@@ -1,0 +1,106 @@
+<div class="card page-wide">
+  <h1>Super Admin</h1>
+  <p class="muted">The tier above Admin/Managing Director: unrestricted everywhere, including self-approval on every gate that otherwise requires a different privileged user. A Super Admin account can never be deactivated or deleted. Temporary delegation lets a Super Admin loan this capability to an Admin for a period, without changing that Admin's actual role — revocable at any time.</p>
+
+  <div class="section">
+    <h2>Permanent Super Admins</h2>
+    <table class="list">
+      <tr><th>Name</th><th>Email</th><th>Action</th></tr>
+      {% for sa in superAdmins %}
+      <tr>
+        <td>{{ sa.name }}</td>
+        <td>{{ sa.email }}</td>
+        <td>
+          {% if superAdmins.length > 1 %}
+          <form method="post" action="/super-admin/set-permanent" style="display:flex;gap:4px;align-items:center" onsubmit="return confirm('Remove Super Admin status from this person?');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="target_id" value="{{ sa.id }}">
+            <input type="hidden" name="is_super_admin" value="0">
+            <input type="text" name="reason" placeholder="Reason (min {{ minReasonLength }} chars)" required minlength="{{ minReasonLength }}" style="width:220px">
+            <button type="submit" class="btn-sm btn-danger">Remove</button>
+          </form>
+          {% else %}
+            <span class="muted small">Last remaining Super Admin — promote someone else first</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <h3 style="margin-top:16px">Promote a user to permanent Super Admin</h3>
+    <form method="post" action="/super-admin/set-permanent" style="display:flex;gap:4px;align-items:center">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <select name="target_id">
+        {% for u in allUsers %}
+          {% if not u.is_super_admin %}
+            <option value="{{ u.id }}">{{ u.name }} ({{ u.email }})</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <input type="hidden" name="is_super_admin" value="1">
+      <input type="text" name="reason" placeholder="Reason (min {{ minReasonLength }} chars)" required minlength="{{ minReasonLength }}" style="width:220px">
+      <button type="submit" class="btn-sm btn-success">Promote</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Active Delegations</h2>
+    <table class="list">
+      <tr><th>Delegate</th><th>Granted By</th><th>Reason</th><th>Granted</th><th>Expires</th><th>Action</th></tr>
+      {% for d in activeDelegations %}
+      <tr>
+        <td>{{ d.delegate_name }}<br><span class="muted small">{{ d.delegate_email }}</span></td>
+        <td>{{ d.granted_by_name }}</td>
+        <td>{{ d.reason }}</td>
+        <td>{{ d.granted_at }}</td>
+        <td>{{ d.expires_at if d.expires_at else 'No fixed expiry' }}</td>
+        <td>
+          <form method="post" action="/super-admin/delegations/{{ d.id }}/revoke" style="display:flex;gap:4px;align-items:center">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="text" name="reason" placeholder="Reason (min {{ minReasonLength }} chars)" required minlength="{{ minReasonLength }}" style="width:180px">
+            <button type="submit" class="btn-sm btn-danger">Revoke</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if activeDelegations.length == 0 %}
+        <tr><td colspan="6" class="muted">No active delegations.</td></tr>
+      {% endif %}
+    </table>
+
+    <h3 style="margin-top:16px">Grant a new delegation</h3>
+    <form method="post" action="/super-admin/delegations" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <select name="delegate_user_id">
+        {% for u in allUsers %}
+          {% if not u.is_super_admin %}
+            <option value="{{ u.id }}">{{ u.name }} — {{ u.role_name if u.role_name else 'No role' }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <input type="text" name="reason" placeholder="Reason (min {{ minReasonLength }} chars) — e.g. covering approvals while MD is on leave" required minlength="{{ minReasonLength }}" style="width:320px">
+      <input type="datetime-local" name="expires_at" title="Leave blank for no fixed expiry — still revocable at any time">
+      <button type="submit" class="btn-sm btn-success">Grant</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Delegation History</h2>
+    <table class="list">
+      <tr><th>Delegate</th><th>Granted By</th><th>Granted</th><th>Ended</th><th>Ended By</th><th>End Reason</th></tr>
+      {% for h in history %}
+      <tr>
+        <td>{{ h.delegate_name }}</td>
+        <td>{{ h.granted_by_name }}</td>
+        <td>{{ h.granted_at }}</td>
+        <td>{{ h.revoked_at if h.revoked_at else 'Expired (' + h.expires_at + ')' }}</td>
+        <td>{{ h.revoked_by_name if h.revoked_by_name else '—' }}</td>
+        <td>{{ h.revoked_reason if h.revoked_reason else '—' }}</td>
+      </tr>
+      {% endfor %}
+      {% if history.length == 0 %}
+        <tr><td colspan="6" class="muted">No past delegations.</td></tr>
+      {% endif %}
+    </table>
+  </div>
+</div>

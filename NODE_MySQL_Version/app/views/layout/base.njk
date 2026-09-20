@@ -24,6 +24,12 @@
     {% if currentUser and permissions.manage_signatories %}
       <a href="/signatories">Signatories</a>
     {% endif %}
+    {% if currentUser and permissions.manage_permissions %}
+      <a href="/admin/permissions">Permissions</a>
+    {% endif %}
+    {% if isSuperAdmin %}
+      <a href="/super-admin">Super Admin</a>
+    {% endif %}
     {% if currentUser %}
       <a href="/reviews">My Reviews</a>
     {% endif %}

@@ -16,7 +16,7 @@
         <td><?= htmlspecialchars($r['requested_by_name']) ?></td>
         <td><?= htmlspecialchars((string) $r['created_at']) ?></td>
         <td>
-          <?php if ((int) $r['requested_by'] === $currentUserId): ?>
+          <?php if ((int) $r['requested_by'] === $currentUserId && !$isSuperAdmin): ?>
             <span class="muted small">Awaiting a different privileged user</span>
           <?php else: ?>
             <form method="post" action="/admin/field-protection/<?= (int) $r['id'] ?>/approve" style="display:inline">

@@ -72,7 +72,7 @@ async function globalDefaultSignatoryUserId() {
 async function setGlobalDefaultSignatory(userId, updatedBy) {
   await db.execute(
     `INSERT INTO company_default_signatory (id, user_id, updated_by) VALUES (1, :uid, :by)
-     ON DUPLICATE KEY UPDATE user_id = :uid, updated_by = :by`,
+     ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), updated_by = VALUES(updated_by)`,
     { uid: userId, by: updatedBy }
   );
   await auditLogRepository.log(updatedBy, 'GLOBAL_DEFAULT_SIGNATORY_SET', 'company_default_signatory', 1, null, null, String(userId));
@@ -97,7 +97,7 @@ async function setDocumentTypeSignatory(documentTypeId, userId, useDesignationSe
     await db.execute(
       `INSERT INTO document_type_signatories (document_type_id, user_id, use_designation_seal, updated_by)
        VALUES (:dt, :uid, :seal, :by)
-       ON DUPLICATE KEY UPDATE user_id = :uid, use_designation_seal = :seal, updated_by = :by`,
+       ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), use_designation_seal = VALUES(use_designation_seal), updated_by = VALUES(updated_by)`,
       { dt: documentTypeId, uid: userId, seal: useDesignationSeal ? 1 : 0, by: updatedBy }
     );
   }

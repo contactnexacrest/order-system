@@ -26,6 +26,12 @@ final class FieldProtectionController
             'pending' => FieldProtectionRepository::pendingRequests(),
             'resolved' => FieldProtectionRepository::recentResolved(),
             'currentUserId' => (int) $user['id'],
+            // A Super Admin can approve their own request (see
+            // FieldProtectionRepository::approve()'s bypass) — the UI must
+            // offer the same Approve/Reject buttons in that case, not show
+            // the "awaiting a different privileged user" placeholder that
+            // would otherwise be actively misleading for them.
+            'isSuperAdmin' => \App\Services\SuperAdminService::isEffective((int) $user['id']),
         ], 'layout/base');
     }
 

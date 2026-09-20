@@ -595,6 +595,15 @@ SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/
        (SELECT id FROM users WHERE email = 'admin@nexacrest.placeholder')
 FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
 
+-- ================================================================
+-- SUPER ADMIN TIER (Section N, added 2026-09-20)
+-- The seeded admin login is the initial permanent Super Admin — real-world
+-- Gulmohar Sontakke is NexaCrest's Founder & Managing Director, the
+-- obvious first holder of the unrestricted tier. Promote/demote further
+-- holders from /super-admin once logged in.
+-- ================================================================
+UPDATE users SET is_super_admin = 1 WHERE email = 'admin@nexacrest.placeholder';
+
 -- Global default signatory = Gulmohar Sontakke (matches legacy md_name).
 INSERT INTO company_default_signatory (id, user_id, updated_by)
 SELECT 1, u.id, u.id FROM users u WHERE u.email = 'admin@nexacrest.placeholder';

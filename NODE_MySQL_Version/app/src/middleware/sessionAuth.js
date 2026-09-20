@@ -5,6 +5,8 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const userRepository = require('../repositories/userRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const permissionService = require('../services/permissionService');
+const permissionRepository = require('../repositories/permissionRepository');
+const superAdminService = require('../services/superAdminService');
 const notificationRepository = require('../repositories/notificationRepository');
 
 // Port of App\Middleware\SessionAuth. Redirects to /login if not
@@ -63,6 +65,20 @@ function required() {
 
       req.user = user;
       req.permissions = await permissionService.load(user.id, user.role_id !== null ? user.role_id : null);
+
+      // A Super Admin (permanent flag or an active delegation) is
+      // unrestricted everywhere: every permission key resolves true, with
+      // no per-key configuration needed. Every currently-registered
+      // permission key is set true here (rather than a Proxy) so both
+      // permissionCheck middleware's plain-object lookups and every view
+      // template's `permissions.xxx` access see the same real object.
+      req.isSuperAdmin = await superAdminService.isEffective(user.id);
+      if (req.isSuperAdmin) {
+        for (const key of await permissionRepository.allKeys()) {
+          req.permissions[key] = true;
+        }
+      }
+
       req.unreadCount = await notificationRepository.unreadCountForUser(user.id);
     }
 

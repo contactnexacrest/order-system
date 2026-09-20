@@ -3,6 +3,7 @@
 const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const fieldProtectionRepository = require('../repositories/fieldProtectionRepository');
+const superAdminService = require('../services/superAdminService');
 
 // Peer-approved lock/unlock governance for the is_protected flag — see
 // Section L, schema.sql, and fieldProtectionRepository's docblock. This
@@ -15,7 +16,8 @@ async function index(req, res) {
     fieldProtectionRepository.pendingRequests(),
     fieldProtectionRepository.recentResolved(),
   ]);
-  res.renderView('field_protection/index', { protectable, pending, resolved, currentUserId: req.user.id }, 'layout/base');
+  const isSuperAdmin = await superAdminService.isEffective(req.user.id);
+  res.renderView('field_protection/index', { protectable, pending, resolved, currentUserId: req.user.id, isSuperAdmin }, 'layout/base');
 }
 
 async function createRequest(req, res) {

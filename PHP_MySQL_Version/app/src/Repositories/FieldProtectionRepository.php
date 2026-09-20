@@ -161,7 +161,7 @@ final class FieldProtectionRepository
         if ($request['status'] !== 'pending') {
             throw new RuntimeException('This request has already been resolved.');
         }
-        if ((int) $request['requested_by'] === $resolvedBy) {
+        if ((int) $request['requested_by'] === $resolvedBy && !\App\Services\SuperAdminService::isEffective($resolvedBy)) {
             throw new RuntimeException('You cannot approve your own protection request — a different privileged user must confirm.');
         }
         self::assertKnownTable($request['table_name']);

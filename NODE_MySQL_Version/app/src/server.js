@@ -35,6 +35,9 @@ const adminOverrideController = require('./controllers/adminOverrideController')
 const fieldProtectionController = require('./controllers/fieldProtectionController');
 const sampleDataController = require('./controllers/sampleDataController');
 const signatoryController = require('./controllers/signatoryController');
+const superAdminController = require('./controllers/superAdminController');
+const permissionAdminController = require('./controllers/permissionAdminController');
+const superAdminOnly = require('./middleware/superAdminOnly');
 
 const app = express();
 const viewsDir = path.join(__dirname, '..', 'views');
@@ -112,6 +115,7 @@ app.use((req, res, next) => {
       flashes: flash.pull(req),
       currentUser: req.user || null,
       permissions: req.permissions || {},
+      isSuperAdmin: req.isSuperAdmin || false,
       unreadCount: req.unreadCount || 0,
     };
     const context = Object.assign({}, common, data);
@@ -185,6 +189,16 @@ app.post('/signatories/users/:id/upload', requireAuth, requirePermission('manage
 app.post('/signatories/user-assets/:id/deactivate', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.deactivateUserAsset));
 app.post('/signatories/global-default', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setGlobalDefault));
 app.post('/signatories/document-types/:id', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setDocumentTypeDefault));
+
+const requireSuperAdmin = asyncHandler(superAdminOnly.required());
+app.get('/super-admin', requireAuth, requireSuperAdmin, asyncHandler(superAdminController.index));
+app.post('/super-admin/delegations', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.grantDelegation));
+app.post('/super-admin/delegations/:id/revoke', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.revokeDelegation));
+app.post('/super-admin/set-permanent', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.setPermanent));
+
+app.get('/admin/permissions', requireAuth, requirePermission('manage_permissions'), asyncHandler(permissionAdminController.index));
+app.post('/admin/permissions/grant', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.grantOverride));
+app.post('/admin/permissions/:id/remove', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.removeOverride));
 
 // --- Phase B: clients / orders / stage gates / document generation ---
 app.get('/clients', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.index));

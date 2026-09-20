@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const superAdminService = require('../services/superAdminService');
 
 // Repository for the "protected fields" governance mechanism (Section L,
 // schema.sql). One shared table/flag/workflow, reused across every table
@@ -109,7 +110,7 @@ async function approve(requestId, resolvedBy, resolvedReason) {
     err.statusCode = 409;
     throw err;
   }
-  if (request.requested_by === resolvedBy) {
+  if (request.requested_by === resolvedBy && !(await superAdminService.isEffective(resolvedBy))) {
     const err = new Error('You cannot approve your own protection request — a different privileged user must confirm.');
     err.statusCode = 403;
     throw err;

@@ -91,6 +91,11 @@ final class UserController
             header('Location: /users');
             return;
         }
+        if ((int) $target['is_super_admin'] === 1) {
+            Flash::set('error', 'A Super Admin account can never be deactivated.');
+            header('Location: /users');
+            return;
+        }
 
         $newState = !((bool) $target['is_active']);
         UserRepository::setActive($userId, $newState);

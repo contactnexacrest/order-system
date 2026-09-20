@@ -1,6 +1,7 @@
-<?php use App\Helpers\Flash; use App\Repositories\NotificationRepository; use App\Services\AuthService; use App\Services\PermissionService;
+<?php use App\Helpers\Flash; use App\Repositories\NotificationRepository; use App\Services\AuthService; use App\Services\PermissionService; use App\Services\SuperAdminService;
 $current = AuthService::currentUser();
 $unreadCount = $current ? NotificationRepository::unreadCountForUser((int) $current['id']) : 0;
+$isEffectiveSuperAdmin = $current && SuperAdminService::isEffective((int) $current['id']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -27,6 +28,12 @@ $unreadCount = $current ? NotificationRepository::unreadCountForUser((int) $curr
     <?php endif; ?>
     <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_signatories')): ?>
       <a href="/signatories">Signatories</a>
+    <?php endif; ?>
+    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_permissions')): ?>
+      <a href="/admin/permissions">Permissions</a>
+    <?php endif; ?>
+    <?php if ($isEffectiveSuperAdmin): ?>
+      <a href="/super-admin">Super Admin</a>
     <?php endif; ?>
     <?php if ($current): ?>
       <a href="/reviews">My Reviews</a>

@@ -1140,8 +1140,72 @@ ALTER TABLE documents
   ADD CONSTRAINT fk_documents_signatory FOREIGN KEY (signatory_user_id) REFERENCES users(id);
 
 -- ================================================================
--- END OF SCHEMA — 57 tables. All open schema questions resolved
+-- SECTION N — SUPER ADMIN TIER (added 2026-09-20)
+-- ================================================================
+-- A tier above Admin/Managing Director: unrestricted everywhere, including
+-- self-approval on every gate that otherwise requires a *different*
+-- privileged user (Field Protection being the first such gate — see
+-- Section L). Deliberately a flag on `users`, not a role: role/permission
+-- rows describe a bundle of capabilities; Super Admin is an orthogonal
+-- override checked directly by PermissionService::can() and by name at
+-- every explicit self-approval gate, not something that composes through
+-- role_permissions/user_permissions.
+ALTER TABLE users
+  ADD COLUMN is_super_admin TINYINT(1) NOT NULL DEFAULT 0;
+
+-- Temporary, revocable delegation: a Super Admin can grant an Admin the
+-- ability to *act as* Super Admin for a period, without changing that
+-- Admin's actual role_id or is_super_admin flag — a capability loan, not a
+-- promotion. SuperAdminService::isEffective() checks both this table and
+-- the permanent flag, so every gate only ever needs one call.
+CREATE TABLE super_admin_delegations (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  delegate_user_id  BIGINT UNSIGNED NOT NULL,
+  granted_by        BIGINT UNSIGNED NOT NULL,
+  reason            VARCHAR(255) NOT NULL,   -- mandatory, minimum length enforced in the application (Section 13 gap: every reason field needs one)
+  granted_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at        TIMESTAMP NULL,          -- NULL = no fixed expiry; still revocable at any time by any Super Admin
+  revoked_at        TIMESTAMP NULL,
+  revoked_by        BIGINT UNSIGNED NULL,
+  revoked_reason    VARCHAR(255) NULL,
+  FOREIGN KEY (delegate_user_id) REFERENCES users(id),
+  FOREIGN KEY (granted_by) REFERENCES users(id),
+  FOREIGN KEY (revoked_by) REFERENCES users(id),
+  INDEX idx_sad_active (delegate_user_id, revoked_at, expires_at)
+) ENGINE=InnoDB;
+
+-- DB-level backstop, independent of the application: a Super Admin account
+-- can never be deleted, and can never be deactivated (is_active set to 0),
+-- full stop — matching the business rule literally ("nobody can delete the
+-- Super Admin", "Super Admin never gets deactivated, at any condition").
+-- Demoting/promoting the is_super_admin flag itself is a separate, allowed,
+-- audited action (App\Controllers\SuperAdminController) — distinct from
+-- delete/deactivate, so a genuine handover (e.g. the account's email
+-- changes hands) is never permanently blocked, only delete/deactivate is.
+DELIMITER $$
+
+CREATE TRIGGER trg_users_super_admin_bd BEFORE DELETE ON users
+FOR EACH ROW
+BEGIN
+  IF OLD.is_super_admin = 1 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot delete a Super Admin account.';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_users_super_admin_bu BEFORE UPDATE ON users
+FOR EACH ROW
+BEGIN
+  IF OLD.is_super_admin = 1 AND NEW.is_active = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot deactivate a Super Admin account.';
+  END IF;
+END$$
+
+DELIMITER ;
+
+-- ================================================================
+-- END OF SCHEMA — 58 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
+-- Section N (Super Admin tier) added 2026-09-20.
 -- ================================================================

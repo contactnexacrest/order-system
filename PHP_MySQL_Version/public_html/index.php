@@ -22,6 +22,9 @@ use App\Controllers\ReviewController;
 use App\Controllers\SampleDataController;
 use App\Controllers\SettingsController;
 use App\Controllers\SignatoryController;
+use App\Controllers\PermissionAdminController;
+use App\Controllers\SuperAdminController;
+use App\Middleware\SuperAdminOnly;
 use App\Controllers\UserController;
 use App\Helpers\Router;
 use App\Middleware\CsrfCheck;
@@ -35,6 +38,8 @@ $dashboard = new DashboardController();
 $settings = new SettingsController();
 $assets = new AssetController();
 $signatories = new SignatoryController();
+$superAdmin = new SuperAdminController();
+$permissionAdmin = new PermissionAdminController();
 $clients = new ClientController();
 $orders = new OrderController();
 $documents = new DocumentController();
@@ -87,6 +92,15 @@ $router->post('/signatories/users/{id}/upload', [$signatories, 'uploadUserAsset'
 $router->post('/signatories/user-assets/{id}/deactivate', [$signatories, 'deactivateUserAsset'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/global-default', [$signatories, 'setGlobalDefault'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/document-types/{id}', [$signatories, 'setDocumentTypeDefault'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+
+$router->get('/super-admin', [$superAdmin, 'index'], [SessionAuth::required(), SuperAdminOnly::required()]);
+$router->post('/super-admin/delegations', [$superAdmin, 'grantDelegation'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+$router->post('/super-admin/delegations/{id}/revoke', [$superAdmin, 'revokeDelegation'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+$router->post('/super-admin/set-permanent', [$superAdmin, 'setPermanent'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+
+$router->get('/admin/permissions', [$permissionAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
+$router->post('/admin/permissions/grant', [$permissionAdmin, 'grantOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/permissions/{id}/remove', [$permissionAdmin, 'removeOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
 
 // --- Phase B: clients / orders / stage gates / document generation ---
 $router->get('/clients', [$clients, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);

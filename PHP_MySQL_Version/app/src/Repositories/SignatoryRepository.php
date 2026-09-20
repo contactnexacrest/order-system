@@ -124,7 +124,7 @@ final class SignatoryRepository
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'INSERT INTO company_default_signatory (id, user_id, updated_by) VALUES (1, :uid, :by)
-             ON DUPLICATE KEY UPDATE user_id = :uid, updated_by = :by'
+             ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), updated_by = VALUES(updated_by)'
         );
         $stmt->execute(['uid' => $userId, 'by' => $updatedBy]);
         AuditLogRepository::log($updatedBy, 'GLOBAL_DEFAULT_SIGNATORY_SET', 'company_default_signatory', 1, null, null, (string) $userId);
@@ -153,7 +153,7 @@ final class SignatoryRepository
             $stmt = $pdo->prepare(
                 'INSERT INTO document_type_signatories (document_type_id, user_id, use_designation_seal, updated_by)
                  VALUES (:dt, :uid, :seal, :by)
-                 ON DUPLICATE KEY UPDATE user_id = :uid, use_designation_seal = :seal, updated_by = :by'
+                 ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), use_designation_seal = VALUES(use_designation_seal), updated_by = VALUES(updated_by)'
             );
             $stmt->execute(['dt' => $documentTypeId, 'uid' => $userId, 'seal' => $useDesignationSeal ? 1 : 0, 'by' => $updatedBy]);
         }

@@ -77,6 +77,11 @@ async function toggleActive(req, res) {
     res.redirect('/users');
     return;
   }
+  if (parseInt(target.is_super_admin, 10) === 1) {
+    flash.set(req, 'error', 'A Super Admin account can never be deactivated.');
+    res.redirect('/users');
+    return;
+  }
 
   const newState = !target.is_active;
   await userRepository.setActive(userId, newState);

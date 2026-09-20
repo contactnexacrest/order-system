@@ -15,7 +15,7 @@
         <td>{{ r.requested_by_name }}</td>
         <td>{{ r.created_at }}</td>
         <td>
-          {% if r.requested_by == currentUserId %}
+          {% if r.requested_by == currentUserId and not isSuperAdmin %}
             <span class="muted small">Awaiting a different privileged user</span>
           {% else %}
             <form method="post" action="/admin/field-protection/{{ r.id }}/approve" style="display:inline">

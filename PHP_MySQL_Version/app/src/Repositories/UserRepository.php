@@ -123,7 +123,7 @@ final class UserRepository
     {
         return Database::connection()->query(
             "SELECT u.id, u.name, u.email, u.phone, u.is_active, u.force_password_change,
-                    u.two_fa_enabled, u.last_login_at, u.locked_until, u.created_at,
+                    u.two_fa_enabled, u.last_login_at, u.locked_until, u.created_at, u.is_super_admin,
                     r.id AS role_id, r.name AS role_name
              FROM users u LEFT JOIN roles r ON r.id = u.role_id
              ORDER BY u.is_active DESC, u.name"
