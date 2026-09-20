@@ -1,0 +1,148 @@
+<div class="card">
+  <h1>Dashboard</h1>
+  <p>Signed in as <strong>{{ user.name }}</strong> ({{ user.email }}).</p>
+</div>
+
+<div class="card page-wide">
+  <h2 style="margin-top:0;">Search — client or order reference</h2>
+  <form method="get" action="/" class="search-box">
+    <input type="text" name="q" value="{{ searchTerm }}" placeholder="Order ref, client no., or company name…">
+    <button type="submit" class="btn-sm">Search</button>
+  </form>
+  {% if searchTerm != '' %}
+    {% if not searchResults or searchResults.length == 0 %}
+      <p class="muted">No matches for "{{ searchTerm }}".</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Order Ref</th><th>Client No.</th><th>Client</th><th>Stage</th><th>Status</th><th></th></tr>
+        {% for r in searchResults %}
+        <tr>
+          <td>{{ r.order_reference }}</td>
+          <td>{{ r.client_unique_number }}</td>
+          <td>{{ r.company_legal_name }}</td>
+          <td>{{ r.current_stage_name or 'Quotation' }}</td>
+          <td>{{ r.status | capitalize }}</td>
+          <td><a href="/orders/{{ r.order_id }}">View</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  {% endif %}
+</div>
+
+<div class="card page-wide">
+  <h2 style="margin-top:0;">My Approvals</h2>
+  <div class="stat-grid">
+    <div class="stat-tile {{ 'warn' if myPendingReviewCount > 0 else '' }}">
+      <div class="num">{{ myPendingReviewCount }}</div>
+      <div class="label">My pending reviews</div>
+    </div>
+    {% if pendingEmailApprovalCount != null %}
+    <div class="stat-tile {{ 'warn' if pendingEmailApprovalCount > 0 else '' }}">
+      <div class="num">{{ pendingEmailApprovalCount }}</div>
+      <div class="label">Emails awaiting Level-2 approval</div>
+    </div>
+    {% endif %}
+    {% if pendingAmendmentApprovalCount != null %}
+    <div class="stat-tile {{ 'warn' if pendingAmendmentApprovalCount > 0 else '' }}">
+      <div class="num">{{ pendingAmendmentApprovalCount }}</div>
+      <div class="label">Amendments awaiting MD approval</div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="btn-row">
+    <a class="btn-sm btn-secondary" href="/reviews">My Reviews</a>
+    {% if pendingEmailApprovalCount != null %}<a class="btn-sm btn-secondary" href="/email-approvals">Email Approvals</a>{% endif %}
+  </div>
+</div>
+
+{% if canManageOrders %}
+<div class="card page-wide">
+  <h2 style="margin-top:0;">Active Orders by Stage ({{ activeOrderCount }} active)</h2>
+  <div class="stat-grid">
+    {% for s in stageBreakdown %}
+    <div class="stat-tile">
+      <div class="num">{{ s.order_count }}</div>
+      <div class="label">{{ s.stage_name }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="btn-row"><a class="btn-sm" href="/clients">Clients</a> <a class="btn-sm btn-secondary" href="/orders">All Orders</a></div>
+</div>
+
+<div class="card page-wide">
+  <h2 style="margin-top:0;">Overdue Payments</h2>
+  {% if (not overdueBalance or overdueBalance.length == 0) and (not overdueFreight or overdueFreight.length == 0) %}
+    <p class="muted">Nothing overdue.</p>
+  {% else %}
+    {% if overdueBalance and overdueBalance.length > 0 %}
+      <h3 style="font-size:0.9rem;color:var(--danger);">Balance payment overdue</h3>
+      <table class="list">
+        <tr><th>Order Ref</th><th>Client</th><th>Due Date</th><th>Amount</th><th></th></tr>
+        {% for r in overdueBalance %}
+        <tr>
+          <td>{{ r.order_reference }}</td>
+          <td>{{ r.company_legal_name }}</td>
+          <td>{{ r.balance_due_date }}</td>
+          <td>{{ r.balance_amount if r.balance_amount != null else '—' }}</td>
+          <td><a href="/orders/{{ r.order_id }}">View</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+    {% if overdueFreight and overdueFreight.length > 0 %}
+      <h3 style="font-size:0.9rem;color:var(--danger);">Freight payment overdue</h3>
+      <table class="list">
+        <tr><th>Order Ref</th><th>Client</th><th>FDN Issued</th><th></th></tr>
+        {% for r in overdueFreight %}
+        <tr>
+          <td>{{ r.order_reference }}</td>
+          <td>{{ r.company_legal_name }}</td>
+          <td>{{ r.fdn_generated_at }}</td>
+          <td><a href="/orders/{{ r.order_id }}">View</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  {% endif %}
+</div>
+
+{% if complianceWarnings.lut or complianceWarnings.rcmc %}
+<div class="card page-wide">
+  <h2 style="margin-top:0;">Compliance Expiry Warnings</h2>
+  <div class="stat-grid">
+    {% if complianceWarnings.lut %}
+    <div class="stat-tile {{ 'danger' if complianceWarnings.lut.days_left < 0 else 'warn' }}">
+      <div class="num">{{ complianceWarnings.lut.days_left }}d</div>
+      <div class="label">LUT expires {{ complianceWarnings.lut.expiry_date }}</div>
+    </div>
+    {% endif %}
+    {% if complianceWarnings.rcmc %}
+    <div class="stat-tile {{ 'danger' if complianceWarnings.rcmc.days_left < 0 else 'warn' }}">
+      <div class="num">{{ complianceWarnings.rcmc.days_left }}d</div>
+      <div class="label">RCMC expires {{ complianceWarnings.rcmc.expiry_date }}</div>
+    </div>
+    {% endif %}
+  </div>
+  <p class="muted">Update these in <a href="/settings">Company Settings</a>.</p>
+</div>
+{% endif %}
+{% endif %}
+
+{% if recentActivity and recentActivity.length > 0 %}
+<div class="card page-wide">
+  <h2 style="margin-top:0;">Recent Activity</h2>
+  <table class="list">
+    <tr><th>When</th><th>User</th><th>Action</th><th>Entity</th></tr>
+    {% for a in recentActivity %}
+    <tr>
+      <td>{{ a.created_at }}</td>
+      <td>{{ a.user_name or 'System' }}</td>
+      <td>{{ a.action_type }}</td>
+      <td>{{ a.entity_type or '—' }}{% if a.entity_id %} #{{ a.entity_id }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="btn-row"><a class="btn-sm btn-secondary" href="/audit-log">Full Audit Log</a> <a class="btn-sm btn-secondary" href="/reports">Reports</a></div>
+</div>
+{% endif %}

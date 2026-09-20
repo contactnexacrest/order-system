@@ -1,0 +1,105 @@
+<div class="card page-wide">
+  <h1>Operations Queues</h1>
+  <p class="muted">Snapshot buckets below are "right now" — no date filter applies to them. The funnel activity section at the bottom is date-ranged.</p>
+
+  <div class="section">
+    <h2>Quotation &amp; Buyer PO</h2>
+    <table class="list">
+      <tr><th>Queue</th><th>Count</th><th>Orders</th></tr>
+      <tr>
+        <td>Quotation drafted, not yet sent to buyer</td>
+        <td>{{ queues.quotationAwaitingSend.length }}</td>
+        <td>{% for o in queues.quotationAwaitingSend %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+      <tr>
+        <td>Quotation sent — waiting on buyer's PO</td>
+        <td>{{ queues.buyerPoAwaited.length }}</td>
+        <td>{% for o in queues.buyerPoAwaited %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+      <tr>
+        <td>Our Order-Acceptance (PO) not yet sent to buyer</td>
+        <td>{{ queues.orderAcceptanceAwaitingSend.length }}</td>
+        <td>{% for o in queues.orderAcceptanceAwaitingSend %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>PI &amp; Order Confirmation</h2>
+    <table class="list">
+      <tr><th>Queue</th><th>Count</th><th>Orders</th></tr>
+      <tr>
+        <td>Sitting at PI stage</td>
+        <td>{{ queues.piStage.length }}</td>
+        <td>{% for o in queues.piStage %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+      <tr>
+        <td>Order Confirmation drafted, not yet sent</td>
+        <td>{{ queues.ocAwaitingSend.length }}</td>
+        <td>{% for o in queues.ocAwaitingSend %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+      <tr>
+        <td>Order Confirmation sent — awaiting buyer's acknowledgement</td>
+        <td>{{ queues.ocAwaitingAck.length }}</td>
+        <td>{% for o in queues.ocAwaitingAck %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Supplier PO</h2>
+    <table class="list">
+      <tr><th>Queue</th><th>Count</th><th>Orders</th></tr>
+      <tr>
+        <td>Reached Supplier PO stage — nothing drafted for our supplier yet</td>
+        <td>{{ queues.supplierPoNeeded.length }}</td>
+        <td>{% for o in queues.supplierPoNeeded %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Commercial Invoice, BL &amp; Balance Payment</h2>
+    <table class="list">
+      <tr><th>Queue</th><th>Count</th><th>Orders</th></tr>
+      <tr>
+        <td>CI issued — scanned BL not yet sent to buyer</td>
+        <td>{{ queues.blAwaitingSend.length }}</td>
+        <td>{% for o in queues.blAwaitingSend %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+      <tr>
+        <td>Scanned BL sent — balance payment not yet received</td>
+        <td>{{ queues.balanceAwaited.length }}</td>
+        <td>{% for o in queues.balanceAwaited %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+      <tr>
+        <td>Balance received — hard-copy document set not yet couriered</td>
+        <td>{{ queues.hardCopyAwaited.length }}</td>
+        <td>{% for o in queues.hardCopyAwaited %}<a href="/orders/{{ o.id }}">{{ o.order_reference }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Funnel Activity — date range</h2>
+    <form method="get" action="/reports/queues" class="section">
+      <div class="kv-grid">
+        <label>Date From<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
+        <label>Date To<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
+      </div>
+      <div class="btn-row">
+        <button type="submit" class="btn-sm">Run</button>
+      </div>
+    </form>
+    <table class="list">
+      <tr><th>Metric</th><th>Count</th></tr>
+      <tr><td>Quotations sent (all)</td><td>{{ funnel.quotationsSent }}</td></tr>
+      <tr><td>Quotations lost (marked lost before reaching PI)</td><td>{{ funnel.quotationsLost }}</td></tr>
+      <tr><td>Quotations won (reached PI)</td><td>{{ funnel.quotationsWon }}</td></tr>
+      <tr><td>PI sent (all)</td><td>{{ funnel.piSent }}</td></tr>
+      <tr><td>PI lost (marked lost after reaching PI, before CI)</td><td>{{ funnel.piLost }}</td></tr>
+      <tr><td>Amendments</td><td>{{ funnel.amendments }}</td></tr>
+    </table>
+    <p class="muted small">"Lost" only counts orders explicitly marked lost (Order screen &rarr; Mark as Lost, reason required). An order still active and simply slow-moving is not counted as lost here.</p>
+  </div>
+</div>

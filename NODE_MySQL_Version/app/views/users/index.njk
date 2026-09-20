@@ -1,0 +1,74 @@
+<div class="card page-wide">
+  <h1>Users</h1>
+  <p class="muted">Create logins, deactivate one, or force a password reset. A temporary password is shown once when you create a user or force-reset one — hand it to them directly (never emailed) since they're forced to set their own on first login regardless.</p>
+
+  <div class="section">
+    <h2>Existing Users</h2>
+    <table class="list">
+      <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>2FA</th><th>Last Login</th><th>Actions</th></tr>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.name }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.role_name or '—' }}</td>
+        <td>
+          {% if u.is_active %}
+            <span class="badge badge-active">Active</span>
+          {% else %}
+            <span class="badge badge-inactive">Deactivated</span>
+          {% endif %}
+          {% if u.force_password_change %}<br><small class="muted">Must change password</small>{% endif %}
+          {% if u.locked_until %}<br><small class="muted">Locked until {{ u.locked_until }}</small>{% endif %}
+        </td>
+        <td>{{ 'On' if u.two_fa_enabled else '—' }}</td>
+        <td>{{ u.last_login_at or 'Never' }}</td>
+        <td>
+          <form method="post" action="/users/{{ u.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if u.is_active else 'Reactivate' }} {{ u.name }}?');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm {{ 'btn-danger' if u.is_active else 'btn-success' }}">{{ 'Deactivate' if u.is_active else 'Reactivate' }}</button>
+          </form>
+          <details style="margin-top:0.4rem;">
+            <summary class="muted small">Force password reset</summary>
+            <form method="post" action="/users/{{ u.id }}/force-reset-password" onsubmit="return confirmForceReset(this, '{{ u.name }}');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <textarea class="reset-reason" name="reason" rows="2" placeholder="Reason for this reset *" required></textarea>
+              <button type="submit" class="btn-sm btn-danger">Force Reset</button>
+            </form>
+          </details>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Create User</h2>
+    <form method="post" action="/users/create">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="kv-grid">
+        <label>Name * <input type="text" name="name" required></label>
+        <label>Email * <input type="email" name="email" required></label>
+        <label>Phone <input type="text" name="phone"></label>
+        <label>Role
+          <select name="role_id">
+            <option value="">— none —</option>
+            {% for r in roles %}
+              <option value="{{ r.id }}">{{ r.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <button type="submit" class="btn-sm">Create User</button>
+    </form>
+  </div>
+</div>
+<script>
+function confirmForceReset(form, name) {
+  var reasonEl = form.querySelector('.reset-reason');
+  if (!reasonEl || reasonEl.value.trim() === '') {
+    alert('A reason is required before resetting.');
+    return false;
+  }
+  return confirm('Force-reset the password for ' + name + '? A new one-time temporary password will be generated and shown once. This is logged.');
+}
+</script>

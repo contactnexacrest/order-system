@@ -1,0 +1,29 @@
+{
+  "name": "nexacrest-export-webapp",
+  "version": "1.0.0",
+  "description": "NexaCrest / StoneCrest export operations webapp (Node/MySQL port)",
+  "type": "commonjs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "mysql2": "^3.11.0",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.4.5",
+    "nunjucks": "^3.2.4",
+    "puppeteer-core": "^25.11.0",
+    "docx": "^9.0.2",
+    "nodemailer": "^10.0.10",
+    "node-cron": "^4.6.0",
+    "multer": "^2.4.0",
+    "csv-stringify": "^6.5.1",
+    "connect-session-knex": "^5.0.0",
+    "knex": "^3.1.0",
+    "express-validator": "^7.2.0",
+    "cookie-parser": "^1.4.7"
+  }
+}

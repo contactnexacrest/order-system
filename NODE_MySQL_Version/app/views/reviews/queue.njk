@@ -1,0 +1,29 @@
+<div class="card page-wide">
+  <h1>My Review Queue</h1>
+  <table class="list">
+    <tr><th>Order</th><th>Type</th><th>Reference</th><th>Rev.</th><th>Assigned</th><th>Action</th></tr>
+    {% for r in pendingReviews %}
+    <tr>
+      <td><a href="/orders/{{ r.order_id }}">Order #{{ r.order_id }}</a></td>
+      <td>{{ r.document_type_code }} — {{ r.document_type_name }}</td>
+      <td>{{ r.document_reference or '—' }}</td>
+      <td>{{ r.revision_number }}</td>
+      <td>{{ r.assigned_at }}</td>
+      <td>
+        <form method="post" action="/reviews/{{ r.id }}/approve" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm btn-success">Approve</button>
+        </form>
+        <form method="post" action="/reviews/{{ r.id }}/reject" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="text" name="comments" placeholder="Reason (mandatory)" required style="width:160px">
+          <button type="submit" class="btn-sm btn-danger">Reject</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    {% if not pendingReviews or pendingReviews.length == 0 %}
+      <tr><td colspan="6" class="muted">No documents are waiting on your review.</td></tr>
+    {% endif %}
+  </table>
+</div>

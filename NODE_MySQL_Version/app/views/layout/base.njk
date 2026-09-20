@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NexaCrest International — Export Operations</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-brand">NEXACREST <span>INTERNATIONAL</span></div>
+  <nav class="topbar-nav">
+    <a href="/">Dashboard</a>
+    {% if currentUser and permissions.manage_orders %}
+      <a href="/clients">Clients</a>
+      <a href="/orders">Orders</a>
+    {% endif %}
+    {% if currentUser and permissions.manage_company_settings %}
+      <a href="/settings">Company Settings</a>
+    {% endif %}
+    {% if currentUser and permissions.manage_assets %}
+      <a href="/company-assets">Assets</a>
+    {% endif %}
+    {% if currentUser %}
+      <a href="/reviews">My Reviews</a>
+    {% endif %}
+    {% if currentUser and permissions.approve_email_send %}
+      <a href="/email-approvals">Email Approvals</a>
+    {% endif %}
+    {% if currentUser and permissions.manage_orders %}
+      <a href="/disputes">Disputes</a>
+    {% endif %}
+    {% if currentUser and permissions.view_audit_log %}
+      <a href="/audit-log">Audit Log</a>
+    {% endif %}
+    {% if currentUser and permissions.view_reports %}
+      <a href="/reports">Reports</a>
+    {% endif %}
+    {% if currentUser and permissions.edit_locked_data %}
+      <a href="/admin/overrides">Admin Overrides</a>
+    {% endif %}
+    {% if currentUser and permissions.manage_field_protection %}
+      <a href="/admin/field-protection">Field Protection</a>
+    {% endif %}
+    {% if currentUser and permissions.manage_users %}
+      <a href="/users">Users</a>
+    {% endif %}
+    {% if currentUser and permissions.manage_sample_data %}
+      <a href="/sample-data">Sample Data</a>
+    {% endif %}
+  </nav>
+  <div class="topbar-user">
+    {% if currentUser %}
+      <a href="/notifications">Notifications{% if unreadCount > 0 %} ({{ unreadCount }}){% endif %}</a>
+      <span>{{ currentUser.name }}</span>
+      <a href="/logout" class="logout-link">Log out</a>
+    {% endif %}
+  </div>
+</header>
+<main class="page">
+  {% for f in flashes %}
+    <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
+  {% endfor %}
+  {{ content | safe }}
+</main>
+</body>
+</html>

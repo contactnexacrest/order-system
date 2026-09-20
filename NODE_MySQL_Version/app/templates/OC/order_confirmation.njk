@@ -1,0 +1,96 @@
+{% extends "_layout.njk" %}
+
+{# The real Order Confirmation header carries no incoterm chip — unlike
+   QT/PI, which show "FOB CHENNAI, INDIA" etc. next to the doctype label.
+   This is a deliberate quirk of the source template, not an omission. #}
+{% block header_incoterm %}{% endblock %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td class="label">OC NUMBER *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
+    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
+  </tr>
+  <tr>
+    <td class="label">PI REFERENCE *</td><td class="value">{{ order.pi_ref or '—' }}</td>
+    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block banner %}
+<div class="confirmed-banner">&#10003; ORDER CONFIRMED &nbsp; — &nbsp; {{ financial.advance_pct }}% advance payment received and cleared{% if payment_status.advance_cleared_at %} on {{ payment_status.advance_cleared_at }}{% endif %}. Production has commenced.</div>
+{% endblock %}
+
+{% block body %}
+
+<div class="section-title">2. BUYER / CONSIGNEE DETAILS</div>
+<table class="kv">
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
+  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
+  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person or 'TBC' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email or 'TBC' }}</td></tr>
+  <tr><td class="k">Phone</td><td class="v">{{ buyer.phone or '—' }}</td></tr>
+</table>
+
+<div class="section-title">3. ORDER SUMMARY</div>
+{% set productList = [] %}
+{% for p in products %}
+  {% set productList = productList.concat([p.description ~ ' (Qty: ' ~ p.quantity ~ ' ' ~ p.unit ~ ')']) %}
+{% endfor %}
+<table class="kv">
+  <tr><td class="k">Quotation No. / Date</td><td class="v">{{ order.quotation_ref or '—' }}{% if order.quotation_date %} &nbsp;&middot;&nbsp; {{ order.quotation_date }}{% endif %}</td></tr>
+  <tr><td class="k">PI No. *</td><td class="v">{{ order.pi_ref or '—' }}</td></tr>
+  <tr><td class="k">Product(s) *</td><td class="v">{{ productList|join('; ') }}</td></tr>
+  <tr><td class="k">Total Order Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.total_value }}</td></tr>
+  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
+  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Certificate of Origin</td><td class="v">{{ order.coo_type }}</td></tr>
+</table>
+
+{#
+  Source template note: the Payment Status section always labels amounts
+  "USD" regardless of the order's quoted/invoiced currency — a fixed
+  reporting-currency convention for this internal confirmation screen,
+  preserved here rather than substituted with order.currency_code as the
+  other sections do.
+#}
+<div class="section-title">4. PAYMENT STATUS</div>
+<table class="kv">
+  <tr><td class="k">{{ financial.advance_pct }}% Advance Amount (USD) *</td><td class="v">{{ payment_status.advance_amount or financial.advance_amount }}</td></tr>
+  <tr><td class="k">Advance T/T Received On *</td><td class="v">{{ payment_status.advance_remittance_received_at or 'TBC' }}</td></tr>
+  <tr><td class="k">Advance Cleared On *</td><td class="v">{{ payment_status.advance_cleared_at or 'TBC' }}</td></tr>
+  <tr class="highlight"><td class="k">Balance Due (USD) *</td><td class="v">{{ payment_status.balance_amount or financial.balance_amount }}</td></tr>
+  <tr><td class="k">Balance Payment Terms</td><td class="v">
+    {% if financial.balance_trigger_option == 'A_BEFORE_SHIPMENT' %}
+      Payable before shipment — within {{ financial.balance_days }} working days of receiving shipment readiness confirmation from NexaCrest.
+    {% else %}
+      Payable against scanned copy of Bill of Lading, within {{ financial.balance_days }} days of BL date.
+    {% endif %}
+  </td></tr>
+  {% if not order.is_fob %}
+  <tr><td class="k">Freight &amp; Insurance ({{ order.incoterm_code }})</td><td class="v">Confirmed amount invoiced separately by Freight Debit Note; not included in the Total Order Value above.</td></tr>
+  {% endif %}
+</table>
+
+<div class="section-title">5. PRODUCTION &amp; ESTIMATED SHIPMENT</div>
+<table class="kv">
+  <tr><td class="k">Production Status</td><td class="v">{{ order.production_status_text }}</td></tr>
+  <tr><td class="k">Estimated Shipment</td><td class="v">{{ order.est_shipment_date_text }}</td></tr>
+</table>
+<p style="font-size:7.8px; color:#5b6774;">Estimated shipment date is indicative and subject to change based on production progress and shipping schedule availability. A firm date will be confirmed at the Freight / BL Instruction stage.</p>
+
+<div class="section-title">6. DOCUMENTS TO BE PROVIDED</div>
+<table class="kv">
+  <tr><td colspan="2">Upon shipment, the following documents will be provided (see Proforma Invoice {{ order.pi_ref or '—' }} for full specifications):<br>
+    1. Commercial Invoice<br>
+    2. Packing List<br>
+    3. Bill of Lading — Original Negotiable, 3 originals<br>
+    4. Certificate of Origin — {{ order.coo_type }}
+  </td></tr>
+</table>
+
+{% endblock %}

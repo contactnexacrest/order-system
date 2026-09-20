@@ -1,0 +1,13 @@
+<?php use App\Helpers\Csrf; ?>
+<div class="card card-narrow">
+  <h1>Forgot your password?</h1>
+  <p>Enter the email address on your account and, if it matches one, we'll send a password reset link that's valid for 45 minutes.</p>
+  <form method="post" action="/forgot-password">
+    <?= Csrf::field() ?>
+    <label>Email
+      <input type="email" name="email" required autofocus>
+    </label>
+    <button type="submit">Send reset link</button>
+  </form>
+  <p class="muted small"><a href="/login">Back to sign in</a></p>
+</div>

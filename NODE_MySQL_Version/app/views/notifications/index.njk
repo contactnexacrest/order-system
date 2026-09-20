@@ -1,0 +1,17 @@
+<div class="card page-wide">
+  <h1>Notifications</h1>
+  <table class="list">
+    <tr><th>When</th><th>Type</th><th>Message</th><th>Order</th></tr>
+    {% for n in notifications %}
+      <tr>
+        <td>{{ n.created_at }}</td>
+        <td>{{ n.type }}</td>
+        <td>{{ n.message }}</td>
+        <td>{% if n.related_order_id %}<a href="/orders/{{ n.related_order_id }}">Order #{{ n.related_order_id }}</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    {% if not notifications or notifications.length == 0 %}
+      <tr><td colspan="4" class="muted">No notifications yet.</td></tr>
+    {% endif %}
+  </table>
+</div>

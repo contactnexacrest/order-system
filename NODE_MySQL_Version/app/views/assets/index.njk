@@ -1,0 +1,33 @@
+<div class="card">
+  <h1>Asset Management</h1>
+  <p class="muted">Placeholder images are in place for every slot below so the app runs end-to-end. Replace each with the real file when it's ready — no code changes needed, just an upload here.</p>
+
+  <div class="asset-grid">
+    {% set typeLabels = {
+      "logo": "Company Logo",
+      "signature": "MD Signature",
+      "seal": "Company Seal",
+      "watermark": "PDF Watermark",
+      "email_header": "Email Header"
+    } %}
+    {% for type, label in typeLabels %}
+      {% set current = active[type][0] if active[type] else null %}
+      <div class="asset-tile">
+        <h3>{{ label }}</h3>
+        {% if current %}
+          <img src="/company-assets/preview?type={{ type | urlencode }}" alt="{{ label }}" class="asset-preview">
+          <p class="muted small">Current: {{ current.name }} · uploaded {{ current.uploaded_at }}</p>
+        {% else %}
+          <p class="muted small">No asset on file yet.</p>
+        {% endif %}
+        <form method="post" action="/company-assets/replace" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="asset_type" value="{{ type }}">
+          <input type="text" name="name" placeholder="{{ label }}">
+          <input type="file" name="file" accept=".png,.jpg,.jpeg,.svg" required>
+          <button type="submit">Replace</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+</div>

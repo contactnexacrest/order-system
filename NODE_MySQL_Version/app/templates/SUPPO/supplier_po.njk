@@ -1,0 +1,75 @@
+{% extends "_layout.njk" %}
+
+{% block header_incoterm %}{% endblock %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td class="label">PO NUMBER *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
+    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
+  </tr>
+  <tr>
+    <td class="label">BUYER ORDER REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+    <td class="label">EXPORT ORDER REF *</td><td class="value">{{ order.pi_ref or order.quotation_ref or '—' }}</td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block body %}
+
+<p class="muted" style="font-size:8.5px;">This Purchase Order is issued by NexaCrest International Private Limited to the named supplier for material procurement. Supplier fills Section 7 only. All other sections are issued by NexaCrest.</p>
+
+<div class="section-title">2. SUPPLIER DETAILS (Pre-filled by NexaCrest)</div>
+<table class="kv">
+  <tr><td class="k">Supplier Legal Name *</td><td class="v">{{ supplier_po.supplier_legal_name }}</td></tr>
+  <tr><td class="k">Address *</td><td class="v">{{ supplier_po.supplier_address }}</td></tr>
+  <tr><td class="k">GSTIN *</td><td class="v">{{ supplier_po.supplier_gstin or 'TBC' }}</td></tr>
+  <tr><td class="k">PAN</td><td class="v">{{ supplier_po.supplier_pan or '—' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ supplier_po.supplier_contact_person or 'TBC' }}</td></tr>
+  <tr><td class="k">Phone *</td><td class="v">{{ supplier_po.supplier_phone or 'TBC' }}</td></tr>
+  <tr><td class="k">Supplier Type *</td><td class="v">{{ supplier_po.supplier_type or 'TBC' }}</td></tr>
+</table>
+
+<div class="section-title">3. MATERIAL SPECIFICATIONS (All fields mandatory — no exceptions)</div>
+<p class="mandatory-note">All specifications below are binding. Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.</p>
+<table class="kv">
+  <tr><td class="k">Material / Stone Type *</td><td class="v">{{ supplier_po.material_stone_type or 'TBC' }}</td></tr>
+  <tr><td class="k">Grade *</td><td class="v">{{ supplier_po.grade }} only — no mixed grades, no seconds</td></tr>
+  <tr><td class="k">Surface Finish *</td><td class="v">{{ supplier_po.surface_finish or 'TBC' }}</td></tr>
+  <tr><td class="k">Dimensions *</td><td class="v">{{ supplier_po.dimensions or 'TBC' }}</td></tr>
+  <tr><td class="k">Dimensional Tolerance</td><td class="v">{{ supplier_po.dimensional_tolerance or '±2 mm on L and W · ±0.5 mm on thickness' }}</td></tr>
+  <tr><td class="k">Quantity *</td><td class="v">{{ supplier_po.quantity }}</td></tr>
+  <tr><td class="k">Unit *</td><td class="v">{{ supplier_po.unit or 'TBC' }}</td></tr>
+  <tr><td class="k">Colour Reference</td><td class="v">{{ supplier_po.colour_reference }}</td></tr>
+  <tr><td class="k">Special Requirements</td><td class="v">{{ supplier_po.special_requirements }}</td></tr>
+</table>
+
+<div class="section-title">4. COMMERCIAL TERMS</div>
+<table class="totals">
+  <tr><td class="k">Unit Price (INR) *</td><td class="v">{{ supplier_po.unit_price_inr }}</td></tr>
+  <tr><td class="k">Basic Value (INR) *</td><td class="v">{{ supplier_po.basic_value_inr }}</td></tr>
+  <tr><td class="k">GST ({{ supplier_po.gst_rate_pct or 'X' }}%) (INR) *</td><td class="v">{{ supplier_po.gst_amount_inr }}</td></tr>
+  <tr class="highlight"><td class="k">TOTAL PAYABLE (INR) *</td><td class="v">{{ supplier_po.total_payable_inr }}</td></tr>
+  <tr><td class="k">Advance ({{ supplier_po.advance_pct or 'X' }}%) (INR) *</td><td class="v">{{ supplier_po.advance_amount_inr }} — payable before production commences</td></tr>
+  <tr><td class="k">Balance (INR) *</td><td class="v">{{ supplier_po.balance_amount_inr }} — payable ONLY after delivery + inspection + written acceptance by NexaCrest</td></tr>
+</table>
+
+<div class="section-title">5. DELIVERY TERMS</div>
+<table class="kv">
+  <tr><td class="k">Delivery Location *</td><td class="v">{{ supplier_po.delivery_location or 'TBC' }}</td></tr>
+  <tr><td class="k">Required Delivery Date *</td><td class="v">{{ supplier_po.required_delivery_date or 'TBC' }}</td></tr>
+  <tr><td class="k">Delivery Confirmation</td><td class="v">Supplier must confirm delivery readiness in writing (WhatsApp acceptable) at least 7 days before the required delivery date.</td></tr>
+  <tr><td class="k">Packing</td><td class="v">{{ supplier_po.packing_requirement }}</td></tr>
+</table>
+
+<div class="section-title">7. SUPPLIER ACCEPTANCE</div>
+<table class="kv">
+  <tr><td class="k">Authorised Signature</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">Name</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">Designation</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">Date</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">Supplier Stamp</td><td class="v">(mandatory)</td></tr>
+</table>
+<p class="mandatory-note">By signing above, the supplier confirms acceptance of all specifications, commercial terms, delivery terms and quality conditions stated in this Purchase Order. Acceptance of advance payment constitutes full acceptance of all terms herein.</p>
+
+{% endblock %}

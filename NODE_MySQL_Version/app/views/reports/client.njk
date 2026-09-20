@@ -1,0 +1,89 @@
+<div class="card page-wide">
+  <h1>Client Report — {{ client.company_legal_name }}</h1>
+  <p class="muted">Buyer Inquiry Ref: <strong>{{ client.client_unique_number }}</strong></p>
+  <div class="btn-row">
+    <a class="btn-sm btn-secondary" href="/reports/client/{{ client.id }}?format=csv">Export Orders CSV</a>
+    <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}">View Client</a>
+  </div>
+
+  <div class="section">
+    <h2>Totals</h2>
+    <div class="kv-grid">
+      <div><span class="k">Total FOB Value (all orders)</span><span class="v">{{ total_fob_value }}</span></div>
+      <div><span class="k">Total Payments Cleared</span><span class="v">{{ total_cleared }}</span></div>
+      <div><span class="k">Order Count</span><span class="v">{{ orders.length }}</span></div>
+      <div><span class="k">Contact Email</span><span class="v">{{ (client.email or '—') if canViewFullEmail else (client.email | maskEmail) }}</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Order History</h2>
+    <table class="list">
+      <tr><th>Order Ref</th><th>Status</th><th>Stage</th><th>Incoterm</th><th>Currency</th><th>Created</th><th></th></tr>
+      {% for o in orders %}
+      <tr>
+        <td>{{ o.order_reference }}</td>
+        <td>{{ o.status | capitalize }}</td>
+        <td>{{ o.current_stage_name or 'Quotation' }}</td>
+        <td>{{ o.incoterm_code }}</td>
+        <td>{{ o.currency_code }}</td>
+        <td>{{ o.created_at }}</td>
+        <td><a href="/orders/{{ o.id }}">View</a> · <a href="/reports/order/{{ o.id }}">Full Report</a></td>
+      </tr>
+      {% endfor %}
+      {% if not orders or orders.length == 0 %}<tr><td colspan="7" class="muted">No orders yet.</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Documents (all orders)</h2>
+    <table class="list">
+      <tr><th>Type</th><th>Reference</th><th>Rev.</th><th>Status</th><th>Generated</th></tr>
+      {% for d in documents %}
+      <tr>
+        <td>{{ d.type_code }}</td>
+        <td>{{ d.document_reference or '—' }}</td>
+        <td>{{ d.revision_number }}</td>
+        <td>{{ d.status }}</td>
+        <td>{{ d.generated_at }}</td>
+      </tr>
+      {% endfor %}
+      {% if not documents or documents.length == 0 %}<tr><td colspan="5" class="muted">No documents yet.</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Payments</h2>
+    <table class="list">
+      <tr><th>Advance</th><th>Advance Cleared</th><th>Balance</th><th>Balance Cleared</th><th>Freight</th><th>Freight Cleared</th></tr>
+      {% for p in payments %}
+      <tr>
+        <td>{{ p.advance_amount if p.advance_amount != null else '—' }}</td>
+        <td>{{ p.advance_cleared_at or '—' }}</td>
+        <td>{{ p.balance_amount if p.balance_amount != null else '—' }}</td>
+        <td>{{ p.balance_cleared_at or '—' }}</td>
+        <td>{{ p.freight_amount if p.freight_amount != null else '—' }}</td>
+        <td>{{ p.freight_cleared_at or '—' }}</td>
+      </tr>
+      {% endfor %}
+      {% if not payments or payments.length == 0 %}<tr><td colspan="6" class="muted">No payment records yet.</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Products (all orders)</h2>
+    <table class="list">
+      <tr><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>FOB Value</th></tr>
+      {% for p in products %}
+      <tr>
+        <td>{{ p.description }}</td>
+        <td>{{ 'TBC' if p.quantity_is_tbc else p.quantity }}</td>
+        <td>{{ p.unit or '—' }}</td>
+        <td>{{ p.unit_price if p.unit_price != null else '—' }}</td>
+        <td>{{ p.fob_value if p.fob_value != null else '—' }}</td>
+      </tr>
+      {% endfor %}
+      {% if not products or products.length == 0 %}<tr><td colspan="5" class="muted">No product lines yet.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>

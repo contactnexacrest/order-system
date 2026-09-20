@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { margin: 28px 32px 40px 32px; }
+  body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1b2430; }
+  .doc-header { background: #14263d; color: #ffffff; padding: 10px 14px; margin-bottom: 10px; }
+  .doc-header .company { font-size: 13px; font-weight: bold; letter-spacing: 0.03em; }
+  .doc-header .doctype { font-size: 11px; color: #e0a052; font-weight: bold; }
+  .doc-header .incoterm { font-size: 9px; color: #cfd8e3; }
+
+  table.meta { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  table.meta td { border: 1px solid #dcd6c9; padding: 4px 8px; font-size: 9px; }
+  table.meta td.label { color: #5b6774; width: 18%; }
+  table.meta td.value { font-weight: bold; width: 32%; }
+
+  .valid-until { background: #f6e9d3; border: 1px solid #a8701f; color: #a8701f; padding: 5px 10px; font-size: 9px; margin-bottom: 8px; font-weight: bold; }
+  .gst-declaration { background: #e7edf3; border: 1px solid #1e3a5f; color: #14263d; padding: 5px 10px; font-size: 8.5px; margin-bottom: 8px; }
+  .confirmed-banner { background: #e3f0e5; border: 1px solid #2f6b3e; color: #2f6b3e; padding: 5px 10px; font-size: 9px; margin-bottom: 8px; font-weight: bold; }
+
+  .section-title { background: #e7edf3; color: #14263d; font-size: 10px; font-weight: bold; padding: 4px 8px; margin-top: 10px; margin-bottom: 4px; border-left: 3px solid #1e3a5f; }
+
+  table.kv { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.kv td { border: 1px solid #dcd6c9; padding: 3px 7px; font-size: 8.7px; vertical-align: top; }
+  table.kv td.k { color: #5b6774; width: 28%; }
+  table.kv td.v { width: 72%; }
+
+  table.products { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.products th { background: #1e3a5f; color: #fff; font-size: 8.5px; padding: 4px 6px; text-align: left; }
+  table.products td { border: 1px solid #dcd6c9; padding: 4px 6px; font-size: 8.7px; }
+  table.products td.num { text-align: right; }
+  table.products tr.spec td { font-size: 8px; color: #5b6774; font-style: italic; border-top: none; }
+
+  table.totals { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.totals td { border: 1px solid #dcd6c9; padding: 4px 8px; font-size: 8.8px; }
+  table.totals td.k { width: 60%; }
+  table.totals td.v { width: 40%; text-align: right; }
+  table.totals tr.highlight td { background: #f6e9d3; font-weight: bold; color: #a8701f; }
+
+  ul.terms { margin: 0; padding-left: 14px; }
+  ul.terms li { font-size: 7.6px; color: #333; margin-bottom: 3px; text-align: justify; }
+
+  .signature-block { margin-top: 16px; }
+  .signature-block table { width: 100%; border-collapse: collapse; }
+  .signature-block td { vertical-align: bottom; font-size: 8.8px; padding: 2px 8px; }
+  .signature-img { height: 34px; }
+
+  .mandatory-note { font-size: 7.8px; color: #a5402b; margin-bottom: 6px; }
+
+  {% if watermark.enabled %}
+  .watermark { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
+    opacity: {{ watermark.opacity }}; transform: rotate(-{{ watermark.angle }}deg); z-index: 0; }
+  {% endif %}
+</style>
+</head>
+<body>
+
+{% if watermark.enabled %}<div class="watermark">{{ watermark.text }}</div>{% endif %}
+
+<div class="doc-header">
+  <span class="company">{{ company.legal_name|upper }}</span><br>
+  <span class="doctype">{{ doc_title }}</span>
+  {% block header_incoterm %}{% if order.incoterm_code %}<span class="incoterm"> &nbsp;&middot;&nbsp; {{ order.incoterm_code }} {{ order.port_of_loading|upper }}</span>{% endif %}{% endblock %}
+</div>
+
+<div class="mandatory-note">Fields marked * are mandatory and must be completed before this document is issued.</div>
+
+{% block meta_table %}{% endblock %}
+
+{% block banner %}{% endblock %}
+
+{% block section1 %}
+<div class="section-title">1. {{ section1_title or 'SELLER / EXPORTER' }}</div>
+<table class="kv">
+  <tr><td class="k">Company / Legal Entity</td><td class="v">{{ company.legal_name }}</td></tr>
+  <tr><td class="k">Registered Office</td><td class="v">{{ company.registered_office }}</td></tr>
+  <tr><td class="k">Corporate Office</td><td class="v">{{ company.corporate_office }}</td></tr>
+  <tr><td class="k">GSTIN</td><td class="v">{{ company.gstin }}</td></tr>
+  <tr><td class="k">IEC / PAN</td><td class="v">{{ company.iec_pan }}</td></tr>
+  <tr><td class="k">Contact Person</td><td class="v">{{ company.md_name }} &mdash; {{ company.md_title }}</td></tr>
+  <tr><td class="k">Phone</td><td class="v">{{ company.phone }}</td></tr>
+  <tr><td class="k">Email</td><td class="v">{{ company.email }}</td></tr>
+</table>
+{% endblock %}
+
+{% block body %}{% endblock %}
+
+{% if terms and terms.length %}
+<div class="section-title">{{ terms_section_number }}. {{ terms_section_title }}</div>
+<ul class="terms">
+  {% for clause in terms %}
+    <li>{{ clause }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<div class="signature-block">
+  <table>
+    <tr>
+      <td style="width:50%;">For<br><strong>{{ company.legal_name }}</strong></td>
+      <td style="width:50%;">Authorised Signatory</td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+      <td>
+        {% if assets.signature_data_uri %}<img class="signature-img" src="{{ assets.signature_data_uri }}"><br>{% endif %}
+        {{ company.md_name }}<br>
+        {{ company.md_title }}<br>
+        {{ company.legal_name }}
+      </td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>

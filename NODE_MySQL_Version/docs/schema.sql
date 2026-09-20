@@ -1,0 +1,1067 @@
+-- ================================================================
+-- NEXACREST EXPORT OPERATIONS WEBAPP — MySQL SCHEMA (PROPOSAL)
+-- Version: 1.0 draft — for review before any code is written
+-- Engine: InnoDB throughout (FK support, transactions)
+-- Charset: utf8mb4 (handles diacritics in buyer names/addresses,
+--          the ⬛/⬜/☐ style markers, and multi-currency symbols)
+-- ================================================================
+-- Conventions:
+--   - Every table: id BIGINT UNSIGNED AUTO_INCREMENT PK
+--   - created_at / updated_at on every mutable table
+--   - *_by columns reference users.id (nullable where system-generated)
+--   - Soft delete via is_active, never hard delete (spec: files, client
+--     contact data, audit log all explicitly non-deletable)
+--   - Money stored as DECIMAL(14,2); percentages as DECIMAL(5,2)
+-- ================================================================
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ================================================================
+-- SECTION A — CONFIGURATION / COMPANY (Spec Section 1, 12, "everything
+-- from DB" rule). company_settings is a key-value table on purpose:
+-- new config values can be added by Admin without a schema change,
+-- matching "if Admin changes any value in DB, behaviour changes
+-- immediately without any code change."
+-- ================================================================
+
+CREATE TABLE company_settings (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  setting_key       VARCHAR(100) NOT NULL UNIQUE,
+  setting_value     TEXT NULL,
+  value_type        ENUM('string','number','boolean','date','json') NOT NULL DEFAULT 'string',
+  category          VARCHAR(50) NOT NULL,     -- e.g. 'company','bank','lut','security','tolerances','formats'
+  description       TEXT NULL,       -- widened from VARCHAR(255): several seeded settings carry a longer
+                                      -- explanatory note (e.g. why a value is a placeholder, or why a key
+                                      -- was added beyond the spec's named list) that runs past 255 chars
+  is_sensitive      TINYINT(1) NOT NULL DEFAULT 0,  -- true for bank/RBI fields -> extra confirm on edit
+  is_protected      TINYINT(1) NOT NULL DEFAULT 0,  -- true = cannot be edited without the unlock gesture
+                                                     -- (reason + unlock + confirm) and cannot be blanked;
+                                                     -- flipping this flag itself requires a peer-approved
+                                                     -- request (see field_protection_requests, Section L)
+  updated_by        BIGINT UNSIGNED NULL,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_cs_category (category)
+) ENGINE=InnoDB;
+-- Seed keys (see seed.sql): legal_name, registered_office, corporate_office,
+-- gstin, iec_pan, md_name, md_title, director_name, director_title, phone,
+-- email, bank_name, bank_branch (added Phase B — the source PI template
+-- shows Branch as its own row, separate from bank_address), bank_account_no, swift_bic, ifsc, bank_address,
+-- bank_pincode, lut_number, lut_valid_fy, lut_expiry_date,
+-- rbi_purpose_code_advance, rbi_purpose_code_balance, rbi_purpose_code_freight,
+-- default_currency, storage_base_path, quantity_shortfall_tolerance_pct,
+-- lut_alert_days_x, lut_escalation_days_y, rcmc_alert_days_a,
+-- rcmc_escalation_days_b, fdn_overdue_days_c, session_timeout_minutes,
+-- failed_login_lockout_count, password_min_length, password_complexity_json,
+-- password_expiry_days, non_usd_price_buffer_pct, revision_start_number,
+-- master_tracking_ref_format, client_number_format, order_ref_format,
+-- dispute_response_days_n
+
+CREATE TABLE ports (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name          VARCHAR(150) NOT NULL,
+  country       VARCHAR(100) NULL,
+  port_role     ENUM('loading','discharge','both') NOT NULL DEFAULT 'both',
+  is_default    TINYINT(1) NOT NULL DEFAULT 0,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order    INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB;
+
+CREATE TABLE incoterms (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code                VARCHAR(10) NOT NULL,        -- FOB / CFR / CIF
+  label_template       VARCHAR(255) NOT NULL,       -- "{code} {port} — Incoterms® 2020"
+  requires_port_role   ENUM('loading','discharge') NOT NULL,
+  is_default           TINYINT(1) NOT NULL DEFAULT 0,
+  is_active            TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order           INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB;
+
+CREATE TABLE currencies (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code          VARCHAR(10) NOT NULL UNIQUE,   -- USD, EUR, GBP...
+  name          VARCHAR(50) NOT NULL,
+  is_default    TINYINT(1) NOT NULL DEFAULT 0,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+-- Payment presets: this table is the fix for the Tier1/Tier2 template
+-- contamination found in the source document set. There is ONE OC
+-- template and ONE CI template; each order carries a preset_id, and
+-- the preset's balance_trigger_option (A = before shipment / B =
+-- against BL) drives which wording and which day-count renders on
+-- every document. No more copy-pasted terms that can drift.
+CREATE TABLE payment_presets (
+  id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  preset_name             VARCHAR(100) NOT NULL,     -- "Standard — New Buyer", "Established Buyer — Post-BL"
+  is_default              TINYINT(1) NOT NULL DEFAULT 0,
+  advance_pct             DECIMAL(5,2) NOT NULL DEFAULT 40.00,
+  advance_trigger_text    VARCHAR(255) NOT NULL DEFAULT 'against Proforma Invoice before production commences',
+  balance_pct             DECIMAL(5,2) NOT NULL DEFAULT 60.00,
+  balance_trigger_option  ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NOT NULL DEFAULT 'A_BEFORE_SHIPMENT',
+  balance_days            INT NOT NULL DEFAULT 3,    -- 3 for option A, 7 for option B (both configurable)
+  currency_id             BIGINT UNSIGNED NOT NULL,
+  requires_md_approval    TINYINT(1) NOT NULL DEFAULT 0,  -- true for "established buyer" style presets
+  is_active               TINYINT(1) NOT NULL DEFAULT 1,
+  is_protected            TINYINT(1) NOT NULL DEFAULT 0,  -- true = cannot be edited/deactivated without
+                                                           -- the unlock gesture; flag itself needs a
+                                                           -- peer-approved request (Section L)
+  created_by              BIGINT UNSIGNED NULL,
+  created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (currency_id) REFERENCES currencies(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE document_types (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code                  VARCHAR(20) NOT NULL UNIQUE,  -- QT, PI, OC, PL, CI, FDN, BLI, BUYERPO, SUPPO, ANNEXA,
+                                                       -- COOPREP, CHECKLIST, AMD, SOP_A_SALES, SOP_B_SALES, ...
+                                                       -- STAGEGATE, WALLREF
+  name                  VARCHAR(150) NOT NULL,
+  category              ENUM('customer_facing','internal','procurement') NOT NULL,
+  ref_format            VARCHAR(100) NULL,            -- e.g. 'SC/QT/{YYYY}/{DDMM}{NNN}' ; NULL for AMD-style internal-only or no-ref docs
+  never_shown_to_buyer  TINYINT(1) NOT NULL DEFAULT 0, -- hard flag for AMD (Business Rule #20)
+  revision_enabled      TINYINT(1) NOT NULL DEFAULT 1,
+  min_reviewers_default INT NOT NULL DEFAULT 1,
+  is_active             TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+CREATE TABLE document_sections (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  document_type_id  BIGINT UNSIGNED NOT NULL,
+  section_key       VARCHAR(100) NOT NULL,
+  section_name      VARCHAR(150) NOT NULL,
+  section_order     INT NOT NULL DEFAULT 0,
+  is_active         TINYINT(1) NOT NULL DEFAULT 1,
+  FOREIGN KEY (document_type_id) REFERENCES document_types(id),
+  UNIQUE KEY uq_doc_section (document_type_id, section_key)
+) ENGINE=InnoDB;
+
+CREATE TABLE tc_clauses (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  clause_number   VARCHAR(20) NULL,
+  clause_order    INT NOT NULL DEFAULT 0,
+  clause_title    VARCHAR(255) NOT NULL,
+  clause_text     TEXT NOT NULL,
+  status          ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  is_locked       TINYINT(1) NOT NULL DEFAULT 0,  -- legacy flag, superseded by is_protected below
+                                                   -- (kept, unused by app logic, for historical reference)
+  is_protected    TINYINT(1) NOT NULL DEFAULT 0,  -- true = cannot be edited/deactivated/deleted without
+                                                   -- the unlock gesture (reason + unlock + confirm), and
+                                                   -- cannot be blanked; flag itself needs a peer-approved
+                                                   -- request (see field_protection_requests, Section L)
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  modified_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  modified_by     BIGINT UNSIGNED NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE tc_clause_documents (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  clause_id         BIGINT UNSIGNED NOT NULL,
+  document_type_id  BIGINT UNSIGNED NOT NULL,
+  FOREIGN KEY (clause_id) REFERENCES tc_clauses(id),
+  FOREIGN KEY (document_type_id) REFERENCES document_types(id),
+  UNIQUE KEY uq_clause_doc (clause_id, document_type_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE email_templates (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  template_key  VARCHAR(100) NOT NULL UNIQUE, -- 'send_qt','send_pi','send_oc','send_ci','send_fdn',
+                                               -- 'payment_followup','shipment_readiness','bl_copy_sent',
+                                               -- 'balance_receipt_confirmation'
+  subject       VARCHAR(255) NOT NULL,
+  body          TEXT NOT NULL,
+  footer        TEXT NULL,
+  updated_by    BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE watermark_settings (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  scope             ENUM('global','document_type','document') NOT NULL,
+  document_type_id  BIGINT UNSIGNED NULL,
+  document_id       BIGINT UNSIGNED NULL,      -- FK added after documents table (below) via ALTER
+  is_draft_mode      TINYINT(1) NOT NULL DEFAULT 0, -- DRAFT watermark vs final client watermark
+  mode              ENUM('text','image','both') NOT NULL DEFAULT 'text',
+  text_content      VARCHAR(255) NULL,
+  font              VARCHAR(100) NULL,
+  font_size         INT NULL,
+  color             VARCHAR(20) NULL,
+  opacity           DECIMAL(4,2) NULL,          -- 0.00 - 1.00
+  angle             INT NULL,                   -- degrees
+  image_asset_id    BIGINT UNSIGNED NULL,       -- FK added after assets table
+  image_opacity     DECIMAL(4,2) NULL,
+  image_position    VARCHAR(30) NULL DEFAULT 'center',
+  created_by        BIGINT UNSIGNED NULL,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_type_id) REFERENCES document_types(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE docx_generation_settings (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  document_type_id  BIGINT UNSIGNED NOT NULL UNIQUE,
+  is_enabled        TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by        BIGINT UNSIGNED NULL,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_type_id) REFERENCES document_types(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE file_upload_contexts (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  context_key           VARCHAR(100) NOT NULL UNIQUE, -- 'received_remittance','draft_bl','fumigation_cert','product_image','signature_asset',...
+  allowed_extensions    VARCHAR(255) NOT NULL,          -- csv e.g. 'pdf,jpg,png'
+  max_size_bytes        BIGINT UNSIGNED NOT NULL,
+  description           VARCHAR(255) NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE dropdown_options (
+  -- generic small-option-list table for every "options from DB, Admin can
+  -- add/edit" dropdown that isn't already its own table (COO type,
+  -- container type, supplier type, dispute status, upload document-type
+  -- labels, "received from" list, etc.) — avoids 15 near-identical
+  -- one-column tables.
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  list_key      VARCHAR(100) NOT NULL,   -- 'coo_type','container_type','supplier_type','dispute_status',
+                                          -- 'upload_doc_type_generated','upload_doc_type_received',
+                                          -- 'received_from','freight_terms'
+  option_value  VARCHAR(150) NOT NULL,
+  sort_order    INT NOT NULL DEFAULT 0,
+  is_default    TINYINT(1) NOT NULL DEFAULT 0,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  INDEX idx_list_key (list_key)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION B — AUTH / RBAC (Spec Section 5, 14)
+-- ================================================================
+
+CREATE TABLE roles (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name          VARCHAR(100) NOT NULL UNIQUE,
+  description   VARCHAR(255) NULL,
+  is_system_role TINYINT(1) NOT NULL DEFAULT 0,  -- true for ADMIN — cannot be deleted
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE permissions (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  permission_key  VARCHAR(100) NOT NULL UNIQUE,  -- 'view_client_email_full','download_pdf','edit_locked_data',...
+  name            VARCHAR(150) NOT NULL,
+  description     VARCHAR(255) NULL,
+  category        VARCHAR(50) NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE role_permissions (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  role_id         BIGINT UNSIGNED NOT NULL,
+  permission_id   BIGINT UNSIGNED NOT NULL,
+  is_enabled      TINYINT(1) NOT NULL DEFAULT 1,
+  FOREIGN KEY (role_id) REFERENCES roles(id),
+  FOREIGN KEY (permission_id) REFERENCES permissions(id),
+  UNIQUE KEY uq_role_perm (role_id, permission_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE users (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name                  VARCHAR(150) NOT NULL,
+  email                 VARCHAR(190) NOT NULL UNIQUE,
+  phone                 VARCHAR(30) NULL,
+  password_hash         VARCHAR(255) NOT NULL,
+  role_id               BIGINT UNSIGNED NULL,
+  is_active             TINYINT(1) NOT NULL DEFAULT 1,
+  force_password_change TINYINT(1) NOT NULL DEFAULT 1,
+  two_fa_enabled        TINYINT(1) NOT NULL DEFAULT 0,
+  two_fa_method         ENUM('email','sms') NULL,   -- user's chosen 2FA delivery method; NULL when two_fa_enabled = 0.
+                                                     -- 'sms' is only offered by the app when an SMS gateway API key exists in .env —
+                                                     -- SMS is optional/pluggable, never a hard dependency; email 2FA always works.
+  two_fa_secret         VARCHAR(255) NULL,          -- OTP/session secret used to validate the emailed or texted code
+  failed_login_count    INT NOT NULL DEFAULT 0,
+  locked_until          TIMESTAMP NULL,
+  last_login_at         TIMESTAMP NULL,
+  password_changed_at   TIMESTAMP NULL,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (role_id) REFERENCES roles(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE user_permissions (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id         BIGINT UNSIGNED NOT NULL,
+  permission_id   BIGINT UNSIGNED NOT NULL,
+  is_enabled      TINYINT(1) NOT NULL,   -- individual override: 1 = force-enable, 0 = force-disable
+  granted_by      BIGINT UNSIGNED NULL,
+  granted_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reason          VARCHAR(255) NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (permission_id) REFERENCES permissions(id),
+  UNIQUE KEY uq_user_perm (user_id, permission_id)
+) ENGINE=InnoDB;
+
+-- Phase E follow-up — self-service "forgot password" (Section 14). Only
+-- the SHA-256 hash of the reset token is ever stored, never the raw token
+-- itself (mirrors password_hash — a DB leak alone must never be enough to
+-- hand out a working reset link). expires_at is short-lived (45 minutes,
+-- set by the application) and used_at is set the moment a token is
+-- consumed, so it can never be replayed even inside its expiry window.
+CREATE TABLE password_reset_tokens (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id         BIGINT UNSIGNED NOT NULL,
+  token_hash      CHAR(64) NOT NULL,     -- SHA-256 hex digest of the raw token mailed to the user
+  requested_ip    VARCHAR(45) NULL,
+  expires_at      TIMESTAMP NOT NULL,
+  used_at         TIMESTAMP NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  UNIQUE KEY uq_token_hash (token_hash),
+  INDEX idx_user_active (user_id, used_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE login_attempts (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id         BIGINT UNSIGNED NULL,
+  email_attempted VARCHAR(190) NULL,
+  ip_address      VARCHAR(45) NULL,
+  success         TINYINT(1) NOT NULL,
+  attempted_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_la_user (user_id),
+  INDEX idx_la_time (attempted_at)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION C — ASSETS & FILES (Spec Section 3, 12)
+-- ================================================================
+
+CREATE TABLE assets (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  asset_type    ENUM('logo','signature','seal','watermark','email_header') NOT NULL,
+  name          VARCHAR(150) NOT NULL,
+  server_path   VARCHAR(500) NOT NULL,
+  mime_type     VARCHAR(100) NULL,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  uploaded_by   BIGINT UNSIGNED NULL,
+  uploaded_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+ALTER TABLE watermark_settings
+  ADD CONSTRAINT fk_ws_image_asset FOREIGN KEY (image_asset_id) REFERENCES assets(id);
+
+CREATE TABLE clients (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  client_unique_number  VARCHAR(50) NOT NULL UNIQUE,   -- NC/SC/YYYY/DDMMNNN
+  company_legal_name    VARCHAR(255) NOT NULL,
+  billing_address       TEXT NOT NULL,
+  consignee_name        VARCHAR(255) NULL,             -- 'SAME' or explicit
+  consignee_address     TEXT NULL,
+  vat_eori_tax_no       VARCHAR(100) NULL,
+  contact_person        VARCHAR(150) NULL,
+  email                 VARCHAR(190) NULL,
+  phone                 VARCHAR(30) NULL,
+  country_of_destination VARCHAR(100) NULL,
+  coo_type              VARCHAR(50) NULL,               -- from dropdown_options('coo_type')
+  notify_party          VARCHAR(255) NULL,
+  duplicate_of_client_id BIGINT UNSIGNED NULL,
+  is_active             TINYINT(1) NOT NULL DEFAULT 1,  -- contact fields never hard-deleted; this soft-flags whole record
+  is_sample_data        TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real client
+  created_by            BIGINT UNSIGNED NULL,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  modified_by           BIGINT UNSIGNED NULL,
+  modified_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (duplicate_of_client_id) REFERENCES clients(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE suppliers (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  supplier_legal_name VARCHAR(255) NOT NULL,
+  address             TEXT NULL,
+  gstin               VARCHAR(20) NULL,
+  pan                 VARCHAR(20) NULL,
+  contact_person      VARCHAR(150) NULL,
+  phone               VARCHAR(30) NULL,
+  supplier_type       VARCHAR(50) NULL,    -- from dropdown_options('supplier_type')
+  is_active           TINYINT(1) NOT NULL DEFAULT 1,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE products (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  product_code          VARCHAR(50) NOT NULL UNIQUE,   -- e.g. SCI-AB-MS-001
+  name                  VARCHAR(255) NOT NULL,
+  product_type          VARCHAR(100) NULL,
+  standard_finish       VARCHAR(150) NULL,
+  standard_dimensions   VARCHAR(150) NULL,
+  description           TEXT NULL,
+  hs_code               VARCHAR(20) NULL,
+  is_active             TINYINT(1) NOT NULL DEFAULT 1,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION D — STAGES MASTER (Spec Section 6)
+-- ================================================================
+
+CREATE TABLE stages_master (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  stage_number  INT NOT NULL UNIQUE,
+  stage_slug    VARCHAR(50) NOT NULL UNIQUE,   -- 'quotation','pi','oc_production','packing','freight',
+                                                -- 'bl_instruction','commercial_invoice','balance_bl_endorsement','closure'
+  stage_name    VARCHAR(150) NOT NULL,
+  sequence      INT NOT NULL,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION E — ORDERS (Spec Section 6, 7)
+-- ================================================================
+
+CREATE TABLE orders (
+  id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_reference         VARCHAR(60) NOT NULL UNIQUE,  -- NC-SC-2026-0409001-001 (display form uses /)
+  client_id               BIGINT UNSIGNED NOT NULL,
+  sequence_no             INT NOT NULL,                  -- per-client order sequence
+  buyer_inquiry_ref        VARCHAR(50) NOT NULL,          -- NC/SC/YYYY/DDMMNNN — master tracking ref
+  payment_preset_id       BIGINT UNSIGNED NOT NULL,
+  incoterm_id             BIGINT UNSIGNED NOT NULL,
+  port_of_loading_id      BIGINT UNSIGNED NULL,
+  port_of_discharge_id    BIGINT UNSIGNED NULL,
+  port_of_discharge_text  VARCHAR(150) NULL,             -- free-text fallback if Admin allows non-dropdown
+  currency_id             BIGINT UNSIGNED NOT NULL,
+  coo_type                VARCHAR(50) NULL,               -- can be 'TBC' — blocks stage 1 gate until confirmed
+  include_annexure_a      TINYINT(1) NOT NULL DEFAULT 0,
+  special_requirements    TEXT NULL,
+
+  -- Added during Phase B, reading the actual QT/PI/OC templates: the
+  -- "Weight & Volume (Estimated)" and shipping-estimate fields those
+  -- documents show at Stage 1-4 have no home in the spec's 28-table
+  -- minimum or the 51-table schema built in Phase A — order_packing (Stage
+  -- 7) only holds the FINAL confirmed figures, not the earlier estimate.
+  -- Nullable throughout — "TBD at packing" is a valid, expected state.
+  container_type          VARCHAR(50) NULL,               -- from dropdown_options('container_type')
+  estimated_total_cbm      DECIMAL(10,3) NULL,
+  estimated_gross_weight_kg DECIMAL(14,2) NULL,
+  estimated_net_weight_kg  DECIMAL(14,2) NULL,
+  estimated_package_count  VARCHAR(50) NULL,               -- e.g. '4' or 'TBD at packing'
+  estimated_package_type   VARCHAR(100) NULL DEFAULT 'Wooden Crates',
+  est_lead_time_text       VARCHAR(255) NULL,              -- e.g. '4-6 weeks from advance payment receipt'
+  indicative_freight_low   DECIMAL(14,2) NULL,             -- CFR/CIF only
+  indicative_freight_high  DECIMAL(14,2) NULL,
+  indicative_insurance_amount DECIMAL(14,2) NULL,
+  buyers_po_ref            VARCHAR(100) NULL,              -- buyer's own internal PO/ref — 'NIL' if none
+
+  -- Per-document dates/refs the QT/PI/OC templates show explicitly.
+  quotation_date           DATE NULL,
+  quotation_valid_until    DATE NULL,                      -- quotation_date + 30 days (company_settings-driven span)
+  pi_date                  DATE NULL,
+  pi_valid_until           DATE NULL,                       -- pi_date + 15 days
+  production_status_text   VARCHAR(255) NULL DEFAULT 'Not yet commenced',
+  est_shipment_date_text   VARCHAR(255) NULL,
+
+  status                  ENUM('active','complete','disputed','lost') NOT NULL DEFAULT 'active',
+  current_stage_id        BIGINT UNSIGNED NULL,
+  is_locked               TINYINT(1) NOT NULL DEFAULT 0,   -- true once status IN ('complete','lost') (Business Rule #17, extended for reporting — added 2026-09-19)
+
+  -- Added 2026-09-19 — reporting could not distinguish "still in play" from
+  -- "buyer walked away" (no such state existed at all before this). Reason
+  -- is mandatory at the controller level, matching every other override
+  -- action in this app; lost_by/lost_at give the audit trail its own quick
+  -- columns instead of forcing every report to join audit_log.
+  lost_reason             VARCHAR(500) NULL,
+  lost_at                 TIMESTAMP NULL,
+  lost_by                 BIGINT UNSIGNED NULL,
+
+  -- Added in Phase D (Section 8 — Payment Terms Amendment System). An
+  -- order's advance/balance % normally come from its payment_preset_id
+  -- (joined live in OrderRepository::find()) — these three columns let an
+  -- ACTIVATED amendment override just that one order's terms without
+  -- touching the shared preset or fabricating a one-off preset row. NULL
+  -- means "no override — use the preset as normal", which is every order
+  -- until its first amendment is signed and activated. active_amendment_id
+  -- is set at the same time, purely for traceability (which amendment is
+  -- currently in force) — the FK is added by ALTER TABLE after the
+  -- amendments table exists, below, since amendments itself references
+  -- orders(id).
+  -- balance_trigger_option/balance_days (not free text) because the PI/CI
+  -- templates hardcode the sentence per enum value and only substitute the
+  -- day count — see app/templates/PI/proforma_invoice.html.twig.
+  advance_pct_override    DECIMAL(5,2) NULL,
+  balance_pct_override    DECIMAL(5,2) NULL,
+  balance_trigger_option_override ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NULL,
+  balance_days_override   INT NULL,
+  active_amendment_id     BIGINT UNSIGNED NULL,
+
+  is_sample_data          TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real order
+  created_by              BIGINT UNSIGNED NULL,
+  created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id),
+  FOREIGN KEY (payment_preset_id) REFERENCES payment_presets(id),
+  FOREIGN KEY (incoterm_id) REFERENCES incoterms(id),
+  FOREIGN KEY (port_of_loading_id) REFERENCES ports(id),
+  FOREIGN KEY (port_of_discharge_id) REFERENCES ports(id),
+  FOREIGN KEY (currency_id) REFERENCES currencies(id),
+  FOREIGN KEY (current_stage_id) REFERENCES stages_master(id),
+  UNIQUE KEY uq_client_sequence (client_id, sequence_no)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_stages (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id          BIGINT UNSIGNED NOT NULL,
+  stage_id          BIGINT UNSIGNED NOT NULL,
+  status            ENUM('locked','unlocked','in_progress','gate_passed','skipped') NOT NULL DEFAULT 'locked',
+  unlocked_at       TIMESTAMP NULL,
+  gate_passed_at    TIMESTAMP NULL,
+  gate_passed_by    BIGINT UNSIGNED NULL,
+  skip_reason       VARCHAR(255) NULL,   -- e.g. 'FOB — freight stage auto-skipped'
+  is_locked_data    TINYINT(1) NOT NULL DEFAULT 0,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (stage_id) REFERENCES stages_master(id),
+  UNIQUE KEY uq_order_stage (order_id, stage_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_products (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL,
+  line_no       INT NOT NULL,
+  product_id    BIGINT UNSIGNED NULL,
+  description   VARCHAR(500) NOT NULL,
+  material      VARCHAR(150) NULL,
+  finish        VARCHAR(150) NULL,
+  dimensions    VARCHAR(150) NULL,
+  quantity      DECIMAL(14,3) NULL,          -- nullable/TBC allowed at Stage 1
+  quantity_is_tbc TINYINT(1) NOT NULL DEFAULT 0,
+  unit          VARCHAR(20) NULL,
+  unit_price    DECIMAL(14,2) NULL,
+  fob_value     DECIMAL(14,2) NULL,
+  hs_code       VARCHAR(20) NOT NULL DEFAULT '6802.93',
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_payment_status (
+  id                          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                    BIGINT UNSIGNED NOT NULL UNIQUE,
+  advance_amount              DECIMAL(14,2) NULL,
+  advance_remittance_received_at TIMESTAMP NULL,
+  advance_cleared_at          TIMESTAMP NULL,
+  advance_cleared_by          BIGINT UNSIGNED NULL,
+  freight_amount              DECIMAL(14,2) NULL,
+  freight_remittance_received_at TIMESTAMP NULL,
+  freight_cleared_at          TIMESTAMP NULL,
+  freight_cleared_by          BIGINT UNSIGNED NULL,
+  balance_amount              DECIMAL(14,2) NULL,
+  balance_remittance_received_at TIMESTAMP NULL,
+  balance_cleared_at          TIMESTAMP NULL,
+  balance_cleared_by          BIGINT UNSIGNED NULL,
+  balance_due_date            DATE NULL,     -- computed: BL date + balance_days (option B) or shipment-readiness + balance_days (option A)
+  followup_sent_at            TIMESTAMP NULL,
+  escalated_to_md_at          TIMESTAMP NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_production (
+  id                                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                          BIGINT UNSIGNED NOT NULL UNIQUE,
+  supplier_id                       BIGINT UNSIGNED NULL,
+  production_start_date             DATE NULL,
+  expected_completion_date          DATE NULL,
+  production_complete_confirmed_at  TIMESTAMP NULL,
+  production_complete_confirmed_by  BIGINT UNSIGNED NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_supplier_po (
+  id                            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                      BIGINT UNSIGNED NOT NULL,
+  supplier_id                   BIGINT UNSIGNED NOT NULL,
+  supplier_po_reference         VARCHAR(60) NOT NULL,   -- SC/SPO/YYYY/DDMMNNN
+  material_stone_type           VARCHAR(150) NULL,
+  grade                         VARCHAR(50) NOT NULL DEFAULT 'Grade A',
+  surface_finish                VARCHAR(150) NULL,
+  dimensions                    VARCHAR(150) NULL,
+  dimensional_tolerance         VARCHAR(100) NULL,
+  quantity                      DECIMAL(14,3) NULL,
+  unit                          VARCHAR(20) NULL,
+  colour_reference              VARCHAR(150) NULL,
+  special_requirements          VARCHAR(255) NULL,
+  unit_price_inr                DECIMAL(14,2) NULL,
+  basic_value_inr               DECIMAL(14,2) NULL,
+  gst_rate_pct                  DECIMAL(5,2) NULL,
+  gst_amount_inr                DECIMAL(14,2) NULL,
+  total_payable_inr             DECIMAL(14,2) NULL,
+  advance_pct                   DECIMAL(5,2) NULL,
+  advance_amount_inr            DECIMAL(14,2) NULL,
+  balance_amount_inr            DECIMAL(14,2) NULL,
+  delivery_location              VARCHAR(255) NULL,
+  required_delivery_date         DATE NULL,
+  delivery_confirmation_due_date DATE NULL,
+  packing_requirement            VARCHAR(255) NULL,
+  status                         ENUM('draft','issued','signed','delivered','rejected','closed') NOT NULL DEFAULT 'draft',
+  created_at                     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_packing (
+  id                             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                       BIGINT UNSIGNED NOT NULL UNIQUE,
+  actual_quantity_packed         DECIMAL(14,3) NULL,
+  crate_count                   INT NULL,
+  total_net_weight_kg            DECIMAL(14,2) NULL,
+  total_gross_weight_kg          DECIMAL(14,2) NULL,
+  total_cbm                     DECIMAL(10,3) NULL,
+  fumigation_cert_file_id        BIGINT UNSIGNED NULL,   -- FK added after file_store table
+  packing_date                   DATE NULL,
+  shortfall_pct                  DECIMAL(5,2) NULL,
+  shortfall_notice_recorded_at   TIMESTAMP NULL,          -- buyer notified in writing, recorded
+  buyer_approval_file_id         BIGINT UNSIGNED NULL,    -- required if shortfall > tolerance
+  packing_complete_confirmed_at  TIMESTAMP NULL,
+  packing_complete_confirmed_by  BIGINT UNSIGNED NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_crates (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id              BIGINT UNSIGNED NOT NULL,
+  crate_no              VARCHAR(20) NOT NULL,   -- 'C-001/010'
+  marks_numbers         VARCHAR(500) NULL,
+  product_description   VARCHAR(500) NULL,
+  dimensions_lwh_cm     VARCHAR(100) NULL,
+  pcs                   DECIMAL(10,2) NULL,
+  net_weight_kg         DECIMAL(10,2) NULL,
+  gross_weight_kg       DECIMAL(10,2) NULL,
+  cbm                   DECIMAL(10,4) NULL,
+  hs_code               VARCHAR(20) NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_freight (
+  id                        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                  BIGINT UNSIGNED NOT NULL UNIQUE,
+  confirmed_freight_rate    DECIMAL(14,2) NULL,
+  insurance_amount          DECIMAL(14,2) NULL,
+  freight_forwarder_name    VARCHAR(255) NULL,
+  freight_forwarder_contact VARCHAR(255) NULL,
+  gst_treatment             ENUM('NIL','IGST_18') NULL,
+  fdn_document_id           BIGINT UNSIGNED NULL,  -- FK added after documents table
+  freight_cleared_at        TIMESTAMP NULL,
+  freight_cleared_by        BIGINT UNSIGNED NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_shipping (
+  id                        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                  BIGINT UNSIGNED NOT NULL UNIQUE,
+  shipping_line             VARCHAR(150) NULL,
+  vessel_name               VARCHAR(150) NULL,
+  voyage_number             VARCHAR(50) NULL,
+  etd                       DATE NULL,
+  eta                       DATE NULL,
+  container_type            VARCHAR(50) NULL,
+  container_no              VARCHAR(50) NULL,
+  seal_no                   VARCHAR(50) NULL,
+  bl_number                 VARCHAR(60) NULL,
+  bl_date                   DATE NULL,
+  draft_bl_file_id          BIGINT UNSIGNED NULL,
+  draft_bl_uploaded_at      TIMESTAMP NULL,
+  draft_bl_approved_at      TIMESTAMP NULL,
+  draft_bl_approved_by      BIGINT UNSIGNED NULL,
+  bl_originals_received_at  TIMESTAMP NULL,
+  bl_originals_received_count INT NULL,
+  bl_endorsed_at            TIMESTAMP NULL,
+  bl_endorsed_by            BIGINT UNSIGNED NULL,
+  scanned_bl_sent_to_buyer_at   TIMESTAMP NULL,
+  scanned_bl_sent_to_accounts_at TIMESTAMP NULL,
+  courier_tracking_number   VARCHAR(100) NULL,
+  courier_sent_at           TIMESTAMP NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_annexure_products (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id              BIGINT UNSIGNED NOT NULL,
+  product_id            BIGINT UNSIGNED NULL,
+  product_code          VARCHAR(50) NULL,
+  name                  VARCHAR(255) NOT NULL,
+  description           TEXT NULL,
+  dimensions            VARCHAR(150) NULL,
+  finish                VARCHAR(150) NULL,
+  components            TEXT NULL,
+  technical_notes       TEXT NULL,
+  sort_order            INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE product_images (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  product_id    BIGINT UNSIGNED NOT NULL,
+  file_id       BIGINT UNSIGNED NOT NULL,  -- FK added after file_store table
+  sort_order    INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_annexure_images (
+  id                          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_annexure_product_id  BIGINT UNSIGNED NOT NULL,
+  file_id                    BIGINT UNSIGNED NOT NULL,
+  sort_order                 INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (order_annexure_product_id) REFERENCES order_annexure_products(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION F — DOCUMENTS (Spec Section 4, 9)
+-- ================================================================
+
+CREATE TABLE documents (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id              BIGINT UNSIGNED NULL,          -- NULL for non-order internal docs (SOPs, StageGate, WallRef)
+  document_type_id      BIGINT UNSIGNED NOT NULL,
+  document_reference    VARCHAR(60) NULL,               -- NULL for ref-less docs (Annexure A, SOPs)
+  revision_number       INT NOT NULL DEFAULT 0,
+  status                ENUM('draft','in_review','approved','sent','superseded') NOT NULL DEFAULT 'draft',
+  generated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  generated_by          BIGINT UNSIGNED NULL,
+  docx_file_id          BIGINT UNSIGNED NULL,
+  pdf_file_id           BIGINT UNSIGNED NULL,
+  is_locked             TINYINT(1) NOT NULL DEFAULT 0,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (document_type_id) REFERENCES document_types(id)
+) ENGINE=InnoDB;
+
+ALTER TABLE watermark_settings
+  ADD CONSTRAINT fk_ws_document FOREIGN KEY (document_id) REFERENCES documents(id);
+ALTER TABLE order_freight
+  ADD CONSTRAINT fk_of_fdn_doc FOREIGN KEY (fdn_document_id) REFERENCES documents(id);
+
+CREATE TABLE document_revisions (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  document_id       BIGINT UNSIGNED NOT NULL,
+  revision_number   INT NOT NULL,
+  reason_for_revision VARCHAR(500) NULL,
+  data_snapshot     JSON NULL,             -- full field values used to generate this revision — immutable history
+  docx_file_id      BIGINT UNSIGNED NULL,
+  pdf_file_id       BIGINT UNSIGNED NULL,
+  created_by        BIGINT UNSIGNED NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_current        TINYINT(1) NOT NULL DEFAULT 1,
+  FOREIGN KEY (document_id) REFERENCES documents(id),
+  UNIQUE KEY uq_doc_rev (document_id, revision_number)
+) ENGINE=InnoDB;
+
+CREATE TABLE document_reviews (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  document_id   BIGINT UNSIGNED NOT NULL,
+  reviewer_id   BIGINT UNSIGNED NOT NULL,
+  status        ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  comments      TEXT NULL,
+  reviewed_at   TIMESTAMP NULL,
+  assigned_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_id) REFERENCES documents(id),
+  FOREIGN KEY (reviewer_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE document_cross_verifications (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  document_id   BIGINT UNSIGNED NOT NULL,
+  verified_by   BIGINT UNSIGNED NOT NULL,
+  result        ENUM('pass','fail') NOT NULL,
+  comments      TEXT NULL,
+  verified_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_id) REFERENCES documents(id),
+  FOREIGN KEY (verified_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE amendments (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  amendment_reference   VARCHAR(60) NOT NULL UNIQUE,  -- SC/AMD/YYYY/DDMMNNN — never on buyer-facing docs
+  order_id              BIGINT UNSIGNED NOT NULL,
+  reason                TEXT NOT NULL,
+  requested_by          ENUM('importer','exporter') NOT NULL,
+  md_approved_by        BIGINT UNSIGNED NULL,
+  md_approved_at        TIMESTAMP NULL,
+  original_terms_snapshot JSON NOT NULL,   -- copied character-for-character from the PI at time of amendment
+  amended_advance_pct   DECIMAL(5,2) NULL,
+  amended_advance_amount DECIMAL(14,2) NULL,
+  amended_balance_terms  VARCHAR(500) NULL,   -- free-text prose for the AMD legal document's Section 4 only
+  amended_balance_trigger_option ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NULL,  -- structured value that actually drives future PI/CI rendering
+  amended_balance_days   INT NULL,
+  amended_balance_amount DECIMAL(14,2) NULL,
+  effective_from        DATE NULL,
+  signed_copy_file_id   BIGINT UNSIGNED NULL,
+  document_id           BIGINT UNSIGNED NULL,   -- the generated SC/AMD document record
+  status                ENUM('pending','md_approved','signed','active','rejected') NOT NULL DEFAULT 'pending',
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (document_id) REFERENCES documents(id)
+) ENGINE=InnoDB;
+
+ALTER TABLE orders
+  ADD CONSTRAINT fk_orders_active_amendment FOREIGN KEY (active_amendment_id) REFERENCES amendments(id);
+
+-- ================================================================
+-- SECTION G — FILES (Spec Section 3)
+-- ================================================================
+
+CREATE TABLE file_store (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  client_id           BIGINT UNSIGNED NULL,
+  order_id            BIGINT UNSIGNED NULL,
+  stage_id            BIGINT UNSIGNED NULL,
+  file_origin         ENUM('GENERATED_AUTO','GENERATED_MANUAL','RECEIVED') NOT NULL,
+  received_from       VARCHAR(50) NULL,     -- Buyer/CHA/Shipping Line/Supplier/Bank/Government Authority/Internal/Other
+  document_type_label VARCHAR(100) NULL,    -- confirmation-popup dropdown value, not FK to document_types
+                                             -- (covers "Payment Remittance", "Signed Buyer PO", etc. — non-generated artifacts)
+  generation_method   VARCHAR(50) NULL,
+  linked_document_id  BIGINT UNSIGNED NULL,
+  sent_to_client      TINYINT(1) NOT NULL DEFAULT 0,
+  sent_at             TIMESTAMP NULL,
+  internal_only       TINYINT(1) NOT NULL DEFAULT 0,
+  server_path         VARCHAR(500) NOT NULL,
+  uuid_filename       VARCHAR(255) NOT NULL,
+  original_filename   VARCHAR(255) NOT NULL,
+  file_size_bytes     BIGINT UNSIGNED NOT NULL,
+  mime_type           VARCHAR(100) NULL,
+  notes               TEXT NULL,
+  uploaded_by         BIGINT UNSIGNED NULL,
+  uploaded_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_active           TINYINT(1) NOT NULL DEFAULT 1,   -- soft delete only — never hard delete
+  FOREIGN KEY (client_id) REFERENCES clients(id),
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (stage_id) REFERENCES stages_master(id),
+  FOREIGN KEY (linked_document_id) REFERENCES documents(id)
+) ENGINE=InnoDB;
+
+ALTER TABLE documents
+  ADD CONSTRAINT fk_doc_docx FOREIGN KEY (docx_file_id) REFERENCES file_store(id),
+  ADD CONSTRAINT fk_doc_pdf  FOREIGN KEY (pdf_file_id)  REFERENCES file_store(id);
+ALTER TABLE document_revisions
+  ADD CONSTRAINT fk_dr_docx FOREIGN KEY (docx_file_id) REFERENCES file_store(id),
+  ADD CONSTRAINT fk_dr_pdf  FOREIGN KEY (pdf_file_id)  REFERENCES file_store(id);
+ALTER TABLE order_packing
+  ADD CONSTRAINT fk_op_fumigation FOREIGN KEY (fumigation_cert_file_id) REFERENCES file_store(id),
+  ADD CONSTRAINT fk_op_buyer_approval FOREIGN KEY (buyer_approval_file_id) REFERENCES file_store(id);
+ALTER TABLE order_shipping
+  ADD CONSTRAINT fk_os_draft_bl FOREIGN KEY (draft_bl_file_id) REFERENCES file_store(id);
+ALTER TABLE amendments
+  ADD CONSTRAINT fk_amd_signed FOREIGN KEY (signed_copy_file_id) REFERENCES file_store(id);
+ALTER TABLE product_images
+  ADD CONSTRAINT fk_pi_file FOREIGN KEY (file_id) REFERENCES file_store(id);
+ALTER TABLE order_annexure_images
+  ADD CONSTRAINT fk_oai_file FOREIGN KEY (file_id) REFERENCES file_store(id);
+
+-- ================================================================
+-- SECTION H — EMAIL / NOTIFICATIONS (Spec Section 10)
+-- ================================================================
+
+CREATE TABLE email_log (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id          BIGINT UNSIGNED NULL,
+  document_id       BIGINT UNSIGNED NULL,
+  template_key      VARCHAR(100) NULL,
+  recipient_email   VARCHAR(190) NOT NULL,
+  subject           VARCHAR(255) NOT NULL,
+  body_snapshot     TEXT NOT NULL,
+  scheduled_at      TIMESTAMP NULL,
+  sent_at           TIMESTAMP NULL,
+  status            ENUM('pending_approval','approved','rejected','sent','failed') NOT NULL DEFAULT 'pending_approval',
+  requested_by      BIGINT UNSIGNED NULL,
+  approved_by       BIGINT UNSIGNED NULL,
+  approved_at       TIMESTAMP NULL,
+  rejection_reason  VARCHAR(500) NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (document_id) REFERENCES documents(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE notifications (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id           BIGINT UNSIGNED NULL,
+  role_id           BIGINT UNSIGNED NULL,
+  type              VARCHAR(100) NOT NULL,   -- 'review_assigned','balance_overdue','lut_expiry',...
+  related_order_id  BIGINT UNSIGNED NULL,
+  message           VARCHAR(500) NOT NULL,
+  is_read           TINYINT(1) NOT NULL DEFAULT 0,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (role_id) REFERENCES roles(id),
+  FOREIGN KEY (related_order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION I — DISPUTES (Spec Section 16)
+-- ================================================================
+
+CREATE TABLE disputes (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id            BIGINT UNSIGNED NOT NULL,
+  notice_date         DATE NOT NULL,
+  from_party          VARCHAR(150) NULL,
+  description         TEXT NOT NULL,
+  assigned_to         BIGINT UNSIGNED NULL,
+  response_due_date   DATE NULL,             -- notice_date + N working days (N from company_settings)
+  status              VARCHAR(30) NOT NULL DEFAULT 'Open',  -- from dropdown_options('dispute_status')
+  resolved_at         TIMESTAMP NULL,
+  resolution_notes    TEXT NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (assigned_to) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE dispute_documents (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  dispute_id    BIGINT UNSIGNED NOT NULL,
+  file_id       BIGINT UNSIGNED NOT NULL,
+  FOREIGN KEY (dispute_id) REFERENCES disputes(id),
+  FOREIGN KEY (file_id) REFERENCES file_store(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION J — AUDIT LOG (Spec Section 11, 13, 14 — immutable, no delete)
+-- ================================================================
+
+CREATE TABLE audit_log (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id       BIGINT UNSIGNED NULL,
+  action_type   VARCHAR(100) NOT NULL,   -- 'FIELD_EDIT','LOCK_OVERRIDE','DOCUMENT_GENERATED','LOGIN_FAILED',...
+  entity_type   VARCHAR(100) NULL,        -- 'orders','clients','company_settings',...
+  entity_id     BIGINT UNSIGNED NULL,
+  field_name    VARCHAR(150) NULL,
+  old_value     TEXT NULL,
+  new_value     TEXT NULL,
+  reason        VARCHAR(500) NULL,
+  ip_address    VARCHAR(45) NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_audit_entity (entity_type, entity_id),
+  INDEX idx_audit_time (created_at)
+  -- No update/delete grants at the application DB-user level for this table.
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION K — 2FA BACKUP CODES & SAVED REPORT DEFINITIONS
+-- (Resolved 2026-09-18 — see ARCHITECTURE.md "Open questions", now closed)
+-- ================================================================
+
+CREATE TABLE two_fa_backup_codes (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id       BIGINT UNSIGNED NOT NULL,
+  code_hash     VARCHAR(255) NOT NULL,   -- one-time recovery code, hashed same as password_hash
+  used_at       TIMESTAMP NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_2fa_backup_user (user_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE report_definitions (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name            VARCHAR(150) NOT NULL,           -- e.g. "Weekly Overdue — Tier 2"
+  report_type     VARCHAR(50) NOT NULL,            -- 'orders','payments','clients','disputes',... (drives which base query runs)
+  owner_user_id   BIGINT UNSIGNED NOT NULL,
+  visibility      ENUM('private','shared') NOT NULL DEFAULT 'private',
+  filters_json    JSON NOT NULL,                    -- saved filter criteria (stage, date range, tier, currency, status, ...)
+  columns_json    JSON NOT NULL,                    -- saved column selection + order
+  last_run_at     TIMESTAMP NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_user_id) REFERENCES users(id),
+  INDEX idx_report_owner (owner_user_id),
+  INDEX idx_report_type (report_type)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION L — PROTECTED FIELDS (peer-approved lock/unlock governance)
+-- Added 2026-09-19. `is_protected` (see company_settings, tc_clauses,
+-- payment_presets above) is one flag/mechanism reused across all three
+-- tables: a protected row cannot be edited without the app-layer unlock
+-- gesture (reason + explicit unlock + confirmation, all logged to
+-- audit_log), and cannot be hard-deleted or blanked even via direct SQL —
+-- the triggers below are the DB-level backstop for that second part.
+-- Toggling is_protected itself is never done by a single admin acting
+-- alone: it goes through this request/approve table, and a second,
+-- different privileged user (permission manage_field_protection) must
+-- approve before the flag actually flips — enforced in the app layer
+-- (fieldProtectionController / FieldProtectionController), because a
+-- database trigger cannot distinguish "who" issued a given UPDATE.
+-- ================================================================
+
+CREATE TABLE field_protection_requests (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  table_name        VARCHAR(50) NOT NULL,    -- 'company_settings' | 'tc_clauses' | 'payment_presets'
+  record_id         BIGINT UNSIGNED NOT NULL,
+  record_label      VARCHAR(255) NOT NULL,   -- human-readable snapshot (setting_key / clause_title /
+                                              -- preset_name) taken at request time, so the request stays
+                                              -- readable even if the underlying row is later renamed
+  requested_action  ENUM('lock','unlock') NOT NULL,
+  reason            VARCHAR(500) NOT NULL,
+  requested_by      BIGINT UNSIGNED NOT NULL,
+  status            ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  resolved_by       BIGINT UNSIGNED NULL,
+  resolved_reason   VARCHAR(500) NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  resolved_at       TIMESTAMP NULL,
+  FOREIGN KEY (requested_by) REFERENCES users(id),
+  FOREIGN KEY (resolved_by) REFERENCES users(id),
+  INDEX idx_fpr_status (status),
+  INDEX idx_fpr_table_record (table_name, record_id)
+) ENGINE=InnoDB;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ---- DB-level backstop: block hard-delete and blanking of protected rows,
+-- ---- independent of and beneath any application-layer bug. These fire
+-- ---- regardless of which DB user issues the statement.
+DELIMITER $$
+
+CREATE TRIGGER trg_company_settings_bd BEFORE DELETE ON company_settings
+FOR EACH ROW
+BEGIN
+  IF OLD.is_protected = 1 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot delete a protected company setting.';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_company_settings_bu BEFORE UPDATE ON company_settings
+FOR EACH ROW
+BEGIN
+  IF OLD.is_protected = 1 AND (NEW.setting_value IS NULL OR NEW.setting_value = '') THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot blank a protected company setting.';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_tc_clauses_bd BEFORE DELETE ON tc_clauses
+FOR EACH ROW
+BEGIN
+  IF OLD.is_protected = 1 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot delete a protected T&C clause.';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_tc_clauses_bu BEFORE UPDATE ON tc_clauses
+FOR EACH ROW
+BEGIN
+  IF OLD.is_protected = 1 AND (NEW.clause_text IS NULL OR NEW.clause_text = '' OR NEW.status = 'inactive') THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot blank or deactivate a protected T&C clause.';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_payment_presets_bd BEFORE DELETE ON payment_presets
+FOR EACH ROW
+BEGIN
+  IF OLD.is_protected = 1 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot delete a protected payment preset.';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_payment_presets_bu BEFORE UPDATE ON payment_presets
+FOR EACH ROW
+BEGIN
+  IF OLD.is_protected = 1 AND NEW.is_active = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot deactivate a protected payment preset.';
+  END IF;
+END$$
+
+DELIMITER ;
+
+-- ================================================================
+-- END OF SCHEMA — 53 tables. All open schema questions resolved
+-- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
+-- Section L (protected fields) added 2026-09-19.
+-- ================================================================

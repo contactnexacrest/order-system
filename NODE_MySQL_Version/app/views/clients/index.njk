@@ -1,0 +1,31 @@
+<div class="card page-wide">
+  <h1>Clients</h1>
+  <p class="muted">Each client carries one Buyer Inquiry Ref for the whole relationship — every order and document for them reuses it.</p>
+  <div class="btn-row"><a class="btn" href="/clients/create">+ New Client</a></div>
+
+  {% if not clients or clients.length == 0 %}
+    <p class="muted">No clients yet.</p>
+  {% else %}
+  <table class="list">
+    <tr><th>Buyer Inquiry Ref</th><th>Company</th><th>Contact</th><th>Country</th><th></th></tr>
+    {% for c in clients %}
+    <tr>
+      <td>{{ c.client_unique_number }}</td>
+      <td>{{ c.company_legal_name }}</td>
+      <td>{{ c.contact_person or '—' }}
+        {% if c.email %}
+          <br>
+          {% if permissions.view_client_email_full %}
+            <span class="muted small">{{ c.email }}</span>
+          {% else %}
+            <span class="muted small masked-value">{{ c.email | maskEmail }}</span>
+          {% endif %}
+        {% endif %}
+      </td>
+      <td>{{ c.country_of_destination or '—' }}</td>
+      <td><a href="/clients/{{ c.id }}">View</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>

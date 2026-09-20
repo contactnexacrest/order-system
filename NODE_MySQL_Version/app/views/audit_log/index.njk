@@ -1,0 +1,47 @@
+<div class="card page-wide">
+  <h1>Audit Log</h1>
+  <p class="muted">Immutable — no user, including Admin, can edit or delete a row here.</p>
+
+  <form method="get" action="/audit-log">
+    <label>Entity Type<input type="text" name="entity_type" value="{{ filters.entity_type or '' }}" placeholder="e.g. orders, documents, amendments"></label>
+    <label>Entity ID<input type="number" name="entity_id" value="{{ filters.entity_id or '' }}"></label>
+    <label>User ID<input type="number" name="user_id" value="{{ filters.user_id or '' }}"></label>
+    <label>Action Type
+      <select name="action_type">
+        <option value="">All</option>
+        {% for at in actionTypes %}
+          <option value="{{ at }}" {{ 'selected' if filters.action_type == at else '' }}>{{ at }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>From<input type="date" name="date_from" value="{{ filters.date_from or '' }}"></label>
+    <label>To<input type="date" name="date_to" value="{{ filters.date_to or '' }}"></label>
+    <button type="submit" class="btn-sm">Filter</button>
+  </form>
+
+  <table class="list">
+    <tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Field</th><th>Old</th><th>New</th><th>Reason</th><th>IP</th></tr>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.created_at }}</td>
+        <td>{{ r.user_name or 'system' }}</td>
+        <td>{{ r.action_type }}</td>
+        <td>{{ r.entity_type or '' }}{% if r.entity_id %} #{{ r.entity_id }}{% endif %}</td>
+        <td>{{ r.field_name or '' }}</td>
+        <td>{{ (r.old_value or '') | truncate(40, true, '…') }}</td>
+        <td>{{ (r.new_value or '') | truncate(40, true, '…') }}</td>
+        <td>{{ (r.reason or '') | truncate(60, true, '…') }}</td>
+        <td>{{ r.ip_address or '' }}</td>
+      </tr>
+    {% endfor %}
+    {% if not rows or rows.length == 0 %}
+      <tr><td colspan="9" class="muted">No matching audit log entries.</td></tr>
+    {% endif %}
+  </table>
+
+  <p>
+    {% if prevPageQuery %}<a href="?{{ prevPageQuery }}">&larr; Newer</a>{% endif %}
+    &nbsp;Page {{ page }}&nbsp;
+    {% if nextPageQuery %}<a href="?{{ nextPageQuery }}">Older &rarr;</a>{% endif %}
+  </p>
+</div>

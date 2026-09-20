@@ -1,0 +1,169 @@
+'use strict';
+
+const db = require('../config/db');
+
+async function all() {
+  return db.query(
+    `SELECT o.*, c.company_legal_name, sm.stage_name AS current_stage_name
+     FROM orders o
+     JOIN clients c ON c.id = o.client_id
+     LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+     ORDER BY o.created_at DESC`
+  );
+}
+
+async function find(id) {
+  return db.queryOne(
+    `SELECT o.*, c.company_legal_name, c.billing_address, c.consignee_name, c.consignee_address,
+            c.vat_eori_tax_no, c.contact_person, c.email AS client_email, c.phone AS client_phone,
+            c.country_of_destination, c.notify_party, c.client_unique_number,
+            sm.stage_name AS current_stage_name, sm.stage_slug AS current_stage_slug,
+            i.code AS incoterm_code, cur.code AS currency_code,
+            pl.name AS port_of_loading_name, pd.name AS port_of_discharge_name,
+            pp.preset_name, pp.advance_trigger_text, pp.requires_md_approval,
+            COALESCE(o.advance_pct_override, pp.advance_pct) AS advance_pct,
+            COALESCE(o.balance_pct_override, pp.balance_pct) AS balance_pct,
+            COALESCE(o.balance_trigger_option_override, pp.balance_trigger_option) AS balance_trigger_option,
+            COALESCE(o.balance_days_override, pp.balance_days) AS balance_days,
+            (o.active_amendment_id IS NOT NULL) AS has_active_amendment
+     FROM orders o
+     JOIN clients c ON c.id = o.client_id
+     LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+     JOIN incoterms i ON i.id = o.incoterm_id
+     JOIN currencies cur ON cur.id = o.currency_id
+     LEFT JOIN ports pl ON pl.id = o.port_of_loading_id
+     LEFT JOIN ports pd ON pd.id = o.port_of_discharge_id
+     JOIN payment_presets pp ON pp.id = o.payment_preset_id
+     WHERE o.id = :id`,
+    { id }
+  );
+}
+
+async function nextSequenceForClient(clientId) {
+  const row = await db.queryOne(
+    'SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM orders WHERE client_id = :client_id',
+    { client_id: clientId }
+  );
+  return parseInt(row.next_seq, 10);
+}
+
+async function create(data, createdBy) {
+  const result = await db.execute(
+    `INSERT INTO orders
+        (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
+         port_of_loading_id, port_of_discharge_id, port_of_discharge_text, currency_id, coo_type,
+         include_annexure_a, special_requirements, container_type, estimated_total_cbm,
+         estimated_gross_weight_kg, estimated_net_weight_kg, estimated_package_count,
+         estimated_package_type, est_lead_time_text, indicative_freight_low, indicative_freight_high,
+         indicative_insurance_amount, buyers_po_ref, quotation_date, quotation_valid_until,
+         status, created_by)
+     VALUES
+        (:order_reference, :client_id, :sequence_no, :buyer_inquiry_ref, :payment_preset_id, :incoterm_id,
+         :port_of_loading_id, :port_of_discharge_id, :port_of_discharge_text, :currency_id, :coo_type,
+         :include_annexure_a, :special_requirements, :container_type, :estimated_total_cbm,
+         :estimated_gross_weight_kg, :estimated_net_weight_kg, :estimated_package_count,
+         :estimated_package_type, :est_lead_time_text, :indicative_freight_low, :indicative_freight_high,
+         :indicative_insurance_amount, :buyers_po_ref, :quotation_date, :quotation_valid_until,
+         'active', :created_by)`,
+    {
+      order_reference: data.order_reference,
+      client_id: data.client_id,
+      sequence_no: data.sequence_no,
+      buyer_inquiry_ref: data.buyer_inquiry_ref,
+      payment_preset_id: data.payment_preset_id,
+      incoterm_id: data.incoterm_id,
+      port_of_loading_id: data.port_of_loading_id ?? null,
+      port_of_discharge_id: data.port_of_discharge_id ?? null,
+      port_of_discharge_text: data.port_of_discharge_text ?? null,
+      currency_id: data.currency_id,
+      coo_type: data.coo_type ?? 'TBC',
+      include_annexure_a: data.include_annexure_a ? 1 : 0,
+      special_requirements: data.special_requirements ?? null,
+      container_type: data.container_type ?? null,
+      estimated_total_cbm: data.estimated_total_cbm || null,
+      estimated_gross_weight_kg: data.estimated_gross_weight_kg || null,
+      estimated_net_weight_kg: data.estimated_net_weight_kg || null,
+      estimated_package_count: data.estimated_package_count ?? 'TBD at packing',
+      estimated_package_type: data.estimated_package_type ?? 'Wooden Crates',
+      est_lead_time_text: data.est_lead_time_text ?? null,
+      indicative_freight_low: data.indicative_freight_low || null,
+      indicative_freight_high: data.indicative_freight_high || null,
+      indicative_insurance_amount: data.indicative_insurance_amount || null,
+      buyers_po_ref: data.buyers_po_ref ?? 'NIL',
+      quotation_date: data.quotation_date,
+      quotation_valid_until: data.quotation_valid_until,
+      created_by: createdBy,
+    }
+  );
+  return result.insertId;
+}
+
+async function markSample(id) {
+  await db.execute('UPDATE orders SET is_sample_data = 1 WHERE id = :id', { id });
+}
+
+async function setCurrentStage(orderId, stageId) {
+  await db.execute('UPDATE orders SET current_stage_id = :stage_id WHERE id = :id', { stage_id: stageId, id: orderId });
+}
+
+async function setPiDates(orderId, piDate, piValidUntil) {
+  await db.execute('UPDATE orders SET pi_date = :pi_date, pi_valid_until = :pi_valid_until WHERE id = :id', { pi_date: piDate, pi_valid_until: piValidUntil, id: orderId });
+}
+
+async function setProductionStatus(orderId, text) {
+  await db.execute('UPDATE orders SET production_status_text = :text WHERE id = :id', { text, id: orderId });
+}
+
+async function setBuyersPoRef(orderId, ref) {
+  await db.execute('UPDATE orders SET buyers_po_ref = :ref WHERE id = :id', { ref, id: orderId });
+}
+
+async function setEstShipmentDate(orderId, text) {
+  await db.execute('UPDATE orders SET est_shipment_date_text = :text WHERE id = :id', { text, id: orderId });
+}
+
+async function markComplete(orderId) {
+  await db.execute("UPDATE orders SET status = 'complete', is_locked = 1 WHERE id = :id", { id: orderId });
+}
+
+/** Added 2026-09-19 — see orders.lost_reason/lost_at/lost_by in schema.sql. Mirrors markComplete()'s locking behavior. */
+async function markLost(orderId, reason, userId) {
+  await db.execute(
+    `UPDATE orders
+        SET status = 'lost', is_locked = 1, lost_reason = :reason, lost_at = NOW(), lost_by = :user_id
+      WHERE id = :id`,
+    { reason, user_id: userId, id: orderId }
+  );
+}
+
+async function applyAmendmentOverride(orderId, advancePct, balancePct, balanceTriggerOption, balanceDays, amendmentId) {
+  await db.execute(
+    `UPDATE orders
+     SET advance_pct_override = :advance_pct,
+         balance_pct_override = :balance_pct,
+         balance_trigger_option_override = :balance_trigger_option,
+         balance_days_override = :balance_days,
+         active_amendment_id = :amendment_id
+     WHERE id = :id`,
+    {
+      advance_pct: advancePct, balance_pct: balancePct, balance_trigger_option: balanceTriggerOption,
+      balance_days: balanceDays, amendment_id: amendmentId, id: orderId,
+    }
+  );
+}
+
+async function forClient(clientId) {
+  return db.query(
+    `SELECT o.*, sm.stage_name AS current_stage_name
+     FROM orders o
+     LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+     WHERE o.client_id = :client_id
+     ORDER BY o.created_at DESC`,
+    { client_id: clientId }
+  );
+}
+
+module.exports = {
+  all, find, nextSequenceForClient, create, markSample, setCurrentStage, setPiDates,
+  setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
+};

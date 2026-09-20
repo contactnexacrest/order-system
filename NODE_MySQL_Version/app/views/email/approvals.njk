@@ -1,0 +1,29 @@
+<div class="card page-wide">
+  <h1>Email Send Approvals (Level 2)</h1>
+  <table class="list">
+    <tr><th>Order</th><th>To</th><th>Subject</th><th>Scheduled</th><th>Requested</th><th>Action</th></tr>
+    {% for row in pending %}
+    <tr>
+      <td>{{ row.order_reference or '—' }}</td>
+      <td>{{ row.recipient_email }}</td>
+      <td>{{ row.subject }}</td>
+      <td>{{ row.scheduled_at or 'Immediate' }}</td>
+      <td>{{ row.created_at }}</td>
+      <td>
+        <form method="post" action="/email-log/{{ row.id }}/approve" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm btn-success">Approve</button>
+        </form>
+        <form method="post" action="/email-log/{{ row.id }}/reject" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:160px">
+          <button type="submit" class="btn-sm btn-danger">Reject</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    {% if not pending or pending.length == 0 %}
+      <tr><td colspan="6" class="muted">Nothing awaiting approval.</td></tr>
+    {% endif %}
+  </table>
+</div>

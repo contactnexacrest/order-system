@@ -1,0 +1,29 @@
+<div class="card page-wide">
+  <h1>Dispute Log (All Orders)</h1>
+  <form method="get" action="/disputes">
+    <label>Status
+      <select name="status" onchange="this.form.submit()">
+        <option value="">All</option>
+        {% for opt in statusOptions %}
+          <option value="{{ opt.option_value }}" {{ 'selected' if statusFilter == opt.option_value else '' }}>{{ opt.option_value }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+
+  <table class="list">
+    <tr><th>Order</th><th>Notice Date</th><th>Status</th><th>Response Due</th><th>Description</th></tr>
+    {% for d in disputes %}
+      <tr>
+        <td><a href="/orders/{{ d.order_id }}/disputes">{{ d.order_reference }}</a></td>
+        <td>{{ d.notice_date }}</td>
+        <td>{{ d.status }}</td>
+        <td>{{ d.response_due_date or '—' }}</td>
+        <td>{{ d.description | truncate(100, true, '…') }}</td>
+      </tr>
+    {% endfor %}
+    {% if not disputes or disputes.length == 0 %}
+      <tr><td colspan="5" class="muted">No disputes recorded.</td></tr>
+    {% endif %}
+  </table>
+</div>

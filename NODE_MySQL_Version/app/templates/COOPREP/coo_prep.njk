@@ -1,0 +1,97 @@
+{% extends "_layout.njk" %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td class="label">SHIPMENT REF *</td><td class="value">{{ order.pi_ref or '—' }}</td>
+    <td class="label">DATE PREPARED *</td><td class="value">{{ meta.generated_date }}</td>
+  </tr>
+  <tr>
+    <td class="label">COO TYPE *</td><td class="value">{{ order.coo_type }}</td>
+    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block banner %}
+<div class="valid-until">INTERNAL USE ONLY — NOT SENT TO BUYER &nbsp; Complete this sheet before requesting COO from CAPEXIL. Hand to your CHA along with the documents listed below. COO is issued by CAPEXIL — not by NexaCrest.</div>
+{% endblock %}
+
+{% block section1 %}{% endblock %}
+
+{% block body %}
+
+<div class="section-title">1. DOCUMENTS TO SUBMIT TO CAPEXIL / CHA</div>
+<p style="font-size:8px; color:#5b6774;">Tick each item once collected and ready. Do not apply for COO until all mandatory items are ticked.</p>
+<table class="products">
+  <tr><th>&#10003;</th><th>Document</th><th>What to check before submitting</th><th>Where it comes from</th></tr>
+  <tr><td>&#9744;</td><td>Commercial Invoice (signed copy)</td><td>Must be signed and stamped. Values, HS code, buyer/seller details must be final — no estimates.</td><td>Commercial Invoice ({{ order.pi_ref or '—' }})</td></tr>
+  <tr><td>&#9744;</td><td>Packing List (signed copy)</td><td>Crate count, weights, CBM must be actuals — not estimates from PI.</td><td>Packing List</td></tr>
+  <tr><td>&#9744;</td><td>Fumigation Certificate (copy)</td><td>Provided as standard with every NexaCrest shipment — collect from fumigation agency and include with COO application.</td><td>Fumigation agency — standard every shipment</td></tr>
+  <tr><td>&#9744;</td><td>Shipping Bill (copy)</td><td>Filed by CHA with Indian customs. Do not apply for COO before Shipping Bill is filed.</td><td>CHA provides after filing</td></tr>
+  <tr><td>&#9744;</td><td>Bill of Lading (copy)</td><td>BL number, date, vessel name, port of loading/discharge must match CI and PL exactly.</td><td>Shipping line / CHA provides</td></tr>
+  <tr><td>&#9744;</td><td>RCMC Certificate (copy)</td><td>NexaCrest RCMC issued by CAPEXIL — already obtained. Check validity date has not expired.</td><td>Already obtained — check validity</td></tr>
+  <tr><td>&#9744;</td><td>IEC Certificate (copy)</td><td>NexaCrest IEC — {{ company.iec_pan }} — already obtained.</td><td>Already obtained</td></tr>
+  <tr><td>&#9744;</td><td>GSP Declaration (if GSP Form A)</td><td>Self-declaration of origin criteria — required for GSP Form A only. CHA will advise the format.</td><td>Required for GSP Form A only</td></tr>
+</table>
+
+<div class="section-title">2. INFORMATION REQUIRED ON THE COO APPLICATION</div>
+<p style="font-size:8px; color:#5b6774;">All values below must match the Commercial Invoice and Packing List exactly. Any mismatch causes rejection.</p>
+<table class="kv">
+  <tr><td class="k">Exporter — Legal Name *</td><td class="v">{{ company.legal_name }}</td></tr>
+  <tr><td class="k">Exporter — Registered Address *</td><td class="v">{{ company.registered_office }}</td></tr>
+  <tr><td class="k">Exporter — GSTIN *</td><td class="v">{{ company.gstin }}</td></tr>
+  <tr><td class="k">Exporter — IEC *</td><td class="v">{{ company.iec_pan }}</td></tr>
+  <tr><td class="k">Consignee — Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Consignee — Address *</td><td class="v">{{ buyer.consignee_address or buyer.billing_address }}</td></tr>
+  <tr><td class="k">Consignee — Country *</td><td class="v">{{ buyer.country_of_destination or 'TBC' }}</td></tr>
+  <tr><td class="k">Vessel Name &amp; Voyage No. *</td><td class="v">{{ shipping.vessel_name or 'TBC' }}{{ (' / V.' ~ shipping.voyage_number) if shipping.voyage_number else '' }}</td></tr>
+  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Bill of Lading No. *</td><td class="v">{{ shipping.bl_number or 'TBC' }}</td></tr>
+  <tr><td class="k">Bill of Lading Date *</td><td class="v">{{ shipping.bl_date or 'TBC — same as CI date' }}</td></tr>
+  {% set productList = [] %}
+  {% set hsCodeList = [] %}
+  {% for p in products %}
+    {% set productList = productList.concat([p.description ~ ((', ' ~ p.finish) if p.finish else '')]) %}
+    {% set hsCodeList = hsCodeList.concat([p.hs_code]) %}
+  {% endfor %}
+  <tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }} — as on CI</td></tr>
+  <tr><td class="k">HS Code *</td><td class="v">{{ hsCodeList|join(', ') }} — verify against CI</td></tr>
+  <tr><td class="k">Country of Origin *</td><td class="v">India</td></tr>
+  <tr><td class="k">No. of Packages *</td><td class="v">{{ (packing.crate_count ~ ' Wooden Crates') if packing.crate_count else 'TBC' }} — must match PL and BL exactly</td></tr>
+  <tr><td class="k">Gross Weight *</td><td class="v">{{ (packing.total_gross_weight_kg ~ ' kg') if packing.total_gross_weight_kg else 'TBC' }} — actual from Packing List</td></tr>
+  <tr><td class="k">Net Weight *</td><td class="v">{{ (packing.total_net_weight_kg ~ ' kg') if packing.total_net_weight_kg else 'TBC' }} — actual from Packing List</td></tr>
+  <tr><td class="k">Total CBM *</td><td class="v">{{ (packing.total_cbm ~ ' m³') if packing.total_cbm else 'TBC' }} — actual from Packing List</td></tr>
+  <tr><td class="k">FOB Value *</td><td class="v">{{ order.currency_code }} {{ financial.fob_value }} — must match CI FOB Value exactly</td></tr>
+  <tr><td class="k">Invoice No. &amp; Date *</td><td class="v">{{ order.ci_ref or 'TBC' }} — {{ order.ci_date or 'TBC' }}</td></tr>
+  <tr><td class="k">Origin Criteria (GSP Form A only)</td><td class="v">Usually 'P' for wholly produced, or 'W/{{ hsCodeList|first }}' for worked in India — CHA advises. Required for GSP Form A only.</td></tr>
+  <tr><td class="k">Competent Authority Signature</td><td class="v">Signed and stamped by CAPEXIL authorised officer — not by NexaCrest. CAPEXIL issues — not your responsibility.</td></tr>
+</table>
+
+<div class="section-title">3. STEP-BY-STEP PROCESS</div>
+<table class="kv">
+  <tr><td class="k">Step 1</td><td class="v">Confirm COO type with buyer (GSP Form A or non-preferential) — ideally at Quotation/PI stage.</td></tr>
+  <tr><td class="k">Step 2</td><td class="v">Cargo packed. Packing List finalised with actuals. CHA files Shipping Bill with customs.</td></tr>
+  <tr><td class="k">Step 3</td><td class="v">Shipment booked. Bill of Lading issued by shipping line.</td></tr>
+  <tr><td class="k">Step 4</td><td class="v">Complete this preparation sheet — fill Section 2 values from CI, PL, and BL.</td></tr>
+  <tr><td class="k">Step 5</td><td class="v">Collect all documents listed in Section 1. Tick each checkbox.</td></tr>
+  <tr><td class="k">Step 6</td><td class="v">Submit complete package to CHA — or apply directly on the CAPEXIL portal. CHA handles this in most cases.</td></tr>
+  <tr><td class="k">Step 7</td><td class="v">CAPEXIL verifies and issues COO — typically 1–3 working days.</td></tr>
+  <tr><td class="k">Step 8</td><td class="v">COO received. Include with shipment documents sent to buyer (along with CI, PL, BL).</td></tr>
+</table>
+
+<div class="section-title">4. NEXACREST CAPEXIL REGISTRATION DETAILS</div>
+<table class="kv">
+  <tr><td class="k">Prepared By *</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">RCMC Issuing Body</td><td class="v">CAPEXIL — Chemicals and Allied Products Export Promotion Council</td></tr>
+  <tr><td class="k">Member Company</td><td class="v">{{ company.legal_name }}</td></tr>
+  <tr><td class="k">IEC</td><td class="v">{{ company.iec_pan }}</td></tr>
+  <tr><td class="k">RCMC Number *</td><td class="v">{{ company.rcmc_number }}</td></tr>
+  <tr><td class="k">RCMC Valid Until *</td><td class="v">{{ company.rcmc_valid_until|date('d F Y') }}</td></tr>
+  <tr><td class="k">CAPEXIL Portal</td><td class="v">www.capexil.com — COO applications can be submitted online</td></tr>
+  <tr><td class="k">CAPEXIL Office</td><td class="v">Chennai Regional Office handles granite/stone exporters from Karnataka — confirm with CHA</td></tr>
+</table>
+<p class="mandatory-note">&#9888; Annual renewal: RCMC must be renewed annually. If RCMC expires, CAPEXIL cannot issue a COO — your shipment documents will be incomplete and customs clearance will fail. Set a reminder 60 days before expiry.</p>
+
+{% endblock %}

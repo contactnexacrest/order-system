@@ -1,0 +1,57 @@
+<div class="card page-wide">
+  <h1>Order Report — {{ order.order_reference }}</h1>
+  <p class="muted">{{ order.company_legal_name }} · {{ order.status | capitalize }}</p>
+  <div class="btn-row"><a class="btn-sm btn-secondary" href="/orders/{{ order.id }}">View Order</a></div>
+
+  <div class="section">
+    <h2>Stage Data</h2>
+    <table class="list">
+      <tr><th>Stage</th><th>Status</th><th>Unlocked</th><th>Gate Passed</th><th>By</th><th>Skip Reason</th></tr>
+      {% for s in stages %}
+      <tr>
+        <td>{{ s.stage_name }}</td>
+        <td>{{ s.status | replace('_', ' ') }}</td>
+        <td>{{ s.unlocked_at or '—' }}</td>
+        <td>{{ s.gate_passed_at or '—' }}</td>
+        <td>{{ s.gate_passed_by_name or '—' }}</td>
+        <td>{{ s.skip_reason or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Documents</h2>
+    <table class="list">
+      <tr><th>Type</th><th>Reference</th><th>Rev.</th><th>Status</th><th>Generated</th></tr>
+      {% for d in documents %}
+      <tr>
+        <td>{{ d.document_type_code or '—' }}</td>
+        <td>{{ d.document_reference or '—' }}</td>
+        <td>{{ d.revision_number }}</td>
+        <td>{{ d.status }}</td>
+        <td>{{ d.generated_at }}</td>
+      </tr>
+      {% endfor %}
+      {% if not documents or documents.length == 0 %}<tr><td colspan="5" class="muted">No documents yet.</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Full Audit Trail</h2>
+    <table class="list">
+      <tr><th>When</th><th>User</th><th>Action</th><th>Field</th><th>Old &rarr; New</th><th>Reason</th></tr>
+      {% for a in audit %}
+      <tr>
+        <td>{{ a.created_at }}</td>
+        <td>{{ a.user_name or 'System' }}</td>
+        <td>{{ a.action_type }}</td>
+        <td>{{ a.field_name or '—' }}</td>
+        <td>{{ ((a.old_value or '—') + ' → ' + (a.new_value or '—')) if (a.old_value != null or a.new_value != null) else '—' }}</td>
+        <td>{{ a.reason or '—' }}</td>
+      </tr>
+      {% endfor %}
+      {% if not audit or audit.length == 0 %}<tr><td colspan="6" class="muted">No audit entries yet.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>

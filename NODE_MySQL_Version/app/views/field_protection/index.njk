@@ -1,0 +1,92 @@
+<div class="card page-wide">
+  <h1>Field Protection</h1>
+  <p class="muted">One shared mechanism, reused across Company Settings, T&amp;C Clauses, and Payment Presets. A <span class="badge badge-protected">protected</span> field cannot be edited without an explicit unlock, and cannot be blanked or deleted even at the database level. Protecting or unprotecting a field is never a single person's decision: request it below, then a <strong>different</strong> privileged user must approve before anything actually changes.</p>
+
+  <div class="section">
+    <h2>Pending Requests</h2>
+    <table class="list">
+      <tr><th>#</th><th>Field</th><th>Requested</th><th>Reason</th><th>Requested By</th><th>When</th><th>Action</th></tr>
+      {% for r in pending %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.table_name }} — {{ r.record_label }}</td>
+        <td>{{ 'Lock' if r.requested_action == 'lock' else 'Unlock' }}</td>
+        <td>{{ r.reason }}</td>
+        <td>{{ r.requested_by_name }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>
+          {% if r.requested_by == currentUserId %}
+            <span class="muted small">Awaiting a different privileged user</span>
+          {% else %}
+            <form method="post" action="/admin/field-protection/{{ r.id }}/approve" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="text" name="resolved_reason" placeholder="Note (optional)" style="width:140px">
+              <button type="submit" class="btn-sm btn-success">Approve</button>
+            </form>
+            <form method="post" action="/admin/field-protection/{{ r.id }}/reject" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="text" name="resolved_reason" placeholder="Reason (mandatory)" required style="width:140px">
+              <button type="submit" class="btn-sm btn-danger">Reject</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not pending or pending.length == 0 %}
+        <tr><td colspan="7" class="muted">No pending requests.</td></tr>
+      {% endif %}
+    </table>
+  </div>
+
+  {% for tableName, rows in protectable %}
+  <div class="section">
+    <h2>
+      {% if tableName == 'company_settings' %}Company Settings
+      {% elif tableName == 'tc_clauses' %}T&amp;C Clauses
+      {% elif tableName == 'payment_presets' %}Payment Presets
+      {% else %}{{ tableName }}{% endif %}
+    </h2>
+    <table class="list">
+      <tr><th>Field</th><th>Status</th><th>Request</th></tr>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.label }}</td>
+        <td>{% if row.is_protected %}<span class="badge badge-protected">🔒 protected</span>{% else %}<span class="muted">unprotected</span>{% endif %}</td>
+        <td>
+          <form method="post" action="/admin/field-protection/request" style="display:inline-flex; gap:.4rem; align-items:center">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="table_name" value="{{ tableName }}">
+            <input type="hidden" name="record_id" value="{{ row.id }}">
+            <input type="hidden" name="record_label" value="{{ row.label }}">
+            <input type="hidden" name="action" value="{{ 'unlock' if row.is_protected else 'lock' }}">
+            <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:200px">
+            <button type="submit" class="btn-sm">{{ 'Request Unprotect' if row.is_protected else 'Request Protect' }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endfor %}
+
+  <div class="section">
+    <h2>Recent Decisions</h2>
+    <table class="list">
+      <tr><th>#</th><th>Field</th><th>Requested</th><th>Status</th><th>By</th><th>Resolved By</th><th>When</th></tr>
+      {% for r in resolved %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.table_name }} — {{ r.record_label }}</td>
+        <td>{{ 'Lock' if r.requested_action == 'lock' else 'Unlock' }}</td>
+        <td>{{ r.status }}</td>
+        <td>{{ r.requested_by_name }}</td>
+        <td>{{ r.resolved_by_name or '—' }}</td>
+        <td>{{ r.resolved_at }}</td>
+      </tr>
+      {% endfor %}
+      {% if not resolved or resolved.length == 0 %}
+        <tr><td colspan="7" class="muted">No resolved requests yet.</td></tr>
+      {% endif %}
+    </table>
+  </div>
+</div>

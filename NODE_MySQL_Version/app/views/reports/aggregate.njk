@@ -1,0 +1,76 @@
+<div class="card page-wide">
+  <h1>Aggregate Report</h1>
+
+  <form method="get" action="/reports/aggregate" class="section">
+    <div class="kv-grid">
+      <label>Date From<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
+      <label>Date To<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
+      <label>Stage
+        <select name="stage_id">
+          <option value="">— any —</option>
+          {% for s in stages %}
+            <option value="{{ s.id }}" {{ 'selected' if (filters.stageId or 0) == s.id else '' }}>{{ s.stage_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Incoterm
+        <select name="incoterm_id">
+          <option value="">— any —</option>
+          {% for i in incoterms %}
+            <option value="{{ i.id }}" {{ 'selected' if (filters.incotermId or 0) == i.id else '' }}>{{ i.code }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Country
+        <select name="country">
+          <option value="">— any —</option>
+          {% for c in countries %}
+            <option value="{{ c }}" {{ 'selected' if (filters.country or '') == c else '' }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm">Run</button>
+      <a class="btn-sm btn-secondary" href="/reports/aggregate?{{ filterQuery }}&format=csv">Export CSV</a>
+    </div>
+  </form>
+
+  {% if canManageDefinitions %}
+  <form method="post" action="/reports/save" class="section">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <input type="hidden" name="report_type" value="aggregate">
+    <input type="hidden" name="date_from" value="{{ filters.dateFrom or '' }}">
+    <input type="hidden" name="date_to" value="{{ filters.dateTo or '' }}">
+    <input type="hidden" name="stage_id" value="{{ filters.stageId or '' }}">
+    <input type="hidden" name="incoterm_id" value="{{ filters.incotermId or '' }}">
+    <input type="hidden" name="country" value="{{ filters.country or '' }}">
+    <label style="display:inline-block;width:auto;margin-right:0.5rem;">Save these filters as <input type="text" name="name" placeholder="Report name" style="display:inline-block;width:220px;"></label>
+    <label style="display:inline-block;width:auto;margin-right:0.5rem;">
+      <select name="visibility" style="display:inline-block;width:auto;">
+        <option value="private">Private</option>
+        <option value="shared">Shared</option>
+      </select>
+    </label>
+    <button type="submit" class="btn-sm btn-secondary">Save Report</button>
+  </form>
+  {% endif %}
+
+  <table class="list">
+    <tr><th>Order Ref</th><th>Client</th><th>Country</th><th>Incoterm</th><th>Currency</th><th>Stage</th><th>Status</th><th>Total FOB</th><th>Created</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.order_reference }}</td>
+      <td>{{ r.company_legal_name }}</td>
+      <td>{{ r.country_of_destination or '—' }}</td>
+      <td>{{ r.incoterm_code }}</td>
+      <td>{{ r.currency_code }}</td>
+      <td>{{ r.current_stage_name or 'Quotation' }}</td>
+      <td>{{ r.status | capitalize }}</td>
+      <td>{{ r.total_fob_value }}</td>
+      <td>{{ r.created_at }}</td>
+    </tr>
+    {% endfor %}
+    {% if not rows or rows.length == 0 %}<tr><td colspan="9" class="muted">No orders match these filters.</td></tr>{% endif %}
+  </table>
+</div>

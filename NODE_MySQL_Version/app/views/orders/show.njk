@@ -1,0 +1,658 @@
+{% set stage1 = stageByNumber[1] %}
+{% set stage2 = stageByNumber[2] %}
+{% set stage3 = stageByNumber[3] %}
+{% set stage4 = stageByNumber[4] %}
+{% set stage5 = stageByNumber[5] %}
+{% set stage6 = stageByNumber[6] %}
+{% set stage7 = stageByNumber[7] %}
+{% set stage8 = stageByNumber[8] %}
+{% set stage9 = stageByNumber[9] %}
+
+{% set hasQt = stage1 and stage1.status == 'gate_passed' %}
+{% set hasBuyerPo = stage2 and stage2.status == 'gate_passed' %}
+{% set advanceCleared = stage3 and stage3.status == 'gate_passed' %}
+{% set buyerAcknowledged = stage4 and stage4.status == 'gate_passed' %}
+{% set supplierSigned = stage5 and stage5.status == 'gate_passed' %}
+{% set isFob = (order.incoterm_code | upper) == 'FOB' %}
+{% set freightSkipped = stage6 and stage6.status == 'skipped' %}
+{% set freightCleared = stage6 and stage6.status == 'gate_passed' %}
+{% set blIssued = stage7 and stage7.status == 'gate_passed' %}
+{% set balanceCleared = stage8 and stage8.status == 'gate_passed' %}
+{% set orderClosed = order.status == 'complete' %}
+
+<div class="card page-wide">
+  <h1>{{ order.order_reference }}
+    {% if order.status != 'active' %}<span class="badge badge-{{ order.status }}">{{ order.status }}</span>{% endif %}
+  </h1>
+  <p class="muted">
+    {{ order.company_legal_name }} &nbsp;&middot;&nbsp;
+    Buyer Inquiry Ref: {{ order.buyer_inquiry_ref }} &nbsp;&middot;&nbsp;
+    {{ order.incoterm_code }} {{ order.port_of_loading_name or '' }}
+    {% if permissions.view_reports %}&nbsp;&middot;&nbsp; <a href="/reports/order/{{ order.id }}">Full Report</a>{% endif %}
+  </p>
+  {% if order.status == 'lost' %}
+    <p class="muted small">Marked lost{% if order.lost_at %} on {{ order.lost_at }}{% endif %}{% if order.lost_reason %} — reason: {{ order.lost_reason }}{% endif %}</p>
+  {% endif %}
+  {% if order.status == 'active' and permissions.manage_orders %}
+  <form method="post" action="/orders/{{ order.id }}/mark-lost" style="display:inline" onsubmit="return confirmMarkLost(this);">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <input type="hidden" name="reason" class="mark-lost-reason">
+    <button type="button" class="btn-sm btn-danger" onclick="promptMarkLost(this)">Mark as Lost</button>
+  </form>
+  <script>
+    function promptMarkLost(btn) {
+      var form = btn.closest('form');
+      var reason = prompt('Why is this order lost? (required — recorded in the audit log)');
+      if (!reason || !reason.trim()) { return; }
+      form.querySelector('.mark-lost-reason').value = reason.trim();
+      form.requestSubmit ? form.requestSubmit() : form.submit();
+    }
+    function confirmMarkLost(form) {
+      var reason = form.querySelector('.mark-lost-reason').value;
+      if (!reason) { return false; }
+      return confirm('Mark {{ order.order_reference }} as LOST? This locks the order (same as closing it) and cannot be undone from this screen.');
+    }
+  </script>
+  {% endif %}
+
+  <div class="stage-track">
+    {% for s in stages %}
+      <div class="stage-chip {{ s.status }}">
+        {{ s.stage_number }}. {{ s.stage_name }}<br>
+        <span class="muted small">{{ s.status | replace('_', ' ') }}</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="section">
+    <h2>Order Details</h2>
+    <div class="kv-grid">
+      <div><span class="k">FOB Value</span><span class="v">{{ order.currency_code }} {{ fobTotal | float | round(2, 'floor') }}</span></div>
+      <div><span class="k">Port of Discharge</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or 'TBC' }}</span></div>
+      <div><span class="k">Container Type</span><span class="v">{{ order.container_type or '—' }}</span></div>
+      <div><span class="k">Payment Preset</span><span class="v">{{ order.preset_name }}</span></div>
+      <div><span class="k">Buyer's PO Ref</span><span class="v">{{ order.buyers_po_ref or 'NIL' }}</span></div>
+      <div><span class="k">Special Requirements</span><span class="v">{{ order.special_requirements or '—' }}</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Products</h2>
+    <table class="list">
+      <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
+      {% for p in products %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ p.description }}{% if p.dimensions or p.finish %}<br><span class="muted small">{{ p.dimensions or '' }} {{ p.finish or '' }}</span>{% endif %}</td>
+        <td>{{ 'TBC' if p.quantity_is_tbc else p.quantity }}</td>
+        <td>{{ p.unit or '' }}</td>
+        <td>{{ p.unit_price if p.unit_price != null else 'TBC' }}</td>
+        <td>{{ p.fob_value if p.fob_value != null else 'TBC' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Documents</h2>
+    <table class="list">
+      <tr><th>Type</th><th>Reference</th><th>Rev.</th><th>Generated</th><th>Status</th><th>Download</th></tr>
+      {% for d in documents %}
+      <tr>
+        <td>{{ d.document_type_code }}</td>
+        <td>{{ d.document_reference or '—' }}</td>
+        <td>{{ d.revision_number }}</td>
+        <td>{{ d.generated_at }}</td>
+        <td>{{ d.status | replace('_', ' ') }}</td>
+        <td>
+          {% if d.pdf_file_id %}<a href="/documents/{{ d.id }}/download?format=pdf">PDF</a>{% endif %}
+          {% if d.docx_file_id %} &middot; <a href="/documents/{{ d.id }}/download?format=docx">DOCX (internal)</a>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not documents or documents.length == 0 %}
+      <tr><td colspan="6" class="muted">No documents generated yet.</td></tr>
+      {% endif %}
+    </table>
+
+    <div class="btn-row">
+      {% if stage1 and stage1.status != 'locked' %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="QT">
+          <button type="submit" class="btn-sm">{{ 'Regenerate Quotation (new revision)' if hasQt else 'Generate Quotation' }}</button>
+        </form>
+      {% endif %}
+
+      {% if stage3 and stage3.status != 'locked' %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="PI">
+          <button type="submit" class="btn-sm">Generate Proforma Invoice</button>
+        </form>
+      {% endif %}
+
+      {% if stage4 and stage4.status != 'locked' %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="OC">
+          <button type="submit" class="btn-sm">Generate Order Confirmation</button>
+        </form>
+      {% endif %}
+
+      {% if stage2 and stage2.status != 'locked' %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="BUYERPO">
+          <button type="submit" class="btn-sm">Generate Buyer PO</button>
+        </form>
+      {% endif %}
+
+      {% if stage5 and stage5.status != 'locked' and supplierPo %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="SUPPO">
+          <button type="submit" class="btn-sm">Generate Supplier PO</button>
+        </form>
+      {% endif %}
+
+      {% if not isFob and stage6 and stage6.status != 'locked' and freight %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="FDN">
+          <button type="submit" class="btn-sm">Generate Freight Debit Note</button>
+        </form>
+      {% endif %}
+
+      {% if stage7 and stage7.status != 'locked' and packing %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="PL">
+          <button type="submit" class="btn-sm">Generate Packing List</button>
+        </form>
+      {% endif %}
+
+      {% if stage7 and stage7.status != 'locked' and shipping %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="BLI">
+          <button type="submit" class="btn-sm">Generate BL Instruction Sheet</button>
+        </form>
+      {% endif %}
+
+      {% if stage8 and stage8.status != 'locked' %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="CI">
+          <button type="submit" class="btn-sm">Generate Commercial Invoice</button>
+        </form>
+      {% endif %}
+
+      {% if stage9 and stage9.status != 'locked' %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="COOPREP">
+          <button type="submit" class="btn-sm">Generate COO Prep Sheet (internal)</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Review, Approval &amp; Send to Buyer</h2>
+    <p class="muted">A document generated above starts life <strong>draft</strong> with the DRAFT watermark. Assign at least one reviewer to move it to review; once every assigned reviewer approves (minimum required per document type), it's re-watermarked as final and can be sent to the buyer. The buyer only ever receives that final watermarked PDF — never the internal DOCX, never an unwatermarked copy.</p>
+    {% for d in documents %}
+      {% set reviews = reviewsByDocument[d.id] or [] %}
+      {% set crossVerifications = crossVerificationsByDocument[d.id] or [] %}
+      {% set myPendingReview = null %}
+      {% for r in reviews %}
+        {% if r.reviewer_id == currentUser.id and r.status == 'pending' %}{% set myPendingReview = r %}{% endif %}
+      {% endfor %}
+      <details>
+        <summary>{{ d.document_type_code }} {{ d.document_reference or '—' }} Rev.{{ d.revision_number }} — {{ d.status | replace('_', ' ') }}</summary>
+
+        {% if not reviews or reviews.length == 0 %}
+          <form method="post" action="/documents/{{ d.id }}/reviewers">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Assign reviewer(s) * (minimum required: {{ d.min_reviewers_default or 1 }})
+              <select name="reviewer_ids[]" multiple size="4" required style="min-width:220px">
+                {% for u in activeUsers %}
+                  <option value="{{ u.id }}">{{ u.name }} ({{ u.role_name or '—' }})</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="submit" class="btn-sm">Assign Reviewers</button>
+          </form>
+        {% else %}
+          <table class="list">
+            <tr><th>Reviewer</th><th>Status</th><th>Comments</th><th>Reviewed</th></tr>
+            {% for r in reviews %}
+              <tr>
+                <td>{{ r.reviewer_name }}</td>
+                <td>{{ r.status }}</td>
+                <td>{{ r.comments or '' }}</td>
+                <td>{{ r.reviewed_at or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+
+        {% if myPendingReview %}
+          <form method="post" action="/reviews/{{ myPendingReview.id }}/approve" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="text" name="comments" placeholder="Comments (optional)">
+            <button type="submit" class="btn-sm btn-success">Approve</button>
+          </form>
+          <form method="post" action="/reviews/{{ myPendingReview.id }}/reject" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="text" name="comments" placeholder="Reason (mandatory)" required>
+            <button type="submit" class="btn-sm btn-danger">Reject</button>
+          </form>
+        {% endif %}
+
+        <form method="post" action="/documents/{{ d.id }}/cross-verify" style="margin-top:6px">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <select name="result" required>
+            <option value="pass">Cross-verify: Pass</option>
+            <option value="fail">Cross-verify: Fail</option>
+          </select>
+          <input type="text" name="comments" placeholder="Comments (optional)">
+          <button type="submit" class="btn-sm">Record Cross-Verification</button>
+        </form>
+        {% if crossVerifications and crossVerifications.length > 0 %}
+          <p class="muted small">
+            {% for cv in crossVerifications %}
+              {{ cv.verified_by_name }}: {{ cv.result }} ({{ cv.verified_at }})<br>
+            {% endfor %}
+          </p>
+        {% endif %}
+
+        {% if d.status == 'approved' and d.document_type_code != 'AMD' and d.document_type_code != 'SUPPO' and d.document_type_code != 'COOPREP' and d.document_type_code != 'BLI' %}
+          <p><a href="/orders/{{ order.id }}/documents/{{ d.id }}/send" class="btn-sm">Send to Buyer (deferred, 2-level approval)</a></p>
+        {% elif d.status == 'sent' %}
+          <p class="muted">Already sent to buyer.</p>
+        {% endif %}
+      </details>
+    {% endfor %}
+  </div>
+
+  <div class="section">
+    <h2>Amendments &amp; Disputes</h2>
+    <p><a href="/orders/{{ order.id }}/amendments">Payment Terms Amendments ({{ amendmentCount }})</a>
+       &nbsp;&middot;&nbsp;
+       <a href="/orders/{{ order.id }}/disputes">Disputes ({{ openDisputeCount }} open)</a></p>
+  </div>
+
+  {% if permissions.edit_locked_data %}
+  <div class="section">
+    <h2>Admin Override</h2>
+    <form method="post" action="/orders/{{ order.id }}/override-status-lock" onsubmit="return confirmFieldOverride(this, &quot;this order's status/lock&quot;);">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Status
+        <select name="status">
+          <option value="active" {{ 'selected' if order.status == 'active' else '' }}>Active</option>
+          <option value="complete" {{ 'selected' if order.status == 'complete' else '' }}>Complete</option>
+          <option value="disputed" {{ 'selected' if order.status == 'disputed' else '' }}>Disputed</option>
+          <option value="lost" {{ 'selected' if order.status == 'lost' else '' }}>Lost</option>
+        </select>
+      </label>
+      <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" {{ 'checked' if order.is_locked else '' }}> Locked (normally set automatically once status = complete)</label>
+      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
+      <button type="submit" class="btn-sm btn-danger">Override Status/Lock</button>
+    </form>
+  </div>
+  <script>
+  function confirmFieldOverride(form, label) {
+    var reasonEl = form.querySelector('.override-reason');
+    if (!reasonEl || reasonEl.value.trim() === '') {
+      alert('A reason is required before saving.');
+      return false;
+    }
+    return confirm('Override ' + label + '? This is logged and cannot be undone through this screen.');
+  }
+  </script>
+  {% endif %}
+
+  <div class="section">
+    <h2>Stage 2 — Buyer PO</h2>
+    {% if hasBuyerPo %}
+      <p>Buyer PO recorded: <strong>{{ order.buyers_po_ref }}</strong></p>
+    {% elif stage2 and stage2.status != 'locked' %}
+      <form method="post" action="/orders/{{ order.id }}/buyer-po">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+        <button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+      </form>
+    {% else %}
+      <p class="muted">Generate the Quotation first to unlock this gate.</p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Payment Status</h2>
+    {% if payment %}
+    <div class="kv-grid">
+      <div><span class="k">Advance Amount</span><span class="v">{{ payment.advance_amount if payment.advance_amount != null else '—' }}</span></div>
+      <div><span class="k">Advance T/T Received</span><span class="v">{{ payment.advance_remittance_received_at or '—' }}</span></div>
+      <div><span class="k">Advance Cleared</span><span class="v">{{ payment.advance_cleared_at or '—' }}</span></div>
+      <div><span class="k">Balance Amount</span><span class="v">{{ payment.balance_amount if payment.balance_amount != null else '—' }}</span></div>
+      <div><span class="k">Balance Due</span><span class="v">{{ payment.balance_due_date or 'event-triggered' }}</span></div>
+    </div>
+    {% endif %}
+
+    {% if stage3 and stage3.status != 'locked' and not advanceCleared %}
+      {% if not payment or payment.advance_remittance_received_at == null %}
+        <form method="post" action="/orders/{{ order.id }}/payment/advance">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Advance Amount Received *<input type="text" name="advance_amount" required></label>
+          <label>Received On<input type="date" name="advance_received_at"></label>
+          <button type="submit" class="btn-sm">Record Advance Remittance</button>
+        </form>
+      {% else %}
+        <form method="post" action="/orders/{{ order.id }}/payment/advance/clear">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Cleared On<input type="date" name="advance_cleared_at"></label>
+          <button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
+        </form>
+      {% endif %}
+    {% elif not stage3 or stage3.status == 'locked' %}
+      <p class="muted">Record the Buyer PO first to unlock this gate.</p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Production &amp; Estimated Shipment</h2>
+    <div class="kv-grid">
+      <div><span class="k">Production Status</span><span class="v">{{ order.production_status_text or 'Not yet commenced' }}</span></div>
+      <div><span class="k">Est. Shipment</span><span class="v">{{ order.est_shipment_date_text or 'TBC' }}</span></div>
+    </div>
+    {% if stage4 and stage4.status != 'locked' %}
+      <form method="post" action="/orders/{{ order.id }}/production-status">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Production Status<input type="text" name="production_status_text" placeholder="e.g. Cutting and finishing in progress — 30% complete"></label>
+        <label>Estimated Shipment<input type="text" name="est_shipment_date_text" placeholder="e.g. Week of 15 October 2026"></label>
+        <button type="submit" class="btn-sm">Update</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
+    {% if buyerAcknowledged %}
+      <p>Buyer has acknowledged the Order Confirmation.</p>
+    {% elif stage4 and stage4.status != 'locked' %}
+      <p class="muted">Generate the Order Confirmation above and send it to the buyer, then confirm their acknowledgement here.</p>
+      <form method="post" action="/orders/{{ order.id }}/buyer-acknowledged">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <button type="submit" class="btn-sm btn-success">Confirm Buyer Acknowledged Order (unlocks Stage 5)</button>
+      </form>
+    {% else %}
+      <p class="muted">Clear the advance payment first to unlock this gate.</p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Stage 5 — Supplier Purchase Order (Material Procurement)</h2>
+    {% if not stage5 or stage5.status == 'locked' %}
+      <p class="muted">Confirm buyer acknowledgement first to unlock this gate.</p>
+    {% else %}
+      {% if supplierPo %}
+        <div class="kv-grid">
+          <div><span class="k">Supplier</span><span class="v">{{ supplierPo.supplier_legal_name }}</span></div>
+          <div><span class="k">Supplier PO Ref</span><span class="v">{{ supplierPo.supplier_po_reference }}</span></div>
+          <div><span class="k">Material</span><span class="v">{{ supplierPo.material_stone_type or '—' }}</span></div>
+          <div><span class="k">Total Payable (INR)</span><span class="v">{{ supplierPo.total_payable_inr or '—' }}</span></div>
+          <div><span class="k">Status</span><span class="v">{{ supplierPo.status }}</span></div>
+        </div>
+      {% else %}
+        <details open>
+          <summary>Add a new supplier</summary>
+          <form method="post" action="/orders/{{ order.id }}/suppliers">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Supplier Legal Name *<input type="text" name="supplier_legal_name" required></label>
+            <label>Address<input type="text" name="address"></label>
+            <label>GSTIN<input type="text" name="gstin"></label>
+            <label>PAN<input type="text" name="pan"></label>
+            <label>Contact Person<input type="text" name="contact_person"></label>
+            <label>Phone<input type="text" name="phone"></label>
+            <label>Supplier Type
+              <select name="supplier_type">
+                <option value="">—</option>
+                {% for opt in supplierTypes %}
+                  <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="submit" class="btn-sm">Add Supplier</button>
+          </form>
+        </details>
+
+        <form method="post" action="/orders/{{ order.id }}/supplier-po">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Supplier *
+            <select name="supplier_id" required>
+              <option value="">Select supplier…</option>
+              {% for sup in suppliers %}
+                <option value="{{ sup.id }}">{{ sup.supplier_legal_name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Material / Stone Type<input type="text" name="material_stone_type"></label>
+          <label>Grade<input type="text" name="grade" value="Grade A"></label>
+          <label>Surface Finish<input type="text" name="surface_finish"></label>
+          <label>Dimensions<input type="text" name="dimensions"></label>
+          <label>Dimensional Tolerance<input type="text" name="dimensional_tolerance"></label>
+          <label>Quantity<input type="text" name="quantity"></label>
+          <label>Unit<input type="text" name="unit"></label>
+          <label>Colour Reference<input type="text" name="colour_reference"></label>
+          <label>Special Requirements<input type="text" name="special_requirements"></label>
+          <label>Unit Price (INR)<input type="text" name="unit_price_inr"></label>
+          <label>Basic Value (INR)<input type="text" name="basic_value_inr"></label>
+          <label>GST Rate (%)<input type="text" name="gst_rate_pct"></label>
+          <label>GST Amount (INR)<input type="text" name="gst_amount_inr"></label>
+          <label>Total Payable (INR)<input type="text" name="total_payable_inr"></label>
+          <label>Advance (%)<input type="text" name="advance_pct"></label>
+          <label>Advance Amount (INR)<input type="text" name="advance_amount_inr"></label>
+          <label>Balance Amount (INR)<input type="text" name="balance_amount_inr"></label>
+          <label>Delivery Location<input type="text" name="delivery_location"></label>
+          <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
+          <label>Packing Requirement<input type="text" name="packing_requirement"></label>
+          <button type="submit" class="btn-sm">Save Supplier PO Terms</button>
+        </form>
+      {% endif %}
+
+      {% if supplierPo and supplierPo.status != 'signed' %}
+        <form method="post" action="/orders/{{ order.id }}/supplier-po/signed">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
+        </form>
+      {% elif supplierPo %}
+        <p>Supplier has signed and returned the PO.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Stage 6 — Freight Payment{{ ' (skipped — FOB)' if isFob else '' }}</h2>
+    {% if isFob %}
+      <p class="muted">FOB order — buyer arranges and pays freight directly. This stage is auto-skipped once Stage 5 passes.</p>
+      {% if freightSkipped %}<p>Confirmed skipped: {{ stage6.skip_reason }}</p>{% endif %}
+    {% elif not stage6 or stage6.status == 'locked' %}
+      <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
+    {% else %}
+      {% if not freight %}
+        <form method="post" action="/orders/{{ order.id }}/freight-terms">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
+          <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
+          <label>Freight Forwarder Name<input type="text" name="freight_forwarder_name"></label>
+          <label>Freight Forwarder Contact<input type="text" name="freight_forwarder_contact"></label>
+          <label>GST Treatment
+            <select name="gst_treatment">
+              <option value="NIL">NIL</option>
+              <option value="IGST_18">18% IGST</option>
+            </select>
+          </label>
+          <button type="submit" class="btn-sm">Save Freight Terms</button>
+        </form>
+      {% else %}
+        <div class="kv-grid">
+          <div><span class="k">Confirmed Rate</span><span class="v">{{ freight.confirmed_freight_rate or '—' }}</span></div>
+          <div><span class="k">Insurance</span><span class="v">{{ freight.insurance_amount or 'NIL' }}</span></div>
+          <div><span class="k">Forwarder</span><span class="v">{{ freight.freight_forwarder_name or '—' }}</span></div>
+        </div>
+        {% if not freightCleared %}
+          {% if not payment or payment.freight_remittance_received_at == null %}
+            <form method="post" action="/orders/{{ order.id }}/payment/freight">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <label>Freight Amount Received *<input type="text" name="freight_amount" required></label>
+              <label>Received On<input type="date" name="freight_received_at"></label>
+              <button type="submit" class="btn-sm">Record Freight Remittance</button>
+            </form>
+          {% else %}
+            <form method="post" action="/orders/{{ order.id }}/payment/freight/clear">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <label>Cleared On<input type="date" name="freight_cleared_at"></label>
+              <button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
+            </form>
+          {% endif %}
+        {% else %}
+          <p>Freight payment cleared.</p>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Stage 7 — Packing &amp; BL Instruction</h2>
+    {% if not stage7 or stage7.status == 'locked' %}
+      <p class="muted">{{ 'Confirm the Supplier PO is signed first' if isFob else 'Clear the freight payment first' }} to unlock this gate.</p>
+    {% else %}
+      <h3>Packing</h3>
+      <form method="post" action="/orders/{{ order.id }}/packing">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="{{ packing.actual_quantity_packed or '' }}"></label>
+        <label>Crate Count<input type="text" name="crate_count" value="{{ packing.crate_count or '' }}"></label>
+        <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="{{ packing.total_net_weight_kg or '' }}"></label>
+        <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="{{ packing.total_gross_weight_kg or '' }}"></label>
+        <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="{{ packing.total_cbm or '' }}"></label>
+        <label>Packing Date<input type="date" name="packing_date" value="{{ packing.packing_date or '' }}"></label>
+        <label>Shortfall %<input type="text" name="shortfall_pct" value="{{ packing.shortfall_pct or '' }}"></label>
+
+        <p class="muted small">Crate-level breakdown (add one row per physical crate):</p>
+        <table class="list">
+          <tr><th>Crate No.</th><th>Marks &amp; Numbers</th><th>Product</th><th>L&times;W&times;H (cm)</th><th>Pcs</th><th>Net (kg)</th><th>Gross (kg)</th><th>CBM</th><th>HS Code</th></tr>
+          {% set existingCrates = crates if crates and crates.length > 0 else [{}, {}, {}] %}
+          {% for c in existingCrates %}
+          <tr>
+            <td><input type="text" name="crate_no[]" value="{{ c.crate_no or '' }}" style="width:70px;"></td>
+            <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:180px;"></td>
+            <td><input type="text" name="crate_product_description[]" value="{{ c.product_description or '' }}" style="width:150px;"></td>
+            <td><input type="text" name="crate_dimensions[]" value="{{ c.dimensions_lwh_cm or '' }}" style="width:90px;"></td>
+            <td><input type="text" name="crate_pcs[]" value="{{ c.pcs or '' }}" style="width:50px;"></td>
+            <td><input type="text" name="crate_net_weight_kg[]" value="{{ c.net_weight_kg or '' }}" style="width:70px;"></td>
+            <td><input type="text" name="crate_gross_weight_kg[]" value="{{ c.gross_weight_kg or '' }}" style="width:70px;"></td>
+            <td><input type="text" name="crate_cbm[]" value="{{ c.cbm or '' }}" style="width:60px;"></td>
+            <td><input type="text" name="crate_hs_code[]" value="{{ c.hs_code or '' }}" style="width:70px;"></td>
+          </tr>
+          {% endfor %}
+        </table>
+        <button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
+      </form>
+
+      <h3>Shipping / Vessel Details</h3>
+      <form method="post" action="/orders/{{ order.id }}/shipping">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Shipping Line<input type="text" name="shipping_line" value="{{ shipping.shipping_line or '' }}"></label>
+        <label>Vessel Name<input type="text" name="vessel_name" value="{{ shipping.vessel_name or '' }}"></label>
+        <label>Voyage Number<input type="text" name="voyage_number" value="{{ shipping.voyage_number or '' }}"></label>
+        <label>ETD<input type="date" name="etd" value="{{ shipping.etd or '' }}"></label>
+        <label>ETA<input type="date" name="eta" value="{{ shipping.eta or '' }}"></label>
+        <label>Container Type<input type="text" name="ship_container_type" value="{{ shipping.container_type or order.container_type or '' }}"></label>
+        <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}"></label>
+        <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}"></label>
+        <button type="submit" class="btn-sm">Save Shipping Details</button>
+      </form>
+
+      {% if not blIssued %}
+        <form method="post" action="/orders/{{ order.id }}/bl-issued">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>BL Number *<input type="text" name="bl_number" required></label>
+          <label>BL Date<input type="date" name="bl_date"></label>
+          <button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+        </form>
+      {% else %}
+        <p>Bill of Lading recorded: <strong>{{ shipping.bl_number }}</strong> ({{ shipping.bl_date }})</p>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Stage 8 — Commercial Invoice &amp; Balance Payment</h2>
+    {% if not stage8 or stage8.status == 'locked' %}
+      <p class="muted">Confirm BL issuance first to unlock this gate.</p>
+    {% else %}
+      {% if shipping and not shipping.scanned_bl_sent_to_buyer_at %}
+        <form method="post" action="/orders/{{ order.id }}/scanned-bl-sent">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
+        </form>
+      {% elif shipping %}
+        <p class="muted small">Scanned BL copy sent to buyer.</p>
+      {% endif %}
+
+      {% if not balanceCleared %}
+        {% if not payment or payment.balance_remittance_received_at == null %}
+          <form method="post" action="/orders/{{ order.id }}/payment/balance">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Balance Amount Received *<input type="text" name="balance_amount" required value="{{ payment.balance_amount or '' }}"></label>
+            <label>Received On<input type="date" name="balance_received_at"></label>
+            <button type="submit" class="btn-sm">Record Balance Remittance</button>
+          </form>
+        {% else %}
+          <form method="post" action="/orders/{{ order.id }}/payment/balance/clear">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Cleared On<input type="date" name="balance_cleared_at"></label>
+            <button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
+          </form>
+        {% endif %}
+      {% else %}
+        <p>Balance payment cleared.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Stage 9 — Document Despatch &amp; Closure</h2>
+    {% if orderClosed %}
+      <p><strong>&#10003; Order closed.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }}</p>
+    {% elif not stage9 or stage9.status == 'locked' %}
+      <p class="muted">Clear the balance payment first to unlock this gate.</p>
+    {% else %}
+      {% if not shipping or not shipping.bl_originals_received_at %}
+        <form method="post" action="/orders/{{ order.id }}/bl-originals-received">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
+          <button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
+        </form>
+      {% else %}
+        <p class="muted small">Original BLs received ({{ shipping.bl_originals_received_count }}).</p>
+      {% endif %}
+
+      {% if shipping and shipping.bl_originals_received_at and not shipping.bl_endorsed_at %}
+        <form method="post" action="/orders/{{ order.id }}/bl-endorsed">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
+        </form>
+      {% elif shipping and shipping.bl_endorsed_at %}
+        <p class="muted small">Original BLs endorsed.</p>
+      {% endif %}
+
+      <form method="post" action="/orders/{{ order.id }}/close">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
+        <button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
+      </form>
+    {% endif %}
+  </div>
+</div>

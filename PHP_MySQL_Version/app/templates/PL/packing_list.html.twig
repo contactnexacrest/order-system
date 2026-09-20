@@ -1,0 +1,93 @@
+{% extends "_layout.html.twig" %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td class="label">PL NUMBER *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
+    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
+  </tr>
+  <tr>
+    <td class="label">PI REFERENCE *</td><td class="value">{{ order.pi_ref ?: '—' }}</td>
+    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block body %}
+
+<div class="section-title">2. CONSIGNEE / BUYER</div>
+<table class="kv">
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
+  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
+  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Notify Party</td><td class="v">{{ buyer.notify_party ?: 'Same as consignee' }}</td></tr>
+</table>
+
+<div class="section-title">3. PRODUCT SUMMARY</div>
+{% set productList = [] %}
+{% set hsCodeList = [] %}
+{% for p in products %}
+  {% set productList = productList|merge([p.description ~ (p.finish ? ' — ' ~ p.finish : '')]) %}
+  {% set hsCodeList = hsCodeList|merge([p.hs_code]) %}
+{% endfor %}
+<table class="kv">
+  <tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }}</td></tr>
+  <tr><td class="k">HS Code *</td><td class="v">{{ hsCodeList|join(', ') }}</td></tr>
+  <tr><td class="k">Country of Origin *</td><td class="v">India</td></tr>
+  <tr><td class="k">Total Quantity Packed *</td><td class="v">{{ packing.actual_quantity_packed ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Total No. of Crates *</td><td class="v">{{ packing.crate_count ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Total Net Weight *</td><td class="v">{{ packing.total_net_weight_kg ? packing.total_net_weight_kg ~ ' kg' : 'TBC' }}</td></tr>
+  <tr><td class="k">Total Gross Weight *</td><td class="v">{{ packing.total_gross_weight_kg ? packing.total_gross_weight_kg ~ ' kg' : 'TBC' }}</td></tr>
+  <tr><td class="k">Total CBM *</td><td class="v">{{ packing.total_cbm ? packing.total_cbm ~ ' m³' : 'TBC' }}</td></tr>
+  <tr><td class="k">Packing Date</td><td class="v">{{ packing.packing_date ?: 'TBC' }}</td></tr>
+</table>
+
+<div class="section-title">4. CRATE-LEVEL BREAKDOWN (from factory packing data)</div>
+{% if crates is not empty %}
+<table class="products">
+  <thead>
+    <tr>
+      <th>Crate No.</th>
+      <th>Marks &amp; Numbers</th>
+      <th>Product Description &amp; Finish</th>
+      <th>Size L×W×H (cm)</th>
+      <th class="num">Pcs</th>
+      <th class="num">Net Wt (kg)</th>
+      <th class="num">Gross Wt (kg)</th>
+      <th class="num">CBM</th>
+      <th>HS Code</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for c in crates %}
+    <tr>
+      <td>{{ c.crate_no }}</td>
+      <td style="font-size:7.5px;">{{ c.marks_numbers }}</td>
+      <td>{{ c.product_description }}</td>
+      <td>{{ c.dimensions_lwh_cm ?: '—' }}</td>
+      <td class="num">{{ c.pcs ?: '—' }}</td>
+      <td class="num">{{ c.net_weight_kg ?: '—' }}</td>
+      <td class="num">{{ c.gross_weight_kg ?: '—' }}</td>
+      <td class="num">{{ c.cbm ?: '—' }}</td>
+      <td>{{ c.hs_code ?: '—' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="font-size:8.7px; color:#5b6774; font-style:italic;">Crate-level breakdown not yet recorded.</p>
+{% endif %}
+
+<div class="section-title">5. DECLARATION</div>
+<table class="kv">
+  <tr><td colspan="2">We hereby declare that the particulars given above are true and correct to the best of our knowledge and belief, and that the goods described herein are of Indian origin.<br>
+    <strong>Fumigation Certificate:</strong> A Fumigation Certificate is provided as standard with every NexaCrest shipment and will be included in the final document set couriered to the buyer.
+  </td></tr>
+</table>
+
+{% endblock %}

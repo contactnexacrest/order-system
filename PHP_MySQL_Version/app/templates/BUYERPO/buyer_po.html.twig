@@ -1,0 +1,66 @@
+{% extends "_layout.html.twig" %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td class="label">PO NUMBER *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
+    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
+  </tr>
+  <tr>
+    <td class="label">QT REFERENCE *</td><td class="value">{{ order.quotation_ref ?: '—' }}</td>
+    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block banner %}
+<div class="valid-until">&#9201; VALID UNTIL * &nbsp; {{ order.quotation_valid_until ?: 'TBC' }} &nbsp;&nbsp; This Purchase Order must be signed and returned before the Quotation validity expires.</div>
+{% endblock %}
+
+{% block body %}
+
+<p class="muted" style="font-size:8.5px;">This Purchase Order is prepared by NexaCrest and sent to the buyer for signature and return. Buyer completes Section 4 only. All other fields are pre-filled by NexaCrest.</p>
+
+<div class="section-title">2. BUYER / CONSIGNEE DETAILS (Pre-filled by NexaCrest — buyer to confirm)</div>
+<table class="kv">
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
+  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
+  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Phone *</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Country of Destination *</td><td class="v">{{ buyer.country_of_destination ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+</table>
+
+<div class="section-title">3. ORDER DETAILS (Pre-filled from Quotation — buyer to confirm)</div>
+{% set productList = [] %}
+{% for p in products %}
+  {% set productList = productList|merge([p.description ~ ' (Qty: ' ~ p.quantity ~ ' ' ~ p.unit ~ ')']) %}
+{% endfor %}
+<table class="kv">
+  <tr><td class="k">Against Quotation No. *</td><td class="v">{{ order.quotation_ref ?: '—' }} (fixed)</td></tr>
+  <tr><td class="k">Quotation Date *</td><td class="v">{{ order.quotation_date ?: '—' }} (fixed)</td></tr>
+  <tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }}</td></tr>
+  <tr><td class="k">Total FOB Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.fob_value }}</td></tr>
+  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
+  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Certificate of Origin *</td><td class="v">{{ order.coo_type }}</td></tr>
+  <tr><td class="k">Payment Terms *</td><td class="v">{{ financial.advance_pct }}% advance T/T against Proforma Invoice before production. {{ financial.balance_pct }}% balance T/T before shipment — within {{ financial.balance_days }} working days of shipment readiness confirmation. Freight &amp; Insurance (CFR/CIF): invoiced separately by Freight Debit Note before shipment.</td></tr>
+</table>
+
+<div class="section-title">4. BUYER ACCEPTANCE (Buyer fills this section, signs and returns)</div>
+<table class="kv">
+  <tr><td class="k">Authorised Signature</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">Name</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">Designation</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">Buyer's PO No.</td><td class="v">_________________________________ (write NIL if not applicable)</td></tr>
+  <tr><td class="k">Date</td><td class="v">_________________________________</td></tr>
+  <tr><td class="k">Company Stamp</td><td class="v">(if applicable)</td></tr>
+</table>
+<p class="mandatory-note">By signing above, the buyer confirms acceptance of all order details, specifications and payment terms stated in this Purchase Order. This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production upon receipt of the {{ financial.advance_pct }}% advance payment. The following clauses are legally binding on both parties:</p>
+
+{% endblock %}

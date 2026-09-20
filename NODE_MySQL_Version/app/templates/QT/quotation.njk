@@ -1,0 +1,119 @@
+{% extends "_layout.njk" %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td class="label">QUOTATION NO. *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
+    <td class="label">DATE *</td><td class="value">{{ order.quotation_date or meta.generated_date }}</td>
+  </tr>
+  <tr>
+    <td class="label">BUYER INQUIRY REF *</td><td class="value" colspan="3">{{ order.buyer_inquiry_ref }}</td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block banner %}
+<div class="valid-until">&#9201; VALID UNTIL * &nbsp; {{ order.quotation_valid_until or 'TBC' }} &nbsp;&nbsp; Prices and terms are not valid after this date.</div>
+{% endblock %}
+
+{% block body %}
+
+<div class="section-title">2. BUYER / CONSIGNEE DETAILS</div>
+<table class="kv">
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
+  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
+  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no or 'TBC' }}</td></tr>
+  <tr><td class="k">Country of Destination *</td><td class="v">{{ buyer.country_of_destination or 'TBC' }}</td></tr>
+  <tr><td class="k">Certificate of Origin Type</td><td class="v">{{ order.coo_type }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person or 'TBC' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email or 'TBC' }}</td></tr>
+  <tr><td class="k">Phone</td><td class="v">{{ buyer.phone or '—' }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+</table>
+
+<div class="section-title">3. PRODUCT / ORDER DETAILS</div>
+<table class="products">
+  <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
+  {% for p in products %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ p.description }}</td>
+    <td class="num">{{ p.quantity }}</td>
+    <td>{{ p.unit }}</td>
+    <td class="num">{{ p.unit_price }}</td>
+    <td class="num">{{ p.amount }}</td>
+  </tr>
+  {% if p.dimensions or p.finish %}
+  <tr class="spec">
+    <td></td>
+    <td colspan="5">{{ loop.index }}. Dimensions: {{ p.dimensions or 'TBC' }} &nbsp;&middot;&nbsp; Finish: {{ p.finish or 'TBC' }} &nbsp;&middot;&nbsp; HS Code: {{ p.hs_code }} &nbsp;&middot;&nbsp; Country of Origin: India</td>
+  </tr>
+  {% endif %}
+  {% endfor %}
+</table>
+
+<table class="totals">
+  <tr><td class="k">FOB Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.fob_value }}</td></tr>
+  <tr><td class="k">Freight ({{ order.currency_code }})</td><td class="v">
+    {% if order.is_fob %}NIL — freight arranged by buyer.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_low or 'XXX' }}–{{ order.indicative_freight_high or 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}. Subject to confirmation at time of booking. Actual freight confirmed and recovered IN ADVANCE by Freight Debit Note when cargo is packed and ready.{% endif %}
+  </td></tr>
+  <tr><td class="k">Insurance ({{ order.currency_code }})</td><td class="v">
+    {% if order.is_fob %}NIL — buyer's responsibility.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount or 'XX' }}. Confirmed by Freight Debit Note when cargo is ready.{% endif %}
+  </td></tr>
+  <tr class="highlight"><td class="k">TOTAL QUOTED VALUE ({{ order.currency_code }})</td><td class="v">{{ financial.total_value }}</td></tr>
+</table>
+
+<p style="font-size:8.5px; color:#5b6774;">Weight &amp; Volume (Estimated — actuals confirmed on Packing List after production)</p>
+<table class="kv">
+  <tr><td class="k">Total CBM (m&sup3;)</td><td class="v">{{ order.estimated_total_cbm or 'TBC' }}</td></tr>
+  <tr><td class="k">Gross Weight (incl. packing)</td><td class="v">{{ order.estimated_gross_weight_kg or 'TBC' }} kg</td></tr>
+  <tr><td class="k">Net Weight (stone only)</td><td class="v">{{ order.estimated_net_weight_kg or 'TBC' }} kg</td></tr>
+  <tr><td class="k">No. of Packages / Crates</td><td class="v">{{ order.estimated_package_count }}</td></tr>
+  <tr><td class="k">Package Type</td><td class="v">{{ order.estimated_package_type }}</td></tr>
+</table>
+
+<div class="section-title">4. SHIPPING / COMMERCIAL TERMS</div>
+<table class="kv">
+  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
+  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Container Type</td><td class="v">{{ order.container_type }}</td></tr>
+  <tr><td class="k">Est. Lead Time</td><td class="v">{{ order.est_lead_time_text }}</td></tr>
+  <tr><td class="k">Insurance</td><td class="v">{% if order.is_fob %}Buyer's responsibility.{% else %}Seller arranges — cost included in invoice.{% endif %}</td></tr>
+</table>
+
+<div class="section-title">5. PAYMENT TERMS</div>
+<table class="kv">
+  <tr><td class="k">{{ financial.advance_pct }}% advance T/T on FOB Value</td><td class="v">{{ financial.advance_trigger_text }}. Amount: {{ order.currency_code }} {{ financial.advance_amount }}</td></tr>
+  <tr><td class="k">{{ financial.balance_pct }}% balance T/T on FOB Value</td><td class="v">
+    {% if financial.balance_trigger_option == 'A_BEFORE_SHIPMENT' %}
+      Payable before shipment — within {{ financial.balance_days }} working days of receiving shipment readiness confirmation from NexaCrest.
+    {% else %}
+      Payable against scanned copy of Bill of Lading, within {{ financial.balance_days }} days of BL date.
+    {% endif %}
+    Amount: {{ order.currency_code }} {{ financial.balance_amount }}
+  </td></tr>
+  {% if not order.is_fob %}
+  <tr><td class="k">Freight &amp; Insurance (CFR/CIF)</td><td class="v">Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 working days of Freight Debit Note date.</td></tr>
+  {% endif %}
+</table>
+
+<div class="section-title">6. DOCUMENTS TO BE PROVIDED</div>
+<table class="kv">
+  <tr><td colspan="2">Upon shipment, the following documents will be provided:<br>
+    1. Commercial Invoice (signed and stamped)<br>
+    2. Packing List (signed and stamped)<br>
+    3. Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL<br>
+    4. Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after {{ financial.balance_pct }}% balance T/T is received and cleared<br>
+    5. Fumigation Certificate — provided as standard with every shipment
+  </td></tr>
+</table>
+
+{% if order.special_requirements %}
+<div class="section-title">SPECIAL REQUIREMENTS</div>
+<table class="kv"><tr><td colspan="2">{{ order.special_requirements }}</td></tr></table>
+{% endif %}
+
+{% endblock %}

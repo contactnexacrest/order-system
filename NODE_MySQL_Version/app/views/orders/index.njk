@@ -1,0 +1,21 @@
+<div class="card page-wide">
+  <h1>Orders</h1>
+  <div class="btn-row"><a class="btn" href="/clients">Go to Clients to start a new order</a></div>
+
+  {% if not orders or orders.length == 0 %}
+    <p class="muted">No orders yet.</p>
+  {% else %}
+  <table class="list">
+    <tr><th>Order Ref</th><th>Client</th><th>Stage</th><th>Status</th><th></th></tr>
+    {% for o in orders %}
+    <tr>
+      <td>{{ o.order_reference }}</td>
+      <td>{{ o.company_legal_name }}</td>
+      <td>{{ o.current_stage_name or 'Quotation' }}</td>
+      <td>{{ o.status | capitalize }}</td>
+      <td><a href="/orders/{{ o.id }}">View</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>

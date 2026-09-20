@@ -1,0 +1,128 @@
+<div class="card page-wide">
+  <h1>Admin Field Overrides</h1>
+  <p class="muted">Spec Section 13 — every edit below requires a reason and a confirmation click, and is logged (who, when, field, old value, new value, reason). Nothing here can be undone through this screen — only a further edit changes a value back.</p>
+  <p class="muted small">🔒 <strong>Protected</strong> items are locked against accidental edits — click <em>Unlock</em> before changing them. Protecting or unprotecting an item is a separate, peer-approved request: see <a href="/admin/field-protection">Field Protection</a>.</p>
+
+  <div class="section">
+    <h2>Document Reference Formats</h2>
+    <p class="muted small">Changing a format only affects references minted <em>after</em> the change — already-generated documents keep the reference they were given.</p>
+    <form method="post" action="/admin/overrides/document-types" onsubmit="return confirmOverride(this, 'document reference formats');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <table class="list">
+        <tr><th>Code</th><th>Name</th><th>Reference Format</th><th>Min Reviewers</th></tr>
+        {% for dt in documentTypes %}
+        <tr>
+          <td>{{ dt.code }}</td>
+          <td>{{ dt.name }}</td>
+          <td><input type="text" name="ref_format[f{{ dt.id }}]" value="{{ dt.ref_format or '' }}" placeholder="(none)"></td>
+          <td><input type="text" name="min_reviewers[f{{ dt.id }}]" value="{{ dt.min_reviewers_default }}" style="width:4rem"></td>
+        </tr>
+        {% endfor %}
+      </table>
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <button type="submit" class="btn-sm">Save Document Type Changes</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Terms &amp; Conditions Clauses</h2>
+    <form method="post" action="/admin/overrides/tc-clauses" onsubmit="return confirmOverride(this, 'T&amp;C clause text');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      {% for c in tcClauses %}
+        <fieldset class="{{ 'protected-row' if c.is_protected }}">
+          <legend>
+            {% if c.is_protected %}<span class="lock-icon" title="Protected — unlock to edit">🔒</span>{% endif %}
+            {{ c.clause_number or '—' }}
+            {% if c.is_locked %}<span class="badge badge-sensitive">mandatory clause</span>{% endif %}
+            {% if c.is_protected %}<span class="badge badge-protected">protected</span>{% endif %}
+          </legend>
+          <label>Title <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}></label>
+          <label>Text <textarea name="clause_text[f{{ c.id }}]" rows="3" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>{{ c.clause_text }}</textarea></label>
+          {% if c.is_protected %}
+            <input type="hidden" name="unlocked_clause[f{{ c.id }}]" value="0" class="unlock-flag">
+            <button type="button" class="btn-sm unlock-btn" onclick="unlockFieldset(this)">Unlock this clause</button>
+          {% endif %}
+        </fieldset>
+      {% endfor %}
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <button type="submit" class="btn-sm">Save T&amp;C Clause Changes</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Payment Presets</h2>
+    <form method="post" action="/admin/overrides/payment-presets" onsubmit="return confirmOverride(this, 'payment preset values');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      {% for p in paymentPresets %}
+        <fieldset class="{{ 'protected-row' if p.is_protected }}">
+          <legend>
+            {% if p.is_protected %}<span class="lock-icon" title="Protected — unlock to edit">🔒</span>{% endif %}
+            {{ p.preset_name }} ({{ p.currency_code }})
+            {% if p.is_protected %}<span class="badge badge-protected">protected</span>{% endif %}
+          </legend>
+          <div class="kv-grid">
+            <label>Advance % <input type="text" name="advance_pct[f{{ p.id }}]" value="{{ p.advance_pct }}" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}></label>
+            <label>Advance Trigger Text <input type="text" name="advance_trigger_text[f{{ p.id }}]" value="{{ p.advance_trigger_text }}" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}></label>
+            <label>Balance % <input type="text" name="balance_pct[f{{ p.id }}]" value="{{ p.balance_pct }}" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}></label>
+            <label>Balance Trigger
+              <select name="balance_trigger_option[f{{ p.id }}]" {{ 'disabled' if p.is_protected }}>
+                <option value="A_BEFORE_SHIPMENT" {{ 'selected' if p.balance_trigger_option == 'A_BEFORE_SHIPMENT' else '' }}>Before Shipment</option>
+                <option value="B_AGAINST_BL" {{ 'selected' if p.balance_trigger_option == 'B_AGAINST_BL' else '' }}>Against BL</option>
+              </select>
+            </label>
+            <label>Balance Days <input type="text" name="balance_days[f{{ p.id }}]" value="{{ p.balance_days }}" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}></label>
+          </div>
+          {% if p.is_protected %}
+            <input type="hidden" name="unlocked_preset[f{{ p.id }}]" value="0" class="unlock-flag">
+            <button type="button" class="btn-sm unlock-btn" onclick="unlockFieldset(this)">Unlock this preset</button>
+          {% endif %}
+        </fieldset>
+      {% endfor %}
+      <p class="muted small">Warning: every order still pointing at this preset (i.e. with no activated amendment overriding it) reads these values live at document-generation time — editing a preset here changes terms for every one of those orders immediately, not just new ones. To change ONE order's terms without touching this shared preset, use that order's Payment Terms Amendment (SC/AMD) workflow instead.</p>
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <button type="submit" class="btn-sm">Save Payment Preset Changes</button>
+    </form>
+  </div>
+</div>
+<script>
+function unlockFieldset(btn) {
+  var fieldset = btn.closest('fieldset');
+  var reason = prompt('Why are you unlocking this protected item? (required)');
+  if (!reason || !reason.trim()) { return; }
+  fieldset.querySelectorAll('input[data-protected="1"], textarea[data-protected="1"]').forEach(function (el) {
+    el.removeAttribute('readonly');
+  });
+  fieldset.querySelectorAll('select').forEach(function (el) { el.disabled = false; });
+  var flag = fieldset.querySelector('.unlock-flag');
+  if (flag) { flag.value = '1'; }
+  var icon = fieldset.querySelector('.lock-icon');
+  if (icon) { icon.textContent = '🔓'; icon.title = 'Unlocked for this edit'; }
+  btn.textContent = 'Unlocked';
+  btn.disabled = true;
+}
+function confirmOverride(form, label) {
+  var reasonEl = form.querySelector('.override-reason');
+  if (!reasonEl || reasonEl.value.trim() === '') {
+    alert('A reason is required before saving.');
+    return false;
+  }
+  var changedProtected = 0;
+  var blocked = false;
+  form.querySelectorAll('[data-protected="1"]').forEach(function (el) {
+    if (el.value !== el.defaultValue) {
+      var fieldset = el.closest('fieldset');
+      var flag = fieldset ? fieldset.querySelector('.unlock-flag') : null;
+      if (!flag || flag.value !== '1') { blocked = true; }
+      else { changedProtected++; }
+    }
+  });
+  if (blocked) {
+    alert('Unlock every protected item you are changing before saving.');
+    return false;
+  }
+  var msg = changedProtected > 0
+    ? ('You are changing ' + changedProtected + ' PROTECTED item(s) that require special authorization. Continue?')
+    : ('Save these changes to ' + label + '? This is logged and cannot be undone through this screen.');
+  return confirm(msg);
+}
+</script>

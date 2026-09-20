@@ -1,0 +1,119 @@
+{% extends "_layout.html.twig" %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td class="label">INVOICE NO. *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
+    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
+  </tr>
+  <tr>
+    <td class="label">PI REFERENCE *</td><td class="value">{{ order.pi_ref ?: '—' }}</td>
+    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block banner %}
+<div class="gst-declaration">GST DECLARATION: Supply meant for export under Letter of Undertaking (LUT) without payment of Integrated Tax (IGST). LUT Order No.: {{ company.lut_number }} &nbsp;·&nbsp; Valid for {{ company.lut_valid_fy }} &nbsp;·&nbsp; GSTIN: {{ company.gstin }}</div>
+{% endblock %}
+
+{% block body %}
+
+<div class="section-title">2. BUYER / CONSIGNEE</div>
+<table class="kv">
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
+  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
+  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Notify Party</td><td class="v">{{ buyer.notify_party ?: 'SAME as consignee' }}</td></tr>
+  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination ?: 'TBC' }}</td></tr>
+</table>
+
+<div class="section-title">3. SHIPPING DETAILS</div>
+<table class="kv">
+  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
+  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Bill of Lading No. *</td><td class="v">{{ shipping.bl_number ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Bill of Lading Date *</td><td class="v">{{ shipping.bl_date ?: 'TBC — must match this invoice date' }}</td></tr>
+  <tr><td class="k">Vessel / Voyage *</td><td class="v">{{ shipping.vessel_name ?: 'TBC' }}{{ shipping.voyage_number ? ' / ' ~ shipping.voyage_number : '' }}</td></tr>
+  <tr><td class="k">No. of Packages *</td><td class="v">{{ packing.crate_count ? packing.crate_count ~ ' Wooden Crates' : 'TBC' }} — must match Packing List</td></tr>
+</table>
+
+<div class="section-title">4. PRODUCT / ORDER DETAILS</div>
+<p style="font-size:8px; color:#5b6774;">Quantities and values below reflect actual shipment — must match Packing List and must not exceed PI quantities.</p>
+<table class="products">
+  <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
+  {% for p in products %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ p.description }}</td>
+    <td class="num">{{ p.quantity }}</td>
+    <td>{{ p.unit }}</td>
+    <td class="num">{{ p.unit_price }}</td>
+    <td class="num">{{ p.amount }}</td>
+  </tr>
+  {% if p.dimensions or p.finish %}
+  <tr class="spec">
+    <td></td>
+    <td colspan="5">{{ loop.index }}. Dimensions: {{ p.dimensions ?: 'TBC' }} &nbsp;·&nbsp; Finish: {{ p.finish ?: 'TBC' }} &nbsp;·&nbsp; HS Code: {{ p.hs_code }} &nbsp;·&nbsp; Country of Origin: India</td>
+  </tr>
+  {% endif %}
+  {% endfor %}
+</table>
+<p style="font-size:8px; color:#5b6774;">See Packing List for full crate-level breakdown — Crates C-001 to C-{{ packing.crate_count ?: 'TBC' }}.</p>
+
+<div class="section-title">5. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
+<p style="font-size:8px; color:#5b6774;">FOB Value is the basis for all payments and required for Indian Shipping Bill &amp; IGST refund. Freight &amp; Insurance (if applicable) are recovered separately via Freight Debit Note and are not included in this Commercial Invoice value.</p>
+<table class="totals">
+  <tr><td colspan="2" style="background:#e7edf3; font-weight:bold;">SECTION A — INVOICE VALUE</td></tr>
+  <tr><td class="k">FOB Value (goods) *</td><td class="v">{{ order.currency_code }} {{ financial.fob_value }}</td></tr>
+  <tr><td class="k">Freight &amp; Insurance</td><td class="v">{{ order.is_fob ? 'NIL — FOB order' : 'Paid via FDN' ~ (order.pi_ref ? ' (Ref: see Freight Debit Note)' : '') }} — not included in this invoice value</td></tr>
+  <tr class="highlight"><td class="k">TOTAL COMMERCIAL INVOICE VALUE *</td><td class="v">{{ order.currency_code }} {{ financial.fob_value }}</td></tr>
+</table>
+<table class="totals">
+  <tr><td colspan="2" style="background:#e7edf3; font-weight:bold;">SECTION B — PAYMENT SETTLEMENT</td></tr>
+  <tr><td class="k">&#10003; {{ financial.advance_pct }}% Advance — {{ payment_status.advance_cleared_at ? 'RECEIVED' : 'PENDING' }}</td><td class="v">{{ order.currency_code }} {{ payment_status.advance_amount ?: financial.advance_amount }}{{ payment_status.advance_cleared_at ? ' (cleared ' ~ payment_status.advance_cleared_at ~ ')' : '' }}</td></tr>
+  <tr><td class="k">&#10003; Freight &amp; Insurance — {{ order.is_fob ? 'NIL (FOB)' : (payment_status.freight_cleared_at ? 'PAID VIA FDN' : 'PENDING') }}</td><td class="v">{{ order.is_fob ? 'NIL' : order.currency_code ~ ' ' ~ (payment_status.freight_amount ?: 'TBC') }}</td></tr>
+  <tr><td class="k">SUBTOTAL ALREADY PAID</td><td class="v">{{ order.currency_code }} {{ payment_status.advance_amount ?: financial.advance_amount }}{{ (not order.is_fob and payment_status.freight_amount) ? ' + ' ~ payment_status.freight_amount ~ ' (freight)' : '' }}</td></tr>
+  <tr class="highlight"><td class="k">&#8658; BALANCE DUE NOW *</td><td class="v">{{ order.currency_code }} {{ payment_status.balance_amount ?: financial.balance_amount }} — payable by T/T within {{ financial.balance_days }} days of BL date, against scanned copy of Bill of Lading. Quote CI No. {{ meta.document_reference }} in remittance.</td></tr>
+  <tr><td class="k">Verification</td><td class="v">Advance + Balance = FOB Value ({{ payment_status.advance_amount ?: financial.advance_amount }} + {{ payment_status.balance_amount ?: financial.balance_amount }} = {{ financial.fob_value }}) &#10003;. Freight &amp; Insurance paid separately via FDN — not included in this verification.</td></tr>
+</table>
+<p class="mandatory-note">Total Invoice Value in Words ({{ order.currency_code }}): _________________________________________________________ *</p>
+
+<div class="section-title">6. BANK DETAILS (for balance T/T payment)</div>
+<table class="kv">
+  <tr><td class="k">Account Holder</td><td class="v">{{ company.legal_name|upper }}</td></tr>
+  <tr><td class="k">Bank</td><td class="v">{{ company.bank_name }}</td></tr>
+  <tr><td class="k">Branch</td><td class="v">{{ company.bank_branch }}</td></tr>
+  <tr><td class="k">Account No.</td><td class="v">{{ company.bank_account_no }}</td></tr>
+  <tr><td class="k">IFSC</td><td class="v">{{ company.ifsc }}</td></tr>
+  <tr><td class="k">SWIFT / BIC</td><td class="v">{{ company.swift_bic }}</td></tr>
+  <tr><td class="k">Bank Address</td><td class="v">{{ company.bank_address }}</td></tr>
+  <tr><td class="k">Payment Reference</td><td class="v">Please quote CI No. {{ meta.document_reference }} in your wire transfer remarks.</td></tr>
+  <tr><td class="k">RBI Purpose Code</td><td class="v">{{ company.rbi_purpose_code_balance }} — enter in the "Purpose of Remittance" field of your wire transfer form.</td></tr>
+</table>
+
+<div class="section-title">7. DOCUMENTS PROVIDED WITH THIS SHIPMENT</div>
+<table class="kv">
+  <tr><td colspan="2">
+    1. Commercial Invoice (this document — signed and stamped)<br>
+    2. Packing List (signed and stamped)<br>
+    3. Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL<br>
+    4. Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared<br>
+    5. Fumigation Certificate — provided as standard with every shipment
+  </td></tr>
+</table>
+
+<div class="section-title">8. DECLARATION</div>
+<table class="kv">
+  <tr><td colspan="2">We hereby declare that the goods described in this Commercial Invoice are of Indian origin and that the particulars given are true and correct.<br>
+    This invoice is issued under Letter of Undertaking (LUT Order No. {{ company.lut_number }}) for export of goods without payment of IGST under the provisions of the IGST Act, 2017.
+  </td></tr>
+</table>
+
+{% endblock %}

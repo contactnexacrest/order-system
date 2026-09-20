@@ -1,0 +1,13 @@
+Options -Indexes
+RewriteEngine On
+
+# Force HTTPS (skip on local dev — Env::isLocal() handles the app-level
+# equivalent; this rule only matters once actually deployed).
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Route everything except real files/dirs (css/js/img under assets/) to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]

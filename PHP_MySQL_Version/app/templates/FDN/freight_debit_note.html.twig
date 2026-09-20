@@ -1,0 +1,75 @@
+{% extends "_layout.html.twig" %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td class="label">DEBIT NOTE NO. *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
+    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
+  </tr>
+  <tr>
+    <td class="label">PI REFERENCE *</td><td class="value">{{ order.pi_ref ?: '—' }}</td>
+    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block banner %}
+<div class="valid-until">&#9201; PAYMENT REQUIRED BEFORE SHIPMENT &nbsp; Payment of this Freight Debit Note is required within 3 working days of the date above. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.</div>
+{% endblock %}
+
+{% block body %}
+
+<div class="section-title">2. TO (BUYER)</div>
+<table class="kv">
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'TBC' }}</td></tr>
+</table>
+
+<div class="section-title">3. ORDER REFERENCE</div>
+{% set productList = [] %}
+{% for p in products %}
+  {% set productList = productList|merge([p.description ~ ' (' ~ p.quantity ~ ' ' ~ p.unit ~ ')']) %}
+{% endfor %}
+<table class="kv">
+  <tr><td class="k">Proforma Invoice No. *</td><td class="v">{{ order.pi_ref ?: '—' }}</td></tr>
+  <tr><td class="k">Product(s)</td><td class="v">{{ productList|join('; ') }}</td></tr>
+  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}. Freight recovery applies as agreed under the referenced Proforma Invoice.</td></tr>
+  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Shipping Line</td><td class="v">{{ freight.freight_forwarder_name ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Cargo Status *</td><td class="v">{{ packing.packing_date ? 'Packed and ready for shipment as of ' ~ packing.packing_date : 'TBC' }}</td></tr>
+</table>
+
+<div class="section-title">4. FREIGHT &amp; CHARGES</div>
+<table class="totals">
+  <tr><td class="k">Ocean Freight ({{ order.container_type }})</td><td class="v">{{ freight.confirmed_freight_rate ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Insurance {{ order.incoterm_code == 'CIF' ? '' : '(CIF only)' }}</td><td class="v">{{ order.incoterm_code == 'CIF' ? (freight.insurance_amount ?: 'TBC') : 'NIL' }}</td></tr>
+  <tr><td class="k">GST / IGST (if applicable)</td><td class="v">{{ freight.gst_treatment == 'IGST_18' ? '18% IGST' : 'NIL' }}</td></tr>
+  <tr class="highlight"><td class="k">TOTAL AMOUNT DUE ({{ order.currency_code }}) *</td><td class="v">{{ freight.total_freight_and_insurance ?: 'TBC' }}</td></tr>
+</table>
+
+<div class="section-title">5. PAYMENT INSTRUCTIONS</div>
+<table class="kv">
+  <tr><td colspan="2">Payment Due: within 3 working days of this Debit Note date.<br>
+    Payment Method: T/T (Telegraphic Transfer) to the NexaCrest bank account below.<br>
+    Reference: Quote Debit Note No. {{ meta.document_reference }} and PI No. {{ order.pi_ref ?: '—' }} in the remittance.<br>
+    <strong>&#9888; Critical:</strong> Share the bank remittance copy with NexaCrest immediately after payment. Shipment booking will be confirmed only upon verification of freight receipt.
+  </td></tr>
+</table>
+
+<div class="section-title">6. BANK DETAILS (for freight T/T payment)</div>
+<table class="kv">
+  <tr><td class="k">Account Holder</td><td class="v">{{ company.legal_name|upper }}</td></tr>
+  <tr><td class="k">Bank</td><td class="v">{{ company.bank_name }}</td></tr>
+  <tr><td class="k">Branch</td><td class="v">{{ company.bank_branch }}</td></tr>
+  <tr><td class="k">Account No.</td><td class="v">{{ company.bank_account_no }}</td></tr>
+  <tr><td class="k">IFSC</td><td class="v">{{ company.ifsc }}</td></tr>
+  <tr><td class="k">SWIFT / BIC</td><td class="v">{{ company.swift_bic }}</td></tr>
+  <tr><td class="k">Bank Address</td><td class="v">{{ company.bank_address }}</td></tr>
+  <tr><td class="k">Payment Reference</td><td class="v">Please quote FDN No. {{ meta.document_reference }} in your wire transfer remarks.</td></tr>
+  <tr><td class="k">RBI Purpose Code</td><td class="v">{{ company.rbi_purpose_code_freight }} — enter in the "Purpose of Remittance" field of your wire transfer form.</td></tr>
+</table>
+
+{% endblock %}
