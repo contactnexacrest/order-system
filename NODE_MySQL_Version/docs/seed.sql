@@ -49,7 +49,9 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('cross_verify_documents',    'Cross-verify documents',        'Add an independent pass/fail quality check on any generated document — separate from the formal reviewer sign-off.', 'documents'),
   ('approve_email_send',        'Approve email send (Level 2)',  'Level-2 approval for a deferred client email before it actually sends (Section 10 — Email & Deferred Send System).', 'documents'),
   ('manage_sample_data',        'Manage sample data',            'Load/clear the Sample Data Playground (test clients/orders only — never real data).', 'admin'),
-  ('manage_field_protection',   'Manage field protection',       'Request or approve locking/unlocking a protected field (company setting, T&C clause, or payment preset). Approving your own request is blocked — a different privileged user must confirm.', 'admin');
+  ('manage_field_protection',   'Manage field protection',       'Request or approve locking/unlocking a protected field (company setting, T&C clause, or payment preset). Approving your own request is blocked — a different privileged user must confirm.', 'admin'),
+  ('delete_assets',             'Delete assets',                 'Permanently remove a superseded (inactive) logo/signature/seal/watermark/email-header upload. The currently active asset for a type can never be deleted this way — replace it first.', 'admin'),
+  ('manage_signatories',        'Manage signatories & designations', 'Manage the designations list, mark a user as signatory-eligible, upload their signature/designation-seal images, and set the global and per-document-type default signatory.', 'admin');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -530,25 +532,82 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
 -- screen). Paths below assume STORAGE_BASE_PATH = <project>/storage;
 -- adjust if you set a different STORAGE_BASE_PATH in .env.
 -- ================================================================
+-- Real company assets, extracted from the source Word document set
+-- (Set 1's embedded media) rather than generic placeholders.
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
-SELECT 'logo', 'Logo (placeholder)', '__STORAGE_BASE_PATH__/assets/logos/logo_placeholder.png', 'image/png', 1, u.id
+SELECT 'logo', 'NexaCrest Logo', '__STORAGE_BASE_PATH__/assets/logos/logo.jpg', 'image/jpeg', 1, u.id
 FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
-SELECT 'signature', 'MD Signature (placeholder)', '__STORAGE_BASE_PATH__/assets/signatures/signature_placeholder.png', 'image/png', 1, u.id
+SELECT 'signature', 'Gulmohar Sontakke — Signature (legacy global slot, superseded by user_signature_assets)', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, u.id
 FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
-SELECT 'seal', 'Company Seal (placeholder)', '__STORAGE_BASE_PATH__/assets/seals/seal_placeholder.png', 'image/png', 1, u.id
+SELECT 'seal', 'Company Seal', '__STORAGE_BASE_PATH__/assets/seals/company_seal.png', 'image/png', 1, u.id
 FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
-SELECT 'watermark', 'Watermark (placeholder)', '__STORAGE_BASE_PATH__/assets/watermarks/watermark_placeholder.png', 'image/png', 1, u.id
+SELECT 'watermark', 'Watermark — Logo', '__STORAGE_BASE_PATH__/assets/watermarks/watermark_logo.jpg', 'image/jpeg', 1, u.id
 FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
-SELECT 'email_header', 'Email Header (placeholder)', '__STORAGE_BASE_PATH__/assets/email_headers/email_header_placeholder.png', 'image/png', 1, u.id
+SELECT 'email_header', 'Email Header — Logo', '__STORAGE_BASE_PATH__/assets/email_headers/email_header_logo.jpg', 'image/jpeg', 1, u.id
 FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+
+-- ================================================================
+-- SIGNATORIES & DESIGNATIONS (Section M, added 2026-09-20)
+-- The company seal above stays the single shared company asset. The two
+-- Directors below each carry their own real signature/designation-seal
+-- images, extracted from the source documents (Gulmohar Sontakke) and
+-- supplied directly by the company (Arti Sontakke).
+-- ================================================================
+INSERT INTO designations (title, is_active) VALUES ('Director', 1);
+
+-- Gulmohar Sontakke already exists as the seeded Admin login
+-- (admin@nexacrest.placeholder) — mark her signatory-eligible with the
+-- Director designation and set her as the company's global default
+-- signatory, matching the existing company_settings.md_name/md_title.
+UPDATE users u
+JOIN designations d ON d.title = 'Director'
+SET u.designation_id = d.id, u.is_signatory_eligible = 1
+WHERE u.email = 'admin@nexacrest.placeholder';
+
+-- Role deliberately conservative (Viewer / Auditor, read-only) — this
+-- account exists so Arti Sontakke can be a signatory on documents; it does
+-- NOT assume her actual operational role in the business. Admin should
+-- change role_id from the Users screen to whatever is actually correct.
+INSERT INTO users (name, email, phone, password_hash, role_id, designation_id, is_signatory_eligible, is_active, force_password_change, two_fa_enabled)
+SELECT 'Arti Sontakke', 'arti.sontakke@nexacrest.placeholder', NULL,
+       '$2y$12$SRa3a47hKlgsRGskEZfWJerGPgxLI8jSnVlckkHENnfs9VRao/You',
+       r.id, d.id, 1, 1, 1, 0
+FROM roles r, designations d WHERE r.name = 'Viewer / Auditor' AND d.title = 'Director';
+
+INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
+SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, 1, u.id
+FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+
+INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
+SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/gulmohar_sontakke_director_seal.png', 'image/png', 1, 1, u.id
+FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+
+INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
+SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/arti_sontakke_director_seal.webp', 'image/webp', 1, 1,
+       (SELECT id FROM users WHERE email = 'admin@nexacrest.placeholder')
+FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
+
+-- Global default signatory = Gulmohar Sontakke (matches legacy md_name).
+INSERT INTO company_default_signatory (id, user_id, updated_by)
+SELECT 1, u.id, u.id FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+
+-- Per the explicit business rule (Payment Terms Amendment is legally
+-- signed by a Director in that capacity, using the personal designation
+-- seal) — every other document type falls back to the global default
+-- (company seal, standard MD signature block) unless an admin sets
+-- another per-document-type row here.
+INSERT INTO document_type_signatories (document_type_id, user_id, use_designation_seal, updated_by)
+SELECT dt.id, u.id, 1, u.id
+FROM document_types dt, users u
+WHERE dt.code = 'AMD' AND u.email = 'admin@nexacrest.placeholder';
 
 SET FOREIGN_KEY_CHECKS = 1;
 

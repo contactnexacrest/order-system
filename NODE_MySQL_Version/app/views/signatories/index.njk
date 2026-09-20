@@ -1,0 +1,132 @@
+<div class="card page-wide">
+  <h1>Signatories &amp; Designations</h1>
+  <p class="muted">Who signs a document, in what capacity, and with which seal — resolved in this order every time a document is generated: a one-off choice made at generation time, then a per-document-type default set here, then the global default below. The company seal itself is a single shared asset managed on the <a href="/company-assets">Assets</a> screen and is unaffected by anything on this page.</p>
+
+  <div class="section">
+    <h2>Designations</h2>
+    <table class="list">
+      <tr><th>Title</th><th>Status</th><th>Action</th></tr>
+      {% for d in designations %}
+      <tr>
+        <td>{{ d.title }}</td>
+        <td>{{ 'Active' if d.is_active else 'Inactive' }}</td>
+        <td>
+          <form method="post" action="/signatories/designations/{{ d.id }}/toggle" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm">{{ 'Deactivate' if d.is_active else 'Reactivate' }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <form method="post" action="/signatories/designations" style="margin-top:8px">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="text" name="title" placeholder="New designation (e.g. Director)" required style="width:240px">
+      <button type="submit" class="btn-sm">Add Designation</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Global Default Signatory</h2>
+    <p class="muted small">Used whenever a document type has no specific default configured below.</p>
+    <form method="post" action="/signatories/global-default">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <select name="user_id">
+        {% for e in eligible %}
+          <option value="{{ e.id }}" {{ 'selected' if globalDefaultUserId == e.id }}>
+            {{ e.name }}{% if e.designation_title %} — {{ e.designation_title }}{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-sm btn-success">Save</button>
+    </form>
+    {% if eligible.length == 0 %}
+      <p class="muted small">No signatory-eligible users yet — mark someone eligible below first.</p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Per-Document-Type Default</h2>
+    <table class="list">
+      <tr><th>Document Type</th><th>Signatory</th><th>Seal Used</th><th>Change</th></tr>
+      {% for row in documentTypeSignatories %}
+      <tr>
+        <td>{{ row.code }} — {{ row.name }}</td>
+        <td>{{ row.signatory_name if row.signatory_name else '(global default)' }}</td>
+        <td>{{ (row.use_designation_seal and 'Designation seal' or 'Company seal') if row.user_id else '—' }}</td>
+        <td>
+          <form method="post" action="/signatories/document-types/{{ row.document_type_id }}" style="display:flex;gap:4px;align-items:center">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <select name="user_id" style="max-width:160px">
+              <option value="">(global default)</option>
+              {% for e in eligible %}
+                <option value="{{ e.id }}" {{ 'selected' if row.user_id == e.id }}>{{ e.name }}</option>
+              {% endfor %}
+            </select>
+            <label class="muted small"><input type="checkbox" name="use_designation_seal" value="1" {{ 'checked' if row.use_designation_seal }}> Designation seal</label>
+            <button type="submit" class="btn-sm">Save</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Signatory-Eligible Users</h2>
+    <table class="list">
+      <tr><th>Name</th><th>Designation &amp; Eligibility</th><th>Signature / Designation Seal</th></tr>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.name }}<br><span class="muted small">{{ u.email }}</span></td>
+        <td>
+          <form method="post" action="/signatories/users/{{ u.id }}/eligibility" style="display:flex;gap:4px;align-items:center">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <select name="designation_id">
+              <option value="">(none)</option>
+              {% for d in designations %}
+                {% if d.is_active or d.id == u.designation_id %}
+                  <option value="{{ d.id }}" {{ 'selected' if u.designation_id == d.id }}>{{ d.title }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <input type="hidden" name="eligible" value="{{ '0' if u.is_signatory_eligible else '1' }}">
+            <button type="submit" class="btn-sm">{{ 'Revoke' if u.is_signatory_eligible else 'Grant' }}</button>
+          </form>
+        </td>
+        <td>
+          {% if u.is_signatory_eligible %}
+            {% for a in (userAssets[u.id] or []) %}
+              {% if a.is_active %}
+              <div class="muted small">
+                {{ 'Signature' if a.asset_kind == 'signature' else 'Designation seal' }}: {{ a.label }}
+                {% if a.is_default_for_kind %}<strong>(default)</strong>{% endif %}
+                <form method="post" action="/signatories/user-assets/{{ a.id }}/deactivate" style="display:inline">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <button type="submit" class="btn-sm btn-danger">Remove</button>
+                </form>
+              </div>
+              {% endif %}
+            {% endfor %}
+            <details style="margin-top:4px">
+              <summary class="muted small">Upload new</summary>
+              <form method="post" action="/signatories/users/{{ u.id }}/upload" enctype="multipart/form-data" style="margin-top:4px">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <select name="asset_kind">
+                  <option value="signature">Signature</option>
+                  <option value="designation_seal">Designation Seal</option>
+                </select>
+                <input type="text" name="label" placeholder="Label (e.g. Default)" style="width:120px">
+                <input type="file" name="file" accept=".png,.jpg,.jpeg,.webp,.svg" required>
+                <button type="submit" class="btn-sm">Upload</button>
+              </form>
+            </details>
+          {% else %}
+            <span class="muted small">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

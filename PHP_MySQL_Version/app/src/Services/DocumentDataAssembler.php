@@ -413,6 +413,59 @@ final class DocumentDataAssembler
         ];
     }
 
+    /**
+     * Rebuilds a render-ready signatory block from a `documents` row's own
+     * snapshot columns, instead of re-resolving current defaults. Used
+     * anywhere an already-generated document is re-rendered (the
+     * DRAFT->FINAL watermark swap in finalizeApproval() being the main
+     * case) — a document must keep showing the same signatory it was
+     * originally generated with, even if the global/document-type default
+     * has since changed, and even if that document predates this feature
+     * entirely (signatory_user_id NULL — falls back to the legacy
+     * md_name/md_title + single global assets rows, same as a fresh
+     * install with no signatory configured).
+     *
+     * @param array<string,mixed> $document a row from the documents table
+     */
+    public static function signatoryFromSnapshot(array $document): array
+    {
+        if ($document['signatory_user_id'] === null) {
+            $company = self::companyBlock();
+            $assets = self::assetsBlock();
+            return [
+                'user_id' => null,
+                'name' => $document['signatory_name_snapshot'] ?? $company['md_name'],
+                'designation' => $document['signatory_designation_snapshot'] ?? $company['md_title'],
+                'signature_data_uri' => $assets['signature_data_uri'],
+                'seal_data_uri' => $assets['seal_data_uri'],
+            ];
+        }
+
+        $pdo = \App\Config\Database::connection();
+        $signatureDataUri = null;
+        if (!empty($document['signature_asset_id_snapshot'])) {
+            $stmt = $pdo->prepare('SELECT * FROM user_signature_assets WHERE id = :id');
+            $stmt->execute(['id' => $document['signature_asset_id_snapshot']]);
+            $signatureDataUri = self::assetDataUri($stmt->fetch() ?: null);
+        }
+
+        $sealDataUri = null;
+        if (!empty($document['seal_asset_id_snapshot'])) {
+            $sealTable = !empty($document['used_designation_seal']) ? 'user_signature_assets' : 'assets';
+            $stmt = $pdo->prepare("SELECT * FROM {$sealTable} WHERE id = :id");
+            $stmt->execute(['id' => $document['seal_asset_id_snapshot']]);
+            $sealDataUri = self::assetDataUri($stmt->fetch() ?: null);
+        }
+
+        return [
+            'user_id' => (int) $document['signatory_user_id'],
+            'name' => $document['signatory_name_snapshot'],
+            'designation' => $document['signatory_designation_snapshot'],
+            'signature_data_uri' => $signatureDataUri,
+            'seal_data_uri' => $sealDataUri,
+        ];
+    }
+
     /** @return array<string,mixed>|null */
     private static function userSignatureAsset(int $userId, string $kind): ?array
     {

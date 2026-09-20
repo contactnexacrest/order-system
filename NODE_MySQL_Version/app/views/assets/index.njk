@@ -1,17 +1,18 @@
 <div class="card">
   <h1>Asset Management</h1>
-  <p class="muted">Placeholder images are in place for every slot below so the app runs end-to-end. Replace each with the real file when it's ready — no code changes needed, just an upload here.</p>
+  <p class="muted">The real logo, company seal, and legacy default signature/watermark/email-header files are shown below. Per-signatory signatures and designation seals are managed from <a href="/signatories">Signatories &amp; Designations</a>.</p>
 
   <div class="asset-grid">
     {% set typeLabels = {
       "logo": "Company Logo",
-      "signature": "MD Signature",
+      "signature": "Signature (legacy global fallback)",
       "seal": "Company Seal",
       "watermark": "PDF Watermark",
       "email_header": "Email Header"
     } %}
     {% for type, label in typeLabels %}
       {% set current = active[type][0] if active[type] else null %}
+      {% set typeHistory = history[type] if history[type] else [] %}
       <div class="asset-tile">
         <h3>{{ label }}</h3>
         {% if current %}
@@ -27,6 +28,25 @@
           <input type="file" name="file" accept=".png,.jpg,.jpeg,.svg" required>
           <button type="submit">Replace</button>
         </form>
+
+        {% if typeHistory.length > 0 %}
+          <details class="asset-history">
+            <summary class="muted small">Previous uploads ({{ typeHistory.length }})</summary>
+            <ul class="asset-history-list">
+              {% for old in typeHistory %}
+                <li>
+                  {{ old.name }} · {{ old.uploaded_at }}
+                  {% if permissions.delete_assets %}
+                    <form method="post" action="/company-assets/{{ old.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete this old upload? This cannot be undone.');">
+                      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                      <button type="submit" class="btn-sm btn-danger">Delete</button>
+                    </form>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+        {% endif %}
       </div>
     {% endfor %}
   </div>

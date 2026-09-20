@@ -18,12 +18,15 @@ const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 async function index(req, res) {
   const assets = await assetRepository.all();
   const active = {};
+  const history = {};
   for (const a of assets) {
     if (a.is_active) {
       (active[a.asset_type] ||= []).push(a);
+    } else {
+      (history[a.asset_type] ||= []).push(a);
     }
   }
-  res.renderView('assets/index', { assets, active }, 'layout/base');
+  res.renderView('assets/index', { assets, active, history }, 'layout/base');
 }
 
 /**
@@ -102,6 +105,43 @@ async function replace(req, res) {
   res.redirect('/company-assets');
 }
 
+/**
+ * Removes a superseded (inactive) upload only — never the currently active
+ * asset of a type, so there is always something to render. Gated on a
+ * separate `delete_assets` permission (not `manage_assets`), matching the
+ * explicit requirement that deletion needs its own, admin/role-controlled
+ * grant, distinct from ordinary upload/replace.
+ */
+async function remove(req, res) {
+  const user = req.user;
+  const id = parseInt(req.params.id, 10) || 0;
+  const asset = await assetRepository.find(id);
+
+  if (!asset) {
+    flash.set(req, 'error', 'Asset not found.');
+    res.redirect('/company-assets');
+    return;
+  }
+
+  if (asset.is_active) {
+    flash.set(req, 'error', `Cannot delete the currently active ${asset.asset_type.replace(/_/g, ' ')}. Replace it with a new upload first, then delete the old one.`);
+    res.redirect('/company-assets');
+    return;
+  }
+
+  try {
+    await assetRepository.remove(id);
+  } catch (e) {
+    flash.set(req, 'error', 'This file is still referenced by a previously generated document or setting and cannot be deleted — its history must be preserved.');
+    res.redirect('/company-assets');
+    return;
+  }
+
+  await auditLogRepository.log(user.id, 'ASSET_DELETED', 'assets', id, asset.asset_type, asset.server_path, null);
+  flash.set(req, 'success', `Old ${asset.asset_type.replace(/_/g, ' ')} upload deleted.`);
+  res.redirect('/company-assets');
+}
+
 function folderFor(assetType) {
   return {
     logo: 'logos',
@@ -112,4 +152,4 @@ function folderFor(assetType) {
   }[assetType] || 'misc';
 }
 
-module.exports = { index, preview, replace };
+module.exports = { index, preview, replace, remove };

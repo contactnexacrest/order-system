@@ -1061,7 +1061,87 @@ END$$
 DELIMITER ;
 
 -- ================================================================
--- END OF SCHEMA — 53 tables. All open schema questions resolved
+-- SECTION M — SIGNATORIES & DESIGNATIONS (added 2026-09-20)
+-- ================================================================
+-- The company seal stays exactly as it was: a single shared company asset
+-- in the existing `assets` table (asset_type='seal'), unchanged. What's new
+-- here is per-signatory identity: more than one Director can exist, each
+-- with their own signature image and their own personal designation seal
+-- (confirmed real from the source Word documents — both are embossed
+-- circular seals reading "DIRECTOR / <name>", distinct from the plain
+-- company seal). Kept as a separate table rather than overloading `assets`
+-- so the existing single-active-row-per-type semantics in
+-- AssetRepository::replace() (logo/watermark/email_header/seal) are not
+-- touched at all — this is purely additive.
+
+CREATE TABLE designations (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title       VARCHAR(100) NOT NULL UNIQUE,   -- e.g. "Director", "Founder & Managing Director"
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,  -- deactivate, never hard-delete — a user/document may still reference it
+  created_by  BIGINT UNSIGNED NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE user_signature_assets (
+  id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id                 BIGINT UNSIGNED NOT NULL,
+  asset_kind              ENUM('signature','designation_seal') NOT NULL,
+  label                   VARCHAR(100) NOT NULL,   -- e.g. "Default", "Formal", lets one person hold several signature variants
+  server_path             VARCHAR(500) NOT NULL,
+  mime_type               VARCHAR(100) NULL,
+  is_default_for_kind     TINYINT(1) NOT NULL DEFAULT 0,  -- which one of this user's own variants is their default
+  is_active                TINYINT(1) NOT NULL DEFAULT 1,
+  uploaded_by             BIGINT UNSIGNED NULL,
+  uploaded_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (uploaded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+ALTER TABLE users
+  ADD COLUMN designation_id          BIGINT UNSIGNED NULL AFTER role_id,
+  ADD COLUMN is_signatory_eligible   TINYINT(1) NOT NULL DEFAULT 0 AFTER designation_id,
+  ADD CONSTRAINT fk_users_designation FOREIGN KEY (designation_id) REFERENCES designations(id);
+
+-- Global fallback signatory (Business Rule: lowest-precedence layer).
+-- Single row by design — id is always 1.
+CREATE TABLE company_default_signatory (
+  id          TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
+  user_id     BIGINT UNSIGNED NOT NULL,
+  updated_by  BIGINT UNSIGNED NULL,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT chk_cds_single_row CHECK (id = 1)
+) ENGINE=InnoDB;
+
+-- Per-document-type default (middle-precedence layer). Admin-editable;
+-- falls back to company_default_signatory when no row exists for a type.
+CREATE TABLE document_type_signatories (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  document_type_id     BIGINT UNSIGNED NOT NULL UNIQUE,
+  user_id               BIGINT UNSIGNED NOT NULL,
+  use_designation_seal  TINYINT(1) NOT NULL DEFAULT 0,  -- 0 = company seal, 1 = this signatory's own designation seal
+  updated_by            BIGINT UNSIGNED NULL,
+  updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_type_id) REFERENCES document_types(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Every generated document snapshots which signatory/seal/signature was
+-- actually used (highest-precedence layer is the per-instance override
+-- passed at generation time and captured here) — never a live lookup, so
+-- changing a default later never alters how a past document reads.
+ALTER TABLE documents
+  ADD COLUMN signatory_user_id             BIGINT UNSIGNED NULL,
+  ADD COLUMN signatory_name_snapshot       VARCHAR(150) NULL,
+  ADD COLUMN signatory_designation_snapshot VARCHAR(100) NULL,
+  ADD COLUMN signature_asset_id_snapshot   BIGINT UNSIGNED NULL,
+  ADD COLUMN seal_asset_id_snapshot        BIGINT UNSIGNED NULL,   -- either the company seal (assets.id) or a designation seal (user_signature_assets.id) — see used_designation_seal
+  ADD COLUMN used_designation_seal         TINYINT(1) NOT NULL DEFAULT 0,
+  ADD CONSTRAINT fk_documents_signatory FOREIGN KEY (signatory_user_id) REFERENCES users(id);
+
+-- ================================================================
+-- END OF SCHEMA — 57 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
+-- Section M (signatories & designations) added 2026-09-20.
 -- ================================================================

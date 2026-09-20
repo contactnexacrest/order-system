@@ -39,7 +39,7 @@ function templatesEnvironment() {
   return njkEnv;
 }
 
-async function generate(orderId, documentTypeCode, generatedByUserId) {
+async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null) {
   const docType = await findDocumentType(documentTypeCode);
   if (!docType) {
     throw new Error(`Unknown document type: ${documentTypeCode}`);
@@ -62,6 +62,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId) {
 
   const watermark = await draftWatermark();
   const terms = await resolveTerms(documentTypeCode, data);
+  const signatory = await documentDataAssembler.signatoryBlock(docType.id, signatoryOverrideUserId);
 
   const context = {
     ...data,
@@ -77,6 +78,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId) {
     terms,
     terms_section_number: termsSectionNumberFor(documentTypeCode),
     terms_section_title: termsSectionTitleFor(documentTypeCode),
+    signatory,
   };
 
   const twig = templatesEnvironment();
@@ -142,7 +144,8 @@ async function generate(orderId, documentTypeCode, generatedByUserId) {
     revisionNumber,
     pdfFileId,
     docxFileId,
-    generatedByUserId
+    generatedByUserId,
+    signatory
   );
 
   return {
@@ -271,6 +274,13 @@ async function finalizeApproval(documentId) {
     terms,
     terms_section_number: termsSectionNumberFor(documentTypeCode),
     terms_section_title: termsSectionTitleFor(documentTypeCode),
+    // Re-rendering the SAME document (draft -> final watermark swap) must
+    // keep showing the same signatory it was originally generated with —
+    // read from the row's own snapshot, never re-resolved from current
+    // defaults (see PHP-side "Real bugs found" note: without this, the
+    // buyer-facing FINAL PDF rendered with a blank signature/seal block,
+    // since this render path never included a `signatory` key at all).
+    signatory: await documentDataAssembler.signatoryFromSnapshot(document),
   };
 
   const twig = templatesEnvironment();
@@ -335,10 +345,12 @@ async function generateAmendment(amendmentId, generatedByUserId) {
   const snapshot = amendment.original_terms_snapshot || {};
   const company = await documentDataAssembler.companyBlock();
   const assets = await documentDataAssembler.assetsBlock();
+  const signatory = await documentDataAssembler.signatoryBlock(docTypeId);
 
   const context = {
     company,
     assets,
+    signatory,
     order: { incoterm_code: null }, // suppresses the default header incoterm chip — not relevant to a legal amendment record
     doc_title: titleFor('AMD'),
     section1_title: section1TitleFor('AMD'),
@@ -433,7 +445,7 @@ async function generateAmendment(amendmentId, generatedByUserId) {
     false
   );
 
-  const documentId = await documentRepository.create(orderId, docTypeId, amendment.amendment_reference, 0, pdfFileId, null, generatedByUserId);
+  const documentId = await documentRepository.create(orderId, docTypeId, amendment.amendment_reference, 0, pdfFileId, null, generatedByUserId, signatory);
 
   await amendmentRepository.attachDocument(amendmentId, documentId);
 

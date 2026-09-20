@@ -56,15 +56,30 @@ async function markSent(id) {
   await db.execute("UPDATE documents SET status = 'sent' WHERE id = :id", { id });
 }
 
-async function create(orderId, documentTypeId, documentReference, revisionNumber, pdfFileId, docxFileId, generatedBy) {
+/**
+ * @param {object|null} signatory as returned by documentDataAssembler.signatoryBlock() —
+ *        snapshotted onto the row so a later change to any signatory
+ *        default never alters how a document that was already generated reads.
+ */
+async function create(orderId, documentTypeId, documentReference, revisionNumber, pdfFileId, docxFileId, generatedBy, signatory = null) {
   const result = await db.execute(
     `INSERT INTO documents
-        (order_id, document_type_id, document_reference, revision_number, status, generated_by, docx_file_id, pdf_file_id)
+        (order_id, document_type_id, document_reference, revision_number, status, generated_by, docx_file_id, pdf_file_id,
+         signatory_user_id, signatory_name_snapshot, signatory_designation_snapshot,
+         signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal)
      VALUES
-        (:order_id, :document_type_id, :document_reference, :revision_number, 'draft', :generated_by, :docx_file_id, :pdf_file_id)`,
+        (:order_id, :document_type_id, :document_reference, :revision_number, 'draft', :generated_by, :docx_file_id, :pdf_file_id,
+         :signatory_user_id, :signatory_name_snapshot, :signatory_designation_snapshot,
+         :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal)`,
     {
       order_id: orderId, document_type_id: documentTypeId, document_reference: documentReference,
       revision_number: revisionNumber, generated_by: generatedBy, docx_file_id: docxFileId, pdf_file_id: pdfFileId,
+      signatory_user_id: signatory ? signatory.user_id : null,
+      signatory_name_snapshot: signatory ? signatory.name : null,
+      signatory_designation_snapshot: signatory ? signatory.designation : null,
+      signature_asset_id_snapshot: signatory ? signatory.signature_asset_id : null,
+      seal_asset_id_snapshot: signatory ? signatory.seal_asset_id : null,
+      used_designation_seal: signatory && signatory.used_designation_seal ? 1 : 0,
     }
   );
   return result.insertId;

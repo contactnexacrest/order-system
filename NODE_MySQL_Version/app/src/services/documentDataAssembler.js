@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 
+const db = require('../config/db');
 const orderRepository = require('../repositories/orderRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
@@ -312,6 +313,153 @@ async function assetsBlock() {
   return out;
 }
 
+/**
+ * Three-layer signatory resolution (highest precedence first):
+ *   1. overrideUserId — a one-off choice made at generation time.
+ *   2. document_type_signatories — a per-document-type default (e.g.
+ *      Payment Terms Amendment always uses the Director designation seal).
+ *   3. company_default_signatory — the global fallback.
+ * The chosen signatory's name/designation/signature/seal are returned
+ * ready to render AND ready to snapshot onto the documents row, so a
+ * later change to any default never alters how a past document reads.
+ */
+async function signatoryBlock(documentTypeId, overrideUserId = null) {
+  let userId = overrideUserId;
+  let useDesignationSeal = false;
+
+  if (userId === null) {
+    const row = await db.queryOne(
+      'SELECT user_id, use_designation_seal FROM document_type_signatories WHERE document_type_id = :dt',
+      { dt: documentTypeId }
+    );
+    if (row) {
+      userId = row.user_id;
+      useDesignationSeal = !!row.use_designation_seal;
+    }
+  }
+
+  if (userId === null) {
+    const row = await db.queryOne('SELECT user_id FROM company_default_signatory WHERE id = 1', {});
+    userId = row ? row.user_id : null;
+  }
+
+  if (userId === null) {
+    // No signatory configured at all — fall back to the legacy
+    // company_settings md_name/md_title + the single global `assets`
+    // signature/seal rows, so a fresh install with no signatory set up
+    // yet still renders a usable document.
+    const company = await companyBlock();
+    const assets = await assetsBlock();
+    return {
+      user_id: null,
+      name: company.md_name,
+      designation: company.md_title,
+      signature_data_uri: assets.signature_data_uri,
+      seal_data_uri: assets.seal_data_uri,
+      signature_asset_id: null,
+      seal_asset_id: null,
+      used_designation_seal: false,
+    };
+  }
+
+  const user = await db.queryOne(
+    `SELECT u.id, u.name, d.title AS designation
+     FROM users u LEFT JOIN designations d ON d.id = u.designation_id
+     WHERE u.id = :id AND u.is_signatory_eligible = 1`,
+    { id: userId }
+  );
+  if (!user) {
+    throw new Error(`Resolved signatory user ${userId} is not signatory-eligible or does not exist`);
+  }
+
+  const signatureAsset = await userSignatureAsset(userId, 'signature');
+  const signatureDataUri = assetDataUri(signatureAsset);
+
+  let sealAsset = null;
+  let sealDataUri = null;
+  if (useDesignationSeal) {
+    sealAsset = await userSignatureAsset(userId, 'designation_seal');
+    sealDataUri = assetDataUri(sealAsset);
+  } else {
+    sealAsset = await assetRepository.findActiveByType('seal');
+    sealDataUri = assetDataUri(sealAsset);
+  }
+
+  return {
+    user_id: user.id,
+    name: user.name,
+    designation: user.designation || '',
+    signature_data_uri: signatureDataUri,
+    seal_data_uri: sealDataUri,
+    signature_asset_id: signatureAsset ? signatureAsset.id : null,
+    seal_asset_id: sealAsset ? sealAsset.id : null,
+    used_designation_seal: useDesignationSeal,
+  };
+}
+
+/**
+ * Rebuilds a render-ready signatory block from a `documents` row's own
+ * snapshot columns, instead of re-resolving current defaults. Used
+ * anywhere an already-generated document is re-rendered (the DRAFT->FINAL
+ * watermark swap in finalizeApproval() being the main case) — a document
+ * must keep showing the same signatory it was originally generated with,
+ * even if the global/document-type default has since changed, and even if
+ * that document predates this feature entirely (signatory_user_id NULL —
+ * falls back to the legacy md_name/md_title + single global assets rows,
+ * same as a fresh install with no signatory configured).
+ */
+async function signatoryFromSnapshot(document) {
+  if (document.signatory_user_id === null || document.signatory_user_id === undefined) {
+    const company = await companyBlock();
+    const assets = await assetsBlock();
+    return {
+      user_id: null,
+      name: document.signatory_name_snapshot || company.md_name,
+      designation: document.signatory_designation_snapshot || company.md_title,
+      signature_data_uri: assets.signature_data_uri,
+      seal_data_uri: assets.seal_data_uri,
+    };
+  }
+
+  let signatureDataUri = null;
+  if (document.signature_asset_id_snapshot) {
+    const asset = await db.queryOne('SELECT * FROM user_signature_assets WHERE id = :id', { id: document.signature_asset_id_snapshot });
+    signatureDataUri = assetDataUri(asset);
+  }
+
+  let sealDataUri = null;
+  if (document.seal_asset_id_snapshot) {
+    const sealTable = document.used_designation_seal ? 'user_signature_assets' : 'assets';
+    const asset = await db.queryOne(`SELECT * FROM ${sealTable} WHERE id = :id`, { id: document.seal_asset_id_snapshot });
+    sealDataUri = assetDataUri(asset);
+  }
+
+  return {
+    user_id: document.signatory_user_id,
+    name: document.signatory_name_snapshot,
+    designation: document.signatory_designation_snapshot,
+    signature_data_uri: signatureDataUri,
+    seal_data_uri: sealDataUri,
+  };
+}
+
+async function userSignatureAsset(userId, kind) {
+  return db.queryOne(
+    `SELECT * FROM user_signature_assets
+     WHERE user_id = :uid AND asset_kind = :kind AND is_active = 1
+     ORDER BY is_default_for_kind DESC, id DESC LIMIT 1`,
+    { uid: userId, kind }
+  );
+}
+
+function assetDataUri(asset) {
+  if (!asset || !asset.server_path || !fs.existsSync(asset.server_path)) {
+    return null;
+  }
+  const buf = fs.readFileSync(asset.server_path);
+  return `data:${asset.mime_type || 'image/png'};base64,${buf.toString('base64')}`;
+}
+
 function formatMoney(value) {
   if (value === null || value === undefined || value === '') {
     return 'TBC';
@@ -375,6 +523,8 @@ module.exports = {
   assemble,
   companyBlock,
   assetsBlock,
+  signatoryBlock,
+  signatoryFromSnapshot,
   formatMoney,
   formatNumber,
   formatDate,

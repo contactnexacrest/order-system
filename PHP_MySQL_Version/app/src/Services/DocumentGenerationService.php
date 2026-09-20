@@ -288,6 +288,14 @@ final class DocumentGenerationService
             'terms' => $terms,
             'terms_section_number' => self::termsSectionNumberFor($documentTypeCode),
             'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
+            // Re-rendering the SAME document (draft -> final watermark
+            // swap) must keep showing the same signatory it was originally
+            // generated with — read from the row's own snapshot, never
+            // re-resolved from current defaults (see "Real bugs found":
+            // without this, the buyer-facing FINAL PDF rendered with a
+            // blank signature/seal block, since this render path never
+            // merged a `signatory` key into $context at all).
+            'signatory' => DocumentDataAssembler::signatoryFromSnapshot($document),
         ]);
 
         $twig = self::twigEnvironment();

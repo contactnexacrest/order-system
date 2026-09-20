@@ -21,6 +21,9 @@
     {% if currentUser and permissions.manage_assets %}
       <a href="/company-assets">Assets</a>
     {% endif %}
+    {% if currentUser and permissions.manage_signatories %}
+      <a href="/signatories">Signatories</a>
+    {% endif %}
     {% if currentUser %}
       <a href="/reviews">My Reviews</a>
     {% endif %}

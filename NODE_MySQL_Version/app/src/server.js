@@ -34,6 +34,7 @@ const userController = require('./controllers/userController');
 const adminOverrideController = require('./controllers/adminOverrideController');
 const fieldProtectionController = require('./controllers/fieldProtectionController');
 const sampleDataController = require('./controllers/sampleDataController');
+const signatoryController = require('./controllers/signatoryController');
 
 const app = express();
 const viewsDir = path.join(__dirname, '..', 'views');
@@ -174,6 +175,16 @@ app.post('/settings/update', requireAuth, requirePermission('manage_company_sett
 app.get('/company-assets', requireAuth, requirePermission('manage_assets'), asyncHandler(assetController.index));
 app.get('/company-assets/preview', requireAuth, asyncHandler(assetController.preview));
 app.post('/company-assets/replace', requireAuth, requirePermission('manage_assets'), upload.single('file'), verifyCsrf, asyncHandler(assetController.replace));
+app.post('/company-assets/:id/delete', requireAuth, requirePermission('delete_assets'), verifyCsrf, asyncHandler(assetController.remove));
+
+app.get('/signatories', requireAuth, requirePermission('manage_signatories'), asyncHandler(signatoryController.index));
+app.post('/signatories/designations', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.createDesignation));
+app.post('/signatories/designations/:id/toggle', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.toggleDesignation));
+app.post('/signatories/users/:id/eligibility', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setEligibility));
+app.post('/signatories/users/:id/upload', requireAuth, requirePermission('manage_signatories'), upload.single('file'), verifyCsrf, asyncHandler(signatoryController.uploadUserAsset));
+app.post('/signatories/user-assets/:id/deactivate', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.deactivateUserAsset));
+app.post('/signatories/global-default', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setGlobalDefault));
+app.post('/signatories/document-types/:id', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setDocumentTypeDefault));
 
 // --- Phase B: clients / orders / stage gates / document generation ---
 app.get('/clients', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.index));
