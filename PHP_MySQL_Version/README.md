@@ -111,11 +111,18 @@ correctly once the password is changed.
    without that line, `mysql < seed.sql` silently mangled every em-dash
    into mojibake. Don't remove it.)
 2. **Fix the storage path in seed data.** `seed.sql` inserts asset rows with
-   a literal placeholder path. After importing, run:
+   a literal placeholder path — in BOTH the `assets` table (company
+   logo/seal) and the `user_signature_assets` table (per-user signatures and
+   designation seals). After importing, run both:
    ```sql
    UPDATE assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
+   UPDATE user_signature_assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
    ```
-   using the same absolute path you'll put in `.env` below.
+   using the same absolute path you'll put in `.env` below. Skipping the
+   second statement doesn't error anywhere — every document generates fine —
+   it just silently renders every signature/seal block blank, since
+   `is_file()` fails on the literal placeholder path. If a generated PDF is
+   ever missing a signature or seal, check this first.
 3. **Environment file.** Copy `app/.env.example` to `app/.env` and fill in:
    DB credentials, `STORAGE_BASE_PATH` (absolute path to the `storage/`
    folder in this project), and SMTP details when you have them. Leave the

@@ -8,6 +8,32 @@ use App\Config\Database;
 
 final class DocumentRepository
 {
+    /**
+     * The client portal's own view — every customer_facing document ever
+     * approved/sent for this order, most recent revision first. Deliberately
+     * excludes draft/in_review status (a client never sees a document
+     * before it's approved) and internal/procurement categories (BLI,
+     * COOPREP, SUPPO — never buyer-facing by design, per document_types).
+     * A client sees this retroactively from the Quotation onward, per the
+     * confirmed scope — there is no date filter here at all.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function customerFacingForOrder(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name
+             FROM documents d
+             JOIN document_types dt ON dt.id = d.document_type_id
+             WHERE d.order_id = :order_id
+               AND dt.category = 'customer_facing'
+               AND d.status IN ('approved', 'sent')
+             ORDER BY d.generated_at DESC"
+        );
+        $stmt->execute(['order_id' => $orderId]);
+        return $stmt->fetchAll();
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function forOrder(int $orderId): array
     {
@@ -25,7 +51,7 @@ final class DocumentRepository
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default
+            'SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default, dt.category AS document_type_category
              FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
              WHERE d.id = :id'
         );

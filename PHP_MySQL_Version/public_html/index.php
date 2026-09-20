@@ -10,6 +10,9 @@ use App\Controllers\AssetController;
 use App\Controllers\AuditLogController;
 use App\Controllers\AuthController;
 use App\Controllers\ClientController;
+use App\Controllers\ClientIntakeController;
+use App\Controllers\ClientIntakeReviewController;
+use App\Controllers\ClientPortalController;
 use App\Controllers\DashboardController;
 use App\Controllers\DisputeController;
 use App\Controllers\DocumentController;
@@ -27,6 +30,7 @@ use App\Controllers\SuperAdminController;
 use App\Middleware\SuperAdminOnly;
 use App\Controllers\UserController;
 use App\Helpers\Router;
+use App\Middleware\ClientAuth;
 use App\Middleware\CsrfCheck;
 use App\Middleware\PermissionCheck;
 use App\Middleware\SessionAuth;
@@ -41,6 +45,9 @@ $signatories = new SignatoryController();
 $superAdmin = new SuperAdminController();
 $permissionAdmin = new PermissionAdminController();
 $clients = new ClientController();
+$clientIntake = new ClientIntakeController();
+$clientIntakeReview = new ClientIntakeReviewController();
+$clientPortal = new ClientPortalController();
 $orders = new OrderController();
 $documents = new DocumentController();
 $reviews = new ReviewController();
@@ -65,6 +72,22 @@ $router->get('/forgot-password', [$auth, 'showForgotPassword']);
 $router->post('/forgot-password', [$auth, 'forgotPassword'], [CsrfCheck::verify()]);
 $router->get('/reset-password/{token}', [$auth, 'showResetPassword']);
 $router->post('/reset-password/{token}', [$auth, 'resetPassword'], [CsrfCheck::verify()]);
+
+// Public quotation-stage intake form — the actual entry point into the
+// system for a Zoho-qualified prospect. No auth: staff sends this link
+// directly. Submitting only ever creates a client_intake_submissions row,
+// never a client or order (see ClientIntakeController's docblock).
+$router->get('/quotation-request', [$clientIntake, 'show']);
+$router->post('/quotation-request/submit', [$clientIntake, 'submit'], [CsrfCheck::verify()]);
+
+// Client portal login/set-password — public (unauthenticated) by nature,
+// gated instead by the client_logins row provisioned at the Stage 3
+// advance-cleared gate (ClientPortalService::provisionIfNeeded).
+$router->get('/client/login', [$clientPortal, 'showLogin']);
+$router->post('/client/login', [$clientPortal, 'login'], [CsrfCheck::verify()]);
+$router->get('/client/logout', [$clientPortal, 'logout']);
+$router->get('/client/set-password/{token}', [$clientPortal, 'showSetPassword']);
+$router->post('/client/set-password/{token}', [$clientPortal, 'setPassword'], [CsrfCheck::verify()]);
 
 // --- Authenticated routes ---
 $router->get('/force-password-change', [$auth, 'showForcePasswordChange'], [SessionAuth::required()]);
@@ -107,6 +130,11 @@ $router->get('/clients', [$clients, 'index'], [SessionAuth::required(), Permissi
 $router->get('/clients/create', [$clients, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients', [$clients, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/clients/{id}', [$clients, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+
+// Staff review queue for public quotation-request submissions.
+$router->get('/client-intake', [$clientIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/client-intake/{id}/accept', [$clientIntakeReview, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/client-intake/{id}/reject', [$clientIntakeReview, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 $router->get('/orders', [$orders, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->get('/orders/create', [$orders, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
@@ -216,6 +244,14 @@ $router->get('/users', [$users, 'index'], [SessionAuth::required(), PermissionCh
 $router->post('/users/create', [$users, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/toggle-active', [$users, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/force-reset-password', [$users, 'forceResetPassword'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+
+// --- Client portal (authenticated, structurally separate from staff /
+// SessionAuth) — gated by ClientAuth::required(), a different session key. ---
+$router->get('/client', [$clientPortal, 'dashboard'], [ClientAuth::required()]);
+$router->get('/client/account', [$clientPortal, 'showAccount'], [ClientAuth::required()]);
+$router->post('/client/account/password', [$clientPortal, 'changePassword'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->get('/client/orders/{id}', [$clientPortal, 'showOrder'], [ClientAuth::required()]);
+$router->get('/client/documents/{id}/download', [$clientPortal, 'downloadDocument'], [ClientAuth::required()]);
 
 $router->get('/sample-data', [$sampleData, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_sample_data')]);
 $router->post('/sample-data/load', [$sampleData, 'load'], [SessionAuth::required(), PermissionCheck::requires('manage_sample_data'), CsrfCheck::verify()]);

@@ -1,0 +1,58 @@
+<?php use App\Helpers\Csrf; ?>
+<div class="card">
+  <h1>Request a Quotation</h1>
+  <p class="muted">Complete and submit — we will review your request and prepare your Quotation within 24 hours. Fields marked * are required.</p>
+
+  <form method="post" action="/quotation-request/submit">
+    <?= Csrf::field() ?>
+
+    <fieldset>
+      <legend>Your Details</legend>
+      <label>Company Legal Name *
+        <input type="text" name="company_legal_name" placeholder="e.g., KŐ BT egyéni vállalkozó" required>
+      </label>
+      <label>Billing Address *
+        <textarea name="billing_address" placeholder="e.g., István K. u. 40., Csorvás, Hungary" required></textarea>
+      </label>
+      <label>VAT / EORI / Tax Reg. No.
+        <input type="text" name="vat_eori_tax_no" placeholder="UK: EORI No. | France: SIRET + TVA No. | Norway: Org. No. + MVA">
+      </label>
+      <label>Contact Person *
+        <input type="text" name="contact_person" placeholder="e.g., Gábor Szekeres" required>
+      </label>
+      <label>Email *
+        <input type="email" name="email" placeholder="e.g., gabor@company.com" required>
+      </label>
+      <label>Phone
+        <input type="text" name="phone" placeholder="e.g., +36 30 878 0373">
+      </label>
+      <label>Country of Destination *
+        <input type="text" name="country_of_destination" placeholder="e.g., Hungary / United Kingdom / France / Norway" required>
+      </label>
+      <label>Port of Discharge
+        <input type="text" name="port_of_discharge_text" placeholder="e.g., Tilbury UK / Port of Koper Slovenia — leave blank if unsure, we will advise">
+      </label>
+      <label>Certificate of Origin Type
+        <input type="text" name="coo_type" placeholder="GSP Form A (preferential) / Non-preferential — confirm with your customs broker if unsure">
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Shipping Preference</legend>
+      <label>Incoterm
+        <input type="text" name="incoterm_preference" placeholder="FOB Chennai, India / CFR [port] / CIF [port] — if unsure, write FOB">
+      </label>
+      <label>Container Type
+        <input type="text" name="container_type_text" placeholder="e.g., 1 × 20ft FCL / 1 × 40ft FCL — leave blank, we will advise based on your order">
+      </label>
+      <label>Your Own Reference Number
+        <input type="text" name="buyer_own_reference" placeholder="Your internal reference number, if any — write NIL if none">
+      </label>
+      <label>Anything else we should know?
+        <textarea name="notes" placeholder="Product details, quantities, timeline, etc."></textarea>
+      </label>
+    </fieldset>
+
+    <button type="submit">Submit Request</button>
+  </form>
+</div>

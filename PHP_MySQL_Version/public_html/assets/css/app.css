@@ -32,6 +32,7 @@ button:hover{background:var(--navy-strong);}
 .alert-error{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger);}
 .alert-success{background:var(--success-soft);color:var(--success);border:1px solid var(--success);}
 .alert-dev{background:var(--amber-soft);color:var(--amber);border:1px dashed var(--amber);}
+.alert-warning{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber);}
 .muted{color:var(--ink-soft);font-size:0.85rem;}
 .muted.small{font-size:0.78rem;}
 fieldset{border:1px solid var(--line);border-radius:6px;margin-bottom:1.25rem;padding:1rem 1.25rem;}

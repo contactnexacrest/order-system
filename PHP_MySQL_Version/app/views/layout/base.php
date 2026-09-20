@@ -19,6 +19,7 @@ $isEffectiveSuperAdmin = $current && SuperAdminService::isEffective((int) $curre
     <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_orders')): ?>
       <a href="/clients">Clients</a>
       <a href="/orders">Orders</a>
+      <a href="/client-intake">Client Requests</a>
     <?php endif; ?>
     <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_company_settings')): ?>
       <a href="/settings">Company Settings</a>

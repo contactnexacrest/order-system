@@ -1203,9 +1203,95 @@ END$$
 DELIMITER ;
 
 -- ================================================================
--- END OF SCHEMA — 58 tables. All open schema questions resolved
+-- SECTION O — CLIENT PORTAL (added 2026-09-20)
+-- ================================================================
+-- Scope, as confirmed: this system starts the moment a Zoho-qualified
+-- prospect is sent the quotation-stage form link below — filling it out IS
+-- their onboarding into this system, landing in a staff review queue
+-- (never auto-creating a client/order). The client gets no login at all
+-- until their first order's advance payment is marked CLEARED — at that
+-- point client_logins is provisioned automatically and a set-password link
+-- is emailed. From then on they see every client-facing document for
+-- every one of their orders, retroactively from the Quotation onward,
+-- read-only, and can change only their own password.
+
+-- Public, unauthenticated quotation-stage intake. Never auto-creates a
+-- client — a member of staff reviews every submission (see
+-- ClientIntakeReviewController) and, if accepted, converts it into a real
+-- `clients` row using the existing ClientRepository::create() path (same
+-- code a manually-entered walk-in client goes through), never a separate
+-- fake-data path.
+CREATE TABLE client_intake_submissions (
+  id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_legal_name      VARCHAR(255) NOT NULL,
+  billing_address         TEXT NOT NULL,
+  vat_eori_tax_no         VARCHAR(100) NULL,
+  contact_person          VARCHAR(150) NOT NULL,
+  email                   VARCHAR(190) NOT NULL,
+  phone                   VARCHAR(30) NULL,
+  country_of_destination  VARCHAR(100) NOT NULL,
+  port_of_discharge_text  VARCHAR(150) NULL,
+  coo_type                VARCHAR(50) NULL,
+  incoterm_preference     VARCHAR(100) NULL,   -- free text per source Quotation Form — "if unsure, write FOB"
+  container_type_text     VARCHAR(100) NULL,
+  buyer_own_reference     VARCHAR(100) NULL,   -- buyer's own internal reference, if any — "write NIL if none"
+  notes                   TEXT NULL,
+  status                  ENUM('pending','converted','rejected') NOT NULL DEFAULT 'pending',
+  reviewed_by             BIGINT UNSIGNED NULL,
+  reviewed_at             TIMESTAMP NULL,
+  rejection_reason        VARCHAR(500) NULL,
+  converted_client_id     BIGINT UNSIGNED NULL,
+  submitted_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  submitted_ip            VARCHAR(45) NULL,
+  FOREIGN KEY (reviewed_by) REFERENCES users(id),
+  FOREIGN KEY (converted_client_id) REFERENCES clients(id)
+) ENGINE=InnoDB;
+
+-- One login per client, created ONLY by the Stage 3 advance-cleared gate
+-- (OrderController::clearAdvancePayment() / ClientPortalService) — never
+-- earlier, never manually. No row here = that client cannot log in, full
+-- stop, matching the business rule literally. Login identifier is the
+-- client's own clients.email — a separate client-portal auth surface
+-- entirely from `users`/staff sessions (structurally separate, per the
+-- explicit requirement that client and company-user surfaces never mix).
+CREATE TABLE client_logins (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  client_id             BIGINT UNSIGNED NOT NULL UNIQUE,
+  password_hash         VARCHAR(255) NOT NULL,
+  is_active             TINYINT(1) NOT NULL DEFAULT 1,
+  force_password_change TINYINT(1) NOT NULL DEFAULT 1,
+  failed_login_count    INT NOT NULL DEFAULT 0,
+  locked_until          TIMESTAMP NULL,
+  last_login_at         TIMESTAMP NULL,
+  password_changed_at   TIMESTAMP NULL,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by_order_id   BIGINT UNSIGNED NULL,   -- which order's advance-cleared gate triggered creation
+  FOREIGN KEY (client_id) REFERENCES clients(id),
+  FOREIGN KEY (created_by_order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+
+-- Single-use "set your password" link, emailed the moment client_logins is
+-- first created (never a raw password by email) — mirrors
+-- password_reset_tokens exactly: only the SHA-256 hash is ever stored.
+CREATE TABLE client_password_reset_tokens (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  client_id       BIGINT UNSIGNED NOT NULL,
+  token_hash      CHAR(64) NOT NULL,
+  requested_ip    VARCHAR(45) NULL,
+  expires_at      TIMESTAMP NOT NULL,
+  used_at         TIMESTAMP NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id),
+  UNIQUE KEY uq_client_token_hash (token_hash),
+  INDEX idx_client_token_active (client_id, used_at)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- END OF SCHEMA — 61 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
+-- Section N (Super Admin tier) added 2026-09-20.
+-- Section O (client portal) added 2026-09-20.
 -- Section N (Super Admin tier) added 2026-09-20.
 -- ================================================================

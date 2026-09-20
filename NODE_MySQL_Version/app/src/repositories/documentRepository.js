@@ -2,6 +2,28 @@
 
 const db = require('../config/db');
 
+/**
+ * The client portal's own view — every customer_facing document ever
+ * approved/sent for this order, most recent revision first. Deliberately
+ * excludes draft/in_review status (a client never sees a document before
+ * it's approved) and internal/procurement categories (BLI, COOPREP, SUPPO —
+ * never buyer-facing by design, per document_types). A client sees this
+ * retroactively from the Quotation onward, per the confirmed scope — there
+ * is no date filter here at all.
+ */
+async function customerFacingForOrder(orderId) {
+  return db.query(
+    `SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name
+     FROM documents d
+     JOIN document_types dt ON dt.id = d.document_type_id
+     WHERE d.order_id = :order_id
+       AND dt.category = 'customer_facing'
+       AND d.status IN ('approved', 'sent')
+     ORDER BY d.generated_at DESC`,
+    { order_id: orderId }
+  );
+}
+
 async function forOrder(orderId) {
   return db.query(
     `SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default
@@ -15,7 +37,7 @@ async function forOrder(orderId) {
 
 async function find(id) {
   return db.queryOne(
-    `SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default
+    `SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default, dt.category AS document_type_category
      FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
      WHERE d.id = :id`,
     { id }
@@ -86,6 +108,6 @@ async function create(orderId, documentTypeId, documentReference, revisionNumber
 }
 
 module.exports = {
-  forOrder, find, findLatestForOrderAndType, findLatestForOrderAndTypeCode,
+  customerFacingForOrder, forOrder, find, findLatestForOrderAndType, findLatestForOrderAndTypeCode,
   markApproved, markInReview, markDraft, markSent, create,
 };

@@ -113,11 +113,14 @@ storage/
    signature, seal, watermark, email header).
 
    **Fix the storage path in the seeded asset rows.** `seed.sql` inserts
-   those 5 asset rows with a literal placeholder path token. Run this once,
-   right after importing `seed.sql`, using the exact same absolute path
+   asset rows with a literal placeholder path token — in BOTH the `assets`
+   table (company logo/seal/watermark) and the `user_signature_assets`
+   table (per-user signatures and designation seals). Run both, right
+   after importing `seed.sql`, using the exact same absolute path
    you'll put in `STORAGE_BASE_PATH` below:
    ```sql
    UPDATE assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/opt/nexacrest_node/storage');
+   UPDATE user_signature_assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/opt/nexacrest_node/storage');
    ```
    Skipping this step doesn't break anything — every generated document
    just silently shows no logo/signature/seal/watermark image (the code

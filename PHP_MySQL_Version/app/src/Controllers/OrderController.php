@@ -255,7 +255,19 @@ final class OrderController
         OrderPaymentStatusRepository::setBalanceAmount($orderId, $balanceAmount, $balanceDueDate);
         StageGateService::passAndUnlockNext($orderId, 3, (int) $user['id']);
 
-        Flash::set('success', 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.');
+        // Client portal access is provisioned here, and only here — see
+        // ClientPortalService's docblock. No-op if this client already has
+        // a login from an earlier order.
+        $provisionStatus = \App\Services\ClientPortalService::provisionIfNeeded((int) $order['client_id'], $orderId);
+
+        $baseMessage = 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.';
+        if ($provisionStatus === 'provisioned') {
+            Flash::set('success', $baseMessage . ' The client has been emailed their portal login.');
+        } elseif ($provisionStatus === 'no_email_on_file') {
+            Flash::set('warning', $baseMessage . ' WARNING: this client has no email on file, so portal login could NOT be provisioned — add an email to their record and provision access manually, otherwise they will never be able to log in.');
+        } else {
+            Flash::set('success', $baseMessage . ' The client already has portal access from an earlier order.');
+        }
         header("Location: /orders/{$orderId}");
     }
 
