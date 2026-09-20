@@ -42,6 +42,19 @@ final class OrderPackingRepository
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * Records the buyer's written approval of a quantity shortfall that
+     * exceeds company_settings.quantity_shortfall_tolerance_pct — see
+     * OrderController::savePacking(), which blocks the save until this is
+     * on file.
+     */
+    public static function attachBuyerApproval(int $orderId, int $fileId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_packing SET buyer_approval_file_id = :file_id, shortfall_notice_recorded_at = NOW() WHERE order_id = :order_id'
+        )->execute(['file_id' => $fileId, 'order_id' => $orderId]);
+    }
+
     public static function markComplete(int $orderId, int $userId): void
     {
         Database::connection()->prepare(

@@ -37,4 +37,17 @@ async function markComplete(orderId, userId) {
   await db.execute('UPDATE order_packing SET packing_complete_confirmed_at = NOW(), packing_complete_confirmed_by = :user_id WHERE order_id = :order_id', { user_id: userId, order_id: orderId });
 }
 
-module.exports = { upsert, find, markComplete };
+/**
+ * Records the buyer's written approval of a quantity shortfall that
+ * exceeds company_settings.quantity_shortfall_tolerance_pct — see
+ * ordersController.savePacking(), which blocks the save until this is on
+ * file.
+ */
+async function attachBuyerApproval(orderId, fileId) {
+  await db.execute(
+    'UPDATE order_packing SET buyer_approval_file_id = :file_id, shortfall_notice_recorded_at = NOW() WHERE order_id = :order_id',
+    { file_id: fileId, order_id: orderId }
+  );
+}
+
+module.exports = { upsert, find, markComplete, attachBuyerApproval };

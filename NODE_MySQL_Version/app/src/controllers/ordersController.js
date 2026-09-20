@@ -27,6 +27,7 @@ const referenceNumberService = require('../services/referenceNumberService');
 const stageGateService = require('../services/stageGateService');
 const documentGenerationService = require('../services/documentGenerationService');
 const clientPortalService = require('../services/clientPortalService');
+const fileUploadService = require('../services/fileUploadService');
 
 // Port of App\Controllers\OrderController.
 
@@ -38,6 +39,10 @@ function addDaysYmd(fromYmd, days) {
   const d = fromYmd ? new Date(`${fromYmd}T00:00:00Z`) : new Date();
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function sanitizePathSegment(value) {
+  return String(value == null ? '' : value).replace(/[^A-Za-z0-9_-]+/g, '-');
 }
 
 function str(v, fallback = '') {
@@ -213,6 +218,8 @@ async function show(req, res) {
       supplierPo: await orderSupplierPoRepository.findLatestForOrder(orderId),
       freight: await orderFreightRepository.find(orderId),
       packing: await orderPackingRepository.find(orderId),
+      orderedQuantitySummary: await orderProductRepository.orderedQuantitySummary(orderId),
+      shortfallTolerance: (await companySettingsRepository.get('quantity_shortfall_tolerance_pct')) ?? '5',
       crates: await orderCrateRepository.forOrder(orderId),
       shipping: await orderShippingRepository.find(orderId),
       production: await orderProductionRepository.find(orderId),
@@ -436,18 +443,81 @@ async function clearFreightPayment(req, res) {
 }
 
 /** Stage 7: record actual packing figures + crate-level breakdown, ahead of generating the Packing List. */
+/**
+ * Stage 7: record actual packing figures + crate-level breakdown, ahead
+ * of generating the Packing List.
+ *
+ * Quantity-tolerance hard rule: when the ordered quantity can be
+ * unambiguously compared (single unit, not TBC), the shortfall is
+ * computed HERE, server-side, never trusted from the client — and a
+ * shortfall exceeding company_settings.quantity_shortfall_tolerance_pct
+ * blocks the save entirely until the buyer's written approval is
+ * uploaded in the same request (order_packing.buyer_approval_file_id — a
+ * column the original delivery reserved but never wired to anything).
+ * When the order can't be unambiguously compared (mixed units, or an
+ * unconfirmed TBC quantity), this falls back to the pre-existing manual
+ * shortfall_pct entry rather than blocking a save the system has no
+ * sound basis to validate.
+ */
 async function savePacking(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const body = req.body;
+  const actualQtyRaw = str(body.actual_quantity_packed);
+  const actualQty = actualQtyRaw !== '' ? parseFloat(actualQtyRaw) : null;
+
+  const summary = await orderProductRepository.orderedQuantitySummary(orderId);
+  const tolerance = parseFloat((await companySettingsRepository.get('quantity_shortfall_tolerance_pct')) ?? '5');
+  let shortfallPct = null;
+
+  if (summary.comparable && actualQty !== null && summary.total > 0) {
+    shortfallPct = Math.max(0, Math.round((((summary.total - actualQty) / summary.total) * 100) * 100) / 100);
+  }
+
+  const existingPacking = await orderPackingRepository.find(orderId);
+  const hasExistingApproval = existingPacking && existingPacking.buyer_approval_file_id;
+  const uploadingApprovalNow = !!(req.file && req.file.buffer);
+
+  if (shortfallPct !== null && shortfallPct > tolerance && !hasExistingApproval && !uploadingApprovalNow) {
+    const totalDisplay = String(summary.total).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+    flash.set(req, 'error', `Actual quantity packed (${actualQtyRaw} ${summary.unit}) is ${shortfallPct.toFixed(2)}% short of the ordered quantity (${totalDisplay} ${summary.unit}) — this exceeds the ${tolerance.toFixed(2)}% tolerance in Company Settings. Nothing was saved. Upload the buyer's written approval of this shortfall below to proceed.`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
   await orderPackingRepository.upsert(orderId, {
-    actual_quantity_packed: str(body.actual_quantity_packed) || null,
+    actual_quantity_packed: actualQtyRaw || null,
     crate_count: str(body.crate_count) || null,
     total_net_weight_kg: str(body.total_net_weight_kg) || null,
     total_gross_weight_kg: str(body.total_gross_weight_kg) || null,
     total_cbm: str(body.total_cbm) || null,
     packing_date: str(body.packing_date) || null,
-    shortfall_pct: str(body.shortfall_pct) || null,
+    // Auto-computed whenever comparable; otherwise the pre-existing
+    // manual field is the only source of truth we have.
+    shortfall_pct: shortfallPct !== null ? String(shortfallPct) : (str(body.shortfall_pct) || null),
   });
+
+  if (uploadingApprovalNow) {
+    const order = await orderRepository.find(orderId);
+    try {
+      const fileId = await fileUploadService.handleUpload(
+        req,
+        'buyer_approval',
+        'buyer_approval',
+        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/packing`,
+        null,
+        orderId,
+        req.user.id,
+        null,
+        'Buyer',
+        'Quantity shortfall approval'
+      );
+      await orderPackingRepository.attachBuyerApproval(orderId, fileId);
+    } catch (e) {
+      flash.set(req, 'error', `Packing figures saved, but the approval upload failed: ${e.message}`);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+  }
 
   const crateNos = [].concat(body.crate_no || []);
   const marks = [].concat(body.crate_marks_numbers || []);

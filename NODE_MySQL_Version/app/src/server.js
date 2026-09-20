@@ -261,7 +261,7 @@ app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_ord
 app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordFreightPayment));
 app.post('/orders/:id/payment/freight/clear', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.clearFreightPayment));
 
-app.post('/orders/:id/packing', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.savePacking));
+app.post('/orders/:id/packing', requireAuth, requirePermission('manage_orders'), upload.single('buyer_approval'), verifyCsrf, asyncHandler(ordersController.savePacking));
 app.post('/orders/:id/shipping', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.saveShipping));
 app.post('/orders/:id/bl-issued', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordBlIssued));
 app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordScannedBlSent));

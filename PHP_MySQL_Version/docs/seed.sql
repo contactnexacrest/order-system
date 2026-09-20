@@ -452,6 +452,8 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('quotation_validity_days', '30', 'number', 'documents', 'Days a Quotation stays valid from its issue date (Addition beyond the spec''s named key list — the source Quotation template states "30 days" directly in its T&C text; making it a setting instead of a literal keeps that number DB-driven if it ever changes).', 0),
   ('pi_validity_days',       '15', 'number', 'documents', 'Days a Proforma Invoice stays valid from its issue date. Same addition as quotation_validity_days, for the same reason — the source PI template states "15 days" directly in its T&C text.', 0),
   ('revision_start_number', '1', 'number', 'documents', 'Starting revision number for a new document.', 0),
+  ('bl_type_instruction', 'ORIGINAL NEGOTIABLE BILL OF LADING — no exceptions. Do not substitute with Sea Waybill or Express BL.', 'string', 'shipping', 'Mandatory BL type instruction printed on every BL Instruction Sheet (Addition beyond the spec''s named key list — this hard rule was previously hardcoded directly in the BLI template, with no governance or audit trail if it ever needed a one-off exception; a Sea Waybill/Express BL lets the buyer collect cargo without surrendering any document, eliminating NexaCrest''s financial leverage over the balance payment).', 0),
+  ('bl_consignee_instruction', 'TO ORDER OF {company}', 'string', 'shipping', 'Mandatory BL consignee instruction — ensures the BL is to NexaCrest''s order so the buyer cannot use it until NexaCrest endorses and releases it. {company} is substituted with the company legal name at render time. Same addition/rationale as bl_type_instruction.', 0),
   ('master_tracking_ref_format', 'NC/SC/{YYYY}/{DDMM}{NNN}', 'string', 'formats', 'Buyer inquiry reference format — matches the format already in use on your existing documents.', 0),
   ('client_number_format',  'SC-CL-{NNNN}', 'string', 'formats', 'Placeholder client numbering format — confirm against your actual convention.', 0),
   ('order_ref_format',      'SC/OC/{YYYY}/{NNN}', 'string', 'formats', 'Placeholder order reference format — confirm against your actual convention.', 0),
@@ -466,7 +468,8 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- field_protection_requests, never a direct edit.
 UPDATE company_settings SET is_protected = 1 WHERE is_sensitive = 1;
 UPDATE company_settings SET is_protected = 1
-  WHERE setting_key IN ('master_tracking_ref_format', 'client_number_format', 'order_ref_format');
+  WHERE setting_key IN ('master_tracking_ref_format', 'client_number_format', 'order_ref_format',
+                         'bl_type_instruction', 'bl_consignee_instruction');
 
 -- ================================================================
 -- WATERMARK_SETTINGS — global draft watermark (every document starts life

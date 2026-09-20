@@ -79,10 +79,10 @@
 <div class="section-title">8. BILL OF LADING TYPE</div>
 <div class="mandatory-note">MANDATORY INSTRUCTION — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL. Always issue: ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS. NexaCrest payment terms are {{ financial.advance_pct }}% advance + {{ financial.balance_pct }}% balance payable against the original BL. NexaCrest retains all 3 original BLs and only releases them to the buyer AFTER the balance T/T is received and cleared in the NexaCrest bank account. Under a Sea Waybill or Express BL, the buyer can collect the cargo without surrendering any document — NexaCrest would lose all financial leverage. A Sea Waybill must NEVER be issued for NexaCrest shipments.</div>
 <table class="kv">
-  <tr><td class="k">BL Type *</td><td class="v">ORIGINAL NEGOTIABLE BILL OF LADING — no exceptions. Do not substitute with Sea Waybill or Express BL.</td></tr>
+  <tr><td class="k">BL Type *</td><td class="v">{{ bl.type_instruction }}</td></tr>
   <tr><td class="k">No. of Original Copies *</td><td class="v">3 (three originals) — NexaCrest will hold all 3 originals until balance payment is received.</td></tr>
   <tr><td class="k">No. of Non-Negotiable Copies</td><td class="v">3 — for buyer records and NexaCrest file; released freely.</td></tr>
-  <tr><td class="k">BL Consignee Instruction *</td><td class="v">TO ORDER OF {{ company.legal_name|upper }} — ensures the BL is to NexaCrest's order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.</td></tr>
+  <tr><td class="k">BL Consignee Instruction *</td><td class="v">{{ bl.consignee_instruction }} — ensures the BL is to NexaCrest's order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.</td></tr>
 </table>
 <table class="kv">
   <tr><td colspan="2">Original BL release process: Once all 3 originals are issued, CHA to hand them to NexaCrest only. NexaCrest will courier originals to the buyer after confirming receipt of the balance T/T payment in the NexaCrest bank account. NexaCrest retains all original BLs until balance payment is received and cleared. Cargo release at destination is subject to carrier and destination port procedures.</td></tr>

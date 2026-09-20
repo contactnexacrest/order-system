@@ -538,7 +538,15 @@
       <p class="muted">{{ 'Confirm the Supplier PO is signed first' if isFob else 'Clear the freight payment first' }} to unlock this gate.</p>
     {% else %}
       <h3>Packing</h3>
-      <form method="post" action="/orders/{{ order.id }}/packing">
+      {% if orderedQuantitySummary.comparable %}
+        <p class="muted small">Ordered quantity: <strong>{{ orderedQuantitySummary.total }} {{ orderedQuantitySummary.unit }}</strong> &middot; Shortfall tolerance: <strong>{{ shortfallTolerance }}%</strong> — the shortfall below is computed automatically from this. A shortfall over tolerance is blocked until the buyer's written approval is uploaded.</p>
+      {% else %}
+        <p class="muted small">Ordered quantity can't be automatically compared for this order (mixed units across product lines, or quantity not yet confirmed) — enter Shortfall % manually below.</p>
+      {% endif %}
+      {% if packing.buyer_approval_file_id %}
+        <p class="muted small">&#9989; Buyer's written approval of the quantity shortfall is on file (recorded {{ packing.shortfall_notice_recorded_at or '' }}).</p>
+      {% endif %}
+      <form method="post" action="/orders/{{ order.id }}/packing" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="{{ packing.actual_quantity_packed or '' }}"></label>
         <label>Crate Count<input type="text" name="crate_count" value="{{ packing.crate_count or '' }}"></label>
@@ -546,7 +554,8 @@
         <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="{{ packing.total_gross_weight_kg or '' }}"></label>
         <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="{{ packing.total_cbm or '' }}"></label>
         <label>Packing Date<input type="date" name="packing_date" value="{{ packing.packing_date or '' }}"></label>
-        <label>Shortfall %<input type="text" name="shortfall_pct" value="{{ packing.shortfall_pct or '' }}"></label>
+        <label>Shortfall % {% if orderedQuantitySummary.comparable %}(auto-computed — this field is ignored when the ordered quantity is comparable){% endif %}<input type="text" name="shortfall_pct" value="{{ packing.shortfall_pct or '' }}" {% if orderedQuantitySummary.comparable %}readonly{% endif %}></label>
+        <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
 
         <p class="muted small">Crate-level breakdown (add one row per physical crate):</p>
         <table class="list">

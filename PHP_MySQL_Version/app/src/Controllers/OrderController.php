@@ -29,6 +29,7 @@ use App\Repositories\OrderSupplierPoRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
+use App\Services\FileUploadService;
 use App\Services\ReferenceNumberService;
 use App\Services\StageGateService;
 
@@ -424,19 +425,84 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
-    /** Stage 7: record actual packing figures + crate-level breakdown, ahead of generating the Packing List. */
+    /**
+     * Stage 7: record actual packing figures + crate-level breakdown, ahead
+     * of generating the Packing List.
+     *
+     * Quantity-tolerance hard rule (Section 13 / additional_instructions
+     * point re: "system-enforced, not just checklist"): when the ordered
+     * quantity can be unambiguously compared (single unit, not TBC), the
+     * shortfall is computed HERE, server-side, never trusted from the
+     * client — and a shortfall exceeding
+     * company_settings.quantity_shortfall_tolerance_pct blocks the save
+     * entirely until the buyer's written approval is uploaded in the same
+     * request (order_packing.buyer_approval_file_id — a column the
+     * original delivery reserved but never wired to anything). When the
+     * order can't be unambiguously compared (mixed units, or an
+     * unconfirmed TBC quantity), this falls back to the pre-existing
+     * manual shortfall_pct entry rather than blocking a save the system
+     * has no sound basis to validate.
+     */
     public function savePacking(array $params): void
     {
         $orderId = (int) $params['id'];
+        $actualQtyRaw = trim((string) ($_POST['actual_quantity_packed'] ?? ''));
+        $actualQty = $actualQtyRaw !== '' ? (float) $actualQtyRaw : null;
+
+        $summary = OrderProductRepository::orderedQuantitySummary($orderId);
+        $tolerance = (float) (CompanySettingsRepository::get('quantity_shortfall_tolerance_pct') ?? 5);
+        $shortfallPct = null;
+
+        if ($summary['comparable'] && $actualQty !== null && $summary['total'] > 0) {
+            $shortfallPct = max(0.0, round((($summary['total'] - $actualQty) / $summary['total']) * 100, 2));
+        }
+
+        $existingPacking = OrderPackingRepository::find($orderId);
+        $hasExistingApproval = $existingPacking && $existingPacking['buyer_approval_file_id'];
+        $uploadingApprovalNow = !empty($_FILES['buyer_approval']['name']);
+
+        if ($shortfallPct !== null && $shortfallPct > $tolerance && !$hasExistingApproval && !$uploadingApprovalNow) {
+            Flash::set('error', sprintf(
+                'Actual quantity packed (%s %s) is %.2f%% short of the ordered quantity (%s %s) — this exceeds the %.2f%% tolerance in Company Settings. Nothing was saved. Upload the buyer\'s written approval of this shortfall below to proceed.',
+                $actualQtyRaw, $summary['unit'], $shortfallPct, rtrim(rtrim(number_format($summary['total'], 3), '0'), '.'), $summary['unit'], $tolerance
+            ));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
         OrderPackingRepository::upsert($orderId, [
-            'actual_quantity_packed' => trim((string) ($_POST['actual_quantity_packed'] ?? '')) ?: null,
+            'actual_quantity_packed' => $actualQtyRaw ?: null,
             'crate_count'            => trim((string) ($_POST['crate_count'] ?? '')) ?: null,
             'total_net_weight_kg'    => trim((string) ($_POST['total_net_weight_kg'] ?? '')) ?: null,
             'total_gross_weight_kg'  => trim((string) ($_POST['total_gross_weight_kg'] ?? '')) ?: null,
             'total_cbm'              => trim((string) ($_POST['total_cbm'] ?? '')) ?: null,
             'packing_date'           => trim((string) ($_POST['packing_date'] ?? '')) ?: null,
-            'shortfall_pct'          => trim((string) ($_POST['shortfall_pct'] ?? '')) ?: null,
+            // Auto-computed whenever comparable; otherwise the pre-existing
+            // manual field is the only source of truth we have.
+            'shortfall_pct'          => $shortfallPct !== null ? (string) $shortfallPct : (trim((string) ($_POST['shortfall_pct'] ?? '')) ?: null),
         ]);
+
+        if ($uploadingApprovalNow) {
+            $order = OrderRepository::find($orderId);
+            try {
+                $fileId = FileUploadService::handleUpload(
+                    'buyer_approval',
+                    'buyer_approval',
+                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/packing',
+                    null,
+                    $orderId,
+                    (int) AuthService::currentUser()['id'],
+                    null,
+                    'Buyer',
+                    'Quantity shortfall approval'
+                );
+                OrderPackingRepository::attachBuyerApproval($orderId, $fileId);
+            } catch (\Throwable $e) {
+                Flash::set('error', 'Packing figures saved, but the approval upload failed: ' . $e->getMessage());
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+        }
 
         $crateNos = $_POST['crate_no'] ?? [];
         $crates = [];

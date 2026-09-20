@@ -30,4 +30,36 @@ async function totalFobValue(orderId) {
   return parseFloat(row.total);
 }
 
-module.exports = { forOrder, add, totalFobValue };
+/**
+ * Ordered-quantity total for the shortfall-tolerance check
+ * (ordersController.savePacking). Only meaningful when every active line
+ * shares one unit and none is quantity_is_tbc — mixing SQM and PCS (or
+ * comparing against a quantity nobody has confirmed yet) has no sane
+ * single percentage, so the caller falls back to manual entry in that
+ * case rather than the system silently comparing apples to oranges.
+ * @returns {Promise<{total: ?number, unit: ?string, comparable: boolean}>}
+ */
+async function orderedQuantitySummary(orderId) {
+  const rows = await forOrder(orderId);
+  if (!rows.length) {
+    return { total: null, unit: null, comparable: false };
+  }
+
+  const units = new Set();
+  let total = 0;
+  for (const r of rows) {
+    if (r.quantity_is_tbc || r.quantity === null) {
+      return { total: null, unit: null, comparable: false };
+    }
+    units.add(r.unit || '');
+    total += parseFloat(r.quantity);
+  }
+
+  if (units.size !== 1) {
+    return { total: null, unit: null, comparable: false };
+  }
+
+  return { total, unit: [...units][0], comparable: true };
+}
+
+module.exports = { forOrder, add, totalFobValue, orderedQuantitySummary };

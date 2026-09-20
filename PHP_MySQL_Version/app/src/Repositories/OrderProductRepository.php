@@ -65,4 +65,38 @@ final class OrderProductRepository
         $stmt->execute(['order_id' => $orderId]);
         return (float) $stmt->fetch()['total'];
     }
+
+    /**
+     * Ordered-quantity total for the shortfall-tolerance check
+     * (OrderController::savePacking). Only meaningful when every active
+     * line shares one unit and none is quantity_is_tbc — mixing SQM and
+     * PCS (or comparing against a quantity nobody has confirmed yet) has
+     * no sane single percentage, so the caller falls back to manual entry
+     * in that case rather than the system silently comparing apples to
+     * oranges.
+     * @return array{total: ?float, unit: ?string, comparable: bool}
+     */
+    public static function orderedQuantitySummary(int $orderId): array
+    {
+        $rows = self::forOrder($orderId);
+        if (empty($rows)) {
+            return ['total' => null, 'unit' => null, 'comparable' => false];
+        }
+
+        $units = [];
+        $total = 0.0;
+        foreach ($rows as $r) {
+            if (!empty($r['quantity_is_tbc']) || $r['quantity'] === null) {
+                return ['total' => null, 'unit' => null, 'comparable' => false];
+            }
+            $units[$r['unit'] ?? ''] = true;
+            $total += (float) $r['quantity'];
+        }
+
+        if (count($units) !== 1) {
+            return ['total' => null, 'unit' => null, 'comparable' => false];
+        }
+
+        return ['total' => $total, 'unit' => array_key_first($units), 'comparable' => true];
+    }
 }

@@ -149,6 +149,24 @@ final class DocumentDataAssembler
             'shipping'    => self::shippingBlock($orderId),
             'production'  => self::productionBlock($orderId),
             'annexure_products' => self::annexureProductsBlock($orderId),
+            'bl'          => self::blBlock($company['legal_name']),
+        ];
+    }
+
+    /**
+     * The BL Instruction Sheet's two hard business rules (BL type,
+     * consignee wording) — previously hardcoded directly in the Twig
+     * template, now governed, protected company_settings so a legitimate
+     * one-off exception goes through the existing unlock-request +
+     * mandatory-reason + audit-log workflow instead of a source-code edit
+     * that leaves no trail at all.
+     */
+    private static function blBlock(string $companyLegalName): array
+    {
+        $consigneeTemplate = CompanySettingsRepository::get('bl_consignee_instruction') ?? 'TO ORDER OF {company}';
+        return [
+            'type_instruction' => CompanySettingsRepository::get('bl_type_instruction'),
+            'consignee_instruction' => str_replace('{company}', strtoupper($companyLegalName), $consigneeTemplate),
         ];
     }
 

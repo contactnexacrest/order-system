@@ -146,6 +146,22 @@ async function assemble(orderId) {
     shipping: await shippingBlock(orderId),
     production: await productionBlock(orderId),
     annexure_products: await annexureProductsBlock(orderId),
+    bl: await blBlock(company.legal_name),
+  };
+}
+
+/**
+ * The BL Instruction Sheet's two hard business rules (BL type, consignee
+ * wording) — previously hardcoded directly in the Nunjucks template, now
+ * governed, protected company_settings so a legitimate one-off exception
+ * goes through the existing unlock-request + mandatory-reason + audit-log
+ * workflow instead of a source-code edit that leaves no trail at all.
+ */
+async function blBlock(companyLegalName) {
+  const consigneeTemplate = (await companySettingsRepository.get('bl_consignee_instruction')) || 'TO ORDER OF {company}';
+  return {
+    type_instruction: await companySettingsRepository.get('bl_type_instruction'),
+    consignee_instruction: consigneeTemplate.replace('{company}', companyLegalName.toUpperCase()),
   };
 }
 
