@@ -45,6 +45,8 @@
   .signature-block table { width: 100%; border-collapse: collapse; }
   .signature-block td { vertical-align: bottom; font-size: 8.8px; padding: 2px 8px; }
   .signature-img { height: 34px; }
+  .seal-img { height: 90px; margin-top: 4px; }
+  .signature-cell { position: relative; min-height: 100px; }
 
   .mandatory-note { font-size: 7.8px; color: #a5402b; margin-bottom: 6px; }
 
@@ -102,11 +104,13 @@
       <td style="width:50%;">Authorised Signatory</td>
     </tr>
     <tr>
-      <td>&nbsp;</td>
+      <td class="signature-cell">
+        {% if signatory.seal_data_uri %}<img class="seal-img" src="{{ signatory.seal_data_uri }}">{% endif %}
+      </td>
       <td>
-        {% if assets.signature_data_uri %}<img class="signature-img" src="{{ assets.signature_data_uri }}"><br>{% endif %}
-        {{ company.md_name }}<br>
-        {{ company.md_title }}<br>
+        {% if signatory.signature_data_uri %}<img class="signature-img" src="{{ signatory.signature_data_uri }}"><br>{% endif %}
+        {{ signatory.name }}<br>
+        {{ signatory.designation }}<br>
         {{ company.legal_name }}
       </td>
     </tr>

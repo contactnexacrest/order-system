@@ -62,7 +62,7 @@ final class AssetController
 
         if (!in_array($assetType, self::ALLOWED_TYPES, true)) {
             Flash::set('error', 'Unknown asset type.');
-            header('Location: /assets');
+            header('Location: /company-assets');
             return;
         }
         if ($name === '') {
@@ -71,14 +71,14 @@ final class AssetController
 
         if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
             Flash::set('error', 'No file was uploaded, or the upload failed.');
-            header('Location: /assets');
+            header('Location: /company-assets');
             return;
         }
 
         $file = $_FILES['file'];
         if ($file['size'] > self::MAX_BYTES) {
             Flash::set('error', 'File too large (max 5MB).');
-            header('Location: /assets');
+            header('Location: /company-assets');
             return;
         }
 
@@ -88,7 +88,7 @@ final class AssetController
 
         if (!isset(self::ALLOWED_MIME[$mime])) {
             Flash::set('error', 'Unsupported file type. Use PNG, JPG, or SVG.');
-            header('Location: /assets');
+            header('Location: /company-assets');
             return;
         }
 
@@ -105,7 +105,7 @@ final class AssetController
 
         if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
             Flash::set('error', 'Could not save the uploaded file.');
-            header('Location: /assets');
+            header('Location: /company-assets');
             return;
         }
 
@@ -113,7 +113,45 @@ final class AssetController
         AuditLogRepository::log((int) $user['id'], 'ASSET_REPLACED', 'assets', $newId, $assetType, null, $targetPath);
 
         Flash::set('success', ucfirst(str_replace('_', ' ', $assetType)) . ' updated.');
-        header('Location: /assets');
+        header('Location: /company-assets');
+    }
+
+    /**
+     * Removes a superseded (inactive) upload only — never the currently
+     * active asset of a type, so there is always something to render.
+     * Gated on a separate `delete_assets` permission (not `manage_assets`)
+     * per the explicit requirement that deletion needs its own,
+     * admin/role-controlled grant, distinct from ordinary upload/replace.
+     */
+    public function delete(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $id = (int) ($params['id'] ?? 0);
+        $asset = AssetRepository::find($id);
+
+        if (!$asset) {
+            Flash::set('error', 'Asset not found.');
+            header('Location: /company-assets');
+            return;
+        }
+
+        if ((int) $asset['is_active'] === 1) {
+            Flash::set('error', 'Cannot delete the currently active ' . str_replace('_', ' ', $asset['asset_type']) . '. Replace it with a new upload first, then delete the old one.');
+            header('Location: /company-assets');
+            return;
+        }
+
+        try {
+            AssetRepository::delete($id);
+        } catch (\PDOException $e) {
+            Flash::set('error', 'This file is still referenced by a previously generated document or setting and cannot be deleted — its history must be preserved.');
+            header('Location: /company-assets');
+            return;
+        }
+
+        AuditLogRepository::log((int) $user['id'], 'ASSET_DELETED', 'assets', $id, $asset['asset_type'], $asset['server_path'], null);
+        Flash::set('success', 'Old ' . str_replace('_', ' ', $asset['asset_type']) . ' upload deleted.');
+        header('Location: /company-assets');
     }
 
     private static function folderFor(string $assetType): string

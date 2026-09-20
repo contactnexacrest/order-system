@@ -25,6 +25,9 @@ $unreadCount = $current ? NotificationRepository::unreadCountForUser((int) $curr
     <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_assets')): ?>
       <a href="/company-assets">Assets</a>
     <?php endif; ?>
+    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_signatories')): ?>
+      <a href="/signatories">Signatories</a>
+    <?php endif; ?>
     <?php if ($current): ?>
       <a href="/reviews">My Reviews</a>
     <?php endif; ?>

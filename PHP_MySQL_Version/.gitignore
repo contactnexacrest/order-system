@@ -1,0 +1,18 @@
+# Real secrets — SMTP/DB credentials, encryption keys. Never committed.
+# Copy app/.env.example to app/.env and fill in real values instead.
+app/.env
+
+# app/vendor/ is intentionally NOT ignored — this package ships with
+# Composer dependencies already built in, by explicit design, so a
+# non-developer can deploy without installing Composer (see README).
+
+# Runtime-generated documents (PDFs/DOCX per order) and scratch files —
+# not source, and can contain buyer data that shouldn't sit in git history.
+storage/clients/*
+storage/temp/*
+!storage/clients/.gitkeep
+!storage/temp/.gitkeep
+
+# OS/editor noise
+.DS_Store
+*.swp

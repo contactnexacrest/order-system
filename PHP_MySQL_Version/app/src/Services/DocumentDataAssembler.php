@@ -323,6 +323,117 @@ final class DocumentDataAssembler
         return $out;
     }
 
+    /**
+     * Three-layer signatory resolution (highest precedence first):
+     *   1. $overrideUserId — a one-off choice made at generation time.
+     *   2. document_type_signatories — a per-document-type default (e.g.
+     *      Payment Terms Amendment always uses the Director designation seal).
+     *   3. company_default_signatory — the global fallback.
+     * The chosen signatory's name/designation/signature/seal are returned
+     * ready to render AND ready to snapshot onto the documents row, so a
+     * later change to any default never alters how a past document reads.
+     */
+    public static function signatoryBlock(int $documentTypeId, ?int $overrideUserId = null): array
+    {
+        $pdo = \App\Config\Database::connection();
+
+        $userId = $overrideUserId;
+        $useDesignationSeal = false;
+
+        if ($userId === null) {
+            $stmt = $pdo->prepare(
+                'SELECT user_id, use_designation_seal FROM document_type_signatories WHERE document_type_id = :dt'
+            );
+            $stmt->execute(['dt' => $documentTypeId]);
+            $row = $stmt->fetch();
+            if ($row) {
+                $userId = (int) $row['user_id'];
+                $useDesignationSeal = (bool) $row['use_designation_seal'];
+            }
+        }
+
+        if ($userId === null) {
+            $row = $pdo->query('SELECT user_id FROM company_default_signatory WHERE id = 1')->fetch();
+            $userId = $row ? (int) $row['user_id'] : null;
+        }
+
+        if ($userId === null) {
+            // No signatory configured at all — fall back to the legacy
+            // company_settings md_name/md_title + the single global
+            // `assets` signature/seal rows, so a fresh install with no
+            // signatory set up yet still renders a usable document.
+            $company = self::companyBlock();
+            $assets = self::assetsBlock();
+            return [
+                'user_id' => null,
+                'name' => $company['md_name'],
+                'designation' => $company['md_title'],
+                'signature_data_uri' => $assets['signature_data_uri'],
+                'seal_data_uri' => $assets['seal_data_uri'],
+                'signature_asset_id' => null,
+                'seal_asset_id' => null,
+                'used_designation_seal' => false,
+            ];
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT u.id, u.name, d.title AS designation
+             FROM users u LEFT JOIN designations d ON d.id = u.designation_id
+             WHERE u.id = :id AND u.is_signatory_eligible = 1'
+        );
+        $stmt->execute(['id' => $userId]);
+        $user = $stmt->fetch();
+        if (!$user) {
+            throw new \RuntimeException("Resolved signatory user {$userId} is not signatory-eligible or does not exist");
+        }
+
+        $signatureAsset = self::userSignatureAsset($userId, 'signature');
+        $signatureDataUri = self::assetDataUri($signatureAsset);
+
+        $sealAsset = null;
+        $sealDataUri = null;
+        if ($useDesignationSeal) {
+            $sealAsset = self::userSignatureAsset($userId, 'designation_seal');
+            $sealDataUri = self::assetDataUri($sealAsset);
+        } else {
+            $companySeal = AssetRepository::findActiveByType('seal');
+            $sealAsset = $companySeal;
+            $sealDataUri = self::assetDataUri($companySeal, true);
+        }
+
+        return [
+            'user_id' => (int) $user['id'],
+            'name' => $user['name'],
+            'designation' => $user['designation'] ?? '',
+            'signature_data_uri' => $signatureDataUri,
+            'seal_data_uri' => $sealDataUri,
+            'signature_asset_id' => $signatureAsset['id'] ?? null,
+            'seal_asset_id' => $sealAsset['id'] ?? null,
+            'used_designation_seal' => $useDesignationSeal,
+        ];
+    }
+
+    /** @return array<string,mixed>|null */
+    private static function userSignatureAsset(int $userId, string $kind): ?array
+    {
+        $stmt = \App\Config\Database::connection()->prepare(
+            'SELECT * FROM user_signature_assets
+             WHERE user_id = :uid AND asset_kind = :kind AND is_active = 1
+             ORDER BY is_default_for_kind DESC, id DESC LIMIT 1'
+        );
+        $stmt->execute(['uid' => $userId, 'kind' => $kind]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** @param array<string,mixed>|null $asset */
+    private static function assetDataUri(?array $asset, bool $isCompanyAsset = false): ?string
+    {
+        if (!$asset || !is_file($asset['server_path'])) {
+            return null;
+        }
+        return 'data:' . ($asset['mime_type'] ?: 'image/png') . ';base64,' . base64_encode((string) file_get_contents($asset['server_path']));
+    }
+
     public static function formatMoney(string|int|float|null $value): string
     {
         if ($value === null || $value === '') {

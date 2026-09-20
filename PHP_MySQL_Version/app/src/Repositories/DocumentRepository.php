@@ -100,6 +100,12 @@ final class DocumentRepository
         )->execute(['id' => $id]);
     }
 
+    /**
+     * @param array<string,mixed>|null $signatory as returned by
+     *        DocumentDataAssembler::signatoryBlock() — snapshotted onto the
+     *        row so a later change to any signatory default never alters
+     *        how a document that was already generated reads.
+     */
     public static function create(
         ?int $orderId,
         int $documentTypeId,
@@ -107,14 +113,19 @@ final class DocumentRepository
         int $revisionNumber,
         ?int $pdfFileId,
         ?int $docxFileId,
-        ?int $generatedBy
+        ?int $generatedBy,
+        ?array $signatory = null
     ): int {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'INSERT INTO documents
-                (order_id, document_type_id, document_reference, revision_number, status, generated_by, docx_file_id, pdf_file_id)
+                (order_id, document_type_id, document_reference, revision_number, status, generated_by, docx_file_id, pdf_file_id,
+                 signatory_user_id, signatory_name_snapshot, signatory_designation_snapshot,
+                 signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal)
              VALUES
-                (:order_id, :document_type_id, :document_reference, :revision_number, \'draft\', :generated_by, :docx_file_id, :pdf_file_id)'
+                (:order_id, :document_type_id, :document_reference, :revision_number, \'draft\', :generated_by, :docx_file_id, :pdf_file_id,
+                 :signatory_user_id, :signatory_name_snapshot, :signatory_designation_snapshot,
+                 :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal)'
         );
         $stmt->execute([
             'order_id'           => $orderId,
@@ -124,6 +135,12 @@ final class DocumentRepository
             'generated_by'       => $generatedBy,
             'docx_file_id'       => $docxFileId,
             'pdf_file_id'        => $pdfFileId,
+            'signatory_user_id'  => $signatory['user_id'] ?? null,
+            'signatory_name_snapshot' => $signatory['name'] ?? null,
+            'signatory_designation_snapshot' => $signatory['designation'] ?? null,
+            'signature_asset_id_snapshot' => $signatory['signature_asset_id'] ?? null,
+            'seal_asset_id_snapshot' => $signatory['seal_asset_id'] ?? null,
+            'used_designation_seal' => !empty($signatory['used_designation_seal']) ? 1 : 0,
         ]);
         return (int) $pdo->lastInsertId();
     }

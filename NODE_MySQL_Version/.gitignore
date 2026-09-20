@@ -1,0 +1,21 @@
+# Real secrets — SMTP/DB credentials, encryption/session keys. Never committed.
+# Copy app/.env.example to app/.env and fill in real values instead.
+app/.env
+
+# app/node_modules/ is intentionally NOT ignored — this package ships with
+# npm dependencies already installed, by explicit design, so a
+# non-developer can deploy without running npm install (see README).
+
+# Runtime-generated documents (PDFs/DOCX per order) and scratch files —
+# not source, and can contain buyer data that shouldn't sit in git history.
+storage/clients/*
+storage/temp/*
+!storage/clients/.gitkeep
+!storage/temp/.gitkeep
+
+# Puppeteer's own browser download cache, if ever regenerated locally.
+app/.browser-cache/
+
+# OS/editor noise
+.DS_Store
+*.swp

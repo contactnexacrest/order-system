@@ -27,7 +27,7 @@ use Twig\Loader\FilesystemLoader as TwigFilesystemLoader;
  */
 final class DocumentGenerationService
 {
-    public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId): array
+    public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null): array
     {
         $pdo = Database::connection();
 
@@ -52,6 +52,7 @@ final class DocumentGenerationService
 
         $watermark = self::draftWatermark();
         $terms = self::resolveTerms($documentTypeCode, $data);
+        $signatory = DocumentDataAssembler::signatoryBlock((int) $docType['id'], $signatoryOverrideUserId);
 
         $context = array_merge($data, [
             'meta' => [
@@ -66,6 +67,7 @@ final class DocumentGenerationService
             'terms' => $terms,
             'terms_section_number' => self::termsSectionNumberFor($documentTypeCode),
             'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
+            'signatory' => $signatory,
         ]);
 
         $twig = self::twigEnvironment();
@@ -132,7 +134,8 @@ final class DocumentGenerationService
             $revisionNumber,
             $pdfFileId,
             $docxFileId,
-            $generatedByUserId
+            $generatedByUserId,
+            $signatory
         );
 
         return [
@@ -355,10 +358,12 @@ final class DocumentGenerationService
         $snapshot = $amendment['original_terms_snapshot'] ?? [];
         $company = DocumentDataAssembler::companyBlock();
         $assets = DocumentDataAssembler::assetsBlock();
+        $signatory = DocumentDataAssembler::signatoryBlock($docTypeId);
 
         $context = [
             'company' => $company,
             'assets'  => $assets,
+            'signatory' => $signatory,
             'order'   => ['incoterm_code' => null], // suppresses the default header incoterm chip — not relevant to a legal amendment record
             'doc_title' => self::titleFor('AMD'),
             'section1_title' => self::section1TitleFor('AMD'),
@@ -462,7 +467,8 @@ final class DocumentGenerationService
             0,
             $pdfFileId,
             null,
-            $generatedByUserId
+            $generatedByUserId,
+            $signatory
         );
 
         AmendmentRepository::attachDocument($amendmentId, $documentId);

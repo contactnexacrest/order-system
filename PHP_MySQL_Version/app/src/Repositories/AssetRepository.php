@@ -45,6 +45,30 @@ final class AssetRepository
         return (int) $pdo->lastInsertId();
     }
 
+    public static function find(int $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM assets WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /**
+     * Hard-delete is only ever allowed for an inactive (superseded) asset
+     * row — never the currently active one, so there is always a usable
+     * logo/signature/seal/watermark/email-header. If a foreign key still
+     * points at this row (e.g. watermark_settings, or a document's
+     * seal_asset_id_snapshot when it was a company-seal document), the
+     * database itself refuses the delete — surfaced to the caller as a
+     * PDOException for the controller to translate into a plain message,
+     * rather than silently orphaning historical documents.
+     */
+    public static function delete(int $id): void
+    {
+        Database::connection()
+            ->prepare('DELETE FROM assets WHERE id = :id AND is_active = 0')
+            ->execute(['id' => $id]);
+    }
+
     /**
      * Replacing an asset: deactivate the current active row for that type,
      * insert the new one as active. Old rows are kept (not deleted) so

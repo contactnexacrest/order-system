@@ -49,7 +49,9 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('cross_verify_documents',    'Cross-verify documents',        'Add an independent pass/fail quality check on any generated document — separate from the formal reviewer sign-off.', 'documents'),
   ('approve_email_send',        'Approve email send (Level 2)',  'Level-2 approval for a deferred client email before it actually sends (Section 10 — Email & Deferred Send System).', 'documents'),
   ('manage_sample_data',        'Manage sample data',            'Load/clear the Sample Data Playground (test clients/orders only — never real data).', 'admin'),
-  ('manage_field_protection',   'Manage field protection',       'Request or approve locking/unlocking a protected field (company setting, T&C clause, or payment preset). Approving your own request is blocked — a different privileged user must confirm.', 'admin');
+  ('manage_field_protection',   'Manage field protection',       'Request or approve locking/unlocking a protected field (company setting, T&C clause, or payment preset). Approving your own request is blocked — a different privileged user must confirm.', 'admin'),
+  ('delete_assets',             'Delete assets',                 'Permanently remove a superseded (inactive) logo/signature/seal/watermark/email-header upload. The currently active asset for a type can never be deleted this way — replace it first.', 'admin'),
+  ('manage_signatories',        'Manage signatories & designations', 'Manage the designations list, mark a user as signatory-eligible, upload their signature/designation-seal images, and set the global and per-document-type default signatory.', 'admin');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)

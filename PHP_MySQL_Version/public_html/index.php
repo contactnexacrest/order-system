@@ -21,6 +21,7 @@ use App\Controllers\ReportController;
 use App\Controllers\ReviewController;
 use App\Controllers\SampleDataController;
 use App\Controllers\SettingsController;
+use App\Controllers\SignatoryController;
 use App\Controllers\UserController;
 use App\Helpers\Router;
 use App\Middleware\CsrfCheck;
@@ -33,6 +34,7 @@ $auth = new AuthController();
 $dashboard = new DashboardController();
 $settings = new SettingsController();
 $assets = new AssetController();
+$signatories = new SignatoryController();
 $clients = new ClientController();
 $orders = new OrderController();
 $documents = new DocumentController();
@@ -75,6 +77,16 @@ $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(
 $router->get('/company-assets', [$assets, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_assets')]);
 $router->get('/company-assets/preview', [$assets, 'preview'], [SessionAuth::required()]);
 $router->post('/company-assets/replace', [$assets, 'replace'], [SessionAuth::required(), PermissionCheck::requires('manage_assets'), CsrfCheck::verify()]);
+$router->post('/company-assets/{id}/delete', [$assets, 'delete'], [SessionAuth::required(), PermissionCheck::requires('delete_assets'), CsrfCheck::verify()]);
+
+$router->get('/signatories', [$signatories, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories')]);
+$router->post('/signatories/designations', [$signatories, 'createDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->post('/signatories/designations/{id}/toggle', [$signatories, 'toggleDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->post('/signatories/users/{id}/eligibility', [$signatories, 'setEligibility'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->post('/signatories/users/{id}/upload', [$signatories, 'uploadUserAsset'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->post('/signatories/user-assets/{id}/deactivate', [$signatories, 'deactivateUserAsset'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->post('/signatories/global-default', [$signatories, 'setGlobalDefault'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->post('/signatories/document-types/{id}', [$signatories, 'setDocumentTypeDefault'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 
 // --- Phase B: clients / orders / stage gates / document generation ---
 $router->get('/clients', [$clients, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
