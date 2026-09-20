@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NexaCrest International — My Orders</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-brand">NEXACREST <span>INTERNATIONAL</span></div>
+  <nav class="topbar-nav">
+    <a href="/client">My Orders</a>
+    <a href="/client/account">My Account</a>
+    <a href="/client/logout" style="margin-left:auto">Log out</a>
+  </nav>
+</header>
+<main class="page">
+  {% for f in flashes %}
+    <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
+  {% endfor %}
+  {{ content | safe }}
+</main>
+</body>
+</html>

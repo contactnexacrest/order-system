@@ -1,0 +1,18 @@
+<div class="card page-wide">
+  <h1>My Orders</h1>
+  <p class="muted">Welcome, {{ client.company_legal_name }}. Below are all your orders with NexaCrest.</p>
+  <table class="list">
+    <tr><th>Order Ref</th><th>Stage</th><th>Status</th><th>Created</th><th></th></tr>
+    {% for o in orders %}
+    <tr>
+      <td>{{ o.order_reference or ('#' ~ o.id) }}</td>
+      <td>{{ o.current_stage_name or '—' }}</td>
+      <td>{{ o.status | capitalize }}</td>
+      <td>{{ o.created_at }}</td>
+      <td><a href="/client/orders/{{ o.id }}">View documents</a></td>
+    </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">No orders yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>

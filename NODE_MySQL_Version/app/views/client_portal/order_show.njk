@@ -1,0 +1,21 @@
+<div class="card page-wide">
+  <h1>Order {{ order.order_reference or ('#' ~ order.id) }}</h1>
+  <p class="muted small"><a href="/client">&larr; Back to My Orders</a></p>
+
+  <div class="section">
+    <h2>Documents</h2>
+    <table class="list">
+      <tr><th>Document</th><th>Reference</th><th>Date</th><th></th></tr>
+      {% for d in documents %}
+      <tr>
+        <td>{{ d.document_type_name }}</td>
+        <td>{{ d.document_reference or '—' }}</td>
+        <td>{{ d.generated_at }}</td>
+        <td><a href="/client/documents/{{ d.id }}/download">Download PDF</a></td>
+      </tr>
+      {% else %}
+        <tr><td colspan="4" class="muted">No documents available yet — check back once your order progresses.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

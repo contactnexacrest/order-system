@@ -1,0 +1,60 @@
+<div class="card page-wide">
+  <h1>Quotation Requests</h1>
+  <p class="muted">Submissions from the public quotation-request form (<code>/quotation-request</code>). Nothing here becomes a real client or order until you accept it — accepting creates the client record and takes you to it, ready for you to create the order and generate the Quotation yourself.</p>
+
+  <div class="section">
+    <h2>Pending ({{ pending.length }})</h2>
+    <table class="list">
+      <tr><th>Company</th><th>Contact</th><th>Destination</th><th>Submitted</th><th>Action</th></tr>
+      {% for s in pending %}
+      <tr>
+        <td>{{ s.company_legal_name }}<br><span class="muted small">{{ s.billing_address }}</span></td>
+        <td>{{ s.contact_person }}<br><span class="muted small">{{ s.email }} &middot; {{ s.phone or '' }}</span></td>
+        <td>
+          {{ s.country_of_destination }}
+          {% if s.port_of_discharge_text %}<br><span class="muted small">Port: {{ s.port_of_discharge_text }}</span>{% endif %}
+          {% if s.incoterm_preference %}<br><span class="muted small">Incoterm: {{ s.incoterm_preference }}</span>{% endif %}
+        </td>
+        <td>{{ s.submitted_at }}</td>
+        <td>
+          <form method="post" action="/client-intake/{{ s.id }}/accept" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-success">Accept &amp; Create Client</button>
+          </form>
+          <form method="post" action="/client-intake/{{ s.id }}/reject" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px">
+            <button type="submit" class="btn-sm btn-danger">Reject</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">No pending requests.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Recently Resolved</h2>
+    <table class="list">
+      <tr><th>Company</th><th>Status</th><th>Resolved By</th><th>When</th><th>Result</th></tr>
+      {% for s in resolved %}
+      <tr>
+        <td>{{ s.company_legal_name }}</td>
+        <td>{{ s.status | capitalize }}</td>
+        <td>{{ s.reviewed_by_name or '—' }}</td>
+        <td>{{ s.reviewed_at }}</td>
+        <td>
+          {% if s.status == 'converted' and s.client_unique_number %}
+            <a href="/clients/{{ s.converted_client_id }}">{{ s.client_unique_number }}</a>
+          {% elif s.status == 'rejected' %}
+            {{ s.rejection_reason or '' }}
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">Nothing resolved yet.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

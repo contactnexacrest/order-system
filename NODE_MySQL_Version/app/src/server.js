@@ -21,6 +21,9 @@ const dashboardController = require('./controllers/dashboardController');
 const settingsController = require('./controllers/settingsController');
 const assetController = require('./controllers/assetController');
 const clientsController = require('./controllers/clientsController');
+const clientIntakeController = require('./controllers/clientIntakeController');
+const clientIntakeReviewController = require('./controllers/clientIntakeReviewController');
+const clientPortalController = require('./controllers/clientPortalController');
 const ordersController = require('./controllers/ordersController');
 const annexureController = require('./controllers/annexureController');
 const documentController = require('./controllers/documentController');
@@ -39,6 +42,7 @@ const signatoryController = require('./controllers/signatoryController');
 const superAdminController = require('./controllers/superAdminController');
 const permissionAdminController = require('./controllers/permissionAdminController');
 const superAdminOnly = require('./middleware/superAdminOnly');
+const clientAuth = require('./middleware/clientAuth');
 
 const app = express();
 const viewsDir = path.join(__dirname, '..', 'views');
@@ -166,6 +170,22 @@ app.post('/forgot-password', verifyCsrf, asyncHandler(authController.forgotPassw
 app.get('/reset-password/:token', asyncHandler(authController.showResetPassword));
 app.post('/reset-password/:token', verifyCsrf, asyncHandler(authController.resetPassword));
 
+// Public quotation-stage intake form — the actual entry point into the
+// system for a Zoho-qualified prospect. No auth: staff sends this link
+// directly. Submitting only ever creates a client_intake_submissions row,
+// never a client or order (see clientIntakeController's docblock).
+app.get('/quotation-request', asyncHandler(clientIntakeController.show));
+app.post('/quotation-request/submit', verifyCsrf, asyncHandler(clientIntakeController.submit));
+
+// Client portal login/set-password — public (unauthenticated) by nature,
+// gated instead by the client_logins row provisioned at the Stage 3
+// advance-cleared gate (clientPortalService.provisionIfNeeded).
+app.get('/client/login', asyncHandler(clientPortalController.showLogin));
+app.post('/client/login', verifyCsrf, asyncHandler(clientPortalController.login));
+app.get('/client/logout', asyncHandler(clientPortalController.logout));
+app.get('/client/set-password/:token', asyncHandler(clientPortalController.showSetPassword));
+app.post('/client/set-password/:token', verifyCsrf, asyncHandler(clientPortalController.setPassword));
+
 // --- Authenticated routes ---
 app.get('/force-password-change', requireAuth, asyncHandler(authController.showForcePasswordChange));
 app.post('/force-password-change', requireAuth, verifyCsrf, asyncHandler(authController.forcePasswordChange));
@@ -206,6 +226,11 @@ app.get('/clients', requireAuth, requirePermission('manage_orders'), asyncHandle
 app.get('/clients/create', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.create));
 app.post('/clients', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.store));
 app.get('/clients/:id', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.show));
+
+// Staff review queue for public quotation-request submissions.
+app.get('/client-intake', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.index));
+app.post('/client-intake/:id/accept', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.accept));
+app.post('/client-intake/:id/reject', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.reject));
 
 app.get('/orders', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.index));
 app.get('/orders/create', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.create));
@@ -326,6 +351,15 @@ app.post('/users/:id/force-reset-password', requireAuth, requirePermission('mana
 app.get('/sample-data', requireAuth, requirePermission('manage_sample_data'), asyncHandler(sampleDataController.index));
 app.post('/sample-data/load', requireAuth, requirePermission('manage_sample_data'), verifyCsrf, asyncHandler(sampleDataController.load));
 app.post('/sample-data/clear', requireAuth, requirePermission('manage_sample_data'), verifyCsrf, asyncHandler(sampleDataController.clear));
+
+// --- Client portal (authenticated, structurally separate from staff /
+// requireAuth) — gated by clientAuth.required(), a different session key. ---
+const requireClientAuth = clientAuth.required();
+app.get('/client', requireClientAuth, asyncHandler(clientPortalController.dashboard));
+app.get('/client/account', requireClientAuth, asyncHandler(clientPortalController.showAccount));
+app.post('/client/account/password', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.changePassword));
+app.get('/client/orders/:id', requireClientAuth, asyncHandler(clientPortalController.showOrder));
+app.get('/client/documents/:id/download', requireClientAuth, asyncHandler(clientPortalController.downloadDocument));
 
 // --- 404 fallback (mirrors the PHP Router's default) ---
 app.use((req, res) => {

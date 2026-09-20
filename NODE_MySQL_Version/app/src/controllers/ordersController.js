@@ -26,6 +26,7 @@ const userRepository = require('../repositories/userRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const stageGateService = require('../services/stageGateService');
 const documentGenerationService = require('../services/documentGenerationService');
+const clientPortalService = require('../services/clientPortalService');
 
 // Port of App\Controllers\OrderController.
 
@@ -271,7 +272,19 @@ async function clearAdvancePayment(req, res) {
   await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
   await stageGateService.passAndUnlockNext(orderId, 3, user.id);
 
-  flash.set(req, 'success', 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.');
+  // Client portal access is provisioned here, and only here — see
+  // clientPortalService's docblock. No-op if this client already has a
+  // login from an earlier order.
+  const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId);
+
+  const baseMessage = 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.';
+  if (provisionStatus === 'provisioned') {
+    flash.set(req, 'success', `${baseMessage} The client has been emailed their portal login.`);
+  } else if (provisionStatus === 'no_email_on_file') {
+    flash.set(req, 'warning', `${baseMessage} WARNING: this client has no email on file, so portal login could NOT be provisioned — add an email to their record and provision access manually, otherwise they will never be able to log in.`);
+  } else {
+    flash.set(req, 'success', `${baseMessage} The client already has portal access from an earlier order.`);
+  }
   res.redirect(`/orders/${orderId}`);
 }
 
