@@ -9,7 +9,7 @@ const stageGateService = require('../services/stageGateService');
 
 // Port of App\Controllers\DocumentController.
 
-const ALLOWED_TYPES = ['QT', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP'];
+const ALLOWED_TYPES = ['QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP'];
 
 async function generate(req, res) {
   const orderId = parseInt(req.params.id, 10);

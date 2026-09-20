@@ -218,4 +218,12 @@ final class OrderRepository
         $stmt->execute(['client_id' => $clientId]);
         return $stmt->fetchAll();
     }
+
+    /** Toggled from the Annexure A management screen for an order created before this flag existed on the New Order form. */
+    public static function setIncludeAnnexureA(int $orderId, bool $include): void
+    {
+        Database::connection()
+            ->prepare('UPDATE orders SET include_annexure_a = :flag WHERE id = :id')
+            ->execute(['flag' => $include ? 1 : 0, 'id' => $orderId]);
+    }
 }

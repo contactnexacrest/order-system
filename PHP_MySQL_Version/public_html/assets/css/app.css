@@ -18,6 +18,7 @@ a{color:var(--navy)}
 .page{max-width:1000px;margin:2rem auto;padding:0 1rem;}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:1.5rem 2rem;margin-bottom:1.5rem;}
 .card-narrow{max-width:380px;margin:4rem auto;}
+.card-nested{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1rem;}
 .bare{min-height:100vh;}
 .bare-wrap{max-width:420px;margin:0 auto;padding-top:3rem;}
 .bare-brand{text-align:center;font-weight:700;letter-spacing:0.08em;color:var(--navy-strong);margin-bottom:1rem;}

@@ -5,10 +5,22 @@
 <style>
   @page { margin: 28px 32px 40px 32px; }
   body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1b2430; }
-  .doc-header { background: #14263d; color: #ffffff; padding: 10px 14px; margin-bottom: 10px; }
+  .doc-header { background: #14263d; color: #ffffff; padding: 8px 14px; margin-bottom: 10px; }
+  .doc-header table { width: 100%; border-collapse: collapse; }
+  .doc-header td { border: none; padding: 0; vertical-align: middle; }
+  .doc-header td.logo-cell { width: 46px; }
+  .doc-header td.logo-cell img { height: 36px; width: auto; }
   .doc-header .company { font-size: 13px; font-weight: bold; letter-spacing: 0.03em; }
   .doc-header .doctype { font-size: 11px; color: #e0a052; font-weight: bold; }
   .doc-header .incoterm { font-size: 9px; color: #cfd8e3; }
+
+  .annexure-notice { background: #fbe9e9; border: 1px solid #a5402b; color: #a5402b; padding: 6px 10px; font-size: 8.8px; margin-top: 8px; margin-bottom: 4px; font-weight: bold; }
+
+  .annexure-product { margin-bottom: 10px; page-break-inside: avoid; }
+  .annexure-product-title { font-size: 9.5px; font-weight: bold; color: #14263d; margin-bottom: 3px; }
+  table.annexure-images { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  table.annexure-images td { border: 1px solid #dcd6c9; padding: 4px; text-align: center; }
+  table.annexure-images img { max-width: 220px; max-height: 160px; }
 
   table.meta { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
   table.meta td { border: 1px solid #dcd6c9; padding: 4px 8px; font-size: 9px; }
@@ -61,9 +73,14 @@
 {% if watermark.enabled %}<div class="watermark">{{ watermark.text }}</div>{% endif %}
 
 <div class="doc-header">
-  <span class="company">{{ company.legal_name|upper }}</span><br>
-  <span class="doctype">{{ doc_title }}</span>
-  {% block header_incoterm %}{% if order.incoterm_code %}<span class="incoterm"> &nbsp;&middot;&nbsp; {{ order.incoterm_code }} {{ order.port_of_loading|upper }}</span>{% endif %}{% endblock %}
+  <table><tr>
+    {% if assets.logo_data_uri %}<td class="logo-cell"><img src="{{ assets.logo_data_uri }}"></td>{% endif %}
+    <td>
+      <span class="company">{{ company.legal_name|upper }}</span><br>
+      <span class="doctype">{{ doc_title }}</span>
+      {% block header_incoterm %}{% if order.incoterm_code %}<span class="incoterm"> &nbsp;&middot;&nbsp; {{ order.incoterm_code }} {{ order.port_of_loading|upper }}</span>{% endif %}{% endblock %}
+    </td>
+  </tr></table>
 </div>
 
 <div class="mandatory-note">Fields marked * are mandatory and must be completed before this document is issued.</div>
@@ -90,6 +107,9 @@
 
 {% if terms and terms.length %}
 <div class="section-title">{{ terms_section_number }}. {{ terms_section_title }}</div>
+{% if order.include_annexure_a %}
+<div class="annexure-notice">&#9888; Annexure A &mdash; Product Technical Specifications is attached and forms an integral part of this {{ doc_title|lower }}. Refer Annexure A for product images, technical drawings, and component dimensions.</div>
+{% endif %}
 <ul class="terms">
   {% for clause in terms %}
     <li>{{ clause }}</li>

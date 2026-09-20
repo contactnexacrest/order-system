@@ -195,7 +195,16 @@
           <button type="submit" class="btn-sm">Generate COO Prep Sheet (internal)</button>
         </form>
       {% endif %}
+
+      {% if order.include_annexure_a %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="ANNEXA">
+          <button type="submit" class="btn-sm">Generate Annexure A</button>
+        </form>
+      {% endif %}
     </div>
+    <p class="muted small"><a href="/orders/{{ order.id }}/annexure">{% if order.include_annexure_a %}Manage Annexure A product entries &amp; images{% else %}Enable / manage Annexure A{% endif %}</a></p>
   </div>
 
   <div class="section">

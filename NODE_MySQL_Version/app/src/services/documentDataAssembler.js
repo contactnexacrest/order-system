@@ -15,6 +15,7 @@ const orderProductionRepository = require('../repositories/orderProductionReposi
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const assetRepository = require('../repositories/assetRepository');
 const documentRepository = require('../repositories/documentRepository');
+const orderAnnexureRepository = require('../repositories/orderAnnexureRepository');
 
 /**
  * Pulls every field a QT/PI/OC template needs from the DB and assembles a
@@ -67,6 +68,7 @@ async function assemble(orderId) {
       est_shipment_date_text: order.est_shipment_date_text ?? 'TBC',
       production_status_text: order.production_status_text ?? 'Not yet commenced',
       coo_type: order.coo_type ?? 'TBC',
+      include_annexure_a: !!order.include_annexure_a,
       currency_code: order.currency_code,
       buyers_po_ref: order.buyers_po_ref ?? 'NIL',
       quotation_date: formatDate(order.quotation_date),
@@ -143,7 +145,33 @@ async function assemble(orderId) {
     crates: await cratesBlock(orderId),
     shipping: await shippingBlock(orderId),
     production: await productionBlock(orderId),
+    annexure_products: await annexureProductsBlock(orderId),
   };
+}
+
+/**
+ * Annexure A's own product list, images embedded as base64 data URIs for
+ * the same isRemoteEnabled=false-equivalent reason assetsBlock() embeds
+ * the logo/signature/seal — Puppeteer renders this HTML from a local file
+ * with no server backing it, so a generated PDF can never depend on a live
+ * HTTP fetch of anything, including this app's own authenticated routes.
+ */
+async function annexureProductsBlock(orderId) {
+  const products = await orderAnnexureRepository.forOrder(orderId);
+  return products.map((p) => ({
+    name: p.name,
+    description: p.description,
+    dimensions: p.dimensions,
+    finish: p.finish,
+    components: p.components,
+    technical_notes: p.technical_notes,
+    images: p.images.map((img) => {
+      const dataUri = fs.existsSync(img.server_path)
+        ? `data:${img.mime_type || 'image/jpeg'};base64,${fs.readFileSync(img.server_path).toString('base64')}`
+        : null;
+      return { data_uri: dataUri };
+    }),
+  }));
 }
 
 /**

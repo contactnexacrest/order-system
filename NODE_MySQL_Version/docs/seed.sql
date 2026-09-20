@@ -393,7 +393,8 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
   ('received_remittance',   'pdf,jpg,jpeg,png', 10485760, 'Buyer/bank remittance advice or payment confirmation copy.'),
   ('draft_bl',              'pdf', 10485760, 'Draft Bill of Lading from the CHA/shipping line, pending written approval before originals are issued.'),
   ('fumigation_cert',       'pdf,jpg,jpeg,png', 5242880, 'Fumigation certificate for wooden packing.'),
-  ('buyer_approval',        'pdf,jpg,jpeg,png,eml,msg', 5242880, 'Buyer''s written approval (e.g. quantity shortfall, draft BL sign-off).');
+  ('buyer_approval',        'pdf,jpg,jpeg,png,eml,msg', 5242880, 'Buyer''s written approval (e.g. quantity shortfall, draft BL sign-off).'),
+  ('product_image',         'jpg,jpeg,png,webp', 5242880, 'Product image/technical drawing attached to an Annexure A entry.');
 
 -- ================================================================
 -- COMPANY_SETTINGS — every key schema.sql reserves for this table.

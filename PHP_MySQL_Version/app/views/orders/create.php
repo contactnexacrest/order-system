@@ -122,6 +122,13 @@
       <textarea name="special_requirements" rows="2"></textarea>
     </fieldset>
 
+    <fieldset>
+      <legend>Annexure A</legend>
+      <label><input type="checkbox" name="include_annexure_a" value="1" style="display:inline-block;width:auto;"> Include Annexure A — Product Technical Specifications
+        <small class="muted">Referenced from the Quotation/PI/OC/Buyer PO as an attached, integral document. Manage its product entries and images from the order page once this order is created.</small>
+      </label>
+    </fieldset>
+
     <button type="submit">Create Order</button>
   </form>
 </div>

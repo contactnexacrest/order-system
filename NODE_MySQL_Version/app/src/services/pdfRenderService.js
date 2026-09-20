@@ -34,19 +34,50 @@ function launchBrowser() {
 }
 
 async function getBrowser() {
-  if (!browserPromise) {
-    browserPromise = launchBrowser().catch((err) => {
-      browserPromise = null; // allow retry on next call rather than caching a permanent failure
-      throw err;
-    });
+  if (browserPromise) {
+    // A previously-launched browser can die on its own between requests
+    // (crash, OOM, the underlying Chromium process being reaped) — without
+    // this check, every future call reused the same dead handle forever
+    // (browser.newPage() failing instantly with "Connection closed"), and
+    // the only recovery was restarting the whole Node process. Real bug
+    // found via live testing: the very first document generation of a
+    // fresh process succeeded, but every one after the browser died failed
+    // immediately.
+    const existing = await browserPromise.catch(() => null);
+    if (existing && existing.connected) {
+      return browserPromise;
+    }
+    browserPromise = null;
   }
+
+  browserPromise = launchBrowser().catch((err) => {
+    browserPromise = null; // allow retry on next call rather than caching a permanent failure
+    throw err;
+  });
   return browserPromise;
 }
 
 /** @returns {Promise<Buffer>} A4 portrait PDF bytes rendered from a self-contained HTML string. */
 async function renderPdfFromHtml(html) {
+  return renderOnce(html, true);
+}
+
+async function renderOnce(html, allowRetry) {
   const browser = await getBrowser();
-  const page = await browser.newPage();
+  let page;
+  try {
+    page = await browser.newPage();
+  } catch (err) {
+    // Narrow race: the browser died between getBrowser()'s `connected`
+    // check and this call. Force a fresh launch and retry exactly once —
+    // never loop, so a genuinely broken Puppeteer setup still surfaces the
+    // real error to the caller instead of hanging.
+    if (allowRetry) {
+      browserPromise = null;
+      return renderOnce(html, false);
+    }
+    throw err;
+  }
   try {
     await page.setContent(html, { waitUntil: 'networkidle0' });
     const pdf = await page.pdf({

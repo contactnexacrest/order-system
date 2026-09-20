@@ -163,7 +163,13 @@ async function forClient(clientId) {
   );
 }
 
+/** Toggled from the Annexure A management screen for an order created before this flag existed on the New Order form. */
+async function setIncludeAnnexureA(orderId, include) {
+  await db.execute('UPDATE orders SET include_annexure_a = :flag WHERE id = :id', { flag: include ? 1 : 0, id: orderId });
+}
+
 module.exports = {
   all, find, nextSequenceForClient, create, markSample, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
+  setIncludeAnnexureA,
 };

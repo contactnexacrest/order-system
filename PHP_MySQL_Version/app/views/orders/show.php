@@ -205,7 +205,16 @@ $orderClosed = $order['status'] === 'complete';
           <button type="submit" class="btn-sm">Generate COO Prep Sheet (internal)</button>
         </form>
       <?php endif; ?>
+
+      <?php if ($order['include_annexure_a']): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="ANNEXA">
+          <button type="submit" class="btn-sm">Generate Annexure A</button>
+        </form>
+      <?php endif; ?>
     </div>
+    <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>/annexure"><?= $order['include_annexure_a'] ? 'Manage Annexure A product entries &amp; images' : 'Enable / manage Annexure A' ?></a></p>
   </div>
 
   <div class="section">

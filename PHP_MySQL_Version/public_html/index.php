@@ -6,6 +6,7 @@ require __DIR__ . '/../app/bootstrap.php';
 
 use App\Controllers\AdminOverrideController;
 use App\Controllers\AmendmentController;
+use App\Controllers\AnnexureController;
 use App\Controllers\AssetController;
 use App\Controllers\AuditLogController;
 use App\Controllers\AuthController;
@@ -49,6 +50,7 @@ $clientIntake = new ClientIntakeController();
 $clientIntakeReview = new ClientIntakeReviewController();
 $clientPortal = new ClientPortalController();
 $orders = new OrderController();
+$annexure = new AnnexureController();
 $documents = new DocumentController();
 $reviews = new ReviewController();
 $emailDispatch = new EmailDispatchController();
@@ -144,6 +146,16 @@ $router->post('/orders/{id}/buyer-po', [$orders, 'recordBuyerPo'], [SessionAuth:
 $router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+
+// Annexure A — Product Technical Specifications (schema tables shipped
+// with no screen ever built against them; this is that missing piece).
+$router->get('/orders/{id}/annexure', [$annexure, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/orders/{id}/annexure/toggle', [$annexure, 'toggleInclude'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/products', [$annexure, 'createProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/products/{productId}', [$annexure, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/products/{productId}/delete', [$annexure, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/products/{productId}/images', [$annexure, 'uploadImage'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/images/{imageId}/remove', [$annexure, 'removeImage'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 // --- Phase C: Stages 4-9 ---
 $router->post('/orders/{id}/buyer-acknowledged', [$orders, 'confirmBuyerAcknowledged'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

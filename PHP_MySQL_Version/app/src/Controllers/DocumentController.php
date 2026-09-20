@@ -13,7 +13,7 @@ use App\Services\StageGateService;
 
 final class DocumentController
 {
-    private const ALLOWED_TYPES = ['QT', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP'];
+    private const ALLOWED_TYPES = ['QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP'];
 
     public function generate(array $params): void
     {

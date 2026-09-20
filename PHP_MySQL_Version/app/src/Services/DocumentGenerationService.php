@@ -497,6 +497,7 @@ final class DocumentGenerationService
     {
         return match ($code) {
             'QT' => 'QT/quotation.html.twig',
+            'ANNEXA' => 'ANNEXA/annexure.html.twig',
             'PI' => 'PI/proforma_invoice.html.twig',
             'OC' => 'OC/order_confirmation.html.twig',
             'BUYERPO' => 'BUYERPO/buyer_po.html.twig',
@@ -574,6 +575,7 @@ final class DocumentGenerationService
     {
         return match ($code) {
             'QT' => 'QUOTATION',
+            'ANNEXA' => 'ANNEXURE A — PRODUCT TECHNICAL SPECIFICATIONS',
             'PI' => 'PROFORMA INVOICE',
             'OC' => 'ORDER CONFIRMATION',
             'BUYERPO' => 'PURCHASE ORDER — ORDER ACCEPTANCE',

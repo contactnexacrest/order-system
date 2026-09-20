@@ -22,6 +22,7 @@ const settingsController = require('./controllers/settingsController');
 const assetController = require('./controllers/assetController');
 const clientsController = require('./controllers/clientsController');
 const ordersController = require('./controllers/ordersController');
+const annexureController = require('./controllers/annexureController');
 const documentController = require('./controllers/documentController');
 const reviewController = require('./controllers/reviewController');
 const amendmentController = require('./controllers/amendmentController');
@@ -214,6 +215,16 @@ app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders')
 app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordAdvancePayment));
 app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
+
+// Annexure A — Product Technical Specifications (schema tables shipped
+// with no screen ever built against them; this is that missing piece).
+app.get('/orders/:id/annexure', requireAuth, requirePermission('manage_orders'), asyncHandler(annexureController.index));
+app.post('/orders/:id/annexure/toggle', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.toggleInclude));
+app.post('/orders/:id/annexure/products', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.createProduct));
+app.post('/orders/:id/annexure/products/:productId', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateProduct));
+app.post('/orders/:id/annexure/products/:productId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.deleteProduct));
+app.post('/orders/:id/annexure/products/:productId/images', requireAuth, requirePermission('manage_orders'), upload.single('image'), verifyCsrf, asyncHandler(annexureController.uploadImage));
+app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.removeImage));
 
 app.post('/orders/:id/buyer-acknowledged', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.confirmBuyerAcknowledged));
 

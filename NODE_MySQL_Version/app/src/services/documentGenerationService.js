@@ -36,6 +36,18 @@ function templatesEnvironment() {
   // Twig's |date('d F Y') — only ever called with that one format string in
   // these templates, so the format argument is accepted but ignored.
   njkEnv.addFilter('date', (value) => documentDataAssembler.formatDate(value));
+  // Nunjucks ships its OWN built-in `nl2br`, but it only copies the input's
+  // existing "safe" mark onto its output (nunjucks/src/filters.js) rather
+  // than marking freshly-inserted <br /> tags safe itself — since
+  // annexure_products text is a plain unmarked string, autoescape then
+  // re-escapes those tags into literal "<br />" text on the page. This
+  // override matches server.js's app-views environment: escape first
+  // (autoescape is on globally, so this filter must do its own escaping
+  // since it returns markup), then turn newlines into <br>, then mark safe.
+  njkEnv.addFilter('nl2br', (value) => {
+    const escaped = nunjucks.runtime.suppressValue(value == null ? '' : String(value), true);
+    return new nunjucks.runtime.SafeString(escaped.replace(/\r\n|\r|\n/g, '<br>\n'));
+  });
   return njkEnv;
 }
 
@@ -455,6 +467,7 @@ async function generateAmendment(amendmentId, generatedByUserId) {
 function templateFileFor(code) {
   const map = {
     QT: 'QT/quotation.njk',
+    ANNEXA: 'ANNEXA/annexure.njk',
     PI: 'PI/proforma_invoice.njk',
     OC: 'OC/order_confirmation.njk',
     BUYERPO: 'BUYERPO/buyer_po.njk',
@@ -528,6 +541,7 @@ async function renderDocx(targetPath, documentTypeCode, context) {
 function titleFor(code) {
   const map = {
     QT: 'QUOTATION',
+    ANNEXA: 'ANNEXURE A — PRODUCT TECHNICAL SPECIFICATIONS',
     PI: 'PROFORMA INVOICE',
     OC: 'ORDER CONFIRMATION',
     BUYERPO: 'PURCHASE ORDER — ORDER ACCEPTANCE',

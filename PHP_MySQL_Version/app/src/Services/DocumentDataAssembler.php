@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Repositories\AssetRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
+use App\Repositories\OrderAnnexureRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPackingRepository;
@@ -71,6 +72,7 @@ final class DocumentDataAssembler
                 'est_shipment_date_text' => $order['est_shipment_date_text'] ?? 'TBC',
                 'production_status_text' => $order['production_status_text'] ?? 'Not yet commenced',
                 'coo_type'             => $order['coo_type'] ?? 'TBC',
+                'include_annexure_a'   => (bool) ($order['include_annexure_a'] ?? false),
                 'currency_code'        => $order['currency_code'],
                 'buyers_po_ref'        => $order['buyers_po_ref'] ?? 'NIL',
                 'quotation_date'       => self::formatDate($order['quotation_date']),
@@ -146,7 +148,36 @@ final class DocumentDataAssembler
             'crates'      => self::cratesBlock($orderId),
             'shipping'    => self::shippingBlock($orderId),
             'production'  => self::productionBlock($orderId),
+            'annexure_products' => self::annexureProductsBlock($orderId),
         ];
+    }
+
+    /**
+     * Annexure A's own product list, images embedded as base64 data URIs
+     * for the same DOMPDF isRemoteEnabled=false reason assetsBlock() embeds
+     * the logo/signature/seal — a generated PDF can never depend on a live
+     * HTTP fetch of anything, including this app's own authenticated
+     * routes.
+     */
+    private static function annexureProductsBlock(int $orderId): array
+    {
+        $products = OrderAnnexureRepository::forOrder($orderId);
+        return array_map(static function (array $p): array {
+            return [
+                'name' => $p['name'],
+                'description' => $p['description'],
+                'dimensions' => $p['dimensions'],
+                'finish' => $p['finish'],
+                'components' => $p['components'],
+                'technical_notes' => $p['technical_notes'],
+                'images' => array_map(static function (array $img): array {
+                    $dataUri = is_file($img['server_path'])
+                        ? 'data:' . ($img['mime_type'] ?: 'image/jpeg') . ';base64,' . base64_encode((string) file_get_contents($img['server_path']))
+                        : null;
+                    return ['data_uri' => $dataUri];
+                }, $p['images']),
+            ];
+        }, $products);
     }
 
     /**
