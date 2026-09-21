@@ -467,6 +467,35 @@ chasing, and how many did we actually lose" — `orders.status` only had
   `order_supplier_po`, `email_log.sent_at`) — nothing here is a new source
   of truth, just new queries against existing data.
 
+## Document template fidelity verification pass (added 2026-09-21)
+
+Used the extended Sample Data Playground (a full CIF order through every
+document type — see above) to visually inspect every rendered PDF page by
+page on both stacks. Found and fixed four real, previously-undiscovered
+bugs — all four surfaced only because this was the first time a CFR/CIF
+order with real crate/shipping data had ever been carried through every
+document type in one run:
+
+1. `orderRepository.setPiDates()` existed but was never called — every
+   Proforma Invoice ever generated showed "VALID UNTIL * TBC", and the
+   PI-send email's `{pi_valid_until}` placeholder would render blank.
+2. The Packing List's crate breakdown skipped the trailing-zero trim every
+   other number on the page gets ("10.00" pcs instead of "10").
+3. The BL Instruction Sheet's "Container Type / Size" read the rough
+   order-creation estimate instead of the confirmed value from the same
+   Packing/BL form the document itself is generated from.
+4. The Buyer PO Acceptance letter's payment-terms sentence was a static
+   string describing only the "before shipment" balance trigger, wrong for
+   every order on the "Established Buyer — Post-BL" preset — a real,
+   legally-significant defect since this document exists for the buyer to
+   countersign. Consolidated onto the same `balanceTriggerSentence()`
+   helper the Order Confirmation template and `amendmentService.js` already
+   used, instead of a second, static copy.
+
+See the PHP/MySQL README's matching section for the full detail and how
+each fix was verified live (regenerate → inspect the actual rendered PDF →
+confirm the fix and confirm the other branch didn't regress).
+
 ## Top-tier UI/UX pass (added 2026-09-21)
 
 The shared layout (`views/layout/base.njk`) and stylesheet (`public/css/app.css`)

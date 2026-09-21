@@ -65,11 +65,7 @@
   <tr><td class="k">Advance Cleared On *</td><td class="v">{{ payment_status.advance_cleared_at or 'TBC' }}</td></tr>
   <tr class="highlight"><td class="k">Balance Due (USD) *</td><td class="v">{{ payment_status.balance_amount or financial.balance_amount }}</td></tr>
   <tr><td class="k">Balance Payment Terms</td><td class="v">
-    {% if financial.balance_trigger_option == 'A_BEFORE_SHIPMENT' %}
-      Payable before shipment — within {{ financial.balance_days }} working days of receiving shipment readiness confirmation from NexaCrest.
-    {% else %}
-      Payable against scanned copy of Bill of Lading, within {{ financial.balance_days }} days of BL date.
-    {% endif %}
+    {{ financial.balance_terms_text }}
   </td></tr>
   {% if not order.is_fob %}
   <tr><td class="k">Freight &amp; Insurance ({{ order.incoterm_code }})</td><td class="v">Confirmed amount invoiced separately by Freight Debit Note; not included in the Total Order Value above.</td></tr>

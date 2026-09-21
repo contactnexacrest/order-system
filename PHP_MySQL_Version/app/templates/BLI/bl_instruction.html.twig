@@ -45,7 +45,7 @@
 
 <div class="section-title">5. CONTAINER &amp; CARGO DETAILS</div>
 <table class="kv">
-  <tr><td class="k">Container Type / Size *</td><td class="v">{{ order.container_type }}</td></tr>
+  <tr><td class="k">Container Type / Size *</td><td class="v">{{ shipping.container_type ?: 'TBC — to be confirmed by shipping line at time of booking' }}</td></tr>
   <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no ?: 'TBC — to be confirmed by shipping line after stuffing' }}</td></tr>
   <tr><td class="k">Seal No. *</td><td class="v">{{ shipping.seal_no ?: 'TBC — to be confirmed after stuffing' }}</td></tr>
   <tr><td class="k">No. of Packages *</td><td class="v">{{ packing.crate_count ? packing.crate_count ~ ' Wooden Crates' : 'TBC' }} — must match Packing List exactly</td></tr>

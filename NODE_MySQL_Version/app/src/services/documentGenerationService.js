@@ -62,6 +62,23 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     throw new Error(`Order ${orderId} not found`);
   }
 
+  // Real bug this fixes: orderRepository.setPiDates() existed but was never
+  // called anywhere — every PI ever generated showed "VALID UNTIL * TBC" on
+  // the document itself, and the PI-send email template's {pi_valid_until}
+  // placeholder (docs/seed.sql) would render blank for every buyer.
+  // pi_date/pi_valid_until mirror quotation_date/quotation_valid_until (set
+  // at order creation) but can only be set here, at actual PI-generation
+  // time — set (or reset, on a re-issued PI) every time a PI is generated
+  // so the validity window always reflects the most recent issue.
+  if (documentTypeCode === 'PI') {
+    const piValidityDays = parseInt((await companySettingsRepository.get('pi_validity_days')) || '15', 10);
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const today = new Date();
+    const validUntil = new Date(today);
+    validUntil.setDate(validUntil.getDate() + piValidityDays);
+    await orderRepository.setPiDates(orderId, fmt(today), fmt(validUntil));
+  }
+
   const data = await documentDataAssembler.assemble(orderId);
 
   const existing = await documentRepository.findLatestForOrderAndType(orderId, docType.id);

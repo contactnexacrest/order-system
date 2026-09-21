@@ -65,7 +65,19 @@
   {% endif %}
   {% endfor %}
 </table>
-<p style="font-size:8px; color:#5b6774;">See Packing List for full crate-level breakdown — Crates C-001 to C-{{ packing.crate_count ?: 'TBC' }}.</p>
+{# Real bug this fixes: synthesizing "C-001 to C-{{ crate_count }}" assumed
+   crate numbers are always sequential digits with no zero-padding, so a
+   2-crate order using the app's own "C-001"/"C-002" convention (see the
+   Packing List) rendered the nonsensical "Crates C-001 to C-2" here. Uses
+   the actual first/last crate_no from the same crates the Packing List
+   itself lists, which is correct regardless of whatever numbering scheme
+   was actually typed into the packing form. #}
+{% if crates is not empty %}
+<p style="font-size:8px; color:#5b6774;">See Packing List for full crate-level breakdown
+  {%- if crates|length > 1 %} — Crates {{ (crates|first).crate_no }} to {{ (crates|last).crate_no }}{% else %} — Crate {{ (crates|first).crate_no }}{% endif -%}.</p>
+{% else %}
+<p style="font-size:8px; color:#5b6774;">See Packing List for full crate-level breakdown.</p>
+{% endif %}
 
 <div class="section-title">5. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
 <p style="font-size:8px; color:#5b6774;">FOB Value is the basis for all payments and required for Indian Shipping Bill &amp; IGST refund. Freight &amp; Insurance (if applicable) are recovered separately via Freight Debit Note and are not included in this Commercial Invoice value.</p>

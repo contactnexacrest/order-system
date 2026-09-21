@@ -126,6 +126,7 @@ async function assemble(orderId) {
       balance_amount: formatMoney(balanceAmount),
       balance_trigger_option: order.balance_trigger_option,
       balance_days: order.balance_days,
+      balance_terms_text: balanceTriggerSentence(order.balance_trigger_option || null, order.balance_days != null ? parseInt(order.balance_days, 10) : null),
       // freight/insurance are indicative-only, not summed into the binding total for FOB
       total_value: formatMoney(fobValue),
       preset_name: order.preset_name,
@@ -279,6 +280,23 @@ async function packingBlock(orderId) {
   };
 }
 
+// Real bug this fixes: order_crates' DECIMAL columns were passed straight
+// through, unlike every other quantity/weight field in this file (see
+// formatNumber() below) — every Packing List ever generated showed
+// "10.00" pcs / "1600.00" kg / "9.2500" m³ in the crate breakdown instead
+// of the trimmed "10" / "1600" / "9.25" the rest of the same document
+// uses. Trims trailing zeros the same way, but returns null (not
+// formatNumber()'s 'TBC') for a genuinely empty cell — the template's own
+// `|| '—'` fallback already handles that, and 'TBC' would be a behavior
+// change for a document type whose crate rows come from a form where
+// these are all required.
+function trimCrateNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  return trimTrailingZeros(Number(value).toFixed(3));
+}
+
 async function cratesBlock(orderId) {
   const rows = await orderCrateRepository.forOrder(orderId);
   return rows.map((c) => ({
@@ -286,10 +304,10 @@ async function cratesBlock(orderId) {
     marks_numbers: c.marks_numbers,
     product_description: c.product_description,
     dimensions_lwh_cm: c.dimensions_lwh_cm,
-    pcs: c.pcs,
-    net_weight_kg: c.net_weight_kg,
-    gross_weight_kg: c.gross_weight_kg,
-    cbm: c.cbm,
+    pcs: trimCrateNumber(c.pcs),
+    net_weight_kg: trimCrateNumber(c.net_weight_kg),
+    gross_weight_kg: trimCrateNumber(c.gross_weight_kg),
+    cbm: trimCrateNumber(c.cbm),
     hs_code: c.hs_code,
   }));
 }

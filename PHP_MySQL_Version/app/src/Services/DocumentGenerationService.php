@@ -41,6 +41,24 @@ final class DocumentGenerationService
             throw new \RuntimeException("Order {$orderId} not found");
         }
 
+        // Real bug this fixes: OrderRepository::setPiDates() existed but was
+        // never called anywhere — every PI ever generated showed "VALID
+        // UNTIL * TBC" on the document itself, and the PI-send email
+        // template's {pi_valid_until} placeholder (docs/seed.sql) would
+        // render blank for every buyer. pi_date/pi_valid_until mirror
+        // quotation_date/quotation_valid_until (set at order creation) but
+        // can only be set here, at actual PI-generation time — set (or
+        // reset, on a re-issued PI) every time a PI is generated so the
+        // validity window always reflects the most recent issue.
+        if ($documentTypeCode === 'PI') {
+            $piValidityDays = (int) (CompanySettingsRepository::get('pi_validity_days') ?? 15);
+            OrderRepository::setPiDates(
+                $orderId,
+                (new \DateTimeImmutable())->format('Y-m-d'),
+                (new \DateTimeImmutable("+{$piValidityDays} days"))->format('Y-m-d')
+            );
+        }
+
         $data = DocumentDataAssembler::assemble($orderId);
 
         $existing = DocumentRepository::findLatestForOrderAndType($orderId, (int) $docType['id']);

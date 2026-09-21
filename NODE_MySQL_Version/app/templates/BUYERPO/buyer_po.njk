@@ -49,7 +49,7 @@
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
   <tr><td class="k">Certificate of Origin *</td><td class="v">{{ order.coo_type }}</td></tr>
-  <tr><td class="k">Payment Terms *</td><td class="v">{{ financial.advance_pct }}% advance T/T against Proforma Invoice before production. {{ financial.balance_pct }}% balance T/T before shipment — within {{ financial.balance_days }} working days of shipment readiness confirmation. Freight &amp; Insurance (CFR/CIF): invoiced separately by Freight Debit Note before shipment.</td></tr>
+  <tr><td class="k">Payment Terms *</td><td class="v">{{ financial.advance_pct }}% advance T/T against Proforma Invoice before production. {{ financial.balance_pct }}% balance T/T — {{ financial.balance_terms_text }} Freight &amp; Insurance (CFR/CIF): invoiced separately by Freight Debit Note before shipment.</td></tr>
 </table>
 
 <div class="section-title">4. BUYER ACCEPTANCE (Buyer fills this section, signs and returns)</div>

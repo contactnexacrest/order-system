@@ -1228,6 +1228,78 @@ the seeded matrix. Phase D adds two new permissions: `cross_verify_documents`
 (Admin/MD-only, via the existing wildcard) — review both against your real
 org chart before going live.
 
+## Document template fidelity verification pass (added 2026-09-21)
+
+Standing tracked item to re-verify every document type's fidelity, not just
+the ones a specific feature task happened to touch. Used the just-extended
+Sample Data Playground (see above) to generate a full CIF order through
+every one of the nine document types plus the Buyer PO acceptance letter,
+then visually inspected every rendered PDF page by page (`pdftoppm` +
+direct image review, not just `pdftotext`) on both stacks. Four real,
+previously-undiscovered bugs found and fixed, all four because this was the
+first time a CFR/CIF order with real crate/shipping data had ever been
+carried through every document type in one continuous run:
+
+1. **`OrderRepository::setPiDates()`/`orderRepository.setPiDates()` existed
+   but was never called anywhere.** Every Proforma Invoice ever generated,
+   in the whole history of the app, showed "VALID UNTIL * TBC" on the
+   document itself, and the PI-send email template's `{pi_valid_until}`
+   placeholder (`docs/seed.sql`) would have rendered blank in every email
+   ever sent to a real buyer. Fixed by computing and storing `pi_date`/
+   `pi_valid_until` (today + `pi_validity_days`, mirroring how
+   `quotation_valid_until` is already computed at order creation) at the
+   moment `DocumentGenerationService::generate()`/
+   `documentGenerationService.generate()` actually generates a PI.
+2. **The Packing List's crate-level breakdown skipped the number-trimming
+   every other quantity/weight field in the same document gets.**
+   `order_crates`' DECIMAL columns were passed straight to the template,
+   so every Packing List ever generated showed "10.00" pcs / "1600.00" kg /
+   "9.2500" m³ in the crate table instead of the trimmed "10" / "1600" /
+   "9.25" used everywhere else on the same page. Fixed by running the same
+   trailing-zero trim the rest of `DocumentDataAssembler`/
+   `documentDataAssembler.js` already uses.
+3. **The BL Instruction Sheet's "Container Type / Size" field read
+   `order.container_type`** (the rough estimate entered at order creation,
+   before a container is even booked) **instead of `shipping.container_type`**
+   (the actual, confirmed container type entered on the same Packing/BL
+   Instruction form this exact document is generated from) — every sibling
+   field in the same table row (Container No., Seal No.) already correctly
+   read from `shipping.*`; this one field alone hadn't been updated to
+   match. A real order that changed container type between quotation and
+   actual booking (not unusual — the order-creation estimate is explicitly
+   "TBD at packing" by default) would have shipped a BL Instruction Sheet
+   telling the CHA/shipping line the wrong container size.
+4. **The Buyer PO Acceptance letter's payment-terms sentence was a static
+   string that only ever described the "before shipment" balance trigger**,
+   regardless of which one the order's actual payment preset uses. Every
+   order on the "Established Buyer — Post-BL" preset (balance payable
+   against the Bill of Lading, not before shipment) would have had its
+   buyer sign and return a Purchase Order Acceptance letter stating
+   payment terms that were flatly wrong — a real, legally-significant
+   defect, since this specific document exists for the buyer to
+   countersign and confirm agreement to. `DocumentDataAssembler`/
+   `documentDataAssembler.js` already had a single-source-of-truth
+   `balanceTriggerSentence()` helper for exactly this sentence (used by
+   `AmendmentService`'s frozen snapshot text) — the Order Confirmation
+   template had its own independent, correct copy of the same if/else
+   instead of calling it, and the Buyer PO template had no branch at all.
+   Added a `financial.balance_terms_text` field computed once via the
+   existing helper; both templates now read it, eliminating the
+   duplicate-logic drift risk the helper's own docblock had already
+   flagged as the reason it existed.
+
+Also reconfirmed (no new issues): the CIF-specific `incoterm_label` fix from
+the Sample Data Playground follow-up above renders correctly across QT, PI,
+OC, FDN, PL, BLI, and CI; the Established Buyer/Post-BL preset's advance/
+balance math is internally consistent end to end (verified via the CI's own
+"Advance + Balance = FOB Value" self-check line); and the FOB order's
+"payable before shipment" branch still renders correctly (checked
+specifically to rule out a regression from fix #4). Every fix verified live
+on both stacks: regenerated the affected document, `pdftotext`'d or
+`pdftoppm`'d the actual output, confirmed the fixed text appears, and
+confirmed the pre-existing correct branch (FOB / A_BEFORE_SHIPMENT) still
+renders unchanged.
+
 ## Top-tier UI/UX pass (added 2026-09-21)
 
 Standing item on the tracked task list: give the whole staff app a proper

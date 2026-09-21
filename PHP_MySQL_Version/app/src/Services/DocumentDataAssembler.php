@@ -132,6 +132,7 @@ final class DocumentDataAssembler
                 'balance_amount'   => self::formatMoney($balanceAmount),
                 'balance_trigger_option' => $order['balance_trigger_option'],
                 'balance_days'     => $order['balance_days'],
+                'balance_terms_text' => self::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null),
                 'total_value'      => self::formatMoney($fobValue), // freight/insurance are indicative-only, not summed into the binding total for FOB
                 'preset_name'      => $order['preset_name'],
             ],
@@ -293,16 +294,30 @@ final class DocumentDataAssembler
     /** @return array<int, array<string,mixed>> */
     private static function cratesBlock(int $orderId): array
     {
-        return array_map(static function (array $c): array {
+        // Real bug this fixes: order_crates' DECIMAL columns were passed
+        // straight through, unlike every other quantity/weight field in
+        // this file (see formatNumber() below) — every Packing List ever
+        // generated showed "10.00" pcs / "1600.00" kg / "9.2500" m³ in the
+        // crate breakdown instead of the trimmed "10" / "1600" / "9.25" the
+        // rest of the same document uses. Trims trailing zeros the same
+        // way, but returns null (not formatNumber()'s 'TBC') for a genuinely
+        // empty cell — the template's own `?: '—'` fallback already handles
+        // that, and 'TBC' would be a behavior change for a document type
+        // whose crate rows come from a form where these are all required.
+        $trim = static fn(?string $v): ?string => $v === null || $v === ''
+            ? null
+            : rtrim(rtrim(number_format((float) $v, 3), '0'), '.');
+
+        return array_map(static function (array $c) use ($trim): array {
             return [
                 'crate_no'            => $c['crate_no'],
                 'marks_numbers'       => $c['marks_numbers'],
                 'product_description' => $c['product_description'],
                 'dimensions_lwh_cm'   => $c['dimensions_lwh_cm'],
-                'pcs'                 => $c['pcs'],
-                'net_weight_kg'       => $c['net_weight_kg'],
-                'gross_weight_kg'     => $c['gross_weight_kg'],
-                'cbm'                 => $c['cbm'],
+                'pcs'                 => $trim($c['pcs']),
+                'net_weight_kg'       => $trim($c['net_weight_kg']),
+                'gross_weight_kg'     => $trim($c['gross_weight_kg']),
+                'cbm'                 => $trim($c['cbm']),
                 'hs_code'             => $c['hs_code'],
             ];
         }, OrderCrateRepository::forOrder($orderId));
