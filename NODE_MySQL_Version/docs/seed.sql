@@ -288,7 +288,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Subject to Proforma Invoice' AND dt.code IN ('OC');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (95, 'Bill of Lading Release', 'Original negotiable BL (3 originals) will be released to buyer only after {balance_pct}% balance payment is CLEARED in NexaCrest''s bank account. Remittance copy alone does not constitute payment receipt. Please allow 1–2 banking days for clearance confirmation before expecting BL originals to be released.', 'active', 0);
+  (95, 'Bill of Lading Release', 'Bill of Lading: Original negotiable BL (3 originals) will be released to buyer only after {balance_pct}% balance payment is CLEARED in NexaCrest''s bank account. Remittance copy alone does not constitute payment receipt. Please allow 1–2 banking days for clearance confirmation before expecting BL originals to be released.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Bill of Lading Release' AND dt.code IN ('OC');

@@ -8,18 +8,16 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td class="label">OC NUMBER *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
-    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
-  </tr>
-  <tr>
-    <td class="label">PI REFERENCE *</td><td class="value">{{ order.pi_ref ?: '—' }}</td>
-    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+    <td><span class="label">OC NUMBER *</span><span class="value">{{ meta.document_reference }} {{ meta.revision_label }}</span></td>
+    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">PI REFERENCE *</span><span class="value">{{ order.pi_ref ?: '—' }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
 
 {% block banner %}
-<div class="confirmed-banner">&#10003; ORDER CONFIRMED &nbsp; — &nbsp; {{ financial.advance_pct }}% advance payment received and cleared{% if payment_status.advance_cleared_at %} on {{ payment_status.advance_cleared_at }}{% endif %}. Production has commenced.</div>
+<div class="banner banner-green"><span class="headline">&#10003;&nbsp; ORDER CONFIRMED</span><br><span class="sub">This order is confirmed upon receipt and clearance of {{ financial.advance_pct }}% advance T/T payment against the referenced Proforma Invoice.</span></div>
 {% endblock %}
 
 {% block body %}
@@ -31,8 +29,8 @@
   <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
   <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
   <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Phone *</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
   <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Phone</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
 </table>
 
 <div class="section-title">3. ORDER SUMMARY</div>
@@ -41,51 +39,45 @@
   {% set productList = productList|merge([p.description ~ ' (Qty: ' ~ p.quantity ~ ' ' ~ p.unit ~ ')']) %}
 {% endfor %}
 <table class="kv">
-  <tr><td class="k">Quotation No. / Date</td><td class="v">{{ order.quotation_ref ?: '—' }}{% if order.quotation_date %} &nbsp;·&nbsp; {{ order.quotation_date }}{% endif %}</td></tr>
-  <tr><td class="k">PI No. *</td><td class="v">{{ order.pi_ref ?: '—' }}</td></tr>
+  <tr><td class="k">Quotation No. *</td><td class="v">{{ order.quotation_ref ?: '—' }}</td></tr>
+  <tr><td class="k">Quotation Date *</td><td class="v">{{ order.quotation_date ?: '—' }}</td></tr>
+  <tr><td class="k">Proforma Invoice No. *</td><td class="v">{{ order.pi_ref ?: '—' }}</td></tr>
   <tr><td class="k">Product(s) *</td><td class="v">{{ productList|join('; ') }}</td></tr>
-  <tr><td class="k">Total Order Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.total_value }}</td></tr>
-  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
-  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Total Order Value *</td><td class="v">{{ order.currency_code }} {{ financial.total_value }}</td></tr>
+  <tr><td class="k">Incoterm</td><td class="v">{{ order.incoterm_label }}</td></tr>
+  <tr><td class="k">Port of Loading</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
   <tr><td class="k">Certificate of Origin</td><td class="v">{{ order.coo_type }}</td></tr>
 </table>
 
-{#
-  Source template note (dump1.txt): the Payment Status section always
-  labels amounts "USD" regardless of the order's quoted/invoiced currency
-  — a fixed reporting-currency convention for this internal confirmation
-  screen, preserved here rather than substituted with order.currency_code
-  as the other sections do.
-#}
 <div class="section-title">4. PAYMENT STATUS</div>
 <table class="kv">
-  <tr><td class="k">{{ financial.advance_pct }}% Advance Amount (USD) *</td><td class="v">{{ payment_status.advance_amount ?: financial.advance_amount }}</td></tr>
+  <tr><td class="k">{{ financial.advance_pct }}% Advance (USD) *</td><td class="v">{{ payment_status.advance_amount ?: financial.advance_amount }}</td></tr>
   <tr><td class="k">Advance T/T Received On *</td><td class="v">{{ payment_status.advance_remittance_received_at ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Advance Cleared On *</td><td class="v">{{ payment_status.advance_cleared_at ?: 'TBC' }}</td></tr>
-  <tr class="highlight"><td class="k">Balance Due (USD) *</td><td class="v">{{ payment_status.balance_amount ?: financial.balance_amount }}</td></tr>
-  <tr><td class="k">Balance Payment Terms</td><td class="v">
-    {{ financial.balance_terms_text }}
-  </td></tr>
+  <tr><td class="k">Balance Due (USD) *</td><td class="v">{{ payment_status.balance_amount ?: financial.balance_amount }} <span style="font-size:8.5pt; color:#5B6573;">&nbsp;—&nbsp;{{ financial.balance_terms_text }}</span></td></tr>
+  <tr><td class="k">Currency</td><td class="v" style="font-weight:bold;">USD (always)</td></tr>
   {% if not order.is_fob %}
-  <tr><td class="k">Freight &amp; Insurance ({{ order.incoterm_code }})</td><td class="v">Confirmed amount invoiced separately by Freight Debit Note; not included in the Total Order Value above.</td></tr>
+  <tr><td class="k" style="background:#FBEAEA; color:#8A1F1F;">CFR / CIF Freight <span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(if applicable)</span></td><td class="v" style="background:#FBEAEA; color:#5A1414; font-size:8.5pt;">A Freight Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. <strong style="color:#8A1F1F;">Payment required within 3 working days of the Debit Note date.</strong> <strong style="color:#8A1F1F;">NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.</strong></td></tr>
   {% endif %}
 </table>
 
 <div class="section-title">5. PRODUCTION &amp; ESTIMATED SHIPMENT</div>
 <table class="kv">
-  <tr><td class="k">Production Status</td><td class="v">{{ order.production_status_text }}</td></tr>
-  <tr><td class="k">Estimated Shipment</td><td class="v">{{ order.est_shipment_date_text }}</td></tr>
+  <tr><td colspan="2" style="background:#F1F5F9;">
+    <p style="margin:0 0 4pt;"><strong style="color:#17233A;">Production status: </strong>{{ order.production_status_text }} &nbsp;&nbsp; <strong style="color:#17233A;">Estimated shipment: </strong><span style="font-style:italic; color:#5B6573;">{{ order.est_shipment_date_text }}</span> <span style="font-weight:bold; color:#C0392B;">*</span></p>
+    <p style="margin:0; font-size:9pt;"><strong style="color:#17233A;">Note: </strong><span style="font-style:italic; color:#5B6573;">Estimated shipment date is indicative and subject to production completion, packing, and port scheduling. A confirmed Bill of Lading date will be communicated once the shipment is booked.</span></p>
+  </td></tr>
 </table>
-<p style="font-size:7.8px; color:#5b6774;">Estimated shipment date is indicative and subject to change based on production progress and shipping schedule availability. A firm date will be confirmed at the Freight / BL Instruction stage.</p>
 
 <div class="section-title">6. DOCUMENTS TO BE PROVIDED</div>
 <table class="kv">
-  <tr><td colspan="2">Upon shipment, the following documents will be provided (see Proforma Invoice {{ order.pi_ref ?: '—' }} for full specifications):<br>
-    1. Commercial Invoice<br>
-    2. Packing List<br>
-    3. Bill of Lading — Original Negotiable, 3 originals<br>
-    4. Certificate of Origin — {{ order.coo_type }}
+  <tr><td colspan="2">
+    <p style="margin:0 0 4pt;"><strong>Upon shipment, the following documents will be provided:</strong></p>
+    <p style="margin:0;">&#8226; Commercial Invoice</p>
+    <p style="margin:0;">&#8226; Packing List</p>
+    <p style="margin:0;">&#8226; Certificate of Origin (CAPEXIL / Chamber of Commerce)</p>
+    <p style="margin:0;">&#8226; Bill of Lading</p>
+    <p style="margin:0;">&#8226; Fumigation Certificate — provided as standard with every shipment</p>
   </td></tr>
 </table>
 
