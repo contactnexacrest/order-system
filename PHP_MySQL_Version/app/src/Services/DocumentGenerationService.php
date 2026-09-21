@@ -756,7 +756,8 @@ final class DocumentGenerationService
             'CI' => 'EXPORTER / SELLER',
             'BLI' => 'SHIPPER / EXPORTER (APPEARS ON BL EXACTLY AS WRITTEN)',
             'AMD' => 'THE EXPORTER',
-            default => 'SELLER / EXPORTER', // QT, PI, OC, PL
+            'PL' => 'EXPORTER',
+            default => 'SELLER / EXPORTER', // QT, PI, OC
         };
     }
 

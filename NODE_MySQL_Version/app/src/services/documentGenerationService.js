@@ -706,8 +706,9 @@ function section1TitleFor(code) {
     CI: 'EXPORTER / SELLER',
     BLI: 'SHIPPER / EXPORTER (APPEARS ON BL EXACTLY AS WRITTEN)',
     AMD: 'THE EXPORTER',
+    PL: 'EXPORTER',
   };
-  return map[code] ?? 'SELLER / EXPORTER'; // QT, PI, OC, PL
+  return map[code] ?? 'SELLER / EXPORTER'; // QT, PI, OC
 }
 
 function termsSectionNumberFor(code) {

@@ -1,14 +1,14 @@
 {% extends "_layout.njk" %}
 
+{% block header_incoterm %}{% endblock %}
+
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td class="label">PL NUMBER *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
-    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
-  </tr>
-  <tr>
-    <td class="label">PI REFERENCE *</td><td class="value">{{ order.pi_ref or '—' }}</td>
-    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+    <td><span class="label">PL NUMBER *</span><span class="value">{{ meta.document_reference }} {{ meta.revision_label }}</span></td>
+    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">PI REFERENCE *</span><span class="value">{{ order.pi_ref or '—' }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
@@ -16,17 +16,21 @@
 {% block body %}
 
 <div class="section-title">2. CONSIGNEE / BUYER</div>
-<table class="kv">
-  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
-  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
-  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no or 'TBC' }}</td></tr>
-  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
-  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
-  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
-  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination or 'TBC' }}</td></tr>
-  <tr><td class="k">Notify Party</td><td class="v">{{ buyer.notify_party or 'Same as consignee' }}</td></tr>
-</table>
+<table class="kv"><tr>
+  <td class="v" style="width:50%; vertical-align:top;">
+    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Company Legal Name *</strong><br>{{ buyer.company_legal_name }}</p>
+    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Consignee Name *</strong><br>{{ buyer.consignee_name }}</p>
+    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Consignee Address *</strong><br>{{ buyer.consignee_address }}</p>
+    <p style="margin:0;"><strong style="color:#17233A;">VAT / EORI / Tax Reg. No. *</strong><br>{{ buyer.vat_eori_tax_no or 'TBC' }}</p>
+  </td>
+  <td class="v" style="width:50%; vertical-align:top; background:#F1F5F9;">
+    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Incoterm *</strong><br>{{ order.incoterm_label }}</p>
+    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Port of Loading *</strong><br>{{ order.port_of_loading }}</p>
+    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Port of Discharge *</strong><br>{{ order.port_of_discharge }}</p>
+    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Country of Final Destination *</strong><br>{{ buyer.country_of_destination or 'TBC' }}</p>
+    <p style="margin:0;"><strong style="color:#17233A;">Notify Party</strong><br>{{ buyer.notify_party or 'Same as consignee' }}</p>
+  </td>
+</tr></table>
 
 <div class="section-title">3. PRODUCT SUMMARY</div>
 {% set productList = [] %}
@@ -39,45 +43,44 @@
   <tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }}</td></tr>
   <tr><td class="k">HS Code *</td><td class="v">{{ hsCodeList|join(', ') }}</td></tr>
   <tr><td class="k">Country of Origin *</td><td class="v">India</td></tr>
-  <tr><td class="k">Total Quantity Packed *</td><td class="v">{{ packing.actual_quantity_packed or 'TBC' }}</td></tr>
+  <tr><td class="k">Total Quantity *</td><td class="v">{{ packing.actual_quantity_packed or 'TBC' }}</td></tr>
   <tr><td class="k">Total No. of Crates *</td><td class="v">{{ packing.crate_count or 'TBC' }}</td></tr>
   <tr><td class="k">Total Net Weight *</td><td class="v">{{ (packing.total_net_weight_kg ~ ' kg') if packing.total_net_weight_kg else 'TBC' }}</td></tr>
   <tr><td class="k">Total Gross Weight *</td><td class="v">{{ (packing.total_gross_weight_kg ~ ' kg') if packing.total_gross_weight_kg else 'TBC' }}</td></tr>
   <tr><td class="k">Total CBM *</td><td class="v">{{ (packing.total_cbm ~ ' m³') if packing.total_cbm else 'TBC' }}</td></tr>
-  <tr><td class="k">Packing Date</td><td class="v">{{ packing.packing_date or 'TBC' }}</td></tr>
 </table>
 
-<div class="section-title">4. CRATE-LEVEL BREAKDOWN (from factory packing data)</div>
+<div class="section-title">4. CRATE-LEVEL BREAKDOWN &nbsp;(from factory packing data)</div>
+<p class="placeholder-italic" style="font-size:9pt; margin:0 0 3pt;">Filled from the factory packing supervisor's actual measurements. Each row = one physical crate.</p>
+<p style="font-size:9pt; margin:0 0 6pt;"><strong style="color:#17233A;">Marks &amp; Numbers format:</strong> <span style="color:#5B6573;">NEXACREST &nbsp;/&nbsp; {{ buyer.company_legal_name | upper }} &nbsp;/&nbsp; {{ order.port_of_discharge | upper }} &nbsp;/&nbsp; C-NNN/TOTAL &nbsp;/&nbsp; {{ order.pi_ref or 'PI NUMBER' }} &nbsp;/&nbsp; MADE IN INDIA</span></p>
+
 {% if crates and crates.length %}
 <table class="products">
-  <thead>
-    <tr>
-      <th>Crate No.</th>
-      <th>Marks &amp; Numbers</th>
-      <th>Product Description &amp; Finish</th>
-      <th>Size L&times;W&times;H (cm)</th>
-      <th class="num">Pcs</th>
-      <th class="num">Net Wt (kg)</th>
-      <th class="num">Gross Wt (kg)</th>
-      <th class="num">CBM</th>
-      <th>HS Code</th>
-    </tr>
-  </thead>
-  <tbody>
+  <tr>
+    <th>Crate No. *</th>
+    <th>Marks &amp; Numbers *</th>
+    <th>Product Description &amp; Finish *</th>
+    <th>Crate Size &nbsp;L&times;W&times;H (cm) *</th>
+  </tr>
   {% for c in crates %}
-    <tr>
-      <td>{{ c.crate_no }}</td>
-      <td style="font-size:7.5px;">{{ c.marks_numbers }}</td>
-      <td>{{ c.product_description }}</td>
-      <td>{{ c.dimensions_lwh_cm or '—' }}</td>
-      <td class="num">{{ c.pcs or '—' }}</td>
-      <td class="num">{{ c.net_weight_kg or '—' }}</td>
-      <td class="num">{{ c.gross_weight_kg or '—' }}</td>
-      <td class="num">{{ c.cbm or '—' }}</td>
-      <td>{{ c.hs_code or '—' }}</td>
-    </tr>
+  {% set lineColor = '#1D6FA8' if loop.index % 2 == 1 else '#2D7D56' %}
+  <tr>
+    <td class="line-no" style="color:{{ lineColor }}; text-align:left;">{{ c.crate_no }}</td>
+    <td style="font-size:8.5pt; color:#5B6573;">{{ c.marks_numbers }}</td>
+    <td style="font-weight:bold; color:#000000;">{{ c.product_description }}</td>
+    <td style="font-style:italic; color:#5B6573;">{{ c.dimensions_lwh_cm or '—' }}</td>
+  </tr>
+  <tr class="spec">
+    <td colspan="4">
+      <span class="line-no" style="color:{{ lineColor }};">{{ c.crate_no }}</span>
+      <span class="spec-label">Pcs:</span> {{ c.pcs or '—' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Net Wt:</span> {{ (c.net_weight_kg ~ ' kg') if c.net_weight_kg else '—' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Gross Wt:</span> {{ (c.gross_weight_kg ~ ' kg') if c.gross_weight_kg else '—' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">CBM:</span> {{ (c.cbm ~ ' m³') if c.cbm else '—' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">HS Code:</span> {{ c.hs_code or '—' }}
+    </td>
+  </tr>
   {% endfor %}
-  </tbody>
 </table>
 {% else %}
 <p style="font-size:8.7px; color:#5b6774; font-style:italic;">Crate-level breakdown not yet recorded.</p>
@@ -85,8 +88,8 @@
 
 <div class="section-title">5. DECLARATION</div>
 <table class="kv">
-  <tr><td colspan="2">We hereby declare that the particulars given above are true and correct to the best of our knowledge and belief, and that the goods described herein are of Indian origin.<br>
-    <strong>Fumigation Certificate:</strong> A Fumigation Certificate is provided as standard with every NexaCrest shipment and will be included in the final document set couriered to the buyer.
+  <tr><td colspan="2" style="font-style:italic; color:#5B6573;">We hereby declare that the particulars given above are true and correct to the best of our knowledge and belief, and that the goods described herein are of Indian origin.
+    <br><span style="font-size:9pt;">Fumigation Certificate: A Fumigation Certificate is provided as standard with every NexaCrest shipment and will be included in the final document set couriered to the buyer.</span>
   </td></tr>
 </table>
 

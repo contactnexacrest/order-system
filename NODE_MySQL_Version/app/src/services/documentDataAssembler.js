@@ -294,7 +294,7 @@ function trimCrateNumber(value) {
   if (value === null || value === undefined || value === '') {
     return null;
   }
-  return trimTrailingZeros(Number(value).toFixed(3));
+  return Number(value).toLocaleString('en-US', { maximumFractionDigits: 3 });
 }
 
 async function cratesBlock(orderId) {
@@ -581,8 +581,7 @@ function formatNumber(value) {
   if (value === null || value === undefined || value === '') {
     return 'TBC';
   }
-  const float = Number(value);
-  return trimTrailingZeros(float.toFixed(3));
+  return Number(value).toLocaleString('en-US', { maximumFractionDigits: 3 });
 }
 
 function formatDate(value) {
