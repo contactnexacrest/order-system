@@ -11,6 +11,9 @@
   <div class="topbar-brand">NEXACREST <span>INTERNATIONAL</span></div>
   <nav class="topbar-nav">
     <a href="/">Dashboard</a>
+    {% if currentUser %}
+      <a href="/reference-docs">Reference Library</a>
+    {% endif %}
     {% if currentUser and permissions.manage_orders %}
       <a href="/clients">Clients</a>
       <a href="/orders">Orders</a>

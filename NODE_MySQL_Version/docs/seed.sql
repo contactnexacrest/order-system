@@ -623,6 +623,141 @@ SELECT dt.id, u.id, 1, u.id
 FROM document_types dt, users u
 WHERE dt.code = 'AMD' AND u.email = 'admin@nexacrest.placeholder';
 
+-- ================================================================
+-- INTERNAL REFERENCE LIBRARY (Section R, added 2026-09-21)
+-- Content here is deliberately derived only from what this app itself
+-- already enforces or has seeded elsewhere (stage-gate conditions in
+-- StageGateService/OrderController, the payment_presets rows, the
+-- company_settings hard-rule rows) — never invented company policy this
+-- codebase has no source for. {placeholder} tokens are substituted from
+-- live company_settings at render time (InternalReferenceDocRepository),
+-- the same convention as bl_type_instruction's {company} token, so this
+-- page never goes stale relative to the actual configured values.
+-- ================================================================
+INSERT INTO internal_reference_docs (document_type_id, content)
+SELECT dt.id, '# Stage Gate Reference — 9-Stage Order Lifecycle
+
+Each stage unlocks the next only after its own gate condition is met. Gate conditions are enforced in code (OrderController + StageGateService) — this page is a read-only reference of what those checks are, so any staff member can see at a glance what has to happen before an order can move forward.
+
+## Stage 1 — Enquiry & Quotation
+Gate: Quotation (QT) document generated for the order.
+
+## Stage 2 — Buyer Purchase Order
+Gate: Buyer''s signed PO reference number recorded against the order.
+
+## Stage 3 — Proforma Invoice
+Gate: Advance payment marked CLEARED in NexaCrest''s bank account (not just received — cleared). This is also the point client portal login is auto-provisioned, if the client has an email on file.
+
+## Stage 4 — Order Confirmation
+Gate: Buyer''s acknowledgement of the Order Confirmation recorded.
+
+## Stage 5 — Supplier Purchase Order
+Gate: Supplier''s signed acknowledgement of the Supplier PO recorded.
+
+## Stage 6 — Freight Payment
+Gate: Freight payment (per the Freight Debit Note) marked cleared.
+
+## Stage 7 — Packing & BL Instruction
+Gate: Bill of Lading issuance recorded. Packing data must be within the configured quantity-shortfall tolerance, or have a buyer-approval file attached for any shortfall beyond it — see the Wall Reference.
+
+## Stage 8 — Commercial Invoice & Balance
+Gate: Balance payment marked cleared in NexaCrest''s bank account.
+
+## Stage 9 — Document Despatch & Closure
+Gate: Order manually closed once all final documents are despatched.
+
+A Super Admin can override a stage''s status/lock directly from the order page in an emergency — every override is logged to the audit trail with a mandatory reason.'
+FROM document_types dt WHERE dt.code = 'STAGEGATE';
+
+INSERT INTO internal_reference_docs (document_type_id, content)
+SELECT dt.id, '# Wall Reference — Hard Rules Quick Lookup
+
+Pin this page. These are the rules the system enforces automatically — this is what to check by eye when something looks off.
+
+## Reference Number Formats
+- Master tracking / buyer inquiry ref: {master_tracking_ref_format}
+- Client number: {client_number_format}
+- Order reference: {order_ref_format}
+
+## Bill of Lading — Non-Negotiable
+- {bl_type_instruction}
+- Consignee instruction: {bl_consignee_instruction}
+- NexaCrest retains all 3 original BLs until the balance T/T is received and cleared — never release before that.
+
+## Quantity Shortfall Tolerance
+- Any shipped quantity within {quantity_shortfall_tolerance_pct}% of the ordered quantity needs no special approval.
+- Beyond that tolerance, packing cannot be saved without a buyer-approval file attached — no exceptions, no verbal approvals.
+
+## Dispute Response Deadline
+- A logged dispute''s response is due {dispute_response_days_n} WORKING days from the notice date — not calendar days. Weekly off-day: {weekly_off_days}. Check the Holiday Calendar for any dates in between.
+
+## Document Integrity
+- Every generated document snapshots the company/bank/LUT details and signatory in force at generation time — a later settings change never rewrites a document that''s already out for review or approval.
+- Regenerating an earlier-stage document (e.g. a new QT revision) after a later-stage document already exists triggers an on-screen warning — review whether the later document needs regenerating too.
+
+## Protected Fields
+- Reference-number formats, the BL hard rule, and other flagged settings/payment presets/T&C clauses require an explicit unlock plus a written reason before they can be edited. Every unlock and every edit is in the audit log.'
+FROM document_types dt WHERE dt.code = 'WALLREF';
+
+INSERT INTO internal_reference_docs (document_type_id, content)
+SELECT dt.id, '# Cross-Verification Checklist
+
+Run through this before recording a Cross-Verification result (Pass/Fail) on any document.
+
+## Every Document
+- Document reference number matches the expected format and sequence.
+- Company legal name, address, GSTIN, IEC/PAN, bank details, and LUT number are all current and correct.
+- Signatory name, designation, and seal are the correct ones for this document type.
+- Watermark is present (DRAFT on an unapproved document, the approved watermark once cleared) — no document in this system is ever clean/unwatermarked.
+
+## Buyer-Facing Financial Documents (PI, OC, CI)
+- Product descriptions, quantities, and unit prices match the order exactly.
+- Advance/balance percentages and trigger conditions match the buyer''s agreed payment preset.
+- Currency and Incoterm are correct and consistent across all documents for this order.
+
+## BL Instruction Sheet
+- BL type instruction reads ORIGINAL NEGOTIABLE BILL OF LADING — never Sea Waybill or Express BL.
+- Consignee instruction is TO ORDER OF the company legal name.
+- Container, seal, and packing figures match the Packing List exactly.
+
+## Packing List
+- Total quantity is within the configured shortfall tolerance of the ordered quantity, or a buyer-approval file is attached for anything beyond it.
+
+## Before Sending to Buyer
+- The document''s status is ''approved'' (not draft, not in_review) — the buyer must never receive anything but the final watermarked PDF.
+- Recipient email address on the send request matches the client''s email on file.'
+FROM document_types dt WHERE dt.code = 'CHECKLIST';
+
+INSERT INTO internal_reference_docs (document_type_id, content)
+SELECT dt.id, '# SOP — Sales Process, Tier A (Standard — New Buyer)
+
+Applies to the "Standard — New Buyer" payment preset: 40% advance / 60% balance, balance payable before shipment, no MD approval required to use this preset.
+
+1. Quotation-stage intake form received — staff reviews the request in the Client Requests queue.
+2. Staff manually accepts the request, creating the client record.
+3. Staff generates the Quotation (QT) — this is Stage 1''s gate.
+4. Buyer returns a signed PO — record the reference number (Stage 2 gate).
+5. Generate the Proforma Invoice (PI) and send it for advance payment.
+6. Once the advance is received AND cleared in the bank account, mark it cleared (Stage 3 gate) — this also auto-provisions the client''s portal login.
+7. Generate the Order Confirmation (OC); record the buyer''s acknowledgement (Stage 4 gate).
+8. Continue through Supplier PO, Freight, Packing/BL, Commercial Invoice, and Closure per the Stage Gate Reference.
+
+No MD approval step is required anywhere in this tier — a new buyer on this preset moves through the stages purely on staff sign-off, since the balance is secured before shipment.'
+FROM document_types dt WHERE dt.code = 'SOP_A_SALES';
+
+INSERT INTO internal_reference_docs (document_type_id, content)
+SELECT dt.id, '# SOP — Sales Process, Tier B (Established Buyer — Post-BL)
+
+Applies to the "Established Buyer — Post-BL" payment preset: 40% advance / 60% balance, balance payable against the Bill of Lading, requires MD approval to use this preset for a given order.
+
+Follow the same 9-stage flow as Tier A, with two differences:
+
+1. Before this preset can be applied to an order, MD approval is required — do not proceed past the advance/balance terms step without it recorded.
+2. The balance due date is computed from the BL issuance date, not from advance clearance — do not release any of the 3 original Bills of Lading to the buyer until the balance T/T is received and cleared in NexaCrest''s bank account. This is the entire point of the Bill of Lading hard rule (see Wall Reference) — releasing the BL early gives up NexaCrest''s only financial leverage over an established buyer''s balance payment.
+
+Everything else — Quotation through Closure — follows the same Stage Gate Reference as Tier A.'
+FROM document_types dt WHERE dt.code = 'SOP_B_SALES';
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ================================================================

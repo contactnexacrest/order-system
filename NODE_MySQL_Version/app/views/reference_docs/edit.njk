@@ -1,0 +1,11 @@
+<div class="card page-wide">
+  <p><a href="/reference-docs/{{ doc.code }}">&larr; {{ doc.name }}</a></p>
+  <h1>Edit: {{ doc.name }}</h1>
+  <p class="muted small">Format: a line starting with "# " is a heading, "## " a sub-heading, "- " a bullet, "1. " a numbered step, and a blank line starts a new paragraph. {% if doc.code == 'WALLREF' %}Placeholders like {{ '{bl_type_instruction}' }} or {{ '{dispute_response_days_n}' }} are substituted from live Company Settings whenever this page is viewed.{% endif %}</p>
+
+  <form method="post" action="/reference-docs/{{ doc.code }}">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <textarea name="content" rows="24" style="width:100%;font-family:monospace">{{ doc.content or '' }}</textarea>
+    <p><button type="submit" class="btn-sm btn-success">Save</button></p>
+  </form>
+</div>

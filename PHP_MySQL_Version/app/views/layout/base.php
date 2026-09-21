@@ -16,6 +16,9 @@ $isEffectiveSuperAdmin = $current && SuperAdminService::isEffective((int) $curre
   <div class="topbar-brand">NEXACREST <span>INTERNATIONAL</span></div>
   <nav class="topbar-nav">
     <a href="/">Dashboard</a>
+    <?php if ($current): ?>
+      <a href="/reference-docs">Reference Library</a>
+    <?php endif; ?>
     <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_orders')): ?>
       <a href="/clients">Clients</a>
       <a href="/orders">Orders</a>

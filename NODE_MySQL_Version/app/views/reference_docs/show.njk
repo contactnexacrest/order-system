@@ -1,0 +1,14 @@
+<div class="card page-wide">
+  <p><a href="/reference-docs">&larr; Reference Library</a></p>
+  <h1>{{ doc.name }}</h1>
+  {% if permissions.manage_company_settings %}
+    <p><a href="/reference-docs/{{ doc.code }}/edit" class="btn-sm">Edit</a></p>
+  {% endif %}
+
+  {% if contentHtml == null %}
+    <p class="muted">Content has not been entered yet.{% if permissions.manage_company_settings %} Use Edit above to add it.{% endif %}</p>
+  {% else %}
+    <div class="reference-doc-content">{{ contentHtml | safe }}</div>
+    <p class="muted small">Last updated: {{ doc.updated_at or '—' }}</p>
+  {% endif %}
+</div>

@@ -108,3 +108,8 @@ a.btn-sm{padding:0.4rem 0.9rem;font-size:0.85rem;}
 .search-box{display:flex;gap:0.5rem;margin-bottom:1rem;}
 .search-box input{margin-top:0;}
 .masked-value{font-family:monospace;letter-spacing:0.03em;color:var(--ink-soft);}
+.reference-doc-content h2{font-size:1.15rem;color:var(--navy-strong);border-left:3px solid var(--navy);padding-left:0.6rem;margin:1.2rem 0 0.6rem;}
+.reference-doc-content h3{font-size:1rem;color:var(--navy-strong);margin:1rem 0 0.4rem;}
+.reference-doc-content p{margin:0 0 0.6rem;}
+.reference-doc-content ul,.reference-doc-content ol{margin:0 0 0.6rem 1.4rem;}
+.reference-doc-content li{margin-bottom:0.3rem;}

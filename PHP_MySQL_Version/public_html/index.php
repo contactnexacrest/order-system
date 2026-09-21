@@ -20,6 +20,7 @@ use App\Controllers\DocumentController;
 use App\Controllers\EmailDispatchController;
 use App\Controllers\FieldProtectionController;
 use App\Controllers\HolidayController;
+use App\Controllers\ReferenceDocController;
 use App\Controllers\NotificationController;
 use App\Controllers\OrderController;
 use App\Controllers\ReportController;
@@ -58,6 +59,7 @@ $emailDispatch = new EmailDispatchController();
 $amendments = new AmendmentController();
 $disputes = new DisputeController();
 $holidays = new HolidayController();
+$referenceDocs = new ReferenceDocController();
 $auditLog = new AuditLogController();
 $notifications = new NotificationController();
 $reports = new ReportController();
@@ -104,6 +106,10 @@ $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(
 $router->get('/holidays', [$holidays, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/holidays', [$holidays, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/holidays/{id}/delete', [$holidays, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->get('/reference-docs', [$referenceDocs, 'index'], [SessionAuth::required()]);
+$router->get('/reference-docs/{code}', [$referenceDocs, 'show'], [SessionAuth::required()]);
+$router->get('/reference-docs/{code}/edit', [$referenceDocs, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/reference-docs/{code}', [$referenceDocs, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 
 // NOTE: deliberately NOT "/assets" — that path collides with the static
 // public_html/assets/ folder (css/js/img). On Apache, .htaccess's -d check

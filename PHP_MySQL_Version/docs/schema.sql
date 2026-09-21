@@ -1351,7 +1351,36 @@ CREATE TABLE company_holidays (
 ) ENGINE=InnoDB;
 
 -- ================================================================
--- END OF SCHEMA — 62 tables. All open schema questions resolved
+-- SECTION R — INTERNAL REFERENCE LIBRARY (added 2026-09-21)
+-- ================================================================
+-- Gap this closes: document_types already seeded five internal,
+-- never_shown_to_buyer reference types — CHECKLIST (Cross-Verification
+-- Checklist), SOP_A_SALES / SOP_B_SALES (Sales Process tier reference),
+-- STAGEGATE (Stage Gate Reference), WALLREF (Wall Reference) — but
+-- nothing anywhere in the app ever generated, stored, or displayed
+-- content for any of them; they existed only as rows nobody read. Unlike
+-- every other document_types row, these five are not order-scoped and
+-- have no revision/review workflow that makes sense for them
+-- (revision_enabled=0 on three of the five, min_reviewers_default is
+-- meaningless with no order to review against) — they're evergreen,
+-- admin-editable staff reference content, closer in shape to
+-- tc_clauses than to a generated document. One row per document_type_id
+-- (not per-order) holds that content; a plain in-app viewer renders it,
+-- and an edit screen (gated the same as company_settings) lets Admin/MD
+-- keep it current as the real process changes.
+CREATE TABLE internal_reference_docs (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  document_type_id  BIGINT UNSIGNED NOT NULL,
+  content           LONGTEXT NOT NULL,
+  updated_by        BIGINT UNSIGNED NULL,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_type_id) REFERENCES document_types(id),
+  FOREIGN KEY (updated_by) REFERENCES users(id),
+  UNIQUE KEY uq_internal_reference_docs_type (document_type_id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- END OF SCHEMA — 63 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
@@ -1359,4 +1388,5 @@ CREATE TABLE company_holidays (
 -- Section O (client portal) added 2026-09-20.
 -- Section P (document data-integrity snapshot) added 2026-09-21.
 -- Section Q (working-days calculator & holiday calendar) added 2026-09-21.
+-- Section R (internal reference library) added 2026-09-21.
 -- ================================================================

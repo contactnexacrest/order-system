@@ -20,6 +20,7 @@ const authController = require('./controllers/authController');
 const dashboardController = require('./controllers/dashboardController');
 const settingsController = require('./controllers/settingsController');
 const holidayController = require('./controllers/holidayController');
+const referenceDocController = require('./controllers/referenceDocController');
 const assetController = require('./controllers/assetController');
 const clientsController = require('./controllers/clientsController');
 const clientIntakeController = require('./controllers/clientIntakeController');
@@ -198,6 +199,10 @@ app.post('/settings/update', requireAuth, requirePermission('manage_company_sett
 app.get('/holidays', requireAuth, requirePermission('manage_company_settings'), asyncHandler(holidayController.index));
 app.post('/holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.create));
 app.post('/holidays/:id/delete', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.remove));
+app.get('/reference-docs', requireAuth, asyncHandler(referenceDocController.index));
+app.get('/reference-docs/:code', requireAuth, asyncHandler(referenceDocController.show));
+app.get('/reference-docs/:code/edit', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.edit));
+app.post('/reference-docs/:code', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.update));
 
 // NOTE: deliberately "/company-assets", not "/assets" — that path collides
 // with the static public/ folder (css/js/img), same reasoning as the PHP original.
