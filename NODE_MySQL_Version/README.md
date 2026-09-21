@@ -467,6 +467,27 @@ chasing, and how many did we actually lose" — `orders.status` only had
   `order_supplier_po`, `email_log.sent_at`) — nothing here is a new source
   of truth, just new queries against existing data.
 
+## Top-tier UI/UX pass (added 2026-09-21)
+
+The shared layout (`views/layout/base.njk`) and stylesheet (`public/css/app.css`)
+got a pass, which reaches every one of the ~60 views for free: the ~20-link
+flat nav bar (unreadable on anything but a wide desktop) is now three
+permission-gated dropdowns (`Operations`/`Insights`/`Admin`, built from
+plain `<details>/<summary>` — no JS) plus a checkbox-driven hamburger for
+screens under 900px; `.card` scrolls horizontally on its own instead of the
+whole page gaining a scrollbar when a table is wider than the screen; the
+order form's 8-column product-line grid collapses to one column on mobile;
+every interactive element gets a visible `:focus-visible` ring; and every
+`type="date"`/`type="number"`/`type="datetime-local"` input is now styled
+the same width as every other field (they were previously stuck at the
+browser's tiny native default, most visible on the Audit Log filter form).
+Also fixed a real, live low-contrast bug: the "Notifications" link in the
+topbar had no explicit color and inherited a dark navy against the dark
+navy header, nearly unreadable on every page. See the PHP/MySQL README's
+matching section for the full list and how it was verified live (Playwright
+against the running app, both stacks, desktop and a 390px/320px phone
+viewport).
+
 ## Placeholder values you must replace before going live
 
 Everything in `company_settings` marked `PLACEHOLDER` in `docs/seed.sql` —

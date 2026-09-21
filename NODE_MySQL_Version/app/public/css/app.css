@@ -8,15 +8,37 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--ink);}
 a{color:var(--navy)}
-.topbar{display:flex;align-items:center;justify-content:space-between;background:var(--navy-strong);color:#fff;padding:0.75rem 1.5rem;}
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible{
+  outline:2px solid var(--amber);outline-offset:2px;
+}
+button, a.btn, input, select, textarea{transition:background-color .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;}
+button:disabled, a.btn[aria-disabled="true"]{opacity:0.55;cursor:not-allowed;}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;row-gap:0.4rem;background:var(--navy-strong);color:#fff;padding:0.75rem 1.5rem;position:relative;}
 .topbar-brand{font-weight:700;letter-spacing:0.05em;}
 .topbar-brand span{color:var(--amber);font-weight:400;}
+.topbar-nav{display:flex;flex-wrap:wrap;align-items:center;row-gap:0.3rem;}
 .topbar-nav a{color:#fff;text-decoration:none;margin-right:1.25rem;opacity:0.9;}
 .topbar-nav a:hover{opacity:1;text-decoration:underline;}
-.topbar-user{display:flex;align-items:center;gap:1rem;}
-.logout-link{color:#fff;text-decoration:underline;}
+.topbar-user{display:flex;align-items:center;gap:1rem;color:#fff;}
+.topbar-user a{color:#fff;text-decoration:none;opacity:0.9;}
+.topbar-user a:hover{opacity:1;text-decoration:underline;}
+.logout-link{color:#fff;text-decoration:underline;opacity:1;}
+.nav-toggle-checkbox{position:absolute;opacity:0;pointer-events:none;}
+.nav-toggle-label{display:none;color:#fff;font-size:1.4rem;line-height:1;padding:0.1rem 0.3rem;cursor:pointer;}
+/* Grouped nav dropdowns (e.g. "Admin ▾") — plain <details>/<summary> so they
+   work with no JS at all: native keyboard support, native tap-to-open on
+   mobile, nothing to wire up or for the two stacks to drift on. */
+.nav-group{position:relative;display:inline-block;margin-right:1.25rem;}
+.nav-group summary{cursor:pointer;color:#fff;opacity:0.9;list-style:none;}
+.nav-group summary::-webkit-details-marker{display:none;}
+.nav-group summary:hover{opacity:1;text-decoration:underline;}
+.nav-group summary::after{content:" \25BE";font-size:0.7em;}
+.nav-group[open] summary::after{content:" \25B4";}
+.nav-dropdown{position:absolute;top:100%;left:0;margin-top:0.5rem;background:var(--navy-strong);border:1px solid rgba(255,255,255,0.18);border-radius:6px;padding:0.4rem 0;min-width:200px;z-index:30;box-shadow:0 10px 24px rgba(0,0,0,0.3);}
+.nav-dropdown a{display:block;padding:0.45rem 1rem;margin-right:0;white-space:nowrap;}
+.nav-dropdown a:hover{background:rgba(255,255,255,0.08);text-decoration:none;}
 .page{max-width:1000px;margin:2rem auto;padding:0 1rem;}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:1.5rem 2rem;margin-bottom:1.5rem;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:1.5rem 2rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(20,38,61,0.07);overflow-x:auto;}
 .card-narrow{max-width:380px;margin:4rem auto;}
 .card-nested{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1rem;}
 .bare{min-height:100vh;}
@@ -24,8 +46,14 @@ a{color:var(--navy)}
 .bare-brand{text-align:center;font-weight:700;letter-spacing:0.08em;color:var(--navy-strong);margin-bottom:1rem;}
 .bare-brand span{color:var(--amber);font-weight:400;}
 label{display:block;margin-bottom:1rem;font-size:0.9rem;color:var(--ink-soft);}
-input[type=text],input[type=email],input[type=password],input[type=file]{
+input[type=text],input[type=email],input[type=password],input[type=file],
+input[type=date],input[type=number],input[type=datetime-local],input[type=tel],input[type=url]{
   display:block;width:100%;padding:0.55rem 0.7rem;margin-top:0.3rem;border:1px solid var(--line);border-radius:6px;font-size:1rem;color:var(--ink);background:#fff;
+}
+input[type=text]:focus,input[type=email]:focus,input[type=password]:focus,input[type=date]:focus,
+input[type=number]:focus,input[type=datetime-local]:focus,input[type=tel]:focus,input[type=url]:focus,
+select:focus,textarea:focus{
+  outline:none;border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-soft);
 }
 button{background:var(--navy);color:#fff;border:none;padding:0.6rem 1.4rem;border-radius:6px;font-size:1rem;cursor:pointer;}
 button:hover{background:var(--navy-strong);}
@@ -113,3 +141,29 @@ a.btn-sm{padding:0.4rem 0.9rem;font-size:0.85rem;}
 .reference-doc-content p{margin:0 0 0.6rem;}
 .reference-doc-content ul,.reference-doc-content ol{margin:0 0 0.6rem 1.4rem;}
 .reference-doc-content li{margin-bottom:0.3rem;}
+
+/* --- Task #18: responsive / mobile pass ---
+   Nothing above this point assumed a phone or tablet viewport — the
+   20-odd-link nav bar and the fixed 8-column product-row grid in
+   particular were unusable below ~900px. Grouped the nav into
+   <details>/<summary> dropdowns (see base.php/base.njk) and hide the
+   whole nav+user block behind a hamburger toggle on narrow screens;
+   collapse the multi-column form grids to one column; let .card scroll
+   horizontally (added above) instead of a wide table forcing the whole
+   page to scroll sideways. */
+@media (max-width: 900px){
+  .nav-toggle-label{display:block;}
+  .topbar-nav, .topbar-user{
+    display:none;width:100%;flex-direction:column;align-items:flex-start;gap:0.15rem;
+  }
+  .nav-toggle-checkbox:checked ~ .topbar-nav, .nav-toggle-checkbox:checked ~ .topbar-user{display:flex;}
+  .topbar-nav a{margin-right:0;padding:0.4rem 0;}
+  .nav-group{width:100%;margin-right:0;}
+  .nav-dropdown{position:static;box-shadow:none;border:none;background:rgba(255,255,255,0.06);margin-top:0.2rem;margin-left:0.75rem;min-width:0;}
+  .topbar-user{border-top:1px solid rgba(255,255,255,0.18);padding-top:0.6rem;margin-top:0.3rem;}
+  .page, .page-wide{padding:0 0.75rem;}
+  .card{padding:1.1rem 1.1rem;}
+  .product-row{grid-template-columns:1fr;align-items:stretch;}
+  .setting-row{flex-direction:column;align-items:stretch;gap:0.2rem;}
+  .setting-label{flex:none;}
+}

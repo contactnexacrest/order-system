@@ -1228,6 +1228,76 @@ the seeded matrix. Phase D adds two new permissions: `cross_verify_documents`
 (Admin/MD-only, via the existing wildcard) — review both against your real
 org chart before going live.
 
+## Top-tier UI/UX pass (added 2026-09-21)
+
+Standing item on the tracked task list: give the whole staff app a proper
+UI/UX pass rather than leaving it at "functional but plain." Scoped to the
+highest-leverage, lowest-risk fixes first — everything below lives in the
+shared layout (`layout/base.php`/`base.njk`) or the shared stylesheet
+(`app.css`), so every one of the ~60 views in both stacks gets it for free,
+with zero per-view template changes needed for most of it:
+
+- **The navigation bar was the single biggest problem in the app.** A user
+  with most permissions saw ~20 links crammed into one unwrapped row —
+  unreadable on a normal laptop screen, let alone a tablet. Regrouped into
+  three permission-gated dropdowns (`Operations`, `Insights`, `Admin`) built
+  from plain `<details>/<summary>` — no JavaScript at all, so nothing new
+  for either stack to keep in sync: native keyboard support, native
+  tap-to-open on mobile, and a group only renders if at least one of its
+  links is actually visible to the current user's permissions. Dashboard,
+  Reference Library, My Reviews, and Super Admin (a distinct high-privilege
+  mode switch, not just another settings page) stay as standalone top-level
+  links.
+- **Nothing in the app degraded gracefully below desktop width before this
+  pass**, despite the viewport meta tag already being present. Added: a
+  checkbox-driven hamburger toggle (still no JS) that collapses the whole
+  nav + user menu behind a "☰" on screens under 900px; the nav's dropdowns
+  switch from floating panels to a plain nested list on mobile; the
+  8-column product-line grid on the order create/edit forms collapses to
+  one stacked column; `.card` (which nearly every table lives inside)
+  scrolls horizontally on its own when content is wider than the screen,
+  instead of the whole page gaining a horizontal scrollbar.
+- **Real, live bug found and fixed**: the "Notifications" link in the
+  top-right user menu had no color rule of its own, so it inherited the
+  global link color (a dark navy) against the dark navy header — nearly
+  unreadable, on every single page, for every logged-in user. Every other
+  topbar link was already explicitly white; this one was missed. Fixed with
+  an explicit `.topbar-user a` rule.
+- **Real, live inconsistency found and fixed**: the width/focus rules for
+  form inputs only ever listed `text`/`email`/`password`/`file` — every
+  `type="date"` (20 of them), `type="number"` (4), and `type="datetime-local"`
+  (2) field across the app rendered at the browser's tiny native default
+  width next to full-width siblings in the same form (most visible on the
+  Audit Log filter form: `Entity Type` was full width, `Entity ID`/`User ID`
+  were not). Extended the same width + focus-ring rules to cover them.
+- **Accessibility basics that were entirely missing**: no visible
+  `:focus-visible` state anywhere (keyboard-only navigation had nothing to
+  show where focus was), and no focus styling on form fields beyond the
+  browser's inconsistent default outline. Added a brand-colored focus ring
+  on every interactive element and a matching focus/border treatment on
+  every text-like input, `select`, and `textarea`.
+- **Small polish**: a subtle shadow on `.card` for depth (it was a flat
+  bordered box), a `transition` on buttons/links/inputs so hover/focus
+  states don't snap, and a dimmed/`not-allowed` cursor style for disabled
+  buttons.
+
+Verified live in a real browser (Playwright + the pre-installed headless
+Chromium) on both stacks, not just by reading the CSS: logged in as the
+seeded Admin, screenshotted the nav at desktop width (all three groups
+present, "Notifications (4)" now legible), opened the Admin dropdown and
+confirmed all nine of its links render, resized to a 390px phone viewport
+and confirmed the hamburger menu opens/closes and every link is reachable,
+confirmed the Audit Log's wide activity table scrolls inside its own card
+with the page itself at zero horizontal overflow (`scrollWidth ===
+clientWidth` at the `<html>` level), confirmed the order-create form's
+product-line grid collapses to one column on mobile and is unchanged at
+desktop width, and confirmed the login page has zero horizontal overflow
+down to a 320px-wide viewport (the narrowest phone screens still sold).
+Not a claim that every one of the ~60 views is now individually polished —
+this pass targeted the shared layout/stylesheet fixes that reach every
+view at once; a view-by-view pass is a reasonable next increment if you
+want one.
+
 ## Verifying this delivery yourself
 
 Every claim above was checked, not assumed. Phase B's checks (below) were

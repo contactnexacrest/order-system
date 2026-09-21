@@ -2,6 +2,31 @@
 $current = AuthService::currentUser();
 $unreadCount = $current ? NotificationRepository::unreadCountForUser((int) $current['id']) : 0;
 $isEffectiveSuperAdmin = $current && SuperAdminService::isEffective((int) $current['id']);
+$roleId = $current && $current['role_id'] !== null ? (int) $current['role_id'] : null;
+$can = static fn(string $perm): bool => $current && PermissionService::can((int) $current['id'], $roleId, $perm);
+
+// Task #18 — the flat nav below used to list every one of these ~20 links
+// side by side; grouped into "Operations" / "Insights" / "Admin" dropdowns
+// (see .nav-group in app.css) so it's readable at all, on desktop or
+// mobile. A group's <details> only renders once at least one of its links
+// is actually visible to this user's permissions.
+$canOrders = $can('manage_orders');
+$canSettings = $can('manage_company_settings');
+$canAssets = $can('manage_assets');
+$canSignatories = $can('manage_signatories');
+$canPermissions = $can('manage_permissions');
+$canApproveEmail = $can('approve_email_send');
+$canAudit = $can('view_audit_log');
+$canReports = $can('view_reports');
+$canOverrides = $can('edit_locked_data');
+$canFieldProtection = $can('manage_field_protection');
+$canUsers = $can('manage_users');
+$canSampleData = $can('manage_sample_data');
+
+$opsGroupVisible = $canOrders;
+$insightsGroupVisible = $canReports || $canAudit || $canApproveEmail;
+$adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
+    || $canUsers || $canFieldProtection || $canOverrides || $canSampleData;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -14,58 +39,55 @@ $isEffectiveSuperAdmin = $current && SuperAdminService::isEffective((int) $curre
 <body>
 <header class="topbar">
   <div class="topbar-brand">NEXACREST <span>INTERNATIONAL</span></div>
+  <?php if ($current): ?>
+    <input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox">
+    <label for="nav-toggle" class="nav-toggle-label" aria-label="Toggle navigation">&#9776;</label>
+  <?php endif; ?>
   <nav class="topbar-nav">
     <a href="/">Dashboard</a>
     <?php if ($current): ?>
       <a href="/reference-docs">Reference Library</a>
+      <a href="/reviews">My Reviews</a>
     <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_orders')): ?>
-      <a href="/clients">Clients</a>
-      <a href="/orders">Orders</a>
-      <a href="/client-intake">Client Requests</a>
+    <?php if ($opsGroupVisible): ?>
+      <details class="nav-group">
+        <summary>Operations</summary>
+        <div class="nav-dropdown">
+          <a href="/clients">Clients</a>
+          <a href="/orders">Orders</a>
+          <a href="/client-intake">Client Requests</a>
+          <a href="/disputes">Disputes</a>
+        </div>
+      </details>
     <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_company_settings')): ?>
-      <a href="/settings">Company Settings</a>
-      <a href="/holidays">Holiday Calendar</a>
+    <?php if ($insightsGroupVisible): ?>
+      <details class="nav-group">
+        <summary>Insights</summary>
+        <div class="nav-dropdown">
+          <?php if ($canReports): ?><a href="/reports">Reports</a><?php endif; ?>
+          <?php if ($canAudit): ?><a href="/audit-log">Audit Log</a><?php endif; ?>
+          <?php if ($canApproveEmail): ?><a href="/email-approvals">Email Approvals</a><?php endif; ?>
+        </div>
+      </details>
     <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_assets')): ?>
-      <a href="/company-assets">Assets</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_signatories')): ?>
-      <a href="/signatories">Signatories</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_permissions')): ?>
-      <a href="/admin/permissions">Permissions</a>
+    <?php if ($adminGroupVisible): ?>
+      <details class="nav-group">
+        <summary>Admin</summary>
+        <div class="nav-dropdown">
+          <?php if ($canSettings): ?><a href="/settings">Company Settings</a><?php endif; ?>
+          <?php if ($canSettings): ?><a href="/holidays">Holiday Calendar</a><?php endif; ?>
+          <?php if ($canAssets): ?><a href="/company-assets">Assets</a><?php endif; ?>
+          <?php if ($canSignatories): ?><a href="/signatories">Signatories</a><?php endif; ?>
+          <?php if ($canPermissions): ?><a href="/admin/permissions">Permissions</a><?php endif; ?>
+          <?php if ($canUsers): ?><a href="/users">Users</a><?php endif; ?>
+          <?php if ($canFieldProtection): ?><a href="/admin/field-protection">Field Protection</a><?php endif; ?>
+          <?php if ($canOverrides): ?><a href="/admin/overrides">Admin Overrides</a><?php endif; ?>
+          <?php if ($canSampleData): ?><a href="/sample-data">Sample Data</a><?php endif; ?>
+        </div>
+      </details>
     <?php endif; ?>
     <?php if ($isEffectiveSuperAdmin): ?>
       <a href="/super-admin">Super Admin</a>
-    <?php endif; ?>
-    <?php if ($current): ?>
-      <a href="/reviews">My Reviews</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'approve_email_send')): ?>
-      <a href="/email-approvals">Email Approvals</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_orders')): ?>
-      <a href="/disputes">Disputes</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'view_audit_log')): ?>
-      <a href="/audit-log">Audit Log</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'view_reports')): ?>
-      <a href="/reports">Reports</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'edit_locked_data')): ?>
-      <a href="/admin/overrides">Admin Overrides</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_field_protection')): ?>
-      <a href="/admin/field-protection">Field Protection</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_users')): ?>
-      <a href="/users">Users</a>
-    <?php endif; ?>
-    <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_sample_data')): ?>
-      <a href="/sample-data">Sample Data</a>
     <?php endif; ?>
   </nav>
   <div class="topbar-user">
