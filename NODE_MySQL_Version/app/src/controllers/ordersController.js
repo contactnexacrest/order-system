@@ -10,6 +10,7 @@ const disputeRepository = require('../repositories/disputeRepository');
 const documentCrossVerificationRepository = require('../repositories/documentCrossVerificationRepository');
 const documentRepository = require('../repositories/documentRepository');
 const documentReviewRepository = require('../repositories/documentReviewRepository');
+const emailLogRepository = require('../repositories/emailLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderCrateRepository = require('../repositories/orderCrateRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
@@ -201,6 +202,20 @@ async function show(req, res) {
 
   const disputes = await disputeRepository.forOrder(orderId);
 
+  // Real gap this closes: emailLogRepository.forOrder() already existed
+  // but nothing on this page ever called it, so the "Send to Buyer" link
+  // would silently reappear after a Level-2 rejection or a cron dispatch
+  // failure with no visible reason, and nothing stopped a second Level-1
+  // request from being submitted while an earlier one still sat in the
+  // approval queue. Grouped by document_id so each document's own send
+  // history renders next to its own review/approval block below.
+  const emailLogByDocument = {};
+  for (const log of await emailLogRepository.forOrder(orderId)) {
+    if (log.document_id !== null) {
+      (emailLogByDocument[log.document_id] = emailLogByDocument[log.document_id] || []).push(log);
+    }
+  }
+
   res.renderView(
     'orders/show',
     {
@@ -212,6 +227,7 @@ async function show(req, res) {
       documents,
       reviewsByDocument,
       crossVerificationsByDocument,
+      emailLogByDocument,
       activeUsers: await userRepository.listActive(),
       fobTotal: await orderProductRepository.totalFobValue(orderId),
       suppliers: await supplierRepository.all(),

@@ -93,6 +93,10 @@ async function buildPreview(orderId, documentId, templateKey, senderUserId) {
 async function requestSend(orderId, documentId, templateKey, scheduledAt, requestedByUserId) {
   const preview = await buildPreview(orderId, documentId, templateKey, requestedByUserId);
 
+  if (await emailLogRepository.hasActiveSendFor(documentId)) {
+    throw new Error('A send for this document is already awaiting approval or scheduled to go out — wait for it to send, be rejected, or fail before submitting another.');
+  }
+
   const id = await emailLogRepository.create(
     orderId,
     documentId,

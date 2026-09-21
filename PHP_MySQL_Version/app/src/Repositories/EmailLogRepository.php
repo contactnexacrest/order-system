@@ -63,6 +63,22 @@ final class EmailLogRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * True if this document already has a send in flight — either awaiting
+     * Level-2 approval or approved and waiting for its scheduled dispatch.
+     * Used to block a second Level-1 request for the same document while
+     * one is still active, rather than letting the buyer end up with two
+     * competing sends.
+     */
+    public static function hasActiveSendFor(int $documentId): bool
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT 1 FROM email_log WHERE document_id = :document_id AND status IN ('pending_approval', 'approved') LIMIT 1"
+        );
+        $stmt->execute(['document_id' => $documentId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
     /** Level 2 approval queue. */
     public static function pendingApproval(): array
     {

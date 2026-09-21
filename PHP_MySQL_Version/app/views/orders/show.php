@@ -289,8 +289,47 @@ $orderClosed = $order['status'] === 'complete';
           </p>
         <?php endif; ?>
 
+        <?php
+          $emailLogs = $emailLogByDocument[(int) $d['id']] ?? [];
+          $hasPendingSend = false;
+          foreach ($emailLogs as $log) {
+              if ($log['status'] === 'pending_approval' || $log['status'] === 'approved') {
+                  $hasPendingSend = true;
+              }
+          }
+        ?>
+        <?php if (!empty($emailLogs)): ?>
+          <table class="list" style="margin-top:6px">
+            <tr><th>Sent To</th><th>Status</th><th>Requested</th><th>Detail</th></tr>
+            <?php foreach ($emailLogs as $log): ?>
+              <tr>
+                <td><?= htmlspecialchars($log['recipient_email']) ?></td>
+                <td><?= htmlspecialchars(str_replace('_', ' ', $log['status'])) ?></td>
+                <td><?= htmlspecialchars($log['created_at']) ?></td>
+                <td>
+                  <?php if ($log['status'] === 'sent'): ?>
+                    Sent <?= htmlspecialchars($log['sent_at'] ?? '') ?>
+                  <?php elseif ($log['status'] === 'rejected'): ?>
+                    Rejected: <?= htmlspecialchars($log['rejection_reason'] ?? '') ?>
+                  <?php elseif ($log['status'] === 'failed'): ?>
+                    Dispatch failed — check mail server configuration and retry.
+                  <?php elseif ($log['status'] === 'approved'): ?>
+                    Approved — will send once its scheduled time arrives.
+                  <?php else: ?>
+                    Awaiting Level-2 approval.
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </table>
+        <?php endif; ?>
+
         <?php if ($d['status'] === 'approved' && $d['document_type_code'] !== 'AMD' && $d['document_type_code'] !== 'SUPPO' && $d['document_type_code'] !== 'COOPREP' && $d['document_type_code'] !== 'BLI'): ?>
-          <p><a href="/orders/<?= (int) $order['id'] ?>/documents/<?= (int) $d['id'] ?>/send" class="btn-sm">Send to Buyer (deferred, 2-level approval)</a></p>
+          <?php if ($hasPendingSend): ?>
+            <p class="muted">A send to the buyer is already in progress for this document (see above) — no new send can be submitted until it's sent, rejected, or fails.</p>
+          <?php else: ?>
+            <p><a href="/orders/<?= (int) $order['id'] ?>/documents/<?= (int) $d['id'] ?>/send" class="btn-sm">Send to Buyer (deferred, 2-level approval)</a></p>
+          <?php endif; ?>
         <?php elseif ($d['status'] === 'sent'): ?>
           <p class="muted">Already sent to buyer.</p>
         <?php endif; ?>

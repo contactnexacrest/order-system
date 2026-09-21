@@ -15,6 +15,7 @@ use App\Repositories\DisputeRepository;
 use App\Repositories\DocumentCrossVerificationRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\DocumentReviewRepository;
+use App\Repositories\EmailLogRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
@@ -182,6 +183,21 @@ final class OrderController
             $crossVerificationsByDocument[(int) $d['id']] = DocumentCrossVerificationRepository::forDocument((int) $d['id']);
         }
 
+        // Real gap this closes: EmailLogRepository::forOrder() already
+        // existed but nothing on this page ever called it, so the "Send to
+        // Buyer" link would silently reappear after a Level-2 rejection or
+        // a cron dispatch failure with no visible reason, and nothing
+        // stopped a second Level-1 request from being submitted while an
+        // earlier one still sat in the approval queue. Grouped by
+        // document_id so each document's own send history renders next to
+        // its own review/approval block below.
+        $emailLogByDocument = [];
+        foreach (EmailLogRepository::forOrder($orderId) as $log) {
+            if ($log['document_id'] !== null) {
+                $emailLogByDocument[(int) $log['document_id']][] = $log;
+            }
+        }
+
         View::render('orders/show', [
             'order'    => $order,
             'products' => OrderProductRepository::forOrder($orderId),
@@ -191,6 +207,7 @@ final class OrderController
             'documents' => $documents,
             'reviewsByDocument' => $reviewsByDocument,
             'crossVerificationsByDocument' => $crossVerificationsByDocument,
+            'emailLogByDocument' => $emailLogByDocument,
             'activeUsers' => UserRepository::listActive(),
             'fobTotal' => OrderProductRepository::totalFobValue($orderId),
             'suppliers' => SupplierRepository::all(),

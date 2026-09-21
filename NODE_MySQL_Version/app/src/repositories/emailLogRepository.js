@@ -33,6 +33,21 @@ async function forOrder(orderId) {
   return db.query('SELECT * FROM email_log WHERE order_id = :order_id ORDER BY created_at DESC', { order_id: orderId });
 }
 
+/**
+ * True if this document already has a send in flight — either awaiting
+ * Level-2 approval or approved and waiting for its scheduled dispatch.
+ * Used to block a second Level-1 request for the same document while one
+ * is still active, rather than letting the buyer end up with two
+ * competing sends.
+ */
+async function hasActiveSendFor(documentId) {
+  const row = await db.queryOne(
+    "SELECT 1 AS x FROM email_log WHERE document_id = :document_id AND status IN ('pending_approval', 'approved') LIMIT 1",
+    { document_id: documentId }
+  );
+  return !!row;
+}
+
 /** Level 2 approval queue. */
 async function pendingApproval() {
   return db.query(
@@ -70,4 +85,4 @@ async function markFailed(id) {
   await db.execute("UPDATE email_log SET status = 'failed' WHERE id = :id", { id });
 }
 
-module.exports = { create, find, forOrder, pendingApproval, approve, reject, dueForSend, markSent, markFailed };
+module.exports = { create, find, forOrder, hasActiveSendFor, pendingApproval, approve, reject, dueForSend, markSent, markFailed };

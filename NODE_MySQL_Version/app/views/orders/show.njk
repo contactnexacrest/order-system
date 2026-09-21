@@ -276,8 +276,43 @@
           </p>
         {% endif %}
 
+        {% set emailLogs = emailLogByDocument[d.id] or [] %}
+        {% set hasPendingSend = false %}
+        {% for log in emailLogs %}
+          {% if log.status == 'pending_approval' or log.status == 'approved' %}{% set hasPendingSend = true %}{% endif %}
+        {% endfor %}
+        {% if emailLogs.length > 0 %}
+          <table class="list" style="margin-top:6px">
+            <tr><th>Sent To</th><th>Status</th><th>Requested</th><th>Detail</th></tr>
+            {% for log in emailLogs %}
+              <tr>
+                <td>{{ log.recipient_email }}</td>
+                <td>{{ log.status | replace('_', ' ') }}</td>
+                <td>{{ log.created_at }}</td>
+                <td>
+                  {% if log.status == 'sent' %}
+                    Sent {{ log.sent_at or '' }}
+                  {% elif log.status == 'rejected' %}
+                    Rejected: {{ log.rejection_reason or '' }}
+                  {% elif log.status == 'failed' %}
+                    Dispatch failed — check mail server configuration and retry.
+                  {% elif log.status == 'approved' %}
+                    Approved — will send once its scheduled time arrives.
+                  {% else %}
+                    Awaiting Level-2 approval.
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+
         {% if d.status == 'approved' and d.document_type_code != 'AMD' and d.document_type_code != 'SUPPO' and d.document_type_code != 'COOPREP' and d.document_type_code != 'BLI' %}
-          <p><a href="/orders/{{ order.id }}/documents/{{ d.id }}/send" class="btn-sm">Send to Buyer (deferred, 2-level approval)</a></p>
+          {% if hasPendingSend %}
+            <p class="muted">A send to the buyer is already in progress for this document (see above) — no new send can be submitted until it's sent, rejected, or fails.</p>
+          {% else %}
+            <p><a href="/orders/{{ order.id }}/documents/{{ d.id }}/send" class="btn-sm">Send to Buyer (deferred, 2-level approval)</a></p>
+          {% endif %}
         {% elif d.status == 'sent' %}
           <p class="muted">Already sent to buyer.</p>
         {% endif %}

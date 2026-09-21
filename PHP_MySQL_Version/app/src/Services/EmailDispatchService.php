@@ -71,6 +71,10 @@ final class EmailDispatchService
     ): int {
         $preview = self::buildPreview($orderId, $documentId, $templateKey, $requestedByUserId);
 
+        if (EmailLogRepository::hasActiveSendFor($documentId)) {
+            throw new \RuntimeException('A send for this document is already awaiting approval or scheduled to go out — wait for it to send, be rejected, or fail before submitting another.');
+        }
+
         $id = EmailLogRepository::create(
             $orderId,
             $documentId,
