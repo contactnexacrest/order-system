@@ -18,6 +18,7 @@ use App\Repositories\DocumentRepository;
 use App\Repositories\DocumentReviewRepository;
 use App\Repositories\EmailLogRepository;
 use App\Repositories\LookupRepository;
+use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPackingRepository;
@@ -27,6 +28,7 @@ use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderShippingRepository;
 use App\Repositories\OrderStageRepository;
+use App\Repositories\OrderSupplierPoDocumentRepository;
 use App\Repositories\OrderSupplierPoRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\UserRepository;
@@ -199,6 +201,8 @@ final class OrderController
             }
         }
 
+        $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
+
         View::render('orders/show', [
             'order'    => $order,
             'products' => OrderProductRepository::forOrder($orderId),
@@ -212,7 +216,9 @@ final class OrderController
             'activeUsers' => UserRepository::listActive(),
             'fobTotal' => OrderProductRepository::totalFobValue($orderId),
             'suppliers' => SupplierRepository::all(),
-            'supplierPo' => OrderSupplierPoRepository::findLatestForOrder($orderId),
+            'supplierPo' => $supplierPo,
+            'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
+            'supplierPoDocuments' => $supplierPo ? OrderSupplierPoDocumentRepository::forSupplierPo((int) $supplierPo['id']) : [],
             'freight'   => OrderFreightRepository::find($orderId),
             'packing'   => OrderPackingRepository::find($orderId),
             'crates'    => OrderCrateRepository::forOrder($orderId),
@@ -238,6 +244,47 @@ final class OrderController
         OrderRepository::setBuyersPoRef($orderId, $ref);
         StageGateService::passAndUnlockNext($orderId, 2, (int) $user['id']);
         Flash::set('success', "Buyer PO recorded ({$ref}). Stage 3 (PI / Production) unlocked.");
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Real gap this closes: recordBuyerPo() above only ever captured a
+     * reference number typed by staff — the buyer's actual signed PO was
+     * never kept on file anywhere, unlike every other counterparty-
+     * evidence flow in this app (amendment_signed_copy, dispute_document,
+     * buyer_approval). A separate upload endpoint (not folded into the
+     * gate-confirmation form) so attaching a copy is never blocked by, or
+     * required for, passing the gate — and a second/corrected upload adds
+     * a new file_store row rather than replacing one, giving real version
+     * history for free (schema.sql SECTION S).
+     */
+    public function uploadBuyerPoDocument(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        try {
+            $fileId = FileUploadService::handleUpload(
+                'document',
+                'buyer_po_copy',
+                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/buyer_po',
+                null,
+                $orderId,
+                (int) AuthService::currentUser()['id'],
+                null,
+                'buyer',
+                'Buyer PO copy'
+            );
+            OrderBuyerPoDocumentRepository::attach($orderId, $fileId);
+            Flash::set('success', 'Buyer PO copy attached.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
         header("Location: /orders/{$orderId}");
     }
 
@@ -398,6 +445,47 @@ final class OrderController
         StageGateService::passAndUnlockNext($orderId, 5, (int) $user['id']);
         StageGateService::maybeAutoSkipFreightStage($orderId, (int) $user['id']);
         Flash::set('success', 'Supplier PO signature confirmed.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Real gap this closes: confirmSupplierSigned() above only ever
+     * flipped order_supplier_po.status on a button click — the supplier's
+     * actual signed acknowledgment was never kept on file anywhere. A
+     * separate upload endpoint, keyed to the specific order_supplier_po
+     * row (not the order) since an order can have more than one Supplier
+     * PO version and the acknowledgment belongs to the version it was
+     * signed against; a second/corrected upload adds a new file_store row
+     * rather than replacing one (schema.sql SECTION S).
+     */
+    public function uploadSupplierPoDocument(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
+        if (!$order || !$supplierPo) {
+            Flash::set('error', 'Save the Supplier PO terms before attaching an acknowledgment copy.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        try {
+            $fileId = FileUploadService::handleUpload(
+                'document',
+                'supplier_po_ack',
+                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/supplier_po',
+                null,
+                $orderId,
+                (int) AuthService::currentUser()['id'],
+                null,
+                'supplier',
+                'Supplier PO acknowledgment'
+            );
+            OrderSupplierPoDocumentRepository::attach((int) $supplierPo['id'], $fileId);
+            Flash::set('success', 'Supplier PO acknowledgment attached.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
         header("Location: /orders/{$orderId}");
     }
 

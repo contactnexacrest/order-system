@@ -375,6 +375,26 @@
     {% else %}
       <p class="muted">Generate the Quotation first to unlock this gate.</p>
     {% endif %}
+
+    {% if stage2 and stage2.status != 'locked' %}
+      {% if buyerPoDocuments and buyerPoDocuments.length > 0 %}
+        <table class="list" style="margin-top:8px">
+          <tr><th>File</th><th>Uploaded</th><th></th></tr>
+          {% for bd in buyerPoDocuments %}
+            <tr>
+              <td>{{ bd.original_filename }}</td>
+              <td>{{ bd.uploaded_at }}</td>
+              <td><a href="/file-store/{{ bd.file_id }}/download">Download</a></td>
+            </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+      <form method="post" action="/orders/{{ order.id }}/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="file" name="document" required>
+        <button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+      </form>
+    {% endif %}
   </div>
 
   <div class="section">
@@ -517,6 +537,26 @@
         </form>
       {% elif supplierPo %}
         <p>Supplier has signed and returned the PO.</p>
+      {% endif %}
+
+      {% if supplierPo %}
+        {% if supplierPoDocuments and supplierPoDocuments.length > 0 %}
+          <table class="list" style="margin-top:8px">
+            <tr><th>File</th><th>Uploaded</th><th></th></tr>
+            {% for sd in supplierPoDocuments %}
+              <tr>
+                <td>{{ sd.original_filename }}</td>
+                <td>{{ sd.uploaded_at }}</td>
+                <td><a href="/file-store/{{ sd.file_id }}/download">Download</a></td>
+              </tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+        <form method="post" action="/orders/{{ order.id }}/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="file" name="document" required>
+          <button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
+        </form>
       {% endif %}
     {% endif %}
   </div>

@@ -23,6 +23,8 @@ const orderRepository = require('../repositories/orderRepository');
 const orderShippingRepository = require('../repositories/orderShippingRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
+const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
+const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
 const supplierRepository = require('../repositories/supplierRepository');
 const userRepository = require('../repositories/userRepository');
 const referenceNumberService = require('../services/referenceNumberService');
@@ -217,6 +219,8 @@ async function show(req, res) {
     }
   }
 
+  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+
   res.renderView(
     'orders/show',
     {
@@ -232,7 +236,9 @@ async function show(req, res) {
       activeUsers: await userRepository.listActive(),
       fobTotal: await orderProductRepository.totalFobValue(orderId),
       suppliers: await supplierRepository.all(),
-      supplierPo: await orderSupplierPoRepository.findLatestForOrder(orderId),
+      supplierPo,
+      buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(orderId),
+      supplierPoDocuments: supplierPo ? await orderSupplierPoDocumentRepository.forSupplierPo(supplierPo.id) : [],
       freight: await orderFreightRepository.find(orderId),
       packing: await orderPackingRepository.find(orderId),
       orderedQuantitySummary: await orderProductRepository.orderedQuantitySummary(orderId),
@@ -261,6 +267,46 @@ async function recordBuyerPo(req, res) {
   await orderRepository.setBuyersPoRef(orderId, ref);
   await stageGateService.passAndUnlockNext(orderId, 2, user.id);
   flash.set(req, 'success', `Buyer PO recorded (${ref}). Stage 3 (PI / Production) unlocked.`);
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Real gap this closes: recordBuyerPo() above only ever captured a
+ * reference number typed by staff — the buyer's actual signed PO was
+ * never kept on file anywhere, unlike every other counterparty-evidence
+ * flow in this app (amendment_signed_copy, dispute_document,
+ * buyer_approval). A separate upload endpoint (not folded into the
+ * gate-confirmation form) so attaching a copy is never blocked by, or
+ * required for, passing the gate — and a second/corrected upload adds a
+ * new file_store row rather than replacing one, giving real version
+ * history for free (schema.sql SECTION S).
+ */
+async function uploadBuyerPoDocument(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  try {
+    const fileId = await fileUploadService.handleUpload(
+      req,
+      'document',
+      'buyer_po_copy',
+      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/buyer_po`,
+      null,
+      orderId,
+      req.user.id,
+      null,
+      'buyer',
+      'Buyer PO copy'
+    );
+    await orderBuyerPoDocumentRepository.attach(orderId, fileId);
+    flash.set(req, 'success', 'Buyer PO copy attached.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -416,6 +462,47 @@ async function confirmSupplierSigned(req, res) {
   await stageGateService.passAndUnlockNext(orderId, 5, user.id);
   await stageGateService.maybeAutoSkipFreightStage(orderId, user.id);
   flash.set(req, 'success', 'Supplier PO signature confirmed.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Real gap this closes: confirmSupplierSigned() above only ever flipped
+ * order_supplier_po.status on a button click — the supplier's actual
+ * signed acknowledgment was never kept on file anywhere. A separate
+ * upload endpoint, keyed to the specific order_supplier_po row (not the
+ * order) since an order can have more than one Supplier PO version and
+ * the acknowledgment belongs to the version it was signed against; a
+ * second/corrected upload adds a new file_store row rather than
+ * replacing one (schema.sql SECTION S).
+ */
+async function uploadSupplierPoDocument(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  if (!order || !supplierPo) {
+    flash.set(req, 'error', 'Save the Supplier PO terms before attaching an acknowledgment copy.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  try {
+    const fileId = await fileUploadService.handleUpload(
+      req,
+      'document',
+      'supplier_po_ack',
+      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/supplier_po`,
+      null,
+      orderId,
+      req.user.id,
+      null,
+      'supplier',
+      'Supplier PO acknowledgment'
+    );
+    await orderSupplierPoDocumentRepository.attach(supplierPo.id, fileId);
+    flash.set(req, 'success', 'Supplier PO acknowledgment attached.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -756,8 +843,8 @@ async function markLost(req, res) {
 
 module.exports = {
   index, create, store, show,
-  recordBuyerPo, recordAdvancePayment, clearAdvancePayment, updateProductionStatus,
-  confirmBuyerAcknowledged, saveSupplierPo, createSupplier, confirmSupplierSigned,
+  recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, clearAdvancePayment, updateProductionStatus,
+  confirmBuyerAcknowledged, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, recordBlIssued, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

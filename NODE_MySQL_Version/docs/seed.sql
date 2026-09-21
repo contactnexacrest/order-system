@@ -394,7 +394,9 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
   ('draft_bl',              'pdf', 10485760, 'Draft Bill of Lading from the CHA/shipping line, pending written approval before originals are issued.'),
   ('fumigation_cert',       'pdf,jpg,jpeg,png', 5242880, 'Fumigation certificate for wooden packing.'),
   ('buyer_approval',        'pdf,jpg,jpeg,png,eml,msg', 5242880, 'Buyer''s written approval (e.g. quantity shortfall, draft BL sign-off).'),
-  ('product_image',         'jpg,jpeg,png,webp', 5242880, 'Product image/technical drawing attached to an Annexure A entry.');
+  ('product_image',         'jpg,jpeg,png,webp', 5242880, 'Product image/technical drawing attached to an Annexure A entry.'),
+  ('buyer_po_copy',         'pdf,jpg,jpeg,png,eml,msg', 10485760, 'Buyer''s actual signed Purchase Order (Stage 2 gate evidence — Addition beyond the spec''s named key list: recordBuyerPo() previously only captured a reference number typed by staff, with no copy of the PO itself on file).'),
+  ('supplier_po_ack',       'pdf,jpg,jpeg,png,eml,msg', 10485760, 'Supplier''s signed acknowledgment of the Supplier PO (Stage 5 gate evidence — same addition/rationale as buyer_po_copy).');
 
 -- ================================================================
 -- COMPANY_SETTINGS — every key schema.sql reserves for this table.

@@ -1380,7 +1380,41 @@ CREATE TABLE internal_reference_docs (
 ) ENGINE=InnoDB;
 
 -- ================================================================
--- END OF SCHEMA — 63 tables. All open schema questions resolved
+-- SECTION S — BUYER PO / SUPPLIER PO ACKNOWLEDGMENT EVIDENCE (added 2026-09-21)
+-- ================================================================
+-- Gap this closes: recordBuyerPo() (Stage 1->2: "buyer's signed PO
+-- received") and confirmSupplierSigned() (Stage 5->6: "supplier PO
+-- signature confirmed") each flip a gate on nothing but a text field or a
+-- button click — unlike every other counterparty-evidence flow in this
+-- app (amendment_signed_copy, dispute_document, buyer_approval), neither
+-- ever captures the actual signed document as proof. Two join tables,
+-- exactly mirroring dispute_documents' proven shape: file_store already
+-- gets a new row per upload (never overwritten), so a plain
+-- (parent_id, file_id) join table gives real version history for free —
+-- re-uploading a corrected copy adds a row, it never replaces one.
+-- order_supplier_po_documents keys off the specific order_supplier_po row
+-- (not order_id) since an order can have more than one Supplier PO
+-- version (OrderSupplierPoRepository::findLatestForOrder implies exactly
+-- that), and the acknowledgment belongs to the PO version it was signed
+-- against.
+CREATE TABLE order_buyer_po_documents (
+  id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id   BIGINT UNSIGNED NOT NULL,
+  file_id    BIGINT UNSIGNED NOT NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (file_id) REFERENCES file_store(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_supplier_po_documents (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_supplier_po_id  BIGINT UNSIGNED NOT NULL,
+  file_id               BIGINT UNSIGNED NOT NULL,
+  FOREIGN KEY (order_supplier_po_id) REFERENCES order_supplier_po(id),
+  FOREIGN KEY (file_id) REFERENCES file_store(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
@@ -1389,4 +1423,5 @@ CREATE TABLE internal_reference_docs (
 -- Section P (document data-integrity snapshot) added 2026-09-21.
 -- Section Q (working-days calculator & holiday calendar) added 2026-09-21.
 -- Section R (internal reference library) added 2026-09-21.
+-- Section S (buyer PO / supplier PO acknowledgment evidence) added 2026-09-21.
 -- ================================================================

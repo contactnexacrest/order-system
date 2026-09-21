@@ -17,6 +17,7 @@ use App\Controllers\ClientPortalController;
 use App\Controllers\DashboardController;
 use App\Controllers\DisputeController;
 use App\Controllers\DocumentController;
+use App\Controllers\FileStoreController;
 use App\Controllers\EmailDispatchController;
 use App\Controllers\FieldProtectionController;
 use App\Controllers\HolidayController;
@@ -54,6 +55,7 @@ $clientPortal = new ClientPortalController();
 $orders = new OrderController();
 $annexure = new AnnexureController();
 $documents = new DocumentController();
+$fileStore = new FileStoreController();
 $reviews = new ReviewController();
 $emailDispatch = new EmailDispatchController();
 $amendments = new AmendmentController();
@@ -154,6 +156,7 @@ $router->get('/orders/create', [$orders, 'create'], [SessionAuth::required(), Pe
 $router->post('/orders', [$orders, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/orders/{id}', [$orders, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/buyer-po', [$orders, 'recordBuyerPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-po/documents', [$orders, 'uploadBuyerPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
@@ -174,6 +177,7 @@ $router->post('/orders/{id}/buyer-acknowledged', [$orders, 'confirmBuyerAcknowle
 $router->post('/orders/{id}/suppliers', [$orders, 'createSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/freight-terms', [$orders, 'saveFreightTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/freight', [$orders, 'recordFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
@@ -194,6 +198,7 @@ $router->post('/orders/{id}/mark-lost', [$orders, 'markLost'], [SessionAuth::req
 
 $router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->get('/documents/{documentId}/download', [$documents, 'download'], [SessionAuth::required(), PermissionCheck::requires('download_pdf')]);
+$router->get('/file-store/{id}/download', [$fileStore, 'download'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 
 // --- Phase D: review/approval, deferred send, amendments, disputes, audit log ---
 

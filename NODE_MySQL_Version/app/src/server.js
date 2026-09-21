@@ -30,6 +30,7 @@ const clientPortalController = require('./controllers/clientPortalController');
 const ordersController = require('./controllers/ordersController');
 const annexureController = require('./controllers/annexureController');
 const documentController = require('./controllers/documentController');
+const fileStoreController = require('./controllers/fileStoreController');
 const reviewController = require('./controllers/reviewController');
 const amendmentController = require('./controllers/amendmentController');
 const disputeController = require('./controllers/disputeController');
@@ -248,6 +249,7 @@ app.get('/orders/create', requireAuth, requirePermission('manage_orders'), async
 app.post('/orders', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.store));
 app.get('/orders/:id', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.show));
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
+app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
 app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordAdvancePayment));
 app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
@@ -267,6 +269,7 @@ app.post('/orders/:id/buyer-acknowledged', requireAuth, requirePermission('manag
 app.post('/orders/:id/suppliers', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.createSupplier));
 app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
 app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
+app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
 
 app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.saveFreightTerms));
 app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordFreightPayment));
@@ -287,6 +290,7 @@ app.post('/orders/:id/mark-lost', requireAuth, requirePermission('manage_orders'
 
 app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));
 app.get('/documents/:documentId/download', requireAuth, requirePermission('download_pdf'), asyncHandler(documentController.download));
+app.get('/file-store/:id/download', requireAuth, requirePermission('manage_orders'), asyncHandler(fileStoreController.download));
 
 // Admin field-override routes for clients/orders (Spec Section 13) — wired
 // here alongside their owning controllers rather than deferred to Phase E,

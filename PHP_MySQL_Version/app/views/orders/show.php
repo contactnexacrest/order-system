@@ -393,6 +393,26 @@ $orderClosed = $order['status'] === 'complete';
     <?php else: ?>
       <p class="muted">Generate the Quotation first to unlock this gate.</p>
     <?php endif; ?>
+
+    <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+      <?php if (!empty($buyerPoDocuments)): ?>
+        <table class="list" style="margin-top:8px">
+          <tr><th>File</th><th>Uploaded</th><th></th></tr>
+          <?php foreach ($buyerPoDocuments as $bd): ?>
+            <tr>
+              <td><?= htmlspecialchars($bd['original_filename']) ?></td>
+              <td><?= htmlspecialchars($bd['uploaded_at']) ?></td>
+              <td><a href="/file-store/<?= (int) $bd['file_id'] ?>/download">Download</a></td>
+            </tr>
+          <?php endforeach; ?>
+        </table>
+      <?php endif; ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
+        <?= Csrf::field() ?>
+        <input type="file" name="document" required>
+        <button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+      </form>
+    <?php endif; ?>
   </div>
 
   <div class="section">
@@ -535,6 +555,26 @@ $orderClosed = $order['status'] === 'complete';
         </form>
       <?php elseif ($supplierPo): ?>
         <p>Supplier has signed and returned the PO.</p>
+      <?php endif; ?>
+
+      <?php if ($supplierPo): ?>
+        <?php if (!empty($supplierPoDocuments)): ?>
+          <table class="list" style="margin-top:8px">
+            <tr><th>File</th><th>Uploaded</th><th></th></tr>
+            <?php foreach ($supplierPoDocuments as $sd): ?>
+              <tr>
+                <td><?= htmlspecialchars($sd['original_filename']) ?></td>
+                <td><?= htmlspecialchars($sd['uploaded_at']) ?></td>
+                <td><a href="/file-store/<?= (int) $sd['file_id'] ?>/download">Download</a></td>
+              </tr>
+            <?php endforeach; ?>
+          </table>
+        <?php endif; ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
+          <?= Csrf::field() ?>
+          <input type="file" name="document" required>
+          <button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
+        </form>
       <?php endif; ?>
     <?php endif; ?>
   </div>
