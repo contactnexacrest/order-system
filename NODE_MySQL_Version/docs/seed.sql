@@ -167,7 +167,10 @@ INSERT INTO document_types (code, name, category, ref_format, never_shown_to_buy
   ('BLI',       'BL Instruction Sheet',                'internal',        'SC/BLI/{YYYY}/{DDMM}{NNN}', 1, 1, 1, 1),
   ('CI',        'Commercial Invoice',                  'customer_facing', 'SC/CI/{YYYY}/{DDMM}{NNN}',  0, 1, 1, 1),
   ('COOPREP',   'Certificate of Origin Preparation',   'procurement',     NULL,                        1, 1, 1, 1),
-  ('CHECKLIST', 'Cross-Verification Checklist',        'internal',        NULL,                        1, 0, 1, 1),
+  ('CHECKLIST', 'Cross-Verification Checklist 1 of 4 — Sales / Documentation Officer', 'internal', NULL, 1, 0, 1, 1),
+  ('CHECKLIST_2_FINANCE',  'Cross-Verification Checklist 2 of 4 — Accounts / Finance',              'internal', NULL, 1, 0, 1, 1),
+  ('CHECKLIST_3_PACKING',  'Cross-Verification Checklist 3 of 4 — Packing / Dispatch Supervisor',   'internal', NULL, 1, 0, 1, 1),
+  ('CHECKLIST_4_SHIPPING', 'Cross-Verification Checklist 4 of 4 — Shipping / Logistics Coordinator', 'internal', NULL, 1, 0, 1, 1),
   ('AMD',       'Payment Terms Amendment',              'internal',       'SC/AMD/{YYYY}/{DDMM}{NNN}', 1, 1, 1, 1),
   ('SOP_A_SALES', 'SOP — Sales Process (Tier reference)', 'internal',     NULL,                        1, 1, 1, 1),
   ('SOP_B_SALES', 'SOP — Sales Process (Tier reference)', 'internal',     NULL,                        1, 1, 1, 1),
@@ -712,33 +715,295 @@ Pin this page. These are the rules the system enforces automatically — this is
 FROM document_types dt WHERE dt.code = 'WALLREF';
 
 INSERT INTO internal_reference_docs (document_type_id, content)
-SELECT dt.id, '# Cross-Verification Checklist
+SELECT dt.id, '# Cross-Verification Checklist 1 of 4 — Sales / Documentation Officer
 
-Run through this before recording a Cross-Verification result (Pass/Fail) on any document.
+Use this checklist when preparing and issuing: Quotation → PI → Order Confirmation.
 
-## Every Document
-- Document reference number matches the expected format and sequence.
-- Company legal name, address, GSTIN, IEC/PAN, bank details, and LUT number are all current and correct.
-- Signatory name, designation, and seal are the correct ones for this document type.
-- Watermark is present (DRAFT on an unapproved document, the approved watermark once cleared) — no document in this system is ever clean/unwatermarked.
+## Master Tracking Number
+- ⚠ MASTER TRACKING NUMBER — BUYER INQUIRY REF: [NC/SC/YYYY/DDMMNNN]. This number must appear on EVERY document for this order: QT · PI · OC · PL · CI · FDN · BL Instruction. Verify it matches on every document before issuing. This is the single reference by which the complete documentation set for any order can be retrieved.
 
-## Buyer-Facing Financial Documents (PI, OC, CI)
-- Product descriptions, quantities, and unit prices match the order exactly.
-- Advance/balance percentages and trigger conditions match the buyer''s agreed payment preset.
-- Currency and Incoterm are correct and consistent across all documents for this order.
+## A. Quotation Issued
+- Buyer Inquiry REF on Quotation matches master tracking number NC/SC/YYYY/DDMMNNN — this is the master number for the entire order ⚠ CRITICAL: if Buyer Inquiry REF is missing or wrong — correct before sending
+- Order acceptance confirmed before PI is issued (Accepted by one of: (1) Signed Buyer PO returned to NexaCrest / (2) Written email acceptance from buyer / (3) WhatsApp confirmation (screenshot saved). At least ONE must be on file before PI is issued.) ⚠ Do not issue PI without written acceptance on file in any form
+- Quotation number follows format SC/QT/YYYY/DDMMNNN (e.g., SC/QT/2026/0409001)
+- Buyer legal name confirmed — exact spelling as per their company registration (Spelling error here propagates to all downstream documents)
+- Buyer VAT/EORI/Tax Reg. No. collected (UK: EORI | France: SIRET+TVA | Norway: Org.No+MVA)
+- COO type confirmed with buyer — GSP Form A (preferential) or Non-preferential — record buyer''s answer
+- Certificate of Origin type recorded on Quotation buyer section
+- Incoterm stated explicitly with port name — not just ''FOB'' — must say ''FOB Chennai, India''
+- Port of Discharge matches buyer''s stated destination
+- Freight row completed correctly — FOB: NIL. CFR/CIF: indicative range + ''IN ADVANCE'' and ''BEFORE booking'' language present ⚠ NEVER omit freight advance payment condition on CFR/CIF orders
+- HS Code: 6802.93 for all granite/monument products ⚠ Different product = verify HS Code before issuing
+- Quotation validity: 30 days stated
+- Payment terms: 40% advance T/T + 60% against scanned BL (Tier 2) OR before shipment (Tier 1)
 
-## BL Instruction Sheet
-- BL type instruction reads ORIGINAL NEGOTIABLE BILL OF LADING — never Sea Waybill or Express BL.
-- Consignee instruction is TO ORDER OF the company legal name.
-- Container, seal, and packing figures match the Packing List exactly.
+## B. PI Issued (After Buyer Accepts Quotation In Writing)
+- Buyer Inquiry REF on PI matches master tracking number exactly (NC/SC/YYYY/DDMMNNN — must be identical to Quotation) ⚠ CRITICAL: mismatch breaks the entire order tracking chain
+- PI number follows format SC/PI/YYYY/DDMMNNN
+- PI date set correctly — not pre-dated or post-dated
+- PI Valid Until date correctly calculated as 15 days from PI date (e.g., PI dated 04 Sep 2026 → Valid Until must be 19 Sep 2026. Check the amber validity row below the meta bar before sending.) ⚠ Wrong validity date means buyer may miss the payment window or you cannot enforce the expiry
+- Quotation reference number on PI matches issued quotation
+- Buyer''s PO / Ref No. recorded on PI if buyer provided one (If buyer provided their own PO number — it must appear on the PI. If buyer has no PO number — write NIL. Never leave this field blank.)
+- All buyer details match Quotation character-for-character — Name, address, VAT/EORI — no abbreviations introduced
+- Product description, size, finish, HS Code match Quotation exactly ⚠ Any deviation from Quotation requires buyer written approval before PI is issued
+- Unit price and quantities match Quotation
+- FOB Value = Qty × Unit Price correctly calculated
+- Freight row: NIL for FOB / indicative amount for CFR-CIF with advance payment condition
+- Total PI Value = FOB + Freight + Insurance
+- 40% advance amount = Total PI Value × 0.40 — calculated and stated
+- 60% balance amount = stated (note: calculated on actual CI value, may differ if shipped short)
+- LUT Order No. ZD290626057408W on PI — check it''s current year''s number ⚠ LUT expires 31 March each year — new number required from 1 April
+- Bank details on PI: Account No. 44523788330 · SWIFT SBININBB949 · IFSC SBIN0064074 · Pincode 560095 — verify all four before sending PI to buyer (Any error in bank details means buyer''s wire transfer fails or goes to wrong account.)
+- RBI Purpose Code P0103 printed in PI bank details section (Buyers must quote P0103 in the ''Purpose of Remittance'' field of their wire transfer form when paying the 40% advance. Without this, SBI may hold or return the payment. Verify it is visible in the bank details section before sending PI to buyer.) ⚠⚠ Missing purpose code = risk of payment delay or return by SBI
+- Three legal protection clauses present in PI T&C (Verify PI T&C contains all three: PAYMENT TERMS FINALITY, DISPUTE RESOLUTION & PUBLIC COMMUNICATIONS, and ACCEPTANCE & ORDER OF PRECEDENCE. These are mandatory on every PI issued. If missing — do not send PI until clauses are added.) ⚠⚠ Missing clauses = NexaCrest has no contractual protection against payment term disputes or public naming
+- PI signed and sealed before sending
 
-## Packing List
-- Total quantity is within the configured shortfall tolerance of the ordered quantity, or a buyer-approval file is attached for anything beyond it.
+## A2. Annexure A (If Applicable)
+- If Annexure A is attached — Annexure shows correct document number (QT or PI number) (Quotation: QT number on Annexure. PI: PI number on Annexure. Never carry over old number.)
+- If Annexure A is attached — product descriptions in Annexure match product table exactly (Any mismatch = confusion for buyer. Fix before sending.)
+- If Annexure A is attached — Annexure reference line present in T&C of QT/PI
+- If Annexure A is attached — Annexure is signed and sealed by Gulmohar Sontakke (Unsigned Annexure is a hanging document with no legal authority. Never send unsigned.) ⚠ An unsigned Annexure can be modified by anyone — always sign before sending
+- If Annexure A is attached — Annexure PDF is merged with main QT/PI PDF into ONE file before sending to buyer (Export QT/PI to PDF → Export Annexure to PDF → Merge into one PDF → Send ONE file to buyer. Never send as two separate files.) ⚠ Buyer must receive a single PDF — not two separate documents
+- If NO Annexure — delete the Annexure reference line from T&C before sending ⚠ Sending a document that says Annexure is attached when it is not = unprofessional and confusing
 
-## Before Sending to Buyer
-- The document''s status is ''approved'' (not draft, not in_review) — the buyer must never receive anything but the final watermarked PDF.
-- Recipient email address on the send request matches the client''s email on file.'
+## C. 40% Advance Received — Before Production Starts
+- Bank remittance copy received from buyer
+- Amount matches PI 40% advance figure exactly ⚠ If amount differs — clarify with buyer before starting production
+- Payment references correct PI number
+- Amount confirmed cleared in NexaCrest SBI account (not just received — cleared)
+- Production commencement confirmed in writing to buyer
+
+## D. Order Confirmation Issued (If Buyer Requests)
+- OC number follows format SC/OC/YYYY/DDMMNNN Rev.00
+- PI reference number matches
+- Advance amount received stated correctly
+- COO type confirmed on OC (matches buyer''s instruction at Quotation stage)
+- CFR/CIF freight note present if applicable
+
+## Sign-Off
+- Fields to complete on the physical/filed checklist: Completed by ______ · Date ______ · Shipment Ref ______ · PI No ______'
 FROM document_types dt WHERE dt.code = 'CHECKLIST';
+
+INSERT INTO internal_reference_docs (document_type_id, content)
+SELECT dt.id, '# Cross-Verification Checklist 2 of 4 — Accounts / Finance
+
+Use this checklist to verify all payments before and after shipment.
+
+## Master Tracking Number
+- ⚠ MASTER TRACKING NUMBER — BUYER INQUIRY REF: [NC/SC/YYYY/DDMMNNN]. Verify this number appears on all payment remittances and all documents for this order before processing any payment or issuing any document.
+
+## A. Before Production — 40% Advance
+- Bank remittance copy filed against PI number
+- Amount received = PI Total × 0.30 (within rounding) ⚠ If less than 40% — production must NOT start. Escalate to MD.
+- Payment cleared in NexaCrest SBI account — not just received (Check bank statement or NetBanking — not just the buyer''s remittance copy)
+- Receipt acknowledged to buyer with PI reference
+- Buyer quoted RBI Purpose Code P0103 on remittance — if not, inform SBI proactively (Check buyer''s remittance copy for Purpose Code P0103. If missing, contact SBI with the PI reference and explain it is an export advance payment so the payment is correctly mapped. Do not wait for the bank to raise a query — resolve proactively.)
+
+## B. CFR/CIF Orders Only — Freight Debit Note
+- Freight Debit Note number follows format SC/FDN/YYYY/DDMMNNN Rev.00 (Skip this section for FOB orders)
+- Freight amount confirmed from freight forwarder quote — not estimated
+- GST treatment confirmed with CA: NIL (cost reimbursement) or 18% IGST
+- Freight Debit Note issued to buyer — payment deadline 3 working days stated
+- RBI Purpose Code P0602 printed in FDN bank details (Buyers must quote P0602 in the ''Purpose of Remittance'' field when paying the FDN. P0602 covers freight and insurance recovery relating to export of goods. Verify it is visible in the FDN before sending.)
+- Freight payment received and cleared BEFORE shipment booking confirmed ⚠ NEVER confirm shipment booking until freight payment is cleared. No exceptions.
+- Freight amount on Freight Debit Note matches freight line on Commercial Invoice
+
+## C. Commercial Invoice — Value Verification
+- CI FOB Value = sum of all product line amounts on CI
+- CI FOB Value matches PI FOB Value (or less if shipped short — within 5% tolerance) ⚠ CI FOB cannot exceed PI FOB. If it does — error on CI. Correct before issuing.
+- Quantity shipped ≤ PI quantity — never over ⚠ HARD RULE: quantity over PI is not permitted under any circumstances
+- Shortfall ≤5%: acceptable — CI on actuals, buyer notified in writing before shipment
+- Shortfall >5%: PI amendment + buyer written approval obtained before shipment
+- Total Invoice Value = FOB + Freight + Insurance (as applicable)
+- 40% advance deducted correctly in Payment Settlement section
+- Freight Debit Note deducted correctly (if CFR/CIF)
+- 60% Balance Due = Total Invoice Value − Advance − Freight paid
+- Verification row: Advance + Freight + Balance = Total Invoice Value (Arithmetic must balance exactly — check before issuing CI)
+- Amount in Words matches Total Invoice Value figure
+- LUT Order No. ZD290626057408W on CI — current year''s number ⚠ Update every April — wrong LUT number can invalidate IGST refund claim
+
+## D. After Shipment — 60% Balance
+- Scanned BL copy received from CHA
+- Scanned BL copy sent to buyer immediately (Buyer needs this to initiate their 60% T/T payment)
+- 7-day countdown started from BL date (Tier 2 only) (Follow up on Day 5 if payment not received)
+- RBI Purpose Code P0102 printed in CI bank details section (Buyers must quote P0102 in the ''Purpose of Remittance'' field when paying the 60% balance. P0102 covers realisation of export bills for goods. Verify it is visible in the CI bank details before sending CI to buyer.)
+- 60% balance received and cleared in NexaCrest SBI account
+- Amount matches CI 60% Balance Due exactly ⚠ If buyer pays less — do not release BL originals. Clarify shortfall first.
+- BL originals NOT released until 60% is confirmed cleared ⚠ NEVER instruct CHA or shipping line to release cargo before 60% is cleared
+- Payment receipt filed against CI number
+
+## E. Annual Compliance Checks
+- LUT renewed before 1 April each year — new Order Number updated on all templates ⚠ If LUT expired: cannot export zero-rated. Renew immediately.
+- RCMC validity checked 60 days before expiry — renewal initiated ⚠ If RCMC expired: CAPEXIL cannot issue COO. Shipment documents incomplete.
+
+## Sign-Off
+- Fields to complete on the physical/filed checklist: Completed by ______ · Date ______ · Shipment Ref ______ · PI No ______'
+FROM document_types dt WHERE dt.code = 'CHECKLIST_2_FINANCE';
+
+INSERT INTO internal_reference_docs (document_type_id, content)
+SELECT dt.id, '# Cross-Verification Checklist 3 of 4 — Packing / Dispatch Supervisor
+
+Use this checklist during and after packing — before cargo leaves factory/warehouse.
+
+## Master Tracking Number
+- ⚠ MASTER TRACKING NUMBER — BUYER INQUIRY REF: [NC/SC/YYYY/DDMMNNN]. Verify this number is on the Packing List before packing begins. Every crate shipping mark must reference this order.
+
+## A. Before Packing Starts
+- PI received and reviewed — product description, size, finish, quantity confirmed
+- Production matches PI specification: stone type, finish, dimensions ⚠ Any deviation from PI specification must be approved by Sales before packing
+- Packing material available: wooden crates, fumigation-ready
+- Fumigation arranged — certificate to be collected after fumigation (Fumigation is standard for every NexaCrest shipment — not optional)
+
+## B. During Packing — Quantity Control
+- ⚠ HARD RULE: Actual quantity packed must NEVER exceed PI quantity. If packing produces more than PI quantity — remove excess. Do not pack over PI quantity. Shortfall ≤5% from PI quantity: acceptable — note actual quantity packed. Shortfall >5% from PI quantity: STOP — notify Sales immediately before completing packing.
+- Running total of quantity packed tracked against PI quantity (Stop when PI quantity is reached — do not continue)
+- Each crate contents recorded: product, quantity (pcs/m²), dimensions
+- Crate dimensions measured after packing: L × W × H in cm
+- Net weight of each crate recorded (stone only)
+- Gross weight of each crate recorded (stone + packaging)
+- CBM of each crate calculated: L × W × H ÷ 1,000,000
+
+## C. Crate Marking
+- Each crate stencilled with correct shipping marks in this exact format: Line 1: NEXACREST; Line 2: [BUYER NAME — exact as on PI]; Line 3: [PORT OF DISCHARGE — e.g., TILBURY UK]; Line 4: C-NNN/TOTAL (e.g., C-001/010 for crate 1 of 10); Line 5: [PI NUMBER — e.g., SC/PI/2026/0001]; Line 6: MADE IN INDIA
+- Crate numbers sequential: C-001/010 through C-010/010 (No gaps, no duplicates)
+- Buyer name on crates matches PI buyer name exactly (Character-for-character — no abbreviations)
+- Port of discharge on crates matches PI/BL Instruction Sheet port
+
+## D. Packing List Preparation Data
+- Total quantity packed recorded (m² or pcs)
+- Total net weight recorded
+- Total gross weight recorded
+- Total CBM recorded
+- Total number of crates recorded
+- Variance from PI estimates checked: Quantity must be ≤ PI quantity — if >5% short from PI, notify Sales; CBM within ±10% of PI estimate is acceptable — if >10% variance, notify Sales; Weight within ±10% of PI estimate is acceptable
+- All packing data handed to Documentation Officer to complete Packing List
+- Fumigation certificate collected and handed to Documentation Officer
+
+## Sign-Off
+- Fields to complete on the physical/filed checklist: Completed by ______ · Date ______ · Shipment Ref ______ · PI No ______'
+FROM document_types dt WHERE dt.code = 'CHECKLIST_3_PACKING';
+
+INSERT INTO internal_reference_docs (document_type_id, content)
+SELECT dt.id, '# Cross-Verification Checklist 4 of 4 — Shipping / Logistics Coordinator (BL / COO)
+
+Use this checklist from Packing List finalisation through BL endorsement and document courier to buyer.
+
+## Master Tracking Number
+- ⚠ MASTER TRACKING NUMBER — BUYER INQUIRY REF: [NC/SC/YYYY/DDMMNNN]. Verify this number appears on PL, CI, BL Instruction, and all shipping documents before sending to CHA. Single reference to retrieve entire order documentation.
+
+## A. Packing List — Verify Before Issuing
+- PL number follows format SC/PL/YYYY/DDMMNNN Rev.00
+- PL date = date packing completed and actuals confirmed
+- PI reference on PL matches
+- Buyer name/address on PL matches PI character-for-character
+- Product description on PL matches PI and CI exactly
+- HS Code on PL matches PI and CI: 6802.93 (or correct code per product)
+- Actual quantity on PL ≤ PI quantity ⚠ HARD RULE — quantity over PI not permitted
+- Crate count on PL matches physical count of sealed crates
+- Shipping marks on PL match marks stencilled on physical crates
+
+## B. BL Instruction Sheet — Before Sending to CHA
+- BL Instruction Sheet completed — all fields filled
+- Buyer name on BL instruction matches PI/PL character-for-character
+- ⚠ MANDATORY — BL TYPE: Original Negotiable Bill of Lading — 3 Originals ONLY. NEVER request Sea Waybill or Express BL. If CHA suggests otherwise — refuse and escalate to MD. BL Consignee: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. Reason: Buyer cannot collect cargo until NexaCrest endorses and releases the original BL. NexaCrest retains all 3 originals until 60% balance T/T is cleared.
+- Freight terms on BL instruction: Freight Collect (FOB) or Freight Prepaid (CFR/CIF)
+- BL Instruction Sheet sent to CHA
+- Draft BL received from CHA and approved by NexaCrest in writing before originals are issued (CHA must send the draft BL to NexaCrest for written approval before issuing any original BL. Check every field: consignee (TO ORDER OF NEXACREST), BL type (Original Negotiable), freight terms, port names, vessel, crate count. Reply in writing (email) confirming approval. Original BL must NOT be issued without this written approval.) ⚠⚠ Never let CHA issue original BL without NexaCrest''s written approval — errors on original BL are costly to correct
+
+## C. Shipping Bill — CHA Files With Indian Customs
+- CHA confirms Shipping Bill filed before COO application initiated ⚠ COO cannot be applied before Shipping Bill is filed — critical sequence
+- Shipping Bill FOB value matches CI FOB value exactly
+- Shipping Bill HS Code matches CI and PL
+
+## D. COO — Apply Via CAPEXIL After Shipping Bill Filed
+- COO type confirmed: GSP Form A or Non-preferential (per buyer''s instruction)
+- COO Preparation Sheet completed — all fields match CI and PL
+- COO application submitted to CAPEXIL (via CHA or directly)
+- COO received from CAPEXIL — details verified against CI
+
+## E. BL Received From CHA
+- 3 original BLs received from CHA — count physically ⚠ If fewer than 3 originals received — contact CHA immediately
+- BL type confirmed: Original Negotiable BL (not Sea Waybill)
+- BL consignee reads: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED
+- BL date matches CI date
+- BL vessel name, voyage, port of loading/discharge match BL Instruction Sheet
+- BL crate count matches PL crate count exactly
+- BL gross weight matches PL gross weight
+- Scanned copy of BL sent to buyer immediately (Buyer needs this to initiate 60% balance T/T payment)
+- Scanned copy of BL sent to Accounts to start 7-day countdown
+- All 3 original BLs stored securely at NexaCrest — NOT given to buyer or CHA
+
+## F. 60% Balance Confirmed Cleared — BL Endorsement
+- ONLY after Accounts confirms 60% balance T/T is CLEARED in NexaCrest SBI account. Do not endorse or courier BL originals based on buyer''s remittance copy alone. Wait for bank clearance confirmation — then proceed.
+- BL ENDORSEMENT — on the BACK of each of the 3 original BLs: apply NexaCrest rubber company stamp; sign over the stamp: Gulmohar Sontakke (wet signature or rubber signature stamp); write date of endorsement; write: For NexaCrest International Private Limited. All 3 originals must be endorsed before couriering. Check all 3 — not just one.
+- All 3 original BLs endorsed (stamp + signature + date on back of each)
+- Endorsed originals couriered to buyer with tracking number recorded
+
+## G. Final Document Set to Buyer
+- Commercial Invoice (signed copy)
+- Packing List (signed copy)
+- 3 original BLs (endorsed)
+- Certificate of Origin (CAPEXIL)
+- Fumigation Certificate
+- All documents couriered together — courier tracking number recorded
+
+## Sign-Off
+- Fields to complete on the physical/filed checklist: Completed by ______ · Date ______ · Shipment Ref ______ · PI No ______
+
+## Master Hard Rules — Nexacrest Export Operations (All Roles)
+- Non-negotiable rules. No exceptions. Any deviation must be escalated to MD before proceeding.
+- QUANTITY: Actual quantity shipped NEVER exceeds PI quantity. Hard stop — no exceptions. Shortfall ≤5%: acceptable. Shortfall >5%: PI amendment + buyer approval required before shipment.
+- PAYMENT — PRODUCTION: Production starts ONLY after 40% advance T/T is confirmed CLEARED in NexaCrest SBI account. Not on remittance copy. Not on buyer''s word. Cleared.
+- PAYMENT — FREIGHT: CFR/CIF only — Freight Debit Note must be paid and cleared BEFORE shipment booking is confirmed. NexaCrest cannot book container until freight is settled.
+- PAYMENT — BALANCE: 60% balance T/T must be CLEARED in NexaCrest account before BL originals are endorsed or released. Scanned BL copy is sent to buyer to initiate payment. Originals are held until cleared.
+- BILL OF LADING: Always Original Negotiable BL — 3 originals. Consignee: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. NEVER Sea Waybill or Express BL. CHA hands all 3 originals to NexaCrest only.
+- BL ENDORSEMENT: Endorse (rubber stamp + sign + date on back) all 3 originals only AFTER 60% balance is cleared. Courier endorsed originals to buyer. Never courier un-endorsed originals.
+- DOCUMENT MATCHING: Buyer name/address must match character-for-character across ALL documents: Quotation, PI, PL, CI, BL, COO. Any mismatch = customs problem. Fix before issuing next document.
+- HS CODE: 6802.93 for all worked monumental granite products. Must be identical on PI, PL, CI, COO, and Shipping Bill. Different product: verify HS code before issuing.
+- LUT: LUT Order No. ZD290626057408W on every Commercial Invoice. Valid FY 2026-27 only. New LUT required before 1 April every year. Wrong/expired LUT = IGST refund rejected.
+- RCMC: Check RCMC validity 60 days before expiry. Expired RCMC = CAPEXIL cannot issue COO = shipment documents incomplete = customs hold at destination.
+- COO SEQUENCE: COO application to CAPEXIL only AFTER Shipping Bill is filed by CHA. Never before. Sequence: Packing done → CHA files Shipping Bill → then apply for COO.
+- DRAFT BL APPROVAL: CHA must send draft BL to NexaCrest for written approval before issuing any original BL. NexaCrest checks: consignee wording (TO ORDER OF NEXACREST), BL type (Original Negotiable), freight terms, port names, vessel, crate count. Written approval (email) required before CHA proceeds. Original BL issued without approval = risk of uncorrectable errors.
+- SHORTFALL NOTIFICATION: If actual quantity is short of PI quantity (even within 5% tolerance), notify buyer in writing BEFORE shipment. Never ship short without informing buyer.
+- BUYER INQUIRY REF: NC/SC/YYYY/DDMMNNN is the MASTER TRACKING NUMBER for every order. It must appear on EVERY document: QT, PI, OC, PL, CI, FDN, BL Instruction. Verify at every stage. This is the single number by which the complete documentation set for any order can be retrieved at any time.
+
+## Pre-Shipment Checklist — Final Gate Check
+- Complete this checklist BEFORE sending BL Instruction Sheet to CHA. Sign and file. Do not proceed if any item fails. This is the last internal check before cargo is handed to the shipping line. If any item below cannot be ticked — STOP and resolve before proceeding.
+
+## A. Documents — All Prepared and Verified
+- Commercial Invoice signed, sealed, LUT number correct (CI date will be set to BL date — leave blank until BL is confirmed)
+- Packing List signed, sealed, actuals match physical cargo
+- BL Instruction Sheet completed — all fields filled, Original Negotiable BL specified
+- COO type confirmed with buyer and noted on all documents
+- Fumigation Certificate obtained and filed
+
+## B. Quantity and Cargo — Final Confirmation
+- Actual quantity packed ≤ PI quantity — confirmed ⚠ HARD RULE: quantity over PI not permitted. Stop if exceeded.
+- Shortfall (if any) ≤5% — buyer notified in writing ⚠ If >5% short: PI amendment + buyer written approval obtained before proceeding
+- Crate count confirmed — matches Packing List
+- Crate markings verified against Packing List marks column
+- Cargo sealed and ready for pick-up
+
+## C. Payments — Confirmed Before Shipment Booking
+- 40% advance confirmed CLEARED in NexaCrest SBI account ⚠ Not on remittance copy. Bank statement confirms cleared.
+- Freight Debit Note payment confirmed CLEARED (CFR/CIF orders only) (FOB orders: skip this item)
+- Freight Debit Note amount matches freight line on Commercial Invoice
+
+## D. BL Instruction — Confirmed Before Sending to CHA
+- ⚠ BL TYPE FINAL CHECK: Original Negotiable BL — 3 originals ONLY. Consignee on BL: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. NEVER Sea Waybill. NEVER Express BL. If in doubt — call MD before sending instruction.
+- BL type confirmed: Original Negotiable BL — 3 originals
+- BL consignee wording confirmed: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED
+- Freight terms on BL instruction correct: Freight Collect (FOB) or Freight Prepaid (CFR/CIF)
+
+## E. Post-Shipment Actions Noted
+- Reminder set: collect 3 original BLs from CHA after vessel departure
+- Reminder set: apply for COO via CAPEXIL after Shipping Bill is filed by CHA
+- Reminder set: send scanned BL copy to buyer and Accounts immediately on receipt
+- Reminder set: 60% balance due within 7 days of BL date (Tier 2) or before shipment (Tier 1)
+
+## Pre-Shipment Sign-Off
+- Fields to complete on the physical/filed checklist: PI No. ______ · Buyer ______ · Completed by ______ · Designation ______ · Date ______ · Shipment ready date ______'
+FROM document_types dt WHERE dt.code = 'CHECKLIST_4_SHIPPING';
 
 INSERT INTO internal_reference_docs (document_type_id, content)
 SELECT dt.id, '# SOP — Sales Process, Tier A (Standard — New Buyer)

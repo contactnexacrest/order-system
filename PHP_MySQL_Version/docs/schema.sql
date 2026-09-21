@@ -115,8 +115,9 @@ CREATE TABLE payment_presets (
 CREATE TABLE document_types (
   id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   code                  VARCHAR(20) NOT NULL UNIQUE,  -- QT, PI, OC, PL, CI, FDN, BLI, BUYERPO, SUPPO, ANNEXA,
-                                                       -- COOPREP, CHECKLIST, AMD, SOP_A_SALES, SOP_B_SALES, ...
-                                                       -- STAGEGATE, WALLREF
+                                                       -- COOPREP, CHECKLIST, CHECKLIST_2_FINANCE,
+                                                       -- CHECKLIST_3_PACKING, CHECKLIST_4_SHIPPING, AMD,
+                                                       -- SOP_A_SALES, SOP_B_SALES, STAGEGATE, WALLREF
   name                  VARCHAR(150) NOT NULL,
   category              ENUM('customer_facing','internal','procurement') NOT NULL,
   ref_format            VARCHAR(100) NULL,            -- e.g. 'SC/QT/{YYYY}/{DDMM}{NNN}' ; NULL for AMD-style internal-only or no-ref docs
