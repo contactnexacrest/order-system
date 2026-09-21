@@ -1556,3 +1556,40 @@ version, or add a new PHP dependency of your own — at that point, install
 Composer normally and run `composer update` (or `composer require ...`) in
 `app/`, from a machine with real internet access to Packagist. That is a
 you're-changing-the-code situation, not a first-time-setup one.
+
+## Final end-to-end verification pass (added 2026-09-21)
+
+Closing item on the tracked task list, after the Sample Data Playground
+extension, UI/UX pass, and document fidelity pass above. Two parts:
+
+1. **Re-verified nothing regressed.** Restarted both the PHP and Node
+   servers fresh, confirmed both live databases still carry their expected
+   table count (65 on this stack; the Node stack's 66th table is
+   `sessions`, its own MySQL-backed session store — not a schema drift),
+   logged in as the seeded Admin on both stacks, and hit ten representative
+   authenticated pages (dashboard, orders, clients, reports, audit log,
+   settings, reference library, sample data, users, holiday calendar) on
+   each — every one returned HTTP 200 with no PHP fatal/warning or Node
+   error output in either server log. Confirmed both databases end this
+   session with zero sample-data rows left loaded (clients, orders, and
+   the supplier the CIF sample order needs) and the seeded Admin's real
+   password hash restored to what it was before this session's live
+   testing temporarily swapped it in for headless-browser login — both
+   swaps were local-only DB writes for testing, always reverted after.
+2. **Regenerated `NexaCrest_PHP_Deployment_Guide.docx`** (and the Node
+   stack's equivalent) **from the current `README.md`**, which had grown
+   substantially since these were first exported and was the actual
+   up-to-date source of truth this whole time. Wrote a small one-off
+   Markdown → OOXML converter using PHPWord (already a proven dependency
+   in this exact codebase) rather than hand-editing a Word document —
+   headings, numbered/bulleted lists (including nested and multi-line
+   items), and fenced code blocks all map to real Word styles, not just
+   monospaced-looking plain text. Caught and fixed a real bug in the
+   converter itself before trusting its output: PHPWord defaults to
+   `writeRaw()` (no XML escaping) for backward compatibility, so every
+   literal `&` in the source Markdown (e.g. "Packing & BL Instruction")
+   produced an invalid, uncorrupted-looking-until-you-try-to-open-it
+   OOXML file — `Settings::setOutputEscapingEnabled(true)` fixes it.
+   Verified the regenerated files open cleanly with `python-docx` (not
+   just "the zip didn't error") and spot-checked heading styles, list
+   formatting, and code-block line breaks in the actual document XML.

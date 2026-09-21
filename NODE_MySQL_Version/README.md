@@ -681,3 +681,18 @@ are a first-cut working default, not a verbatim transcription of a
 role-by-role table from the spec — same note the PHP delivery made, since
 it's the same seed data. Review the matrix against your real org chart
 before going live; it's all DB rows, no code changes needed either way.
+
+## Final end-to-end verification pass (added 2026-09-21)
+
+Restarted both stacks fresh, confirmed this database's table count (66 —
+the extra one versus the PHP stack's 65 is `sessions`, this stack's own
+MySQL-backed session store, not schema drift), logged in as the seeded
+Admin and hit ten representative authenticated pages — all HTTP 200, no
+error output in the server log. Confirmed zero sample-data rows left
+loaded and the seeded Admin's password hash restored after this session's
+temporary swap for headless-browser login testing.
+
+Also regenerated `NexaCrest_Node_Deployment_Guide.docx` from this
+README — see the PHP/MySQL README's matching section for how (a small
+PHPWord-based Markdown → OOXML converter, plus a real bug caught and
+fixed in that converter itself: PHPWord doesn't escape XML by default).
