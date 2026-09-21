@@ -1,3 +1,4 @@
+<?php use App\Helpers\Dates; ?>
 <div class="card page-wide">
   <h1>Order <?= htmlspecialchars($order['order_reference'] ?? ('#' . $order['id'])) ?></h1>
   <p class="muted small"><a href="/client">&larr; Back to My Orders</a></p>
@@ -10,7 +11,7 @@
       <tr>
         <td><?= htmlspecialchars($d['document_type_name']) ?></td>
         <td><?= htmlspecialchars($d['document_reference'] ?? '—') ?></td>
-        <td><?= htmlspecialchars((string) $d['generated_at']) ?></td>
+        <td><?= htmlspecialchars(Dates::human($d['generated_at'])) ?></td>
         <td><a href="/client/documents/<?= (int) $d['id'] ?>/download">Download PDF</a></td>
       </tr>
       <?php endforeach; ?>

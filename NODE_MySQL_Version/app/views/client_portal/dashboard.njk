@@ -8,7 +8,7 @@
       <td>{{ o.order_reference or ('#' ~ o.id) }}</td>
       <td>{{ o.current_stage_name or '—' }}</td>
       <td>{{ o.status | capitalize }}</td>
-      <td>{{ o.created_at }}</td>
+      <td>{{ o.created_at | humanDate }}</td>
       <td><a href="/client/orders/{{ o.id }}">View documents</a></td>
     </tr>
     {% else %}

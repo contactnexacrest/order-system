@@ -10,7 +10,7 @@
       <tr>
         <td>{{ d.document_type_name }}</td>
         <td>{{ d.document_reference or '—' }}</td>
-        <td>{{ d.generated_at }}</td>
+        <td>{{ d.generated_at | humanDate }}</td>
         <td><a href="/client/documents/{{ d.id }}/download">Download PDF</a></td>
       </tr>
       {% else %}

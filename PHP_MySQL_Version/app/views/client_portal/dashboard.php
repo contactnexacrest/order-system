@@ -1,3 +1,4 @@
+<?php use App\Helpers\Dates; ?>
 <div class="card page-wide">
   <h1>My Orders</h1>
   <p class="muted">Welcome, <?= htmlspecialchars($client['company_legal_name']) ?>. Below are all your orders with NexaCrest.</p>
@@ -8,7 +9,7 @@
       <td><?= htmlspecialchars($o['order_reference'] ?? ('#' . $o['id'])) ?></td>
       <td><?= htmlspecialchars($o['current_stage_name'] ?? '—') ?></td>
       <td><?= htmlspecialchars(ucfirst($o['status'])) ?></td>
-      <td><?= htmlspecialchars((string) $o['created_at']) ?></td>
+      <td><?= htmlspecialchars(Dates::human($o['created_at'])) ?></td>
       <td><a href="/client/orders/<?= (int) $o['id'] ?>">View documents</a></td>
     </tr>
     <?php endforeach; ?>

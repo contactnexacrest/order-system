@@ -12,6 +12,7 @@ const nunjucks = require('nunjucks');
 const csrf = require('./helpers/csrf');
 const flash = require('./helpers/flash');
 const mask = require('./helpers/mask');
+const dates = require('./helpers/dates');
 const sessionAuth = require('./middleware/sessionAuth');
 const permissionCheck = require('./middleware/permissionCheck');
 const csrfCheck = require('./middleware/csrfCheck');
@@ -57,6 +58,7 @@ const njkEnv = nunjucks.configure(viewsDir, {
 });
 njkEnv.addFilter('maskEmail', mask.maskEmail);
 njkEnv.addFilter('maskPhone', mask.maskPhone);
+njkEnv.addFilter('humanDate', dates.human);
 // nl2br mirrors PHP's nl2br(htmlspecialchars($v)) — escape first (autoescape
 // is on globally, so this filter must do its own escaping since it returns
 // markup), then turn newlines into <br>, then mark safe.
