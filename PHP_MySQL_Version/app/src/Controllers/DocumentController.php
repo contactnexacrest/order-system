@@ -44,6 +44,20 @@ final class DocumentController
         }
 
         Flash::set('success', "{$type} generated: {$result['document_reference']} Rev.{$result['revision_number']}.");
+
+        // A revision (not a first-ever generation) of an earlier-stage
+        // document while later-stage documents already exist means those
+        // later documents were built from data that existed before
+        // whatever just changed — see downstreamDocumentsAtRisk()'s
+        // docblock. Surfacing this only on regeneration, not on normal
+        // forward progress through the stages.
+        if ((int) $result['revision_number'] > 0) {
+            $downstream = DocumentGenerationService::downstreamDocumentsAtRisk($orderId, $type);
+            if (!empty($downstream)) {
+                Flash::set('warning', "{$type} was revised, but this order already has " . implode(', ', $downstream) . " generated from data that existed before this change. Review whether " . (count($downstream) > 1 ? 'they need' : 'it needs') . " to be regenerated too.");
+            }
+        }
+
         header("Location: /orders/{$orderId}");
     }
 

@@ -170,6 +170,73 @@ final class DocumentGenerationService
         return $row['supplier_po_reference'] ?? null;
     }
 
+    /**
+     * Where a document type sits in the order lifecycle (stages_master
+     * sequence) — used only to detect a stage-regeneration cascade risk,
+     * never for anything that affects rendering itself. Two types can
+     * legitimately share a stage (ANNEXA rides with QT; PL and BLI both
+     * belong to the packing/BL stage) since both are produced from the
+     * same stage's data and neither is "downstream" of the other. AMD and
+     * COOPREP aren't part of the buyer-facing document sequence a
+     * regeneration would meaningfully cascade into, so they're excluded.
+     */
+    private static function stageSequenceFor(string $code): ?int
+    {
+        return match ($code) {
+            'QT', 'ANNEXA' => 1,
+            'BUYERPO' => 2,
+            'PI' => 3,
+            'OC' => 4,
+            'SUPPO' => 5,
+            'FDN' => 6,
+            'PL', 'BLI' => 7,
+            'CI' => 8,
+            default => null,
+        };
+    }
+
+    /**
+     * Real risk this guards against: every document type's data comes from
+     * a live read of the order at the moment generate() runs (see
+     * assemble() above) — there is no propagation from an earlier-stage
+     * document to a later one beyond a cross-reference number (PI cites
+     * the QT ref, OC cites the PI ref). So if QT is REGENERATED (a new
+     * revision of a document type that already existed) after OC has
+     * already been generated, OC's already-rendered PDF still reflects
+     * whatever data was live when OC was made — it does not silently pick
+     * up whatever changed about QT. Nothing technically breaks, but a
+     * later-stage document can now be quietly out of step with an
+     * earlier-stage one a reviewer or the buyer might compare it against.
+     * Called only for a REGENERATION (revisionNumber > 0) — the first-ever
+     * generation of a type is normal forward progress, not a cascade risk.
+     *
+     * @return array<int, string> document type codes with an existing
+     *         generated document at a later stage than $regeneratedCode
+     */
+    public static function downstreamDocumentsAtRisk(int $orderId, string $regeneratedCode): array
+    {
+        $sequence = self::stageSequenceFor($regeneratedCode);
+        if ($sequence === null) {
+            return [];
+        }
+
+        $documents = DocumentRepository::forOrder($orderId);
+        $seen = [];
+        $atRisk = [];
+        foreach ($documents as $doc) {
+            $code = $doc['document_type_code'];
+            if (isset($seen[$code])) {
+                continue;
+            }
+            $docSequence = self::stageSequenceFor($code);
+            if ($docSequence !== null && $docSequence > $sequence) {
+                $seen[$code] = true;
+                $atRisk[] = $code;
+            }
+        }
+        return $atRisk;
+    }
+
     private static function findDocumentType(string $code): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM document_types WHERE code = :code');

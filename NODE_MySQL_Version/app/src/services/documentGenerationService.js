@@ -195,6 +195,82 @@ async function findDocumentType(code) {
 }
 
 /**
+ * Where a document type sits in the order lifecycle (stages_master
+ * sequence) — used only to detect a stage-regeneration cascade risk,
+ * never for anything that affects rendering itself. Two types can
+ * legitimately share a stage (ANNEXA rides with QT; PL and BLI both
+ * belong to the packing/BL stage) since both are produced from the same
+ * stage's data and neither is "downstream" of the other. AMD and COOPREP
+ * aren't part of the buyer-facing document sequence a regeneration would
+ * meaningfully cascade into, so they're excluded.
+ */
+function stageSequenceFor(code) {
+  switch (code) {
+    case 'QT':
+    case 'ANNEXA':
+      return 1;
+    case 'BUYERPO':
+      return 2;
+    case 'PI':
+      return 3;
+    case 'OC':
+      return 4;
+    case 'SUPPO':
+      return 5;
+    case 'FDN':
+      return 6;
+    case 'PL':
+    case 'BLI':
+      return 7;
+    case 'CI':
+      return 8;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Real risk this guards against: every document type's data comes from a
+ * live read of the order at the moment generate() runs (see assemble()
+ * above) — there is no propagation from an earlier-stage document to a
+ * later one beyond a cross-reference number (PI cites the QT ref, OC
+ * cites the PI ref). So if QT is REGENERATED (a new revision of a
+ * document type that already existed) after OC has already been
+ * generated, OC's already-rendered PDF still reflects whatever data was
+ * live when OC was made — it does not silently pick up whatever changed
+ * about QT. Nothing technically breaks, but a later-stage document can
+ * now be quietly out of step with an earlier-stage one a reviewer or the
+ * buyer might compare it against. Called only for a REGENERATION
+ * (revisionNumber > 0) — the first-ever generation of a type is normal
+ * forward progress, not a cascade risk.
+ *
+ * @returns {Promise<string[]>} document type codes with an existing
+ *          generated document at a later stage than regeneratedCode
+ */
+async function downstreamDocumentsAtRisk(orderId, regeneratedCode) {
+  const sequence = stageSequenceFor(regeneratedCode);
+  if (sequence === null) {
+    return [];
+  }
+
+  const documents = await documentRepository.forOrder(orderId);
+  const seen = new Set();
+  const atRisk = [];
+  for (const doc of documents) {
+    const code = doc.document_type_code;
+    if (seen.has(code)) {
+      continue;
+    }
+    const docSequence = stageSequenceFor(code);
+    if (docSequence !== null && docSequence > sequence) {
+      seen.add(code);
+      atRisk.push(code);
+    }
+  }
+  return atRisk;
+}
+
+/**
  * Public lookup for callers outside this service that need a
  * document_types.id before generate() itself runs — currently just
  * ordersController's saveSupplierPo, which must mint SUPPO's reference
@@ -664,5 +740,6 @@ module.exports = {
   finalizeApproval,
   generateAmendment,
   documentTypeIdFor,
+  downstreamDocumentsAtRisk,
   templatesEnvironment,
 };

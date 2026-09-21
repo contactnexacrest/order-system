@@ -40,6 +40,23 @@ async function generate(req, res) {
   }
 
   flash.set(req, 'success', `${type} generated: ${result.document_reference} Rev.${result.revision_number}.`);
+
+  // A revision (not a first-ever generation) of an earlier-stage document
+  // while later-stage documents already exist means those later documents
+  // were built from data that existed before whatever just changed — see
+  // downstreamDocumentsAtRisk()'s docblock. Surfacing this only on
+  // regeneration, not on normal forward progress through the stages.
+  if (result.revision_number > 0) {
+    const downstream = await documentGenerationService.downstreamDocumentsAtRisk(orderId, type);
+    if (downstream.length > 0) {
+      flash.set(
+        req,
+        'warning',
+        `${type} was revised, but this order already has ${downstream.join(', ')} generated from data that existed before this change. Review whether ${downstream.length > 1 ? 'they need' : 'it needs'} to be regenerated too.`
+      );
+    }
+  }
+
   res.redirect(`/orders/${orderId}`);
 }
 
