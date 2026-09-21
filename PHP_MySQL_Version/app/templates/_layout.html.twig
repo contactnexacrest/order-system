@@ -168,6 +168,7 @@
 
 {% block body %}{% endblock %}
 
+{% block terms_section %}
 {% if terms is defined and terms is not empty %}
 <div class="section-title">{{ terms_section_number }}. {{ terms_section_title }}</div>
 {% if order.include_annexure_a %}
@@ -179,7 +180,9 @@
   {% endfor %}
 </ul>
 {% endif %}
+{% endblock %}
 
+{% block signature_block %}
 <div class="signature-block">
   <table>
     <tr>
@@ -199,6 +202,7 @@
     </tr>
   </table>
 </div>
+{% endblock %}
 
 </body>
 </html>

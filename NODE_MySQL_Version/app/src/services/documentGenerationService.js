@@ -48,6 +48,16 @@ function templatesEnvironment() {
     const escaped = nunjucks.runtime.suppressValue(value == null ? '' : String(value), true);
     return new nunjucks.runtime.SafeString(escaped.replace(/\r\n|\r|\n/g, '<br>\n'));
   });
+  // Twig's |split(delimiter, limit) — used by BUYERPO to pull the bold
+  // "LABEL:" lead-in off an already-fully-substituted T&C clause string
+  // (see resolveTerms()'s output shape) for its own bold-label rendering.
+  njkEnv.addFilter('split', (value, delimiter, limit) => {
+    const parts = String(value == null ? '' : value).split(delimiter);
+    if (limit && parts.length > limit) {
+      return parts.slice(0, limit - 1).concat(parts.slice(limit - 1).join(delimiter));
+    }
+    return parts;
+  });
   return njkEnv;
 }
 
