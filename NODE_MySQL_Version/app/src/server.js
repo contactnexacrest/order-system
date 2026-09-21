@@ -336,6 +336,7 @@ app.post('/disputes/:disputeId/documents', requireAuth, requirePermission('manag
 
 app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.index));
 app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));
+app.get('/orders/:id/dossier', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.downloadDossier));
 
 app.get('/notifications', requireAuth, asyncHandler(notificationController.index));
 

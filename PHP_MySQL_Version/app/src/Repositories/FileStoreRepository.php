@@ -92,4 +92,24 @@ final class FileStoreRepository
         $stmt->execute(['id' => $id]);
         return $stmt->fetch() ?: null;
     }
+
+    /**
+     * Every live file for one order, generated or received — order_id is
+     * set on file_store directly for both origins (insertGenerated() and
+     * insertReceived() above), so this is the one query the full order
+     * dossier ZIP needs, rather than separately joining through documents/
+     * dispute_documents/order_buyer_po_documents/etc. Soft-deleted rows
+     * (is_active = 0) are excluded — file_store is never hard-deleted.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function forOrder(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT * FROM file_store WHERE order_id = :order_id AND is_active = 1
+             ORDER BY file_origin, uploaded_at"
+        );
+        $stmt->execute(['order_id' => $orderId]);
+        return $stmt->fetchAll();
+    }
 }

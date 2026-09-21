@@ -51,6 +51,7 @@ docs/
                           (and the PHP build before it) was implemented from
 scripts/
   backup_db.sh            daily DB backup template — see "Database backups"
+  backup_storage.sh       daily storage/ backup template — see "Backing up storage/"
 storage/
   assets/                 5 placeholder brand images (logo, signature,
                           seal, watermark, email header) — see step 3 of
@@ -307,6 +308,55 @@ script and restore command were run against this app's own dev database
 during this delivery's own verification (see "Verifying this delivery
 yourself" below), so the mechanism is proven; only your server's specific
 credentials/paths are new.
+
+## Backing up storage/ — the gap a database-only backup leaves
+
+**A database backup alone is not a backup of this application.** Every
+generated PDF/DOCX and every received file (dispute evidence, amendment
+signed copies, buyer PO copies, supplier PO acknowledgments, product
+images, ...) lives on disk under `STORAGE_BASE_PATH`, outside any
+web-served directory — `file_store` only holds each one's *path* and
+metadata. Restoring the database after a disaster without also restoring
+`storage/` leaves every `file_store` row pointing at a file that no
+longer exists: every "Download PDF" link 404s, the "Download Full
+Dossier (ZIP)" button on an order page silently skips every missing
+file, and a document that was ever draft/final-watermark-swapped can
+never be regenerated to look the way it did when a reviewer actually
+approved it — that exact historical PDF is gone, not reconstructible
+from data alone (see `documentGenerationService.js`'s document-
+integrity snapshot columns, which only guarantee correct *content* if
+the swapped-final PDF file itself still exists).
+
+`scripts/backup_storage.sh` is a template, same convention as
+`backup_db.sh` above — copy it to the server, fill in `STORAGE_DIR`/
+`BACKUP_DIR` at the top, then:
+
+```bash
+chmod 700 scripts/backup_storage.sh
+sudo mkdir -p /var/backups/nexacrest_storage && sudo chmod 700 /var/backups/nexacrest_storage
+```
+
+and add a fourth cron entry, offset from the DB backup so they don't
+compete for I/O:
+```
+30 2 * * *  /opt/nexacrest_node/scripts/backup_storage.sh >> /var/log/nexacrest/backup_storage.log 2>&1
+```
+
+It `tar`s the whole `storage/` tree and prunes anything older than 30
+days, same retention as the DB backup. The two backups are only
+consistent with each other if taken close together — scheduling both
+within the same maintenance window (2:00 and 2:30 above) keeps the drift
+to at most 30 minutes. Restoring:
+`tar -xzf nexacrest_storage_YYYYMMDD_HHMMSS.tar.gz -C "$(dirname "$STORAGE_DIR")"`.
+**Test a restore at least once** — verify a handful of
+`file_store.server_path` values from a restored DB backup taken the same
+night actually resolve to real files after extracting.
+
+The full order dossier ZIP (`/orders/:id/dossier`, "Download Full
+Dossier (ZIP)" on the order page) is a convenient one-order-at-a-time
+export for handing files to someone, or spot-checking that an order's
+files are all present — it is not a substitute for backing up
+`storage/` as a whole; it only ever reflects the current live files.
 
 ## Security hardening already built in
 

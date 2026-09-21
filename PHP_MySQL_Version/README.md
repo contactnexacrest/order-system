@@ -298,6 +298,19 @@ Send to Buyer" section appears per generated document, plus new
   logins, document generation, every review/approval/amendment/dispute
   action) is filterable by entity type, entity id, user, action type, and
   date range, paginated 100 rows at a time.
+- **Per-order audit log** (`/orders/{id}/audit-log`, "Audit Log" link on
+  the order page) — everything logged against one specific order, its
+  documents, disputes, amendments, and buyer email sends in one place,
+  without needing to already know every document/dispute/amendment id to
+  filter the main audit log by one at a time.
+- **Full order dossier ZIP** (`/orders/{id}/dossier`, "Download Full
+  Dossier (ZIP)" on the order page) — every live file on record for that
+  order (every generated document revision, every received/uploaded file)
+  bundled into one ZIP, organized into `Generated Documents/` and
+  `Received Documents/` folders. This is a convenient one-order export for
+  handing files to someone or spot-checking that everything's on file —
+  it is not a substitute for backing up `storage/` as a whole (see
+  "Backing up storage/" below).
 - **Notifications** (bell icon, top right, unread count shown) — reviewer
   assignments, amendments awaiting MD approval, email sends awaiting Level-2
   approval, and the alert cron's own findings (below) all land here.
@@ -401,6 +414,95 @@ Notes specific to Bluehost shared hosting:
 (This backup job is Phase E work — it's grouped with the other two cron
 jobs above rather than under "Using Phase E" below because it's the same
 cPanel → Cron Jobs mechanism, not because it's a Phase D feature.)
+
+### Backing up storage/ — the gap a database-only backup leaves (Section 3, 14)
+
+**A database backup alone is not a backup of this application.** Every
+generated PDF/DOCX and every received file (dispute evidence, amendment
+signed copies, buyer PO copies, supplier PO acknowledgments, product
+images, ...) lives on disk under `STORAGE_BASE_PATH`, outside
+`public_html/` — `file_store` only holds each one's *path* and metadata.
+Restoring the database after a disaster without also restoring
+`storage/` leaves every `file_store` row pointing at a file that no
+longer exists: every "Download PDF" link 404s, the "Download Full
+Dossier (ZIP)" button on an order page silently skips every missing
+file, and a document that was ever draft/final-watermark-swapped can
+never be regenerated to look the way it did when a reviewer actually
+approved it — that exact historical PDF is gone, not reconstructible
+from data alone (see DocumentGenerationService's document-integrity
+snapshot columns, which only guarantee correct *content* if the swapped-
+final PDF file itself still exists).
+
+Add a fourth cPanel → Cron Job alongside the three above, offset from
+the DB backup so they don't compete for I/O:
+
+```
+30 2 * * *  /home/yourcpaneluser/nexacrest_webapp/scripts/backup_storage.sh >> /home/yourcpaneluser/logs/backup_storage.log 2>&1
+```
+
+`scripts/backup_storage.sh` (create this file on the server, same reason
+as `backup_db.sh` — it references real paths that shouldn't be baked
+into the delivered codebase):
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+STORAGE_DIR="/home/yourcpaneluser/nexacrest_webapp/storage"   # same value as STORAGE_BASE_PATH in .env
+BACKUP_DIR="/home/yourcpaneluser/storage_backups"              # outside public_html/ — never web-reachable
+RETENTION_DAYS=30
+
+mkdir -p "$BACKUP_DIR"
+STAMP=$(date +%Y%m%d_%H%M%S)
+FILE="$BACKUP_DIR/nexacrest_storage_${STAMP}.tar.gz"
+
+tar -czf "$FILE" -C "$(dirname "$STORAGE_DIR")" "$(basename "$STORAGE_DIR")"
+
+find "$BACKUP_DIR" -name 'nexacrest_storage_*.tar.gz' -mtime +"$RETENTION_DAYS" -delete
+
+echo "Storage backup complete: $FILE ($(du -h "$FILE" | cut -f1))"
+```
+
+```
+chmod 700 scripts/backup_storage.sh
+chmod 700 /home/yourcpaneluser/storage_backups
+```
+
+Notes:
+
+- A full `tar` of the whole tree is the simplest correct approach for a
+  cron job that has to run unattended — `rsync -a --delete` to a second
+  location is a reasonable alternative if `storage/` grows large enough
+  that a nightly full tarball becomes slow or expensive to keep 30 days
+  of, but loses the point-in-time-snapshot property `tar` gives you for
+  free (an `rsync --delete` mirror only has the *current* state, not
+  yesterday's).
+- The DB backup and the storage backup are **only consistent with each
+  other if taken close together** — a `file_store` row inserted between
+  the two backup runs will reference a file the storage backup doesn't
+  have yet (recoverable — worst case that one file is missing on
+  restore) or, worse, a storage backup taken well after the DB backup
+  can contain files whose `file_store` row was itself part of an order
+  that later changed. Scheduling both within the same maintenance window
+  (2:00 and 2:30 above) keeps the drift to at most 30 minutes; for a
+  stronger guarantee, take both backups back-to-back inside one script
+  instead of two separate cron entries.
+- Restoring: `tar -xzf nexacrest_storage_YYYYMMDD_HHMMSS.tar.gz -C /home/yourcpaneluser/nexacrest_webapp/`
+  restores the whole tree back to `storage/` at that path. As with the DB
+  backup, test this at least once against a scratch location — verify a
+  handful of `file_store.server_path` values from a restored DB backup
+  taken the same night actually resolve to real files after extracting.
+- Bluehost's cPanel → Backup Wizard full-account snapshot (mentioned
+  above for the database) already includes `storage/` if it sits inside
+  the account's home directory — this script is still worth having as
+  the finer-grained, retained-on-your-own-schedule backup, same
+  reasoning as the DB backup script being complementary to it, not a
+  replacement.
+- The full order dossier ZIP (`/orders/{id}/dossier`, "Download Full
+  Dossier (ZIP)" on the order page) is a convenient one-order-at-a-time
+  export for handing files to someone, or spot-checking that an order's
+  files are all present — it is not a substitute for backing up
+  `storage/` as a whole; it only ever reflects the current live files.
 
 ## Using Phase E: dashboard, reports, security hardening
 

@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const JSZip = require('jszip');
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
@@ -24,6 +26,7 @@ const orderShippingRepository = require('../repositories/orderShippingRepository
 const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
+const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
 const supplierRepository = require('../repositories/supplierRepository');
 const userRepository = require('../repositories/userRepository');
@@ -252,6 +255,62 @@ async function show(req, res) {
     },
     'layout/base'
   );
+}
+
+/**
+ * Real gap this closes: no way existed to hand over (or archive)
+ * everything on file for one order in a single action — every generated
+ * document and every received/uploaded file (dispute evidence, buyer PO
+ * copy, supplier PO acknowledgment, ...) had to be downloaded one at a
+ * time. file_store.order_id is already set for both origins
+ * (insertGenerated() and insertReceived()), so fileStoreRepository.forOrder()
+ * alone is everything the dossier needs — no separate joins through
+ * documents/dispute_documents/orderBuyerPoDocuments/etc.
+ */
+async function downloadDossier(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const files = await fileStoreRepository.forOrder(orderId);
+  if (files.length === 0) {
+    flash.set(req, 'error', 'No files are on record for this order yet.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const zip = new JSZip();
+  const usedNames = new Set();
+  for (const file of files) {
+    if (!fs.existsSync(file.server_path)) {
+      continue; // skip a row whose file went missing rather than fail the whole dossier
+    }
+    const folder = String(file.file_origin).startsWith('GENERATED') ? 'Generated Documents' : 'Received Documents';
+    let name = file.original_filename;
+    const key = `${folder}/${name}`;
+    if (usedNames.has(key)) {
+      // Same filename twice in the same folder (e.g. two QT revisions both
+      // named "QT ... Rev.0.pdf" before a numbering scheme changed) —
+      // disambiguate with the file_store id rather than silently letting
+      // one overwrite the other inside the ZIP.
+      const dot = name.lastIndexOf('.');
+      name = dot > 0 ? `${name.slice(0, dot)} (#${file.id})${name.slice(dot)}` : `${name} (#${file.id})`;
+    }
+    usedNames.add(key);
+    zip.file(`${folder}/${name}`, fs.readFileSync(file.server_path));
+  }
+
+  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+  const safeOrderRef = String(order.order_reference).replace(/[^A-Za-z0-9_-]+/g, '-');
+  const downloadName = `NexaCrest Dossier - ${safeOrderRef}.zip`;
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+  res.setHeader('Content-Length', String(buffer.length));
+  res.send(buffer);
 }
 
 /** Stage 1->2 manual gate: buyer's signed PO received. */
@@ -842,7 +901,7 @@ async function markLost(req, res) {
 }
 
 module.exports = {
-  index, create, store, show,
+  index, create, store, show, downloadDossier,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, clearAdvancePayment, updateProductionStatus,
   confirmBuyerAcknowledged, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,

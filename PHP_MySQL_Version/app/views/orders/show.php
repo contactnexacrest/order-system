@@ -347,6 +347,8 @@ $orderClosed = $order['status'] === 'complete';
        &nbsp;·&nbsp;
        <a href="/orders/<?= (int) $order['id'] ?>/audit-log">Audit Log</a>
        <?php endif; ?>
+       &nbsp;·&nbsp;
+       <a href="/orders/<?= (int) $order['id'] ?>/dossier">Download Full Dossier (ZIP)</a>
     </p>
   </div>
 

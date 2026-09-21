@@ -237,6 +237,7 @@ $router->post('/disputes/{disputeId}/documents', [$disputes, 'uploadDocument'], 
 // Audit log viewer (Section 14/17) — read-only, no delete route exists anywhere.
 $router->get('/audit-log', [$auditLog, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
 $router->get('/orders/{id}/audit-log', [$auditLog, 'forOrder'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
+$router->get('/orders/{id}/dossier', [$orders, 'downloadDossier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 
 // Notifications bell.
 $router->get('/notifications', [$notifications, 'index'], [SessionAuth::required()]);

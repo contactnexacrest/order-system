@@ -17,6 +17,7 @@ use App\Repositories\DocumentCrossVerificationRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\DocumentReviewRepository;
 use App\Repositories\EmailLogRepository;
+use App\Repositories\FileStoreRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCrateRepository;
@@ -228,6 +229,78 @@ final class OrderController
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
         ], 'layout/base');
+    }
+
+    /**
+     * Real gap this closes: no way existed to hand over (or archive)
+     * everything on file for one order in a single action — every
+     * generated document and every received/uploaded file (dispute
+     * evidence, buyer PO copy, supplier PO acknowledgment, ...) had to be
+     * downloaded one at a time. file_store.order_id is already set for
+     * both origins (insertGenerated() and insertReceived()), so
+     * FileStoreRepository::forOrder() alone is everything the dossier
+     * needs — no separate joins through documents/dispute_documents/etc.
+     * Built as a temp file (not in-memory) since ZipArchive needs a real
+     * seekable file handle to write to, then streamed and deleted —
+     * never left behind in storage/ for a stray/orphaned ZIP to
+     * accumulate.
+     */
+    public function downloadDossier(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $files = FileStoreRepository::forOrder($orderId);
+        if (empty($files)) {
+            Flash::set('error', 'No files are on record for this order yet.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'nexacrest_dossier_');
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            @unlink($zipPath);
+            Flash::set('error', 'Could not build the dossier ZIP — check server storage/permissions.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $usedNames = [];
+        foreach ($files as $file) {
+            if (!is_file($file['server_path'])) {
+                continue; // skip a row whose file went missing rather than fail the whole dossier
+            }
+            $folder = str_starts_with((string) $file['file_origin'], 'GENERATED') ? 'Generated Documents' : 'Received Documents';
+            $name = $file['original_filename'];
+            $key = $folder . '/' . $name;
+            if (isset($usedNames[$key])) {
+                // Same filename twice in the same folder (e.g. two QT revisions
+                // both named "QT ... Rev.0.pdf" before a numbering scheme
+                // changed) — disambiguate with the file_store id rather than
+                // silently letting one overwrite the other inside the ZIP.
+                $ext = pathinfo($name, PATHINFO_EXTENSION);
+                $base = pathinfo($name, PATHINFO_FILENAME);
+                $name = $ext !== '' ? "{$base} (#{$file['id']}).{$ext}" : "{$name} (#{$file['id']})";
+            }
+            $usedNames[$key] = true;
+            $zip->addFile($file['server_path'], "{$folder}/{$name}");
+        }
+        $zip->close();
+
+        $safeOrderRef = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) ?? 'order';
+        $downloadName = "NexaCrest Dossier - {$safeOrderRef}.zip";
+
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $downloadName . '"');
+        header('Content-Length: ' . (string) filesize($zipPath));
+        readfile($zipPath);
+        unlink($zipPath);
     }
 
     /** Stage 1->2 manual gate: buyer's signed PO received. */

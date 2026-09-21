@@ -82,4 +82,20 @@ async function find(id) {
   return db.queryOne('SELECT * FROM file_store WHERE id = :id', { id });
 }
 
-module.exports = { insertGenerated, insertReceived, find };
+/**
+ * Every live file for one order, generated or received — order_id is set
+ * on file_store directly for both origins (insertGenerated() and
+ * insertReceived() above), so this is the one query the full order
+ * dossier ZIP needs, rather than separately joining through documents/
+ * dispute_documents/orderBuyerPoDocuments/etc. Soft-deleted rows
+ * (is_active = 0) are excluded — file_store is never hard-deleted.
+ */
+async function forOrder(orderId) {
+  return db.query(
+    `SELECT * FROM file_store WHERE order_id = :order_id AND is_active = 1
+     ORDER BY file_origin, uploaded_at`,
+    { order_id: orderId }
+  );
+}
+
+module.exports = { insertGenerated, insertReceived, find, forOrder };
