@@ -606,12 +606,68 @@ final class DocumentGenerationService
         };
     }
 
+    /**
+     * Document fidelity rebuild (2026-09-21): the real source templates
+     * (the .docx files NexaCrest actually hands a buyer, and uses offline
+     * to build one by hand) set every run to "Aptos" — Microsoft's current
+     * Office default, not freely redistributable and not installed on any
+     * Bluehost/VPS host this app will ever run on. Carlito (SIL Open Font
+     * License, bundled in app/assets/fonts/) is the closest freely
+     * redistributable substitute available — same humanist-sans category
+     * Microsoft's own Calibri/Aptos lineage sits in. Registering it AS the
+     * "Aptos" family name (rather than changing every template's CSS to
+     * say "Carlito") means: every template can keep writing
+     * font-family:'Aptos' to stay literally traceable to the source
+     * template's own font choice, this embedded copy is what actually
+     * renders regardless of what's installed on the host, and if a real
+     * licensed Aptos ever gets installed server-side under this exact
+     * family name, DOMPDF's registration below still wins — so nothing
+     * silently changes without a deliberate code edit.
+     */
+    private static function registerDocumentFonts(Dompdf $dompdf): void
+    {
+        $fontDir = dirname(__DIR__, 2) . '/assets/fonts';
+        $metrics = $dompdf->getFontMetrics();
+        // data:// URIs, not file:// paths — DOMPDF's file:// protocol rule
+        // enforces its own chroot (defaults to the dompdf package's own
+        // vendor directory), which would reject anything under this app's
+        // own assets/ folder. data:// carries no such restriction and is
+        // the same technique this app already uses for the logo/seal
+        // images (see DocumentDataAssembler::assetsBlock()'s *_data_uri
+        // fields) — one consistent way to hand DOMPDF a local file.
+        foreach ([
+            ['normal', 'normal', 'Carlito-Regular.ttf'],
+            ['normal', 'bold', 'Carlito-Bold.ttf'],
+            ['italic', 'normal', 'Carlito-Italic.ttf'],
+            ['italic', 'bold', 'Carlito-BoldItalic.ttf'],
+        ] as [$style, $weight, $file]) {
+            $uri = 'data://font/ttf;base64,' . base64_encode((string) file_get_contents("{$fontDir}/{$file}"));
+            $metrics->registerFont(['family' => 'Aptos', 'style' => $style, 'weight' => $weight], $uri);
+        }
+    }
+
     private static function renderPdf(string $html): string
     {
         $options = new DompdfOptions();
         $options->set('isRemoteEnabled', false); // security: never fetch remote resources into a generated PDF
-        $options->set('defaultFont', 'DejaVu Sans');
+        $options->set('defaultFont', 'Aptos');
+        // registerFont() below doesn't just read the source TTFs — it also
+        // WRITES its own converted copy + metrics cache to fontDir/fontCache.
+        // Left at DOMPDF's default, that's inside app/vendor/dompdf/dompdf/
+        // itself: on Bluehost, vendor/ is a delivered, not-necessarily-writable
+        // tree (and even where it is writable, generated cache files don't
+        // belong inside a vendor snapshot). storage/ is this app's one
+        // guaranteed-writable directory (STORAGE_BASE_PATH), so the cache
+        // goes there instead — same reasoning as every generated PDF/DOCX
+        // already living under storage/, not under app/.
+        $fontCacheDir = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/') . '/font_cache';
+        if (!is_dir($fontCacheDir)) {
+            mkdir($fontCacheDir, 0755, true);
+        }
+        $options->setFontDir($fontCacheDir);
+        $options->setFontCache($fontCacheDir);
         $dompdf = new Dompdf($options);
+        self::registerDocumentFonts($dompdf);
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();

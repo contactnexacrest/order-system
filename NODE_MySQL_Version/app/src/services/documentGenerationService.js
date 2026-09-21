@@ -51,6 +51,37 @@ function templatesEnvironment() {
   return njkEnv;
 }
 
+let fontsBlockCache = null;
+
+/**
+ * Document fidelity rebuild (2026-09-21): the real source templates set
+ * every run to "Aptos" — Microsoft's current Office default, not freely
+ * redistributable and not installed on any VPS this app will ever run on.
+ * Carlito (SIL Open Font License, bundled in app/assets/fonts/) is the
+ * closest freely redistributable substitute — same humanist-sans category
+ * Microsoft's own Calibri/Aptos lineage sits in. Puppeteer/Chromium has no
+ * "chroot" restriction the way DOMPDF does (see the PHP stack's
+ * registerDocumentFonts() for that story) — a plain @font-face pointing at
+ * a data: URI is all it needs, embedded directly in the same self-contained
+ * HTML string as the logo/seal images (see documentDataAssembler.assetsBlock()),
+ * so page.setContent() still has nothing external to fetch. Read once and
+ * cached in memory — these 4 files never change while the process is
+ * running, and re-reading + re-base64-encoding ~2.5MB on every single
+ * document generation would be pure waste in a long-lived Node process.
+ */
+function fontsBlock() {
+  if (fontsBlockCache) return fontsBlockCache;
+  const fontDir = path.join(__dirname, '..', '..', 'assets', 'fonts');
+  const toDataUri = (file) => `data:font/ttf;base64,${fs.readFileSync(path.join(fontDir, file)).toString('base64')}`;
+  fontsBlockCache = {
+    regular_data_uri: toDataUri('Carlito-Regular.ttf'),
+    bold_data_uri: toDataUri('Carlito-Bold.ttf'),
+    italic_data_uri: toDataUri('Carlito-Italic.ttf'),
+    bolditalic_data_uri: toDataUri('Carlito-BoldItalic.ttf'),
+  };
+  return fontsBlockCache;
+}
+
 async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null) {
   const docType = await findDocumentType(documentTypeCode);
   if (!docType) {
@@ -94,6 +125,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   const signatory = await documentDataAssembler.signatoryBlock(docType.id, signatoryOverrideUserId);
 
   const context = {
+    fonts: fontsBlock(),
     ...data,
     meta: {
       document_reference: documentReference,
@@ -367,6 +399,7 @@ async function finalizeApproval(documentId) {
   const terms = await resolveTerms(documentTypeCode, data);
 
   const context = {
+    fonts: fontsBlock(),
     ...data,
     meta: {
       document_reference: document.document_reference,
@@ -461,6 +494,7 @@ async function generateAmendment(amendmentId, generatedByUserId) {
   const signatory = await documentDataAssembler.signatoryBlock(docTypeId);
 
   const context = {
+    fonts: fontsBlock(),
     company,
     assets,
     signatory,

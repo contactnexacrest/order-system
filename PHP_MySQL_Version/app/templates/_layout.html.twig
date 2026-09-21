@@ -3,64 +3,121 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  @page { margin: 28px 32px 40px 32px; }
-  body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1b2430; }
-  .doc-header { background: #14263d; color: #ffffff; padding: 8px 14px; margin-bottom: 10px; }
-  .doc-header table { width: 100%; border-collapse: collapse; }
-  .doc-header td { border: none; padding: 0; vertical-align: middle; }
-  .doc-header td.logo-cell { width: 46px; }
-  .doc-header td.logo-cell img { height: 36px; width: auto; }
-  .doc-header .company { font-size: 13px; font-weight: bold; letter-spacing: 0.03em; }
-  .doc-header .doctype { font-size: 11px; color: #e0a052; font-weight: bold; }
-  .doc-header .incoterm { font-size: 9px; color: #cfd8e3; }
+  /*
+   * Document fidelity rebuild (2026-09-21) — every color/font/size/spacing
+   * value below was measured directly off the real source .docx templates
+   * (python-docx run-by-run dump: font, size, bold/italic, color, cell
+   * shading, borders, alignment), not eyeballed. See
+   * DocumentGenerationService::registerDocumentFonts() for why the font
+   * family is "Aptos" but the embedded file is Carlito (SIL OFL, freely
+   * redistributable; Aptos itself is not).
+   */
+  @page { margin: 0.5in 0.59in; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Aptos', sans-serif; font-size: 9.5pt; color: #000000; }
 
-  .annexure-notice { background: #fbe9e9; border: 1px solid #a5402b; color: #a5402b; padding: 6px 10px; font-size: 8.8px; margin-top: 8px; margin-bottom: 4px; font-weight: bold; }
+  table { border-collapse: collapse; }
+  img { -webkit-print-color-adjust: exact; }
 
-  .annexure-product { margin-bottom: 10px; page-break-inside: avoid; }
-  .annexure-product-title { font-size: 9.5px; font-weight: bold; color: #14263d; margin-bottom: 3px; }
-  table.annexure-images { width: 100%; border-collapse: collapse; margin-top: 4px; }
-  table.annexure-images td { border: 1px solid #dcd6c9; padding: 4px; text-align: center; }
-  table.annexure-images img { max-width: 220px; max-height: 160px; }
+  /* --- Header: logo + right-aligned stacked title block, no banner/border --- */
+  table.doc-header { width: 100%; margin-bottom: 6pt; }
+  table.doc-header td { border: none; padding: 0; vertical-align: middle; }
+  table.doc-header td.logo-cell { width: 60pt; }
+  table.doc-header td.logo-cell img { width: 54pt; height: auto; }
+  table.doc-header td.title-cell { text-align: right; }
+  table.doc-header .company { display: block; font-size: 13pt; font-weight: bold; color: #17233A; margin-bottom: 3pt; }
+  table.doc-header .doctype { display: block; font-size: 18pt; font-weight: bold; color: #17233A; margin-bottom: 2pt; }
+  table.doc-header .incoterm { display: block; font-size: 10pt; font-weight: bold; color: #5B6573; }
 
-  table.meta { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-  table.meta td { border: 1px solid #dcd6c9; padding: 4px 8px; font-size: 9px; }
-  table.meta td.label { color: #5b6774; width: 18%; }
-  table.meta td.value { font-weight: bold; width: 32%; }
+  .mandatory-note { font-size: 9pt; font-style: italic; color: #5B6573; margin-bottom: 6pt; }
+  .mandatory-note .star { font-weight: bold; font-style: normal; color: #C0392B; }
 
-  .valid-until { background: #f6e9d3; border: 1px solid #a8701f; color: #a8701f; padding: 5px 10px; font-size: 9px; margin-bottom: 8px; font-weight: bold; }
-  .gst-declaration { background: #e7edf3; border: 1px solid #1e3a5f; color: #14263d; padding: 5px 10px; font-size: 8.5px; margin-bottom: 8px; }
-  .confirmed-banner { background: #e3f0e5; border: 1px solid #2f6b3e; color: #2f6b3e; padding: 5px 10px; font-size: 9px; margin-bottom: 8px; font-weight: bold; }
+  /* --- Meta bar: N-column shaded strip, small gray label over bold navy value --- */
+  table.meta { width: 100%; margin-bottom: 6pt; }
+  table.meta td { border: 1px solid #D7DEE6; background: #F1F5F9; padding: 4pt 7pt; vertical-align: top; }
+  table.meta .label { font-size: 8pt; color: #5B6573; display: block; }
+  table.meta .value { font-size: 10pt; font-weight: bold; color: #17233A; display: block; margin-top: 1pt; }
 
-  .section-title { background: #e7edf3; color: #14263d; font-size: 10px; font-weight: bold; padding: 4px 8px; margin-top: 10px; margin-bottom: 4px; border-left: 3px solid #1e3a5f; }
+  /* --- Banners: valid-until (amber), GST/confirmation (green), annexure warning (red) --- */
+  .banner { padding: 5pt 9pt; margin-bottom: 6pt; font-size: 9.5pt; }
+  .banner-amber { background: #FFF3CD; }
+  .banner-amber .label { font-weight: bold; color: #633806; }
+  .banner-amber .value { font-weight: bold; font-size: 11pt; color: #412402; }
+  .banner-amber .note { font-style: italic; font-size: 8.5pt; color: #854F0B; }
+  .banner-green { background: #EAF3DE; }
+  .banner-green .label { font-weight: bold; color: #27500A; }
+  .banner-green .value { color: #3B6D11; }
+  .banner-green .headline { font-weight: bold; font-size: 13pt; color: #27500A; }
+  .banner-green .sub { font-style: italic; font-size: 9.5pt; color: #3B6D11; }
+  .banner-red { background: #FBEAEA; font-weight: bold; font-size: 10pt; color: #8A1F1F; }
 
-  table.kv { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-  table.kv td { border: 1px solid #dcd6c9; padding: 3px 7px; font-size: 8.7px; vertical-align: top; }
-  table.kv td.k { color: #5b6774; width: 28%; }
-  table.kv td.v { width: 72%; }
+  /* --- Section title bar: solid navy, white bold text, no border --- */
+  .section-title { background: #17233A; color: #FFFFFF; font-size: 11pt; font-weight: bold; padding: 4pt 9pt; margin-top: 9pt; margin-bottom: 6pt; }
 
-  table.products { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-  table.products th { background: #1e3a5f; color: #fff; font-size: 8.5px; padding: 4px 6px; text-align: left; }
-  table.products td { border: 1px solid #dcd6c9; padding: 4px 6px; font-size: 8.7px; }
+  /* --- Key/value table: alternating white/shaded rows, bold navy labels --- */
+  table.kv { width: 100%; margin-bottom: 6pt; }
+  table.kv td { border: 1px solid #D7DEE6; padding: 3.5pt 7pt; font-size: 9.5pt; vertical-align: top; }
+  table.kv td.k { font-weight: bold; color: #17233A; width: 30%; }
+  table.kv td.v { width: 70%; }
+  table.kv tr:nth-child(odd) td.k { background: #F1F5F9; }
+  table.kv tr:nth-child(even) td.k { background: #FFFFFF; }
+  table.kv td.v { background: #FFFFFF; }
+  .placeholder-italic { font-style: italic; color: #5B6573; }
+
+  /* --- Product table: navy-mid header, alternating spec rows, color-coded line numbers --- */
+  table.products { width: 100%; margin-bottom: 6pt; }
+  table.products th { background: #173B73; color: #FFFFFF; font-size: 9pt; font-weight: bold; padding: 4pt 6pt; text-align: left; border: 1px solid #173B73; }
+  table.products td { border: 1px solid #D7DEE6; padding: 4pt 6pt; font-size: 9.5pt; vertical-align: top; }
   table.products td.num { text-align: right; }
-  table.products tr.spec td { font-size: 8px; color: #5b6774; font-style: italic; border-top: none; }
+  table.products td.line-no { font-weight: bold; text-align: center; }
+  table.products tr.spec td { background: #EFF3F7; font-size: 8.5pt; border-top: none; }
+  table.products tr.spec .spec-label { font-weight: bold; color: #17233A; }
+  table.products tr.spec .spec-sep { color: #5B6573; }
 
-  table.totals { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-  table.totals td { border: 1px solid #dcd6c9; padding: 4px 8px; font-size: 8.8px; }
-  table.totals td.k { width: 60%; }
-  table.totals td.v { width: 40%; text-align: right; }
-  table.totals tr.highlight td { background: #f6e9d3; font-weight: bold; color: #a8701f; }
+  /* --- Totals table: highlight row uses the same navy-mid as the product header --- */
+  table.totals { width: 100%; margin-bottom: 6pt; }
+  table.totals td { border: 1px solid #D7DEE6; padding: 4pt 8pt; font-size: 9.5pt; }
+  table.totals td.k { font-weight: bold; color: #17233A; width: 55%; }
+  table.totals td.v { width: 45%; }
+  table.totals tr.highlight td.k { background: #17233A; color: #FFFFFF; font-size: 10.5pt; }
+  table.totals tr.highlight td.v { background: #173B73; color: #FFFFFF; font-weight: bold; font-style: italic; font-size: 10.5pt; }
 
-  ul.terms { margin: 0; padding-left: 14px; }
-  ul.terms li { font-size: 7.6px; color: #333; margin-bottom: 3px; text-align: justify; }
+  .weight-caption { font-weight: bold; font-size: 10.5pt; color: #17233A; margin: 6pt 0 3pt; }
+  .weight-caption .note { font-weight: normal; font-style: italic; font-size: 9pt; color: #5B6573; }
+  table.weight th { background: #173B73; color: #FFFFFF; font-size: 9.5pt; font-weight: bold; padding: 4pt 7pt; text-align: left; border: 1px solid #173B73; }
+  table.weight td { border: 1px solid #D7DEE6; padding: 3.5pt 7pt; font-size: 9.5pt; }
+  table.weight tr:nth-child(odd) td { background: #F1F5F9; }
 
-  .signature-block { margin-top: 16px; }
-  .signature-block table { width: 100%; border-collapse: collapse; }
-  .signature-block td { vertical-align: bottom; font-size: 8.8px; padding: 2px 8px; }
-  .signature-img { height: 34px; }
-  .seal-img { height: 90px; margin-top: 4px; }
-  .signature-cell { position: relative; min-height: 100px; }
+  /* --- Payment-terms / documents-list / T&C blocks --- */
+  .bullet-block { font-size: 9.5pt; margin-bottom: 6pt; }
+  .bullet-block p { margin: 0 0 4pt; }
+  .bullet-block .sub-line { color: #333333; }
+  .bullet-block .mand-star { font-weight: bold; color: #C0392B; }
+  .numbered-block { font-size: 9.5pt; margin-bottom: 6pt; }
+  .numbered-block p { margin: 0 0 3pt; }
+  ul.terms { margin: 0 0 6pt; padding-left: 14pt; }
+  ul.terms li { font-size: 9.5pt; color: #000000; margin-bottom: 4pt; }
 
-  .mandatory-note { font-size: 7.8px; color: #a5402b; margin-bottom: 6px; }
+  /* --- Signature block --- */
+  .signature-block { margin-top: 14pt; }
+  .signature-block table { width: 100%; }
+  .signature-block td { vertical-align: bottom; font-size: 10pt; padding: 2pt 8pt; border: none; }
+  .signature-block .for-line { font-weight: bold; color: #17233A; }
+  .signature-block .auth-label { font-weight: bold; color: #5B6573; }
+  .signature-block .signatory-name { font-weight: bold; font-size: 13pt; color: #17233A; }
+  .signature-block .signatory-title { font-weight: bold; color: #000000; }
+  .signature-block .signatory-company { font-size: 9pt; color: #5B6573; }
+  .signature-img { height: 32pt; }
+  .seal-img { height: 85pt; margin-top: 4pt; }
+  .signature-cell { position: relative; min-height: 95pt; }
+
+  .annexure-notice { background: #FBEAEA; color: #8A1F1F; padding: 6pt 9pt; font-size: 10pt; font-weight: bold; margin-top: 6pt; margin-bottom: 4pt; }
+
+  .annexure-product { margin-bottom: 10pt; page-break-inside: avoid; }
+  .annexure-product-title { font-size: 10pt; font-weight: bold; color: #17233A; margin-bottom: 3pt; }
+  table.annexure-images { width: 100%; margin-top: 4pt; }
+  table.annexure-images td { border: 1px solid #D7DEE6; padding: 4pt; text-align: center; }
+  table.annexure-images img { max-width: 220px; max-height: 160px; }
 
   {% if watermark.enabled %}
   .watermark { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
@@ -72,18 +129,16 @@
 
 {% if watermark.enabled %}<div class="watermark">{{ watermark.text }}</div>{% endif %}
 
-<div class="doc-header">
-  <table><tr>
-    {% if assets.logo_data_uri %}<td class="logo-cell"><img src="{{ assets.logo_data_uri }}"></td>{% endif %}
-    <td>
-      <span class="company">{{ company.legal_name|upper }}</span><br>
-      <span class="doctype">{{ doc_title }}</span>
-      {% block header_incoterm %}{% if order.incoterm_code %}<span class="incoterm"> &nbsp;·&nbsp; {{ order.incoterm_code }} {{ order.port_of_loading|upper }}</span>{% endif %}{% endblock %}
-    </td>
-  </tr></table>
-</div>
+<table class="doc-header"><tr>
+  {% if assets.logo_data_uri %}<td class="logo-cell"><img src="{{ assets.logo_data_uri }}"></td>{% endif %}
+  <td class="title-cell">
+    <span class="company">{{ company.legal_name|upper }}</span>
+    <span class="doctype">{{ doc_title }}</span>
+    {% block header_incoterm %}{% if order.incoterm_code %}<span class="incoterm">{{ order.incoterm_code }} {{ order.port_of_loading|upper }}</span>{% endif %}{% endblock %}
+  </td>
+</tr></table>
 
-<div class="mandatory-note">Fields marked * are mandatory and must be completed before this document is issued.</div>
+<div class="mandatory-note">Fields marked <span class="star">*</span> are mandatory and must be completed before this document is issued.</div>
 
 {% block meta_table %}{% endblock %}
 
@@ -120,8 +175,8 @@
 <div class="signature-block">
   <table>
     <tr>
-      <td style="width:50%;">For<br><strong>{{ company.legal_name }}</strong></td>
-      <td style="width:50%;">Authorised Signatory</td>
+      <td style="width:50%;" class="for-line">For<br>{{ company.legal_name }}</td>
+      <td style="width:50%;" class="auth-label">Authorised Signatory</td>
     </tr>
     <tr>
       <td class="signature-cell">
@@ -129,9 +184,9 @@
       </td>
       <td>
         {% if signatory.signature_data_uri %}<img class="signature-img" src="{{ signatory.signature_data_uri }}"><br>{% endif %}
-        {{ signatory.name }}<br>
-        {{ signatory.designation }}<br>
-        {{ company.legal_name }}
+        <span class="signatory-name">{{ signatory.name }}</span><br>
+        <span class="signatory-title">{{ signatory.designation }}</span><br>
+        <span class="signatory-company">{{ company.legal_name }}</span>
       </td>
     </tr>
   </table>

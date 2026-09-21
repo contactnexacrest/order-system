@@ -13,6 +13,12 @@ storage/temp/*
 !storage/clients/.gitkeep
 !storage/temp/.gitkeep
 
+# DOMPDF's own converted-font + metrics cache (see
+# DocumentGenerationService::renderPdf()) — regenerated automatically from
+# app/assets/fonts/ on first use, never hand-edited, not source.
+storage/font_cache/*
+!storage/font_cache/.gitkeep
+
 # OS/editor noise
 .DS_Store
 *.swp
