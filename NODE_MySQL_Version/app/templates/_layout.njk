@@ -126,6 +126,7 @@
   .signature-cell { position: relative; min-height: 95pt; }
 
   .annexure-notice { background: #FBEAEA; color: #8A1F1F; padding: 6pt 9pt; font-size: 10pt; font-weight: bold; margin-top: 6pt; margin-bottom: 4pt; }
+  .annexure-appendix-start { page-break-before: always; }
 
   .annexure-product { margin-bottom: 10pt; page-break-inside: avoid; }
   .annexure-product-title { font-size: 10pt; font-weight: bold; color: #17233A; margin-bottom: 3pt; }
@@ -188,6 +189,18 @@
 </ul>
 {% endif %}
 {% endblock %}
+
+{#
+  Empty by default — deliberately opt-in, not opt-out. Only document types
+  that actually present product line items to the buyer (QT/PI/OC/PL/CI/
+  BUYERPO) override this block to pull Annexure A in as a guaranteed,
+  page-break-forced appendix to the SAME PDF (see each of those templates).
+  Freight/shipping/internal-ops/supplier document types (FDN, BLI, COOPREP,
+  AMD, SUPPO) never show product technical specs to a buyer in the source
+  templates, so they intentionally do not carry this even when an order has
+  order.include_annexure_a on.
+#}
+{% block annexure_appendix %}{% endblock %}
 
 {% block signature_block %}
 <div class="signature-block">

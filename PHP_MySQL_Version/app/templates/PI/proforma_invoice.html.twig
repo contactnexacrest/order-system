@@ -137,3 +137,12 @@
 </div>
 
 {% endblock %}
+
+{% block annexure_appendix %}
+{% if order.include_annexure_a and annexure_products is defined and annexure_products is not empty %}
+<div class="annexure-appendix-start">
+  <div class="section-title">ANNEXURE A &nbsp;— &nbsp;PRODUCT TECHNICAL SPECIFICATIONS</div>
+  {% include '_annexure_body.html.twig' %}
+</div>
+{% endif %}
+{% endblock %}

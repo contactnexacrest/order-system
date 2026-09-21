@@ -82,3 +82,12 @@
 </table>
 
 {% endblock %}
+
+{% block annexure_appendix %}
+{% if order.include_annexure_a and annexure_products is defined and annexure_products.length > 0 %}
+<div class="annexure-appendix-start">
+  <div class="section-title">ANNEXURE A &nbsp;— &nbsp;PRODUCT TECHNICAL SPECIFICATIONS</div>
+  {% include '_annexure_body.njk' %}
+</div>
+{% endif %}
+{% endblock %}
