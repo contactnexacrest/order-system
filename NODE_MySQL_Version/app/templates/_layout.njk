@@ -136,6 +136,7 @@
   .watermark { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
     opacity: {{ watermark.opacity }}; transform: rotate(-{{ watermark.angle }}deg); z-index: 0; }
   {% endif %}
+  {% block extra_style %}{% endblock %}
 </style>
 </head>
 <body>

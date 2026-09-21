@@ -711,7 +711,7 @@ function titleFor(code) {
 function section1TitleFor(code) {
   const map = {
     BUYERPO: 'SUPPLIER',
-    SUPPO: 'BUYER (NEXACREST INTERNATIONAL PRIVATE LIMITED)',
+    SUPPO: 'BUYER (NexaCrest International Private Limited)',
     FDN: 'FROM (SELLER / EXPORTER)',
     CI: 'EXPORTER / SELLER',
     BLI: 'SHIPPER / EXPORTER (APPEARS ON BL EXACTLY AS WRITTEN)',

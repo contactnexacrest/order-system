@@ -1,25 +1,29 @@
 {% extends "_layout.html.twig" %}
 
-{% block header_incoterm %}{% endblock %}
+{% block header_incoterm %}<span class="incoterm" style="color:#2D7D56; font-style:italic;">Issued to Supplier for Signature and Return</span>{% endblock %}
+
+{% block extra_style %}
+.doc-header .company, .doc-header .doctype { color: #1A4A08; }
+.doc-header .company { font-size: 11pt; }
+.doc-header .doctype { font-size: 13pt; }
+.section-title { background: #1A4A08; }
+{% endblock %}
 
 {% block meta_table %}
+<p class="placeholder-italic" style="font-size:9pt; margin:0 0 4pt;">This Purchase Order is issued by NexaCrest International Private Limited to the named supplier for material procurement. Supplier fills Section 7 only. All other sections are issued by NexaCrest.</p>
 <table class="meta">
   <tr>
-    <td class="label">PO NUMBER *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
-    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
-  </tr>
-  <tr>
-    <td class="label">BUYER ORDER REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
-    <td class="label">EXPORT ORDER REF *</td><td class="value">{{ order.pi_ref ?: order.quotation_ref ?: '—' }}</td>
+    <td><span class="label">PO NUMBER *</span><span class="value">{{ meta.document_reference }} {{ meta.revision_label }}</span></td>
+    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">BUYER ORDER REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
+    <td><span class="label">EXPORT ORDER REF *</span><span class="value">{{ order.pi_ref ?: order.quotation_ref ?: '—' }}</span></td>
   </tr>
 </table>
 {% endblock %}
 
 {% block body %}
 
-<p class="muted" style="font-size:8.5px;">This Purchase Order is issued by NexaCrest International Private Limited to the named supplier for material procurement. Supplier fills Section 7 only. All other sections are issued by NexaCrest.</p>
-
-<div class="section-title">2. SUPPLIER DETAILS (Pre-filled by NexaCrest)</div>
+<div class="section-title">2. SUPPLIER DETAILS &nbsp;(Pre-filled by NexaCrest)</div>
 <table class="kv">
   <tr><td class="k">Supplier Legal Name *</td><td class="v">{{ supplier_po.supplier_legal_name }}</td></tr>
   <tr><td class="k">Address *</td><td class="v">{{ supplier_po.supplier_address }}</td></tr>
@@ -30,8 +34,8 @@
   <tr><td class="k">Supplier Type *</td><td class="v">{{ supplier_po.supplier_type ?: 'TBC' }}</td></tr>
 </table>
 
-<div class="section-title">3. MATERIAL SPECIFICATIONS (All fields mandatory — no exceptions)</div>
-<p class="mandatory-note">All specifications below are binding. Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.</p>
+<div class="section-title">3. MATERIAL SPECIFICATIONS &nbsp;(All fields mandatory — no exceptions)</div>
+<div class="banner banner-red" style="text-align:left; font-size:9pt;">&#9888;&nbsp; <strong>All specifications below are binding.</strong> <span style="font-weight:normal; color:#5A1414;">Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.</span></div>
 <table class="kv">
   <tr><td class="k">Material / Stone Type *</td><td class="v">{{ supplier_po.material_stone_type ?: 'TBC' }}</td></tr>
   <tr><td class="k">Grade *</td><td class="v">{{ supplier_po.grade }} only — no mixed grades, no seconds</td></tr>
@@ -45,13 +49,43 @@
 </table>
 
 <div class="section-title">4. COMMERCIAL TERMS</div>
-<table class="totals">
-  <tr><td class="k">Unit Price (INR) *</td><td class="v">{{ supplier_po.unit_price_inr }}</td></tr>
-  <tr><td class="k">Basic Value (INR) *</td><td class="v">{{ supplier_po.basic_value_inr }}</td></tr>
-  <tr><td class="k">GST ({{ supplier_po.gst_rate_pct ?: 'X' }}%) (INR) *</td><td class="v">{{ supplier_po.gst_amount_inr }}</td></tr>
-  <tr class="highlight"><td class="k">TOTAL PAYABLE (INR) *</td><td class="v">{{ supplier_po.total_payable_inr }}</td></tr>
-  <tr><td class="k">Advance ({{ supplier_po.advance_pct ?: 'X' }}%) (INR) *</td><td class="v">{{ supplier_po.advance_amount_inr }} — payable before production commences</td></tr>
-  <tr><td class="k">Balance (INR) *</td><td class="v">{{ supplier_po.balance_amount_inr }} — payable ONLY after delivery + inspection + written acceptance by NexaCrest</td></tr>
+<table class="kv" style="table-layout:fixed;">
+  <tr><td colspan="3" style="background:#1A4A08; color:#FFFFFF; font-weight:bold; border-color:#1A4A08;">Field</td></tr>
+  <tr>
+    <td class="k" style="width:34%;">Unit Price (INR) *</td>
+    <td class="v" style="width:26%; text-align:right;">{{ supplier_po.unit_price_inr }}</td>
+    <td class="v" style="width:40%; font-style:italic; font-size:8.5pt; color:#555555;">Rate as agreed</td>
+  </tr>
+  <tr>
+    <td class="k">Quantity *</td>
+    <td class="v" style="text-align:right;">{{ supplier_po.quantity }} {{ supplier_po.unit }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Must match Section 3 exactly</td>
+  </tr>
+  <tr>
+    <td class="k">Basic Value *</td>
+    <td class="v" style="text-align:right;">{{ supplier_po.basic_value_inr }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Unit Price &times; Quantity</td>
+  </tr>
+  <tr>
+    <td class="k">GST *</td>
+    <td class="v" style="text-align:right;">{{ supplier_po.gst_rate_pct ?: 'X' }}% — {{ supplier_po.gst_amount_inr }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">CGST + SGST (intrastate) OR IGST (interstate)</td>
+  </tr>
+  <tr>
+    <td class="k" style="background:#FFF3CD; font-weight:bold;">TOTAL PAYABLE *</td>
+    <td class="v" style="background:#FFF3CD; text-align:right; font-weight:bold; color:#8A1F1F;">{{ supplier_po.total_payable_inr }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Basic Value + GST</td>
+  </tr>
+  <tr>
+    <td class="k">Advance ({{ supplier_po.advance_pct ?: 'X' }}%) *</td>
+    <td class="v" style="text-align:right;">{{ supplier_po.advance_amount_inr }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Payable before production commences</td>
+  </tr>
+  <tr>
+    <td class="k" style="background:#FFF3CD; font-weight:bold;">Balance *</td>
+    <td class="v" style="background:#FFF3CD; text-align:right; font-weight:bold; color:#8A1F1F;">{{ supplier_po.balance_amount_inr }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Payable ONLY after delivery + inspection + written acceptance by NexaCrest</td>
+  </tr>
 </table>
 
 <div class="section-title">5. DELIVERY TERMS</div>
@@ -59,17 +93,42 @@
   <tr><td class="k">Delivery Location *</td><td class="v">{{ supplier_po.delivery_location ?: 'TBC' }}</td></tr>
   <tr><td class="k">Required Delivery Date *</td><td class="v">{{ supplier_po.required_delivery_date ?: 'TBC' }}</td></tr>
   <tr><td class="k">Delivery Confirmation</td><td class="v">Supplier must confirm delivery readiness in writing (WhatsApp acceptable) at least 7 days before the required delivery date.</td></tr>
-  <tr><td class="k">Packing</td><td class="v">{{ supplier_po.packing_requirement }}</td></tr>
+  <tr><td class="k">Time is of the Essence</td><td class="v">Delivery by the agreed date is of the essence of this Purchase Order. Failure to deliver by the agreed date may result in cancellation of this PO and / or recovery of losses incurred by NexaCrest as a result of the delay, including but not limited to demurrage, vessel rebooking charges and buyer penalties.</td></tr>
+  <tr><td class="k">Packing *</td><td class="v">{{ supplier_po.packing_requirement }}</td></tr>
 </table>
+
+{% if terms is defined and terms is not empty %}
+<div class="section-title">6. QUALITY &amp; INSPECTION</div>
+<ul class="terms">
+  {% for clause in terms %}
+    <li>{{ clause }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
 
 <div class="section-title">7. SUPPLIER ACCEPTANCE</div>
-<table class="kv">
-  <tr><td class="k">Authorised Signature</td><td class="v">_________________________________</td></tr>
-  <tr><td class="k">Name</td><td class="v">_________________________________</td></tr>
-  <tr><td class="k">Designation</td><td class="v">_________________________________</td></tr>
-  <tr><td class="k">Date</td><td class="v">_________________________________</td></tr>
-  <tr><td class="k">Supplier Stamp</td><td class="v">(mandatory)</td></tr>
+<table class="kv" style="table-layout:fixed;">
+  <tr>
+    <td colspan="1" style="background:#1A4A08; color:#FFFFFF; font-weight:bold; width:50%;">Issued by NexaCrest International Private Limited</td>
+    <td colspan="1" style="background:#1A4A08; color:#FFFFFF; font-weight:bold; width:50%;">Accepted by Supplier &nbsp;&#8226;&nbsp; Sign, Stamp &amp; Return</td>
+  </tr>
+  <tr>
+    <td class="v" style="vertical-align:top;">
+      <p style="margin:8pt 0 0;"><strong style="color:#17233A;">{{ signatory.name }}</strong><br>{{ signatory.designation }}<br><span style="font-size:8.5pt; color:#555555;">{{ company.legal_name }}</span></p>
+    </td>
+    <td class="v" style="vertical-align:top; background:#EAF3DE;">
+      <p style="margin:0 0 4pt;"><strong>Authorised Signature:</strong><br><span style="color:#999999;">_________________________________</span></p>
+      <p style="margin:0 0 2pt;">Name: _____________________________</p>
+      <p style="margin:0 0 2pt;">Designation: ______________________</p>
+      <p style="margin:0 0 4pt;"><strong>Date:</strong> _____________________________</p>
+      <p style="margin:0; font-weight:bold; color:#8A1F1F; font-size:8.5pt;">Supplier Stamp: (mandatory)</p>
+    </td>
+  </tr>
 </table>
-<p class="mandatory-note">By signing above, the supplier confirms acceptance of all specifications, commercial terms, delivery terms and quality conditions stated in this Purchase Order. Acceptance of advance payment constitutes full acceptance of all terms herein.</p>
+<div class="banner" style="background:#EAF3DE; color:#1A4A08; text-align:left; font-weight:normal;">By signing above, the supplier confirms acceptance of all specifications, commercial terms, delivery terms and quality conditions stated in this Purchase Order. <strong>Acceptance of advance payment constitutes full acceptance of all terms herein.</strong></div>
 
 {% endblock %}
+
+{% block terms_section %}{% endblock %}
+
+{% block signature_block %}{% endblock %}

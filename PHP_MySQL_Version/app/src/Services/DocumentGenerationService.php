@@ -751,7 +751,7 @@ final class DocumentGenerationService
     {
         return match ($code) {
             'BUYERPO' => 'SUPPLIER',
-            'SUPPO' => 'BUYER (NEXACREST INTERNATIONAL PRIVATE LIMITED)',
+            'SUPPO' => 'BUYER (NexaCrest International Private Limited)',
             'FDN' => 'FROM (SELLER / EXPORTER)',
             'CI' => 'EXPORTER / SELLER',
             'BLI' => 'SHIPPER / EXPORTER (APPEARS ON BL EXACTLY AS WRITTEN)',
