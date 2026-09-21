@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Helpers\ReasonValidator;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
@@ -108,8 +109,8 @@ final class EmailDispatchService
 
     public static function rejectSend(int $emailLogId, int $approverUserId, string $reason): void
     {
-        if (trim($reason) === '') {
-            throw new \RuntimeException('A reason is mandatory when rejecting a send.');
+        if ($error = ReasonValidator::check($reason)) {
+            throw new \RuntimeException($error);
         }
         $row = EmailLogRepository::find($emailLogId);
         if (!$row || $row['status'] !== 'pending_approval') {

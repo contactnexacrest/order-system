@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const clientRepository = require('../repositories/clientRepository');
 const orderRepository = require('../repositories/orderRepository');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
@@ -84,8 +85,9 @@ async function overrideUniqueNumber(req, res) {
     res.redirect(`/clients/${clientId}`);
     return;
   }
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to override the client unique number — nothing was saved.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect(`/clients/${clientId}`);
     return;
   }

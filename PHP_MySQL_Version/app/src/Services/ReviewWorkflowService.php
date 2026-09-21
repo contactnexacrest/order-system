@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Helpers\ReasonValidator;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\DocumentCrossVerificationRepository;
 use App\Repositories\DocumentRepository;
@@ -76,8 +77,8 @@ final class ReviewWorkflowService
 
     public static function reject(int $documentReviewId, int $reviewerUserId, string $comments): void
     {
-        if (trim($comments) === '') {
-            throw new \RuntimeException('A comment is mandatory when rejecting a document.');
+        if ($error = ReasonValidator::check($comments)) {
+            throw new \RuntimeException($error);
         }
         $review = DocumentReviewRepository::find($documentReviewId);
         if (!$review) {

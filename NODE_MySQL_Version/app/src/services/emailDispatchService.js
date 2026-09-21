@@ -1,5 +1,6 @@
 'use strict';
 
+const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const documentRepository = require('../repositories/documentRepository');
@@ -129,8 +130,9 @@ async function approveSend(emailLogId, approverUserId) {
 }
 
 async function rejectSend(emailLogId, approverUserId, reason) {
-  if (!reason || reason.trim() === '') {
-    throw new Error('A reason is mandatory when rejecting a send.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    throw new Error(reasonError);
   }
   const row = await emailLogRepository.find(emailLogId);
   if (!row || row.status !== 'pending_approval') {

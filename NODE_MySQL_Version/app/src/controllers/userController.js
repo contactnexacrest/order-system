@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const flash = require('../helpers/flash');
 const passwordHash = require('../helpers/passwordHash');
+const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const userRepository = require('../repositories/userRepository');
@@ -109,8 +110,9 @@ async function forceResetPassword(req, res) {
   }
 
   const reason = String(req.body.reason || '').trim();
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to force-reset a password.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect('/users');
     return;
   }

@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -699,8 +700,9 @@ async function overrideStatusLock(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to override order status/lock — nothing was saved.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -739,8 +741,9 @@ async function markLost(req, res) {
     return;
   }
   const reason = str(req.body.reason);
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to mark an order lost — nothing was saved.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect(`/orders/${orderId}`);
     return;
   }

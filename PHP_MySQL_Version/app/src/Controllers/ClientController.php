@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\ReasonValidator;
 use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AuditLogRepository;
@@ -92,8 +93,8 @@ final class ClientController
             header("Location: /clients/{$clientId}");
             return;
         }
-        if ($reason === '') {
-            Flash::set('error', 'A reason is required to override the client unique number — nothing was saved.');
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
             header("Location: /clients/{$clientId}");
             return;
         }

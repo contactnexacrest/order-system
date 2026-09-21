@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 
@@ -49,8 +50,9 @@ async function update(req, res) {
     return;
   }
 
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to save a settings change — nothing was saved.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect('/settings');
     return;
   }

@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 
@@ -59,8 +60,9 @@ async function updateDocumentTypes(req, res) {
     res.redirect('/admin/overrides');
     return;
   }
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to save this change — nothing was saved.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect('/admin/overrides');
     return;
   }
@@ -111,8 +113,9 @@ async function updateTcClauses(req, res) {
     res.redirect('/admin/overrides');
     return;
   }
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to save this change — nothing was saved.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect('/admin/overrides');
     return;
   }
@@ -189,8 +192,9 @@ async function updatePaymentPresets(req, res) {
     res.redirect('/admin/overrides');
     return;
   }
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to save this change — nothing was saved.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect('/admin/overrides');
     return;
   }

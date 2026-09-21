@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\ReasonValidator;
 use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AmendmentRepository;
@@ -679,8 +680,8 @@ final class OrderController
             return;
         }
         $reason = trim((string) ($_POST['reason'] ?? ''));
-        if ($reason === '') {
-            Flash::set('error', 'A reason is required to mark an order lost — nothing was saved.');
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -725,8 +726,8 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        if ($reason === '') {
-            Flash::set('error', 'A reason is required to override order status/lock — nothing was saved.');
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
             header("Location: /orders/{$orderId}");
             return;
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\ReasonValidator;
 use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AmendmentRepository;
@@ -47,8 +48,8 @@ final class AmendmentController
         $amendedBalanceAmount = ($_POST['amended_balance_amount'] ?? '') !== '' ? (float) $_POST['amended_balance_amount'] : null;
         $effectiveFrom = trim((string) ($_POST['effective_from'] ?? '')) ?: null;
 
-        if ($reason === '') {
-            Flash::set('error', 'A reason is mandatory for an amendment request.');
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
             header("Location: /orders/{$orderId}/amendments");
             return;
         }
@@ -174,8 +175,8 @@ final class AmendmentController
             header('Location: /orders/' . $amendment['order_id'] . '/amendments');
             return;
         }
-        if ($reason === '') {
-            Flash::set('error', 'A reason is required to override the amendment reference — nothing was saved.');
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
             header('Location: /orders/' . $amendment['order_id'] . '/amendments');
             return;
         }

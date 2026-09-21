@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -39,8 +40,9 @@ async function create(req, res) {
   const amendedBalanceAmount = req.body.amended_balance_amount !== undefined && req.body.amended_balance_amount !== '' ? parseFloat(req.body.amended_balance_amount) : null;
   const effectiveFrom = String(req.body.effective_from || '').trim() || null;
 
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is mandatory for an amendment request.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect(`/orders/${orderId}/amendments`);
     return;
   }
@@ -159,8 +161,9 @@ async function overrideReference(req, res) {
     res.redirect(`/orders/${amendment.order_id}/amendments`);
     return;
   }
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to override the amendment reference — nothing was saved.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect(`/orders/${amendment.order_id}/amendments`);
     return;
   }

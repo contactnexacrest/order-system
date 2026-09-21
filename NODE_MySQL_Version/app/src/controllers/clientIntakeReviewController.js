@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const clientRepository = require('../repositories/clientRepository');
 const referenceNumberService = require('../services/referenceNumberService');
@@ -64,8 +65,9 @@ async function reject(req, res) {
   const id = parseInt(req.params.id, 10) || 0;
   const reason = String(req.body.reason || '').trim();
 
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to reject a request.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect('/client-intake');
     return;
   }

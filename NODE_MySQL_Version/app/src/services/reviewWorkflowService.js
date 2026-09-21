@@ -1,5 +1,6 @@
 'use strict';
 
+const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const documentCrossVerificationRepository = require('../repositories/documentCrossVerificationRepository');
 const documentRepository = require('../repositories/documentRepository');
@@ -62,8 +63,9 @@ async function approve(documentReviewId, reviewerUserId, comments) {
 }
 
 async function reject(documentReviewId, reviewerUserId, comments) {
-  if (!comments || comments.trim() === '') {
-    throw new Error('A comment is mandatory when rejecting a document.');
+  const reasonError = reasonValidator.check(comments);
+  if (reasonError) {
+    throw new Error(reasonError);
   }
   const review = await documentReviewRepository.find(documentReviewId);
   if (!review) {

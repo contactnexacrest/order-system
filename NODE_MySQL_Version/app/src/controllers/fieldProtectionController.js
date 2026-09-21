@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const fieldProtectionRepository = require('../repositories/fieldProtectionRepository');
 const superAdminService = require('../services/superAdminService');
@@ -38,8 +39,9 @@ async function createRequest(req, res) {
     res.redirect('/admin/field-protection');
     return;
   }
-  if (reason === '') {
-    flash.set(req, 'error', 'A reason is required to request a protection change — nothing was submitted.');
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
     res.redirect('/admin/field-protection');
     return;
   }

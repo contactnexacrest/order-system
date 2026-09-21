@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\ReasonValidator;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\LookupRepository;
@@ -124,8 +125,8 @@ final class UserController
         }
 
         $reason = trim((string) ($_POST['reason'] ?? ''));
-        if ($reason === '') {
-            Flash::set('error', 'A reason is required to force-reset a password.');
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
             header('Location: /users');
             return;
         }

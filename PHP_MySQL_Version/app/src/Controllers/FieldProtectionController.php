@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\ReasonValidator;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\FieldProtectionRepository;
@@ -54,8 +55,8 @@ final class FieldProtectionController
             header('Location: /admin/field-protection');
             return;
         }
-        if ($reason === '') {
-            Flash::set('error', 'A reason is required to request a protection change — nothing was submitted.');
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
             header('Location: /admin/field-protection');
             return;
         }
