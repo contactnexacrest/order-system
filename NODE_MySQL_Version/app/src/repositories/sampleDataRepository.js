@@ -156,6 +156,11 @@ async function clearAll() {
     if (clientIds.length) {
       await conn.execute(inQuery('DELETE FROM clients WHERE id IN (%s)', clientIds));
     }
+
+    // --- Sample suppliers (Task #17 — a Stage-5+ sample order needs one;
+    // order_supplier_po rows pointing at it are already gone via the
+    // order-scoped delete loop above, so this is safe here) ---
+    await conn.execute('DELETE FROM suppliers WHERE is_sample_data = 1');
   });
 
   // Physical files — deleted only after the DB transaction committed,

@@ -688,6 +688,47 @@ the UI, that can never put real data at risk.
   throughout — then repeated the whole load → clear cycle twice more to
   confirm it's genuinely repeatable, not a one-shot demo.
 
+### Follow-up (added 2026-09-21): a third order, all the way to closure
+
+This file's own text above flagged the two-order scope as bounded and
+"easy to extend ... if you want a third order further along later." Added
+exactly that: a third sample client/order on the CIF incoterm and the
+"Established Buyer — Post-BL" payment preset (the tier requiring MD
+approval and a BL-triggered balance — SOP Tier B), pushed through Supplier
+PO, the CFR/CIF-only Freight Payment stage, Packing & BL Instruction,
+Commercial Invoice + balance, and Document Despatch & Closure — leaving it
+`status = 'complete'` with all nine document types (QT, PI, OC, SUPPO, FDN,
+PL, BLI, CI, COOPREP) generated at least once. A Stage-5+ sample order
+needs a supplier to attach its Supplier PO to; `suppliers` gained its own
+`is_sample_data` flag (SECTION T, `docs/schema.sql`) for exactly this, and
+`SampleDataRepository::clearAll()` now also hard-deletes sample suppliers
+— otherwise one would leak into the real, global supplier dropdown
+permanently every time sample data is loaded.
+
+Real bug this surfaced (fixed both stacks): `DocumentDataAssembler`'s
+`incoterm_label` field — the "Incoterm \*" row printed on every single
+document type — always named the *loading* port, even for CFR/CIF orders,
+where Incoterms® 2020 requires naming the port of *discharge* instead. No
+CFR/CIF order had ever been carried through full document generation
+before this session, so nothing had exercised the bug: a CIF document's
+own "Incoterm \*" field read "CIF Chennai, India" (the seller's own port)
+instead of the buyer's actual discharge port. Fixed in
+`DocumentDataAssembler`/`documentDataAssembler.js` and the same
+copy-pasted line in `AmendmentService`/`amendmentService.js`. (The small
+"CIF CHENNAI, INDIA" badge next to the doctype label in the shared
+document header is unrelated and untouched — that one's an intentional,
+documented quirk copied from the real source templates, not a computed
+Incoterms field.)
+
+Verified live end-to-end on both stacks again after the extension: loaded,
+confirmed all 3 clients/orders and all 12 generated files for the new
+order appear correctly, spot-checked the FDN/CI/BLI PDFs to confirm the
+discharge-port fix rendered correctly ("CIF Rotterdam, Netherlands"),
+confirmed the pre-existing FOB order's PDFs still correctly show the
+loading port (no regression), cleared, confirmed zero sample rows
+including the new sample supplier remain, and repeated load → clear once
+more to confirm repeatability.
+
 ## Protected fields (added 2026-09-19)
 
 User request: all the content that gets baked into generated documents —
@@ -1128,14 +1169,22 @@ looking at the real rendered output:
 
 ## Judgment calls made in the Sample Data Playground
 
-1. **Two sample orders, not full 9-stage coverage.** One left untouched at
-   Stage 1, one pushed to Stage 5 with three documents and a cleared advance
-   payment. Enough to exercise order creation, document generation, stage
-   gates, and payment tracking without trying to manufacture a believable
-   order at every one of the 9 stages — that's easy to extend later the same
-   way (add another `createSampleOrder()` + a longer "advance to stage N"
-   helper in `SampleDataService`) if a specific stage's UI needs its own
-   sample to look at.
+1. **Three sample orders — Stage 1, Stage 5, and full Stage 9 closure —
+   not a scenario for every possible variant.** One left untouched at
+   Stage 1; one FOB order pushed to Stage 5 with three documents and a
+   cleared advance payment; one CIF order (on the MD-approval-tier payment
+   preset) pushed all the way to a closed Stage 9 with all nine document
+   types generated, exercising the CFR/CIF-only Freight Payment stage no
+   earlier sample order ever touched. Enough to see every stage and every
+   document type at least once without trying to also manufacture a
+   dispute, an amendment, and a quantity-shortfall buyer-approval upload
+   into the same fixed dataset — those are each real scenarios, but
+   bolting all of them onto one "Load Sample Data" button would make it
+   slower and harder to reason about for what it's actually for: a new
+   user's first walkthrough. Still easy to extend later the same way (add
+   another `createSampleOrder()` + a longer "advance to stage N" helper in
+   `SampleDataService`) if a specific scenario's UI needs its own sample to
+   look at.
 2. **This is the first hard-delete in the entire codebase.** Every other
    table in this app is soft-delete-only (`is_active`, `superseded`, etc.) —
    deliberately, per the original spec's audit/history requirements. Sample

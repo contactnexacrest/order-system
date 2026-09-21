@@ -41,4 +41,10 @@ final class SupplierRepository
         ]);
         return (int) $pdo->lastInsertId();
     }
+
+    /** Phase E follow-up — flags a supplier as Sample Data Playground content (see SampleDataService). */
+    public static function markSample(int $id): void
+    {
+        Database::connection()->prepare('UPDATE suppliers SET is_sample_data = 1 WHERE id = :id')->execute(['id' => $id]);
+    }
 }

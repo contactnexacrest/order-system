@@ -27,4 +27,9 @@ async function create(data) {
   return result.insertId;
 }
 
-module.exports = { all, find, create };
+/** Phase E follow-up — flags a supplier as Sample Data Playground content (see sampleDataService). */
+async function markSample(id) {
+  await db.execute('UPDATE suppliers SET is_sample_data = 1 WHERE id = :id', { id });
+}
+
+module.exports = { all, find, create, markSample };

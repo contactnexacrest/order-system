@@ -63,7 +63,12 @@ final class DocumentDataAssembler
             'order' => [
                 'buyer_inquiry_ref'    => $order['buyer_inquiry_ref'],
                 'incoterm_code'        => $order['incoterm_code'],
-                'incoterm_label'       => $order['incoterm_code'] . ' ' . ($order['port_of_loading_name'] ?? 'Chennai, India') . ' — Incoterms® 2020',
+                // Incoterms® 2020: FOB names the port of LOADING; CFR/CIF name the
+                // port of DISCHARGE — real bug this fixes (found via Task #17's
+                // first-ever CIF sample order): this always named the loading
+                // port, so a CIF document's own header read "CIF Chennai, India"
+                // (the seller's own port) instead of the buyer's discharge port.
+                'incoterm_label'       => $order['incoterm_code'] . ' ' . ($isFob ? ($order['port_of_loading_name'] ?? 'Chennai, India') : $portOfDischarge) . ' — Incoterms® 2020',
                 'is_fob'               => $isFob,
                 'port_of_loading'      => $order['port_of_loading_name'] ?? 'Chennai, India',
                 'port_of_discharge'    => $portOfDischarge,

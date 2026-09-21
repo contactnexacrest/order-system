@@ -230,9 +230,12 @@ reflect the new terms automatically), dispute tracking, a full audit log
 viewer, a permission-gated dashboard and reports module (with CSV export
 and savable/shareable aggregate report definitions), user
 management (create/deactivate/reactivate/force-reset-password), and a
-Sample Data Playground (`/sample-data`) that loads two realistic
-practice clients/orders and clears them again on demand, without ever
-touching real data — useful for training a new user or demoing the app.
+Sample Data Playground (`/sample-data`) that loads three realistic
+practice clients/orders — a fresh Stage 1 order, an FOB order carried to
+Stage 5, and a CIF order carried all the way to a closed Stage 9 with
+every one of the nine document types generated — and clears them again on
+demand, without ever touching real data — useful for training a new user
+or demoing the app.
 
 ## Background jobs
 

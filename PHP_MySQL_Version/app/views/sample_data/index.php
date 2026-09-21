@@ -34,7 +34,7 @@
   <?php else: ?>
     <div class="section">
       <h2>Nothing loaded right now</h2>
-      <p class="muted small">Loading creates 2 sample clients and 2 sample orders: one brand-new order at Stage 1 (to practice creating documents from scratch), and one already carried through to Stage 5 with a Quotation, Proforma Invoice and Order Confirmation generated, and an advance payment recorded and cleared (to see the dashboard/reports with some real-looking numbers in them).</p>
+      <p class="muted small">Loading creates 3 sample clients and 3 sample orders: one brand-new order at Stage 1 (to practice creating documents from scratch); one FOB order carried through to Stage 5 with a Quotation, Proforma Invoice and Order Confirmation generated, and an advance payment recorded and cleared (to see the dashboard/reports with some real-looking numbers in them); and one CIF order on the "Established Buyer — Post-BL" preset, taken all the way through Stage 9 to a closed order — every one of the nine document types generated, including the CFR/CIF-only Freight Payment stage.</p>
       <form method="post" action="/sample-data/load">
         <?= Csrf::field() ?>
         <button type="submit" class="btn-sm">Load Sample Data</button>

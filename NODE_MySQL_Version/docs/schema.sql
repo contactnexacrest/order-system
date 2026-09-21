@@ -1414,6 +1414,23 @@ CREATE TABLE order_supplier_po_documents (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION T — SUPPLIER SAMPLE-DATA FLAG (added 2026-09-21)
+-- ================================================================
+-- Task #17 (expanded Sample Data Playground) adds a third sample order
+-- that reaches Stage 5 (Supplier PO), which means SampleDataService needs
+-- a supplier row to attach it to. clients and orders already have
+-- is_sample_data for exactly this — SampleDataRepository::clearAll()
+-- hard-deletes by that flag, never by name — but suppliers never needed
+-- the same flag before now, since no sample order previously went past
+-- Stage 4. Without it, a supplier created for the sample order would
+-- leak into the real, global supplier dropdown permanently: clearAll()
+-- already deletes every order_supplier_po row before this point (it's
+-- one of the order-scoped tables in that method's cleanup loop), so by
+-- the time suppliers are deleted here nothing still references them.
+ALTER TABLE suppliers
+  ADD COLUMN is_sample_data TINYINT(1) NOT NULL DEFAULT 0;
+
+-- ================================================================
 -- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1424,4 +1441,5 @@ CREATE TABLE order_supplier_po_documents (
 -- Section Q (working-days calculator & holiday calendar) added 2026-09-21.
 -- Section R (internal reference library) added 2026-09-21.
 -- Section S (buyer PO / supplier PO acknowledgment evidence) added 2026-09-21.
+-- Section T (supplier sample-data flag) added 2026-09-21.
 -- ================================================================

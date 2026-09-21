@@ -48,6 +48,8 @@ final class AmendmentService
         $advancePct = (float) $order['advance_pct'];
         $balancePct = (float) $order['balance_pct'];
         $advanceAmount = round($fobValue * $advancePct / 100, 2);
+        $isFob = strtoupper((string) $order['incoterm_code']) === 'FOB';
+        $portOfDischarge = $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'TBC';
 
         $qtDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'QT');
         $piDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
@@ -74,7 +76,9 @@ final class AmendmentService
             'freight_terms'       => $order['incoterm_code'],
             'currency'            => $order['currency_code'],
             'port_of_loading'     => $order['port_of_loading_name'] ?? 'Chennai, India',
-            'incoterm_label'      => $order['incoterm_code'] . ' ' . ($order['port_of_loading_name'] ?? 'Chennai, India') . ' — Incoterms® 2020',
+            // Incoterms® 2020: FOB names the port of LOADING; CFR/CIF name the
+            // port of DISCHARGE — same bug/fix as DocumentDataAssembler.
+            'incoterm_label'      => $order['incoterm_code'] . ' ' . ($isFob ? ($order['port_of_loading_name'] ?? 'Chennai, India') : $portOfDischarge) . ' — Incoterms® 2020',
             'lut_number'          => CompanySettingsRepository::get('lut_number'),
             'gstin'               => CompanySettingsRepository::get('gstin'),
             'iec_pan'             => CompanySettingsRepository::get('iec_pan'),

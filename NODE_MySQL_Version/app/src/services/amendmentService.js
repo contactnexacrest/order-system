@@ -53,6 +53,8 @@ async function createRequest(
   const advancePct = parseFloat(order.advance_pct);
   const balancePct = parseFloat(order.balance_pct);
   const advanceAmount = Math.round((fobValue * advancePct) / 100 * 100) / 100;
+  const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
+  const portOfDischarge = order.port_of_discharge_name || order.port_of_discharge_text || 'TBC';
 
   const qtDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'QT');
   const piDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
@@ -78,7 +80,9 @@ async function createRequest(
     freight_terms: order.incoterm_code,
     currency: order.currency_code,
     port_of_loading: order.port_of_loading_name || 'Chennai, India',
-    incoterm_label: `${order.incoterm_code} ${order.port_of_loading_name || 'Chennai, India'} — Incoterms® 2020`,
+    // Incoterms® 2020: FOB names the port of LOADING; CFR/CIF name the port
+    // of DISCHARGE — same bug/fix as documentDataAssembler.js.
+    incoterm_label: `${order.incoterm_code} ${isFob ? (order.port_of_loading_name || 'Chennai, India') : portOfDischarge} — Incoterms® 2020`,
     lut_number: await companySettingsRepository.get('lut_number'),
     gstin: await companySettingsRepository.get('gstin'),
     iec_pan: await companySettingsRepository.get('iec_pan'),
