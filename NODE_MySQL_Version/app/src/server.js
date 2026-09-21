@@ -329,6 +329,7 @@ app.post('/disputes/:disputeId/status', requireAuth, requirePermission('manage_o
 app.post('/disputes/:disputeId/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(disputeController.uploadDocument));
 
 app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.index));
+app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));
 
 app.get('/notifications', requireAuth, asyncHandler(notificationController.index));
 

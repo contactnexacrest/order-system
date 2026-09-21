@@ -6,11 +6,34 @@ namespace App\Controllers;
 
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\OrderRepository;
 
 /** Spec Section 14/17 — Audit Log viewer. Read-only; no delete anywhere. */
 final class AuditLogController
 {
     private const PAGE_SIZE = 100;
+
+    /**
+     * Everything logged against this order — its own row, plus every
+     * document/dispute/amendment/email_log row that belongs to it. See
+     * AuditLogRepository::forOrder()'s docblock for why this needed its
+     * own query rather than reusing search()'s single entity_type filter.
+     */
+    public function forOrder(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        View::render('audit_log/order', [
+            'order' => $order,
+            'rows'  => AuditLogRepository::forOrder($orderId),
+        ], 'layout/base');
+    }
 
     public function index(array $params): void
     {

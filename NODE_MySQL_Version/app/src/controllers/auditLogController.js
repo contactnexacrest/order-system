@@ -2,6 +2,7 @@
 
 const querystring = require('querystring');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const orderRepository = require('../repositories/orderRepository');
 
 // Port of App\Controllers\AuditLogController. Spec Section 14/17 — Audit
 // Log viewer. Read-only; no delete anywhere.
@@ -55,4 +56,21 @@ async function index(req, res) {
   );
 }
 
-module.exports = { index };
+/**
+ * Everything logged against this order — its own row, plus every
+ * document/dispute/amendment/email_log row that belongs to it. See
+ * auditLogRepository.forOrder()'s docblock for why this needed its own
+ * query rather than reusing search()'s single entity_type filter.
+ */
+async function forOrder(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  res.renderView('audit_log/order', { order, rows: await auditLogRepository.forOrder(orderId) }, 'layout/base');
+}
+
+module.exports = { index, forOrder };

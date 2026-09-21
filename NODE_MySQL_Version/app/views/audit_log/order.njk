@@ -1,0 +1,24 @@
+<div class="card page-wide">
+  <p><a href="/orders/{{ order.id }}">&larr; Order {{ order.order_reference }}</a></p>
+  <h1>Audit Log — Order {{ order.order_reference }}</h1>
+  <p class="muted">Every logged change against this order, its documents, disputes, amendments, and buyer email sends — immutable, newest first. For anything else (company settings, other orders' data), use the <a href="/audit-log">full Audit Log</a>.</p>
+
+  <table class="list">
+    <tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Field</th><th>Old</th><th>New</th><th>Reason</th></tr>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.created_at }}</td>
+        <td>{{ r.user_name or 'system' }}</td>
+        <td>{{ r.action_type }}</td>
+        <td>{{ r.entity_type or '' }}{% if r.entity_id %} #{{ r.entity_id }}{% endif %}</td>
+        <td>{{ r.field_name or '' }}</td>
+        <td>{{ (r.old_value or '') | truncate(40, true, '…') }}</td>
+        <td>{{ (r.new_value or '') | truncate(40, true, '…') }}</td>
+        <td>{{ (r.reason or '') | truncate(60, true, '…') }}</td>
+      </tr>
+    {% endfor %}
+    {% if not rows or rows.length == 0 %}
+      <tr><td colspan="8" class="muted">Nothing logged against this order yet.</td></tr>
+    {% endif %}
+  </table>
+</div>

@@ -324,7 +324,12 @@
     <h2>Amendments &amp; Disputes</h2>
     <p><a href="/orders/{{ order.id }}/amendments">Payment Terms Amendments ({{ amendmentCount }})</a>
        &nbsp;&middot;&nbsp;
-       <a href="/orders/{{ order.id }}/disputes">Disputes ({{ openDisputeCount }} open)</a></p>
+       <a href="/orders/{{ order.id }}/disputes">Disputes ({{ openDisputeCount }} open)</a>
+       {% if permissions.view_audit_log %}
+       &nbsp;&middot;&nbsp;
+       <a href="/orders/{{ order.id }}/audit-log">Audit Log</a>
+       {% endif %}
+    </p>
   </div>
 
   {% if permissions.edit_locked_data %}

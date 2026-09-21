@@ -40,4 +40,30 @@ async function distinctActionTypes() {
   return rows.map((r) => r.action_type);
 }
 
-module.exports = { log, search, distinctActionTypes };
+/**
+ * Real gap this closes: audit_log has no order_id column — every row is
+ * keyed by (entity_type, entity_id) against whatever table it actually
+ * happened to (documents, disputes, amendments, email_log), one hop away
+ * from the order itself. search()'s entity_type/entity_id filter can only
+ * show ONE of those at a time, so there was no way to see "everything
+ * that happened on this order" without already knowing every document/
+ * dispute/amendment/email_log id it has and filtering each separately.
+ * This unions across every order-scoped entity_type the app actually logs
+ * against, using each related table's own order_id to resolve which rows
+ * belong to this order.
+ */
+async function forOrder(orderId) {
+  return db.query(
+    `SELECT al.*, u.name AS user_name
+     FROM audit_log al LEFT JOIN users u ON u.id = al.user_id
+     WHERE (al.entity_type = 'orders' AND al.entity_id = :order_id)
+        OR (al.entity_type = 'documents' AND al.entity_id IN (SELECT id FROM documents WHERE order_id = :order_id))
+        OR (al.entity_type = 'disputes' AND al.entity_id IN (SELECT id FROM disputes WHERE order_id = :order_id))
+        OR (al.entity_type = 'amendments' AND al.entity_id IN (SELECT id FROM amendments WHERE order_id = :order_id))
+        OR (al.entity_type = 'email_log' AND al.entity_id IN (SELECT id FROM email_log WHERE order_id = :order_id))
+     ORDER BY al.created_at DESC`,
+    { order_id: orderId }
+  );
+}
+
+module.exports = { log, search, distinctActionTypes, forOrder };

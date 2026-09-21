@@ -7,6 +7,7 @@ $currentUser = AuthService::currentUser();
 $canViewReports = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_reports');
 $canEditLockedData = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'edit_locked_data');
 $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_orders');
+$canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
 
 $stage1 = $stageByNumber[1] ?? null;
 $stage2 = $stageByNumber[2] ?? null;
@@ -341,7 +342,12 @@ $orderClosed = $order['status'] === 'complete';
     <h2>Amendments &amp; Disputes</h2>
     <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Payment Terms Amendments (<?= (int) $amendmentCount ?>)</a>
        &nbsp;·&nbsp;
-       <a href="/orders/<?= (int) $order['id'] ?>/disputes">Disputes (<?= (int) $openDisputeCount ?> open)</a></p>
+       <a href="/orders/<?= (int) $order['id'] ?>/disputes">Disputes (<?= (int) $openDisputeCount ?> open)</a>
+       <?php if ($canViewAuditLog): ?>
+       &nbsp;·&nbsp;
+       <a href="/orders/<?= (int) $order['id'] ?>/audit-log">Audit Log</a>
+       <?php endif; ?>
+    </p>
   </div>
 
   <?php if ($canEditLockedData): ?>
