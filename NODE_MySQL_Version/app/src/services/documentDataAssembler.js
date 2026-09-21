@@ -16,6 +16,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const assetRepository = require('../repositories/assetRepository');
 const documentRepository = require('../repositories/documentRepository');
 const orderAnnexureRepository = require('../repositories/orderAnnexureRepository');
+const { addWorkingDays } = require('./workingDaysCalculator');
 
 /**
  * Pulls every field a QT/PI/OC template needs from the DB and assembles a
@@ -266,6 +267,10 @@ async function freightBlock(orderId) {
     freight_forwarder_contact: row.freight_forwarder_contact,
     gst_treatment: row.gst_treatment,
     freight_cleared_at: formatDate(row.freight_cleared_at),
+    // FDN's own "Payment Due: ... by [date]" line — 3 working days from
+    // today (the date this debit note is being generated), per the same
+    // hard rule stated in the banner above it.
+    payment_due_date: formatDate(await addWorkingDays(new Date().toISOString().slice(0, 10), 3)),
   };
 }
 

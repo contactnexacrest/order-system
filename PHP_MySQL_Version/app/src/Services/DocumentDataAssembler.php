@@ -276,6 +276,10 @@ final class DocumentDataAssembler
             'freight_forwarder_contact' => $row['freight_forwarder_contact'],
             'gst_treatment'             => $row['gst_treatment'],
             'freight_cleared_at'        => self::formatDate($row['freight_cleared_at']),
+            // FDN's own "Payment Due: ... by [date]" line — 3 working days
+            // from today (the date this debit note is being generated),
+            // per the same hard rule stated in the banner above it.
+            'payment_due_date'          => self::formatDate(WorkingDaysCalculator::addWorkingDays(date('Y-m-d'), 3)),
         ];
     }
 
