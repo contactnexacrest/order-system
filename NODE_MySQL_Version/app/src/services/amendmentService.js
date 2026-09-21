@@ -66,9 +66,9 @@ async function createRequest(
 
   const snapshot = {
     quotation_ref: (qtDoc && qtDoc.document_reference) || null,
-    quotation_date: qtDoc ? String(qtDoc.generated_at).substring(0, 10) : null,
+    quotation_date: qtDoc ? documentDataAssembler.formatDate(String(qtDoc.generated_at).substring(0, 10)) : null,
     pi_ref: (piDoc && piDoc.document_reference) || null,
-    pi_date: piDoc ? String(piDoc.generated_at).substring(0, 10) : null,
+    pi_date: piDoc ? documentDataAssembler.formatDate(String(piDoc.generated_at).substring(0, 10)) : null,
     oc_ref: (ocDoc && ocDoc.document_reference) || null,
     product_summary: productSummary,
     total_fob_value: formatMoney(fobValue),

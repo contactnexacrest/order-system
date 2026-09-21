@@ -715,7 +715,7 @@ function section1TitleFor(code) {
     FDN: 'FROM (SELLER / EXPORTER)',
     CI: 'EXPORTER / SELLER',
     BLI: 'SHIPPER / EXPORTER (APPEARS ON BL EXACTLY AS WRITTEN)',
-    AMD: 'THE EXPORTER',
+    AMD: 'PARTIES TO THIS AMENDMENT',
     PL: 'EXPORTER',
   };
   return map[code] ?? 'SELLER / EXPORTER'; // QT, PI, OC

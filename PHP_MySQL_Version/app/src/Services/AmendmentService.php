@@ -62,9 +62,9 @@ final class AmendmentService
 
         $snapshot = [
             'quotation_ref'       => $qtDoc['document_reference'] ?? null,
-            'quotation_date'      => $qtDoc ? substr((string) $qtDoc['generated_at'], 0, 10) : null,
+            'quotation_date'      => $qtDoc ? DocumentDataAssembler::formatDate(substr((string) $qtDoc['generated_at'], 0, 10)) : null,
             'pi_ref'              => $piDoc['document_reference'] ?? null,
-            'pi_date'             => $piDoc ? substr((string) $piDoc['generated_at'], 0, 10) : null,
+            'pi_date'             => $piDoc ? DocumentDataAssembler::formatDate(substr((string) $piDoc['generated_at'], 0, 10)) : null,
             'oc_ref'              => $ocDoc['document_reference'] ?? null,
             'product_summary'     => $productSummary,
             'total_fob_value'     => number_format($fobValue, 2),

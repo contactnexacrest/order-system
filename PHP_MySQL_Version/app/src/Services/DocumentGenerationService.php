@@ -755,7 +755,7 @@ final class DocumentGenerationService
             'FDN' => 'FROM (SELLER / EXPORTER)',
             'CI' => 'EXPORTER / SELLER',
             'BLI' => 'SHIPPER / EXPORTER (APPEARS ON BL EXACTLY AS WRITTEN)',
-            'AMD' => 'THE EXPORTER',
+            'AMD' => 'PARTIES TO THIS AMENDMENT',
             'PL' => 'EXPORTER',
             default => 'SELLER / EXPORTER', // QT, PI, OC
         };

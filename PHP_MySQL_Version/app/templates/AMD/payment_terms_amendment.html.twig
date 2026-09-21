@@ -5,18 +5,39 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td class="label">AMENDMENT NO. *</td><td class="value">{{ meta.document_reference }}</td>
-    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
-  </tr>
-  <tr>
-    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ amendment.buyer_inquiry_ref }}</td>
-    <td class="label">EFFECTIVE DATE *</td><td class="value">{{ amendment.effective_from ?: 'TBC' }}</td>
+    <td><span class="label">AMENDMENT NO. *</span><span class="value">{{ meta.document_reference }}</span></td>
+    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ amendment.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
 
 {% block banner %}
-<div class="valid-until">&#9201; This amendment is not valid unless signed by authorised representatives of both parties.</div>
+<div class="banner banner-amber">&#9201;&nbsp; <span class="label">EFFECTIVE DATE OF AMENDMENT *</span> &nbsp; <span class="value">{{ amendment.effective_from ?: 'TBC — date from which amended terms apply' }}</span> &nbsp;&nbsp;<span class="note">This amendment is not valid unless signed by authorised representatives of both parties.</span></div>
+{% endblock %}
+
+{% block section1 %}
+<div class="section-title">1. {{ section1_title|default('PARTIES TO THIS AMENDMENT') }}</div>
+<table class="kv">
+  <tr><td class="k">The Exporter</td><td class="v"><strong>{{ company.legal_name }}</strong></td></tr>
+  <tr><td class="k">Registered Office</td><td class="v">{{ company.registered_office }}</td></tr>
+  <tr><td class="k">Corporate Office</td><td class="v">{{ company.corporate_office }}</td></tr>
+  <tr><td class="k">GSTIN</td><td class="v">{{ company.gstin }}</td></tr>
+  <tr><td class="k">IEC / PAN</td><td class="v">{{ company.iec_pan }}</td></tr>
+  <tr><td class="k">Contact Person</td><td class="v">{{ company.md_name }} — {{ company.md_title }}</td></tr>
+  <tr><td class="k">Phone</td><td class="v">{{ company.phone }}</td></tr>
+  <tr><td class="k">Email</td><td class="v">{{ company.email }}</td></tr>
+</table>
+
+<table class="kv" style="margin-top:6pt;">
+  <tr><td class="k" style="background:#FFFDE7;">The Importer *</td><td class="v" style="background:#FFFDE7;"><strong>{{ buyer.company_legal_name }}</strong></td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Registered Address *</td><td class="v" style="background:#FFFDE7;">{{ buyer.billing_address }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">VAT / EORI / Tax Reg. No. *</td><td class="v" style="background:#FFFDE7;">{{ buyer.vat_eori_tax_no ?: 'TBC' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Contact Person *</td><td class="v" style="background:#FFFDE7;">{{ buyer.contact_person ?: 'TBC' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Designation / Title *</td><td class="v" style="background:#FFFDE7;">TBC</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Phone *</td><td class="v" style="background:#FFFDE7;">{{ buyer.phone ?: '—' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Email *</td><td class="v" style="background:#FFFDE7;">{{ buyer.email ?: 'TBC' }}</td></tr>
+</table>
 {% endblock %}
 
 {% block body %}
@@ -33,7 +54,7 @@
 </table>
 
 <div class="section-title">3. ORIGINAL PAYMENT TERMS — AS STATED IN PROFORMA INVOICE</div>
-<div class="mandatory-note">Copied exactly from the original Proforma Invoice at the time this amendment was requested — frozen here even if the order's records are later updated.</div>
+<div class="box-warning-red">&#9888; Copy these terms exactly from the original Proforma Invoice — character for character. Any difference between what is written here and what appears on the PI may be used to argue that the terms were already varied before this amendment. Exact copy only.</div>
 <table class="kv">
   <tr><td class="k">Advance Payment *</td><td class="v">{{ amendment.original.advance_terms_text ?: '—' }}</td></tr>
   <tr><td class="k">Advance Amount *</td><td class="v">{{ amendment.original.currency }} {{ amendment.original.advance_amount ?: '—' }}</td></tr>
@@ -49,7 +70,7 @@
 </table>
 
 <div class="section-title">4. AMENDED PAYMENT TERMS — REPLACING SECTION 3 ABOVE</div>
-<div class="confirmed-banner">These amended terms replace the original payment terms stated in Section 3 above in their entirety. All other terms and conditions of the original Quotation and Proforma Invoice remain unchanged and in full force.</div>
+<div class="box-confirm-green">&#9989;&nbsp; These amended terms replace the original payment terms stated in Section 3 above in their entirety. All other terms and conditions of the original Quotation and Proforma Invoice remain unchanged and in full force.</div>
 <table class="kv">
   <tr><td class="k">Amended Advance Payment *</td><td class="v">{{ amendment.amended.advance_terms_text ?: 'Unchanged from Section 3 above' }}</td></tr>
   <tr><td class="k">Amended Advance Amount *</td><td class="v">{{ amendment.amended.advance_amount ? (amendment.original.currency ~ ' ' ~ amendment.amended.advance_amount) : 'Unchanged from Section 3 above' }}</td></tr>
@@ -66,14 +87,14 @@
 </table>
 
 <div class="section-title">6. LEGAL EFFECT OF THIS AMENDMENT</div>
-<p style="font-size:8.5px;">This Payment Terms Amendment Agreement constitutes a valid and binding amendment to the payment terms of the original commercial documents referenced in Section 2 above, subject to the following conditions:</p>
-<ul class="terms">
-  <li>This amendment is only valid when signed by authorised representatives of both The Exporter and The Importer.</li>
-  <li>No verbal agreement, email exchange, partial payment, or course of conduct constitutes a valid amendment to payment terms — only this signed document.</li>
-  <li>All terms and conditions of the original Quotation and Proforma Invoice not specifically addressed in this amendment remain in full force and effect.</li>
-  <li>The Dispute Resolution &amp; Public Communications clause and Acceptance &amp; Order of Precedence clause of the original documents remain in full force and are not varied by this amendment.</li>
-  <li>This amendment shall be filed in the order records of both parties and referenced by the Amendment No. stated above.</li>
-</ul>
+<div class="box-legal-blue">
+  <p>This Payment Terms Amendment Agreement constitutes a valid and binding amendment to the payment terms of the original commercial documents referenced in Section 2 above, subject to the following conditions:</p>
+  <p><strong>1.&nbsp; This amendment is only valid when signed by authorised representatives of both The Exporter and The Importer.</strong></p>
+  <p><strong>2.&nbsp; No verbal agreement, email exchange, partial payment, or course of conduct constitutes a valid amendment to payment terms — only this signed document.</strong></p>
+  <p>3.&nbsp; All terms and conditions of the original Quotation and Proforma Invoice not specifically addressed in this amendment remain in full force and effect.</p>
+  <p>4.&nbsp; The Dispute Resolution &amp; Public Communications clause and Acceptance &amp; Order of Precedence clause of the original documents remain in full force and are not varied by this amendment.</p>
+  <p>5.&nbsp; This amendment shall be filed in the order records of both parties and referenced by the Amendment No. stated above.</p>
+</div>
 
 <div class="section-title">7. THE IMPORTER — ACKNOWLEDGEMENT &amp; SIGNATURE</div>
 <table class="kv">
@@ -96,9 +117,9 @@
   <tr><td class="k">SWIFT / BIC</td><td class="v">{{ company.swift_bic }}</td></tr>
   <tr><td class="k">IFSC</td><td class="v">{{ company.ifsc }}</td></tr>
   <tr><td class="k">Bank Address</td><td class="v">{{ company.bank_address }}</td></tr>
-  <tr><td class="k">RBI Purpose Code — Advance</td><td class="v">{{ company.rbi_purpose_code_advance }}</td></tr>
-  <tr><td class="k">RBI Purpose Code — Balance</td><td class="v">{{ company.rbi_purpose_code_balance }}</td></tr>
-  <tr><td class="k">RBI Purpose Code — Freight</td><td class="v">{{ company.rbi_purpose_code_freight }} (CFR/CIF orders only)</td></tr>
+  <tr><td class="k">RBI Purpose Code — Advance</td><td class="v" style="color:#185FA5; font-weight:bold;">{{ company.rbi_purpose_code_advance }} — enter in the "Purpose of Remittance" field of your wire transfer form</td></tr>
+  <tr><td class="k">RBI Purpose Code — Balance</td><td class="v" style="color:#185FA5; font-weight:bold;">{{ company.rbi_purpose_code_balance }} — enter in the "Purpose of Remittance" field of your wire transfer form</td></tr>
+  <tr><td class="k">RBI Purpose Code — Freight</td><td class="v" style="color:#185FA5; font-weight:bold;">{{ company.rbi_purpose_code_freight }} — enter in the "Purpose of Remittance" field of your wire transfer form (CFR/CIF orders only)</td></tr>
 </table>
 
 {% endblock %}
