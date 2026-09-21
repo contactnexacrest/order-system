@@ -1,47 +1,53 @@
 {% extends "_layout.html.twig" %}
 
+{% block header_incoterm %}{% endblock %}
+
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td class="label">ANNEXURE TO</td><td class="value">{{ order.quotation_ref ?: order.buyer_inquiry_ref }}</td>
-    <td class="label">DATE</td><td class="value">{{ meta.generated_date }}</td>
-  </tr>
-  <tr>
-    <td class="label">BUYER INQUIRY REF</td><td class="value" colspan="3">{{ order.buyer_inquiry_ref }}</td>
+    <td><span class="label">ANNEXURE TO</span><span class="value">{{ order.quotation_ref ?: order.pi_ref ?: order.buyer_inquiry_ref }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
+<div class="banner" style="background:#FAEEDA; color:#633806; text-align:left; font-weight:normal;"><strong style="color:#8A6D1D;">Note:</strong> <em>Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.</em></div>
 {% endblock %}
+
+{% block section1 %}{% endblock %}
 
 {% block body %}
 
-<div class="section-title">2. BUYER</div>
-<table class="kv">
-  <tr><td class="k">Company Legal Name</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
-</table>
-
-<div class="section-title">3. PRODUCT TECHNICAL SPECIFICATIONS</div>
 {% for p in annexure_products %}
-<div class="annexure-product">
-  <div class="annexure-product-title">{{ loop.index }}. {{ p.name }}</div>
-  <table class="kv">
-    {% if p.description %}<tr><td class="k">Description</td><td class="v">{{ p.description }}</td></tr>{% endif %}
-    {% if p.dimensions %}<tr><td class="k">Dimensions</td><td class="v">{{ p.dimensions }}</td></tr>{% endif %}
-    {% if p.finish %}<tr><td class="k">Finish</td><td class="v">{{ p.finish }}</td></tr>{% endif %}
-    {% if p.components %}<tr><td class="k">Components</td><td class="v">{{ p.components|nl2br }}</td></tr>{% endif %}
-    {% if p.technical_notes %}<tr><td class="k">Technical Notes</td><td class="v">{{ p.technical_notes|nl2br }}</td></tr>{% endif %}
-  </table>
-  {% if p.images is not empty %}
-  <table class="annexure-images">
-    <tr>
-      {% for img in p.images %}
-        {% if img.data_uri %}<td><img src="{{ img.data_uri }}"></td>{% endif %}
-      {% endfor %}
-    </tr>
-  </table>
-  {% endif %}
-</div>
+<div class="section-title">PRODUCT {{ loop.index }} &nbsp;— &nbsp;{{ p.name }}</div>
+<table class="kv" style="table-layout:fixed;">
+  <tr>
+    <td style="width:35%; background:#000000; text-align:center; vertical-align:middle; padding:0; border-color:#000000;">
+      {% if p.images is not empty and (p.images|first).data_uri %}<img src="{{ (p.images|first).data_uri }}" style="max-width:100%; max-height:140pt;">{% endif %}
+    </td>
+    <td class="v" style="width:65%; vertical-align:top;">
+      {% if p.description %}<p style="margin:0 0 4pt; font-weight:bold; color:#17233A;">{{ p.description }}</p>{% endif %}
+      {% if p.finish %}<p style="margin:0 0 3pt;"><strong style="color:#17233A;">Surface Finish:</strong> {{ p.finish }}</p>{% endif %}
+      {% if p.dimensions %}<p style="margin:0 0 3pt;"><strong style="color:#17233A;">Dimensions:</strong> {{ p.dimensions }}</p>{% endif %}
+      {% if p.components %}<p style="margin:0 0 3pt;"><strong style="color:#17233A;">Includes:</strong> {{ p.components|nl2br }}</p>{% endif %}
+      {% if p.technical_notes %}<p style="margin:0;">{{ p.technical_notes|nl2br }}</p>{% endif %}
+    </td>
+  </tr>
+</table>
+{% if p.images|length > 1 %}
+<table class="annexure-images">
+  <tr>
+    {% for img in p.images %}
+      {% if not loop.first and img.data_uri %}<td><img src="{{ img.data_uri }}"></td>{% endif %}
+    {% endfor %}
+  </tr>
+</table>
+{% endif %}
 {% else %}
-<p class="muted">No product entries have been added to this Annexure yet.</p>
+<p class="placeholder-italic">No product entries have been added to this Annexure yet.</p>
 {% endfor %}
 
+<div class="banner" style="background:#E6F1FB; color:#17233A; text-align:left; font-weight:normal;">This Annexure A forms an integral part of {{ order.quotation_ref ?: order.pi_ref ?: 'the referenced document' }} dated {{ meta.generated_date }}. <em style="color:#185FA5;">The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases. Product images and technical drawings in this annexure are for reference and identification purposes only. This Annexure is not valid as a standalone document.</em></div>
+
 {% endblock %}
+
+{% block terms_section %}{% endblock %}
