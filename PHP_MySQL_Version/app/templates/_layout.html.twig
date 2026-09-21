@@ -216,8 +216,8 @@
       </td>
     </tr>
   </table>
-  {% if signatory.signature_data_uri or signatory.seal_data_uri %}
-  <p class="signature-disclaimer">This is a system-generated document. The signature and company seal shown are digital reproductions of the authorised signatory's specimen signature and the company seal, affixed electronically by NexaCrest's order management system.</p>
+  {% if (company.show_generated_document_disclaimer is not defined or company.show_generated_document_disclaimer) and (signatory.signature_data_uri or signatory.seal_data_uri) %}
+  <p class="signature-disclaimer">{{ company.generated_document_disclaimer_text ?: "This is a system-generated document. The signature and company seal shown are NexaCrest's authorised electronic signature and digital company seal, applied automatically by the order management system under internal document-authorisation controls." }}</p>
   {% endif %}
 </div>
 {% endblock %}

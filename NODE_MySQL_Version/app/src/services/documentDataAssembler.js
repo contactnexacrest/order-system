@@ -362,11 +362,19 @@ async function companyBlock() {
     'rcmc_number', 'rcmc_valid_until',
     'rbi_purpose_code_advance', 'rbi_purpose_code_balance', 'rbi_purpose_code_freight',
     'quantity_shortfall_tolerance_pct', 'non_usd_price_buffer_pct',
+    'generated_document_disclaimer_text',
   ];
   const out = {};
   for (const key of keys) {
     out[key] = await companySettingsRepository.get(key);
   }
+  // Cast to a real boolean here (rather than leaving the raw '0'/'1' string
+  // for the template to evaluate) so it is stored as a proper JSON boolean
+  // in company_snapshot_json and reads identically in both the Node/Nunjucks
+  // and PHP/Twig stacks — Nunjucks (JS truthiness) treats the string "0" as
+  // truthy, unlike Twig, so leaving it as a raw string would silently break
+  // the toggle on this stack only.
+  out.show_generated_document_disclaimer = (await companySettingsRepository.get('show_generated_document_disclaimer')) === '1';
   return out;
 }
 

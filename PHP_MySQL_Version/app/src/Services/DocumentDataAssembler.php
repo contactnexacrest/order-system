@@ -375,11 +375,18 @@ final class DocumentDataAssembler
             'rcmc_number', 'rcmc_valid_until',
             'rbi_purpose_code_advance', 'rbi_purpose_code_balance', 'rbi_purpose_code_freight',
             'quantity_shortfall_tolerance_pct', 'non_usd_price_buffer_pct',
+            'generated_document_disclaimer_text',
         ];
         $out = [];
         foreach ($keys as $key) {
             $out[$key] = CompanySettingsRepository::get($key);
         }
+        // Cast to a real boolean here (rather than leaving the raw '0'/'1'
+        // string for the template to evaluate) so it is stored as a proper
+        // JSON boolean in company_snapshot_json and reads identically in
+        // both the PHP/Twig and Node/Nunjucks stacks — Twig and Nunjucks
+        // disagree on whether the string "0" is truthy.
+        $out['show_generated_document_disclaimer'] = CompanySettingsRepository::get('show_generated_document_disclaimer') === '1';
         return $out;
     }
 

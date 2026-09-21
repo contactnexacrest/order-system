@@ -462,6 +462,16 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('dispute_response_days_n', '10', 'number', 'disputes', 'WORKING days allowed for a dispute response before escalation — must match the "ten (10) working days" figure in the Dispute Resolution & Public Communications clause below verbatim, since that clause is the legally binding promise printed on QT/PI/OC/BUYERPO. (Corrected from an earlier placeholder of 7, which did not match the clause text.) response_due_date is computed via WorkingDaysCalculator, which skips weekly_off_days and company_holidays — plain calendar-day arithmetic would silently undercount the deadline by counting Sundays/holidays as working days.', 0),
   ('weekly_off_days', 'sunday', 'string', 'disputes', 'Comma-separated lowercase weekday name(s) that never count as a working day, used by WorkingDaysCalculator (Addition beyond the spec''s named key list — needed to make dispute_response_days_n''s "working days" figure actually computable; NexaCrest''s standard Mon-Sat working week per this same section''s holiday calendar).', 0);
 
+-- Addition beyond the spec's named key list: the signature/seal on generated
+-- documents are electronic marks, not a scan of a wet-ink signature or a
+-- physical company seal, so a short disclaimer is shown under the signature
+-- block. Both the on/off toggle and the wording itself are Admin-editable
+-- here (not hardcoded in the templates) so the text can be revised at any
+-- time without a code change — e.g. once a physical company seal exists.
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('show_generated_document_disclaimer', '1', 'boolean', 'documents', 'Show the "system-generated document" disclaimer under the signature block on any generated document that carries a signature/seal image. Set to 0 to hide it everywhere.', 0),
+  ('generated_document_disclaimer_text', 'This is a system-generated document. The signature and company seal shown are NexaCrest''s authorised electronic signature and digital company seal, applied automatically by the order management system under internal document-authorisation controls.', 'string', 'documents', 'Exact wording shown under the signature block when the disclaimer above is enabled. Edit freely — no code change needed.', 0);
+
 -- Protected by default: the 12 is_sensitive fields (identity/banking/
 -- compliance — a wrong edit is real financial/legal damage), plus the 3
 -- document reference-format strings (changing one mid-year breaks

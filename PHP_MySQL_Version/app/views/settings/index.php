@@ -19,14 +19,38 @@
               <?php if ($row['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
               <?php if ($row['description']): ?><small class="muted"><?= htmlspecialchars($row['description']) ?></small><?php endif; ?>
             </span>
-            <input
-              type="text"
-              name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"
-              value="<?= htmlspecialchars($row['setting_value'] ?? '') ?>"
-              data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
-              data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
-              <?= $row['is_protected'] ? 'readonly' : '' ?>
-            >
+            <?php if ($row['value_type'] === 'boolean'): ?>
+              <input type="hidden" name="settings[<?= htmlspecialchars($row['setting_key']) ?>]" value="<?= $row['setting_value'] === '1' ? '1' : '0' ?>">
+              <input
+                type="checkbox"
+                value="1"
+                data-key="<?= htmlspecialchars($row['setting_key']) ?>"
+                <?= $row['setting_value'] === '1' ? 'checked' : '' ?>
+                data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
+                data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
+                <?= $row['is_protected'] ? 'disabled' : '' ?>
+                onchange="this.previousElementSibling.value = this.checked ? '1' : '0';"
+              >
+            <?php elseif (mb_strlen((string) ($row['setting_value'] ?? '')) > 100): ?>
+              <textarea
+                name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"
+                data-key="<?= htmlspecialchars($row['setting_key']) ?>"
+                rows="3"
+                data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
+                data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
+                <?= $row['is_protected'] ? 'readonly' : '' ?>
+              ><?= htmlspecialchars($row['setting_value'] ?? '') ?></textarea>
+            <?php else: ?>
+              <input
+                type="text"
+                name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"
+                data-key="<?= htmlspecialchars($row['setting_key']) ?>"
+                value="<?= htmlspecialchars($row['setting_value'] ?? '') ?>"
+                data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
+                data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
+                <?= $row['is_protected'] ? 'readonly' : '' ?>
+              >
+            <?php endif; ?>
             <?php if ($row['is_protected']): ?>
               <input type="hidden" name="unlocked[<?= htmlspecialchars($row['setting_key']) ?>]" value="0" class="unlock-flag">
               <button type="button" class="btn-sm unlock-btn" onclick="unlockRow(this)">Unlock</button>
@@ -44,12 +68,12 @@
 <script>
 function unlockRow(btn) {
   var label = btn.closest('.setting-row');
-  var input = label.querySelector('input[type=text]');
+  var field = label.querySelector('input[type=text][data-key], input[type=checkbox][data-key], textarea[data-key]');
   var flag = label.querySelector('.unlock-flag');
   var reason = prompt('Why are you unlocking this protected field? (required)');
   if (!reason || !reason.trim()) { return; }
-  input.removeAttribute('readonly');
-  input.focus();
+  if (field.type === 'checkbox') { field.disabled = false; } else { field.removeAttribute('readonly'); }
+  field.focus();
   flag.value = '1';
   var icon = label.querySelector('.lock-icon');
   if (icon) { icon.textContent = '\u{1F513}'; icon.title = 'Unlocked for this edit'; }
@@ -61,15 +85,16 @@ function confirmSettingsSave(form) {
   var changedSensitive = false;
   var changedProtected = 0;
   var blockedProtected = [];
-  form.querySelectorAll('input[data-sensitive]').forEach(function (el) {
-    if (el.value !== el.defaultValue) {
+  form.querySelectorAll('input[data-key], textarea[data-key]').forEach(function (el) {
+    var isChanged = el.type === 'checkbox' ? (el.checked !== el.defaultChecked) : (el.value !== el.defaultValue);
+    if (isChanged) {
       changedAny = true;
       if (el.dataset.sensitive === '1') changedSensitive = true;
       if (el.dataset.protected === '1') {
         changedProtected++;
         var label = el.closest('.setting-row');
         var flag = label ? label.querySelector('.unlock-flag') : null;
-        if (!flag || flag.value !== '1') { blockedProtected.push(el.name); }
+        if (!flag || flag.value !== '1') { blockedProtected.push(el.dataset.key); }
       }
     }
   });

@@ -55,7 +55,8 @@ CREATE TABLE company_settings (
 -- failed_login_lockout_count, password_min_length, password_complexity_json,
 -- password_expiry_days, non_usd_price_buffer_pct, revision_start_number,
 -- master_tracking_ref_format, client_number_format, order_ref_format,
--- dispute_response_days_n
+-- dispute_response_days_n, weekly_off_days, show_generated_document_disclaimer,
+-- generated_document_disclaimer_text
 
 CREATE TABLE ports (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
