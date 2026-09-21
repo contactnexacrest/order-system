@@ -19,6 +19,7 @@ use App\Controllers\DisputeController;
 use App\Controllers\DocumentController;
 use App\Controllers\EmailDispatchController;
 use App\Controllers\FieldProtectionController;
+use App\Controllers\HolidayController;
 use App\Controllers\NotificationController;
 use App\Controllers\OrderController;
 use App\Controllers\ReportController;
@@ -56,6 +57,7 @@ $reviews = new ReviewController();
 $emailDispatch = new EmailDispatchController();
 $amendments = new AmendmentController();
 $disputes = new DisputeController();
+$holidays = new HolidayController();
 $auditLog = new AuditLogController();
 $notifications = new NotificationController();
 $reports = new ReportController();
@@ -99,6 +101,9 @@ $router->get('/', [$dashboard, 'index'], [SessionAuth::required()]);
 
 $router->get('/settings', [$settings, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->get('/holidays', [$holidays, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/holidays', [$holidays, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/holidays/{id}/delete', [$holidays, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 
 // NOTE: deliberately NOT "/assets" — that path collides with the static
 // public_html/assets/ folder (css/js/img). On Apache, .htaccess's -d check

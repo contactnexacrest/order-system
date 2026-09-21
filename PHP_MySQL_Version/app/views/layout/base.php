@@ -23,6 +23,7 @@ $isEffectiveSuperAdmin = $current && SuperAdminService::isEffective((int) $curre
     <?php endif; ?>
     <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_company_settings')): ?>
       <a href="/settings">Company Settings</a>
+      <a href="/holidays">Holiday Calendar</a>
     <?php endif; ?>
     <?php if ($current && PermissionService::can((int)$current['id'], $current['role_id'] !== null ? (int)$current['role_id'] : null, 'manage_assets')): ?>
       <a href="/company-assets">Assets</a>

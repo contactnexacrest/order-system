@@ -9,6 +9,7 @@ const lookupRepository = require('../repositories/lookupRepository');
 const orderRepository = require('../repositories/orderRepository');
 const userRepository = require('../repositories/userRepository');
 const fileUploadService = require('../services/fileUploadService');
+const workingDaysCalculator = require('../services/workingDaysCalculator');
 
 // Port of App\Controllers\DisputeController. Spec Section 16 — Dispute
 // Management.
@@ -20,12 +21,6 @@ function sanitizePathSegment(value) {
 function todayYmd() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function addDaysYmd(fromYmd, days) {
-  const d = new Date(`${fromYmd}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
 /** Global dispute log, filterable by status. */
@@ -75,8 +70,12 @@ async function create(req, res) {
     return;
   }
 
-  const responseDays = parseInt((await companySettingsRepository.get('dispute_response_days_n')) || '7', 10);
-  const responseDueDate = addDaysYmd(noticeDate, responseDays);
+  // The seeded Dispute Resolution clause promises "ten (10) WORKING days"
+  // on every QT/PI/OC/BUYERPO — calendar-day arithmetic here would
+  // silently count Sundays/holidays as working days and print a due date
+  // the clause doesn't actually support.
+  const responseDays = parseInt((await companySettingsRepository.get('dispute_response_days_n')) || '10', 10);
+  const responseDueDate = await workingDaysCalculator.addWorkingDays(noticeDate, responseDays);
 
   const disputeId = await disputeRepository.create(orderId, noticeDate, fromParty, description, assignedTo, responseDueDate);
   await auditLogRepository.log(req.user.id, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description);

@@ -15,6 +15,7 @@ use App\Repositories\OrderRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
 use App\Services\FileUploadService;
+use App\Services\WorkingDaysCalculator;
 
 /** Spec Section 16 — Dispute Management. */
 final class DisputeController
@@ -62,8 +63,12 @@ final class DisputeController
             return;
         }
 
-        $responseDays = (int) (CompanySettingsRepository::get('dispute_response_days_n') ?? '7');
-        $responseDueDate = (new \DateTimeImmutable($noticeDate))->modify("+{$responseDays} days")->format('Y-m-d');
+        // The seeded Dispute Resolution clause promises "ten (10) WORKING
+        // days" on every QT/PI/OC/BUYERPO — calendar-day arithmetic here
+        // would silently count Sundays/holidays as working days and print
+        // a due date the clause doesn't actually support.
+        $responseDays = (int) (CompanySettingsRepository::get('dispute_response_days_n') ?? '10');
+        $responseDueDate = WorkingDaysCalculator::addWorkingDays($noticeDate, $responseDays);
 
         $disputeId = DisputeRepository::create($orderId, $noticeDate, $fromParty, $description, $assignedTo, $responseDueDate);
         AuditLogRepository::log((int) AuthService::currentUser()['id'], 'DISPUTE_RAISED', 'disputes', $disputeId, null, null, $description);

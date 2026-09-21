@@ -1317,11 +1317,46 @@ ALTER TABLE documents
   ADD COLUMN company_snapshot_json JSON NULL;
 
 -- ================================================================
--- END OF SCHEMA — 61 tables. All open schema questions resolved
+-- SECTION Q — WORKING-DAYS CALCULATOR & HOLIDAY CALENDAR (added 2026-09-21)
+-- ================================================================
+-- Real bug this closes: disputes.response_due_date is documented right
+-- above (see its column comment) as "notice_date + N working days (N from
+-- company_settings)" — and the Dispute Resolution & Public Communications
+-- clause seeded into tc_clauses is a legally binding contractual term
+-- stating the receiving party "shall respond within ten (10) working days
+-- of deemed delivery". DisputeController::create() computed this due date
+-- with plain calendar-day arithmetic (DateTimeImmutable::modify("+N
+-- days")), silently counting Sundays as if they were business days — a
+-- due date printed on a legal notice that doesn't match what "working
+-- days" actually means is exactly the kind of inconsistency that
+-- undermines the company's credibility in a dispute. There was also no
+-- holiday calendar anywhere in the schema, so even a correct weekly-off
+-- skip would still have counted national holidays as working days.
+--
+-- company_holidays is a flat, admin-managed list of specific dates (not a
+-- recurring rule engine — a public holiday's date changes every year
+-- anyway, e.g. Diwali, so re-entering each year's actual dates is both
+-- simpler and more correct than a "same day every year" rule). The weekly
+-- off-day(s) are a company_settings row (see seed.sql) rather than a
+-- second table, since NexaCrest's Mon-Sat working week is a single fixed
+-- fact, not a list that grows over time.
+CREATE TABLE company_holidays (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  holiday_date DATE NOT NULL,
+  description  VARCHAR(255) NOT NULL,
+  created_by   BIGINT UNSIGNED NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  UNIQUE KEY uq_company_holidays_date (holiday_date)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- END OF SCHEMA — 62 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
 -- Section N (Super Admin tier) added 2026-09-20.
 -- Section O (client portal) added 2026-09-20.
 -- Section P (document data-integrity snapshot) added 2026-09-21.
+-- Section Q (working-days calculator & holiday calendar) added 2026-09-21.
 -- ================================================================
