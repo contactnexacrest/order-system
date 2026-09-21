@@ -355,6 +355,29 @@ final class DocumentDataAssembler
     }
 
     /**
+     * Rebuilds the company/bank/LUT block from a `documents` row's own
+     * company_snapshot_json instead of re-reading company_settings live.
+     * Used anywhere an already-generated document is re-rendered (the
+     * DRAFT->FINAL watermark swap in finalizeApproval() being the main
+     * case) — same reasoning as signatoryFromSnapshot() above: a bank
+     * account switch or LUT renewal made during the review window must
+     * never change what a buyer-facing FINAL PDF shows versus the DRAFT a
+     * reviewer actually approved. Falls back to a live companyBlock() read
+     * for rows generated before this column existed (company_snapshot_json
+     * NULL), same fallback convention as the signatory snapshot.
+     *
+     * @param array<string,mixed> $document a row from the documents table
+     */
+    public static function companyFromSnapshot(array $document): array
+    {
+        if (empty($document['company_snapshot_json'])) {
+            return self::companyBlock();
+        }
+        $decoded = json_decode((string) $document['company_snapshot_json'], true);
+        return is_array($decoded) ? $decoded : self::companyBlock();
+    }
+
+    /**
      * DOMPDF renders with isRemoteEnabled=false (no fetching URLs, including
      * the app's own authenticated /company-assets/preview route) — so
      * images must be embedded directly as base64 data URIs, read straight

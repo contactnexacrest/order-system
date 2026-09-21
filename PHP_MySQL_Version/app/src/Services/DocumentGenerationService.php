@@ -135,7 +135,8 @@ final class DocumentGenerationService
             $pdfFileId,
             $docxFileId,
             $generatedByUserId,
-            $signatory
+            $signatory,
+            $data['company']
         );
 
         return [
@@ -296,6 +297,13 @@ final class DocumentGenerationService
             // blank signature/seal block, since this render path never
             // merged a `signatory` key into $context at all).
             'signatory' => DocumentDataAssembler::signatoryFromSnapshot($document),
+            // Same reasoning, extended to company/bank/LUT details: $data
+            // above re-read company_settings LIVE via assemble() ->
+            // companyBlock(), so a bank account switch or LUT renewal made
+            // during the review window would have silently changed what
+            // the buyer-facing FINAL PDF shows versus the DRAFT a reviewer
+            // actually approved. Override with the row's own snapshot.
+            'company' => DocumentDataAssembler::companyFromSnapshot($document),
         ]);
 
         $twig = self::twigEnvironment();
@@ -476,7 +484,8 @@ final class DocumentGenerationService
             $pdfFileId,
             null,
             $generatedByUserId,
-            $signatory
+            $signatory,
+            $company
         );
 
         AmendmentRepository::attachDocument($amendmentId, $documentId);

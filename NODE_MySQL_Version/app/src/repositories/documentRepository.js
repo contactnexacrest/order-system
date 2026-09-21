@@ -82,17 +82,21 @@ async function markSent(id) {
  * @param {object|null} signatory as returned by documentDataAssembler.signatoryBlock() —
  *        snapshotted onto the row so a later change to any signatory
  *        default never alters how a document that was already generated reads.
+ * @param {object|null} companySnapshot as returned by documentDataAssembler.companyBlock() —
+ *        snapshotted onto the row for the same reason: a bank account
+ *        switch or LUT renewal must never alter how a document that was
+ *        already generated reads. See schema.sql SECTION P.
  */
-async function create(orderId, documentTypeId, documentReference, revisionNumber, pdfFileId, docxFileId, generatedBy, signatory = null) {
+async function create(orderId, documentTypeId, documentReference, revisionNumber, pdfFileId, docxFileId, generatedBy, signatory = null, companySnapshot = null) {
   const result = await db.execute(
     `INSERT INTO documents
         (order_id, document_type_id, document_reference, revision_number, status, generated_by, docx_file_id, pdf_file_id,
          signatory_user_id, signatory_name_snapshot, signatory_designation_snapshot,
-         signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal)
+         signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal, company_snapshot_json)
      VALUES
         (:order_id, :document_type_id, :document_reference, :revision_number, 'draft', :generated_by, :docx_file_id, :pdf_file_id,
          :signatory_user_id, :signatory_name_snapshot, :signatory_designation_snapshot,
-         :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal)`,
+         :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal, :company_snapshot_json)`,
     {
       order_id: orderId, document_type_id: documentTypeId, document_reference: documentReference,
       revision_number: revisionNumber, generated_by: generatedBy, docx_file_id: docxFileId, pdf_file_id: pdfFileId,
@@ -102,6 +106,7 @@ async function create(orderId, documentTypeId, documentReference, revisionNumber
       signature_asset_id_snapshot: signatory ? signatory.signature_asset_id : null,
       seal_asset_id_snapshot: signatory ? signatory.seal_asset_id : null,
       used_designation_seal: signatory && signatory.used_designation_seal ? 1 : 0,
+      company_snapshot_json: companySnapshot !== null ? JSON.stringify(companySnapshot) : null,
     }
   );
   return result.insertId;

@@ -131,6 +131,11 @@ final class DocumentRepository
      *        DocumentDataAssembler::signatoryBlock() — snapshotted onto the
      *        row so a later change to any signatory default never alters
      *        how a document that was already generated reads.
+     * @param array<string,mixed>|null $companySnapshot as returned by
+     *        DocumentDataAssembler::companyBlock() — snapshotted onto the
+     *        row for the same reason: a bank account switch or LUT renewal
+     *        must never alter how a document that was already generated
+     *        reads. See schema.sql SECTION P.
      */
     public static function create(
         ?int $orderId,
@@ -140,18 +145,19 @@ final class DocumentRepository
         ?int $pdfFileId,
         ?int $docxFileId,
         ?int $generatedBy,
-        ?array $signatory = null
+        ?array $signatory = null,
+        ?array $companySnapshot = null
     ): int {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'INSERT INTO documents
                 (order_id, document_type_id, document_reference, revision_number, status, generated_by, docx_file_id, pdf_file_id,
                  signatory_user_id, signatory_name_snapshot, signatory_designation_snapshot,
-                 signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal)
+                 signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal, company_snapshot_json)
              VALUES
                 (:order_id, :document_type_id, :document_reference, :revision_number, \'draft\', :generated_by, :docx_file_id, :pdf_file_id,
                  :signatory_user_id, :signatory_name_snapshot, :signatory_designation_snapshot,
-                 :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal)'
+                 :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal, :company_snapshot_json)'
         );
         $stmt->execute([
             'order_id'           => $orderId,
@@ -167,6 +173,7 @@ final class DocumentRepository
             'signature_asset_id_snapshot' => $signatory['signature_asset_id'] ?? null,
             'seal_asset_id_snapshot' => $signatory['seal_asset_id'] ?? null,
             'used_designation_seal' => !empty($signatory['used_designation_seal']) ? 1 : 0,
+            'company_snapshot_json' => $companySnapshot !== null ? json_encode($companySnapshot) : null,
         ]);
         return (int) $pdo->lastInsertId();
     }

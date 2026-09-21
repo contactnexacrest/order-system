@@ -157,7 +157,8 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     pdfFileId,
     docxFileId,
     generatedByUserId,
-    signatory
+    signatory,
+    data.company
   );
 
   return {
@@ -293,6 +294,13 @@ async function finalizeApproval(documentId) {
     // buyer-facing FINAL PDF rendered with a blank signature/seal block,
     // since this render path never included a `signatory` key at all).
     signatory: await documentDataAssembler.signatoryFromSnapshot(document),
+    // Same reasoning, extended to company/bank/LUT details: `data` above
+    // re-read company_settings LIVE via assemble() -> companyBlock(), so a
+    // bank account switch or LUT renewal made during the review window
+    // would have silently changed what the buyer-facing FINAL PDF shows
+    // versus the DRAFT a reviewer actually approved. Override with the
+    // row's own snapshot.
+    company: await documentDataAssembler.companyFromSnapshot(document),
   };
 
   const twig = templatesEnvironment();
@@ -457,7 +465,7 @@ async function generateAmendment(amendmentId, generatedByUserId) {
     false
   );
 
-  const documentId = await documentRepository.create(orderId, docTypeId, amendment.amendment_reference, 0, pdfFileId, null, generatedByUserId, signatory);
+  const documentId = await documentRepository.create(orderId, docTypeId, amendment.amendment_reference, 0, pdfFileId, null, generatedByUserId, signatory, company);
 
   await amendmentRepository.attachDocument(amendmentId, documentId);
 

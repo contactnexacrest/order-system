@@ -338,6 +338,32 @@ async function companyBlock() {
 }
 
 /**
+ * Rebuilds the company/bank/LUT block from a `documents` row's own
+ * company_snapshot_json instead of re-reading company_settings live. Used
+ * anywhere an already-generated document is re-rendered (the DRAFT->FINAL
+ * watermark swap in finalizeApproval() being the main case) — same
+ * reasoning as signatoryFromSnapshot() below: a bank account switch or LUT
+ * renewal made during the review window must never change what a
+ * buyer-facing FINAL PDF shows versus the DRAFT a reviewer actually
+ * approved. Falls back to a live companyBlock() read for rows generated
+ * before this column existed (company_snapshot_json NULL), same fallback
+ * convention as the signatory snapshot.
+ */
+async function companyFromSnapshot(document) {
+  if (!document.company_snapshot_json) {
+    return companyBlock();
+  }
+  try {
+    const decoded = typeof document.company_snapshot_json === 'string'
+      ? JSON.parse(document.company_snapshot_json)
+      : document.company_snapshot_json;
+    return decoded && typeof decoded === 'object' ? decoded : await companyBlock();
+  } catch (err) {
+    return companyBlock();
+  }
+}
+
+/**
  * Puppeteer's page.setContent() has no filesystem/base-URL context (and we
  * deliberately never point it at the app's own authenticated preview route),
  * so images must be embedded directly as base64 data URIs, read straight
@@ -566,6 +592,7 @@ function trimTrailingZeros(numStr) {
 module.exports = {
   assemble,
   companyBlock,
+  companyFromSnapshot,
   assetsBlock,
   signatoryBlock,
   signatoryFromSnapshot,

@@ -1287,11 +1287,41 @@ CREATE TABLE client_password_reset_tokens (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION P — DOCUMENT DATA-INTEGRITY SNAPSHOT (added 2026-09-21)
+-- ================================================================
+-- Same reasoning as the signatory snapshot columns above, extended to the
+-- rest of what DocumentDataAssembler::companyBlock() reads: company
+-- identity (legal name, registered office, GSTIN, IEC/PAN), bank details,
+-- LUT/RCMC numbers, and the RBI purpose codes are all company_settings
+-- rows that can legitimately change at any time — a bank account switch,
+-- an LUT renewal — completely independent of any single order. Real bug
+-- this closes: DocumentGenerationService::finalizeApproval() (the
+-- draft -> final watermark-swap re-render, which its own docblock
+-- correctly assumes is safe because "nothing legitimately changes an
+-- order's data" between generation and approval) re-ran
+-- DocumentDataAssembler::assemble() from scratch, which re-read
+-- companyBlock() LIVE — so if the company's bank account or LUT number
+-- changed during the review window, the buyer-facing FINAL PDF would
+-- silently show different bank/LUT details than the DRAFT the reviewer
+-- actually approved. company_snapshot_json is captured once, at
+-- generate() time, and finalizeApproval() renders from it instead of a
+-- fresh companyBlock() call — a past document's company/bank/LUT details
+-- can never drift after the fact, matching the signatory snapshot's exact
+-- guarantee. (document_revisions.data_snapshot, above, was clearly
+-- reserved for this same purpose but assumes one `documents` row persists
+-- across every revision; the app instead creates a new `documents` row
+-- per revision — see DocumentGenerationService::generate() — so a column
+-- on `documents` itself, not a second table, is the fix that actually
+-- matches how revisions work today.)
+ALTER TABLE documents
+  ADD COLUMN company_snapshot_json JSON NULL;
+
+-- ================================================================
 -- END OF SCHEMA — 61 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
 -- Section N (Super Admin tier) added 2026-09-20.
 -- Section O (client portal) added 2026-09-20.
--- Section N (Super Admin tier) added 2026-09-20.
+-- Section P (document data-integrity snapshot) added 2026-09-21.
 -- ================================================================
