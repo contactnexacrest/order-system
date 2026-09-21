@@ -115,6 +115,7 @@
   .signature-block .signatory-name { font-weight: bold; font-size: 13pt; color: #17233A; }
   .signature-block .signatory-title { font-weight: bold; color: #000000; }
   .signature-block .signatory-company { font-size: 9pt; color: #5B6573; }
+  .signature-disclaimer { font-size: 7.5pt; font-style: italic; color: #888888; margin-top: 6pt; }
   .signature-img { height: 32pt; }
   .seal-img { height: 85pt; margin-top: 4pt; }
   .signature-cell { position: relative; min-height: 95pt; }
@@ -202,6 +203,9 @@
       </td>
     </tr>
   </table>
+  {% if signatory.signature_data_uri or signatory.seal_data_uri %}
+  <p class="signature-disclaimer">This is a system-generated document. The signature and company seal shown are digital reproductions of the authorised signatory's specimen signature and the company seal, affixed electronically by NexaCrest's order management system.</p>
+  {% endif %}
 </div>
 {% endblock %}
 
