@@ -52,6 +52,8 @@ async function assemble(orderId) {
   const qtDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'QT');
   const piDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
   const ciDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CI');
+  const fdnDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'FDN');
+  const plDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PL');
 
   return {
     company,
@@ -84,6 +86,9 @@ async function assemble(orderId) {
       pi_ref: piDoc ? piDoc.document_reference : null,
       ci_ref: ciDoc ? ciDoc.document_reference : null,
       ci_date: ciDoc ? formatDate(ciDoc.generated_at ?? null) : null,
+      fdn_ref: fdnDoc ? fdnDoc.document_reference : null,
+      fdn_date: fdnDoc ? formatDate(fdnDoc.generated_at ?? null) : null,
+      pl_ref: plDoc ? plDoc.document_reference : null,
       special_requirements: order.special_requirements,
       estimated_total_cbm: order.estimated_total_cbm,
       estimated_gross_weight_kg: order.estimated_gross_weight_kg,

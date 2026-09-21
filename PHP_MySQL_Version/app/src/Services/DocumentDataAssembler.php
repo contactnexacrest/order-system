@@ -56,6 +56,8 @@ final class DocumentDataAssembler
         $qtDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'QT');
         $piDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
         $ciDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CI');
+        $fdnDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'FDN');
+        $plDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PL');
 
         return [
             'company' => $company,
@@ -88,6 +90,9 @@ final class DocumentDataAssembler
                 'pi_ref'               => $piDoc['document_reference'] ?? null,
                 'ci_ref'               => $ciDoc['document_reference'] ?? null,
                 'ci_date'              => $ciDoc ? self::formatDate($ciDoc['generated_at'] ?? null) : null,
+                'fdn_ref'              => $fdnDoc['document_reference'] ?? null,
+                'fdn_date'             => $fdnDoc ? self::formatDate($fdnDoc['generated_at'] ?? null) : null,
+                'pl_ref'               => $plDoc['document_reference'] ?? null,
                 'special_requirements' => $order['special_requirements'],
                 'estimated_total_cbm'      => $order['estimated_total_cbm'],
                 'estimated_gross_weight_kg' => $order['estimated_gross_weight_kg'],
