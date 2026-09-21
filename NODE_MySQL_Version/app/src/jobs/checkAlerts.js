@@ -5,6 +5,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const notificationRepository = require('../repositories/notificationRepository');
 const userRepository = require('../repositories/userRepository');
 const emailService = require('../services/emailService');
+const workingDaysCalculator = require('../services/workingDaysCalculator');
 const db = require('../config/db');
 
 /**
@@ -88,8 +89,20 @@ async function run() {
     }
   }
 
-  // --- FDN payment overdue (freight generated, not yet cleared, C working days elapsed) ---
-  const fdnOverdueDays = parseInt((await companySettingsRepository.get('fdn_overdue_days_c')) || '7', 10);
+  // --- FDN payment overdue (freight generated, not yet cleared, C WORKING
+  // days elapsed) --- Real bug this closes: the CFR/CIF Indicative Freight
+  // Validity clause (seeded on QT and PI) is a written promise to the buyer
+  // that freight "must be received BEFORE shipment booking is confirmed...
+  // payable within 3 working days of issue" — but this check used plain
+  // calendar-day SQL arithmetic against fdn_overdue_days_c=7, so the alert
+  // didn't fire until 7 calendar days after issue. For the 4+ days between
+  // the buyer actually breaching their 3-WORKING-day written commitment and
+  // this alert finally firing, nothing in the system showed the payment as
+  // overdue at all. Aligned fdn_overdue_days_c to 3 (the clause's own
+  // figure) and switched the comparison to workingDaysCalculator, matching
+  // the same working-days-not-calendar-days fix already applied to the
+  // dispute response deadline.
+  const fdnOverdueDays = parseInt((await companySettingsRepository.get('fdn_overdue_days_c')) || '3', 10);
   const overdueFreight = await db.query(
     `SELECT o.id AS order_id, o.order_reference, d.generated_at
      FROM order_freight of_
@@ -97,12 +110,14 @@ async function run() {
      JOIN orders o ON o.id = of_.order_id
      LEFT JOIN order_payment_status ps ON ps.order_id = o.id
      WHERE of_.fdn_document_id IS NOT NULL
-       AND ps.freight_cleared_at IS NULL
-       AND DATE(d.generated_at) <= DATE_SUB(CURDATE(), INTERVAL :days DAY)`,
-    { days: fdnOverdueDays }
+       AND ps.freight_cleared_at IS NULL`
   );
+  const todayStr = today.toISOString().slice(0, 10);
   for (const row of overdueFreight) {
-    created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN issued ${row.generated_at}, still not cleared.`, row.order_id, usersById);
+    const dueDate = await workingDaysCalculator.addWorkingDays(String(row.generated_at).slice(0, 10), fdnOverdueDays);
+    if (dueDate < todayStr) {
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN issued ${row.generated_at}, still not cleared.`, row.order_id, usersById);
+    }
   }
 
   // --- Dispute response overdue ---
