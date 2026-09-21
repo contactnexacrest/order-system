@@ -4,6 +4,7 @@ const env = require('../config/env'); // loads .env as a side effect — must ru
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const userRepository = require('../repositories/userRepository');
+const emailService = require('../services/emailService');
 const db = require('../config/db');
 
 /**
@@ -14,17 +15,17 @@ const db = require('../config/db');
  * `node src/jobs/checkAlerts.js` directly — either works, see the
  * deployment guide).
  *
- * Scope note (carried over from the PHP original): this creates in-app
- * notifications (the notifications table — what a logged-in user sees) for
- * every condition the spec names. It does NOT also email those alerts out —
- * the spec's "escalation to MD" language could mean either a notification
- * or an email, and building a second templated-email path for six
- * different alert types, on top of the buyer-facing deferred-send pipeline
- * this phase already delivers, was cut to keep this phase bounded. Every
- * alert an MD would want to see shows up in their notification bell the
- * same day; wiring the same conditions to outbound email is a small,
- * mechanical follow-up against emailService.sendPlainText() whenever
- * that's wanted.
+ * Every alert here also goes out by email now (previously this only
+ * created the in-app notification — this file's own prior docblock
+ * flagged that as a known, deliberately deferred follow-up). A
+ * compliance/financial deadline (LUT/RCMC expiry, an overdue freight or
+ * dispute deadline) sitting unread in a bell icon nobody happened to
+ * check is exactly the kind of risk this alert system exists to prevent
+ * — email doesn't depend on someone being logged in that day.
+ * emailService.sendPlainText() degrades safely (logs instead of
+ * throwing) if SMTP isn't configured, so this never breaks the job
+ * itself; existsToday()'s same-day dedup covers the email too, so this
+ * never sends more than one email per user per condition per day.
  */
 
 /** UTC-safe signed day difference: positive when `dateStr` is in the future. */
@@ -34,13 +35,17 @@ function daysUntil(dateStr, today) {
   return Math.round(diffMs / 86400000);
 }
 
-async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null) {
+async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null, usersById = {}) {
   let count = 0;
   for (const userId of userIds) {
     if (await notificationRepository.existsToday(userId, type, relatedOrderId)) {
-      continue; // already alerted this same condition today — don't spam the bell
+      continue; // already alerted this same condition today — don't spam the bell (or the inbox)
     }
     await notificationRepository.create(userId, null, type, relatedOrderId, message);
+    const email = usersById[userId] && usersById[userId].email;
+    if (email) {
+      await emailService.sendPlainText(email, `NexaCrest Alert: ${type.replace(/_/g, ' ')}`, message);
+    }
     count++;
   }
   return count;
@@ -51,6 +56,8 @@ async function run() {
   let created = 0;
 
   const activeUsers = await userRepository.listActive();
+  const usersById = {};
+  for (const u of activeUsers) usersById[u.id] = u;
   const mdAndAdminIds = activeUsers
     .filter((u) => u.role_name === 'Admin' || u.role_name === 'Managing Director')
     .map((u) => u.id);
@@ -62,9 +69,9 @@ async function run() {
     const alertDays = parseInt((await companySettingsRepository.get('lut_alert_days_x')) || '30', 10);
     const escalationDays = parseInt((await companySettingsRepository.get('lut_escalation_days_y')) || '15', 10);
     if (daysLeft <= escalationDays && daysLeft >= 0) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'lut_escalation', `ESCALATION: LUT expires in ${daysLeft} day(s) (${lutExpiry}). Renew before 1 April or document generation will be blocked.`);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'lut_escalation', `ESCALATION: LUT expires in ${daysLeft} day(s) (${lutExpiry}). Renew before 1 April or document generation will be blocked.`, null, usersById);
     } else if (daysLeft <= alertDays && daysLeft >= 0) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'lut_expiry', `LUT expires in ${daysLeft} day(s) (${lutExpiry}).`);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'lut_expiry', `LUT expires in ${daysLeft} day(s) (${lutExpiry}).`, null, usersById);
     }
   }
 
@@ -75,9 +82,9 @@ async function run() {
     const alertDays = parseInt((await companySettingsRepository.get('rcmc_alert_days_a')) || '60', 10);
     const escalationDays = parseInt((await companySettingsRepository.get('rcmc_escalation_days_b')) || '30', 10);
     if (daysLeft <= escalationDays && daysLeft >= 0) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'rcmc_escalation', `ESCALATION: RCMC certificate expires in ${daysLeft} day(s) (${rcmcExpiry}). Renew with CAPEXIL.`);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'rcmc_escalation', `ESCALATION: RCMC certificate expires in ${daysLeft} day(s) (${rcmcExpiry}). Renew with CAPEXIL.`, null, usersById);
     } else if (daysLeft <= alertDays && daysLeft >= 0) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'rcmc_expiry', `RCMC certificate expires in ${daysLeft} day(s) (${rcmcExpiry}).`);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'rcmc_expiry', `RCMC certificate expires in ${daysLeft} day(s) (${rcmcExpiry}).`, null, usersById);
     }
   }
 
@@ -95,7 +102,7 @@ async function run() {
     { days: fdnOverdueDays }
   );
   for (const row of overdueFreight) {
-    created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN issued ${row.generated_at}, still not cleared.`, row.order_id);
+    created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN issued ${row.generated_at}, still not cleared.`, row.order_id, usersById);
   }
 
   // --- Dispute response overdue ---
@@ -109,7 +116,7 @@ async function run() {
   for (const row of overdueDisputes) {
     const targets = new Set(mdAndAdminIds);
     if (row.assigned_to) targets.add(row.assigned_to);
-    created += await notifyMdAndAdmin([...targets], 'dispute_overdue', `Dispute response overdue on order ${row.order_reference} — was due ${row.response_due_date}.`, row.order_id);
+    created += await notifyMdAndAdmin([...targets], 'dispute_overdue', `Dispute response overdue on order ${row.order_reference} — was due ${row.response_due_date}.`, row.order_id, usersById);
   }
 
   return created;
