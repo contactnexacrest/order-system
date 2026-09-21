@@ -1,26 +1,35 @@
 {% extends "_layout.njk" %}
 
+{% block header_incoterm %}<span class="incoterm">SHIPPING INSTRUCTION — FOR CHA / SHIPPING LINE</span>{% endblock %}
+
 {% block meta_table %}
+<div class="banner" style="background:#E6F1FB; color:#042C53; text-align:left; font-weight:normal;"><strong>Send this sheet to your CHA or shipping line BEFORE shipment booking is confirmed.</strong> <em style="color:#185FA5; font-weight:normal;">All details must match the Commercial Invoice and Packing List exactly. Any mismatch on the issued BL is expensive and time-consuming to correct — amendments after BL issuance attract charges and delays.</em></div>
 <table class="meta">
   <tr>
-    <td class="label">BL INSTRUCTION NO. *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
-    <td class="label">DATE *</td><td class="value">{{ meta.generated_date }}</td>
-  </tr>
-  <tr>
-    <td class="label">PI REFERENCE *</td><td class="value">{{ order.pi_ref or '—' }}</td>
-    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+    <td><span class="label">BL INSTRUCTION NO. *</span><span class="value">{{ meta.document_reference }} {{ meta.revision_label }}</span></td>
+    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">PI REFERENCE *</span><span class="value">{{ order.pi_ref or '—' }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
 
-{% block banner %}
-<div class="valid-until">SHIPPING INSTRUCTION — FOR CHA / SHIPPING LINE &nbsp; Send this sheet to your CHA or shipping line BEFORE shipment booking is confirmed. All details must match the Commercial Invoice and Packing List exactly. Any mismatch on the issued BL is expensive and time-consuming to correct — amendments after BL issuance attract charges and delays.</div>
+{% block section1 %}
+<div class="section-title">1. SHIPPER / EXPORTER &nbsp;(appears on BL exactly as written)</div>
+<table class="kv kv-solid">
+  <tr><td class="k">Company Name</td><td class="v" style="font-weight:bold;">{{ company.legal_name | upper }}</td></tr>
+  <tr><td class="k">Registered Address</td><td class="v">{{ company.registered_office }}</td></tr>
+  <tr><td class="k">Country</td><td class="v" style="font-weight:bold;">India</td></tr>
+  <tr><td class="k">GSTIN</td><td class="v" style="font-weight:bold;">{{ company.gstin }}</td></tr>
+  <tr><td class="k">IEC</td><td class="v" style="font-weight:bold;">{{ company.iec_pan }}</td></tr>
+  <tr><td class="k">Contact / Phone</td><td class="v">{{ company.phone }} &nbsp;|&nbsp; {{ company.email }}</td></tr>
+</table>
 {% endblock %}
 
 {% block body %}
 
-<div class="section-title">2. CONSIGNEE (buyer — appears on BL exactly as written)</div>
-<table class="kv">
+<div class="section-title">2. CONSIGNEE &nbsp;(buyer — appears on BL exactly as written)</div>
+<table class="kv kv-solid">
   <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
   <tr><td class="k">Full Address *</td><td class="v">{{ buyer.consignee_address or buyer.billing_address }}</td></tr>
   <tr><td class="k">Country *</td><td class="v">{{ buyer.country_of_destination or 'TBC' }}</td></tr>
@@ -28,12 +37,12 @@
 </table>
 
 <div class="section-title">3. NOTIFY PARTY</div>
-<table class="kv">
-  <tr><td class="k">Notify Party</td><td class="v">{{ buyer.notify_party or 'SAME AS CONSIGNEE' }}</td></tr>
+<table class="kv kv-solid">
+  <tr><td class="k">Same as consignee?</td><td class="v">{{ buyer.notify_party or 'SAME AS CONSIGNEE' }}</td></tr>
 </table>
 
 <div class="section-title">4. SHIPMENT DETAILS</div>
-<table class="kv">
+<table class="kv kv-solid">
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
   <tr><td class="k">Place of Delivery</td><td class="v">Same as Port of Discharge unless buyer has an inland delivery arrangement</td></tr>
@@ -44,8 +53,13 @@
 </table>
 
 <div class="section-title">5. CONTAINER &amp; CARGO DETAILS</div>
-<table class="kv">
-  <tr><td class="k">Container Type / Size *</td><td class="v">{{ shipping.container_type or 'TBC — to be confirmed by shipping line at time of booking' }}</td></tr>
+<table class="kv kv-solid">
+  <tr><td class="k">Container Load Type *</td><td class="v checkbox-row"><span class="box checked"><span class="cbx">&#10003;</span>FCL (Full Container Load)</span> &nbsp;&nbsp; <span class="box"><span class="cbx"></span>LCL (Less than Container Load)</span></td></tr>
+  <tr><td class="k">Container Size *</td><td class="v checkbox-row">
+    <span class="box{{ ' checked' if '20ft' in order.container_type else '' }}"><span class="cbx">{{ ('&#10003;' if '20ft' in order.container_type else '')|safe }}</span>20ft Standard</span> &nbsp;
+    <span class="box{{ ' checked' if ('40ft' in order.container_type and 'High Cube' not in order.container_type) else '' }}"><span class="cbx">{{ ('&#10003;' if ('40ft' in order.container_type and 'High Cube' not in order.container_type) else '')|safe }}</span>40ft Standard</span> &nbsp;
+    <span class="box{{ ' checked' if 'High Cube' in order.container_type else '' }}"><span class="cbx">{{ ('&#10003;' if 'High Cube' in order.container_type else '')|safe }}</span>40ft High Cube</span>
+  </td></tr>
   <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no or 'TBC — to be confirmed by shipping line after stuffing' }}</td></tr>
   <tr><td class="k">Seal No. *</td><td class="v">{{ shipping.seal_no or 'TBC — to be confirmed after stuffing' }}</td></tr>
   <tr><td class="k">No. of Packages *</td><td class="v">{{ (packing.crate_count ~ ' Wooden Crates') if packing.crate_count else 'TBC' }} — must match Packing List exactly</td></tr>
@@ -54,38 +68,46 @@
   <tr><td class="k">Total CBM *</td><td class="v">{{ (packing.total_cbm ~ ' m³') if packing.total_cbm else 'TBC' }}</td></tr>
 </table>
 
-<div class="section-title">6. CARGO DESCRIPTION (appears on BL exactly as written)</div>
+<div class="section-title">6. CARGO DESCRIPTION &nbsp;(appears on BL exactly as written)</div>
 {% set productList = [] %}
 {% set hsCodeList = [] %}
 {% for p in products %}
   {% set productList = productList.concat([p.description ~ ((', ' ~ p.finish) if p.finish else '')]) %}
   {% set hsCodeList = hsCodeList.concat([p.hs_code]) %}
 {% endfor %}
-<table class="kv">
+<table class="kv kv-solid">
   <tr><td class="k">Description of Goods *</td><td class="v">{{ productList|join('; ') }} — must match Commercial Invoice exactly</td></tr>
   <tr><td class="k">HS Code *</td><td class="v">{{ hsCodeList|join(', ') }}</td></tr>
   <tr><td class="k">Marks &amp; Numbers *</td><td class="v">NEXACREST / {{ buyer.company_legal_name|upper }} / {{ order.port_of_discharge|upper }} / C-001/{{ packing.crate_count or 'N' }} to C-{{ packing.crate_count or 'N' }}/{{ packing.crate_count or 'N' }} / {{ order.pi_ref or '—' }} / MADE IN INDIA</td></tr>
-  <tr><td class="k">Country of Origin *</td><td class="v">India</td></tr>
+  <tr><td class="k">Country of Origin *</td><td class="v" style="font-weight:bold;">India</td></tr>
 </table>
 
-<div class="section-title">7. FREIGHT &amp; CHARGES ON BL — {{ order.incoterm_label }}</div>
-<table class="kv">
-  <tr><td class="k">Freight Terms *</td><td class="v">{{ 'Freight Collect (buyer pays freight — FOB), as per agreed terms' if order.is_fob else ('Freight Prepaid (seller pays freight — ' ~ order.incoterm_code ~ '), as per agreed terms') }}</td></tr>
+<div class="section-title">7. FREIGHT &amp; CHARGES ON BL &nbsp;|&nbsp; {{ order.incoterm_label }}</div>
+<table class="kv kv-solid">
+  <tr><td class="k">Freight Terms *</td><td class="v checkbox-row">
+    <span class="box{{ '' if order.is_fob else ' checked' }}"><span class="cbx">{{ ('' if order.is_fob else '&#10003;')|safe }}</span>Freight Prepaid (seller pays freight — CFR/CIF)</span> &nbsp;&nbsp;
+    <span class="box{{ ' checked' if order.is_fob else '' }}"><span class="cbx">{{ ('&#10003;' if order.is_fob else '')|safe }}</span>Freight Collect (buyer pays freight — FOB)</span>
+  </td></tr>
   <tr><td class="k">Freight Amount</td><td class="v">{{ 'N/A — Freight Collect' if order.is_fob else ((freight.confirmed_freight_rate or 'TBC') ~ ' ' ~ order.currency_code) }}</td></tr>
 </table>
 
-<div class="valid-until">&#9888; MANDATORY — DRAFT BL APPROVAL REQUIRED BEFORE ORIGINALS ARE ISSUED &nbsp; CHA / Shipping Line must send the complete draft Bill of Lading to NexaCrest for written approval before issuing any original BL. No original BL may be issued without NexaCrest's prior written approval. Send draft BL to NexaCrest at the contact details in Section 1 above.</div>
+<div class="banner banner-red">
+  <span class="headline">&#9888;&nbsp; MANDATORY — DRAFT BL APPROVAL REQUIRED BEFORE ORIGINALS ARE ISSUED</span>
+  <span class="sub">CHA / Shipping Line must send the complete draft Bill of Lading to NexaCrest for written approval before issuing any original BL. No original BL may be issued without NexaCrest's prior written approval. Send draft BL to NexaCrest at contact details in Section 1 above.</span>
+</div>
 
 <div class="section-title">8. BILL OF LADING TYPE</div>
-<div class="mandatory-note">MANDATORY INSTRUCTION — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL. Always issue: ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS. NexaCrest payment terms are {{ financial.advance_pct }}% advance + {{ financial.balance_pct }}% balance payable against the original BL. NexaCrest retains all 3 original BLs and only releases them to the buyer AFTER the balance T/T is received and cleared in the NexaCrest bank account. Under a Sea Waybill or Express BL, the buyer can collect the cargo without surrendering any document — NexaCrest would lose all financial leverage. A Sea Waybill must NEVER be issued for NexaCrest shipments.</div>
-<table class="kv">
-  <tr><td class="k">BL Type *</td><td class="v">{{ bl.type_instruction }}</td></tr>
-  <tr><td class="k">No. of Original Copies *</td><td class="v">3 (three originals) — NexaCrest will hold all 3 originals until balance payment is received.</td></tr>
-  <tr><td class="k">No. of Non-Negotiable Copies</td><td class="v">3 — for buyer records and NexaCrest file; released freely.</td></tr>
-  <tr><td class="k">BL Consignee Instruction *</td><td class="v">{{ bl.consignee_instruction }} — ensures the BL is to NexaCrest's order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.</td></tr>
+<div class="banner banner-red" style="text-align:left; font-size:9pt; font-weight:normal;">
+  <p style="margin:0 0 4pt; font-weight:bold; font-size:11pt;">MANDATORY INSTRUCTION — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL</p>
+  <p style="margin:0 0 4pt;"><strong>Always issue:</strong> <strong style="font-size:12pt;">ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS</strong></p>
+  <p style="margin:0; color:#5A1414; font-weight:normal;"><strong style="color:#8A1F1F;">Reason:</strong> NexaCrest payment terms are {{ financial.advance_pct }}% advance + {{ financial.balance_pct }}% balance payable against the original BL. NexaCrest retains all 3 original BLs and only releases them to the buyer AFTER the balance T/T is received and cleared in the NexaCrest bank account. Under a Sea Waybill or Express BL, the buyer can collect the cargo without surrendering any document — NexaCrest would lose all financial leverage and may not receive the balance. A Sea Waybill must NEVER be issued for NexaCrest shipments.</p>
+</div>
+<table class="kv kv-solid">
+  <tr><td class="k">BL Type *</td><td class="v" style="font-weight:bold;">{{ bl.type_instruction }}</td></tr>
+  <tr><td class="k">No. of Original Copies *</td><td class="v" style="font-weight:bold;">3 (three originals) <span class="placeholder-italic" style="font-weight:normal; font-size:8.5pt;">— NexaCrest will hold all 3 originals until balance payment is received.</span></td></tr>
+  <tr><td class="k">No. of Non-Negotiable Copies</td><td class="v"><span class="placeholder-italic">3</span> <span class="placeholder-italic" style="font-size:8.5pt;">— for buyer records and NexaCrest file; released freely.</span></td></tr>
+  <tr><td class="k">BL Consignee Instruction *</td><td class="v">{{ bl.consignee_instruction }} <span class="placeholder-italic" style="font-size:8.5pt;">— ensures the BL is to NexaCrest's order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.</span></td></tr>
 </table>
-<table class="kv">
-  <tr><td colspan="2">Original BL release process: Once all 3 originals are issued, CHA to hand them to NexaCrest only. NexaCrest will courier originals to the buyer after confirming receipt of the balance T/T payment in the NexaCrest bank account. NexaCrest retains all original BLs until balance payment is received and cleared. Cargo release at destination is subject to carrier and destination port procedures.</td></tr>
-</table>
+<div class="banner" style="background:#E6F1FB; color:#042C53; text-align:left; font-weight:normal;"><strong>Original BL release process:</strong> <span style="color:#185FA5;">Once all 3 originals are issued, CHA to hand them to NexaCrest only. NexaCrest will courier originals to the buyer after confirming receipt of the balance T/T payment in the NexaCrest bank account. NexaCrest retains all original BLs until balance payment is received and cleared. Cargo release at destination is subject to carrier and destination port procedures.</span></div>
 
 {% endblock %}
