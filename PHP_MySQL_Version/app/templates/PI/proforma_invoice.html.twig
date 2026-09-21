@@ -3,19 +3,17 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td class="label">PI NUMBER *</td><td class="value">{{ meta.document_reference }} {{ meta.revision_label }}</td>
-    <td class="label">PI DATE *</td><td class="value">{{ order.pi_date ?: meta.generated_date }}</td>
-  </tr>
-  <tr>
-    <td class="label">QUOTATION REF *</td><td class="value">{{ order.quotation_ref ?: '—' }}</td>
-    <td class="label">BUYER INQUIRY REF *</td><td class="value">{{ order.buyer_inquiry_ref }}</td>
+    <td><span class="label">PI NUMBER *</span><span class="value">{{ meta.document_reference }} {{ meta.revision_label }}</span></td>
+    <td><span class="label">PI DATE *</span><span class="value">{{ order.pi_date ?: meta.generated_date }}</span></td>
+    <td><span class="label">QUOTATION REF *</span><span class="value">{{ order.quotation_ref ?: '—' }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
 
 {% block banner %}
-<div class="valid-until">&#9201; VALID UNTIL * &nbsp; {{ order.pi_valid_until ?: 'TBC' }} &nbsp;&nbsp; Payment must be received before this date for prices and terms to remain valid.</div>
-<div class="gst-declaration">GST DECLARATION: Supply meant for export under Letter of Undertaking (LUT) without payment of Integrated Tax (IGST). LUT Order No.: {{ company.lut_number }} &nbsp;·&nbsp; Valid for {{ company.lut_valid_fy }} &nbsp;·&nbsp; GSTIN: {{ company.gstin }}</div>
+<div class="banner banner-amber">&#9201;&nbsp; <span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.pi_valid_until ?: 'TBC' }}</span> &nbsp;&nbsp;<span class="note">Payment must be received before this date for prices and terms to remain valid.</span></div>
+<div class="banner banner-green"><span class="label">GST DECLARATION:</span> <span class="value">Supply meant for export under Letter of Undertaking (LUT) without payment of Integrated Tax (IGST).</span> <span class="label">LUT Order No.: {{ company.lut_number }}</span> <span class="value">&nbsp;·&nbsp; Valid for {{ company.lut_valid_fy }} &nbsp;·&nbsp; GSTIN: {{ company.gstin }}</span></div>
 {% endblock %}
 
 {% block body %}
@@ -40,8 +38,9 @@
 <table class="products">
   <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
   {% for p in products %}
+  {% set lineColor = loop.index is odd ? '#1D6FA8' : '#2D7D56' %}
   <tr>
-    <td>{{ loop.index }}</td>
+    <td class="line-no" style="color:{{ lineColor }};">{{ loop.index }}</td>
     <td>{{ p.description }}</td>
     <td class="num">{{ p.quantity }}</td>
     <td>{{ p.unit }}</td>
@@ -51,31 +50,45 @@
   {% if p.dimensions or p.finish %}
   <tr class="spec">
     <td></td>
-    <td colspan="5">{{ loop.index }}. Dimensions: {{ p.dimensions ?: 'TBC' }} &nbsp;·&nbsp; Finish: {{ p.finish ?: 'TBC' }} &nbsp;·&nbsp; HS Code: {{ p.hs_code }} &nbsp;·&nbsp; Country of Origin: India</td>
+    <td colspan="5">
+      <span class="line-no" style="color:{{ lineColor }};">{{ loop.index }}.</span>
+      <span class="spec-label">Dimensions:</span> {{ p.dimensions ?: 'TBC' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Finish:</span> {{ p.finish ?: 'TBC' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">HS Code:</span> {{ p.hs_code }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Country of Origin:</span> India
+    </td>
   </tr>
   {% endif %}
   {% endfor %}
 </table>
-<p style="font-size:8px; color:#5b6774;">Remark: Loading quantity subject to final packing confirmation.</p>
+
+<table class="totals">
+  {% for p in products %}
+  <tr><td class="k" style="text-align:right;">{{ p.description }} ({{ p.quantity }} {{ p.unit }} &times; {{ p.unit_price }})</td><td class="v" style="text-align:right; font-style:italic; color:#5B6573;">{{ order.currency_code }} {{ p.amount }}</td></tr>
+  {% endfor %}
+  <tr class="highlight"><td class="k" style="text-align:right;">TOTAL PI VALUE ({{ order.currency_code }}) *</td><td class="v" style="text-align:right;">{{ financial.fob_value }}</td></tr>
+</table>
+<p><strong style="color:#17233A;">Remark:</strong> <em style="color:#5B6573;">Loading quantity subject to final packing confirmation.</em></p>
 
 <table class="totals">
   <tr><td class="k">FOB Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.fob_value }}</td></tr>
   <tr><td class="k">Freight ({{ order.currency_code }})</td><td class="v">
-    {% if order.is_fob %}NIL — freight arranged by buyer.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_low ?: 'XXX' }}–{{ order.indicative_freight_high ?: 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}.{% endif %}
+    {% if order.is_fob %}NIL — freight arranged by buyer.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_low ?: 'XXX' }}–{{ order.indicative_freight_high ?: 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}. Subject to confirmation at time of booking. Actual freight confirmed and recovered IN ADVANCE by separate Freight Debit Note when cargo is packed and ready — payment required within 3 working days, and must be received BEFORE shipment booking is confirmed.{% endif %}
   </td></tr>
   <tr><td class="k">Insurance ({{ order.currency_code }})</td><td class="v">
-    {% if order.is_fob %}NIL — buyer's responsibility.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount ?: 'XX' }}.{% endif %}
+    {% if order.is_fob %}NIL — buyer's responsibility.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount ?: 'XX' }}. Confirmed by Freight Debit Note when cargo is ready.{% endif %}
   </td></tr>
   <tr class="highlight"><td class="k">TOTAL PI VALUE ({{ order.currency_code }}) *</td><td class="v">{{ financial.total_value }}</td></tr>
 </table>
 
-<p style="font-size:8.5px; color:#5b6774;">Weight &amp; Volume (Estimated — actuals confirmed on Packing List after production and packing)</p>
-<table class="kv">
-  <tr><td class="k">Total CBM (m&sup3;)</td><td class="v">{{ order.estimated_total_cbm ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Gross Weight (incl. packing)</td><td class="v">{{ order.estimated_gross_weight_kg ?: 'TBC' }} kg</td></tr>
-  <tr><td class="k">Net Weight (stone only)</td><td class="v">{{ order.estimated_net_weight_kg ?: 'TBC' }} kg</td></tr>
-  <tr><td class="k">No. of Packages / Crates</td><td class="v">{{ order.estimated_package_count }}</td></tr>
-  <tr><td class="k">Package Type</td><td class="v">{{ order.estimated_package_type }}</td></tr>
+<p class="weight-caption">Weight &amp; Volume <span class="note">(Estimated — actuals confirmed on Packing List after production and packing)</span></p>
+<table class="weight">
+  <tr><th>Parameter</th><th>Estimated Value *</th><th>Unit</th></tr>
+  <tr><td>Total CBM (m&sup3;)</td><td>{{ order.estimated_total_cbm ?: 'TBC' }}</td><td>m&sup3;</td></tr>
+  <tr><td>Gross Weight (incl. packing)</td><td>{{ order.estimated_gross_weight_kg ?: 'TBC' }}</td><td>kg</td></tr>
+  <tr><td>Net Weight (stone only)</td><td>{{ order.estimated_net_weight_kg ?: 'TBC' }}</td><td>kg</td></tr>
+  <tr><td>No. of Packages / Crates</td><td>{{ order.estimated_package_count }}</td><td>Crates</td></tr>
+  <tr><td>Package Type</td><td>{{ order.estimated_package_type }}</td><td>—</td></tr>
 </table>
 
 <div class="section-title">4. SHIPPING / COMMERCIAL TERMS</div>
@@ -89,17 +102,16 @@
 </table>
 
 <div class="section-title">5. PAYMENT TERMS</div>
-<table class="kv">
-  <tr><td class="k">{{ financial.advance_pct }}% advance T/T on FOB Value</td><td class="v">Against this document. Amount: {{ order.currency_code }} {{ financial.advance_amount }}</td></tr>
-  <tr><td class="k">{{ financial.balance_pct }}% balance T/T on FOB Value</td><td class="v">
-    {% if financial.balance_trigger_option == 'A_BEFORE_SHIPMENT' %}
-      Payable before shipment — within {{ financial.balance_days }} working days of receiving shipment readiness confirmation from NexaCrest.
-    {% else %}
-      Payable against scanned copy of Bill of Lading, within {{ financial.balance_days }} days of BL date.
-    {% endif %}
-    Amount: {{ order.currency_code }} {{ financial.balance_amount }}
-  </td></tr>
-</table>
+<div class="bullet-block">
+  <p>&#8226; {{ financial.advance_pct }}% advance T/T on FOB Value against this document. <span class="mand-star">*</span></p>
+  <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.advance_amount }} <span class="mand-star">*</span></p>
+  <p>&#8226; {{ financial.balance_pct }}% balance T/T on FOB Value {% if financial.balance_trigger_option == 'A_BEFORE_SHIPMENT' %}payable before shipment — within {{ financial.balance_days }} working days of receiving shipment readiness confirmation from NexaCrest.{% else %}payable against scanned copy of Bill of Lading, within {{ financial.balance_days }} days of BL date.{% endif %} <span class="mand-star">*</span></p>
+  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }} <span class="mand-star">*</span></p>
+  {% if not order.is_fob %}
+  <p>&#8226; Freight &amp; Insurance (CFR/CIF orders only): <span class="sub-line">Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 working days of Freight Debit Note date.</span></p>
+  {% endif %}
+  <p>&nbsp;&nbsp;Currency: {{ order.currency_code }}</p>
+</div>
 
 <div class="section-title">6. BANK DETAILS</div>
 <table class="kv">
@@ -110,19 +122,18 @@
   <tr><td class="k">IFSC</td><td class="v">{{ company.ifsc }}</td></tr>
   <tr><td class="k">SWIFT / BIC</td><td class="v">{{ company.swift_bic }}</td></tr>
   <tr><td class="k">Bank Address</td><td class="v">{{ company.bank_address }}</td></tr>
-  <tr><td class="k">Payment Reference</td><td class="v">Please quote PI No. {{ meta.document_reference }} in your wire transfer remarks.</td></tr>
-  <tr><td class="k">RBI Purpose Code</td><td class="v">{{ company.rbi_purpose_code_advance }} — enter in the "Purpose of Remittance" field of your wire transfer form.</td></tr>
+  <tr><td class="k">Payment Reference</td><td class="v" style="color:#185FA5;">Please quote PI No. {{ meta.document_reference }} in your wire transfer remarks.</td></tr>
+  <tr><td class="k">RBI Purpose Code</td><td class="v" style="color:#185FA5; font-weight:bold;">{{ company.rbi_purpose_code_advance }} — enter in the "Purpose of Remittance" field of your wire transfer form.</td></tr>
 </table>
 
 <div class="section-title">7. EXPORT DOCUMENTATION</div>
-<table class="kv">
-  <tr><td colspan="2">Upon shipment, the following documents will be provided:<br>
-    1. Commercial Invoice (signed and stamped)<br>
-    2. Packing List (signed and stamped)<br>
-    3. Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL<br>
-    4. Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after {{ financial.balance_pct }}% balance T/T is received and cleared in NexaCrest bank account<br>
-    5. Fumigation Certificate — provided as standard with every shipment
-  </td></tr>
-</table>
+<div class="numbered-block">
+  <p><strong>Upon shipment, the following documents will be provided:</strong></p>
+  <p>1.&nbsp;&nbsp;Commercial Invoice (signed and stamped)</p>
+  <p>2.&nbsp;&nbsp;Packing List (signed and stamped)</p>
+  <p>3.&nbsp;&nbsp;Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL</p>
+  <p>4.&nbsp;&nbsp;Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after {{ financial.balance_pct }}% balance T/T is received and cleared in NexaCrest bank account</p>
+  <p>5.&nbsp;&nbsp;Fumigation Certificate — provided as standard with every shipment</p>
+</div>
 
 {% endblock %}
