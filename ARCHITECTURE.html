@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NexaCrest Blueprint</title>
+<style>
+:root{
+  --paper:#eef3f8; --paper-alt:#e3ecf4; --surface:#ffffff; --ink:#0d2436; --muted:#4d6478;
+  --line:#c9d8e4; --blue:#1c6fa8; --blue-line:#2f9bd6; --amber:#c96f1a; --amber-soft:#fbe7cf;
+  --amber-ink:#5c3813; --ok:#1f7a4d; --ok-soft:#e3f3ea; --danger:#a4342a; --danger-soft:#fbe8e6;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --diagram-bg:#0a2942; --diagram-panel:#0d3455; --diagram-line:#4fc3e8; --diagram-text:#dbe8f2;
+  --diagram-accent:#f0a94e; --diagram-fill:#123a5c; --diagram-fill2:#17466b; --diagram-border:#2f9bd6;
+  --radius:5px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0a121c; --paper-alt:#0e1826; --surface:#101c2b; --ink:#e4edf5; --muted:#93aac0;
+    --line:#20334a; --blue:#6ec1ec; --blue-line:#4fc3e8; --amber-soft:#3a2c17; --amber-ink:#f0c896;
+    --ok-soft:#123625; --danger-soft:#3a1e1c;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0a121c; --paper-alt:#0e1826; --surface:#101c2b; --ink:#e4edf5; --muted:#93aac0;
+  --line:#20334a; --blue:#6ec1ec; --blue-line:#4fc3e8; --amber-soft:#3a2c17; --amber-ink:#f0c896;
+  --ok-soft:#123625; --danger-soft:#3a1e1c;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.6;}
+h1,h2,h3,h4{font-family:var(--mono);font-weight:700;letter-spacing:-0.01em;color:var(--ink);}
+a{color:var(--blue);}
+code,.mono{font-family:var(--mono);}
+p{max-width:70ch;}
+img{max-width:100%;}
+[hidden]{display:none!important;}
+
+/* ---------- title block ---------- */
+.titleblock{
+  border-bottom:3px solid var(--ink); background:var(--surface);
+  padding:22px 20px 18px; display:flex; flex-wrap:wrap; gap:18px 32px; align-items:flex-end;
+}
+.titleblock .name{font-family:var(--mono); font-size:1.5rem; font-weight:800; letter-spacing:-0.02em; margin:0;}
+.titleblock .name span{color:var(--blue-line);}
+.titleblock .tag{color:var(--muted); font-size:0.92rem; margin-top:4px; max-width:56ch;}
+.tb-meta{display:flex; gap:22px; flex-wrap:wrap; margin-left:auto; font-family:var(--mono); font-size:0.72rem;}
+.tb-meta div{display:flex; flex-direction:column; gap:2px;}
+.tb-meta b{text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); font-weight:600; font-size:0.65rem;}
+.tb-meta span{color:var(--ink); font-weight:700;}
+
+/* ---------- layout ---------- */
+.layout{display:flex; align-items:flex-start; max-width:1280px; margin:0 auto; padding:0 16px;}
+nav.toc{
+  position:sticky; top:16px; align-self:flex-start; width:230px; flex:0 0 230px;
+  padding:20px 14px 40px 0; display:none;
+}
+nav.toc .toc-inner{border-left:2px solid var(--line); padding-left:14px;}
+nav.toc h5{font-family:var(--mono); font-size:0.66rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin:0 0 10px;}
+nav.toc a{display:block; font-size:0.82rem; color:var(--muted); text-decoration:none; padding:3px 0; border-left:2px solid transparent; margin-left:-16px; padding-left:14px;}
+nav.toc a b{font-family:var(--mono); color:var(--blue-line); margin-right:6px;}
+nav.toc a:hover{color:var(--ink);}
+nav.toc a.active{color:var(--ink); border-left-color:var(--blue-line); font-weight:600;}
+@media (min-width:980px){ nav.toc{display:block;} }
+
+main{flex:1 1 auto; min-width:0; padding:28px 0 90px;}
+section{margin-bottom:56px; scroll-margin-top:16px;}
+section > .sec-head{display:flex; align-items:baseline; gap:10px; border-bottom:2px solid var(--ink); padding-bottom:8px; margin-bottom:16px;}
+section > .sec-head .letter{font-family:var(--mono); font-size:1.6rem; color:var(--blue-line); font-weight:800;}
+section > .sec-head h2{margin:0; font-size:1.32rem;}
+section > .sec-head .sub{margin-left:auto; font-family:var(--mono); font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;}
+
+.lede{color:var(--muted); font-size:1.02rem; max-width:75ch;}
+
+/* ---------- diagram sheet ---------- */
+.sheet{
+  background:var(--diagram-bg); border:1px solid var(--diagram-border); border-radius:6px;
+  padding:18px 18px 14px; margin:18px 0; position:relative; overflow-x:auto;
+}
+.sheet:before,.sheet:after{content:""; position:absolute; width:14px; height:14px; border:2px solid var(--diagram-accent); top:8px; left:8px; border-right:none; border-bottom:none;}
+.sheet:after{left:auto; right:8px; border-left:none; border-right:2px solid var(--diagram-accent);}
+.sheet-cap{font-family:var(--mono); font-size:0.7rem; color:var(--diagram-text); opacity:0.75; margin-top:10px; text-align:center; letter-spacing:0.03em;}
+.sheet .mermaid{display:flex; justify-content:center;}
+
+/* ---------- tables ---------- */
+table{width:100%; border-collapse:collapse; margin:14px 0; font-size:0.86rem;}
+caption{caption-side:top; text-align:left; font-family:var(--mono); font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;}
+th{background:var(--paper-alt); text-align:left; font-family:var(--mono); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); padding:8px 10px; border-bottom:2px solid var(--line);}
+td{padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+td code, li code{background:var(--paper-alt); padding:1px 5px; border-radius:3px; font-size:0.87em;}
+.tablewrap{overflow-x:auto;}
+
+/* ---------- misc components ---------- */
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+.grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+@media (max-width:720px){ .grid2,.grid3{grid-template-columns:1fr;} }
+
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px;}
+.card h4{margin:0 0 6px; font-size:0.92rem;}
+.card p{margin:0; font-size:0.86rem; color:var(--muted);}
+
+.callout{border-radius:var(--radius); padding:12px 14px; margin:16px 0; font-size:0.9rem; border:1px solid;}
+.callout.note{background:var(--paper-alt); border-color:var(--line);}
+.callout.rule{background:var(--amber-soft); border-color:var(--amber); color:var(--amber-ink);}
+.callout.rule b{font-family:var(--mono); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.06em; display:block; margin-bottom:4px;}
+.callout.ok{background:var(--ok-soft); border-color:var(--ok);}
+.callout.danger{background:var(--danger-soft); border-color:var(--danger);}
+
+.pill{display:inline-block; font-family:var(--mono); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; padding:2px 8px; border-radius:20px; border:1px solid currentColor;}
+.pill.node{color:#1f7a4d;} .pill.php{color:#5b4bd6;} .pill.both{color:var(--blue);}
+
+pre{background:var(--paper-alt); border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; overflow-x:auto; font-size:0.82rem; line-height:1.55;}
+.tree{font-family:var(--mono); font-size:0.82rem; line-height:1.65; white-space:pre; overflow-x:auto; background:var(--paper-alt); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px;}
+.tree .dir{color:var(--blue-line); font-weight:700;}
+.tree .cm{color:var(--muted); font-style:italic;}
+
+.stagegrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:16px 0;}
+.stagecell{border:1px solid var(--line); border-left:4px solid var(--blue-line); background:var(--surface); border-radius:var(--radius); padding:9px 11px;}
+.stagecell .n{font-family:var(--mono); font-size:0.68rem; color:var(--muted);}
+.stagecell .t{font-size:0.84rem; font-weight:600; margin-top:2px;}
+
+footer{border-top:1px solid var(--line); padding:26px 20px 60px; text-align:center; color:var(--muted); font-size:0.8rem; font-family:var(--mono);}
+
+::selection{background:var(--blue-line); color:#03121d;}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap">
+</head>
+<body>
+
+<div class="titleblock">
+  <div>
+    <p class="name">NEXACREST <span>// BLUEPRINT</span></p>
+    <p class="tag">Complete architecture reference for the export-operations webapp — two parallel stacks, one schema, nine order stages, eleven documents.</p>
+  </div>
+  <div class="tb-meta">
+    <div><b>Stacks</b><span>Node.js + PHP</span></div>
+    <div><b>Database</b><span>MySQL 8 / MariaDB 10.6</span></div>
+    <div><b>Tables</b><span>69 (Sections A–V)</span></div>
+    <div><b>Doc types</b><span>11 + Amendment</span></div>
+    <div><b>Order stages</b><span>9</span></div>
+    <div><b>Rev.</b><span>2026-09-22</span></div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="toc"><div class="toc-inner">
+  <h5>Contents</h5>
+  <a href="#a"><b>A</b>System Overview</a>
+  <a href="#b"><b>B</b>Two Stacks Compared</a>
+  <a href="#c"><b>C</b>Directory Structure</a>
+  <a href="#d"><b>D</b>Request Lifecycle</a>
+  <a href="#e"><b>E</b>Database Schema</a>
+  <a href="#f"><b>F</b>RBAC &amp; Permissions</a>
+  <a href="#g"><b>G</b>The 9-Stage Pipeline</a>
+  <a href="#h"><b>H</b>Document Generation</a>
+  <a href="#i"><b>I</b>Email &amp; Notifications</a>
+  <a href="#j"><b>J</b>File &amp; Asset Storage</a>
+  <a href="#k"><b>K</b>Client Portal &amp; Intake</a>
+  <a href="#l"><b>L</b>Reports &amp; Audit Log</a>
+  <a href="#m"><b>M</b>Admin Tooling</a>
+  <a href="#n"><b>N</b>Deployment Topology</a>
+  <a href="#o"><b>O</b>Extending the App</a>
+  <a href="#p"><b>P</b>Reference Tables</a>
+</div></nav>
+
+<main>
+
+<section id="a">
+  <div class="sec-head"><span class="letter">A</span><h2>System Overview</h2><span class="sub">Fig. A</span></div>
+  <p class="lede">NexaCrest is an internal export-operations webapp for a natural-stone exporter. It runs one client's business end to end: a buyer enquiry becomes a quotation, a quotation becomes an order, and the order is walked through nine gated stages — quotation, buyer PO, proforma invoice, order confirmation, supplier PO, freight, packing/BL, commercial invoice &amp; balance, despatch &amp; closure — generating eleven legally-formatted documents along the way, tracking every payment, dispute and amendment, and giving the buyer a narrow self-service window once their advance payment clears.</p>
+  <p class="lede">It exists as <b>two functionally identical implementations</b> that share one database design: a Node.js/Express build and a PHP build. Neither is a legacy version of the other — they were built from the same specification independently, so a developer comfortable in either stack can read this document once and work on both.</p>
+
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','edgeLabelBackground':'#0d3455','clusterBkg':'#0d3455','clusterBorder':'#2f9bd6','fontFamily':'JetBrains Mono','fontSize':'13px'}}}%%
+flowchart TB
+  browser["🖥️ Browser<br/>staff + buyer"]
+  subgraph EDGE["EDGE"]
+    nginx["Nginx<br/>TLS · static · reverse proxy"]
+  end
+  subgraph APP["APPLICATION (pick one stack)"]
+    direction LR
+    node["Node.js / Express<br/>server.js"]
+    phpfpm["PHP-FPM<br/>index.php"]
+  end
+  subgraph GEN["DOCUMENT ENGINE"]
+    direction LR
+    puppeteer["Puppeteer<br/>+ headless Chromium"]
+    dompdf["Dompdf"]
+    docxjs["docx (npm)"]
+    phpword["PHPWord"]
+  end
+  mysql[("MySQL 8 / MariaDB<br/>69 tables, shared schema")]
+  storage[("Storage volume<br/>outside web root<br/>assets · generated docs")]
+  smtp["SMTP<br/>Nodemailer / PHPMailer"]
+  cron["Cron / node-cron<br/>LUT·RCMC·payment·dispute alerts<br/>deferred email dispatch"]
+
+  browser -->|HTTPS| nginx --> node
+  nginx --> phpfpm
+  node --> mysql
+  phpfpm --> mysql
+  node --> puppeteer
+  node --> docxjs
+  phpfpm --> dompdf
+  phpfpm --> phpword
+  node --> storage
+  phpfpm --> storage
+  node --> smtp
+  phpfpm --> smtp
+  cron --> node
+  cron --> phpfpm
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. A — SYSTEM CONTEXT: EITHER STACK TALKS TO THE SAME MYSQL SCHEMA AND THE SAME STORAGE VOLUME</p>
+
+  <div class="callout note"><b>How to use this document.</b> Sections are lettered like drawing sheets (A–P) and cross-reference each other. Diagrams are the primary explanation; prose fills gaps a diagram can't carry. Section O is written specifically for "I need to change X" — start there if you already know the app and just need to extend it.</div>
+</section>
+
+<section id="b">
+  <div class="sec-head"><span class="letter">B</span><h2>Two Stacks Compared</h2><span class="sub">Fig. B</span></div>
+  <p class="lede">Both stacks implement the identical business logic against the identical database. They differ only in language, framework idioms, and which library performs a given mechanical job (routing, templating, PDF rendering). If you find a bug or add a feature in one stack, the expectation is that it eventually lands in both — check <code>docs/schema.sql</code>'s section comments to see whether a schema change already exists on one side and needs mirroring.</p>
+
+  <div class="tablewrap"><table>
+    <caption>Stack-by-stack equivalents</caption>
+    <tr><th>Concern</th><th>Node.js stack</th><th>PHP stack</th></tr>
+    <tr><td>Runtime</td><td>Node.js 20 LTS, one long-lived process</td><td>PHP 8.1+ under PHP-FPM, fresh per request</td></tr>
+    <tr><td>Entry point</td><td><code>app/src/server.js</code> — every route registered here</td><td><code>public_html/index.php</code> — every route registered here</td></tr>
+    <tr><td>Router</td><td>Express.js</td><td>Hand-rolled <code>App\Helpers\Router</code> (regex path match, per-route middleware array)</td></tr>
+    <tr><td>App-UI templating</td><td>Nunjucks (<code>views/*.njk</code>)</td><td>Plain PHP includes via <code>App\Helpers\View</code> (<code>views/*.php</code>)</td></tr>
+    <tr><td>Business-document templating</td><td>Nunjucks (<code>templates/*.njk</code>)</td><td>Twig (<code>templates/*.html.twig</code>)</td></tr>
+    <tr><td>PDF rendering</td><td>Puppeteer driving a system Chromium (HTML→PDF)</td><td>Dompdf (HTML→PDF, pure PHP)</td></tr>
+    <tr><td>DOCX rendering</td><td><code>docx</code> npm package (programmatic OOXML)</td><td>PHPWord</td></tr>
+    <tr><td>DB access</td><td><code>mysql2/promise</code>, named placeholders, pooled connections</td><td>PDO, named placeholders, one connection per request</td></tr>
+    <tr><td>Sessions</td><td><code>express-session</code> + <code>connect-session-knex</code> (DB-backed table)</td><td>native PHP <code>$_SESSION</code> (file-backed)</td></tr>
+    <tr><td>Email transport</td><td>Nodemailer</td><td>PHPMailer</td></tr>
+    <tr><td>Background jobs</td><td><code>src/jobs/*.js</code> — run via external cron, or in-process via <code>node-cron</code> if <code>RUN_JOBS_IN_PROCESS=true</code></td><td><code>app/cron/*.php</code> — external cron only</td></tr>
+    <tr><td>Dependencies</td><td><code>app/node_modules/</code> committed to the repo — no <code>npm install</code> needed</td><td><code>app/vendor/</code> committed to the repo — no <code>composer install</code> needed</td></tr>
+    <tr><td>Typical host</td><td>A VPS running PM2/systemd behind Nginx</td><td>Shared hosting (e.g. Bluehost) or a VPS behind Nginx/Apache — no persistent process required</td></tr>
+  </table></div>
+
+  <div class="callout ok"><b>Why keep both?</b> Different hosting constraints. The PHP build runs on cheap shared hosting with zero persistent processes; the Node build needs a VPS but renders pixel-perfect PDFs via a real browser engine instead of Dompdf's more limited CSS support.</div>
+</section>
+
+<section id="c">
+  <div class="sec-head"><span class="letter">C</span><h2>Directory Structure</h2><span class="sub">Fig. C</span></div>
+  <div class="grid2">
+    <div>
+      <p class="lede" style="margin-top:0"><span class="pill node">NODE</span></p>
+      <div class="tree">NODE_MySQL_Version/
+├── <span class="dir">app/</span>
+│   ├── <span class="dir">src/</span>
+│   │   ├── server.js          <span class="cm">← routes + middleware chain live here</span>
+│   │   ├── <span class="dir">config/</span>          env.js, db.js
+│   │   ├── <span class="dir">controllers/</span>     one file per resource
+│   │   ├── <span class="dir">services/</span>        business rules, orchestration
+│   │   ├── <span class="dir">repositories/</span>    every SQL statement
+│   │   ├── <span class="dir">middleware/</span>      sessionAuth, permissionCheck,
+│   │   │                    csrfCheck, testModeGate, clientAuth,
+│   │   │                    superAdminOnly
+│   │   ├── <span class="dir">helpers/</span>         csrf, flash, dates, masking
+│   │   └── <span class="dir">jobs/</span>            checkAlerts.js, dispatchDeferredEmails.js
+│   ├── <span class="dir">views/</span>            Nunjucks — app's own screens
+│   ├── <span class="dir">templates/</span>        Nunjucks — the 11 business documents
+│   ├── <span class="dir">public/</span>           static css/js
+│   └── <span class="dir">node_modules/</span>     committed — ready to run
+├── <span class="dir">docs/</span>              schema.sql · seed.sql · ARCHITECTURE.md
+├── <span class="dir">scripts/</span>           backup_db.sh · backup_storage.sh
+└── <span class="dir">storage/</span>           OUTSIDE any web root (see §J)</div>
+    </div>
+    <div>
+      <p class="lede" style="margin-top:0"><span class="pill php">PHP</span></p>
+      <div class="tree">PHP_MySQL_Version/
+├── <span class="dir">app/</span>
+│   ├── <span class="dir">src/</span>
+│   │   ├── <span class="dir">Config/</span>          Env.php, Database.php
+│   │   ├── <span class="dir">Controllers/</span>
+│   │   ├── <span class="dir">Services/</span>
+│   │   ├── <span class="dir">Repositories/</span>
+│   │   ├── <span class="dir">Middleware/</span>      SessionAuth, PermissionCheck,
+│   │   │                    CsrfCheck, TestModeGate, ClientAuth,
+│   │   │                    SuperAdminOnly
+│   │   └── <span class="dir">Helpers/</span>         Router.php, View.php, Csrf.php,
+│   │                        Flash.php
+│   ├── <span class="dir">views/</span>            plain-PHP — app's own screens
+│   ├── <span class="dir">templates/</span>        Twig — the 11 business documents
+│   ├── <span class="dir">vendor/</span>           committed — ready to run
+│   └── bootstrap.php       autoload + env + session start
+├── <span class="dir">public_html/</span>
+│   ├── index.php           <span class="cm">← routes + Test Mode gate live here</span>
+│   └── <span class="dir">assets/</span>css, js
+├── <span class="dir">docs/</span>              schema.sql · seed.sql
+└── <span class="dir">storage/</span>           OUTSIDE the web root (see §J)</div>
+    </div>
+  </div>
+  <div class="callout rule"><b>Naming mirrors 1:1</b> <code>OrderController.php</code> ↔ <code>ordersController.js</code>, <code>ReportRepository.php</code> ↔ <code>reportRepository.js</code>. If you're hunting for the PHP equivalent of a Node file (or vice-versa), same resource name, different casing convention (PascalCase class vs camelCase file).</div>
+</section>
+
+<section id="d">
+  <div class="sec-head"><span class="letter">D</span><h2>Request Lifecycle</h2><span class="sub">Fig. D</span></div>
+  <p class="lede">Every authenticated action passes through the same five checkpoints before it reaches business logic. Test Mode's two gates (§M) sit <em>before</em> routing even happens, because they must also catch public, unauthenticated paths like the client portal.</p>
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','actorBkg':'#123a5c','actorBorder':'#4fc3e8','actorTextColor':'#dbe8f2','signalColor':'#4fc3e8','signalTextColor':'#dbe8f2','labelBoxBkgColor':'#0d3455','labelTextColor':'#dbe8f2','loopTextColor':'#dbe8f2','noteBkgColor':'#f0a94e','noteTextColor':'#0a2942','activationBkgColor':'#17466b','fontFamily':'JetBrains Mono','fontSize':'12.5px'}}}%%
+sequenceDiagram
+  participant B as Browser
+  participant G as Test Mode Gate<br/>(index.php / server.js top)
+  participant R as Router
+  participant M as Route Middleware
+  participant C as Controller
+  participant S as Service
+  participant Rp as Repository
+  participant DB as MySQL
+
+  B->>G: HTTP request
+  G->>G: client-facing path? Test Mode on? → 503
+  G->>G: admin-write path? Test Mode on? → redirect + flash
+  G->>R: pass through
+  R->>M: match route, run chain in order
+  Note over M: 1 SessionAuth / requireAuth<br/>2 PermissionCheck / requirePermission<br/>3 CsrfCheck (POST only)
+  M-->>B: 401/403 short-circuit if any check fails
+  M->>C: all passed
+  C->>S: delegate business rule
+  S->>Rp: read/write via named-placeholder SQL
+  Rp->>DB: prepared statement
+  DB-->>Rp: rows / insertId
+  Rp-->>S: plain objects
+  S-->>C: result or thrown Error
+  C->>C: render view (layout + content) or redirect + flash
+  C-->>B: HTML response
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. D — MIDDLEWARE CHAIN FOR A TYPICAL AUTHENTICATED POST ROUTE</p>
+
+  <div class="tablewrap"><table>
+    <caption>Middleware reference</caption>
+    <tr><th>Purpose</th><th>Node</th><th>PHP</th></tr>
+    <tr><td>Require a logged-in staff session</td><td><code>middleware/sessionAuth.js</code></td><td><code>Middleware\SessionAuth</code></td></tr>
+    <tr><td>Require one named permission</td><td><code>middleware/permissionCheck.js</code></td><td><code>Middleware\PermissionCheck</code></td></tr>
+    <tr><td>Verify CSRF token on POST</td><td><code>middleware/csrfCheck.js</code></td><td><code>Middleware\CsrfCheck</code></td></tr>
+    <tr><td>Require effective Super Admin</td><td><code>middleware/superAdminOnly.js</code></td><td><code>Middleware\SuperAdminOnly</code></td></tr>
+    <tr><td>Require a client-portal session</td><td><code>middleware/clientAuth.js</code></td><td><code>Middleware\ClientAuth</code></td></tr>
+    <tr><td>Test Mode's two global gates</td><td><code>middleware/testModeGate.js</code></td><td><code>Middleware\TestModeGate</code></td></tr>
+  </table></div>
+</section>
+
+<section id="e">
+  <div class="sec-head"><span class="letter">E</span><h2>Database Schema</h2><span class="sub">Fig. E</span></div>
+  <p class="lede">One schema, 69 tables, shared byte-for-byte in spirit between both stacks (<code>NODE_MySQL_Version/docs/schema.sql</code> and <code>PHP_MySQL_Version/docs/schema.sql</code>). The file is organised as lettered sections in the order features were built — the comments at the bottom of the file (<code>-- Section X … added YYYY-MM-DD</code>) are the changelog.</p>
+
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','fontFamily':'JetBrains Mono','fontSize':'12px'}}}%%
+erDiagram
+  CLIENTS ||--o{ ORDERS : places
+  ORDERS ||--o{ ORDER_STAGES : "9 rows, one per stage"
+  ORDERS ||--o{ ORDER_PRODUCTS : "line items"
+  ORDERS ||--o| ORDER_PAYMENT_STATUS : "advance/balance/freight"
+  ORDERS ||--o| ORDER_PRODUCTION : status
+  ORDERS ||--o{ ORDER_SUPPLIER_PO : "material procurement"
+  ORDERS ||--o| ORDER_PACKING : "crates/weights"
+  ORDERS ||--o| ORDER_FREIGHT : terms
+  ORDERS ||--o| ORDER_SHIPPING : "BL tracking"
+  ORDERS ||--o{ ORDER_ANNEXURE_PRODUCTS : "Annexure A specs"
+  ORDERS ||--o{ DOCUMENTS : generates
+  ORDERS ||--o{ AMENDMENTS : "payment-term changes"
+  ORDERS ||--o{ DISPUTES : raises
+  SUPPLIERS ||--o{ ORDER_SUPPLIER_PO : fulfils
+  DOCUMENTS ||--o| FILE_STORE : "pdf_file_id"
+  DOCUMENTS ||--o| FILE_STORE : "docx_file_id"
+  DOCUMENTS ||--o{ DOCUMENT_REVIEWS : "reviewer approvals"
+  DOCUMENTS ||--o{ DOCUMENT_REVISIONS : history
+  CLIENTS ||--o| CLIENT_LOGINS : "provisioned at Stage 3"
+  USERS }o--|| ROLES : has
+  ROLES ||--o{ ROLE_PERMISSIONS : grants
+  PERMISSIONS ||--o{ ROLE_PERMISSIONS : "granted via"
+  USERS ||--o{ USER_PERMISSIONS : "individual overrides"
+  USERS ||--o{ AUDIT_LOG : "acts, logged as"
+  DOCUMENT_TYPES ||--o{ DOCUMENTS : "of type"
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. E1 — CORE ENTITY RELATIONSHIPS (SIMPLIFIED — 22 OF 69 TABLES SHOWN)</p>
+
+  <div class="tablewrap"><table>
+    <caption>Schema sections, in build order</caption>
+    <tr><th>§</th><th>Holds</th><th>§</th><th>Holds</th></tr>
+    <tr><td>A–K</td><td>Foundational: company_settings, RBAC (roles/permissions), clients, orders + every order sub-table, documents, file_store, email_log, disputes, audit_log</td><td>L</td><td>Protected-field lock/unlock requests</td></tr>
+    <tr><td>M</td><td>Signatories &amp; designations (who can sign which document type)</td><td>N</td><td>Super Admin tier + delegation</td></tr>
+    <tr><td>O</td><td>Client portal (client_logins, password reset tokens, intake submissions)</td><td>P</td><td>Document data-integrity snapshot (company/bank/LUT frozen per document)</td></tr>
+    <tr><td>Q</td><td>Working-days calculator + holiday calendar</td><td>R</td><td>Internal reference library (SOPs, checklists, hard-rules docs)</td></tr>
+    <tr><td>S</td><td>Buyer PO / Supplier PO signed-acknowledgement evidence files</td><td>T</td><td>Sample Data Playground flag (<code>is_sample_data</code>)</td></tr>
+    <tr><td>U</td><td>Product Interface — internal product/supplier reference catalog (<code>catalog_*</code> tables, independent of the order pipeline)</td><td>V</td><td>Test Mode (<code>is_test_data</code> flag + <code>test_mode_settings</code>) — see §M</td></tr>
+  </table></div>
+
+  <div class="callout note"><b>No <code>ON DELETE CASCADE</code> anywhere.</b> Every deletion routine in the app (Sample Data clear, Test Mode delete) walks the FK graph by hand, children before parents, and explicitly breaks the one real reference cycle — <code>documents.docx_file_id/pdf_file_id</code> ↔ <code>file_store.linked_document_id</code> — before deleting either side. If you add a table that hangs off <code>orders</code> or <code>clients</code>, you must add it to both deletion routines or it will silently orphan on cleanup.</div>
+</section>
+
+<section id="f">
+  <div class="sec-head"><span class="letter">F</span><h2>RBAC &amp; Permissions</h2><span class="sub">Fig. F</span></div>
+  <p class="lede">Three layers, checked in this order, each able to grant access the layer below couldn't:</p>
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','fontFamily':'JetBrains Mono','fontSize':'13px'}}}%%
+flowchart TD
+  req["Request needs permission<br/>e.g. manage_orders"] --> sa{"Effective Super Admin?<br/>(permanent OR active delegation)"}
+  sa -- yes --> allow["ALLOW — bypasses everything below"]
+  sa -- no --> base["role_permissions<br/>for this user's role"]
+  base --> hasBase{"Role grants it?"}
+  hasBase -- yes --> allow
+  hasBase -- no --> override["user_permissions<br/>per-user GRANT-ONLY override"]
+  override --> hasOverride{"Individually granted?"}
+  hasOverride -- yes --> allow
+  hasOverride -- no --> deny["DENY — 403 + audit log PERMISSION_DENIED"]
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. F — PERMISSION RESOLUTION ORDER</p>
+  <div class="grid2">
+    <div class="card"><h4>Super Admin is not a permission</h4><p>It's a tier above the whole system — gated by its own <code>SuperAdminOnly</code>/<code>superAdminOnly</code> middleware, never a <code>permissions</code> row. A user is Super Admin permanently, or temporarily via a time-boxed, revocable <code>super_admin_delegations</code> grant from an existing Super Admin. Self-approval on privileged gates is allowed for this tier — it's the tier that can't be locked out.</p></div>
+    <div class="card"><h4><code>user_permissions</code> is additive only</h4><p>There is no per-user <em>revoke</em>. If a role's baseline is too generous for one person, the fix is a role change or a new role — not a negative override. This keeps "why can't this user do X" answerable by reading exactly two tables.</p></div>
+  </div>
+</section>
+
+<section id="g">
+  <div class="sec-head"><span class="letter">G</span><h2>The 9-Stage Order Pipeline</h2><span class="sub">Fig. G</span></div>
+  <p class="lede">This is the core business object. <code>orders.current_stage_id</code> always points at the <b>frontier stage</b> — the one whose gate hasn't passed yet. Passing a gate (<code>stageGateService.passAndUnlockNext</code> / <code>StageGateService::passAndUnlockNext</code>) is the only thing that advances it. Two terminal side-exits — <code>lost</code> and the locked <code>complete</code>/<code>disputed</code> states — can happen from most points in the flow.</p>
+
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','fontFamily':'JetBrains Mono','fontSize':'12.5px','edgeLabelBackground':'#0a2942'}}}%%
+stateDiagram-v2
+  direction LR
+  [*] --> S1
+  S1: 1 · Enquiry & Quotation
+  S2: 2 · Buyer PO
+  S3: 3 · Proforma Invoice
+  S4: 4 · Order Confirmation
+  S5: 5 · Supplier PO
+  S6: 6 · Freight Payment
+  S7: 7 · Packing & BL
+  S8: 8 · Commercial Invoice & Balance
+  S9: 9 · Despatch & Closure
+  S1 --> S2 : QT generated & sent
+  S2 --> S3 : Buyer PO recorded
+  S3 --> S4 : Advance payment cleared
+  S4 --> S5 : Buyer acknowledgement confirmed
+  S5 --> S6 : Supplier PO signed
+  S6 --> S7 : Freight payment cleared
+  S6 --> S7 : (auto-skip if Incoterm = FOB)
+  S7 --> S8 : BL issued
+  S8 --> S9 : Balance payment cleared
+  S9 --> [*] : Order marked complete (locked)
+  S1 --> Lost
+  S2 --> Lost
+  S3 --> Lost
+  S4 --> Lost
+  Lost: LOST (locked, reason required)
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. G — ORDER STATE MACHINE (STAGE 6 IS THE ONLY CONDITIONAL SKIP)</p>
+
+  <div class="stagegrid">
+    <div class="stagecell"><div class="n">STAGE 1</div><div class="t">Enquiry &amp; Quotation</div></div>
+    <div class="stagecell"><div class="n">STAGE 2</div><div class="t">Buyer Purchase Order</div></div>
+    <div class="stagecell"><div class="n">STAGE 3</div><div class="t">Proforma Invoice</div></div>
+    <div class="stagecell"><div class="n">STAGE 4</div><div class="t">Order Confirmation</div></div>
+    <div class="stagecell"><div class="n">STAGE 5</div><div class="t">Supplier PO</div></div>
+    <div class="stagecell"><div class="n">STAGE 6</div><div class="t">Freight Payment</div></div>
+    <div class="stagecell"><div class="n">STAGE 7</div><div class="t">Packing &amp; BL Instruction</div></div>
+    <div class="stagecell"><div class="n">STAGE 8</div><div class="t">Commercial Invoice &amp; Balance</div></div>
+    <div class="stagecell"><div class="n">STAGE 9</div><div class="t">Document Despatch &amp; Closure</div></div>
+  </div>
+  <div class="callout rule"><b>Hard rule</b>Stage 4's gate is also the trigger that provisions <code>client_logins</code> — a buyer only ever gets portal credentials automatically, at the advance-cleared moment, never by self-registering (see §K).</div>
+</section>
+
+<section id="h">
+  <div class="sec-head"><span class="letter">H</span><h2>Document Generation</h2><span class="sub">Fig. H</span></div>
+  <p class="lede">Eleven document types plus a dynamic Amendment type, each with a DB-driven reference-number format (<code>document_types.ref_format</code>) and its own Nunjucks/Twig template extending a shared <code>_layout</code> partial (header, meta bar, signature block, watermark). PDF generation is <b>never optional</b> — DOCX is the only user-facing toggle, produced for internal content-parity use, never sent to a buyer.</p>
+
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','fontFamily':'JetBrains Mono','fontSize':'13px'}}}%%
+flowchart LR
+  gen["Generate<br/>(controller action)"] --> assemble["Assemble data<br/>+ snapshot company/bank/LUT<br/>at generation time"]
+  assemble --> render["Render PDF (always)<br/>Puppeteer / Dompdf"]
+  assemble -. optional .-> renderx["Render DOCX<br/>docx npm / PHPWord"]
+  render --> draft["status = draft<br/>DRAFT watermark"]
+  draft --> assign["Reviewers assigned"]
+  assign --> approve{"Every assigned<br/>reviewer approved?"}
+  approve -- no --> assign
+  approve -- yes --> final["Re-rendered FINAL<br/>watermark swapped/removed"]
+  final --> gate["Email send — approval gated<br/>(approve_email_send permission)"]
+  gate --> buyer["Buyer receives FINAL PDF only<br/>— never DOCX, never draft"]
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. H — DOCUMENT LIFECYCLE: DRAFT → REVIEW → FINAL → APPROVAL-GATED SEND</p>
+
+  <div class="tablewrap"><table>
+    <caption>The 11 document types (+ Amendment)</caption>
+    <tr><th>Code</th><th>Name</th><th>Fires at</th></tr>
+    <tr><td><code>QT</code></td><td>Quotation</td><td>Stage 1 gate</td></tr>
+    <tr><td><code>ANNEXA</code></td><td>Annexure A — Product Technical Specs</td><td>Optional appendix, forced into QT/PI/OC/PL/CI/BUYERPO when enabled on the order</td></tr>
+    <tr><td><code>PI</code></td><td>Proforma Invoice</td><td>After Buyer PO recorded</td></tr>
+    <tr><td><code>OC</code></td><td>Order Confirmation (internal PO acceptance)</td><td>After advance payment cleared</td></tr>
+    <tr><td><code>BUYERPO</code></td><td>Purchase Order for buyer signature</td><td>Stage 4</td></tr>
+    <tr><td><code>SUPPO</code></td><td>Supplier Purchase Order</td><td>Stage 5 (material procurement)</td></tr>
+    <tr><td><code>FDN</code></td><td>Freight Debit Note</td><td>Stage 6, skipped for FOB orders</td></tr>
+    <tr><td><code>PL</code></td><td>Packing List</td><td>Stage 7</td></tr>
+    <tr><td><code>BLI</code></td><td>BL Instruction Sheet</td><td>Stage 7</td></tr>
+    <tr><td><code>CI</code></td><td>Commercial Invoice</td><td>Stage 8</td></tr>
+    <tr><td><code>COOPREP</code></td><td>Certificate of Origin Prep Sheet</td><td>Stage 9</td></tr>
+    <tr><td><code>AMD</code></td><td>Payment Terms Amendment</td><td>Ad hoc — requested any time, requires MD approval before it can generate a document</td></tr>
+  </table></div>
+  <div class="callout note">Generated file paths live under <code>storage/clients/&lt;client_unique_number&gt;/&lt;order_reference&gt;/…</code>, but the application <b>never</b> constructs that path from business data to find a file again — every generated file is looked up by its <code>file_store</code> row (§J). The folder layout only matters for backup/restore and manual inspection.</div>
+</section>
+
+<section id="i">
+  <div class="sec-head"><span class="letter">I</span><h2>Email &amp; Notifications</h2><span class="sub">Fig. I</span></div>
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','fontFamily':'JetBrains Mono','fontSize':'12.5px'}}}%%
+flowchart TB
+  a["EmailDispatchService<br/>buyer document sends<br/>(approval-gated)"] --> chokepoint
+  b["TwoFactorService<br/>login codes"] -->|isSecurityEmail=true<br/>NEVER redirected| chokepoint
+  c["AuthController<br/>password reset"] -->|isSecurityEmail=true<br/>NEVER redirected| chokepoint
+  d["ClientPortalService<br/>portal access credentials"] --> chokepoint
+  e["checkAlerts cron job<br/>LUT · RCMC · payment · dispute reminders"] --> chokepoint
+  chokepoint{{"EmailService<br/>sendPlainText / sendWithAttachment<br/>— THE single send chokepoint"}}
+  chokepoint --> testcheck{"Test Mode on<br/>AND not a security email?"}
+  testcheck -- yes --> redirect["Redirect to configured<br/>test_email"]
+  testcheck -- no --> real["Deliver to real recipient"]
+  redirect --> smtp[("SMTP transport")]
+  real --> smtp
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. I — EVERY EMAIL FUNNELS THROUGH ONE FUNCTION, WHICH IS WHERE TEST MODE INTERCEPTS IT</p>
+  <p class="lede">In-app <code>notifications</code> rows are a separate, unrelated channel (bell icon, unread count) — not every notification sends an email, and not every email creates a notification.</p>
+</section>
+
+<section id="j">
+  <div class="sec-head"><span class="letter">J</span><h2>File &amp; Asset Storage</h2><span class="sub">Fig. J</span></div>
+  <div class="tree">storage/                          <span class="cm">← OUTSIDE the web root, always</span>
+├── <span class="dir">assets/</span>                     logo, seal, signatures, watermark,
+│                                email-header — swappable via /company-assets
+├── <span class="dir">clients/</span>
+│   └── <span class="dir">&lt;client_unique_number&gt;/</span>
+│       └── <span class="dir">&lt;order_reference&gt;/</span>
+│           ├── <span class="dir">generated/</span>       every PDF/DOCX ever produced
+│           └── <span class="dir">evidence/</span>        uploaded buyer-PO scans, signed
+│                                Supplier PO copies, BL drafts,
+│                                fumigation certs, dispute docs
+└── <span class="dir">temp/</span>                       scratch space, cleared periodically</div>
+  <p class="lede">Every physical file is mirrored by exactly one <code>file_store</code> row (server path, mime type, size, active flag). The app <b>reads that row</b> to serve a download or build the full-dossier ZIP — it never re-derives a path from a client/order reference. This is also why deletion routines (Sample Data, Test Mode) delete <code>file_store</code> rows first and only then touch disk: a half-finished delete should never leave a DB pointer to a missing file, or vice-versa.</p>
+  <div class="callout danger"><b>Deployment note</b> Both READMEs are explicit: <code>STORAGE_BASE_PATH</code> must resolve outside anything Nginx/Apache serves directly. Nothing in this directory should ever be publicly reachable by URL — access is always mediated by an authenticated download route that checks permissions first.</div>
+</section>
+
+<section id="k">
+  <div class="sec-head"><span class="letter">K</span><h2>Client Portal &amp; Public Intake</h2><span class="sub">Fig. K</span></div>
+  <div class="grid2">
+    <div class="card"><h4>Public quotation-request form</h4><p><code>/quotation-request</code> — no auth. A prospect submits company + shipment details, landing only in <code>client_intake_submissions</code>. Staff review the queue at <code>/client-intake</code> and either accept (creates a real <code>clients</code> row) or reject. A submission is never auto-converted.</p></div>
+    <div class="card"><h4>Client portal login</h4><p><code>/client/login</code> — a structurally separate auth surface from staff sessions (its own session key, its own <code>ClientAuth</code> middleware). A <code>client_logins</code> row is provisioned by the server <em>only</em> at the Stage-4 advance-cleared gate — a buyer can never self-register.</p></div>
+  </div>
+  <p class="lede">Once logged in, a buyer can see their own order's stage, download sent (final, watermarked) documents, and manage their own password — nothing else. Both surfaces above are entirely unavailable while Test Mode is on (§M) — real buyers must never land on a test-populated system.</p>
+</section>
+
+<section id="l">
+  <div class="sec-head"><span class="letter">L</span><h2>Reports &amp; Audit Log</h2><span class="sub">Fig. L</span></div>
+  <div class="grid3">
+    <div class="card"><h4>Per-client</h4><p>Order history, payments, products, running FOB/cleared totals for one client.</p></div>
+    <div class="card"><h4>Per-order</h4><p>Every stage, every document, and the order's full audit trail assembled from audit_log by entity type.</p></div>
+    <div class="card"><h4>Aggregate + Queues</h4><p>Date/stage/Incoterm/country filters; an "operations queues" snapshot (10 buckets — e.g. "QT sent, buyer PO not yet recorded") and date-ranged funnel activity (sent/lost/won counts).</p></div>
+  </div>
+  <p class="lede" style="margin-top:14px;">The <code>audit_log</code> table is append-only by design — no repository method here ever issues an <code>UPDATE</code> or <code>DELETE</code>. Rows are polymorphic (<code>entity_type</code> + <code>entity_id</code>, no real foreign key), which is deliberate: it lets one log outlive every entity type it might ever reference, including ones deleted later by Sample Data or Test Mode cleanup.</p>
+</section>
+
+<section id="m">
+  <div class="sec-head"><span class="letter">M</span><h2>Admin Tooling: Super Admin, Sample Data, Test Mode</h2><span class="sub">Fig. M</span></div>
+  <p class="lede">Three operational features, easy to confuse, each solving a different problem:</p>
+  <div class="tablewrap"><table>
+    <tr><th></th><th>Super Admin</th><th>Sample Data Playground</th><th>Test Mode</th></tr>
+    <tr><td>What it is</td><td>A privilege tier above RBAC</td><td>One-click canned demo dataset</td><td>A global "everything is fake" switch</td></tr>
+    <tr><td>Flag</td><td><code>users.is_super_admin</code> + delegation</td><td><code>is_sample_data</code> on clients/orders/suppliers</td><td><code>is_test_data</code> on clients/orders/suppliers + <code>test_mode_settings</code> singleton</td></tr>
+    <tr><td>Who can create records</td><td>n/a</td><td>One button loads a fixed 3-order demo scenario</td><td>Any staff member, using the real UI, while it's on</td></tr>
+    <tr><td>Side effects while active</td><td>Bypasses every permission check</td><td>None — coexists silently with real data</td><td>Client portal + public intake return 503; all business email redirects to a configured test address; every admin-settings screen is frozen for everyone including Super Admin; reports show <em>only</em> matching-mode data; no audit-log entries recorded</td></tr>
+    <tr><td>Reference numbers</td><td>—</td><td>Whatever the format produces normally</td><td>Every reference gets a <code>TEST-</code> prefix (client number, order number, every document number)</td></tr>
+    <tr><td>Cleanup</td><td>—</td><td><code>/sample-data/clear</code> — hard-deletes by flag, FK-safe order</td><td><code>/test-mode/delete-test-data</code> — same FK-safe pattern, extended for portal-related tables; <b>disabling Test Mode is refused until this returns zero rows</b></td></tr>
+  </table></div>
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','fontFamily':'JetBrains Mono','fontSize':'13px'}}}%%
+flowchart LR
+  off(("OFF")) -->|"Super Admin enables"| on(("ON"))
+  on -->|"staff use the real app<br/>every new record flagged<br/>is_test_data=1, TEST- prefixed"| populated["Test data<br/>accumulates"]
+  populated -->|"Disable Test Mode"| blocked["❌ REFUSED<br/>while test data exists"]
+  populated -->|"Delete Test Data"| clean["All test rows + files<br/>hard-deleted"]
+  clean -->|"Disable Test Mode"| off
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. M — TEST MODE CANNOT BE TURNED OFF WITH DATA STILL LOADED, BY DESIGN</p>
+</section>
+
+<section id="n">
+  <div class="sec-head"><span class="letter">N</span><h2>Deployment Topology</h2><span class="sub">Fig. N</span></div>
+  <div class="sheet">
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#123a5c','primaryTextColor':'#dbe8f2','primaryBorderColor':'#4fc3e8','lineColor':'#4fc3e8','secondaryColor':'#17466b','tertiaryColor':'#0a2942','background':'#0a2942','mainBkg':'#123a5c','nodeTextColor':'#dbe8f2','fontFamily':'JetBrains Mono','fontSize':'12.5px','clusterBkg':'#0d3455','clusterBorder':'#2f9bd6'}}}%%
+flowchart TB
+  subgraph VPS["NODE DEPLOY — VPS"]
+    direction TB
+    nginx1["Nginx :443"] --> pm2["PM2-managed Node process :3000"]
+    pm2 --> chromium["System Chromium<br/>(Puppeteer target)"]
+    cron1["node-cron in-process<br/>OR external crontab"] --> pm2
+  end
+  subgraph SHARED["PHP DEPLOY — SHARED HOSTING"]
+    direction TB
+    nginx2["Nginx/Apache"] --> fpm["PHP-FPM"]
+    cron2["External crontab<br/>→ php app/cron/*.php"] --> fpm
+  end
+  pm2 --> db[("MySQL / MariaDB")]
+  fpm --> db
+  pm2 --> vol[("storage/ volume<br/>outside web root")]
+  fpm --> vol
+  bak["scripts/backup_db.sh<br/>scripts/backup_storage.sh"] --> db
+  bak --> vol
+    </pre>
+  </div>
+  <p class="sheet-cap">FIG. N — NODE NEEDS A PERSISTENT PROCESS + A BROWSER BINARY; PHP NEEDS NEITHER</p>
+  <div class="callout note">Both deployment guides ship as <code>.docx</code> files at the root of each stack folder — <code>NexaCrest_Node_Deployment_Guide.docx</code> and <code>NexaCrest_PHP_Deployment_Guide.docx</code> — with copy-pasteable shell commands for a from-scratch server.</div>
+</section>
+
+<section id="o">
+  <div class="sec-head"><span class="letter">O</span><h2>Extending the App</h2><span class="sub">Fig. O</span></div>
+  <p class="lede">Recipes for the changes a developer actually asks for. Do the equivalent edit in <em>both</em> stacks unless you have a specific reason not to.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>Add a new document type</h4>
+      <p>1. Insert a row into <code>document_types</code> (code, name, <code>ref_format</code>).<br>
+      2. Add a template extending <code>_layout.njk</code> / <code>_layout.html.twig</code>.<br>
+      3. Add a generation function in <code>documentGenerationService.js</code> / <code>DocumentGenerationService.php</code>.<br>
+      4. Add the code to <code>ALLOWED_TYPES</code> in <code>documentController.js</code> / the equivalent PHP controller.<br>
+      5. If it needs a DOCX builder, add a matching function in <code>docxDocumentBuilder.js</code> / <code>DocxDocumentBuilder.php</code>.</p>
+    </div>
+    <div class="card">
+      <h4>Add a new permission</h4>
+      <p>1. Insert into <code>permissions</code>.<br>
+      2. Grant it to the right roles via <code>role_permissions</code> (seed.sql).<br>
+      3. Guard the route: <code>requirePermission('your_key')</code> (Node) or <code>PermissionCheck::requires('your_key')</code> (PHP) in the route's middleware array.<br>
+      4. Gate the nav link in <code>views/layout/base.njk</code> / <code>base.php</code> behind the same key.</p>
+    </div>
+    <div class="card">
+      <h4>Add a field to the order pipeline</h4>
+      <p>1. <code>ALTER TABLE orders</code> or the relevant child table (<code>order_packing</code>, <code>order_shipping</code>, …) in <b>both</b> <code>schema.sql</code> files.<br>
+      2. Update the repository's <code>create</code>/<code>find</code>/<code>update</code> SQL.<br>
+      3. Update the controller action that collects the form field.<br>
+      4. Update any document template that should display it.<br>
+      5. If it's order/client-scoped, confirm the Test Mode and Sample Data delete routines don't need to know about it (they usually don't — only new <em>tables</em> need adding there, per §E's callout).</p>
+    </div>
+    <div class="card">
+      <h4>Tune a business rule</h4>
+      <p>Check <code>company_settings</code> first — quantity tolerance %, LUT/RCMC alert windows, quotation validity days, password policy, working-days weekly-off pattern, and more are all key/value rows editable from <code>/settings</code>, <b>no code change needed</b>. Only reach for a code change if the rule isn't already a settings key.</p>
+    </div>
+    <div class="card">
+      <h4>Add a new report</h4>
+      <p>1. Add a query function to <code>reportRepository.js</code> / <code>ReportRepository.php</code> — remember the Test Mode <code>is_test_data</code> scoping pattern used by every existing query there (§M).<br>
+      2. Add a route + controller action.<br>
+      3. Add a view under <code>views/reports/</code>.</p>
+    </div>
+    <div class="card">
+      <h4>Change what a role can see on generated documents</h4>
+      <p>Look at <code>watermark_settings</code> (scope: global / document_type / document) and <code>docx_generation_settings</code> (per document type, whether DOCX is offered at all) — both admin-editable, no code change.</p>
+    </div>
+  </div>
+
+  <div class="callout rule"><b>Before you touch anything</b>Read the block comment at the top of the file you're editing first. This codebase consistently explains <em>why</em> a non-obvious decision was made in-line (e.g. why PHPWord and <code>docx</code> compute cell widths differently, why <code>audit_log</code> has no real foreign key) — those comments exist specifically so the next developer doesn't "fix" something that was already a deliberate trade-off.</div>
+</section>
+
+<section id="p">
+  <div class="sec-head"><span class="letter">P</span><h2>Reference Tables</h2><span class="sub">Fig. P</span></div>
+
+  <div class="tablewrap"><table>
+    <caption>Selected company_settings keys (editable at /settings, no deploy needed)</caption>
+    <tr><th>Key</th><th>Controls</th></tr>
+    <tr><td><code>order_ref_format</code> / <code>master_tracking_ref_format</code></td><td>Reference-number templates (<code>{YYYY}</code>, <code>{DDMM}</code>, <code>{NNN}</code> placeholders)</td></tr>
+    <tr><td><code>quantity_shortfall_tolerance_pct</code></td><td>Allowed under-delivery % before a hard-rule block fires</td></tr>
+    <tr><td><code>quotation_validity_days</code></td><td>Days a QT stays valid from issue</td></tr>
+    <tr><td><code>lut_alert_days_x</code> / <code>lut_escalation_days_y</code></td><td>LUT-expiry reminder + escalation windows (checked by the alerts cron)</td></tr>
+    <tr><td><code>rcmc_alert_days_a</code> / <code>rcmc_escalation_days_b</code></td><td>Same, for RCMC certificate expiry</td></tr>
+    <tr><td><code>fdn_overdue_days_c</code></td><td>Freight Debit Note overdue-payment threshold</td></tr>
+    <tr><td><code>dispute_response_days_n</code></td><td>SLA window for responding to a raised dispute</td></tr>
+    <tr><td><code>weekly_off_days</code></td><td>Feeds the working-days calculator (holiday calendar is a separate table)</td></tr>
+    <tr><td><code>session_timeout_minutes</code> / <code>failed_login_lockout_count</code> / <code>password_*</code></td><td>Session &amp; auth security policy</td></tr>
+  </table></div>
+
+  <div class="tablewrap"><table>
+    <caption>Business objects at a glance</caption>
+    <tr><th>Object</th><th>Count / shape</th></tr>
+    <tr><td>Order pipeline stages</td><td>9, linear with one conditional skip (Stage 6, FOB Incoterm)</td></tr>
+    <tr><td>Generated document types</td><td>11 fixed + 1 dynamic (Amendment)</td></tr>
+    <tr><td>Database tables</td><td>69, in 22 lettered schema sections (A–V)</td></tr>
+    <tr><td>Auth surfaces</td><td>3, structurally separate — staff session, client-portal session, and unauthenticated public intake</td></tr>
+    <tr><td>File formats generated</td><td>PDF (always) + DOCX (optional, internal-only)</td></tr>
+    <tr><td>Permission resolution layers</td><td>3 — Super Admin bypass → role_permissions → user_permissions</td></tr>
+  </table></div>
+</section>
+
+</main>
+</div>
+
+<footer>NEXACREST BLUEPRINT · REV. 2026-09-22 · BOTH STACKS, ONE SCHEMA · OPEN THIS FILE DIRECTLY IN ANY BROWSER</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+try { if (window.mermaid) { mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' }); } } catch (e) { /* diagrams degrade to plain text if the CDN is unreachable */ }
+</script>
+<script>
+try {
+  var links = document.querySelectorAll('nav.toc a');
+  var sections = Array.prototype.map.call(links, function(a){ return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if ('IntersectionObserver' in window && sections.length) {
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if (entry.isIntersecting) {
+          var id = '#' + entry.target.id;
+          links.forEach(function(a){ a.classList.toggle('active', a.getAttribute('href') === id); });
+        }
+      });
+    }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+    sections.forEach(function(s){ obs.observe(s); });
+  }
+  links.forEach(function(a){
+    a.addEventListener('click', function(e){
+      var target = document.querySelector(a.getAttribute('href'));
+      if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); history.replaceState(null,'',a.getAttribute('href')); }
+    });
+  });
+} catch (e) { /* nav is progressive enhancement only */ }
+</script>
+</body>
+</html>
