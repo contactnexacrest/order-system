@@ -22,9 +22,16 @@ async function generate(req, res) {
     return;
   }
 
+  // PDF is always generated — the approval workflow, the draft->final
+  // watermark swap, and the buyer email attachment all assume every
+  // document has one, so it isn't actually a user-controllable choice even
+  // though the PDF checkbox is shown (checked, disabled) for clarity in the
+  // form. DOCX is the real optional toggle.
+  const generateDocx = !!req.body.generate_docx;
+
   let result;
   try {
-    result = await documentGenerationService.generate(orderId, type, user.id);
+    result = await documentGenerationService.generate(orderId, type, user.id, null, generateDocx);
   } catch (e) {
     console.error(`[DOCUMENT GENERATION FAILED] order=${orderId} type=${type} —`, e);
     flash.set(req, 'error', 'Document generation failed. Check the server error log for details.');

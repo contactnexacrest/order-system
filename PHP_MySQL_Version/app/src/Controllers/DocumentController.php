@@ -27,8 +27,15 @@ final class DocumentController
             return;
         }
 
+        // PDF is always generated — the approval workflow, the draft->final
+        // watermark swap, and the buyer email attachment all assume every
+        // document has one, so it isn't actually a user-controllable choice
+        // even though the PDF checkbox is shown (checked, disabled) for
+        // clarity in the form. DOCX is the real optional toggle.
+        $generateDocx = !empty($_POST['generate_docx']);
+
         try {
-            $result = DocumentGenerationService::generate($orderId, $type, (int) $user['id']);
+            $result = DocumentGenerationService::generate($orderId, $type, (int) $user['id'], null, $generateDocx);
         } catch (\Throwable $e) {
             error_log('[DOCUMENT GENERATION FAILED] order=' . $orderId . ' type=' . $type . ' — ' . $e->getMessage());
             Flash::set('error', 'Document generation failed. Check the server error log for details.');

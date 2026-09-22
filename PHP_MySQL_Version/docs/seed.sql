@@ -506,12 +506,17 @@ INSERT INTO watermark_settings (scope, is_draft_mode, mode, text_content, font, 
   ('global', 0, 'text', 'NEXACREST INTERNATIONAL — ORIGINAL', 'Helvetica', 50, '#7a7a7a', 0.08, 45);
 
 -- ================================================================
--- DOCX_GENERATION_SETTINGS — QT/PI/OC also get an internal-only DOCX copy
--- alongside the buyer-facing PDF (content-parity, not pixel-parity — see
--- README's Phase B scope note).
+-- DOCX_GENERATION_SETTINGS — every order-scoped document type can now
+-- generate an internal-only DOCX alongside the buyer-facing PDF, at the
+-- user's choice via the "Generate DOCX" checkbox on the order page (off
+-- by default; PDF is always generated regardless of its checkbox state).
+-- Both formats are now built to visually match the real source Word
+-- templates, not just content-parity — see renderDocx()'s docblock.
+-- AMD is generated through its own bespoke generateAmendment() path and
+-- has no DOCX support at all yet, so it isn't in this list.
 -- ================================================================
 INSERT INTO docx_generation_settings (document_type_id, is_enabled)
-SELECT id, 1 FROM document_types WHERE code IN ('QT', 'PI', 'OC');
+SELECT id, 1 FROM document_types WHERE code IN ('QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP');
 
 -- ================================================================
 -- EMAIL_TEMPLATES — the 9 templates Section 10 names. All subject/body/

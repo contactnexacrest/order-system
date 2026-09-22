@@ -92,7 +92,7 @@ function fontsBlock() {
   return fontsBlockCache;
 }
 
-async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null) {
+async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null, generateDocx = false) {
   const docType = await findDocumentType(documentTypeCode);
   if (!docType) {
     throw new Error(`Unknown document type: ${documentTypeCode}`);
@@ -187,9 +187,9 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     false
   );
 
-  // --- DOCX (only if enabled for this document type) ---
+  // --- DOCX (only if the user asked for it AND it's admin-enabled for this document type) ---
   let docxFileId = null;
-  if (await docxEnabledFor(docType.id)) {
+  if (generateDocx && (await docxEnabledFor(docType.id))) {
     const docxUuidName = uuidFilename('docx');
     const docxPath = path.join(targetDir, docxUuidName);
     await renderDocx(docxPath, documentTypeCode, context);

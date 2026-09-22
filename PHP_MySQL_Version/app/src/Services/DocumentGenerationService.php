@@ -27,7 +27,7 @@ use Twig\Loader\FilesystemLoader as TwigFilesystemLoader;
  */
 final class DocumentGenerationService
 {
-    public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null): array
+    public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null, bool $generateDocx = false): array
     {
         $pdo = Database::connection();
 
@@ -125,9 +125,9 @@ final class DocumentGenerationService
             false
         );
 
-        // --- DOCX (only if enabled for this document type) ---
+        // --- DOCX (only if the user asked for it AND it's admin-enabled for this document type) ---
         $docxFileId = null;
-        if (self::docxEnabledFor((int) $docType['id'])) {
+        if ($generateDocx && self::docxEnabledFor((int) $docType['id'])) {
             $docxUuidName = self::uuidFilename('docx');
             $docxPath = "{$targetDir}/{$docxUuidName}";
             self::renderDocx($docxPath, $documentTypeCode, $context);
