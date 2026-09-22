@@ -5,6 +5,17 @@ const orderRepository = require('./orderRepository');
 const documentRepository = require('./documentRepository');
 const amendmentRepository = require('./amendmentRepository');
 const disputeRepository = require('./disputeRepository');
+const testModeService = require('../services/testModeService');
+
+/**
+ * Test Mode (docs/schema.sql Section V) — reports must never mix test and
+ * production data. Every query below is scoped to match the CURRENT mode:
+ * with Test Mode on, only test-flagged orders/clients show up; off, only
+ * real ones do. `isTestModeFlag()` is the one place that reads the switch.
+ */
+async function isTestModeFlag() {
+  return (await testModeService.isEnabled()) ? 1 : 0;
+}
 
 /**
  * Port of App\Repositories\ReportRepository. Spec Section 16 — "REPORTS:
@@ -16,7 +27,13 @@ const disputeRepository = require('./disputeRepository');
 
 /** @returns {Promise<object>} order history, payments, products, totals for one client */
 async function perClient(clientId) {
+  const isTestMode = await isTestModeFlag();
   const client = await db.queryOne('SELECT * FROM clients WHERE id = :id', { id: clientId });
+  if (client && parseInt(client.is_test_data, 10) !== isTestMode) {
+    // A real client while Test Mode is on, or a test client while it's
+    // off — never shown, same contract as "client not found".
+    return { client: null, orders: [], documents: [], payments: [], products: [], total_fob_value: 0, total_cleared: 0 };
+  }
 
   const orders = await db.query(
     `SELECT o.id, o.order_reference, o.status, o.created_at,
@@ -26,9 +43,9 @@ async function perClient(clientId) {
      JOIN incoterms i ON i.id = o.incoterm_id
      JOIN currencies cur ON cur.id = o.currency_id
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     WHERE o.client_id = :client_id
+     WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data
      ORDER BY o.created_at DESC`,
-    { client_id: clientId }
+    { client_id: clientId, is_test_data: isTestMode }
   );
 
   const orderIds = orders.map((o) => o.id);
@@ -88,7 +105,11 @@ async function perClient(clientId) {
 
 /** @returns {Promise<object>} all stage data, all documents, full audit for one order */
 async function perOrder(orderId) {
+  const isTestMode = await isTestModeFlag();
   const order = await orderRepository.find(orderId);
+  if (order && parseInt(order.is_test_data, 10) !== isTestMode) {
+    return { order: null, stages: [], documents: [], audit: [] };
+  }
 
   const stages = await db.query(
     `SELECT sm.stage_name, sm.sequence, os.status, os.unlocked_at, os.gate_passed_at, os.skip_reason,
@@ -140,8 +161,8 @@ async function perOrder(orderId) {
  * @returns {Promise<Array<object>>}
  */
 async function aggregate(dateFrom, dateTo, stageId, incotermId, country) {
-  const where = [];
-  const params = {};
+  const where = ['o.is_test_data = :is_test_data'];
+  const params = { is_test_data: await isTestModeFlag() };
   if (dateFrom) {
     where.push('DATE(o.created_at) >= :date_from');
     params.date_from = dateFrom;
@@ -231,7 +252,8 @@ function sentClause(code) {
 
 async function queueRows(whereSql, extraJoins = '') {
   return db.query(
-    `SELECT ${ORDER_ROW_COLS} ${ORDER_ROW_JOIN} ${extraJoins} WHERE ${whereSql} ORDER BY o.created_at`
+    `SELECT ${ORDER_ROW_COLS} ${ORDER_ROW_JOIN} ${extraJoins} WHERE (${whereSql}) AND o.is_test_data = :is_test_data ORDER BY o.created_at`,
+    { is_test_data: await isTestModeFlag() }
   );
 }
 
@@ -367,9 +389,11 @@ async function operationsQueues() {
  * can sit generated-but-unsent for days.
  */
 async function funnelActivity(dateFrom, dateTo) {
+  const isTestMode = await isTestModeFlag();
+
   async function sentCount(code, dateCol) {
-    const clauses = [`dt.code = :code`, `el.status = 'sent'`];
-    const p = { code };
+    const clauses = [`dt.code = :code`, `el.status = 'sent'`, `o.is_test_data = :is_test_data`];
+    const p = { code, is_test_data: isTestMode };
     if (dateFrom) {
       clauses.push(`DATE(el.${dateCol}) >= :date_from`);
       p.date_from = dateFrom;
@@ -383,6 +407,7 @@ async function funnelActivity(dateFrom, dateTo) {
          FROM email_log el
          JOIN documents d ON d.id = el.document_id
          JOIN document_types dt ON dt.id = d.document_type_id
+         JOIN orders o ON o.id = d.order_id
         WHERE ${clauses.join(' AND ')}`,
       p
     );
@@ -390,8 +415,8 @@ async function funnelActivity(dateFrom, dateTo) {
   }
 
   async function lostCount(reachedPi) {
-    const clauses = [`o.status = 'lost'`];
-    const p = {};
+    const clauses = [`o.status = 'lost'`, `o.is_test_data = :is_test_data`];
+    const p = { is_test_data: isTestMode };
     const reachedClause = `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`;
     clauses.push(reachedPi ? reachedClause : `NOT ${reachedClause}`);
     if (dateFrom) {
@@ -409,8 +434,9 @@ async function funnelActivity(dateFrom, dateTo) {
   async function quotationsWon() {
     const clauses = [
       `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`,
+      `o.is_test_data = :is_test_data`,
     ];
-    const p = {};
+    const p = { is_test_data: isTestMode };
     if (dateFrom) {
       clauses.push(`o.pi_date >= :date_from`);
       p.date_from = dateFrom;
@@ -424,8 +450,10 @@ async function funnelActivity(dateFrom, dateTo) {
   }
 
   async function amendmentCount() {
-    const clauses = ['1=1'];
-    const p = {};
+    const clauses = [
+      `EXISTS (SELECT 1 FROM orders oo WHERE oo.id = amendments.order_id AND oo.is_test_data = :is_test_data)`,
+    ];
+    const p = { is_test_data: isTestMode };
     if (dateFrom) {
       clauses.push('DATE(created_at) >= :date_from');
       p.date_from = dateFrom;

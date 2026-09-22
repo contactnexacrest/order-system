@@ -7,6 +7,7 @@ const orderRepository = require('../repositories/orderRepository');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const referenceNumberService = require('../services/referenceNumberService');
+const testModeService = require('../services/testModeService');
 
 // Port of App\Controllers\ClientController.
 
@@ -49,6 +50,9 @@ async function store(req, res) {
     user.id,
     clientUniqueNumber
   );
+  if (await testModeService.isEnabled()) {
+    await clientRepository.markTest(clientId);
+  }
 
   flash.set(req, 'success', `Client created — Buyer Inquiry Ref ${clientUniqueNumber}.`);
   res.redirect(`/clients/${clientId}`);

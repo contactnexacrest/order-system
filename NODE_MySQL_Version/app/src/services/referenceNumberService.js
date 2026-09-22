@@ -2,21 +2,31 @@
 
 const db = require('../config/db');
 const companySettingsRepository = require('./../repositories/companySettingsRepository');
+const testModeService = require('./testModeService');
 
 // Port of App\Services\ReferenceNumberService. Formats are DB-driven
 // (company_settings.master_tracking_ref_format, document_types.ref_format)
 // — never hardcoded. {NNN} is a same-calendar-day sequence within scope.
 
-function render(format, seq) {
+/**
+ * Single chokepoint for every minted reference number (client unique
+ * number, every document reference, amendment reference) — the TEST-
+ * prefix (docs/schema.sql Section V, requirement: test reference numbers
+ * must be identifiable) is applied exactly once here rather than at each
+ * of the three call sites below.
+ */
+async function render(format, seq) {
   const now = new Date();
   const yyyy = String(now.getFullYear());
   const dd = String(now.getDate()).padStart(2, '0');
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const nnn = String(seq).padStart(3, '0');
-  return format
+  const rendered = format
     .replace(/\{YYYY\}/g, yyyy)
     .replace(/\{DDMM\}/g, dd + mm)
     .replace(/\{NNN\}/g, nnn);
+  const testMode = await testModeService.isEnabled();
+  return testModeService.applyReferencePrefix(rendered, testMode);
 }
 
 async function generateClientUniqueNumber() {

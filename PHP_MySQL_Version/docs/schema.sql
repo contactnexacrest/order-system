@@ -1538,6 +1538,55 @@ CREATE TABLE catalog_product_misc_charges (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION V — TEST MODE (added 2026-09-22)
+-- ================================================================
+-- A global, system-wide switch (single row here, id=1) distinct from the
+-- Sample Data Playground (is_sample_data, Section T note): Sample Data is a
+-- one-shot canned demo dataset; Test Mode is a live toggle staff flip on to
+-- manually walk arbitrary orders through the REAL UI/pipeline — with
+-- production access suspended (client portal + quotation-request form) and
+-- every business email redirected to test_email — then bulk-delete
+-- afterward. The two flags coexist independently on the same tables; a row
+-- can never be both, since Sample Data is always loaded with Test Mode off
+-- and nothing here forces otherwise, but that's an operational convention,
+-- not a constraint.
+--
+-- is_enabled cannot be flipped 1->0 while any is_test_data=1 row exists
+-- anywhere (TestModeService::disable() enforces this in application code,
+-- not a DB trigger, matching this codebase's convention of keeping
+-- business rules in the service layer). test_email is editable at any
+-- time, on or off, so it's ready before the next time Test Mode is
+-- enabled.
+CREATE TABLE test_mode_settings (
+  id           TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,  -- singleton row, same convention would apply if this table ever needed more than one — it never does
+  is_enabled   TINYINT(1) NOT NULL DEFAULT 0,
+  test_email   VARCHAR(190) NULL,
+  enabled_at   TIMESTAMP NULL,
+  enabled_by   BIGINT UNSIGNED NULL,
+  disabled_at  TIMESTAMP NULL,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (enabled_by) REFERENCES users(id),
+  CONSTRAINT chk_test_mode_singleton CHECK (id = 1)
+) ENGINE=InnoDB;
+INSERT INTO test_mode_settings (id, is_enabled) VALUES (1, 0);
+
+-- Root-aggregate test flag. Everything hanging off an order/client
+-- (documents, amendments, disputes, email_log, file_store, client_logins,
+-- etc.) derives its test status by joining up to orders.is_test_data /
+-- clients.is_test_data — deliberately NOT duplicated onto every child
+-- table, so it can never drift out of sync with its parent. suppliers gets
+-- its own flag because, like the existing is_sample_data precedent (see
+-- Section T), a test Supplier PO can create a brand-new supplier row that
+-- isn't hung off any single order. catalog_products/catalog_product_*
+-- (Section U) deliberately do NOT get this flag — that catalog is
+-- reference data staff use identically in and out of Test Mode.
+ALTER TABLE clients ADD COLUMN is_test_data TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN is_test_data TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE suppliers ADD COLUMN is_test_data TINYINT(1) NOT NULL DEFAULT 0;
+CREATE INDEX idx_clients_is_test_data ON clients (is_test_data);
+CREATE INDEX idx_orders_is_test_data ON orders (is_test_data);
+
+-- ================================================================
 -- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1550,4 +1599,5 @@ CREATE TABLE catalog_product_misc_charges (
 -- Section S (buyer PO / supplier PO acknowledgment evidence) added 2026-09-21.
 -- Section T (supplier sample-data flag) added 2026-09-21.
 -- Section U (product interface / internal product catalog) added 2026-09-21.
+-- Section V (test mode) added 2026-09-22.
 -- ================================================================

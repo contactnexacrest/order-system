@@ -35,6 +35,7 @@ const stageGateService = require('../services/stageGateService');
 const documentGenerationService = require('../services/documentGenerationService');
 const clientPortalService = require('../services/clientPortalService');
 const fileUploadService = require('../services/fileUploadService');
+const testModeService = require('../services/testModeService');
 
 // Port of App\Controllers\OrderController.
 
@@ -113,10 +114,13 @@ async function store(req, res) {
 
   const sequenceNo = await orderRepository.nextSequenceForClient(clientId);
   const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/OC/{YYYY}/{NNN}';
-  const orderReference =
+  const testModeEnabled = await testModeService.isEnabled();
+  const orderReference = testModeService.applyReferencePrefix(
     orderRefFormat
       .replace(/\{YYYY\}/g, String(new Date().getFullYear()))
-      .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0')) + `-${clientId}`; // client suffix keeps this globally unique even though the format string isn't scoped per-client
+      .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0')) + `-${clientId}`, // client suffix keeps this globally unique even though the format string isn't scoped per-client
+    testModeEnabled
+  );
 
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
 
@@ -151,6 +155,9 @@ async function store(req, res) {
     },
     user.id
   );
+  if (testModeEnabled) {
+    await orderRepository.markTest(orderId);
+  }
 
   await orderStageRepository.initializeForOrder(orderId);
   await orderPaymentStatusRepository.initializeForOrder(orderId);
@@ -494,7 +501,7 @@ async function createSupplier(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  await supplierRepository.create({
+  const supplierId = await supplierRepository.create({
     supplier_legal_name: name,
     address: str(req.body.address) || null,
     gstin: str(req.body.gstin) || null,
@@ -503,6 +510,9 @@ async function createSupplier(req, res) {
     phone: str(req.body.phone) || null,
     supplier_type: str(req.body.supplier_type) || null,
   });
+  if (await testModeService.isEnabled()) {
+    await supplierRepository.markTest(supplierId);
+  }
   flash.set(req, 'success', `Supplier "${name}" added.`);
   res.redirect(`/orders/${orderId}`);
 }

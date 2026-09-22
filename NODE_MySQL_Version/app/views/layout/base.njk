@@ -62,6 +62,7 @@
     {% endif %}
     {% if isSuperAdmin %}
       <a href="/super-admin">Super Admin</a>
+      <a href="/test-mode">Test Mode{% if testModeEnabled %} (ON){% endif %}</a>
     {% endif %}
   </nav>
   <div class="topbar-user">
@@ -72,6 +73,9 @@
     {% endif %}
   </div>
 </header>
+{% if testModeEnabled %}
+  <div class="test-mode-banner">TEST MODE ACTIVE — client access suspended, all outbound business mail is redirected, admin panel settings are locked. Any order/client/document created now is test data.</div>
+{% endif %}
 <main class="page">
   {% for f in flashes %}
     <div class="alert alert-{{ f.type }}">{{ f.message }}</div>

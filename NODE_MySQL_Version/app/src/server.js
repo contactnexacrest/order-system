@@ -16,6 +16,7 @@ const dates = require('./helpers/dates');
 const sessionAuth = require('./middleware/sessionAuth');
 const permissionCheck = require('./middleware/permissionCheck');
 const csrfCheck = require('./middleware/csrfCheck');
+const testModeGate = require('./middleware/testModeGate');
 
 const authController = require('./controllers/authController');
 const dashboardController = require('./controllers/dashboardController');
@@ -46,6 +47,7 @@ const signatoryController = require('./controllers/signatoryController');
 const superAdminController = require('./controllers/superAdminController');
 const permissionAdminController = require('./controllers/permissionAdminController');
 const productsController = require('./controllers/productsController');
+const testModeController = require('./controllers/testModeController');
 const superAdminOnly = require('./middleware/superAdminOnly');
 const clientAuth = require('./middleware/clientAuth');
 
@@ -113,12 +115,30 @@ app.use(session({
   },
 }));
 
+// asyncHandler is declared further below (used by every route registration);
+// these three global middleware run earlier in the stack and need the same
+// promise-rejection-to-next(err) wrapping, so a small local copy lives here
+// too rather than hoisting the route-handler one up past its usual spot.
+function wrapAsyncMiddleware(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+// Test Mode's two access gates (docs/schema.sql Section V) run before
+// everything else: the client-facing block must intercept public routes
+// that never reach requireAuth, and the admin-settings freeze must apply
+// regardless of role, so neither can be expressed as per-route middleware
+// alongside requirePermission().
+app.use(wrapAsyncMiddleware(testModeGate.injectLocals()));
+app.use(wrapAsyncMiddleware(testModeGate.blockClientFacingInTestMode()));
+app.use(wrapAsyncMiddleware(testModeGate.blockAdminWritesInTestMode()));
+
 // --- res.renderView(viewPath, data, layout) — Express's res.render()
 // doesn't have a layout concept by default, so this reproduces the PHP
 // View::render() contract: render the inner template, then wrap it in a
 // layout template that receives {content}. Common context (CSRF token,
 // flash messages, current user, permissions, unread count) is merged in
 // automatically so every controller doesn't have to thread it through. ----
+
 app.use((req, res, next) => {
   res.renderView = function renderView(viewPath, data = {}, layout = 'layout/base') {
     const common = {
@@ -128,6 +148,7 @@ app.use((req, res, next) => {
       permissions: req.permissions || {},
       isSuperAdmin: req.isSuperAdmin || false,
       unreadCount: req.unreadCount || 0,
+      testModeEnabled: req.testModeEnabled || false,
     };
     const context = Object.assign({}, common, data);
     const content = njkEnv.render(`${viewPath}.njk`, context);
@@ -229,6 +250,15 @@ app.get('/super-admin', requireAuth, requireSuperAdmin, asyncHandler(superAdminC
 app.post('/super-admin/delegations', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.grantDelegation));
 app.post('/super-admin/delegations/:id/revoke', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.revokeDelegation));
 app.post('/super-admin/set-permanent', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.setPermanent));
+
+// Test Mode (docs/schema.sql Section V) — Super Admin only, same tier as
+// /super-admin itself, given how broadly it affects the whole system
+// (client access, every business email, every admin settings screen).
+app.get('/test-mode', requireAuth, requireSuperAdmin, asyncHandler(testModeController.index));
+app.post('/test-mode/enable', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.enable));
+app.post('/test-mode/disable', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.disable));
+app.post('/test-mode/test-email', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.updateTestEmail));
+app.post('/test-mode/delete-test-data', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.deleteTestData));
 
 app.get('/admin/permissions', requireAuth, requirePermission('manage_permissions'), asyncHandler(permissionAdminController.index));
 app.post('/admin/permissions/grant', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.grantOverride));

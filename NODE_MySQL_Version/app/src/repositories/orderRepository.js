@@ -102,6 +102,11 @@ async function markSample(id) {
   await db.execute('UPDATE orders SET is_sample_data = 1 WHERE id = :id', { id });
 }
 
+/** Test Mode (docs/schema.sql Section V) — mirrors markSample()'s pattern. */
+async function markTest(id) {
+  await db.execute('UPDATE orders SET is_test_data = 1 WHERE id = :id', { id });
+}
+
 async function setCurrentStage(orderId, stageId) {
   await db.execute('UPDATE orders SET current_stage_id = :stage_id WHERE id = :id', { stage_id: stageId, id: orderId });
 }
@@ -169,7 +174,7 @@ async function setIncludeAnnexureA(orderId, include) {
 }
 
 module.exports = {
-  all, find, nextSequenceForClient, create, markSample, setCurrentStage, setPiDates,
+  all, find, nextSequenceForClient, create, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
   setIncludeAnnexureA,
 };

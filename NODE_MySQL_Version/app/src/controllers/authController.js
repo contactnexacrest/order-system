@@ -135,7 +135,7 @@ async function forgotPassword(req, res) {
         + `To set a new password, open this link within 45 minutes:\n${resetUrl}\n\n`
         + `If you didn't request this, you can ignore this email — your password will not be changed.`;
 
-      await emailService.sendPlainText(email, 'Reset your NexaCrest password', body);
+      await emailService.sendPlainText(email, 'Reset your NexaCrest password', body, { isSecurityEmail: true });
       await auditLogRepository.log(user.id, 'PASSWORD_RESET_REQUESTED', 'users', user.id, null, null, null, `Requested from IP ${ip}`);
     }
   }

@@ -43,4 +43,9 @@ async function markSample(id) {
   await db.execute('UPDATE clients SET is_sample_data = 1 WHERE id = :id', { id });
 }
 
-module.exports = { all, find, create, markSample };
+/** Test Mode (docs/schema.sql Section V) — mirrors markSample()'s pattern. */
+async function markTest(id) {
+  await db.execute('UPDATE clients SET is_test_data = 1 WHERE id = :id', { id });
+}
+
+module.exports = { all, find, create, markSample, markTest };

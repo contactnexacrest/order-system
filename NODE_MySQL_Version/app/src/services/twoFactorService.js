@@ -32,7 +32,7 @@ async function issueCodeFor(req, userId, method, destination) {
   if (method === 'sms' && smsService.isAvailable()) {
     await smsService.send(destination, `NexaCrest login code: ${code} (expires in 5 min)`);
   } else {
-    await emailService.sendPlainText(destination, subject, body);
+    await emailService.sendPlainText(destination, subject, body, { isSecurityEmail: true });
   }
 
   // Local dev only — surfaces the code so the flow can be tested without a
