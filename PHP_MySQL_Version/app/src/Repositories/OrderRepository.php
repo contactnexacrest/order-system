@@ -117,6 +117,12 @@ final class OrderRepository
         Database::connection()->prepare('UPDATE orders SET is_sample_data = 1 WHERE id = :id')->execute(['id' => $id]);
     }
 
+    /** Test Mode (docs/schema.sql Section V) — mirrors markSample()'s pattern. */
+    public static function markTest(int $id): void
+    {
+        Database::connection()->prepare('UPDATE orders SET is_test_data = 1 WHERE id = :id')->execute(['id' => $id]);
+    }
+
     public static function setCurrentStage(int $orderId, int $stageId): void
     {
         Database::connection()->prepare(

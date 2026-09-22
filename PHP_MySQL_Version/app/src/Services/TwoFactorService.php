@@ -37,7 +37,7 @@ final class TwoFactorService
         if ($method === 'sms' && SmsService::isAvailable()) {
             SmsService::send($destination, "NexaCrest login code: {$code} (expires in 5 min)");
         } else {
-            EmailService::sendPlainText($destination, $subject, $body);
+            EmailService::sendPlainText($destination, $subject, $body, true);
         }
 
         // In local dev only, surface the code so the flow can be tested without

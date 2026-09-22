@@ -20,10 +20,39 @@ use App\Config\Env;
 final class EmailService
 {
     /**
+     * Test Mode (docs/schema.sql Section V) redirect — the single
+     * chokepoint both send methods below funnel through, so nothing that
+     * calls either of them has to know about Test Mode. $isSecurityEmail
+     * is the one exception carved out by design: staff's own 2FA codes
+     * and password-reset links must keep going to the real address they
+     * belong to, or Test Mode would lock staff out of their own accounts.
+     * Every other call site (order/document notices, buyer
+     * communications, reminder alerts, client portal access emails)
+     * defaults to redirectable.
+     */
+    private static function resolveRecipient(string $toEmail, bool $isSecurityEmail, string $subject): string
+    {
+        if ($isSecurityEmail) {
+            return $toEmail;
+        }
+        $settings = TestModeService::getSettings();
+        if (!$settings || (int) $settings['is_enabled'] !== 1) {
+            return $toEmail;
+        }
+        if (empty($settings['test_email'])) {
+            error_log("[TEST MODE — no test_email configured, sending to real address] To: {$toEmail} | Subject: {$subject}");
+            return $toEmail;
+        }
+        error_log("[TEST MODE — email redirected] Original To: {$toEmail} -> Test: {$settings['test_email']} | Subject: {$subject}");
+        return (string) $settings['test_email'];
+    }
+
+    /**
      * @return bool true if actually handed to a transport, false if only logged (dev fallback)
      */
-    public static function sendPlainText(string $toEmail, string $subject, string $body): bool
+    public static function sendPlainText(string $toEmail, string $subject, string $body, bool $isSecurityEmail = false): bool
     {
+        $to = self::resolveRecipient($toEmail, $isSecurityEmail, $subject);
         $smtpHost = Env::get('SMTP_HOST');
         $hasPhpMailer = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
 
@@ -42,7 +71,7 @@ final class EmailService
                     Env::get('SMTP_FROM_ADDRESS', 'no-reply@example.com'),
                     Env::get('SMTP_FROM_NAME', 'NexaCrest International Private Limited')
                 );
-                $mail->addAddress($toEmail);
+                $mail->addAddress($to);
                 $mail->Subject = $subject;
                 $mail->Body    = $body;
                 $mail->send();
@@ -54,7 +83,7 @@ final class EmailService
         }
 
         // Dev/incomplete-config fallback: never silently lose the message.
-        error_log("[EMAIL NOT SENT — no SMTP configured or PHPMailer not installed] To: {$toEmail} | Subject: {$subject} | Body: {$body}");
+        error_log("[EMAIL NOT SENT — no SMTP configured or PHPMailer not installed] To: {$to} | Subject: {$subject} | Body: {$body}");
         return false;
     }
 
@@ -67,8 +96,9 @@ final class EmailService
      *
      * @return bool true if actually handed to a transport, false if only logged (dev fallback)
      */
-    public static function sendWithAttachment(string $toEmail, string $subject, string $body, string $attachmentPath, string $attachmentName): bool
+    public static function sendWithAttachment(string $toEmail, string $subject, string $body, string $attachmentPath, string $attachmentName, bool $isSecurityEmail = false): bool
     {
+        $to = self::resolveRecipient($toEmail, $isSecurityEmail, $subject);
         $smtpHost = Env::get('SMTP_HOST');
         $hasPhpMailer = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
 
@@ -87,7 +117,7 @@ final class EmailService
                     Env::get('SMTP_FROM_ADDRESS', 'no-reply@example.com'),
                     Env::get('SMTP_FROM_NAME', 'NexaCrest International Private Limited')
                 );
-                $mail->addAddress($toEmail);
+                $mail->addAddress($to);
                 $mail->Subject = $subject;
                 $mail->Body    = $body;
                 if (is_file($attachmentPath)) {
@@ -101,7 +131,7 @@ final class EmailService
             }
         }
 
-        error_log("[EMAIL NOT SENT — no SMTP configured or PHPMailer not installed] To: {$toEmail} | Subject: {$subject} | Attachment: {$attachmentName}");
+        error_log("[EMAIL NOT SENT — no SMTP configured or PHPMailer not installed] To: {$to} | Subject: {$subject} | Attachment: {$attachmentName}");
         return false;
     }
 }

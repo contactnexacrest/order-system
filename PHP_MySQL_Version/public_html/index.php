@@ -33,6 +33,8 @@ use App\Controllers\PermissionAdminController;
 use App\Controllers\ProductController;
 use App\Controllers\SuperAdminController;
 use App\Middleware\SuperAdminOnly;
+use App\Middleware\TestModeGate;
+use App\Controllers\TestModeController;
 use App\Controllers\UserController;
 use App\Helpers\Router;
 use App\Middleware\ClientAuth;
@@ -71,6 +73,7 @@ $fieldProtection = new FieldProtectionController();
 $users = new UserController();
 $sampleData = new SampleDataController();
 $products = new ProductController();
+$testMode = new TestModeController();
 
 // --- Public (unauthenticated) routes ---
 $router->get('/login', [$auth, 'showLogin']);
@@ -137,6 +140,15 @@ $router->get('/super-admin', [$superAdmin, 'index'], [SessionAuth::required(), S
 $router->post('/super-admin/delegations', [$superAdmin, 'grantDelegation'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/super-admin/delegations/{id}/revoke', [$superAdmin, 'revokeDelegation'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/super-admin/set-permanent', [$superAdmin, 'setPermanent'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+
+// Test Mode (docs/schema.sql Section V) — Super Admin only, same tier as
+// /super-admin itself, given how broadly it affects the whole system
+// (client access, every business email, every admin settings screen).
+$router->get('/test-mode', [$testMode, 'index'], [SessionAuth::required(), SuperAdminOnly::required()]);
+$router->post('/test-mode/enable', [$testMode, 'enable'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+$router->post('/test-mode/disable', [$testMode, 'disable'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+$router->post('/test-mode/test-email', [$testMode, 'updateTestEmail'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+$router->post('/test-mode/delete-test-data', [$testMode, 'deleteTestData'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 
 $router->get('/admin/permissions', [$permissionAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
 $router->post('/admin/permissions/grant', [$permissionAdmin, 'grantOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
@@ -310,5 +322,15 @@ $router->post('/products/suppliers/{supplierId}/delete', [$products, 'deleteSupp
 $router->post('/products/suppliers/{supplierId}/set-primary', [$products, 'setPrimarySupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/{id}/misc-charges/add', [$products, 'addMiscCharge'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/misc-charges/{chargeId}/delete', [$products, 'deleteMiscCharge'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+
+// Test Mode's two access gates (docs/schema.sql Section V) run before
+// dispatch: the client-facing block must intercept public routes that
+// never reach SessionAuth, and the admin-settings freeze must apply
+// regardless of role, so neither can be expressed as per-route middleware
+// alongside PermissionCheck (the Router has no global "before every
+// route" concept — see TestModeGate's docblock).
+$requestPath = rtrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/', '/') ?: '/';
+TestModeGate::blockClientFacingInTestMode($requestPath);
+TestModeGate::blockAdminWritesInTestMode($_SERVER['REQUEST_METHOD'], $requestPath);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

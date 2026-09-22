@@ -59,4 +59,10 @@ final class ClientRepository
     {
         Database::connection()->prepare('UPDATE clients SET is_sample_data = 1 WHERE id = :id')->execute(['id' => $id]);
     }
+
+    /** Test Mode (docs/schema.sql Section V) — mirrors markSample()'s pattern. */
+    public static function markTest(int $id): void
+    {
+        Database::connection()->prepare('UPDATE clients SET is_test_data = 1 WHERE id = :id')->execute(['id' => $id]);
+    }
 }

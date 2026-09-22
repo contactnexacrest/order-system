@@ -37,6 +37,7 @@ use App\Services\AuthService;
 use App\Services\FileUploadService;
 use App\Services\ReferenceNumberService;
 use App\Services\StageGateService;
+use App\Services\TestModeService;
 
 final class OrderController
 {
@@ -101,10 +102,14 @@ final class OrderController
 
         $sequenceNo = OrderRepository::nextSequenceForClient($clientId);
         $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/OC/{YYYY}/{NNN}';
-        $orderReference = strtr($orderRefFormat, [
-            '{YYYY}' => date('Y'),
-            '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
-        ]) . '-' . $clientId; // client suffix keeps this globally unique even though the format string isn't scoped per-client
+        $testModeEnabled = TestModeService::isEnabled();
+        $orderReference = TestModeService::applyReferencePrefix(
+            strtr($orderRefFormat, [
+                '{YYYY}' => date('Y'),
+                '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
+            ]) . '-' . $clientId, // client suffix keeps this globally unique even though the format string isn't scoped per-client
+            $testModeEnabled
+        );
 
         $orderId = OrderRepository::create([
             'order_reference'       => $orderReference,
@@ -134,6 +139,9 @@ final class OrderController
             'quotation_date'        => date('Y-m-d'),
             'quotation_valid_until' => date('Y-m-d', strtotime('+' . ((int) (CompanySettingsRepository::get('quotation_validity_days') ?? 30)) . ' days')),
         ], (int) $user['id']);
+        if ($testModeEnabled) {
+            OrderRepository::markTest($orderId);
+        }
 
         OrderStageRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::initializeForOrder($orderId);
@@ -490,7 +498,7 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        SupplierRepository::create([
+        $supplierId = SupplierRepository::create([
             'supplier_legal_name' => $name,
             'address'             => trim((string) ($_POST['address'] ?? '')) ?: null,
             'gstin'               => trim((string) ($_POST['gstin'] ?? '')) ?: null,
@@ -499,6 +507,9 @@ final class OrderController
             'phone'               => trim((string) ($_POST['phone'] ?? '')) ?: null,
             'supplier_type'       => trim((string) ($_POST['supplier_type'] ?? '')) ?: null,
         ]);
+        if (TestModeService::isEnabled()) {
+            SupplierRepository::markTest($supplierId);
+        }
         Flash::set('success', "Supplier \"{$name}\" added.");
         header("Location: /orders/{$orderId}");
     }

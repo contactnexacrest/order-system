@@ -13,6 +13,7 @@ use App\Repositories\ClientRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AuthService;
 use App\Services\ReferenceNumberService;
+use App\Services\TestModeService;
 
 final class ClientController
 {
@@ -53,6 +54,9 @@ final class ClientController
             'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: 'TBC',
             'notify_party'          => trim((string) ($_POST['notify_party'] ?? '')) ?: null,
         ], (int) $user['id'], $clientUniqueNumber);
+        if (TestModeService::isEnabled()) {
+            ClientRepository::markTest($clientId);
+        }
 
         Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}.");
         header("Location: /clients/{$clientId}");

@@ -89,6 +89,13 @@ final class ReferenceNumberService
         return self::render($row['ref_format'], $seq);
     }
 
+    /**
+     * Single chokepoint for every minted reference number (client unique
+     * number, every document reference, amendment reference) — the TEST-
+     * prefix (docs/schema.sql Section V, requirement: test reference
+     * numbers must be identifiable) is applied exactly once here rather
+     * than at each of the three call sites above.
+     */
     private static function render(string $format, int $seq): string
     {
         $now = new \DateTimeImmutable();
@@ -97,6 +104,7 @@ final class ReferenceNumberService
             '{DDMM}' => $now->format('dm'),
             '{NNN}'  => str_pad((string) $seq, 3, '0', STR_PAD_LEFT),
         ];
-        return strtr($format, $replacements);
+        $rendered = strtr($format, $replacements);
+        return TestModeService::applyReferencePrefix($rendered, TestModeService::isEnabled());
     }
 }

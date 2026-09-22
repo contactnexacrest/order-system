@@ -62,6 +62,7 @@ button:hover{background:var(--navy-strong);}
 .alert-success{background:var(--success-soft);color:var(--success);border:1px solid var(--success);}
 .alert-dev{background:var(--amber-soft);color:var(--amber);border:1px dashed var(--amber);}
 .alert-warning{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber);}
+.test-mode-banner{background:#8A1F1F;color:#fff;text-align:center;font-weight:700;font-size:0.85rem;padding:0.5rem 1rem;letter-spacing:0.02em;}
 .muted{color:var(--ink-soft);font-size:0.85rem;}
 .muted.small{font-size:0.78rem;}
 fieldset{border:1px solid var(--line);border-radius:6px;margin-bottom:1.25rem;padding:1rem 1.25rem;}

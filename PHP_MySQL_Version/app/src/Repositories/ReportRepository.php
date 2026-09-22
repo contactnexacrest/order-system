@@ -5,23 +5,40 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\TestModeService;
 
 /**
  * Spec Section 16 — "REPORTS: Per client ... Per order ... Aggregate ...
  * Export to CSV/Excel." Three query shapes, one per report type named in
  * the spec — kept as plain read queries here; ReportService decides which
  * one a saved report_definitions row runs.
+ *
+ * Test Mode (docs/schema.sql Section V) — reports must never mix test and
+ * production data. Every query below is scoped to match the CURRENT mode:
+ * with Test Mode on, only test-flagged orders/clients show up; off, only
+ * real ones do. isTestModeFlag() is the one place that reads the switch.
  */
 final class ReportRepository
 {
+    private static function isTestModeFlag(): int
+    {
+        return TestModeService::isEnabled() ? 1 : 0;
+    }
+
     /** @return array<string,mixed> order history, payments, products, totals for one client */
     public static function perClient(int $clientId): array
     {
         $pdo = Database::connection();
+        $isTestMode = self::isTestModeFlag();
 
         $client = $pdo->prepare('SELECT * FROM clients WHERE id = :id');
         $client->execute(['id' => $clientId]);
         $client = $client->fetch() ?: null;
+        if ($client && (int) $client['is_test_data'] !== $isTestMode) {
+            // A real client while Test Mode is on, or a test client while
+            // it's off — never shown, same contract as "client not found".
+            return ['client' => null, 'orders' => [], 'documents' => [], 'payments' => [], 'products' => [], 'total_fob_value' => 0.0, 'total_cleared' => 0.0];
+        }
 
         $orders = $pdo->prepare(
             "SELECT o.id, o.order_reference, o.status, o.created_at,
@@ -31,10 +48,10 @@ final class ReportRepository
              JOIN incoterms i ON i.id = o.incoterm_id
              JOIN currencies cur ON cur.id = o.currency_id
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             WHERE o.client_id = :client_id
+             WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data
              ORDER BY o.created_at DESC"
         );
-        $orders->execute(['client_id' => $clientId]);
+        $orders->execute(['client_id' => $clientId, 'is_test_data' => $isTestMode]);
         $orders = $orders->fetchAll();
 
         $orderIds = array_map(static fn(array $o): int => (int) $o['id'], $orders);
@@ -97,8 +114,12 @@ final class ReportRepository
     public static function perOrder(int $orderId): array
     {
         $pdo = Database::connection();
+        $isTestMode = self::isTestModeFlag();
 
         $order = OrderRepository::find($orderId);
+        if ($order && (int) $order['is_test_data'] !== $isTestMode) {
+            return ['order' => null, 'stages' => [], 'documents' => [], 'audit' => []];
+        }
 
         $stages = $pdo->prepare(
             "SELECT sm.stage_name, sm.sequence, os.status, os.unlocked_at, os.gate_passed_at, os.skip_reason,
@@ -166,8 +187,8 @@ final class ReportRepository
         ?int $incotermId,
         ?string $country
     ): array {
-        $where = [];
-        $params = [];
+        $where = ['o.is_test_data = :is_test_data'];
+        $params = ['is_test_data' => self::isTestModeFlag()];
         if ($dateFrom) {
             $where[] = 'DATE(o.created_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -265,9 +286,9 @@ final class ReportRepository
     private static function queueRows(string $whereSql, string $extraJoins = ''): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT ' . self::ORDER_ROW_COLS . ' ' . self::ORDER_ROW_JOIN . " {$extraJoins} WHERE {$whereSql} ORDER BY o.created_at"
+            'SELECT ' . self::ORDER_ROW_COLS . ' ' . self::ORDER_ROW_JOIN . " {$extraJoins} WHERE ({$whereSql}) AND o.is_test_data = :is_test_data ORDER BY o.created_at"
         );
-        $stmt->execute();
+        $stmt->execute(['is_test_data' => self::isTestModeFlag()]);
         return $stmt->fetchAll();
     }
 
@@ -382,8 +403,8 @@ final class ReportRepository
 
     private static function sentCount(string $code, string $dateCol, ?string $dateFrom, ?string $dateTo): int
     {
-        $clauses = ['dt.code = :code', "el.status = 'sent'"];
-        $params = ['code' => $code];
+        $clauses = ['dt.code = :code', "el.status = 'sent'", 'o.is_test_data = :is_test_data'];
+        $params = ['code' => $code, 'is_test_data' => self::isTestModeFlag()];
         if ($dateFrom) {
             $clauses[] = "DATE(el.{$dateCol}) >= :date_from";
             $params['date_from'] = $dateFrom;
@@ -397,6 +418,7 @@ final class ReportRepository
                FROM email_log el
                JOIN documents d ON d.id = el.document_id
                JOIN document_types dt ON dt.id = d.document_type_id
+               JOIN orders o ON o.id = d.order_id
               WHERE ' . implode(' AND ', $clauses)
         );
         $stmt->execute($params);
@@ -407,8 +429,8 @@ final class ReportRepository
     private static function lostCount(bool $reachedPi, ?string $dateFrom, ?string $dateTo): int
     {
         $reachedClause = "EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)";
-        $clauses = ["o.status = 'lost'", $reachedPi ? $reachedClause : "NOT {$reachedClause}"];
-        $params = [];
+        $clauses = ["o.status = 'lost'", $reachedPi ? $reachedClause : "NOT {$reachedClause}", 'o.is_test_data = :is_test_data'];
+        $params = ['is_test_data' => self::isTestModeFlag()];
         if ($dateFrom) {
             $clauses[] = 'DATE(o.lost_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -427,8 +449,11 @@ final class ReportRepository
 
     private static function quotationsWonCount(?string $dateFrom, ?string $dateTo): int
     {
-        $clauses = ["EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)"];
-        $params = [];
+        $clauses = [
+            "EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)",
+            'o.is_test_data = :is_test_data',
+        ];
+        $params = ['is_test_data' => self::isTestModeFlag()];
         if ($dateFrom) {
             $clauses[] = 'o.pi_date >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -447,8 +472,8 @@ final class ReportRepository
 
     private static function amendmentCount(?string $dateFrom, ?string $dateTo): int
     {
-        $clauses = ['1=1'];
-        $params = [];
+        $clauses = ["EXISTS (SELECT 1 FROM orders oo WHERE oo.id = amendments.order_id AND oo.is_test_data = :is_test_data)"];
+        $params = ['is_test_data' => self::isTestModeFlag()];
         if ($dateFrom) {
             $clauses[] = 'DATE(created_at) >= :date_from';
             $params['date_from'] = $dateFrom;

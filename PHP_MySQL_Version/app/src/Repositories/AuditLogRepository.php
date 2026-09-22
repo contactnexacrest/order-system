@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\TestModeService;
 
 final class AuditLogRepository
 {
@@ -18,6 +19,14 @@ final class AuditLogRepository
         ?string $newValue = null,
         ?string $reason = null
     ): void {
+        // Test Mode (docs/schema.sql Section V) — no audit trail for
+        // actions on test-flagged records. Only the entity types that can
+        // actually resolve to a test order/client are checked; everything
+        // else (settings, permissions, users, the Product Catalog, ...) is
+        // never test data and always gets logged normally.
+        if (TestModeService::isTestEntity($entityType, $entityId)) {
+            return;
+        }
         Database::connection()->prepare(
             'INSERT INTO audit_log
                 (user_id, action_type, entity_type, entity_id, field_name, old_value, new_value, reason, ip_address)

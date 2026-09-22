@@ -1,5 +1,6 @@
-<?php use App\Helpers\Flash; use App\Repositories\NotificationRepository; use App\Services\AuthService; use App\Services\PermissionService; use App\Services\SuperAdminService;
+<?php use App\Helpers\Flash; use App\Repositories\NotificationRepository; use App\Services\AuthService; use App\Services\PermissionService; use App\Services\SuperAdminService; use App\Services\TestModeService;
 $current = AuthService::currentUser();
+$testModeEnabled = TestModeService::isEnabled();
 $unreadCount = $current ? NotificationRepository::unreadCountForUser((int) $current['id']) : 0;
 $isEffectiveSuperAdmin = $current && SuperAdminService::isEffective((int) $current['id']);
 $roleId = $current && $current['role_id'] !== null ? (int) $current['role_id'] : null;
@@ -90,6 +91,7 @@ $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermis
     <?php endif; ?>
     <?php if ($isEffectiveSuperAdmin): ?>
       <a href="/super-admin">Super Admin</a>
+      <a href="/test-mode">Test Mode<?= $testModeEnabled ? ' (ON)' : '' ?></a>
     <?php endif; ?>
   </nav>
   <div class="topbar-user">
@@ -100,6 +102,9 @@ $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermis
     <?php endif; ?>
   </div>
 </header>
+<?php if ($testModeEnabled): ?>
+  <div class="test-mode-banner">TEST MODE ACTIVE — client access suspended, all outbound business mail is redirected, admin panel settings are locked. Any order/client/document created now is test data.</div>
+<?php endif; ?>
 <main class="page">
   <?php foreach (Flash::pull() as $f): ?>
     <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?></div>

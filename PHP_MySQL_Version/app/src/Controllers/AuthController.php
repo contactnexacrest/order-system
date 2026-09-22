@@ -162,7 +162,7 @@ final class AuthController
                     . "To set a new password, open this link within 45 minutes:\n{$resetUrl}\n\n"
                     . "If you didn't request this, you can ignore this email — your password will not be changed.";
 
-                EmailService::sendPlainText($email, 'Reset your NexaCrest password', $body);
+                EmailService::sendPlainText($email, 'Reset your NexaCrest password', $body, true);
                 AuditLogRepository::log((int) $user['id'], 'PASSWORD_RESET_REQUESTED', 'users', (int) $user['id'], null, null, null, "Requested from IP {$ip}");
             }
         }
