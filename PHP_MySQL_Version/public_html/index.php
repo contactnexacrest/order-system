@@ -30,6 +30,7 @@ use App\Controllers\SampleDataController;
 use App\Controllers\SettingsController;
 use App\Controllers\SignatoryController;
 use App\Controllers\PermissionAdminController;
+use App\Controllers\ProductController;
 use App\Controllers\SuperAdminController;
 use App\Middleware\SuperAdminOnly;
 use App\Controllers\UserController;
@@ -69,6 +70,7 @@ $adminOverrides = new AdminOverrideController();
 $fieldProtection = new FieldProtectionController();
 $users = new UserController();
 $sampleData = new SampleDataController();
+$products = new ProductController();
 
 // --- Public (unauthenticated) routes ---
 $router->get('/login', [$auth, 'showLogin']);
@@ -286,5 +288,27 @@ $router->get('/client/documents/{id}/download', [$clientPortal, 'downloadDocumen
 $router->get('/sample-data', [$sampleData, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_sample_data')]);
 $router->post('/sample-data/load', [$sampleData, 'load'], [SessionAuth::required(), PermissionCheck::requires('manage_sample_data'), CsrfCheck::verify()]);
 $router->post('/sample-data/clear', [$sampleData, 'clear'], [SessionAuth::required(), PermissionCheck::requires('manage_sample_data'), CsrfCheck::verify()]);
+
+// --- Product Interface (internal product catalog) — Section U. Fully
+// independent of the order pipeline; internal staff reference only,
+// never shown to clients/buyers. See ProductController's docblock for
+// the browse_product_catalog / view_product_pricing server-side gating.
+$router->get('/products', [$products, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
+$router->get('/products/create', [$products, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
+$router->post('/products/create', [$products, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->get('/products/{id}', [$products, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
+$router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
+$router->post('/products/{id}/update', [$products, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/{id}/delete', [$products, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/{id}/images/upload', [$products, 'uploadImage'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/images/{imageId}/delete', [$products, 'deleteImage'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+// Streams the actual image bytes (storage lives outside the web root, exactly like AssetController::preview()) — gated on plain view access, not manage.
+$router->get('/products/images/{imageId}/view', [$products, 'viewImage'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
+$router->post('/products/{id}/suppliers/add', [$products, 'addSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/suppliers/{supplierId}/update', [$products, 'updateSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/suppliers/{supplierId}/delete', [$products, 'deleteSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/suppliers/{supplierId}/set-primary', [$products, 'setPrimarySupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/{id}/misc-charges/add', [$products, 'addMiscCharge'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/misc-charges/{chargeId}/delete', [$products, 'deleteMiscCharge'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

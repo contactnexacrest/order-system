@@ -22,6 +22,7 @@ $canOverrides = $can('edit_locked_data');
 $canFieldProtection = $can('manage_field_protection');
 $canUsers = $can('manage_users');
 $canSampleData = $can('manage_sample_data');
+$canViewProducts = $can('view_product_catalog');
 
 $opsGroupVisible = $canOrders;
 $insightsGroupVisible = $canReports || $canAudit || $canApproveEmail;
@@ -48,6 +49,7 @@ $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermis
     <?php if ($current): ?>
       <a href="/reference-docs">Reference Library</a>
       <a href="/reviews">My Reviews</a>
+      <?php if ($canViewProducts): ?><a href="/products">Products</a><?php endif; ?>
     <?php endif; ?>
     <?php if ($opsGroupVisible): ?>
       <details class="nav-group">
