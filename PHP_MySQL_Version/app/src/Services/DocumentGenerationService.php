@@ -14,8 +14,6 @@ use App\Repositories\OrderRepository;
 use App\Repositories\TermsClauseRepository;
 use Dompdf\Dompdf;
 use Dompdf\Options as DompdfOptions;
-use PhpOffice\PhpWord\IOFactory as PhpWordIOFactory;
-use PhpOffice\PhpWord\PhpWord;
 use Twig\Environment as TwigEnvironment;
 use Twig\Loader\FilesystemLoader as TwigFilesystemLoader;
 
@@ -675,50 +673,15 @@ final class DocumentGenerationService
     }
 
     /**
-     * Content-parity internal DOCX — a straightforward PHPWord rendering
-     * of the same assembled data, not a pixel-for-pixel copy of the PDF
-     * layout (see class docblock).
+     * Document-fidelity internal DOCX — one PHPWord render method per
+     * document type (App\Services\Docx\DocxDocumentBuilder), each mirroring
+     * its own Twig template's sections/labels/colors via the shared
+     * App\Services\Docx\DocxComponents toolkit, not a single generic body
+     * (see class docblock and DocxDocumentBuilder's own docblock).
      */
     private static function renderDocx(string $path, string $documentTypeCode, array $context): void
     {
-        $phpWord = new PhpWord();
-        $section = $phpWord->addSection();
-
-        $section->addText($context['company']['legal_name'], ['bold' => true, 'size' => 16]);
-        $section->addText(self::titleFor($documentTypeCode), ['bold' => true, 'size' => 13]);
-        $section->addTextBreak();
-
-        $section->addText("{$documentTypeCode} No.: {$context['meta']['document_reference']} {$context['meta']['revision_label']}");
-        $section->addText("Date: {$context['meta']['generated_date']}");
-        $section->addText("Buyer Inquiry Ref: {$context['order']['buyer_inquiry_ref']}");
-        $section->addTextBreak();
-
-        $section->addText('Buyer: ' . $context['buyer']['company_legal_name'], ['bold' => true]);
-        $section->addText($context['buyer']['billing_address']);
-        $section->addTextBreak();
-
-        $table = $section->addTable(['borderSize' => 6, 'borderColor' => '999999', 'width' => 100 * 50]);
-        $table->addRow();
-        foreach (['#', 'Description', 'Qty', 'Unit', 'Unit Price', 'Amount'] as $header) {
-            $table->addCell(2000)->addText($header, ['bold' => true]);
-        }
-        foreach ($context['products'] as $i => $p) {
-            $table->addRow();
-            $table->addCell(2000)->addText((string) ($i + 1));
-            $table->addCell(2000)->addText($p['description']);
-            $table->addCell(2000)->addText($p['quantity']);
-            $table->addCell(2000)->addText($p['unit'] ?? '');
-            $table->addCell(2000)->addText($p['unit_price']);
-            $table->addCell(2000)->addText($p['amount']);
-        }
-
-        $section->addTextBreak();
-        $section->addText("FOB Value ({$context['order']['currency_code']}): {$context['financial']['fob_value']}", ['bold' => true]);
-        $section->addText("Advance ({$context['financial']['advance_pct']}%): {$context['financial']['advance_amount']}");
-        $section->addText("Balance ({$context['financial']['balance_pct']}%): {$context['financial']['balance_amount']}");
-
-        $writer = PhpWordIOFactory::createWriter($phpWord, 'Word2007');
-        $writer->save($path);
+        \App\Services\Docx\DocxDocumentBuilder::render($path, $documentTypeCode, $context);
     }
 
     private static function titleFor(string $code): string
