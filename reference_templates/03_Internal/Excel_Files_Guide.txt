@@ -1,0 +1,126 @@
+================================================================================
+NEXACREST INTERNATIONAL PRIVATE LIMITED
+EXCEL FILES — WHAT EACH IS FOR AND HOW TO USE THEM
+================================================================================
+Internal Use Only | Version 1.0 | FY 2026-27
+================================================================================
+
+FOLDER STRUCTURE — WHICH FOLDER TO USE
+================================================================================
+
+01_Tier1_NewBuyer/
+   USE FOR: All first-time buyers and new buyers — DEFAULT
+   PAYMENT: 40% advance + 60% before shipment
+   APPROVAL: No MD approval needed
+
+02_Tier2_EstablishedBuyer/
+   USE FOR: Buyers who completed 2+ successful orders — MD approval required
+   PAYMENT: 40% advance + 60% against scanned BL within 7 days
+   APPROVAL: MD must approve before using Tier 2
+
+RULE: Never mix documents from Tier 1 and Tier 2 folders.
+All documents for one order must come from the SAME folder.
+
+================================================================================
+THREE EXCEL FILES — QUICK REFERENCE
+================================================================================
+
+1. NexaCrest_Client_Forms.xlsx
+   Purpose  : Collect initial buyer requirements at enquiry stage
+   Who uses : Sales / documentation person
+   When     : New buyer enquiry comes in
+   Action   : RETIRE — use Order_Data_Sheet for all new orders going forward
+              Keep for historical reference only
+
+2. NexaCrest_Master_Data_Sheet.xlsx
+   Purpose  : Reference lookup — which field appears in which document
+   Who uses : Anyone who needs to verify a field or train new staff
+   When     : Reference only — never fill data here
+   Action   : KEEP as reference. Do not use for live orders.
+
+3. NexaCrest_Order_Data_Sheet.xlsx  (PRIMARY WORKING FILE — one copy per order)
+   Purpose  : Single source of truth for every live export order
+   Who uses : Documentation officer, accounts, shipping coordinator
+   When     : Every new order — fill this FIRST before opening any Word document
+   Action   : THIS IS THE PRIMARY WORKING FILE going forward
+
+================================================================================
+HOW TO USE THE ORDER DATA SHEET — STEP BY STEP
+================================================================================
+
+BEFORE YOU START
+----------------
+1. Make a COPY of NexaCrest_Order_Data_Sheet.xlsx
+2. Rename the copy using the Buyer Inquiry REF:
+   e.g. NC-SC-2026-0409001_Order_Data_Sheet.xlsx
+3. Save it in the order folder for that buyer
+4. Share the renamed copy with everyone working on this order
+   (documentation, accounts, shipping)
+
+FILLING THE DATA — 4 TABS
+--------------------------
+
+TAB 1 — Order Master Data  (fill this tab for EVERY order)
+   Fill in this order as the order progresses:
+   - Section 1: Reference Numbers — fill when creating the first document
+   - Section 2: Buyer Details — fill from buyer's enquiry / email
+   - Section 3: Product Item 1 — fill from buyer's specification
+   - Section 4: Product Item 2 — fill only if second product. Leave blank if not.
+   - Section 5: Commercial Terms — fill when Incoterm and port are confirmed
+   - Section 6: Payment Data — advance amount at PI stage, freight at FDN stage
+   - Section 7: Shipping Details — fill AFTER CHA confirms booking
+
+TAB 2 — Supplier Data  (fill when issuing Supplier PO)
+   - Fill supplier name, GSTIN, contact details
+   - Fill material specifications — must match export order exactly
+   - Fill INR pricing and delivery terms
+
+TAB 3 — Document Status Tracker  (update throughout the order)
+   - Mark YES / NO / N/A as each document is issued, signed and sent
+   - One person updates this — avoids confusion about which documents are done
+
+TAB 4 — How To Use  (read once, then refer as needed)
+   - Step-by-step process guide
+   - Rules and cross-verification instructions
+
+RULES — READ BEFORE FILLING
+----------------------------
+- Yellow cells ONLY — enter data in Column D only
+- ⬛ = Required — must be filled before the relevant document is issued
+- ⬜ = Optional — fill if available / applicable to this order
+- Do NOT edit Column A, B, C, E, F — these are reference columns only
+- Fixed company details (GSTIN, IEC, bank details, LUT number, port of loading)
+  are already hardcoded in the Word templates — no need to enter here
+
+CROSS-VERIFICATION RULE
+------------------------
+Before issuing any document:
+- A SECOND PERSON must check Column D values against the previous document
+- Buyer name must be character-for-character identical across all documents
+- Product description, HS Code, quantity must match QT → PI → OC → PL → CI
+- Document numbers must follow format: SC/[TYPE]/YYYY/DDMMNNN Rev.00
+- All amounts must cross-check: FOB Value = Qty × Unit Price
+
+NAMING CONVENTION — ORDER DATA SHEET FILES
+-------------------------------------------
+Save one copy per order using this naming format:
+
+   NC-SC-[YEAR]-[DDMMNNN]_[BUYER NAME SHORT]_Order_Data_Sheet.xlsx
+
+Examples:
+   NC-SC-2026-0409001_Szekeres_Order_Data_Sheet.xlsx
+   NC-SC-2026-1509002_Dupont_Order_Data_Sheet.xlsx
+   NC-SC-2026-2211003_Smith_Order_Data_Sheet.xlsx
+
+Store all order data sheets in a shared folder:
+   /NexaCrest Orders/[YEAR]/[Buyer Inquiry REF]/
+
+================================================================================
+CONTACT
+================================================================================
+Gulmohar Sontakke — Founder & Managing Director
+NexaCrest International Private Limited
+gulmohar.sontakke@nexacrestinternational.com
++91-7676463030
+GSTIN: 29AAKCN8733G1ZZ | IEC: AAKCN8733G
+================================================================================
