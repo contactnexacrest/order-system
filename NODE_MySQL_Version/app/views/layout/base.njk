@@ -21,6 +21,7 @@
     {% if currentUser %}
       <a href="/reference-docs">Reference Library</a>
       <a href="/reviews">My Reviews</a>
+      {% if permissions.view_product_catalog %}<a href="/products">Products</a>{% endif %}
     {% endif %}
     {% if currentUser and opsGroupVisible %}
       <details class="nav-group">

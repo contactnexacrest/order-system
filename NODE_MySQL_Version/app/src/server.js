@@ -45,6 +45,7 @@ const sampleDataController = require('./controllers/sampleDataController');
 const signatoryController = require('./controllers/signatoryController');
 const superAdminController = require('./controllers/superAdminController');
 const permissionAdminController = require('./controllers/permissionAdminController');
+const productsController = require('./controllers/productsController');
 const superAdminOnly = require('./middleware/superAdminOnly');
 const clientAuth = require('./middleware/clientAuth');
 
@@ -297,6 +298,24 @@ app.get('/file-store/:id/download', requireAuth, requirePermission('manage_order
 // since clientsController/ordersController already exist.
 app.post('/clients/:id/override-unique-number', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(clientsController.overrideUniqueNumber));
 app.post('/orders/:id/override-status-lock', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(ordersController.overrideStatusLock));
+
+// --- Product Interface (internal product catalog, docs/schema.sql Section U) ---
+app.get('/products', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.index));
+app.get('/products/create', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.create));
+app.post('/products/create', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.store));
+app.get('/products/:id', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.show));
+app.get('/products/:id/edit', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.edit));
+app.post('/products/:id/update', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.update));
+app.post('/products/:id/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.remove));
+app.post('/products/:id/images/upload', requireAuth, requirePermission('manage_product_catalog'), upload.single('image'), verifyCsrf, asyncHandler(productsController.uploadImage));
+app.post('/products/images/:imageId/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.deleteImage));
+app.get('/products/images/:imageId/view', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.viewImage));
+app.post('/products/:id/suppliers/add', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.addSupplier));
+app.post('/products/suppliers/:supplierId/update', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.updateSupplier));
+app.post('/products/suppliers/:supplierId/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.deleteSupplier));
+app.post('/products/suppliers/:supplierId/set-primary', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.setPrimarySupplier));
+app.post('/products/:id/misc-charges/add', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.addMiscCharge));
+app.post('/products/misc-charges/:chargeId/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.deleteMiscCharge));
 
 // --- Phase C: Stages 4-9 ---
 // (routes land here once Phase C's controllers exist)

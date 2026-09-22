@@ -1433,6 +1433,109 @@ ALTER TABLE suppliers
   ADD COLUMN is_sample_data TINYINT(1) NOT NULL DEFAULT 0;
 
 -- ================================================================
+-- SECTION U — PRODUCT INTERFACE / INTERNAL PRODUCT CATALOG (added 2026-09-21)
+-- ================================================================
+-- Internal reference catalog for staff preparing quotations manually —
+-- specs, HS code, default cost components, per-supplier sourcing/FOB, and
+-- misc reference charges. Deliberately standalone: never selected into
+-- orders/order_products, and nothing here is ever shown to clients.
+--
+-- NAMING NOTE: Section C already defines a `products` table used by the
+-- order pipeline (order_products/buyer_po_line_items key off it via
+-- product_id -> products(id)). This catalog is a completely separate,
+-- unrelated concept, so it uses catalog_products/catalog_product_images/
+-- catalog_product_suppliers/catalog_product_misc_charges to avoid any
+-- collision with that existing table.
+CREATE TABLE catalog_products (
+  id                          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name                        VARCHAR(255) NOT NULL,
+  specifications              TEXT NOT NULL,
+  hs_code                     VARCHAR(20) NOT NULL,        -- mandatory, no default
+  origin                      VARCHAR(150) NULL,
+  default_factory_cost        DECIMAL(14,2) NULL,
+  default_transportation_cost DECIMAL(14,2) NULL,
+  default_packing_cost        DECIMAL(14,2) NULL,
+  default_loading_cost        DECIMAL(14,2) NULL,
+  default_cha_cost            DECIMAL(14,2) NULL,
+  is_active                   TINYINT(1) NOT NULL DEFAULT 1,
+  created_by                  BIGINT UNSIGNED NULL,
+  updated_by                  BIGINT UNSIGNED NULL,
+  created_at                  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at                  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  FOREIGN KEY (updated_by) REFERENCES users(id),
+  INDEX idx_catalog_products_hs_code (hs_code),
+  INDEX idx_catalog_products_name (name)
+) ENGINE=InnoDB;
+
+CREATE TABLE catalog_product_images (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  product_id    BIGINT UNSIGNED NOT NULL,
+  server_path   VARCHAR(500) NOT NULL,
+  mime_type     VARCHAR(100) NULL,
+  uploaded_by   BIGINT UNSIGNED NULL,
+  uploaded_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
+  FOREIGN KEY (uploaded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Same product can be sourced from more than one supplier/location (e.g.
+-- Karnataka vs Telangana) at different costs — one row per source.
+-- fob_value is only meaningful when fob_source='direct'; for 'computed'
+-- suppliers it stays NULL forever and the effective FOB is assembled at
+-- read time by ProductService::effectiveFobForSupplier() from the cost
+-- component fields below (falling back to the parent product's defaults
+-- via PHP's ?? operator — NULL falls back, a real 0 does not) so the
+-- number can never go stale the way a persisted computed value could.
+-- "only one primary supplier per product" (is_primary) is enforced in
+-- ProductService::setPrimarySupplier(), not by a DB constraint, since it
+-- requires clearing the other rows for the same product_id in the same
+-- transaction before setting the new one.
+CREATE TABLE catalog_product_suppliers (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  product_id            BIGINT UNSIGNED NOT NULL,
+  supplier_name         VARCHAR(255) NOT NULL,
+  location              VARCHAR(150) NULL,       -- e.g. "Karnataka" vs "Telangana" — same product, different source
+  contact_person        VARCHAR(150) NULL,
+  contact_phone         VARCHAR(50) NULL,
+  contact_email         VARCHAR(150) NULL,
+  fob_source            ENUM('direct','computed') NOT NULL DEFAULT 'direct',
+  fob_value             DECIMAL(14,2) NULL,       -- required/used when fob_source='direct'; NULL when 'computed' (computed dynamically, see above — never store a value here that could go stale)
+  factory_cost          DECIMAL(14,2) NULL,       -- overrides catalog_products.default_factory_cost when set; NULL = inherit
+  transportation_cost   DECIMAL(14,2) NULL,       -- overrides catalog_products.default_transportation_cost when set; NULL = inherit
+  packing_cost          DECIMAL(14,2) NULL,       -- overrides catalog_products.default_packing_cost when set; NULL = inherit
+  loading_cost          DECIMAL(14,2) NULL,       -- overrides catalog_products.default_loading_cost when set; NULL = inherit
+  cha_cost              DECIMAL(14,2) NULL,       -- overrides catalog_products.default_cha_cost when set; NULL = inherit
+  is_primary            TINYINT(1) NOT NULL DEFAULT 0,   -- which supplier's FOB is the headline price in the product list; enforced "only one primary per product" in the SERVICE layer (see above)
+  notes                 TEXT NULL,
+  created_by            BIGINT UNSIGNED NULL,
+  updated_by            BIGINT UNSIGNED NULL,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Open-ended list of miscellaneous charges (e.g. "Bank charges", "LC
+-- charges", "Exchange rate fluctuation buffer") per explicit requirement
+-- that this NOT be a fixed set of columns. Informational reference data
+-- only, shown only to roles holding view_product_pricing — NEVER summed
+-- into any FOB calculation (see ProductService::effectiveFobForSupplier,
+-- which never reads this table at all).
+CREATE TABLE catalog_product_misc_charges (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  product_id    BIGINT UNSIGNED NOT NULL,
+  label         VARCHAR(150) NOT NULL,
+  amount        DECIMAL(14,2) NOT NULL,
+  notes         VARCHAR(500) NULL,
+  created_by    BIGINT UNSIGNED NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
 -- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1444,4 +1547,5 @@ ALTER TABLE suppliers
 -- Section R (internal reference library) added 2026-09-21.
 -- Section S (buyer PO / supplier PO acknowledgment evidence) added 2026-09-21.
 -- Section T (supplier sample-data flag) added 2026-09-21.
+-- Section U (product interface / internal product catalog) added 2026-09-21.
 -- ================================================================

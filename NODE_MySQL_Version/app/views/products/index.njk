@@ -1,0 +1,44 @@
+<div class="card page-wide">
+  <h1>Product Catalog</h1>
+  <p class="muted">Internal reference only — specs, HS code, cost, and suppliers for staff to consult while preparing quotations manually. This catalog is completely independent of the order pipeline and is never shown to clients or buyers.</p>
+
+  <form method="get" action="/products" style="display:flex;gap:8px;margin-bottom:1rem">
+    <input type="text" name="q" value="{{ query }}" placeholder="Search by name, HS code, or specification…" style="flex:1">
+    <button type="submit" class="btn-sm">Search</button>
+    {% if searched %}<a class="btn-sm" href="/products">Clear</a>{% endif %}
+  </form>
+
+  {% if canManage %}
+    <p><a class="btn-sm btn-success" href="/products/create">+ Add Product</a></p>
+  {% endif %}
+
+  {% if not canBrowse and not searched %}
+    <p class="muted">Enter a search term above to find a product. You do not have permission to browse the full catalog list.</p>
+  {% else %}
+    <table class="list">
+      <tr>
+        <th>Name</th>
+        <th>HS Code</th>
+        <th>Origin</th>
+        {% if canViewPricing %}<th>Headline FOB</th>{% endif %}
+        <th>Status</th>
+        <th></th>
+      </tr>
+      {% if not products.length %}
+        <tr><td colspan="6" class="muted">No products found.</td></tr>
+      {% endif %}
+      {% for p in products %}
+        <tr>
+          <td><a href="/products/{{ p.id }}">{{ p.name }}</a></td>
+          <td>{{ p.hs_code }}</td>
+          <td>{{ p.origin or '—' }}</td>
+          {% if canViewPricing %}
+            <td>{{ 'TBC' if p.headline_fob == null else (p.headline_fob | float | round(2)) }}</td>
+          {% endif %}
+          <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
+          <td><a class="btn-sm" href="/products/{{ p.id }}">View</a></td>
+        </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+</div>

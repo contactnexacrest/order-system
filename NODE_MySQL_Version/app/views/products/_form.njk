@@ -1,0 +1,23 @@
+{# Shared by create.njk and edit.njk. #}
+{% set isEdit = product != null %}
+{% set formAction = ('/products/' ~ product.id ~ '/update') if isEdit else '/products/create' %}
+<form method="post" action="{{ formAction }}">
+  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+  <label>Name *<input type="text" name="name" value="{{ product.name or '' }}" required></label>
+  <label>Specifications *<textarea name="specifications" rows="4" required>{{ product.specifications or '' }}</textarea></label>
+  <label>HS Code * <small class="muted">(mandatory)</small><input type="text" name="hs_code" value="{{ product.hs_code or '' }}" required></label>
+  <label>Origin<input type="text" name="origin" value="{{ product.origin or '' }}"></label>
+
+  <fieldset>
+    <legend>Default Cost Components <small class="muted">(catalog-wide fallbacks used by computed-FOB suppliers)</small></legend>
+    <label>Default Factory Cost<input type="number" step="0.01" name="default_factory_cost" value="{{ product.default_factory_cost if product.default_factory_cost != null else '' }}"></label>
+    <label>Default Transportation Cost<input type="number" step="0.01" name="default_transportation_cost" value="{{ product.default_transportation_cost if product.default_transportation_cost != null else '' }}"></label>
+    <label>Default Packing Cost<input type="number" step="0.01" name="default_packing_cost" value="{{ product.default_packing_cost if product.default_packing_cost != null else '' }}"></label>
+    <label>Default Loading Cost<input type="number" step="0.01" name="default_loading_cost" value="{{ product.default_loading_cost if product.default_loading_cost != null else '' }}"></label>
+    <label>Default CHA Cost<input type="number" step="0.01" name="default_cha_cost" value="{{ product.default_cha_cost if product.default_cha_cost != null else '' }}"></label>
+  </fieldset>
+
+  <label><input type="checkbox" name="is_active" value="1" {{ 'checked' if (not isEdit) or product.is_active }}> Active</label>
+
+  <button type="submit">{{ 'Save Changes' if isEdit else 'Add Product' }}</button>
+</form>
