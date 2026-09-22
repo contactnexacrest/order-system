@@ -4,7 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const nunjucks = require('nunjucks');
-const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, HeadingLevel } = require('docx');
 
 const env = require('../config/env');
 const db = require('../config/db');
@@ -17,6 +16,7 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
 const termsClauseRepository = require('../repositories/termsClauseRepository');
 const documentDataAssembler = require('./documentDataAssembler');
 const { renderPdfFromHtml } = require('./pdfRenderService');
+const docxDocumentBuilder = require('./docx/docxDocumentBuilder');
 
 /**
  * Nunjucks -> Puppeteer/Chromium (buyer-facing PDF, always) and, when
@@ -632,54 +632,13 @@ function templateFileFor(code) {
 }
 
 /**
- * Content-parity internal DOCX — a straightforward `docx` package
- * rendering of the same assembled data, not a pixel-for-pixel copy of the
- * PDF layout (see module docblock).
+ * Document-fidelity internal DOCX — delegates to docxDocumentBuilder.js,
+ * the Node sibling of the PHP stack's DocxDocumentBuilder.php, which
+ * visually matches the company's real Word templates (fonts, colors,
+ * tables, signature block, logo, watermark) using the `docx` npm package.
  */
 async function renderDocx(targetPath, documentTypeCode, context) {
-  const productRows = [
-    new TableRow({
-      children: ['#', 'Description', 'Qty', 'Unit', 'Unit Price', 'Amount'].map(
-        (h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })
-      ),
-    }),
-    ...context.products.map(
-      (p, i) =>
-        new TableRow({
-          children: [String(i + 1), p.description, p.quantity, p.unit || '', p.unit_price, p.amount].map(
-            (v) => new TableCell({ children: [new Paragraph(String(v ?? ''))] })
-          ),
-        })
-    ),
-  ];
-
-  const doc = new Document({
-    sections: [
-      {
-        children: [
-          new Paragraph({ children: [new TextRun({ text: context.company.legal_name, bold: true, size: 32 })] }),
-          new Paragraph({ children: [new TextRun({ text: titleFor(documentTypeCode), bold: true, size: 26 })] }),
-          new Paragraph(''),
-          new Paragraph(`${documentTypeCode} No.: ${context.meta.document_reference} ${context.meta.revision_label}`),
-          new Paragraph(`Date: ${context.meta.generated_date}`),
-          new Paragraph(`Buyer Inquiry Ref: ${context.order.buyer_inquiry_ref}`),
-          new Paragraph(''),
-          new Paragraph({ children: [new TextRun({ text: `Buyer: ${context.buyer.company_legal_name}`, bold: true })] }),
-          new Paragraph(context.buyer.billing_address || ''),
-          new Paragraph(''),
-          new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: productRows }),
-          new Paragraph(''),
-          new Paragraph({
-            children: [new TextRun({ text: `FOB Value (${context.order.currency_code}): ${context.financial.fob_value}`, bold: true })],
-          }),
-          new Paragraph(`Advance (${context.financial.advance_pct}%): ${context.financial.advance_amount}`),
-          new Paragraph(`Balance (${context.financial.balance_pct}%): ${context.financial.balance_amount}`),
-        ],
-      },
-    ],
-  });
-
-  const buffer = await Packer.toBuffer(doc);
+  const buffer = await docxDocumentBuilder.render(documentTypeCode, context);
   fs.writeFileSync(targetPath, buffer);
 }
 
