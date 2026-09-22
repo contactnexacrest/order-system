@@ -38,6 +38,7 @@ const {
   AlignmentType,
   VerticalAlign,
   TextWrappingType,
+  TableLayoutType,
 } = require('docx');
 
 // --------------------------------------------------------------------
@@ -105,6 +106,15 @@ const PAGE_A4 = {
 
 const TABLE_MARGINS = { top: 40, bottom: 40, left: 100, right: 100 };
 const FULL_WIDTH = { size: 100, type: WidthType.PERCENTAGE };
+
+// Usable page width in twips (A4 width minus left/right margins) — used to
+// give wide-text tables an accurate `columnWidths`/`tblGrid`. Without it,
+// `docx` emits a placeholder ~100-twip grid column for every
+// WidthType.PERCENTAGE cell; Word tolerates that and recalculates from the
+// pct value, but LibreOffice (and some other renderers) size the column off
+// the tiny grid width instead, wrapping any text that doesn't fit in it —
+// e.g. the header's company name/doc title were wrapping onto two lines.
+const CONTENT_WIDTH_TWIPS = PAGE_A4.size.width - PAGE_A4.margin.left - PAGE_A4.margin.right;
 
 // --------------------------------------------------------------------
 // Small shared helpers
@@ -333,14 +343,25 @@ function header(context, docTitle, incotermText) {
 
   const logoImage = logoDataUri ? imageAtHeight(logoDataUri, 40, 40) : null;
   const cells = [];
+  let columnWidths;
   if (logoImage) {
+    const logoWidth = Math.round(CONTENT_WIDTH_TWIPS * 0.15);
+    columnWidths = [logoWidth, CONTENT_WIDTH_TWIPS - logoWidth];
     cells.push(cell([new Paragraph({ children: [logoImage] })], { width: pctWidth(15), verticalAlign: VerticalAlign.CENTER }));
     cells.push(cell(titleParas, { width: pctWidth(85), verticalAlign: VerticalAlign.CENTER }));
   } else {
+    columnWidths = [CONTENT_WIDTH_TWIPS];
     cells.push(cell(titleParas, { width: pctWidth(100), verticalAlign: VerticalAlign.CENTER }));
   }
 
-  const table = new Table({ width: FULL_WIDTH, margins: TABLE_MARGINS, borders: NO_BORDERS, rows: [new TableRow({ children: cells })] });
+  const table = new Table({
+    width: FULL_WIDTH,
+    columnWidths,
+    layout: TableLayoutType.FIXED,
+    margins: TABLE_MARGINS,
+    borders: NO_BORDERS,
+    rows: [new TableRow({ children: cells })],
+  });
   return [table, spacer(120)];
 }
 
