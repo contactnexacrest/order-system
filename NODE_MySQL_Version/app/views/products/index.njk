@@ -33,7 +33,7 @@
           <td>{{ p.hs_code }}</td>
           <td>{{ p.origin or '—' }}</td>
           {% if canViewPricing %}
-            <td>{{ 'TBC' if p.headline_fob == null else (p.headline_fob | float | round(2)) }}</td>
+            <td>{{ 'TBC' if p.headline_fob == null else (p.headline_fob | money) }}</td>
           {% endif %}
           <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
           <td><a class="btn-sm" href="/products/{{ p.id }}">View</a></td>

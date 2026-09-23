@@ -85,6 +85,24 @@ njkEnv.addFilter('humanDate', dates.human);
 // built-in startswith, and the PHP side's equivalent ($isActive) is a
 // plain str_starts_with(), so this is the same one-line check.
 njkEnv.addFilter('startswith', (value, prefix) => typeof value === 'string' && value.startsWith(prefix));
+// Mirrors PHP's number_format($v, 2) — comma thousands separator, fixed 2
+// decimals — so money amounts render identically on both stacks (e.g.
+// "1,500.00", not the raw "1500").
+njkEnv.addFilter('money', (value) => {
+  const num = parseFloat(value);
+  if (Number.isNaN(num)) return value;
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+});
+// Mirrors PHP's rtrim(rtrim(number_format($v, 3), '0'), '.') — 3 decimals
+// with trailing zeros (and a trailing bare dot) trimmed off, used for
+// quantity totals where whole numbers shouldn't show ".000".
+njkEnv.addFilter('qty', (value) => {
+  const num = parseFloat(value);
+  if (Number.isNaN(num)) return value;
+  const [intPart, fracPart] = num.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).split('.');
+  const trimmedFrac = fracPart.replace(/0+$/, '');
+  return trimmedFrac ? `${intPart}.${trimmedFrac}` : intPart;
+});
 // nl2br mirrors PHP's nl2br(htmlspecialchars($v)) — escape first (autoescape
 // is on globally, so this filter must do its own escaping since it returns
 // markup), then turn newlines into <br>, then mark safe.

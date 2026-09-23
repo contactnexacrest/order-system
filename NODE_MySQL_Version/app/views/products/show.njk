@@ -22,11 +22,11 @@
     <h2>Default Cost Components</h2>
     <p class="muted small">These are the catalog-wide fallbacks a computed-FOB supplier uses for any cost component it does not itself override.</p>
     <div class="kv-grid">
-      <div><span class="k">Factory Cost</span><span class="v">{{ '—' if product.default_factory_cost == null else (product.default_factory_cost | float | round(2)) }}</span></div>
-      <div><span class="k">Transportation Cost</span><span class="v">{{ '—' if product.default_transportation_cost == null else (product.default_transportation_cost | float | round(2)) }}</span></div>
-      <div><span class="k">Packing Cost</span><span class="v">{{ '—' if product.default_packing_cost == null else (product.default_packing_cost | float | round(2)) }}</span></div>
-      <div><span class="k">Loading Cost</span><span class="v">{{ '—' if product.default_loading_cost == null else (product.default_loading_cost | float | round(2)) }}</span></div>
-      <div><span class="k">CHA Cost</span><span class="v">{{ '—' if product.default_cha_cost == null else (product.default_cha_cost | float | round(2)) }}</span></div>
+      <div><span class="k">Factory Cost</span><span class="v">{{ '—' if product.default_factory_cost == null else (product.default_factory_cost | money) }}</span></div>
+      <div><span class="k">Transportation Cost</span><span class="v">{{ '—' if product.default_transportation_cost == null else (product.default_transportation_cost | money) }}</span></div>
+      <div><span class="k">Packing Cost</span><span class="v">{{ '—' if product.default_packing_cost == null else (product.default_packing_cost | money) }}</span></div>
+      <div><span class="k">Loading Cost</span><span class="v">{{ '—' if product.default_loading_cost == null else (product.default_loading_cost | money) }}</span></div>
+      <div><span class="k">CHA Cost</span><span class="v">{{ '—' if product.default_cha_cost == null else (product.default_cha_cost | money) }}</span></div>
     </div>
   </div>
   {% endif %}
@@ -76,7 +76,7 @@
             {% if s.contact_email %}<br><small class="muted">{{ s.contact_email }}</small>{% endif %}
           </td>
           <td>{{ s.fob_source | capitalize }}</td>
-          <td>{{ 'TBC' if s.effective_fob == null else (s.effective_fob | float | round(2)) }}</td>
+          <td>{{ 'TBC' if s.effective_fob == null else (s.effective_fob | money) }}</td>
           <td>{{ '&#9733;' | safe if s.is_primary else '' }}</td>
           <td>
             {% if canManage %}
@@ -166,7 +166,7 @@
       {% for mc in miscCharges %}
         <tr>
           <td>{{ mc.label }}</td>
-          <td>{{ mc.amount | float | round(2) }}</td>
+          <td>{{ mc.amount | money }}</td>
           <td>{{ mc.notes or '' }}</td>
           <td>
             {% if canManage %}

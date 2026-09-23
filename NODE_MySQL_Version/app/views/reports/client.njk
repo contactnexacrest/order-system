@@ -9,8 +9,8 @@
   <div class="section">
     <h2>Totals</h2>
     <div class="kv-grid">
-      <div><span class="k">Total FOB Value (all orders)</span><span class="v">{{ total_fob_value }}</span></div>
-      <div><span class="k">Total Payments Cleared</span><span class="v">{{ total_cleared }}</span></div>
+      <div><span class="k">Total FOB Value (all orders)</span><span class="v">{{ total_fob_value | money }}</span></div>
+      <div><span class="k">Total Payments Cleared</span><span class="v">{{ total_cleared | money }}</span></div>
       <div><span class="k">Order Count</span><span class="v">{{ orders.length }}</span></div>
       <div><span class="k">Contact Email</span><span class="v">{{ (client.email or '—') if canViewFullEmail else (client.email | maskEmail) }}</span></div>
     </div>
@@ -58,11 +58,11 @@
       <tr><th>Advance</th><th>Advance Cleared</th><th>Balance</th><th>Balance Cleared</th><th>Freight</th><th>Freight Cleared</th></tr>
       {% for p in payments %}
       <tr>
-        <td>{{ p.advance_amount if p.advance_amount != null else '—' }}</td>
+        <td>{{ (p.advance_amount | money) if p.advance_amount != null else '—' }}</td>
         <td>{{ p.advance_cleared_at or '—' }}</td>
-        <td>{{ p.balance_amount if p.balance_amount != null else '—' }}</td>
+        <td>{{ (p.balance_amount | money) if p.balance_amount != null else '—' }}</td>
         <td>{{ p.balance_cleared_at or '—' }}</td>
-        <td>{{ p.freight_amount if p.freight_amount != null else '—' }}</td>
+        <td>{{ (p.freight_amount | money) if p.freight_amount != null else '—' }}</td>
         <td>{{ p.freight_cleared_at or '—' }}</td>
       </tr>
       {% endfor %}
@@ -77,10 +77,10 @@
       {% for p in products %}
       <tr>
         <td>{{ p.description }}</td>
-        <td>{{ 'TBC' if p.quantity_is_tbc else p.quantity }}</td>
+        <td>{{ 'TBC' if p.quantity_is_tbc else (p.quantity | qty) }}</td>
         <td>{{ p.unit or '—' }}</td>
-        <td>{{ p.unit_price if p.unit_price != null else '—' }}</td>
-        <td>{{ p.fob_value if p.fob_value != null else '—' }}</td>
+        <td>{{ (p.unit_price | money) if p.unit_price != null else '—' }}</td>
+        <td>{{ (p.fob_value | money) if p.fob_value != null else '—' }}</td>
       </tr>
       {% endfor %}
       {% if not products or products.length == 0 %}<tr><td colspan="5" class="muted">No product lines yet.</td></tr>{% endif %}

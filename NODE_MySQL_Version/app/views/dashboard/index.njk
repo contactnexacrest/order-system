@@ -87,7 +87,7 @@
           <td>{{ r.order_reference }}</td>
           <td>{{ r.company_legal_name }}</td>
           <td>{{ r.balance_due_date }}</td>
-          <td>{{ r.balance_amount if r.balance_amount != null else '—' }}</td>
+          <td>{{ (r.balance_amount | money) if r.balance_amount != null else '—' }}</td>
           <td><a href="/orders/{{ r.order_id }}">View</a></td>
         </tr>
         {% endfor %}

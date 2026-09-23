@@ -81,7 +81,7 @@
   <div class="section">
     <h2>Order Details</h2>
     <div class="kv-grid">
-      <div><span class="k">FOB Value</span><span class="v">{{ order.currency_code }} {{ fobTotal | float | round(2, 'floor') }}</span></div>
+      <div><span class="k">FOB Value</span><span class="v">{{ order.currency_code }} {{ fobTotal | money }}</span></div>
       <div><span class="k">Port of Discharge</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or 'TBC' }}</span></div>
       <div><span class="k">Container Type</span><span class="v">{{ order.container_type or '—' }}</span></div>
       <div><span class="k">Payment Preset</span><span class="v">{{ order.preset_name }}</span></div>
@@ -100,8 +100,8 @@
         <td>{{ p.description }}{% if p.dimensions or p.finish %}<br><span class="muted small">{{ p.dimensions or '' }} {{ p.finish or '' }}</span>{% endif %}</td>
         <td>{{ 'TBC' if p.quantity_is_tbc else p.quantity }}</td>
         <td>{{ p.unit or '' }}</td>
-        <td>{{ p.unit_price if p.unit_price != null else 'TBC' }}</td>
-        <td>{{ p.fob_value if p.fob_value != null else 'TBC' }}</td>
+        <td>{{ (p.unit_price | money) if p.unit_price != null else 'TBC' }}</td>
+        <td>{{ (p.fob_value | money) if p.fob_value != null else 'TBC' }}</td>
       </tr>
       {% endfor %}
     </table>
@@ -491,10 +491,10 @@
     <h2>Payment Status</h2>
     {% if payment %}
     <div class="kv-grid">
-      <div><span class="k">Advance Amount</span><span class="v">{{ payment.advance_amount if payment.advance_amount != null else '—' }}</span></div>
+      <div><span class="k">Advance Amount</span><span class="v">{{ (payment.advance_amount | money) if payment.advance_amount != null else '—' }}</span></div>
       <div><span class="k">Advance T/T Received</span><span class="v">{{ payment.advance_remittance_received_at or '—' }}</span></div>
       <div><span class="k">Advance Cleared</span><span class="v">{{ payment.advance_cleared_at or '—' }}</span></div>
-      <div><span class="k">Balance Amount</span><span class="v">{{ payment.balance_amount if payment.balance_amount != null else '—' }}</span></div>
+      <div><span class="k">Balance Amount</span><span class="v">{{ (payment.balance_amount | money) if payment.balance_amount != null else '—' }}</span></div>
       <div><span class="k">Balance Due</span><span class="v">{{ payment.balance_due_date or 'event-triggered' }}</span></div>
     </div>
     {% endif %}
@@ -709,7 +709,7 @@
     {% else %}
       <h3>Packing</h3>
       {% if orderedQuantitySummary.comparable %}
-        <p class="muted small">Ordered quantity: <strong>{{ orderedQuantitySummary.total }} {{ orderedQuantitySummary.unit }}</strong> &middot; Shortfall tolerance: <strong>{{ shortfallTolerance }}%</strong> — the shortfall below is computed automatically from this. A shortfall over tolerance is blocked until the buyer's written approval is uploaded.</p>
+        <p class="muted small">Ordered quantity: <strong>{{ orderedQuantitySummary.total | qty }} {{ orderedQuantitySummary.unit }}</strong> &middot; Shortfall tolerance: <strong>{{ shortfallTolerance }}%</strong> — the shortfall below is computed automatically from this. A shortfall over tolerance is blocked until the buyer's written approval is uploaded.</p>
       {% else %}
         <p class="muted small">Ordered quantity can't be automatically compared for this order (mixed units across product lines, or quantity not yet confirmed) — enter Shortfall % manually below.</p>
       {% endif %}

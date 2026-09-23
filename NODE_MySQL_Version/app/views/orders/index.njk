@@ -59,7 +59,7 @@
         {% else %}
           <span class="badge badge-active">Active</span>
         {% endif %}
-        <span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | float | round(2, 'floor') }}</span>
+        <span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | money }}</span>
       </div>
     </a>
     {% endfor %}

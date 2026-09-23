@@ -67,7 +67,7 @@
       <td>{{ r.currency_code }}</td>
       <td>{{ r.current_stage_name or 'Quotation' }}</td>
       <td>{{ r.status | capitalize }}</td>
-      <td>{{ r.total_fob_value }}</td>
+      <td>{{ r.total_fob_value | money }}</td>
       <td>{{ r.created_at }}</td>
     </tr>
     {% endfor %}
