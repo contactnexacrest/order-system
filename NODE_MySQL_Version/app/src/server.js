@@ -43,6 +43,8 @@ const assetController = require('./controllers/assetController');
 const clientsController = require('./controllers/clientsController');
 const clientIntakeController = require('./controllers/clientIntakeController');
 const clientIntakeReviewController = require('./controllers/clientIntakeReviewController');
+const piIntakeController = require('./controllers/piIntakeController');
+const piIntakeReviewController = require('./controllers/piIntakeReviewController');
 const clientPortalController = require('./controllers/clientPortalController');
 const ordersController = require('./controllers/ordersController');
 const annexureController = require('./controllers/annexureController');
@@ -219,6 +221,15 @@ app.post('/reset-password/:token', verifyCsrf, asyncHandler(authController.reset
 // never a client or order (see clientIntakeController's docblock).
 app.get('/quotation-details', asyncHandler(clientIntakeController.show));
 app.post('/quotation-details/submit', verifyCsrf, asyncHandler(clientIntakeController.submit));
+app.get('/quotation-details/edit/:token', asyncHandler(clientIntakeController.showEdit));
+app.post('/quotation-details/edit/:token', verifyCsrf, asyncHandler(clientIntakeController.updateSubmission));
+
+// PI-stage intake — a SEPARATE public form from the Quotation-stage one
+// above, per the business's Client_Forms.xlsx spec (schema.sql Section
+// AA). Staff generate the per-order link (see ordersController's
+// generatePiFormLink); the client never reaches this without one.
+app.get('/pi-details/:token', asyncHandler(piIntakeController.show));
+app.post('/pi-details/:token', verifyCsrf, asyncHandler(piIntakeController.submit));
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -314,6 +325,10 @@ app.post('/clients/:id/toggle-active', requireAuth, requirePermission('manage_or
 app.get('/client-intake', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.index));
 app.post('/client-intake/:id/accept', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.accept));
 app.post('/client-intake/:id/reject', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.reject));
+
+app.get('/pi-intake-review', requireAuth, requirePermission('manage_orders'), asyncHandler(piIntakeReviewController.index));
+app.post('/pi-intake-review/:id/accept', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(piIntakeReviewController.accept));
+app.post('/pi-intake-review/:id/reject', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(piIntakeReviewController.reject));
 
 app.get('/orders', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.index));
 app.get('/orders/archived', requireAuth, requirePermission('view_archived_orders'), asyncHandler(ordersController.archivedIndex));
@@ -433,6 +448,7 @@ app.post('/disputes/:disputeId/documents', requireAuth, requirePermission('manag
 app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.index));
 app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));
 app.get('/orders/:id/dossier', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.downloadDossier));
+app.post('/orders/:id/pi-form-link', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.generatePiFormLink));
 
 app.get('/notifications', requireAuth, asyncHandler(notificationController.index));
 

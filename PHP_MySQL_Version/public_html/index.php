@@ -14,6 +14,8 @@ use App\Controllers\ClientController;
 use App\Controllers\ClientIntakeController;
 use App\Controllers\ClientIntakeReviewController;
 use App\Controllers\ClientPortalController;
+use App\Controllers\PiIntakeController;
+use App\Controllers\PiIntakeReviewController;
 use App\Controllers\DashboardController;
 use App\Controllers\DisputeController;
 use App\Controllers\DocumentController;
@@ -54,6 +56,8 @@ $permissionAdmin = new PermissionAdminController();
 $clients = new ClientController();
 $clientIntake = new ClientIntakeController();
 $clientIntakeReview = new ClientIntakeReviewController();
+$piIntake = new PiIntakeController();
+$piIntakeReview = new PiIntakeReviewController();
 $clientPortal = new ClientPortalController();
 $orders = new OrderController();
 $annexure = new AnnexureController();
@@ -92,6 +96,15 @@ $router->post('/reset-password/{token}', [$auth, 'resetPassword'], [CsrfCheck::v
 // never a client or order (see ClientIntakeController's docblock).
 $router->get('/quotation-details', [$clientIntake, 'show']);
 $router->post('/quotation-details/submit', [$clientIntake, 'submit'], [CsrfCheck::verify()]);
+$router->get('/quotation-details/edit/{token}', [$clientIntake, 'showEdit']);
+$router->post('/quotation-details/edit/{token}', [$clientIntake, 'updateSubmission'], [CsrfCheck::verify()]);
+
+// PI-stage intake — a SEPARATE public form from the Quotation-stage one
+// above, per the business's Client_Forms.xlsx spec (schema.sql Section
+// AA). Staff generate the per-order link (see OrderController's
+// generatePiFormLink); the client never reaches this without one.
+$router->get('/pi-details/{token}', [$piIntake, 'show']);
+$router->post('/pi-details/{token}', [$piIntake, 'submit'], [CsrfCheck::verify()]);
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -189,6 +202,10 @@ $router->get('/client-intake', [$clientIntakeReview, 'index'], [SessionAuth::req
 $router->post('/client-intake/{id}/accept', [$clientIntakeReview, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/client-intake/{id}/reject', [$clientIntakeReview, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
+$router->get('/pi-intake-review', [$piIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/pi-intake-review/{id}/accept', [$piIntakeReview, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/pi-intake-review/{id}/reject', [$piIntakeReview, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+
 $router->get('/orders', [$orders, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->get('/orders/archived', [$orders, 'archivedIndex'], [SessionAuth::required(), PermissionCheck::requires('view_archived_orders')]);
 $router->get('/orders/create', [$orders, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
@@ -283,6 +300,7 @@ $router->post('/disputes/{disputeId}/documents', [$disputes, 'uploadDocument'], 
 $router->get('/audit-log', [$auditLog, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
 $router->get('/orders/{id}/audit-log', [$auditLog, 'forOrder'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
 $router->get('/orders/{id}/dossier', [$orders, 'downloadDossier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/orders/{id}/pi-form-link', [$orders, 'generatePiFormLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 // Notifications bell.
 $router->get('/notifications', [$notifications, 'index'], [SessionAuth::required()]);

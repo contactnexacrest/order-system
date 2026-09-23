@@ -47,7 +47,7 @@ final class TestModeGate
      * the prefix, and both of those paths diverge from "/client" at the
      * very next character ('s', '-').
      */
-    private const CLIENT_FACING_PREFIXES = ['/quotation-details', '/client'];
+    private const CLIENT_FACING_PREFIXES = ['/quotation-details', '/pi-details', '/client'];
 
     public static function blockAdminWritesInTestMode(string $method, string $path): void
     {

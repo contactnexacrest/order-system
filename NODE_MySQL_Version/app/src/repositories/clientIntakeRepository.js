@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const db = require('../config/db');
 
 // Port of App\Repositories\ClientIntakeRepository. Public quotation-stage
@@ -41,6 +42,55 @@ async function find(id) {
   return db.queryOne('SELECT * FROM client_intake_submissions WHERE id = :id', { id });
 }
 
+async function setAccessToken(id, tokenHash, expiresAt) {
+  await db.execute(
+    'UPDATE client_intake_submissions SET access_token_hash = :hash, access_token_expires_at = :expires WHERE id = :id',
+    { hash: tokenHash, expires: expiresAt, id }
+  );
+}
+
+/**
+ * Only while still status='pending' — once staff act on a submission
+ * (converted/rejected), the client-side correction link stops working,
+ * by design (see schema.sql Section AA).
+ */
+async function findValidByToken(rawToken) {
+  const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  return db.queryOne(
+    "SELECT * FROM client_intake_submissions WHERE access_token_hash = :hash AND access_token_expires_at > NOW() AND status = 'pending'",
+    { hash }
+  );
+}
+
+async function updateFromClient(id, data) {
+  await db.execute(
+    `UPDATE client_intake_submissions SET
+        company_legal_name = :company_legal_name, billing_address = :billing_address,
+        vat_eori_tax_no = :vat_eori_tax_no, contact_person = :contact_person, email = :email,
+        phone = :phone, country_of_destination = :country_of_destination,
+        port_of_discharge_text = :port_of_discharge_text, coo_type = :coo_type,
+        incoterm_preference = :incoterm_preference, container_type_text = :container_type_text,
+        buyer_own_reference = :buyer_own_reference, notes = :notes
+     WHERE id = :id`,
+    {
+      company_legal_name: data.company_legal_name,
+      billing_address: data.billing_address,
+      vat_eori_tax_no: data.vat_eori_tax_no || null,
+      contact_person: data.contact_person,
+      email: data.email,
+      phone: data.phone || null,
+      country_of_destination: data.country_of_destination,
+      port_of_discharge_text: data.port_of_discharge_text || null,
+      coo_type: data.coo_type || null,
+      incoterm_preference: data.incoterm_preference || null,
+      container_type_text: data.container_type_text || null,
+      buyer_own_reference: data.buyer_own_reference || null,
+      notes: data.notes || null,
+      id,
+    }
+  );
+}
+
 async function pending() {
   return db.query("SELECT * FROM client_intake_submissions WHERE status = 'pending' ORDER BY submitted_at ASC");
 }
@@ -74,4 +124,4 @@ async function markRejected(id, reviewedBy, reason) {
   );
 }
 
-module.exports = { create, find, pending, recentResolved, markConverted, markRejected };
+module.exports = { create, find, setAccessToken, findValidByToken, updateFromClient, pending, recentResolved, markConverted, markRejected };

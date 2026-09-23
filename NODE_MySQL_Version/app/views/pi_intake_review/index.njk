@@ -1,0 +1,61 @@
+<div class="card page-wide">
+  <h1>PI Intake Review</h1>
+  <p class="muted">Submissions from the per-order PI-stage form (<code>/pi-details/&lt;token&gt;</code>), generated per-order from the order screen. Accepting overwrites the client's identity fields (consignee, notify party, VAT/EORI, phone, confirmed contact/billing) with what the client confirmed here — this is the "must match official documents" checkpoint — and sets the order's Buyer PO ref if provided. Everything else (payment-terms confirmation, quotation acceptance reference, confirmed Incoterm/port/COO, changes, special requirements) stays on the submission for you to read before generating the PI.</p>
+
+  <div class="section">
+    <h2>Pending ({{ pending.length }})</h2>
+    <table class="list">
+      <tr><th>Order</th><th>Company</th><th>Consignee</th><th>Confirmation</th><th>Submitted</th><th>Action</th></tr>
+      {% for s in pending %}
+      <tr>
+        <td><a href="/orders/{{ s.order_id }}">{{ s.order_reference }}</a></td>
+        <td>{{ s.company_legal_name }}<br><span class="muted small">{{ s.contact_person }} &middot; {{ s.email }}</span></td>
+        <td>{{ s.consignee_name }}<br><span class="muted small">Notify: {{ s.notify_party or '—' }}</span></td>
+        <td>
+          <span class="muted small">Incoterm: {{ s.incoterm_confirmed }}</span><br>
+          <span class="muted small">Port: {{ s.port_of_discharge_text }}</span><br>
+          <span class="muted small">{{ s.quotation_acceptance_reference }}</span><br>
+          <span class="muted small">{{ s.payment_terms_confirmation }}</span>
+          {% if s.changes_from_quotation %}<br><span class="muted small">Changes: {{ s.changes_from_quotation }}</span>{% endif %}
+          {% if s.buyer_po_ref %}<br><span class="muted small">Buyer PO: {{ s.buyer_po_ref }}</span>{% endif %}
+        </td>
+        <td>{{ s.submitted_at }}</td>
+        <td>
+          <form method="post" action="/pi-intake-review/{{ s.id }}/accept" style="display:inline" onsubmit="return confirm('Accept and apply these details to the client and order?');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-success">Accept &amp; Apply</button>
+          </form>
+          <form method="post" action="/pi-intake-review/{{ s.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this PI-stage submission?');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px">
+            <button type="submit" class="btn-sm btn-danger">Reject</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if pending.length == 0 %}
+        <tr><td colspan="6" class="muted">No pending submissions.</td></tr>
+      {% endif %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Recently Resolved</h2>
+    <table class="list">
+      <tr><th>Order</th><th>Company</th><th>Status</th><th>Resolved By</th><th>When</th><th>Result</th></tr>
+      {% for s in resolved %}
+      <tr>
+        <td><a href="/orders/{{ s.order_id }}">{{ s.order_reference }}</a></td>
+        <td>{{ s.company_legal_name or s.client_company_legal_name }}</td>
+        <td>{{ s.status | capitalize }}</td>
+        <td>{{ s.reviewed_by_name or '—' }}</td>
+        <td>{{ s.reviewed_at }}</td>
+        <td>{{ s.rejection_reason if s.status == 'rejected' else '—' }}</td>
+      </tr>
+      {% endfor %}
+      {% if resolved.length == 0 %}
+        <tr><td colspan="6" class="muted">Nothing resolved yet.</td></tr>
+      {% endif %}
+    </table>
+  </div>
+</div>

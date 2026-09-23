@@ -181,6 +181,7 @@ final class TestModeRepository
                 foreach ([
                     'order_stages', 'order_products', 'order_payment_status', 'order_production',
                     'order_supplier_po', 'order_packing', 'order_crates', 'order_freight', 'order_shipping',
+                    'pi_intake_submissions',
                 ] as $table) {
                     $pdo->exec(self::inQuery("DELETE FROM {$table} WHERE order_id IN (%s)", $orderIds));
                 }

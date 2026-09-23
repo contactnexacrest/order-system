@@ -396,6 +396,40 @@ $orderClosed = $order['status'] === 'complete';
   </div>
 
   <div class="section">
+    <h2>PI-Stage Intake</h2>
+    <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
+    <?php if ($piIntake): ?>
+      <p>
+        Status: <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $piIntake['status']))) ?></strong>
+        <?php if ($piIntake['status'] === 'pending_review'): ?>
+          &nbsp;·&nbsp; <a href="/pi-intake-review">Review in PI Intake Review</a>
+        <?php elseif ($piIntake['status'] === 'applied'): ?>
+          &nbsp;·&nbsp; Applied by <?= htmlspecialchars($piIntake['reviewed_by_name'] ?? '—') ?> on <?= htmlspecialchars((string) $piIntake['reviewed_at']) ?>
+        <?php endif; ?>
+      </p>
+      <?php if ($piIntake['status'] === 'applied'): ?>
+        <div class="kv-grid">
+          <div><span class="k">Confirmed Incoterm</span><span class="v"><?= htmlspecialchars($piIntake['incoterm_confirmed'] ?? '—') ?></span></div>
+          <div><span class="k">Confirmed Port of Discharge</span><span class="v"><?= htmlspecialchars($piIntake['port_of_discharge_text'] ?? '—') ?></span></div>
+          <div><span class="k">Confirmed COO Type</span><span class="v"><?= htmlspecialchars($piIntake['coo_type'] ?? '—') ?></span></div>
+          <div><span class="k">Payment Terms Confirmation</span><span class="v"><?= htmlspecialchars($piIntake['payment_terms_confirmation'] ?? '—') ?></span></div>
+          <div><span class="k">Quotation Acceptance Reference</span><span class="v"><?= htmlspecialchars($piIntake['quotation_acceptance_reference'] ?? '—') ?></span></div>
+          <?php if ($piIntake['changes_from_quotation']): ?><div><span class="k">Changes from Quotation</span><span class="v"><?= htmlspecialchars($piIntake['changes_from_quotation']) ?></span></div><?php endif; ?>
+          <?php if ($piIntake['special_document_requirements']): ?><div><span class="k">Special Document Requirements</span><span class="v"><?= htmlspecialchars($piIntake['special_document_requirements']) ?></span></div><?php endif; ?>
+        </div>
+      <?php endif; ?>
+    <?php else: ?>
+      <p class="muted">No PI-stage form has been sent to this client yet.</p>
+    <?php endif; ?>
+    <?php if ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/pi-form-link" style="display:inline">
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm"><?= $piIntake ? 'Regenerate PI Form Link' : 'Generate PI Form Link' ?></button>
+    </form>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
     <h2>Amendments &amp; Disputes</h2>
     <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Payment Terms Amendments (<?= (int) $amendmentCount ?>)</a>
        &nbsp;·&nbsp;

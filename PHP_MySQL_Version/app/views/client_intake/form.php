@@ -14,8 +14,8 @@
       <label>Billing Address *
         <textarea name="billing_address" placeholder="e.g., István K. u. 40., Csorvás, Hungary" required></textarea>
       </label>
-      <label>VAT / EORI / Tax Reg. No.
-        <input type="text" name="vat_eori_tax_no" placeholder="UK: EORI No. | France: SIRET + TVA No. | Norway: Org. No. + MVA">
+      <label>VAT / EORI / Tax Reg. No. *
+        <input type="text" name="vat_eori_tax_no" placeholder="UK: EORI No. | France: SIRET + TVA No. | Norway: Org. No. + MVA" required>
       </label>
       <label>Contact Person *
         <input type="text" name="contact_person" placeholder="e.g., Gábor Szekeres" required>
@@ -39,8 +39,8 @@
 
     <fieldset>
       <legend>Shipping Preference</legend>
-      <label>Incoterm
-        <input type="text" name="incoterm_preference" placeholder="FOB Chennai, India / CFR [port] / CIF [port] — if unsure, write FOB">
+      <label>Incoterm *
+        <input type="text" name="incoterm_preference" placeholder="FOB Chennai, India / CFR [port] / CIF [port] — if unsure, write FOB" required>
       </label>
       <label>Container Type
         <input type="text" name="container_type_text" placeholder="e.g., 1 × 20ft FCL / 1 × 40ft FCL — leave blank, we will advise based on your order">

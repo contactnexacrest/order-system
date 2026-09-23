@@ -1734,6 +1734,86 @@ END$$
 DELIMITER ;
 
 -- ================================================================
+-- SECTION AA — CLIENT SELF-CORRECTION + PI-STAGE INTAKE (added 2026-09-23)
+-- ================================================================
+-- Two gaps closed together, both from the same real business need: the
+-- client-facing "Client_Forms.xlsx" spec provided directly by the
+-- business defines a Quotation Form (the existing /quotation-details
+-- intake) and a SEPARATE PI Form the client fills in after accepting the
+-- Quotation and before staff issue the Proforma Invoice — confirming
+-- details "exactly as they appear on official documents" and adding
+-- fields the Quotation stage never asked for (consignee, notify party,
+-- payment-terms confirmation, formal acceptance of the quotation number).
+--
+-- 1. Quotation-stage self-correction: a client who mistyped something on
+--    /quotation-details can fix it themselves via a one-time emailed
+--    link, but ONLY while their submission is still status='pending' —
+--    once staff act on it (converted/rejected) the link stops working,
+--    and once a client has portal login (post-advance-payment) further
+--    changes go through Amendments, never a self-edit, per explicit
+--    instruction. The raw token is never stored — only its SHA-256 hash,
+--    exactly like ClientPasswordResetTokenRepository — so a DB leak alone
+--    can't be used to edit someone's pending submission.
+ALTER TABLE client_intake_submissions
+  ADD COLUMN access_token_hash VARCHAR(64) NULL AFTER submitted_ip,
+  ADD COLUMN access_token_expires_at DATETIME NULL AFTER access_token_hash;
+
+-- 2. PI-stage intake: staff generate a per-order link (button on the
+--    order screen) once the Quotation is out; the client fills this
+--    SEPARATE form; it lands in its own staff review queue
+--    (pi_intake_submissions), never auto-applied. Accepting copies the
+--    client-identity fields (consignee/notify-party/VAT-EORI/phone/
+--    confirmed contact+billing) onto the live `clients` row — the PI
+--    form is explicitly the "must match exactly as they appear on
+--    official documents" checkpoint, so this IS the authoritative
+--    correction point for that data — plus buyers_po_ref onto the order.
+--    Everything else the sheet asks for (payment-terms confirmation,
+--    formal quotation-acceptance reference, confirmed Incoterm/port/COO,
+--    changes from quotation, special document requirements) is kept
+--    permanently on this row as the record staff actually read before
+--    generating the PI, rather than auto-written onto the order's own
+--    structured/FK-driven columns (incoterm_id, port_of_discharge_id) —
+--    those stay staff-reconciled, the same way quotation-intake data was
+--    never auto-written into a client/order row without a staff step.
+CREATE TABLE pi_intake_submissions (
+  id                              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                        BIGINT UNSIGNED NOT NULL,
+  access_token_hash               VARCHAR(64) NOT NULL,
+  access_token_expires_at         DATETIME NOT NULL,
+  company_legal_name              VARCHAR(255) NULL,
+  billing_address                 TEXT NULL,
+  consignee_name                  VARCHAR(255) NULL,
+  consignee_address               TEXT NULL,
+  vat_eori_tax_no                 VARCHAR(100) NULL,
+  contact_person                  VARCHAR(150) NULL,
+  email                           VARCHAR(190) NULL,
+  phone                           VARCHAR(30) NULL,
+  notify_party                    VARCHAR(255) NULL,
+  port_of_discharge_text          VARCHAR(150) NULL,
+  country_of_destination          VARCHAR(100) NULL,
+  incoterm_confirmed              VARCHAR(100) NULL,
+  container_type_text             VARCHAR(100) NULL,
+  payment_terms_confirmation      TEXT NULL,
+  quotation_acceptance_reference  TEXT NULL,
+  coo_type                        VARCHAR(50) NULL,
+  buyer_po_ref                    VARCHAR(100) NULL,
+  changes_from_quotation          TEXT NULL,
+  special_document_requirements   TEXT NULL,
+  status                          ENUM('awaiting_client','pending_review','applied','rejected') NOT NULL DEFAULT 'awaiting_client',
+  submitted_at                    TIMESTAMP NULL,
+  submitted_ip                    VARCHAR(45) NULL,
+  reviewed_by                     BIGINT UNSIGNED NULL,
+  reviewed_at                     TIMESTAMP NULL,
+  rejection_reason                VARCHAR(500) NULL,
+  created_by                      BIGINT UNSIGNED NULL,
+  created_at                      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (reviewed_by) REFERENCES users(id),
+  FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE INDEX idx_pi_intake_order ON pi_intake_submissions(order_id);
+
+-- ================================================================
 -- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1751,4 +1831,5 @@ DELIMITER ;
 -- Section X (role & permission management) added 2026-09-23.
 -- Section Y (custom reference library entries) added 2026-09-23.
 -- Section Z (protected founder accounts) added 2026-09-23.
+-- Section AA (client self-correction + PI-stage intake) added 2026-09-23.
 -- ================================================================

@@ -62,6 +62,7 @@ $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermis
           <a href="/orders">Orders</a>
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived">Archived Orders</a><?php endif; ?>
           <a href="/client-intake">Client Requests</a>
+          <a href="/pi-intake-review">PI Intake Review</a>
           <a href="/disputes">Disputes</a>
         </div>
       </details>

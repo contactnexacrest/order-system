@@ -375,6 +375,40 @@
   </div>
 
   <div class="section">
+    <h2>PI-Stage Intake</h2>
+    <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
+    {% if piIntake %}
+      <p>
+        Status: <strong>{{ piIntake.status | replace('_', ' ') | capitalize }}</strong>
+        {% if piIntake.status == 'pending_review' %}
+          &nbsp;&middot;&nbsp; <a href="/pi-intake-review">Review in PI Intake Review</a>
+        {% elif piIntake.status == 'applied' %}
+          &nbsp;&middot;&nbsp; Applied by {{ piIntake.reviewed_by_name or '—' }} on {{ piIntake.reviewed_at }}
+        {% endif %}
+      </p>
+      {% if piIntake.status == 'applied' %}
+        <div class="kv-grid">
+          <div><span class="k">Confirmed Incoterm</span><span class="v">{{ piIntake.incoterm_confirmed or '—' }}</span></div>
+          <div><span class="k">Confirmed Port of Discharge</span><span class="v">{{ piIntake.port_of_discharge_text or '—' }}</span></div>
+          <div><span class="k">Confirmed COO Type</span><span class="v">{{ piIntake.coo_type or '—' }}</span></div>
+          <div><span class="k">Payment Terms Confirmation</span><span class="v">{{ piIntake.payment_terms_confirmation or '—' }}</span></div>
+          <div><span class="k">Quotation Acceptance Reference</span><span class="v">{{ piIntake.quotation_acceptance_reference or '—' }}</span></div>
+          {% if piIntake.changes_from_quotation %}<div><span class="k">Changes from Quotation</span><span class="v">{{ piIntake.changes_from_quotation }}</span></div>{% endif %}
+          {% if piIntake.special_document_requirements %}<div><span class="k">Special Document Requirements</span><span class="v">{{ piIntake.special_document_requirements }}</span></div>{% endif %}
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="muted">No PI-stage form has been sent to this client yet.</p>
+    {% endif %}
+    {% if permissions.manage_orders %}
+    <form method="post" action="/orders/{{ order.id }}/pi-form-link" style="display:inline">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm">{{ 'Regenerate PI Form Link' if piIntake else 'Generate PI Form Link' }}</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="section">
     <h2>Amendments &amp; Disputes</h2>
     <p><a href="/orders/{{ order.id }}/amendments">Payment Terms Amendments ({{ amendmentCount }})</a>
        &nbsp;&middot;&nbsp;

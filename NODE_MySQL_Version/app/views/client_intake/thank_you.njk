@@ -1,5 +1,13 @@
 <div class="card card-narrow">
   <h1>Thank you</h1>
-  <p>We've received your quotation request. Our team will review it and get back to you with a Quotation within 24 hours.</p>
+  {% if updated %}
+    <p>Your correction has been saved. Our team will review your request and get back to you with a Quotation within 24 hours.</p>
+  {% else %}
+    <p>We've received your quotation request. Our team will review it and get back to you with a Quotation within 24 hours.</p>
+    {% if correctionLink %}
+      <p class="muted small">We've also emailed you a link in case you spot a mistake and want to correct it before we review your request:</p>
+      <p class="muted small" style="word-break:break-all;"><a href="{{ correctionLink }}">{{ correctionLink }}</a></p>
+    {% endif %}
+  {% endif %}
   <p class="muted small">If you don't hear from us within a couple of days, please check your spam folder or contact us directly.</p>
 </div>

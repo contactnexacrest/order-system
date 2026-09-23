@@ -31,9 +31,12 @@ use App\Repositories\OrderShippingRepository;
 use App\Repositories\OrderStageRepository;
 use App\Repositories\OrderSupplierPoDocumentRepository;
 use App\Repositories\OrderSupplierPoRepository;
+use App\Repositories\PiIntakeRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\UserRepository;
+use App\Config\Env;
 use App\Services\AuthService;
+use App\Services\EmailService;
 use App\Services\FileUploadService;
 use App\Services\PermissionService;
 use App\Services\ReferenceNumberService;
@@ -293,7 +296,45 @@ final class OrderController
             'supplierTypes' => LookupRepository::dropdownOptions('supplier_type'),
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
+            'piIntake' => PiIntakeRepository::latestForOrder($orderId),
         ], 'layout/base');
+    }
+
+    /**
+     * Staff-initiated: generates (or regenerates) a per-order PI-stage
+     * intake link and emails it to the client's on-file address —
+     * mirroring ClientPortalService's set-password email pattern. The
+     * link is also flashed back once, same as a freshly created user's
+     * temp password, so staff always have a way to hand it over even
+     * when no SMTP is configured yet (EmailService degrades to a log
+     * line in that case, never a thrown error).
+     */
+    public function generatePiFormLink(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $rawToken = PiIntakeRepository::createLink($orderId, (int) $user['id']);
+        $link = rtrim(Env::get('APP_URL', ''), '/') . '/pi-details/' . $rawToken;
+
+        if (!empty($order['client_email'])) {
+            $body = "Hello,\n\n"
+                . "Thank you for accepting our Quotation for order {$order['order_reference']}.\n\n"
+                . "To issue your Proforma Invoice, please confirm your shipping/consignee details at:\n{$link}\n\n"
+                . "This link works for 30 days.\n\n"
+                . "NexaCrest International Private Limited";
+            EmailService::sendPlainText($order['client_email'], 'NexaCrest — confirm your PI-stage details', $body);
+        }
+
+        AuditLogRepository::log((int) $user['id'], 'PI_INTAKE_LINK_GENERATED', 'orders', $orderId, null, null, null, 'PI-stage intake link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
+        Flash::set('success', "PI-stage form link" . (!empty($order['client_email']) ? " emailed to {$order['client_email']}" : ' generated') . ": {$link}");
+        header("Location: /orders/{$orderId}");
     }
 
     /**

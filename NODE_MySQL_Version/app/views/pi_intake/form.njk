@@ -1,0 +1,80 @@
+<div class="card">
+  <h1>Proforma Invoice (PI) Form</h1>
+  <p class="muted">Order {{ submission.order_reference }} — {{ submission.client_company_legal_name }}</p>
+  <p class="muted">Complete after accepting the Quotation — we will issue your PI within 24 hours. Fields marked * are required. Confirm your details exactly as they appear on official documents.</p>
+
+  <form method="post" action="/pi-details/{{ token }}">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+    <fieldset>
+      <legend>Confirm Your Details (must match exactly as they appear on official documents)</legend>
+      <label>Company Legal Name *
+        <input type="text" name="company_legal_name" value="{{ submission.company_legal_name or '' }}" placeholder="Exact legal name, no abbreviations" required>
+      </label>
+      <label>Billing Address *
+        <textarea name="billing_address" placeholder="Full address including postcode — must match PI and BL exactly" required>{{ submission.billing_address or '' }}</textarea>
+      </label>
+      <label>Consignee Name *
+        <input type="text" name="consignee_name" value="{{ submission.consignee_name or '' }}" placeholder="Write SAME if same as Company Legal Name — appears on Bill of Lading" required>
+      </label>
+      <label>Consignee Address *
+        <textarea name="consignee_address" placeholder="Write SAME if same as Billing Address — appears on Bill of Lading" required>{{ submission.consignee_address or '' }}</textarea>
+      </label>
+      <label>VAT / EORI / Tax Reg. No. *
+        <input type="text" name="vat_eori_tax_no" value="{{ submission.vat_eori_tax_no or '' }}" required>
+      </label>
+      <label>Contact Person *
+        <input type="text" name="contact_person" value="{{ submission.contact_person or '' }}" required>
+      </label>
+      <label>Email *
+        <input type="email" name="email" value="{{ submission.email or '' }}" required>
+      </label>
+      <label>Phone *
+        <input type="text" name="phone" value="{{ submission.phone or '' }}" required>
+      </label>
+      <label>Notify Party
+        <input type="text" name="notify_party" value="{{ submission.notify_party or '' }}" placeholder="Your freight forwarder or customs agent — write SAME or NIL">
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Shipping Details</legend>
+      <label>Port of Discharge *
+        <input type="text" name="port_of_discharge_text" value="{{ submission.port_of_discharge_text or '' }}" required>
+      </label>
+      <label>Country of Final Destination *
+        <input type="text" name="country_of_destination" value="{{ submission.country_of_destination or '' }}" required>
+      </label>
+      <label>Incoterm *
+        <input type="text" name="incoterm_confirmed" value="{{ submission.incoterm_confirmed or '' }}" required>
+      </label>
+      <label>Container Type
+        <input type="text" name="container_type_text" value="{{ submission.container_type_text or '' }}" placeholder="Leave blank if same as quotation">
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Payment &amp; Order Confirmation</legend>
+      <label>Payment Terms Confirmation *
+        <textarea name="payment_terms_confirmation" placeholder="e.g. CONFIRMED — 30% advance T/T + 70% balance against scanned BL copy within 7 days" required>{{ submission.payment_terms_confirmation or '' }}</textarea>
+      </label>
+      <label>Acceptance of Quotation No. *
+        <textarea name="quotation_acceptance_reference" placeholder="e.g. We accept Quotation SC/QT/2026/MMNNN dated DD Month YYYY" required>{{ submission.quotation_acceptance_reference or '' }}</textarea>
+      </label>
+      <label>Certificate of Origin Type *
+        <input type="text" name="coo_type" value="{{ submission.coo_type or '' }}" placeholder="GSP Form A (preferential) / Non-preferential" required>
+      </label>
+      <label>Buyer PO / Reference No.
+        <input type="text" name="buyer_po_ref" value="{{ submission.buyer_po_ref or '' }}" placeholder="Write NIL if none">
+      </label>
+      <label>Any Changes from Quotation
+        <textarea name="changes_from_quotation" placeholder="Write: No changes — or describe any changes to product / quantity / price">{{ submission.changes_from_quotation or '' }}</textarea>
+      </label>
+      <label>Special Document Requirements
+        <textarea name="special_document_requirements" placeholder="e.g. No special requirements / Consular legalised CI required">{{ submission.special_document_requirements or '' }}</textarea>
+      </label>
+    </fieldset>
+
+    <button type="submit">Submit PI Details</button>
+  </form>
+</div>

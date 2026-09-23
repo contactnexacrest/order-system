@@ -28,8 +28,11 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
+const piIntakeRepository = require('../repositories/piIntakeRepository');
 const supplierRepository = require('../repositories/supplierRepository');
 const userRepository = require('../repositories/userRepository');
+const env = require('../config/env');
+const emailService = require('../services/emailService');
 const referenceNumberService = require('../services/referenceNumberService');
 const stageGateService = require('../services/stageGateService');
 const documentGenerationService = require('../services/documentGenerationService');
@@ -304,9 +307,45 @@ async function show(req, res) {
       supplierTypes: await lookupRepository.dropdownOptions('supplier_type'),
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
+      piIntake: await piIntakeRepository.latestForOrder(orderId),
     },
     'layout/base'
   );
+}
+
+/**
+ * Staff-initiated: generates (or regenerates) a per-order PI-stage
+ * intake link and emails it to the client's on-file address — mirroring
+ * clientPortalService's set-password email pattern. The link is also
+ * flashed back once, same as a freshly created user's temp password, so
+ * staff always have a way to hand it over even when no SMTP is
+ * configured yet (emailService degrades to a log line in that case,
+ * never a thrown error).
+ */
+async function generatePiFormLink(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const user = req.user;
+  const rawToken = await piIntakeRepository.createLink(orderId, user.id);
+  const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/pi-details/${rawToken}`;
+
+  if (order.client_email) {
+    const body = 'Hello,\n\n'
+      + `Thank you for accepting our Quotation for order ${order.order_reference}.\n\n`
+      + `To issue your Proforma Invoice, please confirm your shipping/consignee details at:\n${link}\n\n`
+      + 'This link works for 30 days.\n\n'
+      + 'NexaCrest International Private Limited';
+    await emailService.sendPlainText(order.client_email, 'NexaCrest — confirm your PI-stage details', body);
+  }
+
+  await auditLogRepository.log(user.id, 'PI_INTAKE_LINK_GENERATED', 'orders', orderId, null, null, null, 'PI-stage intake link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
+  flash.set(req, 'success', `PI-stage form link${order.client_email ? ` emailed to ${order.client_email}` : ' generated'}: ${link}`);
+  res.redirect(`/orders/${orderId}`);
 }
 
 /**
@@ -956,7 +995,7 @@ async function markLost(req, res) {
 }
 
 module.exports = {
-  index, archivedIndex, archive, unarchive, create, store, show, downloadDossier,
+  index, archivedIndex, archive, unarchive, create, store, show, downloadDossier, generatePiFormLink,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, clearAdvancePayment, updateProductionStatus,
   confirmBuyerAcknowledged, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,

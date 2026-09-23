@@ -35,7 +35,7 @@ const FROZEN_PREFIXES = [
 // staff-side `/clients` or `/client-intake` — matchesPrefix requires an
 // exact match or a '/' boundary right after the prefix, and both of those
 // paths diverge from "/client" at the very next character ('s', '-').
-const CLIENT_FACING_PREFIXES = ['/quotation-details', '/client'];
+const CLIENT_FACING_PREFIXES = ['/quotation-details', '/pi-details', '/client'];
 
 function matchesPrefix(path, prefixes) {
   return prefixes.some((p) => path === p || path.startsWith(`${p}/`));
