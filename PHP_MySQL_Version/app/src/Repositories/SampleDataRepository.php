@@ -22,10 +22,17 @@ use PDO;
  * (documents <-> file_store, via docx_file_id/pdf_file_id and
  * linked_document_id). Those FK columns are nulled out first so both sides
  * can then be deleted in either order. Everything else is deleted
- * strictly children-before-parents. audit_log is deliberately left alone —
- * entity_id there is NOT a real foreign key (no constraint in the schema),
- * so historical log rows referencing a since-cleared sample client/order
- * remain valid, harmless history rather than orphaned references.
+ * strictly children-before-parents, including the tables the "cover all"
+ * sample-data expansion actually exercises (order_buyer_po_documents,
+ * order_supplier_po_documents keyed off order_supplier_po.id, and — since
+ * client portal provisioning is now part of the sample walkthrough —
+ * client_logins and client_password_reset_tokens, plus nulling
+ * client_intake_submissions.converted_client_id). This mirrors
+ * TestModeRepository::clearAllTestData(), which already covered all of
+ * these. audit_log is deliberately left alone — entity_id there is NOT a
+ * real foreign key (no constraint in the schema), so historical log rows
+ * referencing a since-cleared sample client/order remain valid, harmless
+ * history rather than orphaned references.
  */
 final class SampleDataRepository
 {
@@ -84,6 +91,8 @@ final class SampleDataRepository
         $amendmentIds = $orderIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM amendments WHERE order_id IN (%s)', $orderIds)) : [];
         $disputeIds = $orderIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM disputes WHERE order_id IN (%s)', $orderIds)) : [];
         $annexureProductIds = $orderIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM order_annexure_products WHERE order_id IN (%s)', $orderIds)) : [];
+        $supplierPoIds = $orderIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM order_supplier_po WHERE order_id IN (%s)', $orderIds)) : [];
+        $clientLoginIds = $clientIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM client_logins WHERE client_id IN (%s)', $clientIds)) : [];
 
         // file_store rows belong to the order and/or the client directly.
         $fileRows = [];
@@ -103,6 +112,10 @@ final class SampleDataRepository
             }
             if ($orderIds) {
                 $pdo->exec(self::inQuery('DELETE FROM order_annexure_products WHERE order_id IN (%s)', $orderIds));
+                $pdo->exec(self::inQuery('DELETE FROM order_buyer_po_documents WHERE order_id IN (%s)', $orderIds));
+            }
+            if ($supplierPoIds) {
+                $pdo->exec(self::inQuery('DELETE FROM order_supplier_po_documents WHERE order_supplier_po_id IN (%s)', $supplierPoIds));
             }
             if ($disputeIds) {
                 $pdo->exec(self::inQuery('DELETE FROM dispute_documents WHERE dispute_id IN (%s)', $disputeIds));
@@ -118,6 +131,13 @@ final class SampleDataRepository
             if ($orderIds) {
                 $pdo->exec(self::inQuery('DELETE FROM email_log WHERE order_id IN (%s)', $orderIds));
                 $pdo->exec(self::inQuery('DELETE FROM notifications WHERE related_order_id IN (%s)', $orderIds));
+            }
+            if ($clientIds) {
+                $pdo->exec(self::inQuery('DELETE FROM client_password_reset_tokens WHERE client_id IN (%s)', $clientIds));
+                $pdo->exec(self::inQuery('UPDATE client_intake_submissions SET converted_client_id = NULL WHERE converted_client_id IN (%s)', $clientIds));
+            }
+            if ($clientLoginIds) {
+                $pdo->exec(self::inQuery('DELETE FROM client_logins WHERE id IN (%s)', $clientLoginIds));
             }
 
             // --- Break the documents <-> file_store cycle before deleting either ---

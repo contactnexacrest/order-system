@@ -20,10 +20,17 @@ const env = require('../config/env');
  * (documents <-> file_store, via docx_file_id/pdf_file_id and
  * linked_document_id). Those FK columns are nulled out first so both sides
  * can then be deleted in either order. Everything else is deleted
- * strictly children-before-parents. audit_log is deliberately left alone —
- * entity_id there is NOT a real foreign key (no constraint in the schema),
- * so historical log rows referencing a since-cleared sample client/order
- * remain valid, harmless history rather than orphaned references.
+ * strictly children-before-parents, including the tables the "cover all"
+ * sample-data expansion actually exercises (order_buyer_po_documents,
+ * order_supplier_po_documents keyed off order_supplier_po.id, and — since
+ * client portal provisioning is now part of the sample walkthrough —
+ * client_logins and client_password_reset_tokens, plus nulling
+ * client_intake_submissions.converted_client_id). This mirrors
+ * testModeRepository's clearAllTestData(), which already covered all of
+ * these. audit_log is deliberately left alone — entity_id there is NOT a
+ * real foreign key (no constraint in the schema), so historical log rows
+ * referencing a since-cleared sample client/order remain valid, harmless
+ * history rather than orphaned references.
  */
 
 async function isLoaded() {
@@ -71,6 +78,8 @@ async function clearAll() {
   const amendmentIds = orderIds.length ? await intColumn(inQuery('SELECT id FROM amendments WHERE order_id IN (%s)', orderIds)) : [];
   const disputeIds = orderIds.length ? await intColumn(inQuery('SELECT id FROM disputes WHERE order_id IN (%s)', orderIds)) : [];
   const annexureProductIds = orderIds.length ? await intColumn(inQuery('SELECT id FROM order_annexure_products WHERE order_id IN (%s)', orderIds)) : [];
+  const supplierPoIds = orderIds.length ? await intColumn(inQuery('SELECT id FROM order_supplier_po WHERE order_id IN (%s)', orderIds)) : [];
+  const clientLoginIds = clientIds.length ? await intColumn(inQuery('SELECT id FROM client_logins WHERE client_id IN (%s)', clientIds)) : [];
 
   // file_store rows belong to the order and/or the client directly.
   let fileRows = [];
@@ -89,6 +98,10 @@ async function clearAll() {
     }
     if (orderIds.length) {
       await conn.execute(inQuery('DELETE FROM order_annexure_products WHERE order_id IN (%s)', orderIds));
+      await conn.execute(inQuery('DELETE FROM order_buyer_po_documents WHERE order_id IN (%s)', orderIds));
+    }
+    if (supplierPoIds.length) {
+      await conn.execute(inQuery('DELETE FROM order_supplier_po_documents WHERE order_supplier_po_id IN (%s)', supplierPoIds));
     }
     if (disputeIds.length) {
       await conn.execute(inQuery('DELETE FROM dispute_documents WHERE dispute_id IN (%s)', disputeIds));
@@ -104,6 +117,13 @@ async function clearAll() {
     if (orderIds.length) {
       await conn.execute(inQuery('DELETE FROM email_log WHERE order_id IN (%s)', orderIds));
       await conn.execute(inQuery('DELETE FROM notifications WHERE related_order_id IN (%s)', orderIds));
+    }
+    if (clientIds.length) {
+      await conn.execute(inQuery('DELETE FROM client_password_reset_tokens WHERE client_id IN (%s)', clientIds));
+      await conn.execute(inQuery('UPDATE client_intake_submissions SET converted_client_id = NULL WHERE converted_client_id IN (%s)', clientIds));
+    }
+    if (clientLoginIds.length) {
+      await conn.execute(inQuery('DELETE FROM client_logins WHERE id IN (%s)', clientLoginIds));
     }
 
     // --- Break the documents <-> file_store cycle before deleting either ---

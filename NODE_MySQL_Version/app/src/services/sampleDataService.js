@@ -1,5 +1,8 @@
 'use strict';
 
+const crypto = require('crypto');
+const fs = require('fs');
+
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const lookupRepository = require('../repositories/lookupRepository');
@@ -17,6 +20,21 @@ const supplierRepository = require('../repositories/supplierRepository');
 const referenceNumberService = require('./referenceNumberService');
 const documentGenerationService = require('./documentGenerationService');
 const stageGateService = require('./stageGateService');
+const amendmentService = require('./amendmentService');
+const amendmentRepository = require('../repositories/amendmentRepository');
+const reviewWorkflowService = require('./reviewWorkflowService');
+const documentReviewRepository = require('../repositories/documentReviewRepository');
+const clientPortalService = require('./clientPortalService');
+const piIntakeRepository = require('../repositories/piIntakeRepository');
+const disputeRepository = require('../repositories/disputeRepository');
+const disputeDocumentRepository = require('../repositories/disputeDocumentRepository');
+const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
+const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
+const fileStoreRepository = require('../repositories/fileStoreRepository');
+const userRepository = require('../repositories/userRepository');
+const auditLogRepository = require('../repositories/auditLogRepository');
+const workingDaysCalculator = require('./workingDaysCalculator');
+const env = require('../config/env');
 
 /**
  * Phase E follow-up — "can we have some sample records to play with, and
@@ -26,30 +44,36 @@ const stageGateService = require('./stageGateService');
  * Deliberately reuses the exact same repository/service calls a real user's
  * request would make (orderRepository.create(), stageGateService, the same
  * documentGenerationService.generate() every real QT/PI/OC goes through,
- * ...) rather than inventing a parallel fake-data insertion path — the
- * point of a playground is that it behaves exactly like the real system,
- * because it IS the real system, just flagged is_sample_data = 1 and
- * cleanly removable. See sampleDataRepository for the deletion side.
+ * amendmentService, reviewWorkflowService, clientPortalService, ...) rather
+ * than inventing a parallel fake-data insertion path — the point of a
+ * playground is that it behaves exactly like the real system, because it IS
+ * the real system, just flagged is_sample_data = 1 and cleanly removable.
+ * See sampleDataRepository for the deletion side.
  *
- * Scope (Task #17 follow-up, 2026-09-21 — extends the original two-order
- * bounded scope, which this file's own docblock flagged as "easy to extend
- * ... if you want a third order further along later"):
- *   - Order A: brand new, left at Stage 1 (no documents) — the
- *     "start from scratch" walkthrough.
- *   - Order B: FOB, "Standard — New Buyer" preset, pushed to Stage 5
- *     (QT/PI/OC generated, buyer PO + advance recorded and cleared) — the
- *     "financials worth looking at on the dashboard" walkthrough.
- *   - Order C: CIF, "Established Buyer — Post-BL" preset (the tier requiring
- *     MD approval and a BL-triggered balance — SOP Tier B), pushed all the
- *     way through Stage 9 to a fully closed order — the "see every document
- *     type and the complete 9-stage lifecycle, including the CFR/CIF-only
- *     Freight Payment stage" walkthrough. Still not an attempt to cover
- *     every possible scenario (a dispute, an amendment, a quantity-shortfall
- *     buyer-approval upload are all real but separate scenarios) — those
- *     are each exercised by their own feature's own live testing, and
- *     bolting all of them onto the fixed "load sample data" button would
- *     make it slower and harder to reason about for the thing it's actually
- *     for: a new user's first walkthrough of the system.
+ * Scope ("cover all" follow-up, 2026-09-23 — extends the Task #17 scope to
+ * every scenario a fixed 3-order walkthrough couldn't reach):
+ *   - Client A (Aurora Décor Imports) — TWO orders, demonstrating multiple
+ *     orders under one client (same buyer_inquiry_ref, since that's derived
+ *     from the client's own unique number): Order A1 left at Stage 1 with no
+ *     documents ("start from scratch"), Order A2 pushed to Stage 2 passed /
+ *     awaiting PI ("a second, independently-progressing order").
+ *   - Client B (Meridian Home Collections) — the single most heavily
+ *     instrumented order: buyer PO reference AND an actual signed-copy
+ *     upload, a PI-stage intake submission deliberately left pending staff
+ *     review, client-portal auto-provisioning the moment advance clears, an
+ *     Order-Confirmation review/reject/regenerate/approve cycle, a full
+ *     payment-terms amendment lifecycle (request -> MD-approve -> generate
+ *     -> signed copy uploaded -> active), a Supplier PO with its
+ *     acknowledgment copy uploaded, the FOB auto-skip of the Freight
+ *     Payment stage, and a quantity-shortfall-with-buyer-approval packing
+ *     scenario — left at Stage 8, deliberately not closed.
+ *   - Client C (Silverleaf Global Trading) — unchanged full 9-stage CIF
+ *     closure (still the only order that pays through the CFR/CIF-only
+ *     Freight Payment stage, contrasting with Order B's FOB auto-skip), now
+ *     followed by a post-closure dispute: raised, evidence uploaded, and
+ *     resolved.
+ *   - Client D (Copperfield Trading Co.) — a new client whose only order is
+ *     quoted and then marked lost.
  */
 
 async function isLoaded() {
@@ -86,6 +110,10 @@ async function load(userId) {
     throw new Error('No incoterm/currency/payment preset configured yet — set those up first (Company Settings), then load sample data.');
   }
 
+  const reviewerUserId = await pickReviewerUserId(userId);
+  const supplierId = await createSampleSupplier();
+
+  // --- Client A: two orders under one client ---
   const clientAId = await createSampleClient(
     '[SAMPLE] Aurora Décor Imports',
     '124 Harbor Lane, Sample District, Test Country',
@@ -95,21 +123,32 @@ async function load(userId) {
     ['Hand-carved decorative planter, Model A', '30 x 30 x 45 cm', 'Polished'],
     ['Hand-carved decorative planter, Model B', '25 x 25 x 40 cm', 'Matte'],
   ]);
-  // Left exactly here — Stage 1, no documents yet — as the
+  // Left exactly here — Stage 1, no documents yet — the
   // "start from scratch" sample order.
 
+  const orderA2Id = await createSampleOrder(clientAId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
+    ['Hand-carved decorative planter, Model C', '35 x 35 x 50 cm', 'Polished'],
+  ]);
+  await advanceSampleOrderToStage2Pending(orderA2Id, userId);
+
+  // --- Client B: FOB, "Standard — New Buyer" preset — the single order
+  // carrying every scenario a fixed 3-order set couldn't reach ---
   const clientBId = await createSampleClient(
     '[SAMPLE] Meridian Home Collections',
     '77 Riverside Court, Sample District, Test Country',
-    userId
+    userId,
+    'meridian.buyer@sample-client.test'
   );
   const orderB1Id = await createSampleOrder(clientBId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
     ['Outdoor stone planter, large', '60 x 60 x 70 cm', 'Natural finish'],
     ['Outdoor stone planter, medium', '40 x 40 x 50 cm', 'Natural finish'],
     ['Garden bench, stone composite', '150 x 45 x 45 cm', 'Sandblasted'],
   ]);
-  await advanceSampleOrderToStage5(orderB1Id, userId);
+  await advanceSampleOrderBJourney(orderB1Id, clientBId, supplierId, userId, reviewerUserId);
 
+  // --- Client C: CIF, "Established Buyer — Post-BL" preset — the only
+  // order that runs through the CFR/CIF Freight Payment stage, pushed all
+  // the way to closure, then a post-closure dispute ---
   const clientCId = await createSampleClient(
     '[SAMPLE] Silverleaf Global Trading',
     '9 Customs Quay, Sample Port District, Test Country',
@@ -119,16 +158,28 @@ async function load(userId) {
     ['Natural stone kerb stone, large', '100 x 30 x 15 cm', 'Flamed'],
     ['Natural stone kerb stone, small', '60 x 30 x 15 cm', 'Flamed'],
   ], 'Rotterdam, Netherlands');
-  await advanceSampleOrderToStage9(orderC1Id, userId);
+  await advanceSampleOrderToStage9(orderC1Id, supplierId, userId);
+  await addSampleDispute(orderC1Id, userId);
 
-  return { clients: 3, orders: 3 };
+  // --- Client D: a lost order ---
+  const clientDId = await createSampleClient(
+    '[SAMPLE] Copperfield Trading Co.',
+    '15 Deadline Drive, Sample District, Test Country',
+    userId
+  );
+  const orderD1Id = await createSampleOrder(clientDId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
+    ['Polished marble tabletop, round', '90 cm dia x 3 cm', 'High polish'],
+  ]);
+  await advanceAndLoseSampleOrder(orderD1Id, userId);
+
+  return { clients: 4, orders: 5 };
 }
 
 async function clear() {
   return sampleDataRepository.clearAll();
 }
 
-async function createSampleClient(companyName, billingAddress, userId) {
+async function createSampleClient(companyName, billingAddress, userId, email = null) {
   const clientUniqueNumber = await referenceNumberService.generateClientUniqueNumber();
   const clientId = await clientRepository.create(
     {
@@ -137,7 +188,7 @@ async function createSampleClient(companyName, billingAddress, userId) {
       consignee_name: 'SAME',
       consignee_address: 'SAME',
       contact_person: 'Sample Contact',
-      email: null,
+      email,
       phone: null,
       country_of_destination: 'Test Country',
       coo_type: 'TBC',
@@ -254,6 +305,242 @@ async function advanceSampleOrderToStage5(orderId, userId) {
   await stageGateService.passAndUnlockNext(orderId, 4, userId);
 }
 
+/** Order A2 — a second, independently-progressing order for the same client, stopped partway (Stage 2 passed, awaiting PI). */
+async function advanceSampleOrderToStage2Pending(orderId, userId) {
+  await documentGenerationService.generate(orderId, 'QT', userId);
+  await stageGateService.passAndUnlockNext(orderId, 1, userId);
+  await orderRepository.setBuyersPoRef(orderId, 'SAMPLE-BUYER-PO-0003');
+  await stageGateService.passAndUnlockNext(orderId, 2, userId);
+}
+
+/**
+ * Order B's walkthrough ("cover all", 2026-09-23) — everything a real
+ * staff user would do for a FOB order that runs into a document
+ * rejection, a payment-terms renegotiation, and a packing-quantity
+ * shortfall, while also being the order whose client gets portal access
+ * and whose PI-stage form is left sitting in the review queue. Leaves
+ * the order at Stage 8 (Commercial Invoice) — active, not closed, so
+ * Order C remains the only fully-closed sample order.
+ */
+async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId, reviewerUserId) {
+  // --- Stage 1: Quotation ---
+  await documentGenerationService.generate(orderId, 'QT', userId);
+  await stageGateService.passAndUnlockNext(orderId, 1, userId);
+
+  // A PI-stage intake link sent once the Quotation is out — the client
+  // has submitted it, but nobody's actioned it yet, so it sits in the
+  // PI Intake Review queue exactly like a real unresolved one.
+  const piToken = await piIntakeRepository.createLink(orderId, userId);
+  const piSubmission = await piIntakeRepository.findValidByToken(piToken);
+  await piIntakeRepository.submit(piSubmission.id, {
+    company_legal_name: 'Meridian Home Collections LLC',
+    billing_address: '77 Riverside Court, Sample District, Test Country',
+    consignee_name: 'SAME',
+    consignee_address: 'SAME',
+    vat_eori_tax_no: 'GB-SAMPLE-987654321',
+    contact_person: 'Jordan Blake',
+    email: 'meridian.buyer@sample-client.test',
+    phone: '+1-555-0100-2002',
+    notify_party: 'NIL',
+    port_of_discharge_text: 'Long Beach, USA',
+    country_of_destination: 'United States',
+    incoterm_confirmed: 'FOB',
+    container_type_text: null,
+    payment_terms_confirmation: 'CONFIRMED — 30% advance T/T + 70% balance against scanned BL copy within 30 days.',
+    quotation_acceptance_reference: 'We accept the Quotation as issued — no changes.',
+    coo_type: 'Non-preferential',
+    buyer_po_ref: null,
+    changes_from_quotation: 'No changes.',
+    special_document_requirements: null,
+  }, '203.0.113.42');
+
+  // --- Stage 2: Buyer PO — reference recorded AND the buyer's actual
+  // signed copy attached (Stage 2 gate evidence beyond just a typed ref) ---
+  await orderRepository.setBuyersPoRef(orderId, 'SAMPLE-BUYER-PO-0002');
+  let order = await orderRepository.find(orderId);
+  const buyerPoFileId = await attachSamplePlaceholderFile(
+    null,
+    orderId,
+    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/buyer_po`,
+    'Buyer PO SAMPLE-BUYER-PO-0002 (signed).pdf',
+    'Buyer',
+    'Buyer PO copy',
+    userId
+  );
+  await orderBuyerPoDocumentRepository.attach(orderId, buyerPoFileId);
+  await stageGateService.passAndUnlockNext(orderId, 2, userId);
+
+  // --- Stage 3: PI / Production — advance recorded and cleared ---
+  await documentGenerationService.generate(orderId, 'PI', userId);
+  const fobTotal = await orderProductRepository.totalFobValue(orderId);
+  order = await orderRepository.find(orderId);
+  const advanceAmount = Math.round(fobTotal * parseFloat(order.advance_pct) / 100 * 100) / 100;
+  const balanceAmount = Math.round(fobTotal * parseFloat(order.balance_pct) / 100 * 100) / 100;
+  const balanceDueDate = order.balance_trigger_option === 'A_BEFORE_SHIPMENT'
+    ? null
+    : formatDate(addDays(new Date(), parseInt(order.balance_days, 10)));
+  await orderPaymentStatusRepository.recordAdvanceReceived(orderId, advanceAmount, formatDate(new Date()));
+  await orderPaymentStatusRepository.markAdvanceCleared(orderId, formatDate(new Date()), userId);
+  await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
+  await stageGateService.passAndUnlockNext(orderId, 3, userId);
+
+  // Advance cleared -> the real trigger point for auto-provisioning client
+  // portal access (clientPortalService.provisionIfNeeded()'s only
+  // precondition is an email on file, which this client has).
+  await clientPortalService.provisionIfNeeded(clientId, orderId);
+
+  // --- Stage 4: Order Confirmation — a review/reject/regenerate/approve
+  // cycle (Section 9) before it can pass ---
+  const ocResult = await documentGenerationService.generate(orderId, 'OC', userId);
+  await reviewWorkflowService.assignReviewers(ocResult.document_id, [reviewerUserId], userId);
+  let reviews = await documentReviewRepository.forDocument(ocResult.document_id);
+  await reviewWorkflowService.reject(
+    reviews[0].id,
+    reviewerUserId,
+    'Buyer name on the OC does not match the signed Buyer PO exactly — please correct and resubmit.'
+  );
+  const ocResult2 = await documentGenerationService.generate(orderId, 'OC', userId); // new revision, regenerated from draft
+  await reviewWorkflowService.assignReviewers(ocResult2.document_id, [reviewerUserId], userId);
+  reviews = await documentReviewRepository.forDocument(ocResult2.document_id);
+  await reviewWorkflowService.approve(reviews[0].id, reviewerUserId, 'Corrected — matches the Buyer PO. Approved.');
+  await stageGateService.passAndUnlockNext(orderId, 4, userId);
+
+  // --- Payment Terms Amendment (Section 8) — full lifecycle:
+  // request -> MD-approve -> generate agreement -> signed copy uploaded
+  // -> active (payment terms updated on the order) ---
+  const amendmentId = await amendmentService.createRequest(
+    orderId,
+    'Buyer requested additional time on the balance payment due to an import financing delay at their bank.',
+    'importer',
+    null,
+    null,
+    '70% balance T/T against scanned BL copy within 45 days of BL date (extended from 30 days).',
+    'B_AGAINST_BL',
+    45,
+    null,
+    formatDate(new Date()),
+    userId
+  );
+  await amendmentService.approveByMd(amendmentId, userId);
+  await amendmentService.generateDocument(amendmentId, userId);
+  const amendment = await amendmentRepository.find(amendmentId);
+  order = await orderRepository.find(orderId);
+  const signedCopyFileId = await attachSamplePlaceholderFile(
+    null,
+    orderId,
+    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/amendments/${pathSafe(amendment.amendment_reference)}/signed`,
+    `Countersigned Amendment ${amendment.amendment_reference}.pdf`,
+    'Buyer',
+    'Countersigned Payment Terms Amendment Agreement',
+    userId
+  );
+  await amendmentService.attachSignedCopyAndActivate(amendmentId, signedCopyFileId, userId);
+
+  // --- Stage 5: Supplier Purchase Order — with the supplier's signed
+  // acknowledgment copy attached (Stage 5 gate evidence beyond the flag alone) ---
+  const suppoTypeId = await documentGenerationService.documentTypeIdFor('SUPPO');
+  const supplierPoReference = await referenceNumberService.generateDocumentRef(suppoTypeId);
+  await orderSupplierPoRepository.create(orderId, supplierId, supplierPoReference, {
+    material_stone_type: 'Natural Granite, Absolute Black',
+    grade: 'Grade A',
+    surface_finish: 'Natural/Sandblasted',
+    dimensions: 'Per order — see Annexure',
+    dimensional_tolerance: '+/- 2mm',
+    quantity: '30',
+    unit: 'pcs',
+    colour_reference: 'Sample swatch on file',
+    unit_price_inr: '15000.00',
+    basic_value_inr: '450000.00',
+    gst_rate_pct: '18.00',
+    gst_amount_inr: '81000.00',
+    total_payable_inr: '531000.00',
+    advance_pct: '40.00',
+    advance_amount_inr: '212400.00',
+    balance_amount_inr: '318600.00',
+    delivery_location: 'NexaCrest Factory, Chennai',
+    required_delivery_date: formatDate(addDays(new Date(), 21)),
+    packing_requirement: 'Export wooden crates, fumigated',
+  });
+  await documentGenerationService.generate(orderId, 'SUPPO', userId);
+  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  const supplierAckFileId = await attachSamplePlaceholderFile(
+    null,
+    orderId,
+    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/supplier_po`,
+    `Supplier PO ${supplierPoReference} (acknowledged).pdf`,
+    'Supplier',
+    'Supplier PO acknowledgment',
+    userId
+  );
+  await orderSupplierPoDocumentRepository.attach(supplierPo.id, supplierAckFileId);
+  await orderSupplierPoRepository.markSigned(supplierPo.id);
+  await stageGateService.passAndUnlockNext(orderId, 5, userId);
+
+  // --- FOB -> Freight Payment (Stage 6) auto-skipped — the direct
+  // contrast with Order C's CIF order, which actually pays it ---
+  await stageGateService.maybeAutoSkipFreightStage(orderId, userId);
+
+  // --- Stage 7: Packing & BL Instruction — a quantity shortfall beyond
+  // tolerance, resolved with the buyer's written approval on file
+  // (mirrors ordersController.savePacking()'s own gate) ---
+  const summary = await orderProductRepository.orderedQuantitySummary(orderId);
+  const actualQty = summary.total - 5.0; // 5 of 30 pcs short — well beyond the default 5% tolerance
+  const shortfallPct = Math.round(((summary.total - actualQty) / summary.total) * 100 * 100) / 100;
+  const buyerApprovalFileId = await attachSamplePlaceholderFile(
+    null,
+    orderId,
+    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/packing`,
+    'Buyer approval - quantity shortfall.pdf',
+    'Buyer',
+    'Quantity shortfall approval',
+    userId
+  );
+  await orderPackingRepository.upsert(orderId, {
+    actual_quantity_packed: String(actualQty),
+    crate_count: '2',
+    total_net_weight_kg: '2100.00',
+    total_gross_weight_kg: '2280.00',
+    total_cbm: '12.400',
+    packing_date: formatDate(new Date()),
+    shortfall_pct: String(shortfallPct),
+  });
+  await orderPackingRepository.attachBuyerApproval(orderId, buyerApprovalFileId);
+
+  const products = await orderProductRepository.forOrder(orderId);
+  const crates = products.map((product, i) => ({
+    crate_no: `C-${String(i + 1).padStart(3, '0')}`,
+    marks_numbers: `NEXACREST/SAMPLE/${i + 1}`,
+    product_description: product.description,
+    dimensions_lwh_cm: '110 x 90 x 80',
+    pcs: product.quantity,
+    net_weight_kg: '700.00',
+    gross_weight_kg: '760.00',
+    cbm: '4.100',
+    hs_code: product.hs_code || '6802.93',
+  }));
+  await orderCrateRepository.replaceForOrder(orderId, crates);
+  await documentGenerationService.generate(orderId, 'PL', userId);
+
+  await orderShippingRepository.upsert(orderId, {
+    shipping_line: 'Sample Shipping Line',
+    vessel_name: 'MV Sample Pioneer',
+    voyage_number: 'SP-2026-009',
+    etd: formatDate(addDays(new Date(), 3)),
+    eta: formatDate(addDays(new Date(), 24)),
+    container_type: '1x20FT',
+    container_no: 'SAMU7654321',
+    seal_no: 'SEAL000456',
+  });
+  await documentGenerationService.generate(orderId, 'BLI', userId);
+  await orderShippingRepository.recordBl(orderId, 'SAMPLE-BL-0002', formatDate(new Date()));
+  await stageGateService.passAndUnlockNext(orderId, 7, userId);
+
+  // --- Stage 8: Commercial Invoice — generated, balance not yet cleared.
+  // Deliberately left here, active and not closed, so Order C remains
+  // the only fully-closed sample order. ---
+  await documentGenerationService.generate(orderId, 'CI', userId);
+}
+
 /**
  * Order C's walkthrough (Task #17) — everything advanceSampleOrderToStage5()
  * does, then continues Stage 5 through Stage 9 by replaying the exact same
@@ -264,11 +551,10 @@ async function advanceSampleOrderToStage5(orderId, userId) {
  * 'complete' with every one of the nine document types generated at least
  * once.
  */
-async function advanceSampleOrderToStage9(orderId, userId) {
+async function advanceSampleOrderToStage9(orderId, supplierId, userId) {
   await advanceSampleOrderToStage5(orderId, userId);
 
   // --- Stage 5: Supplier Purchase Order ---
-  const supplierId = await createSampleSupplier();
   const suppoTypeId = await documentGenerationService.documentTypeIdFor('SUPPO');
   const supplierPoReference = await referenceNumberService.generateDocumentRef(suppoTypeId);
   await orderSupplierPoRepository.create(orderId, supplierId, supplierPoReference, {
@@ -372,7 +658,44 @@ async function advanceSampleOrderToStage9(orderId, userId) {
   await orderRepository.markComplete(orderId);
 }
 
-/** Task #17 — a fresh, clearly-flagged supplier for the Stage-5+ sample order (see supplier is_sample_data / markSample()). */
+/** A dispute raised after closure, with evidence attached, then resolved (Spec Section 16). */
+async function addSampleDispute(orderId, userId) {
+  const description = 'Buyer reports a shortage of 2 pieces found upon container destuffing at the destination port, against the Packing List quantity.';
+  const noticeDate = formatDate(new Date());
+  const responseDays = parseInt((await companySettingsRepository.get('dispute_response_days_n')) || '10', 10);
+  const responseDueDate = await workingDaysCalculator.addWorkingDays(noticeDate, responseDays);
+
+  const disputeId = await disputeRepository.create(orderId, noticeDate, 'Buyer', description, userId, responseDueDate);
+  await auditLogRepository.log(userId, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description);
+
+  const order = await orderRepository.find(orderId);
+  const evidenceFileId = await attachSamplePlaceholderFile(
+    null,
+    orderId,
+    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/disputes/${disputeId}`,
+    'Buyer shortage claim - photos and destuffing report.pdf',
+    'Buyer',
+    'Dispute-related document',
+    userId
+  );
+  await disputeDocumentRepository.attach(disputeId, evidenceFileId);
+
+  const resolutionNotes = 'Verified against the Packing List and crate photographs; supplier confirmed a short-shipment of 2 pieces and issued a credit note applied to the buyer\'s next order. Buyer confirmed satisfaction with the resolution.';
+  await disputeRepository.resolve(disputeId, resolutionNotes);
+  await auditLogRepository.log(userId, 'DISPUTE_STATUS_CHANGED', 'disputes', disputeId, 'status', 'Open', 'Resolved', resolutionNotes);
+}
+
+/** A quoted order the buyer went cold on — marked lost (replays ordersController.markLost()'s own checks). */
+async function advanceAndLoseSampleOrder(orderId, userId) {
+  await documentGenerationService.generate(orderId, 'QT', userId);
+  await stageGateService.passAndUnlockNext(orderId, 1, userId);
+
+  const reason = 'Buyer stopped responding after 45 days despite repeated follow-ups; sourced from a domestic supplier instead per their email.';
+  await orderRepository.markLost(orderId, reason, userId);
+  await auditLogRepository.log(userId, 'ORDER_MARKED_LOST', 'orders', orderId, 'status', 'active', 'lost', reason);
+}
+
+/** Task #17 — a fresh, clearly-flagged supplier shared by every Stage-5+ sample order (see supplier is_sample_data / markSample()). */
 async function createSampleSupplier() {
   const supplierId = await supplierRepository.create({
     supplier_legal_name: '[SAMPLE] Deccan Stone Quarries Pvt. Ltd.',
@@ -385,6 +708,52 @@ async function createSampleSupplier() {
   });
   await supplierRepository.markSample(supplierId);
   return supplierId;
+}
+
+/** Any active user other than the one running the load, so review-assignment scenarios have a distinct reviewer. Falls back to the same user if none exists. */
+async function pickReviewerUserId(fallbackUserId) {
+  const users = await userRepository.listActive();
+  for (const user of users) {
+    if (parseInt(user.id, 10) !== fallbackUserId) {
+      return parseInt(user.id, 10);
+    }
+  }
+  return fallbackUserId;
+}
+
+/**
+ * fileUploadService can't be driven without a real multipart upload, so
+ * sample "received" files replay its own two steps directly: write a
+ * placeholder straight to the same storage path convention, then
+ * fileStoreRepository.insertReceived() — never a shared file across rows,
+ * since sampleDataRepository.clearAll() unlinks each file_store row's own
+ * path individually.
+ */
+async function attachSamplePlaceholderFile(clientId, orderId, subPath, originalFilename, receivedFrom, documentTypeLabel, uploadedBy) {
+  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const targetDir = `${storageBase}/${subPath}`;
+  fs.mkdirSync(targetDir, { recursive: true });
+  const uuidFilename = `${crypto.randomBytes(16).toString('hex')}.pdf`;
+  const targetPath = `${targetDir}/${uuidFilename}`;
+  const placeholderContent = `%PDF-1.4\n% Sample placeholder document generated by the Sample Data Playground.\n% ${documentTypeLabel}\n`;
+  fs.writeFileSync(targetPath, placeholderContent);
+
+  return fileStoreRepository.insertReceived(
+    clientId,
+    orderId,
+    targetPath,
+    uuidFilename,
+    originalFilename,
+    Buffer.byteLength(placeholderContent),
+    'application/pdf',
+    uploadedBy,
+    receivedFrom,
+    documentTypeLabel
+  );
+}
+
+function pathSafe(value) {
+  return String(value ?? '').replace(/[^A-Za-z0-9_-]+/g, '-');
 }
 
 function formatDate(d) {
