@@ -13,6 +13,7 @@ use App\Repositories\EmailTemplateRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\NotificationRepository;
 use App\Repositories\OrderRepository;
+use App\Repositories\PermissionRepository;
 use App\Repositories\UserRepository;
 
 /**
@@ -87,10 +88,12 @@ final class EmailDispatchService
             $requestedByUserId
         );
 
-        foreach (UserRepository::listActive() as $user) {
-            if (in_array($user['role_name'], ['Admin', 'Managing Director'], true)) {
-                NotificationRepository::create((int) $user['id'], null, 'email_send_pending_approval', $orderId, "A send to {$preview['recipient_email']} is awaiting your approval.");
-            }
+        // Notify whoever can actually approve this (approve_email_send —
+        // the same permission this exact approval route is gated on).
+        // Checked by permission, not a hardcoded role name, since roles
+        // can be renamed via /admin/roles.
+        foreach (PermissionRepository::usersWithPermission('approve_email_send') as $userId) {
+            NotificationRepository::create($userId, null, 'email_send_pending_approval', $orderId, "A send to {$preview['recipient_email']} is awaiting your approval.");
         }
 
         AuditLogRepository::log($requestedByUserId, 'EMAIL_SEND_REQUESTED', 'email_log', $id, 'recipient_email', null, $preview['recipient_email']);

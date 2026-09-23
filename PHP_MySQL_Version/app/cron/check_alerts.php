@@ -29,6 +29,7 @@ require __DIR__ . '/../bootstrap.php';
 use App\Config\Database;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\NotificationRepository;
+use App\Repositories\PermissionRepository;
 use App\Repositories\UserRepository;
 use App\Services\EmailService;
 use App\Services\WorkingDaysCalculator;
@@ -42,10 +43,10 @@ foreach (UserRepository::listActive() as $u) {
     $activeUsersById[(int) $u['id']] = $u;
 }
 
-$mdAndAdminIds = array_map(
-    static fn(array $u): int => (int) $u['id'],
-    array_filter($activeUsersById, static fn(array $u): bool => in_array($u['role_name'], ['Admin', 'Managing Director'], true))
-);
+// Whoever can manage company settings is who these compliance-deadline
+// escalations are for — checked by permission, not a hardcoded role name,
+// since roles can be renamed via /admin/roles.
+$mdAndAdminIds = PermissionRepository::usersWithPermission('manage_company_settings');
 
 function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $relatedOrderId = null, array $activeUsersById = []): int
 {

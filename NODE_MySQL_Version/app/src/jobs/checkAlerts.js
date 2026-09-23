@@ -3,6 +3,7 @@
 const env = require('../config/env'); // loads .env as a side effect — must run first
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const notificationRepository = require('../repositories/notificationRepository');
+const permissionRepository = require('../repositories/permissionRepository');
 const userRepository = require('../repositories/userRepository');
 const emailService = require('../services/emailService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
@@ -60,9 +61,10 @@ async function run() {
   const activeUsers = await userRepository.listActive();
   const usersById = {};
   for (const u of activeUsers) usersById[u.id] = u;
-  const mdAndAdminIds = activeUsers
-    .filter((u) => u.role_name === 'Admin' || u.role_name === 'Managing Director')
-    .map((u) => u.id);
+  // Whoever can manage company settings is who these compliance-deadline
+  // escalations are for — checked by permission, not a hardcoded role
+  // name, since roles can be renamed via /admin/roles.
+  const mdAndAdminIds = await permissionRepository.usersWithPermission('manage_company_settings');
 
   // --- LUT expiry ---
   const lutExpiry = await companySettingsRepository.get('lut_expiry_date');

@@ -9,6 +9,7 @@ const emailTemplateRepository = require('../repositories/emailTemplateRepository
 const fileStoreRepository = require('../repositories/fileStoreRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const orderRepository = require('../repositories/orderRepository');
+const permissionRepository = require('../repositories/permissionRepository');
 const userRepository = require('../repositories/userRepository');
 const emailService = require('./emailService');
 const documentDataAssembler = require('./documentDataAssembler');
@@ -109,11 +110,13 @@ async function requestSend(orderId, documentId, templateKey, scheduledAt, reques
     requestedByUserId
   );
 
-  const activeUsers = await userRepository.listActive();
-  for (const user of activeUsers) {
-    if (user.role_name === 'Admin' || user.role_name === 'Managing Director') {
-      await notificationRepository.create(user.id, null, 'email_send_pending_approval', orderId, `A send to ${preview.recipient_email} is awaiting your approval.`);
-    }
+  // Notify whoever can actually approve this (approve_email_send — the
+  // same permission this exact approval route is gated on). Checked by
+  // permission, not a hardcoded role name, since roles can be renamed via
+  // /admin/roles.
+  const approverIds = await permissionRepository.usersWithPermission('approve_email_send');
+  for (const userId of approverIds) {
+    await notificationRepository.create(userId, null, 'email_send_pending_approval', orderId, `A send to ${preview.recipient_email} is awaiting your approval.`);
   }
 
   await auditLogRepository.log(requestedByUserId, 'EMAIL_SEND_REQUESTED', 'email_log', id, 'recipient_email', null, preview.recipient_email);

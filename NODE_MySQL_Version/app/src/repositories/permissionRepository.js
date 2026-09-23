@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const superAdminService = require('../services/superAdminService');
 
 // Port of App\Repositories\PermissionRepository.
 
@@ -37,6 +38,35 @@ async function effectivePermissions(userId, roleId) {
   }
 
   return effective;
+}
+
+/**
+ * Active users who effectively hold a given permission — role grant, minus
+ * any per-user force-disable, plus a per-user grant override, and always
+ * including an effective Super Admin regardless of role. Used to route
+ * approval/escalation notifications (e.g. "notify whoever can approve
+ * this") by the actual permission the action requires, not by a role's
+ * display name — a role can be renamed via /admin/roles, so a hardcoded
+ * name like 'Admin' or 'Managing Director' would silently stop matching
+ * after a rename. Not indexed/optimized — called for occasional
+ * notification fan-out (an amendment request, a daily alert sweep), never
+ * a request hot path.
+ * @returns {Promise<Array<number>>} user ids
+ */
+async function usersWithPermission(permissionKey) {
+  const activeUsers = await db.query('SELECT id, role_id FROM users WHERE is_active = 1');
+  const matched = [];
+  for (const u of activeUsers) {
+    if (await superAdminService.isEffective(u.id)) {
+      matched.push(u.id);
+      continue;
+    }
+    const effective = await effectivePermissions(u.id, u.role_id);
+    if (effective[permissionKey]) {
+      matched.push(u.id);
+    }
+  }
+  return matched;
 }
 
 /** @returns {Promise<Array<object>>} every permission, for pickers and the role matrix */
@@ -109,6 +139,6 @@ async function removeGrantOverride(id) {
 }
 
 module.exports = {
-  effectivePermissions, all, allKeys, roleMatrix, activeGrantOverrides,
+  effectivePermissions, usersWithPermission, all, allKeys, roleMatrix, activeGrantOverrides,
   grantOverride, removeGrantOverride,
 };

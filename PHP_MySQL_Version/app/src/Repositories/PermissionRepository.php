@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\SuperAdminService;
 
 final class PermissionRepository
 {
@@ -46,6 +47,41 @@ final class PermissionRepository
         }
 
         return $effective;
+    }
+
+    /**
+     * Active users who effectively hold a given permission — role grant,
+     * minus any per-user force-disable, plus a per-user grant override,
+     * and always including an effective Super Admin regardless of role.
+     * Used to route approval/escalation notifications (e.g. "notify
+     * whoever can approve this") by the actual permission the action
+     * requires, not by a role's display name — a role can be renamed via
+     * /admin/roles, so a hardcoded name like 'Admin' or 'Managing
+     * Director' would silently stop matching after a rename. Not
+     * indexed/optimized — called for occasional notification fan-out (an
+     * amendment request, a daily alert sweep), never a request hot path.
+     *
+     * @return array<int, int> user ids
+     */
+    public static function usersWithPermission(string $permissionKey): array
+    {
+        $activeUsers = Database::connection()
+            ->query('SELECT id, role_id FROM users WHERE is_active = 1')
+            ->fetchAll();
+        $matched = [];
+        foreach ($activeUsers as $u) {
+            $userId = (int) $u['id'];
+            if (SuperAdminService::isEffective($userId)) {
+                $matched[] = $userId;
+                continue;
+            }
+            $roleId = $u['role_id'] !== null ? (int) $u['role_id'] : null;
+            $effective = self::effectivePermissions($userId, $roleId);
+            if (!empty($effective[$permissionKey])) {
+                $matched[] = $userId;
+            }
+        }
+        return $matched;
     }
 
     /** @return array<int, array<string,mixed>> every permission, for pickers and the role matrix */

@@ -7,7 +7,7 @@ const documentRepository = require('../repositories/documentRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
-const userRepository = require('../repositories/userRepository');
+const permissionRepository = require('../repositories/permissionRepository');
 const referenceNumberService = require('./referenceNumberService');
 const documentDataAssembler = require('./documentDataAssembler');
 const documentGenerationService = require('./documentGenerationService');
@@ -105,13 +105,14 @@ async function createRequest(
 
   await auditLogRepository.log(requestedByUserId, 'AMENDMENT_REQUESTED', 'amendments', amendmentId, 'reason', null, reason);
 
-  // Notify every MD/Admin so approval isn't stuck waiting on someone
-  // stumbling across it — mirrors the reviewer-assignment pattern.
-  const activeUsers = await userRepository.listActive();
-  for (const user of activeUsers) {
-    if (user.role_name === 'Admin' || user.role_name === 'Managing Director') {
-      await notificationRepository.create(user.id, null, 'amendment_pending_md_approval', orderId, `Amendment ${reference} needs MD approval.`);
-    }
+  // Notify whoever can actually approve it (approve_documents — the same
+  // permission /amendments/:id/md-approve is gated on) so this isn't stuck
+  // waiting on someone stumbling across it — mirrors the
+  // reviewer-assignment pattern. Checked by permission, not a hardcoded
+  // role name, since roles can be renamed via /admin/roles.
+  const approverIds = await permissionRepository.usersWithPermission('approve_documents');
+  for (const userId of approverIds) {
+    await notificationRepository.create(userId, null, 'amendment_pending_md_approval', orderId, `Amendment ${reference} needs MD approval.`);
   }
 
   return amendmentId;

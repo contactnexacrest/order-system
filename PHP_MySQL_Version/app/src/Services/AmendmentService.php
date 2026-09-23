@@ -11,7 +11,7 @@ use App\Repositories\DocumentRepository;
 use App\Repositories\NotificationRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
-use App\Repositories\UserRepository;
+use App\Repositories\PermissionRepository;
 
 /**
  * Spec Section 8 — PAYMENT TERMS AMENDMENT SYSTEM (SC/AMD). Orchestrates
@@ -101,12 +101,13 @@ final class AmendmentService
 
         AuditLogRepository::log($requestedByUserId, 'AMENDMENT_REQUESTED', 'amendments', $amendmentId, 'reason', null, $reason);
 
-        // Notify every MD/Admin so approval isn't stuck waiting on someone
-        // stumbling across it — mirrors the reviewer-assignment pattern.
-        foreach (UserRepository::listActive() as $user) {
-            if (in_array($user['role_name'], ['Admin', 'Managing Director'], true)) {
-                NotificationRepository::create((int) $user['id'], null, 'amendment_pending_md_approval', $orderId, "Amendment {$reference} needs MD approval.");
-            }
+        // Notify whoever can actually approve it (approve_documents — the
+        // same permission /amendments/{id}/md-approve is gated on) so this
+        // isn't stuck waiting on someone stumbling across it — mirrors the
+        // reviewer-assignment pattern. Checked by permission, not a
+        // hardcoded role name, since roles can be renamed via /admin/roles.
+        foreach (PermissionRepository::usersWithPermission('approve_documents') as $userId) {
+            NotificationRepository::create($userId, null, 'amendment_pending_md_approval', $orderId, "Amendment {$reference} needs MD approval.");
         }
 
         return $amendmentId;
