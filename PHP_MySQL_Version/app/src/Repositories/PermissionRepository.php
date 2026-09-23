@@ -162,4 +162,85 @@ final class PermissionRepository
             ->prepare('DELETE FROM user_permissions WHERE id = :id AND is_enabled = 1')
             ->execute(['id' => $id]);
     }
+
+    public static function find(int $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM permissions WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public static function findByKey(string $permissionKey): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM permissions WHERE permission_key = :permission_key');
+        $stmt->execute(['permission_key' => $permissionKey]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** Freshly created permissions are never system-protected — see schema.sql Section X. */
+    public static function create(string $permissionKey, string $name, ?string $description, ?string $category): int
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare(
+            'INSERT INTO permissions (permission_key, name, description, category, is_system_permission)
+             VALUES (:permission_key, :name, :description, :category, 0)'
+        );
+        $stmt->execute(['permission_key' => $permissionKey, 'name' => $name, 'description' => $description, 'category' => $category]);
+        return (int) $pdo->lastInsertId();
+    }
+
+    /** permission_key is immutable once created — every PermissionCheck::requires() call in code is a string literal against it. */
+    public static function update(int $id, string $name, ?string $description, ?string $category): void
+    {
+        Database::connection()->prepare(
+            'UPDATE permissions SET name = :name, description = :description, category = :category WHERE id = :id'
+        )->execute(['name' => $name, 'description' => $description, 'category' => $category, 'id' => $id]);
+    }
+
+    /** How many role or per-user grants currently reference this permission — deletion is blocked while this is nonzero. */
+    public static function usageCount(int $permissionId): int
+    {
+        // Two distinct placeholders, not :id reused twice — PDO::ATTR_EMULATE_PREPARES
+        // is off (native prepares), which doesn't allow binding one named
+        // parameter to two positions in the same query.
+        $stmt = Database::connection()->prepare(
+            'SELECT
+               (SELECT COUNT(*) FROM role_permissions WHERE permission_id = :id1) +
+               (SELECT COUNT(*) FROM user_permissions WHERE permission_id = :id2) AS c'
+        );
+        $stmt->execute(['id1' => $permissionId, 'id2' => $permissionId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public static function deletePermission(int $id): void
+    {
+        Database::connection()->prepare('DELETE FROM permissions WHERE id = :id')->execute(['id' => $id]);
+    }
+
+    /**
+     * Replace a role's entire permission set in one go — the actual "edit
+     * which permissions a role has" the read-only matrix used to explicitly
+     * rule out. role_permissions is a pure junction table nothing else
+     * references, so delete-then-reinsert for just this one role_id is safe
+     * and doesn't touch any other role's rows.
+     *
+     * @param array<int, int> $enabledPermissionIds
+     */
+    public static function setForRole(int $roleId, array $enabledPermissionIds): void
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('DELETE FROM role_permissions WHERE role_id = :role_id')->execute(['role_id' => $roleId]);
+        $stmt = $pdo->prepare('INSERT INTO role_permissions (role_id, permission_id, is_enabled) VALUES (:role_id, :permission_id, 1)');
+        foreach ($enabledPermissionIds as $permissionId) {
+            $stmt->execute(['role_id' => $roleId, 'permission_id' => $permissionId]);
+        }
+    }
+
+    /** The permission_ids currently enabled for one role — for pre-checking the edit-permissions form. @return array<int, int> */
+    public static function enabledForRole(int $roleId): array
+    {
+        $stmt = Database::connection()->prepare('SELECT permission_id FROM role_permissions WHERE role_id = :role_id AND is_enabled = 1');
+        $stmt->execute(['role_id' => $roleId]);
+        return array_map('intval', array_column($stmt->fetchAll(), 'permission_id'));
+    }
 }

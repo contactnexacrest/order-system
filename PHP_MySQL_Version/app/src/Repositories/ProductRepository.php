@@ -27,13 +27,18 @@ final class ProductRepository
     /** @return array<int, array<string,mixed>> */
     public static function search(string $term): array
     {
+        // Three distinct placeholders, not :term reused three times —
+        // PDO::ATTR_EMULATE_PREPARES is off (native prepares), which
+        // doesn't allow binding one named parameter to multiple positions
+        // in the same query (throws "Invalid parameter number").
         $stmt = Database::connection()->prepare(
             'SELECT * FROM catalog_products
              WHERE is_active = 1
-               AND (name LIKE :term OR hs_code LIKE :term OR specifications LIKE :term)
+               AND (name LIKE :term1 OR hs_code LIKE :term2 OR specifications LIKE :term3)
              ORDER BY name'
         );
-        $stmt->execute(['term' => '%' . $term . '%']);
+        $needle = '%' . $term . '%';
+        $stmt->execute(['term1' => $needle, 'term2' => $needle, 'term3' => $needle]);
         return $stmt->fetchAll();
     }
 

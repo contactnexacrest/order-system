@@ -1607,6 +1607,32 @@ ALTER TABLE orders ADD COLUMN archived_by BIGINT UNSIGNED NULL;
 CREATE INDEX idx_orders_is_archived ON orders (is_archived);
 
 -- ================================================================
+-- SECTION X — ROLE & PERMISSION MANAGEMENT (added 2026-09-23)
+-- ================================================================
+-- Turns roles/permissions from seed-managed-only into a real admin
+-- screen (create/edit/delete roles, create/edit/delete permission
+-- definitions, and edit which permissions a role has — not just the
+-- existing per-user grant-only override in user_permissions).
+--
+-- is_system_permission mirrors roles.is_system_role: every permission_key
+-- that shipped in seed.sql is also a string literal a route/controller
+-- checks directly (requirePermission('manage_orders') and its ~25
+-- siblings) — deleting one of those would silently lock everyone out of
+-- whatever it gates, with no error, since nothing could ever hold that
+-- key again. A permission created fresh through this new admin screen is
+-- NOT marked system (is_system_permission = 0 by default) since nothing
+-- in code depends on its key yet — it's inert until a developer wires a
+-- requirePermission()/PermissionCheck::requires() call to it, same as any
+-- new permission always has been. permission_key itself is immutable
+-- once created, system or not, for the same string-literal reason — only
+-- name/description/category can be edited. See
+-- PermissionRepository::delete() (blocks system rows, and any row still
+-- referenced by role_permissions/user_permissions) and RoleRepository::
+-- delete() (blocks is_system_role, and any role still assigned to a user).
+ALTER TABLE permissions ADD COLUMN is_system_permission TINYINT(1) NOT NULL DEFAULT 0;
+UPDATE permissions SET is_system_permission = 1;
+
+-- ================================================================
 -- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1621,4 +1647,5 @@ CREATE INDEX idx_orders_is_archived ON orders (is_archived);
 -- Section U (product interface / internal product catalog) added 2026-09-21.
 -- Section V (test mode) added 2026-09-22.
 -- Section W (order archiving) added 2026-09-23.
+-- Section X (role & permission management) added 2026-09-23.
 -- ================================================================

@@ -279,6 +279,16 @@ app.post('/test-mode/delete-test-data', requireAuth, requireSuperAdmin, verifyCs
 app.get('/admin/permissions', requireAuth, requirePermission('manage_permissions'), asyncHandler(permissionAdminController.index));
 app.post('/admin/permissions/grant', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.grantOverride));
 app.post('/admin/permissions/:id/remove', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.removeOverride));
+app.post('/admin/roles', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.roleCreate));
+app.get('/admin/roles/:id/edit', requireAuth, requirePermission('manage_permissions'), asyncHandler(permissionAdminController.roleEditForm));
+app.post('/admin/roles/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.roleUpdate));
+app.post('/admin/roles/:id/delete', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.roleDelete));
+app.get('/admin/roles/:id/permissions', requireAuth, requirePermission('manage_permissions'), asyncHandler(permissionAdminController.rolePermissionsForm));
+app.post('/admin/roles/:id/permissions', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.rolePermissionsUpdate));
+app.post('/admin/permission-definitions', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.permissionCreate));
+app.get('/admin/permission-definitions/:id/edit', requireAuth, requirePermission('manage_permissions'), asyncHandler(permissionAdminController.permissionEditForm));
+app.post('/admin/permission-definitions/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.permissionUpdate));
+app.post('/admin/permission-definitions/:id/delete', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.permissionDelete));
 
 // --- Phase B: clients / orders / stage gates / document generation ---
 app.get('/clients', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.index));

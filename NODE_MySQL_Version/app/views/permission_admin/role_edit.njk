@@ -1,0 +1,14 @@
+<div class="card page-wide">
+  <h1>Edit Role — {{ role.name }}</h1>
+  <form method="post" action="/admin/roles/{{ role.id }}/update">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="kv-grid">
+      <label>Name * <input type="text" name="name" value="{{ role.name }}" required></label>
+      <label>Description <input type="text" name="description" value="{{ role.description or '' }}"></label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm btn-success">Save Changes</button>
+      <a href="/admin/permissions" class="btn-sm btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>

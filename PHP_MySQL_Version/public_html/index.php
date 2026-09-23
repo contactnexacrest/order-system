@@ -153,6 +153,16 @@ $router->post('/test-mode/delete-test-data', [$testMode, 'deleteTestData'], [Ses
 $router->get('/admin/permissions', [$permissionAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
 $router->post('/admin/permissions/grant', [$permissionAdmin, 'grantOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
 $router->post('/admin/permissions/{id}/remove', [$permissionAdmin, 'removeOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/roles', [$permissionAdmin, 'roleCreate'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->get('/admin/roles/{id}/edit', [$permissionAdmin, 'roleEditForm'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
+$router->post('/admin/roles/{id}/update', [$permissionAdmin, 'roleUpdate'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/roles/{id}/delete', [$permissionAdmin, 'roleDelete'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->get('/admin/roles/{id}/permissions', [$permissionAdmin, 'rolePermissionsForm'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
+$router->post('/admin/roles/{id}/permissions', [$permissionAdmin, 'rolePermissionsUpdate'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/permission-definitions', [$permissionAdmin, 'permissionCreate'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->get('/admin/permission-definitions/{id}/edit', [$permissionAdmin, 'permissionEditForm'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
+$router->post('/admin/permission-definitions/{id}/update', [$permissionAdmin, 'permissionUpdate'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/permission-definitions/{id}/delete', [$permissionAdmin, 'permissionDelete'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
 
 // --- Phase B: clients / orders / stage gates / document generation ---
 $router->get('/clients', [$clients, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);

@@ -1,0 +1,21 @@
+<div class="card page-wide">
+  <h1>Edit Permissions — {{ role.name }}</h1>
+  <p class="muted">Check every permission this role should grant. Saving replaces the role's entire permission set — a per-user extra permission (granted from the main Roles &amp; Permissions page) still applies on top of this regardless.</p>
+  <form method="post" action="/admin/roles/{{ role.id }}/permissions">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <table class="list">
+      <tr><th></th><th>Permission</th><th>Category</th></tr>
+      {% for p in allPermissions %}
+      <tr>
+        <td><input type="checkbox" name="permission_ids[]" value="{{ p.id }}" {{ 'checked' if p.id in enabledIds }}></td>
+        <td>{{ p.name }} <span class="muted small">({{ p.permission_key }})</span></td>
+        <td>{{ p.category or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm btn-success">Save Permissions</button>
+      <a href="/admin/permissions" class="btn-sm btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>

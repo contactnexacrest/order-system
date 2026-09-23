@@ -138,7 +138,75 @@ async function removeGrantOverride(id) {
   await db.execute('DELETE FROM user_permissions WHERE id = :id AND is_enabled = 1', { id });
 }
 
+async function find(id) {
+  return db.queryOne('SELECT * FROM permissions WHERE id = :id', { id });
+}
+
+async function findByKey(permissionKey) {
+  return db.queryOne('SELECT * FROM permissions WHERE permission_key = :permission_key', { permission_key: permissionKey });
+}
+
+/** Freshly created permissions are never system-protected — see schema.sql Section X. */
+async function create(permissionKey, name, description, category) {
+  const result = await db.execute(
+    `INSERT INTO permissions (permission_key, name, description, category, is_system_permission)
+     VALUES (:permission_key, :name, :description, :category, 0)`,
+    { permission_key: permissionKey, name, description, category }
+  );
+  return result.insertId;
+}
+
+/** permission_key is immutable once created — every requirePermission() call in code is a string literal against it. */
+async function update(id, name, description, category) {
+  await db.execute(
+    'UPDATE permissions SET name = :name, description = :description, category = :category WHERE id = :id',
+    { id, name, description, category }
+  );
+}
+
+/** How many role or per-user grants currently reference this permission — deletion is blocked while this is nonzero. */
+async function usageCount(permissionId) {
+  const row = await db.queryOne(
+    `SELECT
+       (SELECT COUNT(*) FROM role_permissions WHERE permission_id = :id) +
+       (SELECT COUNT(*) FROM user_permissions WHERE permission_id = :id) AS c`,
+    { id: permissionId }
+  );
+  return row ? parseInt(row.c, 10) : 0;
+}
+
+async function deletePermission(id) {
+  await db.execute('DELETE FROM permissions WHERE id = :id', { id });
+}
+
+/**
+ * Replace a role's entire permission set in one go — the actual "edit
+ * which permissions a role has" the read-only matrix used to explicitly
+ * rule out. role_permissions is a pure junction table nothing else
+ * references, so delete-then-reinsert for just this one role_id is safe
+ * and doesn't touch any other role's rows.
+ */
+async function setForRole(roleId, enabledPermissionIds) {
+  await db.execute('DELETE FROM role_permissions WHERE role_id = :role_id', { role_id: roleId });
+  for (const permissionId of enabledPermissionIds) {
+    await db.execute(
+      'INSERT INTO role_permissions (role_id, permission_id, is_enabled) VALUES (:role_id, :permission_id, 1)',
+      { role_id: roleId, permission_id: permissionId }
+    );
+  }
+}
+
+/** The permission_ids currently enabled for one role — for pre-checking the edit-permissions form. */
+async function enabledForRole(roleId) {
+  const rows = await db.query(
+    'SELECT permission_id FROM role_permissions WHERE role_id = :role_id AND is_enabled = 1',
+    { role_id: roleId }
+  );
+  return rows.map((r) => r.permission_id);
+}
+
 module.exports = {
   effectivePermissions, usersWithPermission, all, allKeys, roleMatrix, activeGrantOverrides,
-  grantOverride, removeGrantOverride,
+  grantOverride, removeGrantOverride, find, findByKey, create, update, usageCount, deletePermission,
+  setForRole, enabledForRole,
 };

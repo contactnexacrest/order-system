@@ -1,0 +1,16 @@
+<div class="card page-wide">
+  <h1>Edit Permission — {{ permission.name }}</h1>
+  <p class="muted small">Key: <code>{{ permission.permission_key }}</code> (immutable — every permission check in code refers to this exact string).</p>
+  <form method="post" action="/admin/permission-definitions/{{ permission.id }}/update">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="kv-grid">
+      <label>Name * <input type="text" name="name" value="{{ permission.name }}" required></label>
+      <label>Category <input type="text" name="category" value="{{ permission.category or '' }}"></label>
+      <label>Description <input type="text" name="description" value="{{ permission.description or '' }}"></label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm btn-success">Save Changes</button>
+      <a href="/admin/permissions" class="btn-sm btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
