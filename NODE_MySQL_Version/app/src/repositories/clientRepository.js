@@ -10,6 +10,10 @@ async function find(id) {
   return db.queryOne('SELECT * FROM clients WHERE id = :id', { id });
 }
 
+async function allInactive() {
+  return db.query('SELECT * FROM clients WHERE is_active = 0 ORDER BY company_legal_name');
+}
+
 async function create(data, createdBy, clientUniqueNumber) {
   const result = await db.execute(
     `INSERT INTO clients
@@ -39,6 +43,42 @@ async function create(data, createdBy, clientUniqueNumber) {
   return result.insertId;
 }
 
+async function update(id, data) {
+  await db.execute(
+    `UPDATE clients SET
+        company_legal_name = :company_legal_name,
+        billing_address = :billing_address,
+        consignee_name = :consignee_name,
+        consignee_address = :consignee_address,
+        vat_eori_tax_no = :vat_eori_tax_no,
+        contact_person = :contact_person,
+        email = :email,
+        phone = :phone,
+        country_of_destination = :country_of_destination,
+        coo_type = :coo_type,
+        notify_party = :notify_party
+     WHERE id = :id`,
+    {
+      company_legal_name: data.company_legal_name,
+      billing_address: data.billing_address,
+      consignee_name: data.consignee_name || null,
+      consignee_address: data.consignee_address || null,
+      vat_eori_tax_no: data.vat_eori_tax_no ?? null,
+      contact_person: data.contact_person ?? null,
+      email: data.email ?? null,
+      phone: data.phone ?? null,
+      country_of_destination: data.country_of_destination ?? null,
+      coo_type: data.coo_type ?? null,
+      notify_party: data.notify_party ?? null,
+      id,
+    }
+  );
+}
+
+async function setActive(id, active) {
+  await db.execute('UPDATE clients SET is_active = :active WHERE id = :id', { active: active ? 1 : 0, id });
+}
+
 async function markSample(id) {
   await db.execute('UPDATE clients SET is_sample_data = 1 WHERE id = :id', { id });
 }
@@ -48,4 +88,4 @@ async function markTest(id) {
   await db.execute('UPDATE clients SET is_test_data = 1 WHERE id = :id', { id });
 }
 
-module.exports = { all, find, create, markSample, markTest };
+module.exports = { all, find, allInactive, create, update, setActive, markSample, markTest };

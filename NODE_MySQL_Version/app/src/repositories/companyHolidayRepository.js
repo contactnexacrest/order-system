@@ -24,8 +24,19 @@ async function create(holidayDate, description, createdBy) {
   return result.insertId;
 }
 
+async function find(id) {
+  return db.queryOne('SELECT * FROM company_holidays WHERE id = :id', { id });
+}
+
+async function update(id, holidayDate, description) {
+  await db.execute(
+    'UPDATE company_holidays SET holiday_date = :holiday_date, description = :description WHERE id = :id',
+    { holiday_date: holidayDate, description, id }
+  );
+}
+
 async function remove(id) {
   await db.execute('DELETE FROM company_holidays WHERE id = :id', { id });
 }
 
-module.exports = { all, datesBetween, create, remove };
+module.exports = { all, datesBetween, create, find, update, remove };

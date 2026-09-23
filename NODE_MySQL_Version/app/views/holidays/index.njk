@@ -10,12 +10,13 @@
       {% endif %}
       {% for h in holidays %}
       <tr>
-        <td>{{ h.holiday_date }}</td>
-        <td>{{ h.description }}</td>
-        <td>
-          <form method="post" action="/holidays/{{ h.id }}/delete" style="display:inline" onsubmit="return confirm('Remove this holiday?');">
+        <td colspan="3">
+          <form method="post" action="/holidays/{{ h.id }}/update" style="display:flex;gap:8px;align-items:center">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <button type="submit" class="btn-sm btn-danger">Remove</button>
+            <input type="date" name="holiday_date" value="{{ h.holiday_date }}" required>
+            <input type="text" name="description" value="{{ h.description }}" required style="width:240px">
+            <button type="submit" class="btn-sm">Save</button>
+            <button type="submit" formaction="/holidays/{{ h.id }}/delete" formnovalidate class="btn-sm btn-danger" onclick="return confirm('Remove this holiday?');">Remove</button>
           </form>
         </td>
       </tr>

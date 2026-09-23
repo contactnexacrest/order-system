@@ -112,6 +112,7 @@ $router->get('/settings', [$settings, 'index'], [SessionAuth::required(), Permis
 $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->get('/holidays', [$holidays, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/holidays', [$holidays, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/holidays/{id}/update', [$holidays, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/holidays/{id}/delete', [$holidays, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->get('/reference-docs', [$referenceDocs, 'index'], [SessionAuth::required()]);
 $router->get('/reference-docs/custom/create', [$referenceDocs, 'customCreateForm'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
@@ -137,6 +138,8 @@ $router->post('/company-assets/{id}/delete', [$assets, 'delete'], [SessionAuth::
 $router->get('/signatories', [$signatories, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories')]);
 $router->post('/signatories/designations', [$signatories, 'createDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/designations/{id}/toggle', [$signatories, 'toggleDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->post('/signatories/designations/{id}/update', [$signatories, 'updateDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->post('/signatories/designations/{id}/delete', [$signatories, 'deleteDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/users/{id}/eligibility', [$signatories, 'setEligibility'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/users/{id}/upload', [$signatories, 'uploadUserAsset'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/user-assets/{id}/deactivate', [$signatories, 'deactivateUserAsset'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
@@ -173,9 +176,13 @@ $router->post('/admin/permission-definitions/{id}/delete', [$permissionAdmin, 'p
 
 // --- Phase B: clients / orders / stage gates / document generation ---
 $router->get('/clients', [$clients, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->get('/clients/inactive', [$clients, 'inactiveIndex'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->get('/clients/create', [$clients, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients', [$clients, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/clients/{id}', [$clients, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->get('/clients/{id}/edit', [$clients, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/clients/{id}/update', [$clients, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/toggle-active', [$clients, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 // Staff review queue for public quotation-details submissions.
 $router->get('/client-intake', [$clientIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
@@ -289,6 +296,7 @@ $router->get('/reports/aggregate', [$reports, 'aggregate'], [SessionAuth::requir
 $router->get('/reports/queues', [$reports, 'queues'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->post('/reports/save', [$reports, 'saveDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
 $router->get('/reports/saved/{reportId}/run', [$reports, 'runDefinition'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->post('/reports/saved/{reportId}/update', [$reports, 'updateDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
 $router->post('/reports/saved/{reportId}/delete', [$reports, 'deleteDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
 
 // --- Phase E: admin field-override system (Section 13) — every route requires

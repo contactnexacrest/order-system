@@ -170,6 +170,35 @@ final class ReportController
         header('Location: /reports/aggregate' . ($qs !== '' ? "?{$qs}" : ''));
     }
 
+    public function updateDefinition(array $params): void
+    {
+        $id = (int) $params['reportId'];
+        $user = AuthService::currentUser();
+        $def = ReportDefinitionRepository::find($id);
+        if (!$def) {
+            Flash::set('error', 'Saved report not found.');
+            header('Location: /reports');
+            return;
+        }
+        if ((int) $def['owner_user_id'] !== (int) $user['id']) {
+            Flash::set('error', 'You can only edit your own saved reports.');
+            header('Location: /reports');
+            return;
+        }
+
+        $name = trim((string) ($_POST['name'] ?? ''));
+        if ($name === '') {
+            Flash::set('error', 'A name is required.');
+            header('Location: /reports');
+            return;
+        }
+        $visibility = ($_POST['visibility'] ?? '') === 'shared' ? 'shared' : 'private';
+
+        ReportDefinitionRepository::updateNameVisibility($id, $name, $visibility);
+        Flash::set('success', "\"{$name}\" updated.");
+        header('Location: /reports');
+    }
+
     public function deleteDefinition(array $params): void
     {
         $id = (int) $params['reportId'];

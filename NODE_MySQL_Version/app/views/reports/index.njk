@@ -43,11 +43,25 @@
         <tr><th>Name</th><th>Type</th><th>Owner</th><th>Visibility</th><th>Last Run</th><th></th></tr>
         {% for r in savedReports %}
         <tr>
+          {% if currentUser and r.owner_user_id == currentUser.id %}
+          <td colspan="5">
+            <form method="post" action="/reports/saved/{{ r.id }}/update" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="text" name="name" value="{{ r.name }}" required style="width:200px">
+              <select name="visibility">
+                <option value="private" {{ 'selected' if r.visibility == 'private' }}>Private</option>
+                <option value="shared" {{ 'selected' if r.visibility == 'shared' }}>Shared</option>
+              </select>
+              <button type="submit" class="btn-sm">Save</button>
+              <span class="muted small">{{ r.report_type }} &middot; last run {{ r.last_run_at or 'never' }}</span>
+            </form>
+          </td>
+          {% else %}
           <td>{{ r.name }}</td>
           <td>{{ r.report_type }}</td>
           <td>{{ r.owner_name }}</td>
           <td>{{ r.visibility | capitalize }}</td>
-          <td>{{ r.last_run_at or 'never' }}</td>
+          {% endif %}
           <td>
             <a href="/reports/saved/{{ r.id }}/run">Run</a>
             {% if currentUser and r.owner_user_id == currentUser.id %}

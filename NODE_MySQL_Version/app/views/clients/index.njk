@@ -1,7 +1,7 @@
 <div class="card page-wide">
   <h1>Clients</h1>
   <p class="muted">Each client carries one Buyer Inquiry Ref for the whole relationship — every order and document for them reuses it.</p>
-  <div class="btn-row"><a class="btn" href="/clients/create">+ New Client</a></div>
+  <div class="btn-row"><a class="btn" href="/clients/create">+ New Client</a> <a class="btn-sm btn-secondary" href="/clients/inactive">Deactivated Clients</a></div>
 
   {% if not clients or clients.length == 0 %}
     <p class="muted">No clients yet.</p>
@@ -23,7 +23,7 @@
         {% endif %}
       </td>
       <td>{{ c.country_of_destination or '—' }}</td>
-      <td><a href="/clients/{{ c.id }}">View</a></td>
+      <td><a href="/clients/{{ c.id }}">View</a> &middot; <a href="/clients/{{ c.id }}/edit">Edit</a></td>
     </tr>
     {% endfor %}
   </table>

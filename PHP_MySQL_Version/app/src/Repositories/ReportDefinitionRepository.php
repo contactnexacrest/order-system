@@ -64,6 +64,13 @@ final class ReportDefinitionRepository
         Database::connection()->prepare('UPDATE report_definitions SET last_run_at = NOW() WHERE id = :id')->execute(['id' => $id]);
     }
 
+    public static function updateNameVisibility(int $id, string $name, string $visibility): void
+    {
+        Database::connection()
+            ->prepare('UPDATE report_definitions SET name = :name, visibility = :visibility WHERE id = :id')
+            ->execute(['name' => $name, 'visibility' => $visibility === 'shared' ? 'shared' : 'private', 'id' => $id]);
+    }
+
     public static function delete(int $id): void
     {
         Database::connection()->prepare('DELETE FROM report_definitions WHERE id = :id')->execute(['id' => $id]);

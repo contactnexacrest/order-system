@@ -65,6 +65,51 @@ final class SignatoryController
         header('Location: /signatories');
     }
 
+    public function updateDesignation(array $params): void
+    {
+        $id = (int) ($params['id'] ?? 0);
+        $designation = SignatoryRepository::findDesignation($id);
+        if (!$designation) {
+            Flash::set('error', 'Designation not found.');
+            header('Location: /signatories');
+            return;
+        }
+        $title = trim((string) ($_POST['title'] ?? ''));
+        if ($title === '') {
+            Flash::set('error', 'Designation title is required.');
+            header('Location: /signatories');
+            return;
+        }
+        if ($title !== $designation['title'] && SignatoryRepository::designationAssignedToProtectedAccount($id)) {
+            Flash::set('error', 'This designation is assigned to a protected founder account — its title can never be changed through the application.');
+            header('Location: /signatories');
+            return;
+        }
+        SignatoryRepository::updateDesignationTitle($id, $title);
+        Flash::set('success', "Designation renamed to \"{$title}\".");
+        header('Location: /signatories');
+    }
+
+    public function deleteDesignation(array $params): void
+    {
+        $id = (int) ($params['id'] ?? 0);
+        $designation = SignatoryRepository::findDesignation($id);
+        if (!$designation) {
+            Flash::set('error', 'Designation not found.');
+            header('Location: /signatories');
+            return;
+        }
+        $usage = SignatoryRepository::designationUsageCount($id);
+        if ($usage > 0) {
+            Flash::set('error', "Can't delete \"{$designation['title']}\" — {$usage} user(s) currently carry it. Reassign them first.");
+            header('Location: /signatories');
+            return;
+        }
+        SignatoryRepository::deleteDesignation($id);
+        Flash::set('success', "Designation \"{$designation['title']}\" deleted.");
+        header('Location: /signatories');
+    }
+
     public function setEligibility(array $params): void
     {
         $user = AuthService::currentUser();

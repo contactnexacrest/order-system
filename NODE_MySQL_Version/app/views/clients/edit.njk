@@ -1,0 +1,26 @@
+<div class="card">
+  <h1>Edit Client</h1>
+  <p class="muted small"><a href="/clients/{{ client.id }}">&larr; Back to Client</a></p>
+  <p class="muted">Buyer Inquiry Ref: <strong>{{ client.client_unique_number }}</strong> — changed only via the Admin Override on the client's page, not here.</p>
+  <form method="post" action="/clients/{{ client.id }}/update">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <fieldset>
+      <legend>Buyer / Consignee</legend>
+      <label>Company Legal Name *<input type="text" name="company_legal_name" value="{{ client.company_legal_name }}" required></label>
+      <label>Billing Address *<textarea name="billing_address" rows="2" required>{{ client.billing_address }}</textarea></label>
+      <label>Consignee Name <small class="muted">(leave blank if same as buyer)</small><input type="text" name="consignee_name" value="{{ client.consignee_name or '' }}"></label>
+      <label>Consignee Address <small class="muted">(leave blank if same as buyer)</small><textarea name="consignee_address" rows="2">{{ client.consignee_address or '' }}</textarea></label>
+      <label>VAT / EORI / Tax Reg. No.<input type="text" name="vat_eori_tax_no" value="{{ client.vat_eori_tax_no or '' }}"></label>
+      <label>Country of Destination<input type="text" name="country_of_destination" value="{{ client.country_of_destination or '' }}"></label>
+      <label>Certificate of Origin Type<input type="text" name="coo_type" value="{{ client.coo_type or '' }}" placeholder="e.g. Non-Preferential"></label>
+      <label>Notify Party <small class="muted">(leave blank for "SAME as buyer")</small><input type="text" name="notify_party" value="{{ client.notify_party or '' }}"></label>
+    </fieldset>
+    <fieldset>
+      <legend>Contact</legend>
+      <label>Contact Person<input type="text" name="contact_person" value="{{ client.contact_person or '' }}"></label>
+      <label>Email<input type="email" name="email" value="{{ client.email or '' }}"></label>
+      <label>Phone<input type="text" name="phone" value="{{ client.phone or '' }}"></label>
+    </fieldset>
+    <button type="submit">Save Changes</button>
+  </form>
+</div>

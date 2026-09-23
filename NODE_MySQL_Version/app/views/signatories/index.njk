@@ -8,13 +8,31 @@
       <tr><th>Title</th><th>Status</th><th>Action</th></tr>
       {% for d in designations %}
       <tr>
-        <td>{{ d.title }}</td>
+        <td>
+          {% if d.protected_usage_count > 0 %}
+            {{ d.title }} <span class="badge badge-protected">In use by a protected founder</span>
+          {% else %}
+            <form method="post" action="/signatories/designations/{{ d.id }}/update" style="display:flex;gap:6px;align-items:center">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="text" name="title" value="{{ d.title }}" required style="width:220px">
+              <button type="submit" class="btn-sm">Rename</button>
+            </form>
+          {% endif %}
+        </td>
         <td>{{ 'Active' if d.is_active else 'Inactive' }}</td>
         <td>
           <form method="post" action="/signatories/designations/{{ d.id }}/toggle" style="display:inline">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm">{{ 'Deactivate' if d.is_active else 'Reactivate' }}</button>
           </form>
+          {% if d.usage_count == 0 %}
+            <form method="post" action="/signatories/designations/{{ d.id }}/delete" style="display:inline" onsubmit="return confirm('Delete the designation \'{{ d.title }}\'?');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
+          {% else %}
+            <span class="muted small">In use by {{ d.usage_count }}</span>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

@@ -19,7 +19,13 @@ final class SignatoryRepository
     public static function designations(): array
     {
         return Database::connection()
-            ->query('SELECT * FROM designations ORDER BY is_active DESC, title')
+            ->query(
+                'SELECT d.*,
+                        (SELECT COUNT(*) FROM users u WHERE u.designation_id = d.id) AS usage_count,
+                        (SELECT COUNT(*) FROM users u WHERE u.designation_id = d.id AND u.is_protected_account = 1) AS protected_usage_count
+                 FROM designations d
+                 ORDER BY d.is_active DESC, d.title'
+            )
             ->fetchAll();
     }
 
@@ -36,6 +42,42 @@ final class SignatoryRepository
         Database::connection()
             ->prepare('UPDATE designations SET is_active = 1 - is_active WHERE id = :id')
             ->execute(['id' => $id]);
+    }
+
+    public static function findDesignation(int $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM designations WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** How many users currently carry this designation — blocks rename-onto-a-protected-user and delete-while-in-use. */
+    public static function designationUsageCount(int $id): int
+    {
+        $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM users WHERE designation_id = :id');
+        $stmt->execute(['id' => $id]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public static function designationAssignedToProtectedAccount(int $id): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*) FROM users WHERE designation_id = :id AND is_protected_account = 1'
+        );
+        $stmt->execute(['id' => $id]);
+        return ((int) $stmt->fetchColumn()) > 0;
+    }
+
+    public static function updateDesignationTitle(int $id, string $title): void
+    {
+        Database::connection()
+            ->prepare('UPDATE designations SET title = :title WHERE id = :id')
+            ->execute(['title' => $title, 'id' => $id]);
+    }
+
+    public static function deleteDesignation(int $id): void
+    {
+        Database::connection()->prepare('DELETE FROM designations WHERE id = :id')->execute(['id' => $id]);
     }
 
     /** @return array<int, array<string,mixed>> every user, with designation title and eligibility joined in */

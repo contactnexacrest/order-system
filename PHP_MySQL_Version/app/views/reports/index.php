@@ -49,11 +49,25 @@ $__uid = $__u ? (int) $__u['id'] : 0;
         <tr><th>Name</th><th>Type</th><th>Owner</th><th>Visibility</th><th>Last Run</th><th></th></tr>
         <?php foreach ($savedReports as $r): ?>
         <tr>
+          <?php if ((int) $r['owner_user_id'] === $__uid): ?>
+          <td colspan="5">
+            <form method="post" action="/reports/saved/<?= (int) $r['id'] ?>/update" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <?= Csrf::field() ?>
+              <input type="text" name="name" value="<?= htmlspecialchars($r['name']) ?>" required style="width:200px">
+              <select name="visibility">
+                <option value="private" <?= $r['visibility'] === 'private' ? 'selected' : '' ?>>Private</option>
+                <option value="shared" <?= $r['visibility'] === 'shared' ? 'selected' : '' ?>>Shared</option>
+              </select>
+              <button type="submit" class="btn-sm">Save</button>
+              <span class="muted small"><?= htmlspecialchars($r['report_type']) ?> &middot; last run <?= htmlspecialchars($r['last_run_at'] ?? 'never') ?></span>
+            </form>
+          </td>
+          <?php else: ?>
           <td><?= htmlspecialchars($r['name']) ?></td>
           <td><?= htmlspecialchars($r['report_type']) ?></td>
           <td><?= htmlspecialchars($r['owner_name']) ?></td>
           <td><?= htmlspecialchars(ucfirst($r['visibility'])) ?></td>
-          <td><?= htmlspecialchars($r['last_run_at'] ?? 'never') ?></td>
+          <?php endif; ?>
           <td>
             <a href="/reports/saved/<?= (int) $r['id'] ?>/run">Run</a>
             <?php if ((int) $r['owner_user_id'] === $__uid): ?>

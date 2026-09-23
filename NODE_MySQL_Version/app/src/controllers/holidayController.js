@@ -50,6 +50,46 @@ async function create(req, res) {
   res.redirect('/holidays');
 }
 
+async function update(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const existing = await companyHolidayRepository.find(id);
+  if (!existing) {
+    flash.set(req, 'error', 'Holiday not found.');
+    res.redirect('/holidays');
+    return;
+  }
+
+  const date = String(req.body.holiday_date || '').trim();
+  const description = String(req.body.description || '').trim();
+  if (date === '' || description === '') {
+    flash.set(req, 'error', 'Both a date and a description are required.');
+    res.redirect('/holidays');
+    return;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T00:00:00Z`).getTime())) {
+    flash.set(req, 'error', 'Invalid date.');
+    res.redirect('/holidays');
+    return;
+  }
+
+  try {
+    await companyHolidayRepository.update(id, date, description);
+  } catch (err) {
+    if (err && err.code === 'ER_DUP_ENTRY') {
+      flash.set(req, 'error', 'That date is already on the holiday calendar.');
+      res.redirect('/holidays');
+      return;
+    }
+    throw err;
+  }
+  await auditLogRepository.log(
+    req.user.id, 'HOLIDAY_UPDATED', 'company_holidays', id,
+    null, `${existing.holiday_date}: ${existing.description}`, `${date}: ${description}`
+  );
+  flash.set(req, 'success', `Holiday updated: ${date} — ${description}.`);
+  res.redirect('/holidays');
+}
+
 async function remove(req, res) {
   const id = parseInt(req.params.id, 10);
   await companyHolidayRepository.remove(id);
@@ -58,4 +98,4 @@ async function remove(req, res) {
   res.redirect('/holidays');
 }
 
-module.exports = { index, create, remove };
+module.exports = { index, create, update, remove };

@@ -59,6 +59,46 @@ final class HolidayController
         header('Location: /holidays');
     }
 
+    public function update(array $params): void
+    {
+        $id = (int) ($params['id'] ?? 0);
+        $existing = CompanyHolidayRepository::find($id);
+        if (!$existing) {
+            Flash::set('error', 'Holiday not found.');
+            header('Location: /holidays');
+            return;
+        }
+
+        $date = trim((string) ($_POST['holiday_date'] ?? ''));
+        $description = trim((string) ($_POST['description'] ?? ''));
+        if ($date === '' || $description === '') {
+            Flash::set('error', 'Both a date and a description are required.');
+            header('Location: /holidays');
+            return;
+        }
+        $d = \DateTimeImmutable::createFromFormat('Y-m-d', $date);
+        if (!$d || $d->format('Y-m-d') !== $date) {
+            Flash::set('error', 'Invalid date.');
+            header('Location: /holidays');
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        try {
+            CompanyHolidayRepository::update($id, $date, $description);
+        } catch (\PDOException $e) {
+            Flash::set('error', 'That date is already on the holiday calendar.');
+            header('Location: /holidays');
+            return;
+        }
+        AuditLogRepository::log(
+            (int) $user['id'], 'HOLIDAY_UPDATED', 'company_holidays', $id,
+            null, "{$existing['holiday_date']}: {$existing['description']}", "{$date}: {$description}"
+        );
+        Flash::set('success', "Holiday updated: {$date} — {$description}.");
+        header('Location: /holidays');
+    }
+
     public function delete(array $params): void
     {
         $id = (int) ($params['id'] ?? 0);

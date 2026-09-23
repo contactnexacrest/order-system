@@ -15,6 +15,16 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
       &nbsp;·&nbsp; <a href="/reports/client/<?= (int) $client['id'] ?>">Full Report</a>
     <?php endif; ?>
   </p>
+  <?php if ((int) $client['is_active'] === 0): ?>
+    <p class="muted small">Deactivated — hidden from the main Clients list. Nothing was deleted.</p>
+  <?php endif; ?>
+  <div class="btn-row">
+    <a class="btn-sm btn-secondary" href="/clients/<?= (int) $client['id'] ?>/edit">Edit</a>
+    <form method="post" action="/clients/<?= (int) $client['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('<?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>?<?= (int) $client['is_active'] === 1 ? ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' : '' ?>');">
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm <?= (int) $client['is_active'] === 1 ? 'btn-danger' : 'btn-success' ?>"><?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?></button>
+    </form>
+  </div>
 
   <div class="section">
     <h2>Buyer / Consignee Details</h2>

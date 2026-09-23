@@ -52,8 +52,15 @@ async function markRun(id) {
   await db.execute('UPDATE report_definitions SET last_run_at = NOW() WHERE id = :id', { id });
 }
 
+async function updateNameVisibility(id, name, visibility) {
+  await db.execute(
+    'UPDATE report_definitions SET name = :name, visibility = :visibility WHERE id = :id',
+    { name, visibility: visibility === 'shared' ? 'shared' : 'private', id }
+  );
+}
+
 async function deleteDefinition(id) {
   await db.execute('DELETE FROM report_definitions WHERE id = :id', { id });
 }
 
-module.exports = { create, find, visibleTo, markRun, delete: deleteDefinition };
+module.exports = { create, find, visibleTo, markRun, updateNameVisibility, delete: deleteDefinition };

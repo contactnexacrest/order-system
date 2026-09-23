@@ -8,7 +8,7 @@ $canViewFullEmail = $__u && PermissionService::can((int) $__u['id'], $__u['role_
 <div class="card page-wide">
   <h1>Clients</h1>
   <p class="muted">Each client carries one Buyer Inquiry Ref for the whole relationship — every order and document for them reuses it.</p>
-  <div class="btn-row"><a class="btn" href="/clients/create">+ New Client</a></div>
+  <div class="btn-row"><a class="btn" href="/clients/create">+ New Client</a> <a class="btn-sm btn-secondary" href="/clients/inactive">Deactivated Clients</a></div>
 
   <?php if (empty($clients)): ?>
     <p class="muted">No clients yet.</p>
@@ -30,7 +30,7 @@ $canViewFullEmail = $__u && PermissionService::can((int) $__u['id'], $__u['role_
         <?php endif; ?>
       </td>
       <td><?= htmlspecialchars($c['country_of_destination'] ?? '—') ?></td>
-      <td><a href="/clients/<?= (int) $c['id'] ?>">View</a></td>
+      <td><a href="/clients/<?= (int) $c['id'] ?>">View</a> &middot; <a href="/clients/<?= (int) $c['id'] ?>/edit">Edit</a></td>
     </tr>
     <?php endforeach; ?>
   </table>

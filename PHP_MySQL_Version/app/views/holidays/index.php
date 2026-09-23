@@ -11,12 +11,13 @@
       <?php endif; ?>
       <?php foreach ($holidays as $h): ?>
       <tr>
-        <td><?= htmlspecialchars($h['holiday_date']) ?></td>
-        <td><?= htmlspecialchars($h['description']) ?></td>
-        <td>
-          <form method="post" action="/holidays/<?= (int) $h['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove this holiday?');">
+        <td colspan="3">
+          <form method="post" action="/holidays/<?= (int) $h['id'] ?>/update" style="display:flex;gap:8px;align-items:center">
             <?= Csrf::field() ?>
-            <button type="submit" class="btn-sm btn-danger">Remove</button>
+            <input type="date" name="holiday_date" value="<?= htmlspecialchars($h['holiday_date']) ?>" required>
+            <input type="text" name="description" value="<?= htmlspecialchars($h['description']) ?>" required style="width:240px">
+            <button type="submit" class="btn-sm">Save</button>
+            <button type="submit" formaction="/holidays/<?= (int) $h['id'] ?>/delete" formnovalidate class="btn-sm btn-danger" onclick="return confirm('Remove this holiday?');">Remove</button>
           </form>
         </td>
       </tr>

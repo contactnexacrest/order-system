@@ -239,6 +239,7 @@ app.get('/settings', requireAuth, requirePermission('manage_company_settings'), 
 app.post('/settings/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.update));
 app.get('/holidays', requireAuth, requirePermission('manage_company_settings'), asyncHandler(holidayController.index));
 app.post('/holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.create));
+app.post('/holidays/:id/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.update));
 app.post('/holidays/:id/delete', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.remove));
 app.get('/reference-docs', requireAuth, asyncHandler(referenceDocController.index));
 app.get('/reference-docs/custom/create', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.customCreateForm));
@@ -262,6 +263,8 @@ app.post('/company-assets/:id/delete', requireAuth, requirePermission('delete_as
 app.get('/signatories', requireAuth, requirePermission('manage_signatories'), asyncHandler(signatoryController.index));
 app.post('/signatories/designations', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.createDesignation));
 app.post('/signatories/designations/:id/toggle', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.toggleDesignation));
+app.post('/signatories/designations/:id/update', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.updateDesignation));
+app.post('/signatories/designations/:id/delete', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.deleteDesignation));
 app.post('/signatories/users/:id/eligibility', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setEligibility));
 app.post('/signatories/users/:id/upload', requireAuth, requirePermission('manage_signatories'), upload.single('file'), verifyCsrf, asyncHandler(signatoryController.uploadUserAsset));
 app.post('/signatories/user-assets/:id/deactivate', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.deactivateUserAsset));
@@ -299,9 +302,13 @@ app.post('/admin/permission-definitions/:id/delete', requireAuth, requirePermiss
 
 // --- Phase B: clients / orders / stage gates / document generation ---
 app.get('/clients', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.index));
+app.get('/clients/inactive', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.inactiveIndex));
 app.get('/clients/create', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.create));
 app.post('/clients', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.store));
 app.get('/clients/:id', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.show));
+app.get('/clients/:id/edit', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.editForm));
+app.post('/clients/:id/update', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.update));
+app.post('/clients/:id/toggle-active', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.toggleActive));
 
 // Staff review queue for public quotation-details submissions.
 app.get('/client-intake', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.index));
@@ -437,6 +444,7 @@ app.get('/reports/aggregate', requireAuth, requirePermission('view_reports'), as
 app.get('/reports/queues', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.queues));
 app.post('/reports/save', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.saveDefinition));
 app.get('/reports/saved/:reportId/run', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.runDefinition));
+app.post('/reports/saved/:reportId/update', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.updateDefinition));
 app.post('/reports/saved/:reportId/delete', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.deleteDefinition));
 
 app.get('/admin/overrides', requireAuth, requirePermission('edit_locked_data'), asyncHandler(adminOverrideController.index));

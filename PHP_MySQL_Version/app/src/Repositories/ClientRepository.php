@@ -23,6 +23,14 @@ final class ClientRepository
         return $stmt->fetch() ?: null;
     }
 
+    /** @return array<int, array<string,mixed>> deactivated clients — never shown in all(), still directly viewable */
+    public static function allInactive(): array
+    {
+        return Database::connection()
+            ->query('SELECT * FROM clients WHERE is_active = 0 ORDER BY company_legal_name')
+            ->fetchAll();
+    }
+
     public static function create(array $data, int $createdBy, string $clientUniqueNumber): int
     {
         $pdo = Database::connection();
@@ -52,6 +60,44 @@ final class ClientRepository
             'created_by'              => $createdBy,
         ]);
         return (int) $pdo->lastInsertId();
+    }
+
+    public static function update(int $id, array $data): void
+    {
+        Database::connection()->prepare(
+            'UPDATE clients SET
+                company_legal_name = :company_legal_name,
+                billing_address = :billing_address,
+                consignee_name = :consignee_name,
+                consignee_address = :consignee_address,
+                vat_eori_tax_no = :vat_eori_tax_no,
+                contact_person = :contact_person,
+                email = :email,
+                phone = :phone,
+                country_of_destination = :country_of_destination,
+                coo_type = :coo_type,
+                notify_party = :notify_party
+             WHERE id = :id'
+        )->execute([
+            'company_legal_name'      => $data['company_legal_name'],
+            'billing_address'         => $data['billing_address'],
+            'consignee_name'          => $data['consignee_name'] ?: null,
+            'consignee_address'       => $data['consignee_address'] ?: null,
+            'vat_eori_tax_no'         => $data['vat_eori_tax_no'] ?? null,
+            'contact_person'          => $data['contact_person'] ?? null,
+            'email'                   => $data['email'] ?? null,
+            'phone'                   => $data['phone'] ?? null,
+            'country_of_destination'  => $data['country_of_destination'] ?? null,
+            'coo_type'                => $data['coo_type'] ?? null,
+            'notify_party'            => $data['notify_party'] ?? null,
+            'id'                      => $id,
+        ]);
+    }
+
+    public static function setActive(int $id, bool $active): void
+    {
+        Database::connection()->prepare('UPDATE clients SET is_active = :active WHERE id = :id')
+            ->execute(['active' => $active ? 1 : 0, 'id' => $id]);
     }
 
     /** Phase E follow-up — flags a client as Sample Data Playground content (see SampleDataService). */

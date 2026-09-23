@@ -45,6 +45,20 @@ final class CompanyHolidayRepository
         return (int) $pdo->lastInsertId();
     }
 
+    public static function find(int $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM company_holidays WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public static function update(int $id, string $holidayDate, string $description): void
+    {
+        Database::connection()
+            ->prepare('UPDATE company_holidays SET holiday_date = :holiday_date, description = :description WHERE id = :id')
+            ->execute(['holiday_date' => $holidayDate, 'description' => $description, 'id' => $id]);
+    }
+
     public static function delete(int $id): void
     {
         Database::connection()->prepare('DELETE FROM company_holidays WHERE id = :id')->execute(['id' => $id]);

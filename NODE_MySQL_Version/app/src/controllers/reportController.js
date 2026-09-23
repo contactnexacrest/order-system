@@ -211,6 +211,34 @@ async function runDefinition(req, res) {
   res.redirect('/reports/aggregate' + (qs !== '' ? `?${qs}` : ''));
 }
 
+async function updateDefinition(req, res) {
+  const id = parseInt(req.params.reportId, 10);
+  const user = req.user;
+  const def = await reportDefinitionRepository.find(id);
+  if (!def) {
+    flash.set(req, 'error', 'Saved report not found.');
+    res.redirect('/reports');
+    return;
+  }
+  if (parseInt(def.owner_user_id, 10) !== parseInt(user.id, 10)) {
+    flash.set(req, 'error', 'You can only edit your own saved reports.');
+    res.redirect('/reports');
+    return;
+  }
+
+  const name = String(req.body.name || '').trim();
+  if (name === '') {
+    flash.set(req, 'error', 'A name is required.');
+    res.redirect('/reports');
+    return;
+  }
+  const visibility = String(req.body.visibility || '') === 'shared' ? 'shared' : 'private';
+
+  await reportDefinitionRepository.updateNameVisibility(id, name, visibility);
+  flash.set(req, 'success', `"${name}" updated.`);
+  res.redirect('/reports');
+}
+
 async function deleteDefinition(req, res) {
   const id = parseInt(req.params.reportId, 10);
   const user = req.user;
@@ -224,4 +252,4 @@ async function deleteDefinition(req, res) {
   res.redirect('/reports');
 }
 
-module.exports = { index, client, order, aggregate, queues, saveDefinition, runDefinition, deleteDefinition };
+module.exports = { index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition };

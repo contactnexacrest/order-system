@@ -9,13 +9,31 @@
       <tr><th>Title</th><th>Status</th><th>Action</th></tr>
       <?php foreach ($designations as $d): ?>
       <tr>
-        <td><?= htmlspecialchars($d['title']) ?></td>
+        <td>
+          <?php if ((int) $d['protected_usage_count'] > 0): ?>
+            <?= htmlspecialchars($d['title']) ?> <span class="badge badge-protected">In use by a protected founder</span>
+          <?php else: ?>
+            <form method="post" action="/signatories/designations/<?= (int) $d['id'] ?>/update" style="display:flex;gap:6px;align-items:center">
+              <?= Csrf::field() ?>
+              <input type="text" name="title" value="<?= htmlspecialchars($d['title']) ?>" required style="width:220px">
+              <button type="submit" class="btn-sm">Rename</button>
+            </form>
+          <?php endif; ?>
+        </td>
         <td><?= $d['is_active'] ? 'Active' : 'Inactive' ?></td>
         <td>
           <form method="post" action="/signatories/designations/<?= (int) $d['id'] ?>/toggle" style="display:inline">
             <?= Csrf::field() ?>
             <button type="submit" class="btn-sm"><?= $d['is_active'] ? 'Deactivate' : 'Reactivate' ?></button>
           </form>
+          <?php if ((int) $d['usage_count'] === 0): ?>
+            <form method="post" action="/signatories/designations/<?= (int) $d['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Delete the designation \'<?= htmlspecialchars(addslashes($d['title'])) ?>\'?');">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
+          <?php else: ?>
+            <span class="muted small">In use by <?= (int) $d['usage_count'] ?></span>
+          <?php endif; ?>
         </td>
       </tr>
       <?php endforeach; ?>

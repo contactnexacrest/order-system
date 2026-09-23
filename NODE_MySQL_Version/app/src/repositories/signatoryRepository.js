@@ -6,7 +6,13 @@ const auditLogRepository = require('./auditLogRepository');
 // Port of App\Repositories\SignatoryRepository.
 
 async function designations() {
-  return db.query('SELECT * FROM designations ORDER BY is_active DESC, title');
+  return db.query(
+    `SELECT d.*,
+            (SELECT COUNT(*) FROM users u WHERE u.designation_id = d.id) AS usage_count,
+            (SELECT COUNT(*) FROM users u WHERE u.designation_id = d.id AND u.is_protected_account = 1) AS protected_usage_count
+     FROM designations d
+     ORDER BY d.is_active DESC, d.title`
+  );
 }
 
 async function createDesignation(title, createdBy) {
@@ -16,6 +22,28 @@ async function createDesignation(title, createdBy) {
 
 async function toggleDesignationActive(id) {
   await db.execute('UPDATE designations SET is_active = 1 - is_active WHERE id = :id', { id });
+}
+
+async function findDesignation(id) {
+  return db.queryOne('SELECT * FROM designations WHERE id = :id', { id });
+}
+
+async function designationUsageCount(id) {
+  const row = await db.queryOne('SELECT COUNT(*) AS c FROM users WHERE designation_id = :id', { id });
+  return parseInt(row.c, 10);
+}
+
+async function designationAssignedToProtectedAccount(id) {
+  const row = await db.queryOne('SELECT COUNT(*) AS c FROM users WHERE designation_id = :id AND is_protected_account = 1', { id });
+  return parseInt(row.c, 10) > 0;
+}
+
+async function updateDesignationTitle(id, title) {
+  await db.execute('UPDATE designations SET title = :title WHERE id = :id', { title, id });
+}
+
+async function deleteDesignation(id) {
+  await db.execute('DELETE FROM designations WHERE id = :id', { id });
 }
 
 async function usersWithSignatoryInfo() {
@@ -106,6 +134,8 @@ async function setDocumentTypeSignatory(documentTypeId, userId, useDesignationSe
 
 module.exports = {
   designations, createDesignation, toggleDesignationActive,
+  findDesignation, designationUsageCount, designationAssignedToProtectedAccount,
+  updateDesignationTitle, deleteDesignation,
   usersWithSignatoryInfo, eligibleSignatories, setEligibility,
   assetsForUser, addUserAsset, deactivateUserAsset,
   globalDefaultSignatoryUserId, setGlobalDefaultSignatory,

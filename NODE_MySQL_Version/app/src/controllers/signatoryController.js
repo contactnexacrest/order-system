@@ -54,6 +54,49 @@ async function toggleDesignation(req, res) {
   res.redirect('/signatories');
 }
 
+async function updateDesignation(req, res) {
+  const id = parseInt(req.params.id, 10) || 0;
+  const designation = await signatoryRepository.findDesignation(id);
+  if (!designation) {
+    flash.set(req, 'error', 'Designation not found.');
+    res.redirect('/signatories');
+    return;
+  }
+  const title = String(req.body.title || '').trim();
+  if (title === '') {
+    flash.set(req, 'error', 'Designation title is required.');
+    res.redirect('/signatories');
+    return;
+  }
+  if (title !== designation.title && (await signatoryRepository.designationAssignedToProtectedAccount(id))) {
+    flash.set(req, 'error', 'This designation is assigned to a protected founder account — its title can never be changed through the application.');
+    res.redirect('/signatories');
+    return;
+  }
+  await signatoryRepository.updateDesignationTitle(id, title);
+  flash.set(req, 'success', `Designation renamed to "${title}".`);
+  res.redirect('/signatories');
+}
+
+async function deleteDesignation(req, res) {
+  const id = parseInt(req.params.id, 10) || 0;
+  const designation = await signatoryRepository.findDesignation(id);
+  if (!designation) {
+    flash.set(req, 'error', 'Designation not found.');
+    res.redirect('/signatories');
+    return;
+  }
+  const usage = await signatoryRepository.designationUsageCount(id);
+  if (usage > 0) {
+    flash.set(req, 'error', `Can't delete "${designation.title}" — ${usage} user(s) currently carry it. Reassign them first.`);
+    res.redirect('/signatories');
+    return;
+  }
+  await signatoryRepository.deleteDesignation(id);
+  flash.set(req, 'success', `Designation "${designation.title}" deleted.`);
+  res.redirect('/signatories');
+}
+
 async function setEligibility(req, res) {
   const userId = parseInt(req.params.id, 10) || 0;
   const eligible = String(req.body.eligible || '0') === '1';
@@ -152,6 +195,6 @@ async function setDocumentTypeDefault(req, res) {
 }
 
 module.exports = {
-  index, createDesignation, toggleDesignation, setEligibility,
+  index, createDesignation, toggleDesignation, updateDesignation, deleteDesignation, setEligibility,
   uploadUserAsset, deactivateUserAsset, setGlobalDefault, setDocumentTypeDefault,
 };

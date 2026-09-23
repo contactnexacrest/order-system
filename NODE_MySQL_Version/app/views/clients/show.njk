@@ -6,6 +6,16 @@
       &nbsp;&middot;&nbsp; <a href="/reports/client/{{ client.id }}">Full Report</a>
     {% endif %}
   </p>
+  {% if not client.is_active %}
+    <p class="muted small">Deactivated — hidden from the main Clients list. Nothing was deleted.</p>
+  {% endif %}
+  <div class="btn-row">
+    <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/edit">Edit</a>
+    <form method="post" action="/clients/{{ client.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if client.is_active else 'Reactivate' }} {{ client.company_legal_name }}?{{ ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' if client.is_active else '' }}');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm {{ 'btn-danger' if client.is_active else 'btn-success' }}">{{ 'Deactivate' if client.is_active else 'Reactivate' }}</button>
+    </form>
+  </div>
 
   <div class="section">
     <h2>Buyer / Consignee Details</h2>
