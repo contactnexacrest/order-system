@@ -431,6 +431,8 @@ app.post('/admin/field-protection/:requestId/reject', requireAuth, requirePermis
 
 app.get('/users', requireAuth, requirePermission('manage_users'), asyncHandler(userController.index));
 app.post('/users/create', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.create));
+app.get('/users/:id/edit', requireAuth, requirePermission('manage_users'), asyncHandler(userController.editForm));
+app.post('/users/:id/update', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.update));
 app.post('/users/:id/toggle-active', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.toggleActive));
 app.post('/users/:id/force-reset-password', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.forceResetPassword));
 

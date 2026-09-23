@@ -290,6 +290,8 @@ $router->post('/amendments/{amendmentId}/override-reference', [$amendments, 'ove
 // --- Phase E follow-up: admin user management (Section 14 gap) ---
 $router->get('/users', [$users, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_users')]);
 $router->post('/users/create', [$users, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+$router->get('/users/{id}/edit', [$users, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_users')]);
+$router->post('/users/{id}/update', [$users, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/toggle-active', [$users, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/force-reset-password', [$users, 'forceResetPassword'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 

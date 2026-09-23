@@ -1,0 +1,23 @@
+<div class="card page-wide">
+  <h1>Edit User — {{ target.name }}</h1>
+  <form method="post" action="/users/{{ target.id }}/update">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="kv-grid">
+      <label>Name * <input type="text" name="name" value="{{ target.name }}" required></label>
+      <label>Email * <input type="email" name="email" value="{{ target.email }}" required></label>
+      <label>Phone <input type="text" name="phone" value="{{ target.phone or '' }}"></label>
+      <label>Role
+        <select name="role_id">
+          <option value="">— none —</option>
+          {% for r in roles %}
+            <option value="{{ r.id }}" {{ 'selected' if r.id == target.role_id }}>{{ r.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm btn-success">Save Changes</button>
+      <a href="/users" class="btn-sm btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>

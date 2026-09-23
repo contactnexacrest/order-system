@@ -16,16 +16,13 @@ use App\Services\AuthService;
  * Admin user-management screen (Section 14 gap found in Phase E's own
  * follow-up review — there was previously no way, not even for Admin, to
  * create a login, deactivate one, or reset someone else's password short
- * of a direct SQL statement). Gated entirely on `manage_users`, a
- * permission that was already seeded in Phase A and granted to
- * Admin/Managing Director, but never had a screen behind it until now.
- *
- * Deliberately NOT a generic "edit any user field" screen, matching the
- * same bounded-scope judgment call Phase E's admin-override system made —
- * this covers exactly the actions the gap analysis named: create, list,
- * deactivate/reactivate, and force a password reset. Editing an existing
- * user's name/email/role isn't included; add it the same targeted way if
- * it turns out to be needed later.
+ * of a direct SQL statement). Gated entirely on `manage_users` (a Super
+ * Admin always passes that check — see PermissionService, which grants
+ * every permission key to an effective Super Admin, so no separate bypass
+ * is needed here). Covers create, edit (name/email/phone/role), list,
+ * deactivate/reactivate, and force a password reset. Password itself is
+ * never editable here — only via force-reset (always generates a new
+ * one-time temp password) or the user's own change-password flow.
  */
 final class UserController
 {
@@ -73,6 +70,79 @@ final class UserController
         // Hand it to the person out-of-band; they're forced to change it
         // on first login regardless (force_password_change = 1).
         Flash::set('success', "User created: {$name} ({$email}). One-time temporary password: {$tempPassword} — give this to them directly; it will not be shown again, and they must change it on first login.");
+        header('Location: /users');
+    }
+
+    public function editForm(array $params): void
+    {
+        $userId = (int) $params['id'];
+        $target = UserRepository::findById($userId);
+        if (!$target) {
+            Flash::set('error', 'User not found.');
+            header('Location: /users');
+            return;
+        }
+        View::render('users/edit', [
+            'target' => $target,
+            'roles' => LookupRepository::roles(),
+        ], 'layout/base');
+    }
+
+    public function update(array $params): void
+    {
+        $userId = (int) $params['id'];
+        $target = UserRepository::findById($userId);
+        if (!$target) {
+            Flash::set('error', 'User not found.');
+            header('Location: /users');
+            return;
+        }
+
+        $name = trim((string) ($_POST['name'] ?? ''));
+        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+        $phone = trim((string) ($_POST['phone'] ?? '')) ?: null;
+        $roleId = ($_POST['role_id'] ?? '') !== '' ? (int) $_POST['role_id'] : null;
+
+        if ($name === '' || $email === '') {
+            Flash::set('error', 'Name and email are required.');
+            header("Location: /users/{$userId}/edit");
+            return;
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            Flash::set('error', "\"{$email}\" doesn't look like a valid email address.");
+            header("Location: /users/{$userId}/edit");
+            return;
+        }
+        $existing = UserRepository::findByEmail($email);
+        if ($existing && (int) $existing['id'] !== $userId) {
+            Flash::set('error', "A user with the email {$email} already exists.");
+            header("Location: /users/{$userId}/edit");
+            return;
+        }
+
+        $actor = AuthService::currentUser();
+        $changes = array_filter([
+            ['name', $target['name'], $name],
+            ['email', $target['email'], $email],
+            ['phone', $target['phone'], $phone],
+            ['role_id', $target['role_id'], $roleId],
+        ], static fn(array $c): bool => (string) ($c[1] ?? '') !== (string) ($c[2] ?? ''));
+
+        UserRepository::update($userId, $name, $email, $phone, $roleId);
+
+        foreach ($changes as [$field, $oldVal, $newVal]) {
+            AuditLogRepository::log(
+                (int) $actor['id'],
+                'USER_UPDATED',
+                'users',
+                $userId,
+                $field,
+                $oldVal !== null ? (string) $oldVal : null,
+                $newVal !== null ? (string) $newVal : null
+            );
+        }
+
+        Flash::set('success', "{$name} updated.");
         header('Location: /users');
     }
 

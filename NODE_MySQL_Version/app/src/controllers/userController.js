@@ -11,10 +11,13 @@ const userRepository = require('../repositories/userRepository');
 
 /**
  * Port of App\Controllers\UserController — admin user-management screen.
- * Gated entirely on `manage_users`. Deliberately NOT a generic "edit any
- * user field" screen — covers exactly: create, list, deactivate/reactivate,
- * and force a password reset. Editing an existing user's name/email/role
- * isn't included here, matching the PHP source.
+ * Gated entirely on `manage_users` (a Super Admin always passes that check
+ * — see sessionAuth.js, which grants every permission key to an effective
+ * Super Admin, so no separate bypass is needed here). Covers create, edit
+ * (name/email/phone/role), list, deactivate/reactivate, and force a
+ * password reset. Password itself is never editable here — only via
+ * force-reset (always generates a new one-time temp password) or the
+ * user's own change-password flow.
  */
 
 async function index(req, res) {
@@ -60,6 +63,67 @@ async function create(req, res) {
   // Hand it to the person out-of-band; they're forced to change it
   // on first login regardless (force_password_change = 1).
   flash.set(req, 'success', `User created: ${name} (${email}). One-time temporary password: ${tempPassword} — give this to them directly; it will not be shown again, and they must change it on first login.`);
+  res.redirect('/users');
+}
+
+async function editForm(req, res) {
+  const userId = parseInt(req.params.id, 10);
+  const target = await userRepository.findById(userId);
+  if (!target) {
+    flash.set(req, 'error', 'User not found.');
+    res.redirect('/users');
+    return;
+  }
+  const roles = await lookupRepository.roles();
+  res.renderView('users/edit', { target, roles }, 'layout/base');
+}
+
+async function update(req, res) {
+  const userId = parseInt(req.params.id, 10);
+  const target = await userRepository.findById(userId);
+  if (!target) {
+    flash.set(req, 'error', 'User not found.');
+    res.redirect('/users');
+    return;
+  }
+
+  const name = String(req.body.name || '').trim();
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const phone = String(req.body.phone || '').trim() || null;
+  const roleId = req.body.role_id !== undefined && req.body.role_id !== '' ? parseInt(req.body.role_id, 10) : null;
+
+  if (name === '' || email === '') {
+    flash.set(req, 'error', 'Name and email are required.');
+    res.redirect(`/users/${userId}/edit`);
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    flash.set(req, 'error', `"${email}" doesn't look like a valid email address.`);
+    res.redirect(`/users/${userId}/edit`);
+    return;
+  }
+  const existing = await userRepository.findByEmail(email);
+  if (existing && existing.id !== userId) {
+    flash.set(req, 'error', `A user with the email ${email} already exists.`);
+    res.redirect(`/users/${userId}/edit`);
+    return;
+  }
+
+  const actor = req.user;
+  const changes = [
+    ['name', target.name, name],
+    ['email', target.email, email],
+    ['phone', target.phone, phone],
+    ['role_id', target.role_id, roleId],
+  ].filter(([, oldVal, newVal]) => String(oldVal ?? '') !== String(newVal ?? ''));
+
+  await userRepository.update(userId, name, email, phone, roleId);
+
+  for (const [field, oldVal, newVal] of changes) {
+    await auditLogRepository.log(actor.id, 'USER_UPDATED', 'users', userId, field, oldVal !== null && oldVal !== undefined ? String(oldVal) : null, newVal !== null && newVal !== undefined ? String(newVal) : null);
+  }
+
+  flash.set(req, 'success', `${name} updated.`);
   res.redirect('/users');
 }
 
@@ -135,4 +199,4 @@ function generateTempPassword() {
   return crypto.randomBytes(12).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-module.exports = { index, create, toggleActive, forceResetPassword };
+module.exports = { index, create, editForm, update, toggleActive, forceResetPassword };

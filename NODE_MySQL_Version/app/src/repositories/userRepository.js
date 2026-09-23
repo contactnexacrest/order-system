@@ -78,6 +78,13 @@ async function setActive(userId, active) {
   await db.execute('UPDATE users SET is_active = :active WHERE id = :id', { active: active ? 1 : 0, id: userId });
 }
 
+async function update(userId, name, email, phone, roleId) {
+  await db.execute(
+    'UPDATE users SET name = :name, email = :email, phone = :phone, role_id = :role_id WHERE id = :id',
+    { name, email, phone, role_id: roleId, id: userId }
+  );
+}
+
 async function adminForceResetPassword(userId, tempPasswordHash) {
   await db.execute(
     `UPDATE users SET password_hash = :hash, force_password_change = 1,
@@ -90,5 +97,5 @@ async function adminForceResetPassword(userId, tempPasswordHash) {
 module.exports = {
   findByEmail, findById, incrementFailedLogins, resetFailedLogins, lockUntil,
   updateLastLogin, updatePassword, flagPasswordExpired, setTwoFactor,
-  listActive, listAllForAdmin, create, setActive, adminForceResetPassword,
+  listActive, listAllForAdmin, create, update, setActive, adminForceResetPassword,
 };

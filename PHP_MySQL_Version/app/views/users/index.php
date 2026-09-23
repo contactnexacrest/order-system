@@ -1,7 +1,7 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
   <h1>Users</h1>
-  <p class="muted">Create logins, deactivate one, or force a password reset. A temporary password is shown once when you create a user or force-reset one — hand it to them directly (never emailed) since they're forced to set their own on first login regardless.</p>
+  <p class="muted">Create logins, edit an existing one, deactivate one, or force a password reset. A temporary password is shown once when you create a user or force-reset one — hand it to them directly (never emailed) since they're forced to set their own on first login regardless.</p>
 
   <div class="section">
     <h2>Existing Users</h2>
@@ -24,6 +24,7 @@
         <td><?= $u['two_fa_enabled'] ? 'On' : '—' ?></td>
         <td><?= htmlspecialchars($u['last_login_at'] ?? 'Never') ?></td>
         <td>
+          <a href="/users/<?= (int) $u['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
           <form method="post" action="/users/<?= (int) $u['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($u['name'])) ?>?');">
             <?= Csrf::field() ?>
             <button type="submit" class="btn-sm <?= $u['is_active'] ? 'btn-danger' : 'btn-success' ?>"><?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?></button>

@@ -159,6 +159,13 @@ final class UserRepository
         )->execute(['active' => $active ? 1 : 0, 'id' => $userId]);
     }
 
+    public static function update(int $userId, string $name, string $email, ?string $phone, ?int $roleId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE users SET name = :name, email = :email, phone = :phone, role_id = :role_id WHERE id = :id'
+        )->execute(['name' => $name, 'email' => $email, 'phone' => $phone, 'role_id' => $roleId, 'id' => $userId]);
+    }
+
     /**
      * Admin-forced reset (as opposed to updatePassword(), which a user
      * runs on themselves via /force-password-change). Also clears any

@@ -1,6 +1,6 @@
 <div class="card page-wide">
   <h1>Users</h1>
-  <p class="muted">Create logins, deactivate one, or force a password reset. A temporary password is shown once when you create a user or force-reset one — hand it to them directly (never emailed) since they're forced to set their own on first login regardless.</p>
+  <p class="muted">Create logins, edit an existing one, deactivate one, or force a password reset. A temporary password is shown once when you create a user or force-reset one — hand it to them directly (never emailed) since they're forced to set their own on first login regardless.</p>
 
   <div class="section">
     <h2>Existing Users</h2>
@@ -23,6 +23,7 @@
         <td>{{ 'On' if u.two_fa_enabled else '—' }}</td>
         <td>{{ u.last_login_at or 'Never' }}</td>
         <td>
+          <a href="/users/{{ u.id }}/edit" class="btn-sm btn-secondary">Edit</a>
           <form method="post" action="/users/{{ u.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if u.is_active else 'Reactivate' }} {{ u.name }}?');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm {{ 'btn-danger' if u.is_active else 'btn-success' }}">{{ 'Deactivate' if u.is_active else 'Reactivate' }}</button>
