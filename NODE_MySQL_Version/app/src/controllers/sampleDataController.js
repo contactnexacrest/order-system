@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const logger = require('../helpers/logger');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const sampleDataService = require('../services/sampleDataService');
 
@@ -30,7 +31,7 @@ async function load(req, res) {
   try {
     result = await sampleDataService.load(user.id);
   } catch (e) {
-    console.error('[SAMPLE DATA LOAD FAILED]', e.message);
+    logger.error('SAMPLE DATA LOAD FAILED', e);
     flash.set(req, 'error', e.message || 'Could not load sample data — check the server error log.');
     res.redirect('/sample-data');
     return;
@@ -49,7 +50,7 @@ async function clear(req, res) {
   try {
     result = await sampleDataService.clear();
   } catch (e) {
-    console.error('[SAMPLE DATA CLEAR FAILED]', e.message);
+    logger.error('SAMPLE DATA CLEAR FAILED', e);
     flash.set(req, 'error', 'Could not clear sample data — check the server error log. Nothing was left half-deleted (it runs in one transaction).');
     res.redirect('/sample-data');
     return;

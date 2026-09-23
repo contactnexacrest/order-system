@@ -10,8 +10,10 @@ app/.env
 # not source, and can contain buyer data that shouldn't sit in git history.
 storage/clients/*
 storage/temp/*
+storage/logs/*
 !storage/clients/.gitkeep
 !storage/temp/.gitkeep
+!storage/logs/.gitkeep
 
 # Puppeteer's own browser download cache, if ever regenerated locally.
 app/.browser-cache/

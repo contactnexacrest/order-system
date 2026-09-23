@@ -4,6 +4,7 @@ const env = require('../config/env'); // loads .env as a side effect — must ru
 const emailLogRepository = require('../repositories/emailLogRepository');
 const emailDispatchService = require('../services/emailDispatchService');
 const db = require('../config/db');
+const logger = require('../helpers/logger');
 
 /**
  * Port of app/cron/dispatch_deferred_emails.php. Spec Section 10 — "LEVEL 2
@@ -54,7 +55,7 @@ if (require.main === module) {
       return db.pool.end();
     })
     .catch((e) => {
-      console.error('[dispatch_deferred_emails] failed:', e);
+      logger.error('dispatch_deferred_emails', e);
       process.exitCode = 1;
     });
 }

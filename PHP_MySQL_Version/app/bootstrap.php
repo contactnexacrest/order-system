@@ -45,6 +45,45 @@ Env::load($envFile);
 ini_set('display_errors', Env::isLocal() ? '1' : '0');
 ini_set('log_errors', '1');
 
+// Give errors a fixed, discoverable home instead of whatever the host's
+// default error_log happens to be (on shared hosting this is often outside
+// the account's own writable space, or split across several log files
+// depending on which handler caught it). Everything — PHP-level warnings/
+// notices via log_errors above, and uncaught exceptions/fatal errors via
+// the handlers below — lands in this one file.
+$logDir = dirname(__DIR__) . '/storage/logs';
+if (!is_dir($logDir)) {
+    @mkdir($logDir, 0755, true);
+}
+$errorLogPath = $logDir . '/error.log';
+ini_set('error_log', $errorLogPath);
+
+set_exception_handler(function (\Throwable $e) use ($errorLogPath): void {
+    error_log('[UNCAUGHT EXCEPTION] ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+    http_response_code(500);
+    if (Env::isLocal()) {
+        echo '<pre>' . htmlspecialchars((string) $e) . '</pre>';
+    } else {
+        echo '<h1>500 — Something went wrong</h1><p>The error has been logged.</p>';
+    }
+});
+
+// Fatal errors (parse errors, out-of-memory, ...) never reach
+// set_exception_handler — this is the only hook that still fires for them,
+// registered here so it's active for every request from the first line on.
+register_shutdown_function(function (): void {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        error_log('[FATAL ERROR] ' . $error['message'] . ' in ' . $error['file'] . ':' . $error['line']);
+        if (!headers_sent()) {
+            http_response_code(500);
+            echo Env::isLocal()
+                ? '<pre>' . htmlspecialchars($error['message'] . ' in ' . $error['file'] . ':' . $error['line']) . '</pre>'
+                : '<h1>500 — Something went wrong</h1><p>The error has been logged.</p>';
+        }
+    }
+});
+
 date_default_timezone_set('Asia/Kolkata');
 
 if (session_status() === PHP_SESSION_NONE) {

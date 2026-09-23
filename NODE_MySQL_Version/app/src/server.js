@@ -13,6 +13,22 @@ const csrf = require('./helpers/csrf');
 const flash = require('./helpers/flash');
 const mask = require('./helpers/mask');
 const dates = require('./helpers/dates');
+const logger = require('./helpers/logger');
+
+// Process-level safety net — without these, an error thrown outside any
+// Express request handler (a stray async callback, a timer) used to just
+// print to console and vanish, or crash the process with nothing recorded.
+// Still exits after logging: process state after a truly uncaught error is
+// unknown, and a process manager (PM2/systemd — see the deployment guide)
+// is what should restart it, not this process limping on.
+process.on('uncaughtException', (err) => {
+  logger.error('UNCAUGHT EXCEPTION', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('UNHANDLED REJECTION', reason instanceof Error ? reason : new Error(String(reason)));
+  process.exit(1);
+});
 const sessionAuth = require('./middleware/sessionAuth');
 const permissionCheck = require('./middleware/permissionCheck');
 const csrfCheck = require('./middleware/csrfCheck');
@@ -438,7 +454,7 @@ app.use((req, res) => {
 
 // --- Error handler (never leak stack traces outside APP_ENV=local, same rule as bootstrap.php's display_errors) ---
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-  console.error('[UNHANDLED ERROR]', err);
+  logger.error('UNHANDLED ERROR', err, { method: req.method, url: req.originalUrl, user: req.user ? req.user.id : null });
   if (env.isLocal()) {
     res.status(500).send(`<pre>${escapeHtml(err.stack || String(err))}</pre>`);
   } else {

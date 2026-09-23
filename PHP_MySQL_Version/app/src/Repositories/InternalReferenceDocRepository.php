@@ -8,10 +8,12 @@ use App\Config\Database;
 
 /**
  * The Internal Reference Library (schema.sql SECTION R) — evergreen,
- * admin-editable content for the five internal document_types rows
- * (CHECKLIST, SOP_A_SALES, SOP_B_SALES, STAGEGATE, WALLREF) that existed
- * only as unused rows before this. One row per document_type_id, not
- * per-order — these apply company-wide, not to any single order.
+ * admin-editable content for the eight internal document_types rows (the
+ * four Cross-Verification Checklists — CHECKLIST, CHECKLIST_2_FINANCE,
+ * CHECKLIST_3_PACKING, CHECKLIST_4_SHIPPING — plus SOP_A_SALES,
+ * SOP_B_SALES, STAGEGATE, WALLREF) that existed only as unused rows
+ * before this. One row per document_type_id, not per-order — these apply
+ * company-wide, not to any single order.
  */
 final class InternalReferenceDocRepository
 {
@@ -22,7 +24,7 @@ final class InternalReferenceDocRepository
             "SELECT dt.id AS document_type_id, dt.code, dt.name, ird.content, ird.updated_at
              FROM document_types dt
              LEFT JOIN internal_reference_docs ird ON ird.document_type_id = dt.id
-             WHERE dt.code IN ('CHECKLIST', 'SOP_A_SALES', 'SOP_B_SALES', 'STAGEGATE', 'WALLREF')
+             WHERE dt.code IN ('CHECKLIST', 'CHECKLIST_2_FINANCE', 'CHECKLIST_3_PACKING', 'CHECKLIST_4_SHIPPING', 'SOP_A_SALES', 'SOP_B_SALES', 'STAGEGATE', 'WALLREF')
              ORDER BY dt.id"
         );
         return $stmt->fetchAll();

@@ -3,6 +3,7 @@
 const cron = require('node-cron');
 const checkAlerts = require('./checkAlerts');
 const dispatchDeferredEmails = require('./dispatchDeferredEmails');
+const logger = require('../helpers/logger');
 
 /**
  * Optional in-process alternative to external OS-level cron/systemd timers
@@ -46,14 +47,14 @@ function start() {
   // for the external-cron option, so behavior is the same either way.
   tasks.push(
     cron.schedule('0 2 * * *', () => {
-      checkAlerts.run().catch((e) => console.error('[scheduler] checkAlerts failed:', e));
+      checkAlerts.run().catch((e) => logger.error('scheduler:checkAlerts', e));
     })
   );
 
   // Every 10 minutes — deferred/approved email dispatch.
   tasks.push(
     cron.schedule('*/10 * * * *', () => {
-      dispatchDeferredEmails.run().catch((e) => console.error('[scheduler] dispatchDeferredEmails failed:', e));
+      dispatchDeferredEmails.run().catch((e) => logger.error('scheduler:dispatchDeferredEmails', e));
     })
   );
 

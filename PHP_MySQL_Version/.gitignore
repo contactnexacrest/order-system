@@ -10,8 +10,10 @@ app/.env
 # not source, and can contain buyer data that shouldn't sit in git history.
 storage/clients/*
 storage/temp/*
+storage/logs/*
 !storage/clients/.gitkeep
 !storage/temp/.gitkeep
+!storage/logs/.gitkeep
 
 # DOMPDF's own converted-font + metrics cache (see
 # DocumentGenerationService::renderPdf()) — regenerated automatically from

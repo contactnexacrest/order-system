@@ -176,8 +176,8 @@ INSERT INTO document_types (code, name, category, ref_format, never_shown_to_buy
   ('CHECKLIST_3_PACKING',  'Cross-Verification Checklist 3 of 4 — Packing / Dispatch Supervisor',   'internal', NULL, 1, 0, 1, 1),
   ('CHECKLIST_4_SHIPPING', 'Cross-Verification Checklist 4 of 4 — Shipping / Logistics Coordinator', 'internal', NULL, 1, 0, 1, 1),
   ('AMD',       'Payment Terms Amendment',              'internal',       'SC/AMD/{YYYY}/{DDMM}{NNN}', 1, 1, 1, 1),
-  ('SOP_A_SALES', 'SOP — Sales Process (Tier reference)', 'internal',     NULL,                        1, 1, 1, 1),
-  ('SOP_B_SALES', 'SOP — Sales Process (Tier reference)', 'internal',     NULL,                        1, 1, 1, 1),
+  ('SOP_A_SALES', 'SOP — Sales Process, Tier A (Standard — New Buyer)', 'internal', NULL,               1, 1, 1, 1),
+  ('SOP_B_SALES', 'SOP — Sales Process, Tier B (Established Buyer — Post-BL)', 'internal', NULL,        1, 1, 1, 1),
   ('STAGEGATE', 'Stage Gate Reference',                 'internal',       NULL,                        1, 0, 1, 1),
   ('WALLREF',   'Wall Reference',                       'internal',       NULL,                        1, 0, 1, 1);
 

@@ -7,6 +7,7 @@ const userRepository = require('../repositories/userRepository');
 const emailService = require('../services/emailService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
 const db = require('../config/db');
+const logger = require('../helpers/logger');
 
 /**
  * Port of app/cron/check_alerts.php. Spec Section 10 — "AUTO-NOTIFICATIONS"
@@ -146,7 +147,7 @@ if (require.main === module) {
       return db.pool.end();
     })
     .catch((e) => {
-      console.error('[check_alerts] failed:', e);
+      logger.error('check_alerts', e);
       process.exitCode = 1;
     });
 }
