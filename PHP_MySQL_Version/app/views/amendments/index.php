@@ -62,7 +62,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
             <?php if ($a['document_id'] === null): ?>
               <form method="post" action="/amendments/<?= (int) $a['id'] ?>/generate-document" style="display:inline">
                 <?= Csrf::field() ?>
-                <button type="submit" class="btn-sm">Generate Agreement Document</button>
+                <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Agreement Document</button>
               </form>
             <?php else: ?>
               <a href="/documents/<?= (int) $a['document_id'] ?>/download?format=pdf" class="btn-sm">Download Agreement PDF</a>

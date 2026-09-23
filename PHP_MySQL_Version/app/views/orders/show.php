@@ -147,7 +147,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="QT">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button>
         </form>
       <?php endif; ?>
 
@@ -157,7 +157,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="PI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate Proforma Invoice</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Proforma Invoice</button>
         </form>
       <?php endif; ?>
 
@@ -167,7 +167,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="OC">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate Order Confirmation</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Order Confirmation</button>
         </form>
       <?php endif; ?>
 
@@ -177,7 +177,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="BUYERPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate Buyer PO</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Buyer PO</button>
         </form>
       <?php endif; ?>
 
@@ -187,7 +187,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="SUPPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate Supplier PO</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Supplier PO</button>
         </form>
       <?php endif; ?>
 
@@ -197,7 +197,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="FDN">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate Freight Debit Note</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Freight Debit Note</button>
         </form>
       <?php endif; ?>
 
@@ -207,7 +207,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="PL">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate Packing List</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Packing List</button>
         </form>
       <?php endif; ?>
 
@@ -217,7 +217,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="BLI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate BL Instruction Sheet</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
         </form>
       <?php endif; ?>
 
@@ -227,7 +227,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="CI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate Commercial Invoice</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Commercial Invoice</button>
         </form>
       <?php endif; ?>
 
@@ -237,7 +237,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="COOPREP">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate COO Prep Sheet (internal)</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate COO Prep Sheet (internal)</button>
         </form>
       <?php endif; ?>
 
@@ -247,7 +247,7 @@ $orderClosed = $order['status'] === 'complete';
           <input type="hidden" name="document_type" value="ANNEXA">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm">Generate Annexure A</button>
+          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Annexure A</button>
         </form>
       <?php endif; ?>
     </div>
@@ -405,7 +405,7 @@ $orderClosed = $order['status'] === 'complete';
        <a href="/orders/<?= (int) $order['id'] ?>/audit-log">Audit Log</a>
        <?php endif; ?>
        &nbsp;·&nbsp;
-       <a href="/orders/<?= (int) $order['id'] ?>/dossier">Download Full Dossier (ZIP)</a>
+       <a href="/orders/<?= (int) $order['id'] ?>/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
     </p>
   </div>
 

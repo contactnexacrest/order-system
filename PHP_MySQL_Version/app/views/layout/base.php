@@ -38,6 +38,7 @@ $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermis
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NexaCrest International — Export Operations</title>
 <link rel="stylesheet" href="/assets/css/app.css">
+<script src="/assets/js/app.js" defer></script>
 </head>
 <body>
 <header class="topbar">

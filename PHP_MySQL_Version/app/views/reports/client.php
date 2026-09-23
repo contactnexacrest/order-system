@@ -3,7 +3,7 @@
   <h1>Client Report — <?= htmlspecialchars($client['company_legal_name']) ?></h1>
   <p class="muted">Buyer Inquiry Ref: <strong><?= htmlspecialchars($client['client_unique_number']) ?></strong></p>
   <div class="btn-row">
-    <a class="btn-sm btn-secondary" href="/reports/client/<?= (int) $client['id'] ?>?format=csv">Export Orders CSV</a>
+    <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/client/<?= (int) $client['id'] ?>?format=csv">Export Orders CSV</a>
     <a class="btn-sm btn-secondary" href="/clients/<?= (int) $client['id'] ?>">View Client</a>
   </div>
 

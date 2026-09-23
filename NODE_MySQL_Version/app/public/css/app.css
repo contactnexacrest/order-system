@@ -13,6 +13,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 button, a.btn, input, select, textarea{transition:background-color .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;}
 button:disabled, a.btn[aria-disabled="true"]{opacity:0.55;cursor:not-allowed;}
+.btn-spinner{display:inline-block;width:0.85em;height:0.85em;border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;vertical-align:-0.15em;animation:btn-spin 0.6s linear infinite;}
+a.btn-spinner, .btn-secondary .btn-spinner{border-color:rgba(30,58,95,0.3);border-top-color:var(--navy);}
+a.js-slow-download.is-loading{pointer-events:none;opacity:0.7;}
+@keyframes btn-spin{to{transform:rotate(360deg);}}
 .topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;row-gap:0.4rem;background:var(--navy-strong);color:#fff;padding:0.75rem 1.5rem;position:relative;}
 .topbar-brand{font-weight:700;letter-spacing:0.05em;}
 .topbar-brand span{color:var(--amber);font-weight:400;}

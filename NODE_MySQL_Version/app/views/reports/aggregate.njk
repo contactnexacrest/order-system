@@ -32,7 +32,7 @@
     </div>
     <div class="btn-row">
       <button type="submit" class="btn-sm">Run</button>
-      <a class="btn-sm btn-secondary" href="/reports/aggregate?{{ filterQuery }}&format=csv">Export CSV</a>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/aggregate?{{ filterQuery }}&format=csv">Export CSV</a>
     </div>
   </form>
 

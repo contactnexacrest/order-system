@@ -27,7 +27,7 @@
 
       <form method="post" action="/sample-data/clear" style="margin-top:1rem;" onsubmit="return confirm('Remove all sample clients/orders and their generated documents? This only affects rows flagged as sample data — your real clients and orders are never touched. This cannot be undone, but you can load fresh sample data again right after.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <button type="submit" class="btn-sm btn-danger">Clear Sample Data</button>
+        <button type="submit" class="btn-sm btn-danger" data-loading-text="Clearing…">Clear Sample Data</button>
       </form>
     </div>
   {% else %}
@@ -36,7 +36,7 @@
       <p class="muted small">Loading creates 3 sample clients and 3 sample orders: one brand-new order at Stage 1 (to practice creating documents from scratch); one FOB order carried through to Stage 5 with a Quotation, Proforma Invoice and Order Confirmation generated, and an advance payment recorded and cleared (to see the dashboard/reports with some real-looking numbers in them); and one CIF order on the "Established Buyer — Post-BL" preset, taken all the way through Stage 9 to a closed order — every one of the nine document types generated, including the CFR/CIF-only Freight Payment stage.</p>
       <form method="post" action="/sample-data/load">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <button type="submit" class="btn-sm">Load Sample Data</button>
+        <button type="submit" class="btn-sm" data-loading-text="Loading sample data…">Load Sample Data</button>
       </form>
     </div>
   {% endif %}

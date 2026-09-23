@@ -55,7 +55,7 @@
             {% if a.document_id == null %}
               <form method="post" action="/amendments/{{ a.id }}/generate-document" style="display:inline">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <button type="submit" class="btn-sm">Generate Agreement Document</button>
+                <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Agreement Document</button>
               </form>
             {% else %}
               <a href="/documents/{{ a.document_id }}/download?format=pdf" class="btn-sm">Download Agreement PDF</a>

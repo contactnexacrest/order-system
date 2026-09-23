@@ -33,7 +33,7 @@
     </div>
     <div class="btn-row">
       <button type="submit" class="btn-sm">Run</button>
-      <a class="btn-sm btn-secondary" href="/reports/aggregate?<?= htmlspecialchars(http_build_query(array_filter(['date_from' => $filters['dateFrom'] ?? null, 'date_to' => $filters['dateTo'] ?? null, 'stage_id' => $filters['stageId'] ?? null, 'incoterm_id' => $filters['incotermId'] ?? null, 'country' => $filters['country'] ?? null]))) ?>&format=csv">Export CSV</a>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/aggregate?<?= htmlspecialchars(http_build_query(array_filter(['date_from' => $filters['dateFrom'] ?? null, 'date_to' => $filters['dateTo'] ?? null, 'stage_id' => $filters['stageId'] ?? null, 'incoterm_id' => $filters['incotermId'] ?? null, 'country' => $filters['country'] ?? null]))) ?>&format=csv">Export CSV</a>
     </div>
   </form>
 
