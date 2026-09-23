@@ -368,6 +368,10 @@ app.post('/orders/:id/documents/:documentId/send', requireAuth, requirePermissio
 app.get('/email-approvals', requireAuth, requirePermission('approve_email_send'), asyncHandler(emailDispatchController.approvalQueue));
 app.post('/email-log/:emailLogId/approve', requireAuth, requirePermission('approve_email_send'), verifyCsrf, asyncHandler(emailDispatchController.approve));
 app.post('/email-log/:emailLogId/reject', requireAuth, requirePermission('approve_email_send'), verifyCsrf, asyncHandler(emailDispatchController.reject));
+// No requirePermission wrapper: a Level-2 approver may cancel any row, but a
+// plain requester may also cancel their own — that ownership check can only
+// happen once the row is loaded, so it lives in emailDispatchService.cancelSend().
+app.post('/email-log/:emailLogId/cancel', requireAuth, verifyCsrf, asyncHandler(emailDispatchController.cancel));
 
 app.get('/orders/:id/amendments', requireAuth, requirePermission('manage_orders'), asyncHandler(amendmentController.index));
 app.post('/orders/:id/amendments', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(amendmentController.create));

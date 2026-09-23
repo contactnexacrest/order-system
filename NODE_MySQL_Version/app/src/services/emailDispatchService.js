@@ -146,6 +146,39 @@ async function rejectSend(emailLogId, approverUserId, reason) {
 }
 
 /**
+ * Pulls a send back before it goes out. Works on both 'pending_approval'
+ * (nobody has reviewed it yet) and 'approved' (already cleared Level-2 but
+ * still waiting out its scheduled_at window) — that whole span is what the
+ * spec's "deferred send" was for: giving staff a chance to stop a mail they
+ * realize needs changes after clicking send, right up until the background
+ * job actually dispatches it. Once dispatch() has run and marked it 'sent',
+ * nothing here can reach it any more — the mail is already gone.
+ *
+ * Any Level-2 approver can cancel any row (mirrors their reject power).
+ * Anyone else may only cancel a row they themselves requested.
+ */
+async function cancelSend(emailLogId, userId, reason, isApprover) {
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    throw new Error(reasonError);
+  }
+  const row = await emailLogRepository.find(emailLogId);
+  if (!row || (row.status !== 'pending_approval' && row.status !== 'approved')) {
+    throw new Error('This send can no longer be cancelled — it has already been sent, rejected, or cancelled.');
+  }
+  if (!isApprover && row.requested_by !== userId) {
+    throw new Error('You can only cancel a send you requested yourself.');
+  }
+
+  await emailLogRepository.cancel(emailLogId, userId, reason);
+
+  if (row.requested_by !== null && row.requested_by !== undefined && row.requested_by !== userId) {
+    await notificationRepository.create(row.requested_by, null, 'email_send_cancelled', row.order_id, `Your send to ${row.recipient_email} was cancelled: ${reason}`);
+  }
+  await auditLogRepository.log(userId, 'EMAIL_SEND_CANCELLED', 'email_log', emailLogId, null, null, null, reason);
+}
+
+/**
  * The actual send — called only by the deferred-email-dispatch background
  * job, never synchronously from a web request (see that job's docblock).
  * Returns true on send success.
@@ -185,4 +218,4 @@ async function dispatch(emailLogRow) {
   return sent;
 }
 
-module.exports = { buildPreview, requestSend, approveSend, rejectSend, dispatch };
+module.exports = { buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch };

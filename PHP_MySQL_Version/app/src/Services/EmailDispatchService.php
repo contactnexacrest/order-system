@@ -124,6 +124,40 @@ final class EmailDispatchService
     }
 
     /**
+     * Pulls a send back before it goes out. Works on both 'pending_approval'
+     * (nobody has reviewed it yet) and 'approved' (already cleared Level-2
+     * but still waiting out its scheduled_at window) — that whole span is
+     * what the spec's "deferred send" was for: giving staff a chance to
+     * stop a mail they realize needs changes after clicking send, right up
+     * until the cron job actually dispatches it. Once dispatch() has run
+     * and marked it 'sent', nothing here can reach it any more — the mail
+     * is already gone.
+     *
+     * Any Level-2 approver can cancel any row (mirrors their reject power).
+     * Anyone else may only cancel a row they themselves requested.
+     */
+    public static function cancelSend(int $emailLogId, int $userId, string $reason, bool $isApprover): void
+    {
+        if ($error = ReasonValidator::check($reason)) {
+            throw new \RuntimeException($error);
+        }
+        $row = EmailLogRepository::find($emailLogId);
+        if (!$row || !in_array($row['status'], ['pending_approval', 'approved'], true)) {
+            throw new \RuntimeException('This send can no longer be cancelled — it has already been sent, rejected, or cancelled.');
+        }
+        if (!$isApprover && (int) $row['requested_by'] !== $userId) {
+            throw new \RuntimeException('You can only cancel a send you requested yourself.');
+        }
+
+        EmailLogRepository::cancel($emailLogId, $userId, $reason);
+
+        if ($row['requested_by'] !== null && (int) $row['requested_by'] !== $userId) {
+            NotificationRepository::create((int) $row['requested_by'], null, 'email_send_cancelled', (int) $row['order_id'], "Your send to {$row['recipient_email']} was cancelled: {$reason}");
+        }
+        AuditLogRepository::log($userId, 'EMAIL_SEND_CANCELLED', 'email_log', $emailLogId, null, null, null, $reason);
+    }
+
+    /**
      * The actual send — called only by app/cron/dispatch_deferred_emails.php,
      * never synchronously from a web request (see that script's docblock).
      * Returns true on send success.

@@ -232,6 +232,10 @@ $router->post('/orders/{id}/documents/{documentId}/send', [$emailDispatch, 'requ
 $router->get('/email-approvals', [$emailDispatch, 'approvalQueue'], [SessionAuth::required(), PermissionCheck::requires('approve_email_send')]);
 $router->post('/email-log/{emailLogId}/approve', [$emailDispatch, 'approve'], [SessionAuth::required(), PermissionCheck::requires('approve_email_send'), CsrfCheck::verify()]);
 $router->post('/email-log/{emailLogId}/reject', [$emailDispatch, 'reject'], [SessionAuth::required(), PermissionCheck::requires('approve_email_send'), CsrfCheck::verify()]);
+// No PermissionCheck wrapper: a Level-2 approver may cancel any row, but a
+// plain requester may also cancel their own — that ownership check can only
+// happen once the row is loaded, so it lives in EmailDispatchService::cancelSend().
+$router->post('/email-log/{emailLogId}/cancel', [$emailDispatch, 'cancel'], [SessionAuth::required(), CsrfCheck::verify()]);
 
 // Payment Terms Amendments (Section 8).
 $router->get('/orders/{id}/amendments', [$amendments, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);

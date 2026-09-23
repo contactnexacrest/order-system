@@ -67,9 +67,9 @@ async function requestSend(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
-/** Level 2 — approval queue. */
+/** Level 2 — approval queue. Shows both awaiting-approval and already-approved-but-not-yet-sent rows, since both are still cancellable. */
 async function approvalQueue(req, res) {
-  res.renderView('email/approvals', { pending: await emailLogRepository.pendingApproval() }, 'layout/base');
+  res.renderView('email/approvals', { pending: await emailLogRepository.awaitingDispatch() }, 'layout/base');
 }
 
 async function approve(req, res) {
@@ -94,4 +94,33 @@ async function reject(req, res) {
   res.redirect('/email-approvals');
 }
 
-module.exports = { compose, requestSend, approvalQueue, approve, reject };
+/**
+ * Cancel a send still in its deferred window (pending_approval or approved,
+ * not yet sent). Open to a Level-2 approver for any row, or to anyone else
+ * only for a row they themselves requested — enforced in the service, not
+ * by route-level permission, since ownership can't be checked until the
+ * row is loaded. redirectTo is rebuilt from a validated integer order id
+ * rather than trusted from the request body, so this can't be used as an
+ * open redirect.
+ */
+async function cancel(req, res) {
+  const id = parseInt(req.params.emailLogId, 10);
+  const reason = String(req.body.reason || '').trim();
+  const isApprover = !!(req.permissions && req.permissions.approve_email_send);
+
+  let redirectTo = '/email-approvals';
+  const orderId = parseInt(req.body.order_id, 10);
+  if (Number.isInteger(orderId) && orderId > 0) {
+    redirectTo = `/orders/${orderId}`;
+  }
+
+  try {
+    await emailDispatchService.cancelSend(id, req.user.id, reason, isApprover);
+    flash.set(req, 'success', 'Send cancelled before it went out.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect(redirectTo);
+}
+
+module.exports = { compose, requestSend, approvalQueue, approve, reject, cancel };

@@ -330,16 +330,37 @@ $orderClosed = $order['status'] === 'complete';
                 <td><?= htmlspecialchars(str_replace('_', ' ', $log['status'])) ?></td>
                 <td><?= htmlspecialchars($log['created_at']) ?></td>
                 <td>
+                  <?php
+                    $canCancelThis = $currentUser && (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'approve_email_send') || (int) $log['requested_by'] === (int) $currentUser['id']);
+                  ?>
                   <?php if ($log['status'] === 'sent'): ?>
                     Sent <?= htmlspecialchars($log['sent_at'] ?? '') ?>
                   <?php elseif ($log['status'] === 'rejected'): ?>
                     Rejected: <?= htmlspecialchars($log['rejection_reason'] ?? '') ?>
                   <?php elseif ($log['status'] === 'failed'): ?>
                     Dispatch failed — check mail server configuration and retry.
+                  <?php elseif ($log['status'] === 'cancelled'): ?>
+                    Cancelled: <?= htmlspecialchars($log['cancellation_reason'] ?? '') ?>
                   <?php elseif ($log['status'] === 'approved'): ?>
                     Approved — will send once its scheduled time arrives.
+                    <?php if ($canCancelThis): ?>
+                    <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px">
+                      <?= Csrf::field() ?>
+                      <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                      <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                      <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
+                    </form>
+                    <?php endif; ?>
                   <?php else: ?>
                     Awaiting Level-2 approval.
+                    <?php if ($canCancelThis): ?>
+                    <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px">
+                      <?= Csrf::field() ?>
+                      <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                      <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                      <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
+                    </form>
+                    <?php endif; ?>
                   <?php endif; ?>
                 </td>
               </tr>

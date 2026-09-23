@@ -318,10 +318,28 @@
                     Rejected: {{ log.rejection_reason or '' }}
                   {% elif log.status == 'failed' %}
                     Dispatch failed — check mail server configuration and retry.
+                  {% elif log.status == 'cancelled' %}
+                    Cancelled: {{ log.cancellation_reason or '' }}
                   {% elif log.status == 'approved' %}
                     Approved — will send once its scheduled time arrives.
+                    {% if permissions.approve_email_send or log.requested_by == currentUser.id %}
+                    <form method="post" action="/email-log/{{ log.id }}/cancel" style="margin-top:4px">
+                      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                      <input type="hidden" name="order_id" value="{{ order.id }}">
+                      <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                      <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
+                    </form>
+                    {% endif %}
                   {% else %}
                     Awaiting Level-2 approval.
+                    {% if permissions.approve_email_send or log.requested_by == currentUser.id %}
+                    <form method="post" action="/email-log/{{ log.id }}/cancel" style="margin-top:4px">
+                      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                      <input type="hidden" name="order_id" value="{{ order.id }}">
+                      <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                      <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
+                    </form>
+                    {% endif %}
                   {% endif %}
                 </td>
               </tr>

@@ -91,6 +91,23 @@ final class EmailLogRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * The full deferred window — awaiting Level-2 approval, or already
+     * approved but not yet dispatched (scheduled_at still in the future or
+     * the cron job hasn't ticked yet). This is everything a "Cancel" action
+     * can still stop before it becomes 'sent'.
+     */
+    public static function awaitingDispatch(): array
+    {
+        $stmt = Database::connection()->query(
+            "SELECT el.*, o.order_reference
+             FROM email_log el LEFT JOIN orders o ON o.id = el.order_id
+             WHERE el.status IN ('pending_approval', 'approved')
+             ORDER BY el.created_at"
+        );
+        return $stmt->fetchAll();
+    }
+
     public static function approve(int $id, int $approvedBy): void
     {
         Database::connection()->prepare(
@@ -126,5 +143,20 @@ final class EmailLogRepository
         Database::connection()->prepare(
             "UPDATE email_log SET status = 'failed' WHERE id = :id"
         )->execute(['id' => $id]);
+    }
+
+    /**
+     * Pulls a send back before it goes out — from 'pending_approval'
+     * (Level-1 requester changed their mind before anyone reviewed it) or
+     * from 'approved' (still sitting in its deferred window, not yet
+     * picked up by the cron dispatcher). Once a row is 'sent' this can no
+     * longer apply to it — see EmailDispatchService::cancelSend()'s status
+     * check.
+     */
+    public static function cancel(int $id, int $cancelledBy, string $reason): void
+    {
+        Database::connection()->prepare(
+            "UPDATE email_log SET status = 'cancelled', cancelled_by = :cancelled_by, cancelled_at = NOW(), cancellation_reason = :reason WHERE id = :id"
+        )->execute(['cancelled_by' => $cancelledBy, 'reason' => $reason, 'id' => $id]);
     }
 }

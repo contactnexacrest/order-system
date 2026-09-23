@@ -58,6 +58,21 @@ async function pendingApproval() {
   );
 }
 
+/**
+ * The full deferred window — awaiting Level-2 approval, or already approved
+ * but not yet dispatched (scheduled_at still in the future or the
+ * background job hasn't ticked yet). This is everything a "Cancel" action
+ * can still stop before it becomes 'sent'.
+ */
+async function awaitingDispatch() {
+  return db.query(
+    `SELECT el.*, o.order_reference
+     FROM email_log el LEFT JOIN orders o ON o.id = el.order_id
+     WHERE el.status IN ('pending_approval', 'approved')
+     ORDER BY el.created_at`
+  );
+}
+
 async function approve(id, approvedBy) {
   await db.execute("UPDATE email_log SET status = 'approved', approved_by = :approved_by, approved_at = NOW() WHERE id = :id", {
     approved_by: approvedBy,
@@ -85,4 +100,31 @@ async function markFailed(id) {
   await db.execute("UPDATE email_log SET status = 'failed' WHERE id = :id", { id });
 }
 
-module.exports = { create, find, forOrder, hasActiveSendFor, pendingApproval, approve, reject, dueForSend, markSent, markFailed };
+/**
+ * Pulls a send back before it goes out — from 'pending_approval' (Level-1
+ * requester changed their mind before anyone reviewed it) or from
+ * 'approved' (still sitting in its deferred window, not yet picked up by
+ * the dispatch job). Once a row is 'sent' this can no longer apply to it —
+ * see emailDispatchService.cancelSend()'s status check.
+ */
+async function cancel(id, cancelledBy, reason) {
+  await db.execute(
+    "UPDATE email_log SET status = 'cancelled', cancelled_by = :cancelled_by, cancelled_at = NOW(), cancellation_reason = :reason WHERE id = :id",
+    { cancelled_by: cancelledBy, reason, id }
+  );
+}
+
+module.exports = {
+  create,
+  find,
+  forOrder,
+  hasActiveSendFor,
+  pendingApproval,
+  awaitingDispatch,
+  approve,
+  reject,
+  cancel,
+  dueForSend,
+  markSent,
+  markFailed,
+};

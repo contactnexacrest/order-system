@@ -12,6 +12,7 @@ use App\Repositories\EmailTemplateRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AuthService;
 use App\Services\EmailDispatchService;
+use App\Services\PermissionService;
 
 /** Spec Section 10 — Email & Deferred Send System, Level 1 + Level 2. */
 final class EmailDispatchController
@@ -71,11 +72,11 @@ final class EmailDispatchController
         header("Location: /orders/{$orderId}");
     }
 
-    /** Level 2 — approval queue. */
+    /** Level 2 — approval queue. Shows both awaiting-approval and already-approved-but-not-yet-sent rows, since both are still cancellable. */
     public function approvalQueue(array $params): void
     {
         View::render('email/approvals', [
-            'pending' => EmailLogRepository::pendingApproval(),
+            'pending' => EmailLogRepository::awaitingDispatch(),
         ], 'layout/base');
     }
 
@@ -101,5 +102,35 @@ final class EmailDispatchController
             Flash::set('error', $e->getMessage());
         }
         header('Location: /email-approvals');
+    }
+
+    /**
+     * Cancel a send still in its deferred window (pending_approval or
+     * approved, not yet sent). Open to a Level-2 approver for any row, or
+     * to anyone else only for a row they themselves requested — enforced
+     * in the service, not by route-level permission, since ownership can't
+     * be checked until the row is loaded. The redirect target is rebuilt
+     * from a validated integer order id rather than trusted from the
+     * request body, so this can't be used as an open redirect.
+     */
+    public function cancel(array $params): void
+    {
+        $id = (int) $params['emailLogId'];
+        $user = AuthService::currentUser();
+        $isApprover = PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'approve_email_send');
+
+        $redirectTo = '/email-approvals';
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($orderId > 0) {
+            $redirectTo = "/orders/{$orderId}";
+        }
+
+        try {
+            EmailDispatchService::cancelSend($id, (int) $user['id'], trim((string) ($_POST['reason'] ?? '')), $isApprover);
+            Flash::set('success', 'Send cancelled before it went out.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header("Location: {$redirectTo}");
     }
 }
