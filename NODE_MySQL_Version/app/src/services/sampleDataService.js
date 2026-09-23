@@ -6,6 +6,7 @@ const fs = require('fs');
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const lookupRepository = require('../repositories/lookupRepository');
+const orderAnnexureRepository = require('../repositories/orderAnnexureRepository');
 const orderCrateRepository = require('../repositories/orderCrateRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPackingRepository = require('../repositories/orderPackingRepository');
@@ -74,6 +75,31 @@ const env = require('../config/env');
  *     resolved.
  *   - Client D (Copperfield Trading Co.) — a new client whose only order is
  *     quoted and then marked lost.
+ *
+ * Further extended (2026-09-23 follow-up — Annexure A / product-line variety
+ * had no sample coverage at all: every order above has include_annexure_a =
+ * 0) with a fifth client and five more orders, judged individually on
+ * whether the scenario actually needs Annexure A (a technical-specification
+ * sheet — free text plus optional images) or is purely a product-line/
+ * quantity variation that doesn't:
+ *   - Client E (Regal Memorials & Monuments Inc.) — four orders:
+ *     - Order E1: the SAME product at two different sizes as separate line
+ *       items, WITH Annexure A giving each size its own written
+ *       specification (no images — a size difference doesn't need a photo).
+ *     - Order E2: two different products (a monument blank + a headstone),
+ *       WITH Annexure A giving each its own specification AND a reference
+ *       image.
+ *     - Order E3: a single "complete monument set" product line, WITH
+ *       Annexure A describing its components (base/die/cap/vase) and a
+ *       reference image.
+ *     - Order E4: two line items that are the same kind of product at two
+ *       different set sizes (a 10-piece set vs a 12-piece set) — NO
+ *       Annexure A, since this is a quantity/packaging distinction, not a
+ *       technical drawing one.
+ *   - Client F (Granite Quarry Direct Traders) — Order F1: a single raw,
+ *     unprocessed block line item (HS code 2516.11, not the finished-goods
+ *     default 6802.93) — NO Annexure A, since a raw block has no finish or
+ *     technical spec to document.
  */
 
 async function isLoaded() {
@@ -172,7 +198,118 @@ async function load(userId) {
   ]);
   await advanceAndLoseSampleOrder(orderD1Id, userId);
 
-  return { clients: 4, orders: 5 };
+  // --- Client E: Annexure A / product-line variety (2026-09-23) ---
+  const clientEId = await createSampleClient(
+    '[SAMPLE] Regal Memorials & Monuments Inc.',
+    '48 Cemetery Row, Sample Memorial District, Test Country',
+    userId
+  );
+
+  // Order E1: same product, two sizes, Annexure A with a written spec per size (no images needed).
+  const orderE1Id = await createSampleOrderCustomLines(clientEId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
+    { description: 'Granite Monument Slab', dimensions: '120 x 80 x 3 cm', finish: 'Polished', quantity: '25', unit: 'pcs', unit_price: '180.00' },
+    { description: 'Granite Monument Slab', dimensions: '60 x 60 x 2 cm', finish: 'Polished', quantity: '40', unit: 'pcs', unit_price: '95.00' },
+  ], true);
+  await orderAnnexureRepository.createProduct(orderE1Id, {
+    name: 'Granite Monument Slab — 120 x 80 x 3 cm',
+    description: 'Large-format slab for base/kerb use.',
+    dimensions: '120 x 80 x 3 cm',
+    finish: 'Polished (mirror finish, top & face)',
+    components: null,
+    technical_notes: 'Thickness tolerance +/- 2mm; edges arrised.',
+  });
+  await orderAnnexureRepository.createProduct(orderE1Id, {
+    name: 'Granite Monument Slab — 60 x 60 x 2 cm',
+    description: 'Smaller-format slab — same material and finish as the 120 x 80 cm size.',
+    dimensions: '60 x 60 x 2 cm',
+    finish: 'Polished (mirror finish, top & face)',
+    components: null,
+    technical_notes: 'Thickness tolerance +/- 2mm; edges arrised.',
+  });
+  await advanceSampleOrderPastQuotation(orderE1Id, userId, true);
+
+  // Order E2: monument blank + headstone, Annexure A with a spec AND a reference image for each.
+  const orderE2Id = await createSampleOrderCustomLines(clientEId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
+    { description: 'Monument Blank', dimensions: '90 x 45 x 8 cm', finish: 'Polished front & top, rock-pitched sides', quantity: '12', unit: 'pcs', unit_price: '310.00' },
+    { description: 'Headstone — Traditional Upright', dimensions: '60 x 30 x 8 cm', finish: 'Polished, all sides', quantity: '12', unit: 'pcs', unit_price: '260.00' },
+  ], true);
+  const orderE2 = await orderRepository.find(orderE2Id);
+  const blankAnnexureId = await orderAnnexureRepository.createProduct(orderE2Id, {
+    name: 'Monument Blank',
+    description: 'Base blank supplied for on-site engraving by the buyer.',
+    dimensions: '90 x 45 x 8 cm',
+    finish: 'Polished front & top, rock-pitched sides',
+    components: null,
+    technical_notes: 'Top edge chamfered 10mm; back face left rough for mounting.',
+  });
+  await attachSampleAnnexureImage(
+    orderE2Id,
+    blankAnnexureId,
+    `clients/${pathSafe(orderE2.client_unique_number)}/${pathSafe(orderE2.order_reference)}/annexure`,
+    'Monument Blank - reference photo.png',
+    userId
+  );
+  const headstoneAnnexureId = await orderAnnexureRepository.createProduct(orderE2Id, {
+    name: 'Headstone — Traditional Upright',
+    description: 'Standard upright headstone, same order as the monument blank above.',
+    dimensions: '60 x 30 x 8 cm',
+    finish: 'Polished, all sides',
+    components: null,
+    technical_notes: 'Serpentine-top profile; polished on all visible faces.',
+  });
+  await attachSampleAnnexureImage(
+    orderE2Id,
+    headstoneAnnexureId,
+    `clients/${pathSafe(orderE2.client_unique_number)}/${pathSafe(orderE2.order_reference)}/annexure`,
+    'Headstone - reference photo.png',
+    userId
+  );
+  await advanceSampleOrderPastQuotation(orderE2Id, userId, true);
+
+  // Order E3: a complete monument set, Annexure A describing its components + a reference image.
+  const orderE3Id = await createSampleOrderCustomLines(clientEId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
+    { description: 'Complete Monument Set (Base + Die + Cap + Vase)', dimensions: 'Base 90x45x15cm; Die 60x30x8cm; Cap 66x33x10cm', finish: 'Polished front & top, rock-pitched sides', quantity: '6', unit: 'set', unit_price: '780.00' },
+  ], true);
+  const orderE3 = await orderRepository.find(orderE3Id);
+  const monumentSetAnnexureId = await orderAnnexureRepository.createProduct(orderE3Id, {
+    name: 'Complete Monument Set',
+    description: 'Full monument assembly, matched from a single block for colour consistency.',
+    dimensions: 'Base 90 x 45 x 15 cm; Die 60 x 30 x 8 cm; Cap 66 x 33 x 10 cm',
+    finish: 'Polished front & top, rock-pitched sides',
+    components: '1x Base, 1x Die (headstone), 1x Cap, 1x Vase',
+    technical_notes: 'Assembled on-site by the buyer; all pieces cut from the same block for colour match.',
+  });
+  await attachSampleAnnexureImage(
+    orderE3Id,
+    monumentSetAnnexureId,
+    `clients/${pathSafe(orderE3.client_unique_number)}/${pathSafe(orderE3.order_reference)}/annexure`,
+    'Complete Monument Set - reference photo.png',
+    userId
+  );
+  await advanceSampleOrderPastQuotation(orderE3Id, userId, true);
+
+  // Order E4: same kind of product, two set sizes (10-piece vs 12-piece) — no Annexure A, a quantity distinction, not a technical one.
+  const orderE4Id = await createSampleOrderCustomLines(clientEId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
+    { description: 'Granite Flower Vase — 10-Piece Set', dimensions: '20 x 20 x 30 cm each', finish: 'Polished', quantity: '10', unit: 'pcs', unit_price: '45.00' },
+    { description: 'Granite Flower Vase — 12-Piece Set', dimensions: '18 x 18 x 28 cm each', finish: 'Polished', quantity: '12', unit: 'pcs', unit_price: '38.00' },
+  ]);
+  await advanceSampleOrderPastQuotation(orderE4Id, userId, false);
+
+  // --- Client F: a raw, unprocessed block — no Annexure A, no finish to specify ---
+  const clientFId = await createSampleClient(
+    '[SAMPLE] Granite Quarry Direct Traders',
+    '2 Quarry Access Road, Sample Industrial Zone, Test Country',
+    userId
+  );
+  const orderF1Id = await createSampleOrderCustomLines(clientFId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
+    // 2516.11, not the finished-goods default 6802.93 — a raw/crude-trimmed
+    // block is a materially different tariff classification (seed.sql's own
+    // note: "Different product = verify HS Code before issuing").
+    { description: 'Raw Granite Block — Absolute Black (unprocessed)', dimensions: 'approx. 300 x 150 x 150 cm (irregular, as-quarried)', finish: 'Natural / Unfinished (Raw Block)', quantity: '4', unit: 'blocks', unit_price: '95000.00', hs_code: '2516.11' },
+  ]);
+  await advanceSampleOrderPastQuotation(orderF1Id, userId, false);
+
+  return { clients: 6, orders: 10 };
 }
 
 async function clear() {
@@ -202,12 +339,18 @@ async function createSampleClient(companyName, billingAddress, userId, email = n
 }
 
 /**
- * @param {Array<[string,string,string]>} productLines [description, dimensions, finish]
+ * Everything a sample order needs before its product lines exist: the
+ * order shell itself (reference, client/incoterm/currency/preset linkage,
+ * stage/payment-status initialization). Shared by both createSampleOrder()
+ * (fixed-quantity 3-tuple lines) and createSampleOrderCustomLines() (full
+ * per-line control — quantity, unit, price, HS code — for the
+ * product/Annexure-A variety scenarios).
+ *
  * @param {string|null} [portOfDischargeText] free-text discharge port — only Chennai (loading) is seeded by
  *   default, so a CFR/CIF sample order (which needs a discharge port to look believable) supplies its own
  *   text fallback rather than depending on a discharge port row existing.
  */
-async function createSampleOrder(clientId, incoterm, currency, loadingPort, preset, userId, productLines, portOfDischargeText = null) {
+async function createSampleOrderShell(clientId, incoterm, currency, loadingPort, preset, userId, portOfDischargeText = null, includeAnnexureA = false) {
   const client = await clientRepository.find(clientId);
   const sequenceNo = await orderRepository.nextSequenceForClient(clientId);
   const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/OC/{YYYY}/{NNN}';
@@ -244,6 +387,7 @@ async function createSampleOrder(clientId, incoterm, currency, loadingPort, pres
       buyers_po_ref: 'NIL',
       quotation_date: quotationDate,
       quotation_valid_until: formatDate(validUntil),
+      include_annexure_a: includeAnnexureA,
     },
     userId
   );
@@ -251,6 +395,13 @@ async function createSampleOrder(clientId, incoterm, currency, loadingPort, pres
 
   await orderStageRepository.initializeForOrder(orderId);
   await orderPaymentStatusRepository.initializeForOrder(orderId);
+
+  return orderId;
+}
+
+/** @param {Array<[string,string,string]>} productLines [description, dimensions, finish] — fixed quantity '10' pcs @ 250.00, HS 6802.93. */
+async function createSampleOrder(clientId, incoterm, currency, loadingPort, preset, userId, productLines, portOfDischargeText = null) {
+  const orderId = await createSampleOrderShell(clientId, incoterm, currency, loadingPort, preset, userId, portOfDischargeText);
 
   let lineNo = 1;
   for (const [description, dimensions, finish] of productLines) {
@@ -265,6 +416,35 @@ async function createSampleOrder(clientId, incoterm, currency, loadingPort, pres
       'pcs',
       '250.00',
       '6802.93'
+    );
+  }
+
+  return orderId;
+}
+
+/**
+ * Full per-line control (quantity, unit, price, HS code) for the
+ * product/Annexure-A variety scenarios — same product at different sizes,
+ * piece-count sets, raw blocks with a non-default HS code, etc.
+ *
+ * @param {Array<{description:string,dimensions:string,finish:string,quantity:string,unit:string,unit_price:string,hs_code?:string}>} productLines
+ */
+async function createSampleOrderCustomLines(clientId, incoterm, currency, loadingPort, preset, userId, productLines, includeAnnexureA = false) {
+  const orderId = await createSampleOrderShell(clientId, incoterm, currency, loadingPort, preset, userId, null, includeAnnexureA);
+
+  let lineNo = 1;
+  for (const line of productLines) {
+    await orderProductRepository.add(
+      orderId,
+      lineNo++,
+      line.description,
+      line.dimensions,
+      line.finish,
+      line.quantity,
+      false,
+      line.unit,
+      line.unit_price,
+      line.hs_code || '6802.93'
     );
   }
 
@@ -311,6 +491,21 @@ async function advanceSampleOrderToStage2Pending(orderId, userId) {
   await stageGateService.passAndUnlockNext(orderId, 1, userId);
   await orderRepository.setBuyersPoRef(orderId, 'SAMPLE-BUYER-PO-0003');
   await stageGateService.passAndUnlockNext(orderId, 2, userId);
+}
+
+/**
+ * The product/Annexure-A variety orders (Client E/F, 2026-09-23) don't need
+ * to demonstrate stage depth (that's what Orders A2/B/C/D already cover) —
+ * just generate the Quotation (and Annexure A, for the orders whose product
+ * lines actually need one — its own product entries must already exist by
+ * the time this is called) and pass Stage 1.
+ */
+async function advanceSampleOrderPastQuotation(orderId, userId, generateAnnexure) {
+  await documentGenerationService.generate(orderId, 'QT', userId);
+  if (generateAnnexure) {
+    await documentGenerationService.generate(orderId, 'ANNEXA', userId);
+  }
+  await stageGateService.passAndUnlockNext(orderId, 1, userId);
 }
 
 /**
@@ -750,6 +945,38 @@ async function attachSamplePlaceholderFile(clientId, orderId, subPath, originalF
     receivedFrom,
     documentTypeLabel
   );
+}
+
+/**
+ * Annexure product images get base64-embedded straight into the generated
+ * Annexure A PDF (see documentDataAssembler's annexure products block) —
+ * unlike attachSamplePlaceholderFile()'s stand-in PDF text, this needs
+ * genuinely valid, decodable image bytes so it actually renders rather than
+ * showing as a broken image.
+ */
+async function attachSampleAnnexureImage(orderId, annexureProductId, subPath, originalFilename, uploadedBy) {
+  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const targetDir = `${storageBase}/${subPath}`;
+  fs.mkdirSync(targetDir, { recursive: true });
+  const uuidFilename = `${crypto.randomBytes(16).toString('hex')}.png`;
+  const targetPath = `${targetDir}/${uuidFilename}`;
+  // A minimal but genuinely valid 1x1 PNG.
+  const pngBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  fs.writeFileSync(targetPath, pngBytes);
+
+  const fileId = await fileStoreRepository.insertReceived(
+    null,
+    orderId,
+    targetPath,
+    uuidFilename,
+    originalFilename,
+    pngBytes.length,
+    'image/png',
+    uploadedBy,
+    null,
+    'Annexure product image'
+  );
+  await orderAnnexureRepository.addImage(annexureProductId, fileId);
 }
 
 function pathSafe(value) {
