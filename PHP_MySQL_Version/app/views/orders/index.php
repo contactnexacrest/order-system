@@ -1,6 +1,15 @@
+<?php
+use App\Services\AuthService;
+use App\Services\PermissionService;
+$currentUser = AuthService::currentUser();
+$canViewArchivedOrders = $currentUser && PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_archived_orders');
+?>
 <div class="card page-wide">
   <h1>Orders</h1>
-  <div class="btn-row"><a class="btn" href="/clients">Go to Clients to start a new order</a></div>
+  <div class="btn-row">
+    <a class="btn" href="/clients">Go to Clients to start a new order</a>
+    <?php if ($canViewArchivedOrders): ?><a class="btn-sm btn-secondary" href="/orders/archived">View Archived Orders</a><?php endif; ?>
+  </div>
 
   <?php if (empty($orders)): ?>
     <p class="muted">No orders yet.</p>

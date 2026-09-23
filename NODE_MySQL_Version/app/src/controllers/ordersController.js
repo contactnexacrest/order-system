@@ -61,6 +61,44 @@ async function index(req, res) {
   res.renderView('orders/index', { orders: await orderRepository.all() }, 'layout/base');
 }
 
+async function archivedIndex(req, res) {
+  res.renderView('orders/archived', { orders: await orderRepository.allArchived() }, 'layout/base');
+}
+
+/**
+ * Visibility-only, never a deletion path — see schema.sql Section W. No
+ * reason is required (matches the toggle-active precedent for a
+ * reversible, non-destructive state flip); the confirm() dialog on the
+ * button is what stands in for a deliberate-action check here.
+ */
+async function archive(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect('/orders');
+    return;
+  }
+  await orderRepository.archive(orderId, req.user.id);
+  await auditLogRepository.log(req.user.id, 'ORDER_ARCHIVED', 'orders', orderId, 'is_archived', '0', '1');
+  flash.set(req, 'success', `${order.order_reference} archived — it no longer appears in the main Orders list. Nothing was deleted; view it any time from Archived Orders.`);
+  res.redirect('/orders');
+}
+
+async function unarchive(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect('/orders/archived');
+    return;
+  }
+  await orderRepository.unarchive(orderId);
+  await auditLogRepository.log(req.user.id, 'ORDER_UNARCHIVED', 'orders', orderId, 'is_archived', '1', '0');
+  flash.set(req, 'success', `${order.order_reference} restored to the main Orders list.`);
+  res.redirect(`/orders/${orderId}`);
+}
+
 async function create(req, res) {
   const preselectedClientId = req.query.client_id ? parseInt(req.query.client_id, 10) : null;
   res.renderView(
@@ -198,6 +236,13 @@ async function show(req, res) {
   const order = await orderRepository.find(orderId);
   if (!order) {
     res.status(404).send('Order not found.');
+    return;
+  }
+  // Archiving only removes an order from the default listing — direct
+  // access by URL/bookmark still needs its own gate, or view_archived_orders
+  // would be meaningless (Super Admin already bypasses every permission).
+  if (order.is_archived && !req.permissions.view_archived_orders) {
+    res.status(403).send('This order has been archived. You need the "View archived orders" permission to open it.');
     return;
   }
 
@@ -911,7 +956,7 @@ async function markLost(req, res) {
 }
 
 module.exports = {
-  index, create, store, show, downloadDossier,
+  index, archivedIndex, archive, unarchive, create, store, show, downloadDossier,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, clearAdvancePayment, updateProductionStatus,
   confirmBuyerAcknowledged, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,

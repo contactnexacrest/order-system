@@ -1588,6 +1588,25 @@ CREATE INDEX idx_clients_is_test_data ON clients (is_test_data);
 CREATE INDEX idx_orders_is_test_data ON orders (is_test_data);
 
 -- ================================================================
+-- SECTION W — ORDER ARCHIVING (added 2026-09-23)
+-- ================================================================
+-- Visibility only — never a deletion mechanism. Per explicit user
+-- direction: no order data file or folder may ever be deleted by this
+-- app, at any point, archived or not — government audits can require
+-- production of records up to 7 years back, so retention is unconditional
+-- and any space-saving backup/offload is something staff do themselves,
+-- outside the app. Archiving just moves an order out of the default
+-- /orders listing; nothing referencing it (documents, file_store rows,
+-- audit_log, ...) is touched, and it remains fully viewable at its normal
+-- URL by anyone with the new view_archived_orders permission (or Super
+-- Admin, via the existing blanket bypass) — see orderRepository.all()
+-- (excludes archived) vs. .allArchived() (archived only).
+ALTER TABLE orders ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN archived_at TIMESTAMP NULL;
+ALTER TABLE orders ADD COLUMN archived_by BIGINT UNSIGNED NULL;
+CREATE INDEX idx_orders_is_archived ON orders (is_archived);
+
+-- ================================================================
 -- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1601,4 +1620,5 @@ CREATE INDEX idx_orders_is_test_data ON orders (is_test_data);
 -- Section T (supplier sample-data flag) added 2026-09-21.
 -- Section U (product interface / internal product catalog) added 2026-09-21.
 -- Section V (test mode) added 2026-09-22.
+-- Section W (order archiving) added 2026-09-23.
 -- ================================================================

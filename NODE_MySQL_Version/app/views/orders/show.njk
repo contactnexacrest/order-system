@@ -33,6 +33,20 @@
   {% if order.status == 'lost' %}
     <p class="muted small">Marked lost{% if order.lost_at %} on {{ order.lost_at }}{% endif %}{% if order.lost_reason %} — reason: {{ order.lost_reason }}{% endif %}</p>
   {% endif %}
+  {% if order.is_archived %}
+    <p class="muted small">Archived{% if order.archived_at %} on {{ order.archived_at }}{% endif %} — hidden from the main Orders list. Nothing was deleted.</p>
+    {% if permissions.manage_orders %}
+    <form method="post" action="/orders/{{ order.id }}/unarchive" style="display:inline" onsubmit="return confirm('Restore {{ order.order_reference }} to the main Orders list?');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm btn-success">Restore from Archive</button>
+    </form>
+    {% endif %}
+  {% elif permissions.manage_orders %}
+    <form method="post" action="/orders/{{ order.id }}/archive" style="display:inline" onsubmit="return confirm('Archive {{ order.order_reference }}? It will no longer appear in the main Orders list, but nothing is deleted and it can be restored any time.');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm btn-secondary">Archive Order</button>
+    </form>
+  {% endif %}
   {% if order.status == 'active' and permissions.manage_orders %}
   <form method="post" action="/orders/{{ order.id }}/mark-lost" style="display:inline" onsubmit="return confirmMarkLost(this);">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">

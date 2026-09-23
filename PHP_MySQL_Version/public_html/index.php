@@ -166,9 +166,12 @@ $router->post('/client-intake/{id}/accept', [$clientIntakeReview, 'accept'], [Se
 $router->post('/client-intake/{id}/reject', [$clientIntakeReview, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 $router->get('/orders', [$orders, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->get('/orders/archived', [$orders, 'archivedIndex'], [SessionAuth::required(), PermissionCheck::requires('view_archived_orders')]);
 $router->get('/orders/create', [$orders, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders', [$orders, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/orders/{id}', [$orders, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/orders/{id}/archive', [$orders, 'archive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/unarchive', [$orders, 'unarchive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/buyer-po', [$orders, 'recordBuyerPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/buyer-po/documents', [$orders, 'uploadBuyerPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

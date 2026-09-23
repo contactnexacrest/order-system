@@ -16,8 +16,38 @@ final class OrderRepository
              FROM orders o
              JOIN clients c ON c.id = o.client_id
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+             WHERE o.is_archived = 0
              ORDER BY o.created_at DESC'
         )->fetchAll();
+    }
+
+    /** Archived orders only — visible via the separate view_archived_orders permission, never deleted, never dropped from any other listing/report. */
+    public static function allArchived(): array
+    {
+        return Database::connection()->query(
+            'SELECT o.*, c.company_legal_name, sm.stage_name AS current_stage_name,
+                    u.name AS archived_by_name
+             FROM orders o
+             JOIN clients c ON c.id = o.client_id
+             LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+             LEFT JOIN users u ON u.id = o.archived_by
+             WHERE o.is_archived = 1
+             ORDER BY o.archived_at DESC'
+        )->fetchAll();
+    }
+
+    public static function archive(int $orderId, int $archivedBy): void
+    {
+        Database::connection()->prepare(
+            'UPDATE orders SET is_archived = 1, archived_at = NOW(), archived_by = :archived_by WHERE id = :id'
+        )->execute(['archived_by' => $archivedBy, 'id' => $orderId]);
+    }
+
+    public static function unarchive(int $orderId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE orders SET is_archived = 0, archived_at = NULL, archived_by = NULL WHERE id = :id'
+        )->execute(['id' => $orderId]);
     }
 
     public static function find(int $id): ?array

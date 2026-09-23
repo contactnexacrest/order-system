@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-{% set opsGroupVisible = permissions.manage_orders %}
+{% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log or permissions.approve_email_send %}
 {% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data %}
 <header class="topbar">
@@ -29,6 +29,7 @@
         <div class="nav-dropdown">
           <a href="/clients">Clients</a>
           <a href="/orders">Orders</a>
+          {% if permissions.view_archived_orders %}<a href="/orders/archived">Archived Orders</a>{% endif %}
           <a href="/client-intake">Client Requests</a>
           <a href="/disputes">Disputes</a>
         </div>

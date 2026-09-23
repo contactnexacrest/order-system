@@ -55,7 +55,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('view_product_catalog',      'View product catalog',          'Search and view individual products in the internal product catalog.', 'catalog'),
   ('browse_product_catalog',    'Browse product catalog',        'Browse the full product catalog list, not just search results.', 'catalog'),
   ('view_product_pricing',      'View product pricing',          'See product pricing, supplier list, and misc charges.', 'catalog'),
-  ('manage_product_catalog',    'Manage product catalog',        'Create, edit, and delete products, suppliers, images, and misc charges.', 'catalog');
+  ('manage_product_catalog',    'Manage product catalog',        'Create, edit, and delete products, suppliers, images, and misc charges.', 'catalog'),
+  ('view_archived_orders',      'View archived orders',          'See orders that have been archived out of the default listing. Archiving never deletes anything — this only gates who can look an archived order up.', 'orders');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -69,19 +70,19 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Export Executive'
-  AND p.permission_key IN ('manage_orders','generate_documents','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing');
+  AND p.permission_key IN ('manage_orders','generate_documents','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Accounts Executive'
-  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing');
+  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Logistics Executive'
-  AND p.permission_key IN ('manage_orders','generate_documents','download_pdf','cross_verify_documents','view_product_catalog','browse_product_catalog');
+  AND p.permission_key IN ('manage_orders','generate_documents','download_pdf','cross_verify_documents','view_product_catalog','browse_product_catalog','view_archived_orders');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1

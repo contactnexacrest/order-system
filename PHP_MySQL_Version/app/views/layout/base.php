@@ -24,8 +24,9 @@ $canFieldProtection = $can('manage_field_protection');
 $canUsers = $can('manage_users');
 $canSampleData = $can('manage_sample_data');
 $canViewProducts = $can('view_product_catalog');
+$canViewArchivedOrders = $can('view_archived_orders');
 
-$opsGroupVisible = $canOrders;
+$opsGroupVisible = $canOrders || $canViewArchivedOrders;
 $insightsGroupVisible = $canReports || $canAudit || $canApproveEmail;
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
     || $canUsers || $canFieldProtection || $canOverrides || $canSampleData;
@@ -58,6 +59,7 @@ $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermis
         <div class="nav-dropdown">
           <a href="/clients">Clients</a>
           <a href="/orders">Orders</a>
+          <?php if ($canViewArchivedOrders): ?><a href="/orders/archived">Archived Orders</a><?php endif; ?>
           <a href="/client-intake">Client Requests</a>
           <a href="/disputes">Disputes</a>
         </div>

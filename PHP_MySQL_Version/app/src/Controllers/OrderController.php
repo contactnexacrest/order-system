@@ -35,6 +35,7 @@ use App\Repositories\SupplierRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
 use App\Services\FileUploadService;
+use App\Services\PermissionService;
 use App\Services\ReferenceNumberService;
 use App\Services\StageGateService;
 use App\Services\TestModeService;
@@ -44,6 +45,49 @@ final class OrderController
     public function index(array $params): void
     {
         View::render('orders/index', ['orders' => OrderRepository::all()], 'layout/base');
+    }
+
+    public function archivedIndex(array $params): void
+    {
+        View::render('orders/archived', ['orders' => OrderRepository::allArchived()], 'layout/base');
+    }
+
+    /**
+     * Visibility-only, never a deletion path — see schema.sql Section W. No
+     * reason is required (matches the toggle-active precedent for a
+     * reversible, non-destructive state flip); the confirm() dialog on the
+     * button is what stands in for a deliberate-action check here.
+     */
+    public function archive(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header('Location: /orders');
+            return;
+        }
+        $actor = AuthService::currentUser();
+        OrderRepository::archive($orderId, (int) $actor['id']);
+        AuditLogRepository::log((int) $actor['id'], 'ORDER_ARCHIVED', 'orders', $orderId, 'is_archived', '0', '1');
+        Flash::set('success', "{$order['order_reference']} archived — it no longer appears in the main Orders list. Nothing was deleted; view it any time from Archived Orders.");
+        header('Location: /orders');
+    }
+
+    public function unarchive(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header('Location: /orders/archived');
+            return;
+        }
+        $actor = AuthService::currentUser();
+        OrderRepository::unarchive($orderId);
+        AuditLogRepository::log((int) $actor['id'], 'ORDER_UNARCHIVED', 'orders', $orderId, 'is_archived', '1', '0');
+        Flash::set('success', "{$order['order_reference']} restored to the main Orders list.");
+        header("Location: /orders/{$orderId}");
     }
 
     public function create(array $params): void
@@ -179,6 +223,19 @@ final class OrderController
             http_response_code(404);
             echo 'Order not found.';
             return;
+        }
+        // Archiving only removes an order from the default listing — direct
+        // access by URL/bookmark still needs its own gate, or
+        // view_archived_orders would be meaningless (Super Admin already
+        // bypasses every permission).
+        if ((int) $order['is_archived'] === 1) {
+            $actor = AuthService::currentUser();
+            $canView = PermissionService::can((int) $actor['id'], $actor['role_id'] !== null ? (int) $actor['role_id'] : null, 'view_archived_orders');
+            if (!$canView) {
+                http_response_code(403);
+                echo 'This order has been archived. You need the "View archived orders" permission to open it.';
+                return;
+            }
         }
 
         $stages = OrderStageRepository::forOrder($orderId);

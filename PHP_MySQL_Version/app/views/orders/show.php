@@ -44,6 +44,20 @@ $orderClosed = $order['status'] === 'complete';
   <?php if ($order['status'] === 'lost'): ?>
     <p class="muted small">Marked lost<?php if ($order['lost_at']): ?> on <?= htmlspecialchars($order['lost_at']) ?><?php endif; ?><?php if ($order['lost_reason']): ?> — reason: <?= htmlspecialchars($order['lost_reason']) ?><?php endif; ?></p>
   <?php endif; ?>
+  <?php if ((int) ($order['is_archived'] ?? 0) === 1): ?>
+    <p class="muted small">Archived<?php if ($order['archived_at']): ?> on <?= htmlspecialchars($order['archived_at']) ?><?php endif; ?> — hidden from the main Orders list. Nothing was deleted.</p>
+    <?php if ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/unarchive" style="display:inline" onsubmit="return confirm('Restore <?= htmlspecialchars(addslashes($order['order_reference'])) ?> to the main Orders list?');">
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm btn-success">Restore from Archive</button>
+    </form>
+    <?php endif; ?>
+  <?php elseif ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/archive" style="display:inline" onsubmit="return confirm('Archive <?= htmlspecialchars(addslashes($order['order_reference'])) ?>? It will no longer appear in the main Orders list, but nothing is deleted and it can be restored any time.');">
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm btn-secondary">Archive Order</button>
+    </form>
+  <?php endif; ?>
   <?php if ($order['status'] === 'active' && $canManageOrders): ?>
   <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-lost" style="display:inline" onsubmit="return confirmMarkLost(this);">
     <?= Csrf::field() ?>

@@ -1,6 +1,9 @@
 <div class="card page-wide">
   <h1>Orders</h1>
-  <div class="btn-row"><a class="btn" href="/clients">Go to Clients to start a new order</a></div>
+  <div class="btn-row">
+    <a class="btn" href="/clients">Go to Clients to start a new order</a>
+    {% if permissions.view_archived_orders %}<a class="btn-sm btn-secondary" href="/orders/archived">View Archived Orders</a>{% endif %}
+  </div>
 
   {% if not orders or orders.length == 0 %}
     <p class="muted">No orders yet.</p>

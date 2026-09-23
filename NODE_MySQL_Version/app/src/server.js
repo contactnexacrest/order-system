@@ -292,9 +292,12 @@ app.post('/client-intake/:id/accept', requireAuth, requirePermission('manage_ord
 app.post('/client-intake/:id/reject', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.reject));
 
 app.get('/orders', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.index));
+app.get('/orders/archived', requireAuth, requirePermission('view_archived_orders'), asyncHandler(ordersController.archivedIndex));
 app.get('/orders/create', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.create));
 app.post('/orders', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.store));
 app.get('/orders/:id', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.show));
+app.post('/orders/:id/archive', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.archive));
+app.post('/orders/:id/unarchive', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.unarchive));
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
 app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
 app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordAdvancePayment));

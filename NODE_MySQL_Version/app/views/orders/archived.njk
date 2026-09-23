@@ -1,0 +1,29 @@
+<div class="card page-wide">
+  <h1>Archived Orders</h1>
+  <p class="muted">Archiving only removes an order from the main Orders list — nothing is ever deleted. Restore an order any time to bring it back.</p>
+  <div class="btn-row"><a class="btn-sm btn-secondary" href="/orders">Back to Orders</a></div>
+
+  {% if not orders or orders.length == 0 %}
+    <p class="muted">No archived orders.</p>
+  {% else %}
+  <table class="list">
+    <tr><th>Order Ref</th><th>Client</th><th>Stage</th><th>Status</th><th>Archived</th><th></th></tr>
+    {% for o in orders %}
+    <tr>
+      <td>{{ o.order_reference }}</td>
+      <td>{{ o.company_legal_name }}</td>
+      <td>{{ o.current_stage_name or 'Quotation' }}</td>
+      <td>{{ o.status | capitalize }}</td>
+      <td>{{ o.archived_at }} {{ 'by ' + o.archived_by_name if o.archived_by_name }}</td>
+      <td>
+        <a href="/orders/{{ o.id }}">View</a>
+        <form method="post" action="/orders/{{ o.id }}/unarchive" style="display:inline" onsubmit="return confirm('Restore {{ o.order_reference }} to the main Orders list?');">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm btn-success">Restore</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
