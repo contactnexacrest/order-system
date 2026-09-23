@@ -8,7 +8,7 @@ const referenceNumberService = require('../services/referenceNumberService');
 
 /**
  * Port of App\Controllers\ClientIntakeReviewController. Staff review queue
- * for public quotation-request submissions (client_intake_submissions).
+ * for public quotation-details submissions (client_intake_submissions).
  * Accepting a submission creates the real `clients` row through the exact
  * same clientRepository.create() path a manually-entered walk-in client
  * goes through — never a separate, parallel creation path — then hands

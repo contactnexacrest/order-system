@@ -1545,7 +1545,7 @@ CREATE TABLE catalog_product_misc_charges (
 -- Sample Data Playground (is_sample_data, Section T note): Sample Data is a
 -- one-shot canned demo dataset; Test Mode is a live toggle staff flip on to
 -- manually walk arbitrary orders through the REAL UI/pipeline — with
--- production access suspended (client portal + quotation-request form) and
+-- production access suspended (client portal + quotation-details form) and
 -- every business email redirected to test_email — then bulk-delete
 -- afterward. The two flags coexist independently on the same tables; a row
 -- can never be both, since Sample Data is always loaded with Test Mode off

@@ -217,8 +217,8 @@ app.post('/reset-password/:token', verifyCsrf, asyncHandler(authController.reset
 // system for a Zoho-qualified prospect. No auth: staff sends this link
 // directly. Submitting only ever creates a client_intake_submissions row,
 // never a client or order (see clientIntakeController's docblock).
-app.get('/quotation-request', asyncHandler(clientIntakeController.show));
-app.post('/quotation-request/submit', verifyCsrf, asyncHandler(clientIntakeController.submit));
+app.get('/quotation-details', asyncHandler(clientIntakeController.show));
+app.post('/quotation-details/submit', verifyCsrf, asyncHandler(clientIntakeController.submit));
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -286,7 +286,7 @@ app.get('/clients/create', requireAuth, requirePermission('manage_orders'), asyn
 app.post('/clients', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.store));
 app.get('/clients/:id', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.show));
 
-// Staff review queue for public quotation-request submissions.
+// Staff review queue for public quotation-details submissions.
 app.get('/client-intake', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.index));
 app.post('/client-intake/:id/accept', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.accept));
 app.post('/client-intake/:id/reject', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.reject));

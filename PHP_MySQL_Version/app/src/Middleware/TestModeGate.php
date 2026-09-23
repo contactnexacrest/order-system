@@ -40,14 +40,14 @@ final class TestModeGate
 
     /**
      * Client-facing surfaces — blocked entirely (every method, not just
-     * writes) while Test Mode is on: the public quotation-request intake
+     * writes) while Test Mode is on: the public quotation-details intake
      * form and the whole client portal. "/client" as a prefix does not
      * collide with staff-side "/clients" or "/client-intake" —
      * matchesPrefix requires an exact match or a '/' boundary right after
      * the prefix, and both of those paths diverge from "/client" at the
      * very next character ('s', '-').
      */
-    private const CLIENT_FACING_PREFIXES = ['/quotation-request', '/client'];
+    private const CLIENT_FACING_PREFIXES = ['/quotation-details', '/client'];
 
     public static function blockAdminWritesInTestMode(string $method, string $path): void
     {

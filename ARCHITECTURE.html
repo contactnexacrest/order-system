@@ -556,7 +556,7 @@ flowchart TB
 <section id="k">
   <div class="sec-head"><span class="letter">K</span><h2>Client Portal &amp; Public Intake</h2><span class="sub">Fig. K</span></div>
   <div class="grid2">
-    <div class="card"><h4>Public quotation-request form</h4><p><code>/quotation-request</code> — no auth. A prospect submits company + shipment details, landing only in <code>client_intake_submissions</code>. Staff review the queue at <code>/client-intake</code> and either accept (creates a real <code>clients</code> row) or reject. A submission is never auto-converted.</p></div>
+    <div class="card"><h4>Public quotation-details form</h4><p><code>/quotation-details</code> — no auth. A prospect submits company + shipment details, landing only in <code>client_intake_submissions</code>. Staff review the queue at <code>/client-intake</code> and either accept (creates a real <code>clients</code> row) or reject. A submission is never auto-converted.</p></div>
     <div class="card"><h4>Client portal login</h4><p><code>/client/login</code> — a structurally separate auth surface from staff sessions (its own session key, its own <code>ClientAuth</code> middleware). A <code>client_logins</code> row is provisioned by the server <em>only</em> at the Stage-4 advance-cleared gate — a buyer can never self-register.</p></div>
   </div>
   <p class="lede">Once logged in, a buyer can see their own order's stage, download sent (final, watermarked) documents, and manage their own password — nothing else. Both surfaces above are entirely unavailable while Test Mode is on (§M) — real buyers must never land on a test-populated system.</p>

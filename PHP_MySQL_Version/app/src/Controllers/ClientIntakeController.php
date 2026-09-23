@@ -32,12 +32,12 @@ final class ClientIntakeController
 
         if ($companyLegalName === '' || $billingAddress === '' || $contactPerson === '' || $email === '' || $countryOfDestination === '') {
             Flash::set('error', 'Please fill in all required fields (marked *).');
-            header('Location: /quotation-request');
+            header('Location: /quotation-details');
             return;
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             Flash::set('error', "\"{$email}\" doesn't look like a valid email address.");
-            header('Location: /quotation-request');
+            header('Location: /quotation-details');
             return;
         }
 

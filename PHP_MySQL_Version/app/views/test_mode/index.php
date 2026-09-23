@@ -1,7 +1,7 @@
 <?php use App\Helpers\Csrf; use App\Helpers\View; ?>
 <div class="card page-wide">
   <h1>Test Mode</h1>
-  <p class="muted">Run the application full-fledged for testing — complete order pipeline, PDF/DOCX generation, and reports — without touching production data or sending real mail to real clients. While Test Mode is on: the client portal and the public quotation-request form are unavailable, every business email is redirected to the test address below, admin panel settings cannot be changed by anyone (Super Admin included), reports show only test data, and no audit-log entries are recorded for test records. Every order/client/document created while it is on is a test record — its reference number is prefixed "TEST-".</p>
+  <p class="muted">Run the application full-fledged for testing — complete order pipeline, PDF/DOCX generation, and reports — without touching production data or sending real mail to real clients. While Test Mode is on: the client portal and the public quotation-details form are unavailable, every business email is redirected to the test address below, admin panel settings cannot be changed by anyone (Super Admin included), reports show only test data, and no audit-log entries are recorded for test records. Every order/client/document created while it is on is a test record — its reference number is prefixed "TEST-".</p>
 
   <?php if ((int) ($settings['is_enabled'] ?? 0) === 1): ?>
     <div class="alert alert-error" style="font-weight:700">TEST MODE IS CURRENTLY ON</div>
@@ -35,7 +35,7 @@
     <h2>Controls</h2>
     <div style="display:flex;gap:12px;flex-wrap:wrap">
       <?php if ((int) ($settings['is_enabled'] ?? 0) !== 1): ?>
-        <form method="post" action="/test-mode/enable" onsubmit="return confirm('Enable Test Mode? The client portal and quotation-request form will become unavailable, and all outbound business mail will redirect to the test email.');">
+        <form method="post" action="/test-mode/enable" onsubmit="return confirm('Enable Test Mode? The client portal and quotation-details form will become unavailable, and all outbound business mail will redirect to the test email.');">
           <?= Csrf::field() ?>
           <button type="submit" class="btn-success">Enable Test Mode</button>
         </form>

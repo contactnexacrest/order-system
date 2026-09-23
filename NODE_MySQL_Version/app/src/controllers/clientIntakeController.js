@@ -25,12 +25,12 @@ async function submit(req, res) {
 
   if (companyLegalName === '' || billingAddress === '' || contactPerson === '' || email === '' || countryOfDestination === '') {
     flash.set(req, 'error', 'Please fill in all required fields (marked *).');
-    res.redirect('/quotation-request');
+    res.redirect('/quotation-details');
     return;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     flash.set(req, 'error', `"${email}" doesn't look like a valid email address.`);
-    res.redirect('/quotation-request');
+    res.redirect('/quotation-details');
     return;
   }
 

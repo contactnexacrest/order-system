@@ -90,8 +90,8 @@ $router->post('/reset-password/{token}', [$auth, 'resetPassword'], [CsrfCheck::v
 // system for a Zoho-qualified prospect. No auth: staff sends this link
 // directly. Submitting only ever creates a client_intake_submissions row,
 // never a client or order (see ClientIntakeController's docblock).
-$router->get('/quotation-request', [$clientIntake, 'show']);
-$router->post('/quotation-request/submit', [$clientIntake, 'submit'], [CsrfCheck::verify()]);
+$router->get('/quotation-details', [$clientIntake, 'show']);
+$router->post('/quotation-details/submit', [$clientIntake, 'submit'], [CsrfCheck::verify()]);
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -160,7 +160,7 @@ $router->get('/clients/create', [$clients, 'create'], [SessionAuth::required(), 
 $router->post('/clients', [$clients, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/clients/{id}', [$clients, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 
-// Staff review queue for public quotation-request submissions.
+// Staff review queue for public quotation-details submissions.
 $router->get('/client-intake', [$clientIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/client-intake/{id}/accept', [$clientIntakeReview, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/client-intake/{id}/reject', [$clientIntakeReview, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

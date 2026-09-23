@@ -13,7 +13,7 @@ use App\Services\AuthService;
 use App\Services\ReferenceNumberService;
 
 /**
- * Staff review queue for public quotation-request submissions
+ * Staff review queue for public quotation-details submissions
  * (client_intake_submissions). Accepting a submission creates the real
  * `clients` row through the exact same ClientRepository::create() path a
  * manually-entered walk-in client goes through — never a separate,
