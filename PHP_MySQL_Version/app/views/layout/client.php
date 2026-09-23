@@ -5,11 +5,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NexaCrest International — My Orders</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/css/app.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="topbar-brand">NEXACREST <span>INTERNATIONAL</span></div>
+<header class="client-topbar">
+  <div class="topbar-brand">
+    <span class="bare-brand-mark" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 8c0-2 2-3.4 4.5-3.4S16 6.2 16 9s-2 3.6-4.5 3.6S7 14.2 7 17s2 3.4 4.5 3.4S16 18.8 16 16" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"></path></svg></span>
+    NexaCrest <span>International</span>
+  </div>
   <nav class="topbar-nav">
     <a href="/client">My Orders</a>
     <a href="/client/account">My Account</a>

@@ -1,29 +1,37 @@
+{% macro statusBadgeClass(status) %}{% if status == 'Resolved' %}badge-active{% elif status == 'Escalated' %}badge-lost{% else %}badge-protected{% endif %}{% endmacro %}
 <div class="card page-wide">
-  <h1>Dispute Log (All Orders)</h1>
-  <form method="get" action="/disputes">
-    <label>Status
-      <select name="status" onchange="this.form.submit()">
-        <option value="">All</option>
-        {% for opt in statusOptions %}
-          <option value="{{ opt.option_value }}" {{ 'selected' if statusFilter == opt.option_value else '' }}>{{ opt.option_value }}</option>
-        {% endfor %}
-      </select>
-    </label>
-  </form>
+  <div class="page-header-row">
+    <div>
+      <h1>Dispute Log (All Orders)</h1>
+      <p class="muted" style="margin:0;">{{ disputes.length }} shown.</p>
+    </div>
+  </div>
 
-  <table class="list">
-    <tr><th>Order</th><th>Notice Date</th><th>Status</th><th>Response Due</th><th>Description</th></tr>
-    {% for d in disputes %}
-      <tr>
-        <td><a href="/orders/{{ d.order_id }}/disputes">{{ d.order_reference }}</a></td>
-        <td>{{ d.notice_date }}</td>
-        <td>{{ d.status }}</td>
-        <td>{{ d.response_due_date or '—' }}</td>
-        <td>{{ d.description | truncate(100, true, '…') }}</td>
-      </tr>
+  <div class="filter-chip-row">
+    <a class="filter-chip{{ ' active' if not statusFilter else '' }}" href="/disputes">All</a>
+    {% for opt in statusOptions %}
+      <a class="filter-chip{{ ' active' if statusFilter == opt.option_value else '' }}" href="/disputes?status={{ opt.option_value | urlencode }}">{{ opt.option_value }}</a>
     {% endfor %}
-    {% if not disputes or disputes.length == 0 %}
-      <tr><td colspan="5" class="muted">No disputes recorded.</td></tr>
-    {% endif %}
-  </table>
+  </div>
+
+  {% if not disputes or disputes.length == 0 %}
+    <p class="muted">No disputes recorded.</p>
+  {% else %}
+  <div class="card-grid">
+    {% for d in disputes %}
+    <a class="entity-card" href="/orders/{{ d.order_id }}/disputes">
+      <div class="entity-card-header">
+        <span class="entity-card-title">{{ d.order_reference }}</span>
+        <span class="badge {{ statusBadgeClass(d.status) }}">{{ d.status }}</span>
+      </div>
+      <div class="entity-card-sub">{{ d.company_legal_name }}</div>
+      <div class="muted small">{{ d.description | truncate(110, true, '…') }}</div>
+      <div class="entity-card-footer">
+        <span class="muted small">Notice: {{ d.notice_date }}</span>
+        <span class="muted small">Response due: {{ d.response_due_date or '—' }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>

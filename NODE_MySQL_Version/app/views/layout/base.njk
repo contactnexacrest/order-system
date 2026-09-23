@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NexaCrest International — Export Operations</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/css/app.css">
 <script src="/js/app.js" defer></script>
 </head>
@@ -11,79 +12,98 @@
 {% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log or permissions.approve_email_send %}
 {% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data %}
-<header class="topbar">
-  <div class="topbar-brand">NEXACREST <span>INTERNATIONAL</span></div>
+{% set opsGroupActive = (currentPath | startswith('/clients')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/disputes')) %}
+{% set insightsGroupActive = (currentPath | startswith('/reports')) or (currentPath | startswith('/audit-log')) or (currentPath | startswith('/email-approvals')) %}
+{% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) %}
+{% set ordersActive = currentPath === '/orders' or ((currentPath | startswith('/orders/')) and not (currentPath | startswith('/orders/archived'))) %}
+<div class="app-shell">
+<header class="sidebar">
+  <div class="sidebar-brand">
+    <span class="sidebar-brand-mark" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 8c0-2 2-3.4 4.5-3.4S16 6.2 16 9s-2 3.6-4.5 3.6S7 14.2 7 17s2 3.4 4.5 3.4S16 18.8 16 16" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"></path></svg>
+    </span>
+    <span class="sidebar-brand-name">NexaCrest</span>
+  </div>
   {% if currentUser %}
     <input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox">
     <label for="nav-toggle" class="nav-toggle-label" aria-label="Toggle navigation">&#9776;</label>
   {% endif %}
-  <nav class="topbar-nav">
-    <a href="/">Dashboard</a>
+  <nav class="sidebar-nav">
+    <a href="/" class="{{ 'active' if currentPath === '/' else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg></span>Dashboard</a>
     {% if currentUser %}
-      <a href="/reference-docs">Reference Library</a>
-      <a href="/reviews">My Reviews</a>
-      {% if permissions.view_product_catalog %}<a href="/products">Products</a>{% endif %}
+      <a href="/reference-docs" class="{{ 'active' if (currentPath | startswith('/reference-docs')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>Reference Library</a>
+      <a href="/reviews" class="{{ 'active' if (currentPath | startswith('/reviews')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>My Reviews</a>
+      {% if permissions.view_product_catalog %}<a href="/products" class="{{ 'active' if (currentPath | startswith('/products')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>Products</a>{% endif %}
     {% endif %}
     {% if currentUser and opsGroupVisible %}
-      <details class="nav-group">
-        <summary>Operations</summary>
+      <details class="nav-group" {{ 'open' if opsGroupActive else '' }}>
+        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>Operations</summary>
         <div class="nav-dropdown">
-          <a href="/clients">Clients</a>
-          <a href="/orders">Orders</a>
-          {% if permissions.view_archived_orders %}<a href="/orders/archived">Archived Orders</a>{% endif %}
-          <a href="/client-intake">Client Requests</a>
-          <a href="/pi-intake-review">PI Intake Review</a>
-          <a href="/disputes">Disputes</a>
+          <a href="/clients" class="{{ 'active' if (currentPath | startswith('/clients')) else '' }}">Clients</a>
+          <a href="/orders" class="{{ 'active' if ordersActive else '' }}">Orders</a>
+          {% if permissions.view_archived_orders %}<a href="/orders/archived" class="{{ 'active' if (currentPath | startswith('/orders/archived')) else '' }}">Archived Orders</a>{% endif %}
+          <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Client Requests</a>
+          <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review</a>
+          <a href="/disputes" class="{{ 'active' if (currentPath | startswith('/disputes')) else '' }}">Disputes</a>
         </div>
       </details>
     {% endif %}
     {% if currentUser and insightsGroupVisible %}
-      <details class="nav-group">
-        <summary>Insights</summary>
+      <details class="nav-group" {{ 'open' if insightsGroupActive else '' }}>
+        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg></span>Insights</summary>
         <div class="nav-dropdown">
-          {% if permissions.view_reports %}<a href="/reports">Reports</a>{% endif %}
-          {% if permissions.view_audit_log %}<a href="/audit-log">Audit Log</a>{% endif %}
-          {% if permissions.approve_email_send %}<a href="/email-approvals">Email Approvals</a>{% endif %}
+          {% if permissions.view_reports %}<a href="/reports" class="{{ 'active' if (currentPath | startswith('/reports')) else '' }}">Reports</a>{% endif %}
+          {% if permissions.view_audit_log %}<a href="/audit-log" class="{{ 'active' if (currentPath | startswith('/audit-log')) else '' }}">Audit Log</a>{% endif %}
+          {% if permissions.approve_email_send %}<a href="/email-approvals" class="{{ 'active' if (currentPath | startswith('/email-approvals')) else '' }}">Email Approvals</a>{% endif %}
         </div>
       </details>
     {% endif %}
     {% if currentUser and adminGroupVisible %}
-      <details class="nav-group">
-        <summary>Admin</summary>
+      <details class="nav-group" {{ 'open' if adminGroupActive else '' }}>
+        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>Admin</summary>
         <div class="nav-dropdown">
-          {% if permissions.manage_company_settings %}<a href="/settings">Company Settings</a>{% endif %}
-          {% if permissions.manage_company_settings %}<a href="/holidays">Holiday Calendar</a>{% endif %}
-          {% if permissions.manage_assets %}<a href="/company-assets">Assets</a>{% endif %}
-          {% if permissions.manage_signatories %}<a href="/signatories">Signatories</a>{% endif %}
-          {% if permissions.manage_permissions %}<a href="/admin/permissions">Permissions</a>{% endif %}
-          {% if permissions.manage_users %}<a href="/users">Users</a>{% endif %}
-          {% if permissions.manage_field_protection %}<a href="/admin/field-protection">Field Protection</a>{% endif %}
-          {% if permissions.edit_locked_data %}<a href="/admin/overrides">Admin Overrides</a>{% endif %}
-          {% if permissions.manage_sample_data %}<a href="/sample-data">Sample Data</a>{% endif %}
+          {% if permissions.manage_company_settings %}<a href="/settings" class="{{ 'active' if (currentPath | startswith('/settings')) else '' }}">Company Settings</a>{% endif %}
+          {% if permissions.manage_company_settings %}<a href="/holidays" class="{{ 'active' if (currentPath | startswith('/holidays')) else '' }}">Holiday Calendar</a>{% endif %}
+          {% if permissions.manage_assets %}<a href="/company-assets" class="{{ 'active' if (currentPath | startswith('/company-assets')) else '' }}">Assets</a>{% endif %}
+          {% if permissions.manage_signatories %}<a href="/signatories" class="{{ 'active' if (currentPath | startswith('/signatories')) else '' }}">Signatories</a>{% endif %}
+          {% if permissions.manage_permissions %}<a href="/admin/permissions" class="{{ 'active' if (currentPath | startswith('/admin/permissions')) else '' }}">Permissions</a>{% endif %}
+          {% if permissions.manage_users %}<a href="/users" class="{{ 'active' if (currentPath | startswith('/users')) else '' }}">Users</a>{% endif %}
+          {% if permissions.manage_field_protection %}<a href="/admin/field-protection" class="{{ 'active' if (currentPath | startswith('/admin/field-protection')) else '' }}">Field Protection</a>{% endif %}
+          {% if permissions.edit_locked_data %}<a href="/admin/overrides" class="{{ 'active' if (currentPath | startswith('/admin/overrides')) else '' }}">Admin Overrides</a>{% endif %}
+          {% if permissions.manage_sample_data %}<a href="/sample-data" class="{{ 'active' if (currentPath | startswith('/sample-data')) else '' }}">Sample Data</a>{% endif %}
         </div>
       </details>
     {% endif %}
     {% if isSuperAdmin %}
-      <a href="/super-admin">Super Admin</a>
-      <a href="/test-mode">Test Mode{% if testModeEnabled %} (ON){% endif %}</a>
+      <a href="/super-admin" class="{{ 'active' if (currentPath | startswith('/super-admin')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg></span>Super Admin</a>
+      <a href="/test-mode" class="{{ 'active' if (currentPath | startswith('/test-mode')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"></path><path d="M8.5 14h7"></path></svg></span>Test Mode{% if testModeEnabled %} <span class="nav-live-dot" aria-hidden="true"></span>{% endif %}</a>
     {% endif %}
   </nav>
-  <div class="topbar-user">
+  <div class="sidebar-user">
     {% if currentUser %}
-      <a href="/notifications">Notifications{% if unreadCount > 0 %} ({{ unreadCount }}){% endif %}</a>
-      <span>{{ currentUser.name }}</span>
-      <a href="/logout" class="logout-link">Log out</a>
+      <a href="/notifications" class="sidebar-user-notif {{ 'active' if (currentPath | startswith('/notifications')) else '' }}" aria-label="Notifications{% if unreadCount > 0 %} ({{ unreadCount }} unread){% endif %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        Notifications{% if unreadCount > 0 %} <span class="nav-badge">{{ unreadCount }}</span>{% endif %}
+      </a>
+      <div class="sidebar-user-card">
+        <span class="sidebar-user-avatar">{{ currentUser.name[0] | upper }}</span>
+        <span class="sidebar-user-name">{{ currentUser.name }}</span>
+      </div>
+      <a href="/logout" class="sidebar-logout">Log out</a>
     {% endif %}
   </div>
 </header>
-{% if testModeEnabled %}
-  <div class="test-mode-banner">TEST MODE ACTIVE — client access suspended, all outbound business mail is redirected, admin panel settings are locked. Any order/client/document created now is test data.</div>
-{% endif %}
-<main class="page">
-  {% for f in flashes %}
-    <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
-  {% endfor %}
-  {{ content | safe }}
-</main>
+<div class="app-main">
+  {% if testModeEnabled %}
+    <div class="test-mode-banner">TEST MODE ACTIVE — client access suspended, all outbound business mail is redirected, admin panel settings are locked. Any order/client/document created now is test data.</div>
+  {% endif %}
+  <main class="page">
+    {% for f in flashes %}
+      <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
+    {% endfor %}
+    {{ content | safe }}
+  </main>
+</div>
+</div>
 </body>
 </html>

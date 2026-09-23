@@ -81,6 +81,10 @@ const njkEnv = nunjucks.configure(viewsDir, {
 njkEnv.addFilter('maskEmail', mask.maskEmail);
 njkEnv.addFilter('maskPhone', mask.maskPhone);
 njkEnv.addFilter('humanDate', dates.human);
+// Sidebar active-link highlighting (layout/base.njk) — Nunjucks has no
+// built-in startswith, and the PHP side's equivalent ($isActive) is a
+// plain str_starts_with(), so this is the same one-line check.
+njkEnv.addFilter('startswith', (value, prefix) => typeof value === 'string' && value.startsWith(prefix));
 // nl2br mirrors PHP's nl2br(htmlspecialchars($v)) — escape first (autoescape
 // is on globally, so this filter must do its own escaping since it returns
 // markup), then turn newlines into <br>, then mark safe.
@@ -167,6 +171,7 @@ app.use((req, res, next) => {
       isSuperAdmin: req.isSuperAdmin || false,
       unreadCount: req.unreadCount || 0,
       testModeEnabled: req.testModeEnabled || false,
+      currentPath: req.path,
     };
     const context = Object.assign({}, common, data);
     const content = njkEnv.render(`${viewPath}.njk`, context);

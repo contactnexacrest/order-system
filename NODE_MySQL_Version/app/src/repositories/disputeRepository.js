@@ -19,15 +19,21 @@ async function forOrder(orderId) {
   return db.query('SELECT * FROM disputes WHERE order_id = :order_id ORDER BY created_at DESC', { order_id: orderId });
 }
 
+/** Also carries company_legal_name — the card-grid list view (disputes/index.njk) shows it per dispute. */
 async function all(statusFilter = null) {
   if (statusFilter) {
     return db.query(
-      `SELECT d.*, o.order_reference FROM disputes d JOIN orders o ON o.id = d.order_id
+      `SELECT d.*, o.order_reference, c.company_legal_name FROM disputes d
+       JOIN orders o ON o.id = d.order_id JOIN clients c ON c.id = o.client_id
        WHERE d.status = :status ORDER BY d.created_at DESC`,
       { status: statusFilter }
     );
   }
-  return db.query(`SELECT d.*, o.order_reference FROM disputes d JOIN orders o ON o.id = d.order_id ORDER BY d.created_at DESC`);
+  return db.query(
+    `SELECT d.*, o.order_reference, c.company_legal_name FROM disputes d
+     JOIN orders o ON o.id = d.order_id JOIN clients c ON c.id = o.client_id
+     ORDER BY d.created_at DESC`
+  );
 }
 
 async function updateStatus(id, status) {

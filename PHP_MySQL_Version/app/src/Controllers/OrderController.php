@@ -45,9 +45,45 @@ use App\Services\TestModeService;
 
 final class OrderController
 {
+    /**
+     * Card-grid list (2026-09-23 redesign) — the filter chips are plain
+     * query-string links (?status=...), no JS, matching how every other
+     * filtered list in this app (e.g. DisputeController::index()) already
+     * works. Counts for the chip labels always come from the full
+     * unfiltered set so a chip never has to be clicked to know its count.
+     */
     public function index(array $params): void
     {
-        View::render('orders/index', ['orders' => OrderRepository::all()], 'layout/base');
+        $all = OrderRepository::all();
+        $statusFilter = trim((string) ($_GET['status'] ?? ''));
+
+        $counts = [
+            'all' => count($all),
+            'active' => 0,
+            'overdue' => 0,
+            'complete' => 0,
+            'lost' => 0,
+        ];
+        foreach ($all as $o) {
+            if (!empty($o['is_overdue'])) {
+                $counts['overdue']++;
+            }
+            if (isset($counts[$o['status']])) {
+                $counts[$o['status']]++;
+            }
+        }
+
+        $orders = match ($statusFilter) {
+            'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
+            'active', 'complete', 'lost' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
+            default => $all,
+        };
+
+        View::render('orders/index', [
+            'orders' => $orders,
+            'statusFilter' => $statusFilter ?: 'all',
+            'counts' => $counts,
+        ], 'layout/base');
     }
 
     public function archivedIndex(array $params): void

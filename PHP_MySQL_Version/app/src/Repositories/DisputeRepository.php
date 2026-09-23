@@ -52,18 +52,21 @@ final class DisputeRepository
     }
 
     /** @return array<int, array<string,mixed>> */
+    /** Also carries company_legal_name — the card-grid list view (disputes/index.php) shows it per dispute. */
     public static function all(?string $statusFilter = null): array
     {
         $pdo = Database::connection();
         if ($statusFilter) {
             $stmt = $pdo->prepare(
-                'SELECT d.*, o.order_reference FROM disputes d JOIN orders o ON o.id = d.order_id
+                'SELECT d.*, o.order_reference, c.company_legal_name FROM disputes d
+                 JOIN orders o ON o.id = d.order_id JOIN clients c ON c.id = o.client_id
                  WHERE d.status = :status ORDER BY d.created_at DESC'
             );
             $stmt->execute(['status' => $statusFilter]);
         } else {
             $stmt = $pdo->query(
-                'SELECT d.*, o.order_reference FROM disputes d JOIN orders o ON o.id = d.order_id
+                'SELECT d.*, o.order_reference, c.company_legal_name FROM disputes d
+                 JOIN orders o ON o.id = d.order_id JOIN clients c ON c.id = o.client_id
                  ORDER BY d.created_at DESC'
             );
         }

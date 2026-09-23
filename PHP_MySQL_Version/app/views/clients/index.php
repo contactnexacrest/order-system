@@ -6,33 +6,45 @@ $__u = AuthService::currentUser();
 $canViewFullEmail = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_client_email_full');
 ?>
 <div class="card page-wide">
-  <h1>Clients</h1>
-  <p class="muted">Each client carries one Buyer Inquiry Ref for the whole relationship — every order and document for them reuses it.</p>
-  <div class="btn-row"><a class="btn" href="/clients/create">+ New Client</a> <a class="btn-sm btn-secondary" href="/clients/inactive">Deactivated Clients</a></div>
+  <div class="page-header-row">
+    <div>
+      <h1>Clients</h1>
+      <p class="muted" style="margin:0;">Each client carries one Buyer Inquiry Ref for the whole relationship — every order and document for them reuses it.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <a class="btn btn-accent" href="/clients/create">+ New Client</a>
+      <a class="btn-sm btn-secondary" href="/clients/inactive">Deactivated Clients</a>
+    </div>
+  </div>
 
   <?php if (empty($clients)): ?>
     <p class="muted">No clients yet.</p>
   <?php else: ?>
-  <table class="list">
-    <tr><th>Buyer Inquiry Ref</th><th>Company</th><th>Contact</th><th>Country</th><th></th></tr>
+  <div class="card-grid">
     <?php foreach ($clients as $c): ?>
-    <tr>
-      <td><?= htmlspecialchars($c['client_unique_number']) ?></td>
-      <td><?= htmlspecialchars($c['company_legal_name']) ?></td>
-      <td><?= htmlspecialchars($c['contact_person'] ?? '—') ?>
+    <div class="entity-card entity-card-linked">
+      <div class="entity-card-header">
+        <a class="entity-card-stretched-link" href="/clients/<?= (int) $c['id'] ?>"><span class="entity-card-title"><?= htmlspecialchars($c['company_legal_name']) ?></span></a>
+        <span class="tag tag-navy"><?= (int) $c['order_count'] ?> order<?= (int) $c['order_count'] === 1 ? '' : 's' ?></span>
+      </div>
+      <div class="entity-card-sub"><?= htmlspecialchars($c['client_unique_number']) ?></div>
+      <div class="entity-card-sub">
+        <?= htmlspecialchars($c['contact_person'] ?? '—') ?>
         <?php if ($c['email']): ?>
-          <br>
+          &middot;
           <?php if ($canViewFullEmail): ?>
-            <span class="muted small"><?= htmlspecialchars($c['email']) ?></span>
+            <span class="masked-value"><?= htmlspecialchars($c['email']) ?></span>
           <?php else: ?>
-            <span class="muted small masked-value"><?= htmlspecialchars(Mask::email($c['email'])) ?></span>
+            <span class="masked-value"><?= htmlspecialchars(Mask::email($c['email'])) ?></span>
           <?php endif; ?>
         <?php endif; ?>
-      </td>
-      <td><?= htmlspecialchars($c['country_of_destination'] ?? '—') ?></td>
-      <td><a href="/clients/<?= (int) $c['id'] ?>">View</a> &middot; <a href="/clients/<?= (int) $c['id'] ?>/edit">Edit</a></td>
-    </tr>
+      </div>
+      <div class="entity-card-footer">
+        <span class="muted small"><?= htmlspecialchars($c['country_of_destination'] ?? 'Country not set') ?></span>
+        <a class="entity-card-action" href="/clients/<?= (int) $c['id'] ?>/edit">Edit</a>
+      </div>
+    </div>
     <?php endforeach; ?>
-  </table>
+  </div>
   <?php endif; ?>
 </div>

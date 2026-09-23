@@ -9,15 +9,30 @@ use App\Config\Database;
 final class OrderRepository
 {
     /** @return array<int, array<string,mixed>> */
+    /**
+     * Also carries incoterm_code, current_stage_number, and total_fob_value —
+     * the card-grid list view (see orders/index.php) needs all three for its
+     * incoterm tag, 9-segment stage bar, and displayed amount, none of which
+     * a plain o.* + one join used to expose.
+     */
     public static function all(): array
     {
         return Database::connection()->query(
-            'SELECT o.*, c.company_legal_name, sm.stage_name AS current_stage_name
+            "SELECT o.*, c.company_legal_name, sm.stage_name AS current_stage_name,
+                    sm.stage_number AS current_stage_number, it.code AS incoterm_code, cur.code AS currency_code,
+                    (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
+                    EXISTS (
+                        SELECT 1 FROM order_payment_status ops
+                        WHERE ops.order_id = o.id AND ops.balance_due_date IS NOT NULL
+                          AND ops.balance_cleared_at IS NULL AND ops.balance_due_date < CURDATE()
+                    ) AS is_overdue
              FROM orders o
              JOIN clients c ON c.id = o.client_id
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+             LEFT JOIN incoterms it ON it.id = o.incoterm_id
+             LEFT JOIN currencies cur ON cur.id = o.currency_id
              WHERE o.is_archived = 0
-             ORDER BY o.created_at DESC'
+             ORDER BY o.created_at DESC"
         )->fetchAll();
     }
 

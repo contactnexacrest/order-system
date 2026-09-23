@@ -2,8 +2,12 @@
 
 const db = require('../config/db');
 
+/** Also carries order_count — the card-grid list view (clients/index.njk) shows it per client. */
 async function all() {
-  return db.query('SELECT * FROM clients WHERE is_active = 1 ORDER BY company_legal_name');
+  return db.query(
+    `SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.client_id = c.id AND o.is_archived = 0) AS order_count
+     FROM clients c WHERE c.is_active = 1 ORDER BY c.company_legal_name`
+  );
 }
 
 async function find(id) {

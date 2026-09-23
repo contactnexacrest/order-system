@@ -60,8 +60,42 @@ function str(v, fallback = '') {
   return String(v ?? fallback).trim();
 }
 
+/**
+ * Card-grid list (2026-09-23 redesign) — the filter chips are plain
+ * query-string links (?status=...), no JS. Counts for the chip labels
+ * always come from the full unfiltered set so a chip never has to be
+ * clicked to know its count.
+ */
 async function index(req, res) {
-  res.renderView('orders/index', { orders: await orderRepository.all() }, 'layout/base');
+  const all = await orderRepository.all();
+  const statusFilter = String(req.query.status || '').trim();
+
+  const counts = { all: all.length, active: 0, overdue: 0, complete: 0, lost: 0 };
+  for (const o of all) {
+    if (o.is_overdue) counts.overdue++;
+    if (Object.prototype.hasOwnProperty.call(counts, o.status)) counts[o.status]++;
+  }
+
+  let orders = all;
+  if (statusFilter === 'overdue') {
+    orders = all.filter((o) => !!o.is_overdue);
+  } else if (['active', 'complete', 'lost'].includes(statusFilter)) {
+    orders = all.filter((o) => o.status === statusFilter);
+  }
+
+  // Precomputed here (not in the template) since Nunjucks has no min/max
+  // filter — how many of the 9 mini-stage-track segments render filled.
+  const stageTotal = 9;
+  orders = orders.map((o) => ({
+    ...o,
+    filled_segments: o.status === 'complete' ? stageTotal : (o.status === 'lost' ? Math.max(o.current_stage_number || 0, 1) : (o.current_stage_number || 0)),
+  }));
+
+  res.renderView('orders/index', {
+    orders,
+    statusFilter: statusFilter || 'all',
+    counts,
+  }, 'layout/base');
 }
 
 async function archivedIndex(req, res) {

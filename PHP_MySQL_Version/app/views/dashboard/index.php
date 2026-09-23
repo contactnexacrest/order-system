@@ -34,17 +34,20 @@
   <h2 style="margin-top:0;">My Approvals</h2>
   <div class="stat-grid">
     <div class="stat-tile <?= $myPendingReviewCount > 0 ? 'warn' : '' ?>">
+      <div class="icon-chip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>
       <div class="num"><?= (int) $myPendingReviewCount ?></div>
       <div class="label">My pending reviews</div>
     </div>
     <?php if ($pendingEmailApprovalCount !== null): ?>
     <div class="stat-tile <?= $pendingEmailApprovalCount > 0 ? 'warn' : '' ?>">
+      <div class="icon-chip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><polyline points="3 7 12 13 21 7"></polyline></svg></div>
       <div class="num"><?= (int) $pendingEmailApprovalCount ?></div>
       <div class="label">Emails awaiting Level-2 approval</div>
     </div>
     <?php endif; ?>
     <?php if ($pendingAmendmentApprovalCount !== null): ?>
     <div class="stat-tile <?= $pendingAmendmentApprovalCount > 0 ? 'warn' : '' ?>">
+      <div class="icon-chip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg></div>
       <div class="num"><?= (int) $pendingAmendmentApprovalCount ?></div>
       <div class="label">Amendments awaiting MD approval</div>
     </div>

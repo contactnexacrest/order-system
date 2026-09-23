@@ -1,24 +1,68 @@
+{% set statusLabels = [['all', 'All'], ['active', 'Active'], ['overdue', 'Overdue'], ['complete', 'Complete'], ['lost', 'Lost']] %}
 <div class="card page-wide">
-  <h1>Orders</h1>
-  <div class="btn-row">
-    <a class="btn" href="/clients">Go to Clients to start a new order</a>
-    {% if permissions.view_archived_orders %}<a class="btn-sm btn-secondary" href="/orders/archived">View Archived Orders</a>{% endif %}
+  <div class="page-header-row">
+    <div>
+      <h1>Orders</h1>
+      <p class="muted" style="margin:0;">{{ counts.all }} total &middot; a card for every order, not a spreadsheet row.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <a class="btn btn-accent" href="/clients">Go to Clients to start a new order</a>
+      {% if permissions.view_archived_orders %}<a class="btn-sm btn-secondary" href="/orders/archived">View Archived Orders</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="filter-chip-row">
+    {% for key, label in statusLabels %}
+      <a class="filter-chip{{ ' active' if statusFilter == key else '' }}" href="/orders{{ '' if key == 'all' else '?status=' + key }}">{{ label }} ({{ counts[key] }})</a>
+    {% endfor %}
   </div>
 
   {% if not orders or orders.length == 0 %}
-    <p class="muted">No orders yet.</p>
+    <p class="muted">No orders match this filter.</p>
   {% else %}
-  <table class="list">
-    <tr><th>Order Ref</th><th>Client</th><th>Stage</th><th>Status</th><th></th></tr>
+  <div class="card-grid">
     {% for o in orders %}
-    <tr>
-      <td>{{ o.order_reference }}</td>
-      <td>{{ o.company_legal_name }}</td>
-      <td>{{ o.current_stage_name or 'Quotation' }}</td>
-      <td>{{ o.status | capitalize }}</td>
-      <td><a href="/orders/{{ o.id }}">View</a></td>
-    </tr>
+      {% set stageTotal = 9 %}
+      {% set stageNumber = o.current_stage_number or 0 %}
+      {% set isLost = o.status == 'lost' %}
+      {% set isComplete = o.status == 'complete' %}
+      {% set filledSegments = o.filled_segments %}
+    <a class="entity-card{{ ' entity-card-overdue' if o.is_overdue else '' }}" href="/orders/{{ o.id }}">
+      <div class="entity-card-header">
+        <span class="entity-card-title">{{ o.order_reference }}</span>
+        {% if o.incoterm_code %}<span class="tag tag-gold">{{ o.incoterm_code }}</span>{% endif %}
+      </div>
+      <div class="entity-card-sub">{{ o.company_legal_name }}</div>
+      <div>
+        <div class="mini-stage-track">
+          {% for i in range(1, stageTotal + 1) %}
+            <div class="mini-stage-seg{{ ' filled' if i <= filledSegments else '' }}{{ ' lost' if (isLost and i <= filledSegments) else '' }}"></div>
+          {% endfor %}
+        </div>
+        <div class="mini-stage-label">
+          {% if isLost %}
+            {{ (o.lost_reason | truncate(46)) if o.lost_reason else 'Marked lost' }}
+          {% elif isComplete %}
+            Stage 9 of 9 &middot; Closed
+          {% else %}
+            Stage {{ stageNumber or 1 }} of {{ stageTotal }} &middot; {{ o.current_stage_name or 'Quotation' }}
+          {% endif %}
+        </div>
+      </div>
+      <div class="entity-card-footer">
+        {% if o.is_overdue %}
+          <span class="badge badge-lost">Overdue</span>
+        {% elif isLost %}
+          <span class="badge badge-lost">Lost</span>
+        {% elif isComplete %}
+          <span class="badge badge-complete">Complete</span>
+        {% else %}
+          <span class="badge badge-active">Active</span>
+        {% endif %}
+        <span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | float | round(2, 'floor') }}</span>
+      </div>
+    </a>
     {% endfor %}
-  </table>
+  </div>
   {% endif %}
 </div>

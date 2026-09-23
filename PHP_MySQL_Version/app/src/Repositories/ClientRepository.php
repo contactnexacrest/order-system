@@ -9,10 +9,14 @@ use App\Config\Database;
 final class ClientRepository
 {
     /** @return array<int, array<string,mixed>> */
+    /** Also carries order_count — the card-grid list view (clients/index.php) shows it per client. */
     public static function all(): array
     {
         return Database::connection()
-            ->query('SELECT * FROM clients WHERE is_active = 1 ORDER BY company_legal_name')
+            ->query(
+                'SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.client_id = c.id AND o.is_archived = 0) AS order_count
+                 FROM clients c WHERE c.is_active = 1 ORDER BY c.company_legal_name'
+            )
             ->fetchAll();
     }
 
