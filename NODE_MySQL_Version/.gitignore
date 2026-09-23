@@ -11,9 +11,11 @@ app/.env
 storage/clients/*
 storage/temp/*
 storage/logs/*
+storage/internal/reference_library/*
 !storage/clients/.gitkeep
 !storage/temp/.gitkeep
 !storage/logs/.gitkeep
+!storage/internal/reference_library/.gitkeep
 
 # Puppeteer's own browser download cache, if ever regenerated locally.
 app/.browser-cache/

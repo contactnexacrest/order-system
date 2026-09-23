@@ -11,9 +11,11 @@ app/.env
 storage/clients/*
 storage/temp/*
 storage/logs/*
+storage/internal/reference_library/*
 !storage/clients/.gitkeep
 !storage/temp/.gitkeep
 !storage/logs/.gitkeep
+!storage/internal/reference_library/.gitkeep
 
 # DOMPDF's own converted-font + metrics cache (see
 # DocumentGenerationService::renderPdf()) — regenerated automatically from

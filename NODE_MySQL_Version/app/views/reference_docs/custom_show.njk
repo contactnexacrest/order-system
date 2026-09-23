@@ -1,0 +1,18 @@
+<div class="card page-wide">
+  <p><a href="/reference-docs">&larr; Reference Library</a></p>
+  <h1>{{ doc.title }}</h1>
+  {% if permissions.manage_company_settings %}
+    <p><a href="/reference-docs/custom/{{ doc.id }}/edit" class="btn-sm">Edit</a></p>
+  {% endif %}
+
+  {% if doc.file_path %}
+    <p><a href="/reference-docs/custom/{{ doc.id }}/download" class="btn-sm btn-secondary">Download {{ doc.file_original_name }}</a></p>
+  {% endif %}
+
+  {% if contentHtml == null %}
+    <p class="muted">No typed content on this entry.{% if doc.file_path %} See the attached file above.{% endif %}</p>
+  {% else %}
+    <div class="reference-doc-content">{{ contentHtml | safe }}</div>
+  {% endif %}
+  <p class="muted small">Last updated: {{ doc.updated_at or '—' }}</p>
+</div>

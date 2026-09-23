@@ -12,4 +12,37 @@
       </tr>
     {% endfor %}
   </table>
+
+  <div class="section">
+    <h2>Other Reference Documents</h2>
+    <p class="muted small">Freely add/edit/delete — for anything that isn't one of the fixed documents above. Each can carry typed content, an uploaded file (PDF/Word/Excel), or both.</p>
+    <table class="list">
+      <tr><th>Title</th><th>File</th><th>Last Updated</th><th>Action</th></tr>
+      {% for d in customDocs %}
+        <tr>
+          <td>{{ d.title }}</td>
+          <td>
+            {% if d.file_path %}<a href="/reference-docs/custom/{{ d.id }}/download">{{ d.file_original_name }}</a>{% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td>{{ d.updated_at }}{% if d.updated_by_name %} <span class="muted small">by {{ d.updated_by_name }}</span>{% endif %}</td>
+          <td>
+            <a href="/reference-docs/custom/{{ d.id }}" class="btn-sm">View</a>
+            {% if permissions.manage_company_settings %}
+            <a href="/reference-docs/custom/{{ d.id }}/edit" class="btn-sm btn-secondary">Edit</a>
+            <form method="post" action="/reference-docs/custom/{{ d.id }}/delete" style="display:inline" onsubmit="return confirm('Delete \'{{ d.title }}\' from the Reference Library? Any uploaded file stays on disk, but this entry and its typed content are removed.');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      {% if not customDocs or customDocs.length == 0 %}
+        <tr><td colspan="4" class="muted">No other reference documents added yet.</td></tr>
+      {% endif %}
+    </table>
+    {% if permissions.manage_company_settings %}
+    <p><a href="/reference-docs/custom/create" class="btn-sm btn-success">+ Add Reference Document</a></p>
+    {% endif %}
+  </div>
 </div>

@@ -241,6 +241,13 @@ app.get('/holidays', requireAuth, requirePermission('manage_company_settings'), 
 app.post('/holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.create));
 app.post('/holidays/:id/delete', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.remove));
 app.get('/reference-docs', requireAuth, asyncHandler(referenceDocController.index));
+app.get('/reference-docs/custom/create', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.customCreateForm));
+app.post('/reference-docs/custom', requireAuth, requirePermission('manage_company_settings'), uploadLarge.single('file'), verifyCsrf, asyncHandler(referenceDocController.customCreate));
+app.get('/reference-docs/custom/:id', requireAuth, asyncHandler(referenceDocController.customShow));
+app.get('/reference-docs/custom/:id/edit', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.customEditForm));
+app.post('/reference-docs/custom/:id/update', requireAuth, requirePermission('manage_company_settings'), uploadLarge.single('file'), verifyCsrf, asyncHandler(referenceDocController.customUpdate));
+app.post('/reference-docs/custom/:id/delete', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.customDelete));
+app.get('/reference-docs/custom/:id/download', requireAuth, asyncHandler(referenceDocController.customDownload));
 app.get('/reference-docs/:code', requireAuth, asyncHandler(referenceDocController.show));
 app.get('/reference-docs/:code/edit', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.edit));
 app.post('/reference-docs/:code', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.update));

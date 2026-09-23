@@ -114,6 +114,13 @@ $router->get('/holidays', [$holidays, 'index'], [SessionAuth::required(), Permis
 $router->post('/holidays', [$holidays, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/holidays/{id}/delete', [$holidays, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->get('/reference-docs', [$referenceDocs, 'index'], [SessionAuth::required()]);
+$router->get('/reference-docs/custom/create', [$referenceDocs, 'customCreateForm'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/reference-docs/custom', [$referenceDocs, 'customCreate'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->get('/reference-docs/custom/{id}', [$referenceDocs, 'customShow'], [SessionAuth::required()]);
+$router->get('/reference-docs/custom/{id}/edit', [$referenceDocs, 'customEditForm'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/reference-docs/custom/{id}/update', [$referenceDocs, 'customUpdate'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/reference-docs/custom/{id}/delete', [$referenceDocs, 'customDelete'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->get('/reference-docs/custom/{id}/download', [$referenceDocs, 'customDownload'], [SessionAuth::required()]);
 $router->get('/reference-docs/{code}', [$referenceDocs, 'show'], [SessionAuth::required()]);
 $router->get('/reference-docs/{code}/edit', [$referenceDocs, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/reference-docs/{code}', [$referenceDocs, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);

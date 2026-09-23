@@ -1633,6 +1633,42 @@ ALTER TABLE permissions ADD COLUMN is_system_permission TINYINT(1) NOT NULL DEFA
 UPDATE permissions SET is_system_permission = 1;
 
 -- ================================================================
+-- SECTION Y — CUSTOM REFERENCE LIBRARY ENTRIES (added 2026-09-23)
+-- ================================================================
+-- The original Reference Library (Section R) is 8 fixed entries tied 1:1
+-- to a document_types row each — deliberately not a general-purpose CMS,
+-- since those 8 are specific named documents (the checklists, the two SOP
+-- tiers, Stage Gate Reference, Wall Reference) that the app itself refers
+-- to by code (e.g. WALLREF's placeholder substitution). Real gap this
+-- closes: staff have no way to add a NEW reference document (add/delete,
+-- not just edit) or attach an actual source file (a PDF/DOCX) rather than
+-- typed content — this table is a second, independent, freely add/
+-- delete-able list of arbitrary reference material for exactly that,
+-- alongside the fixed 8. It never touches document_types.
+--
+-- file_path is nullable — an entry can be text-only, file-only, or both.
+-- Re-uploading a new file only ever changes file_path/file_original_name/
+-- file_mime_type to point at the new one; the previous file already on
+-- disk under storage/internal/reference_library/ is never deleted (same
+-- "nothing gets deleted" rule the rest of the app follows for order data —
+-- see Section W's order-archiving note). Deleting the whole row likewise
+-- never deletes its file from disk, only the row that pointed to it.
+CREATE TABLE reference_library_documents (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title               VARCHAR(200) NOT NULL,
+  content             LONGTEXT NULL,
+  file_path           VARCHAR(500) NULL,
+  file_original_name  VARCHAR(255) NULL,
+  file_mime_type      VARCHAR(100) NULL,
+  created_by          BIGINT UNSIGNED NULL,
+  updated_by          BIGINT UNSIGNED NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
 -- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1648,4 +1684,5 @@ UPDATE permissions SET is_system_permission = 1;
 -- Section V (test mode) added 2026-09-22.
 -- Section W (order archiving) added 2026-09-23.
 -- Section X (role & permission management) added 2026-09-23.
+-- Section Y (custom reference library entries) added 2026-09-23.
 -- ================================================================
