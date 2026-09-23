@@ -35,7 +35,7 @@
           <div class="btn-row">
             <?php foreach ($p['images'] as $img): ?>
               <span class="muted small"><?= htmlspecialchars($img['original_filename']) ?>
-                <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/images/<?= (int) $img['id'] ?>/remove" style="display:inline">
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/images/<?= (int) $img['id'] ?>/remove" style="display:inline" onsubmit="return confirm('Remove this image from Annexure A?');">
                   <?= Csrf::field() ?>
                   <button type="submit" class="btn-sm btn-danger">&times;</button>
                 </form>

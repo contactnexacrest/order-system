@@ -302,7 +302,7 @@ $orderClosed = $order['status'] === 'complete';
             <input type="text" name="comments" placeholder="Comments (optional)">
             <button type="submit" class="btn-sm btn-success">Approve</button>
           </form>
-          <form method="post" action="/reviews/<?= (int) $myPendingReview['id'] ?>/reject" style="display:inline">
+          <form method="post" action="/reviews/<?= (int) $myPendingReview['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this document? It goes back for rework.');">
             <?= Csrf::field() ?>
             <input type="text" name="comments" placeholder="Reason (mandatory)" required>
             <button type="submit" class="btn-sm btn-danger">Reject</button>
@@ -358,7 +358,7 @@ $orderClosed = $order['status'] === 'complete';
                   <?php elseif ($log['status'] === 'approved'): ?>
                     Approved — will send once its scheduled time arrives.
                     <?php if ($canCancelThis): ?>
-                    <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px">
+                    <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
                       <?= Csrf::field() ?>
                       <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                       <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
@@ -368,7 +368,7 @@ $orderClosed = $order['status'] === 'complete';
                   <?php else: ?>
                     Awaiting Level-2 approval.
                     <?php if ($canCancelThis): ?>
-                    <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px">
+                    <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
                       <?= Csrf::field() ?>
                       <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                       <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
@@ -495,7 +495,7 @@ $orderClosed = $order['status'] === 'complete';
           <button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
       <?php else: ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <?= Csrf::field() ?>
           <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
           <button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
@@ -676,7 +676,7 @@ $orderClosed = $order['status'] === 'complete';
               <button type="submit" class="btn-sm">Record Freight Remittance</button>
             </form>
           <?php else: ?>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight/clear">
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
               <?= Csrf::field() ?>
               <label>Cleared On<input type="date" name="freight_cleared_at" value="<?= date('Y-m-d') ?>"></label>
               <button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
@@ -788,7 +788,7 @@ $orderClosed = $order['status'] === 'complete';
             <button type="submit" class="btn-sm">Record Balance Remittance</button>
           </form>
         <?php else: ?>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear">
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
             <?= Csrf::field() ?>
             <label>Cleared On<input type="date" name="balance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
             <button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>

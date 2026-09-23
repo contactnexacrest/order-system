@@ -18,13 +18,13 @@
           <?= Csrf::field() ?>
           <button type="submit" class="btn-sm btn-success">Approve</button>
         </form>
-        <form method="post" action="/email-log/<?= (int) $row['id'] ?>/reject" style="display:inline">
+        <form method="post" action="/email-log/<?= (int) $row['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this send?');">
           <?= Csrf::field() ?>
           <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:160px">
           <button type="submit" class="btn-sm btn-danger">Reject</button>
         </form>
         <?php endif; ?>
-        <form method="post" action="/email-log/<?= (int) $row['id'] ?>/cancel" style="display:inline">
+        <form method="post" action="/email-log/<?= (int) $row['id'] ?>/cancel" style="display:inline" onsubmit="return confirm('Cancel this send? It will never go out.');">
           <?= Csrf::field() ?>
           <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:160px">
           <button type="submit" class="btn-sm btn-warning">Cancel Send</button>

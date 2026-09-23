@@ -47,7 +47,7 @@
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-success">MD Approve</button>
             </form>
-            <form method="post" action="/amendments/{{ a.id }}/reject" style="display:inline">
+            <form method="post" action="/amendments/{{ a.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this payment terms amendment?');">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-danger">Reject</button>
             </form>

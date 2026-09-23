@@ -54,7 +54,7 @@
         <td><?= htmlspecialchars((string) $d['granted_at']) ?></td>
         <td><?= $d['expires_at'] ? htmlspecialchars((string) $d['expires_at']) : 'No fixed expiry' ?></td>
         <td>
-          <form method="post" action="/super-admin/delegations/<?= (int) $d['id'] ?>/revoke" style="display:flex;gap:4px;align-items:center">
+          <form method="post" action="/super-admin/delegations/<?= (int) $d['id'] ?>/revoke" style="display:flex;gap:4px;align-items:center" onsubmit="return confirm('Revoke this Super Admin delegation immediately? They lose the unrestricted access right away.');">
             <?= Csrf::field() ?>
             <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars)" required minlength="<?= $minReasonLength ?>" style="width:180px">
             <button type="submit" class="btn-sm btn-danger">Revoke</button>

@@ -22,7 +22,7 @@
             <?= Csrf::field() ?>
             <button type="submit" class="btn-sm btn-success">Accept &amp; Create Client</button>
           </form>
-          <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/reject" style="display:inline">
+          <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this quotation request?');">
             <?= Csrf::field() ?>
             <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px">
             <button type="submit" class="btn-sm btn-danger">Reject</button>

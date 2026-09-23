@@ -15,7 +15,7 @@
           <?= Csrf::field() ?>
           <button type="submit" class="btn-sm btn-success">Approve</button>
         </form>
-        <form method="post" action="/reviews/<?= (int) $r['id'] ?>/reject" style="display:inline">
+        <form method="post" action="/reviews/<?= (int) $r['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this document? It goes back for rework.');">
           <?= Csrf::field() ?>
           <input type="text" name="comments" placeholder="Reason (mandatory)" required style="width:160px">
           <button type="submit" class="btn-sm btn-danger">Reject</button>

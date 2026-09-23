@@ -99,7 +99,7 @@
               <div class="muted small">
                 <?= $a['asset_kind'] === 'signature' ? 'Signature' : 'Designation seal' ?>: <?= htmlspecialchars($a['label']) ?>
                 <?php if ($a['is_default_for_kind']): ?><strong>(default)</strong><?php endif; ?>
-                <form method="post" action="/signatories/user-assets/<?= (int) $a['id'] ?>/deactivate" style="display:inline">
+                <form method="post" action="/signatories/user-assets/<?= (int) $a['id'] ?>/deactivate" style="display:inline" onsubmit="return confirm('Remove this <?= $a['asset_kind'] === 'signature' ? 'signature' : 'designation seal' ?>? Documents already generated with it keep their existing image; this only stops it being used going forward.');">
                   <?= Csrf::field() ?>
                   <button type="submit" class="btn-sm btn-danger">Remove</button>
                 </form>

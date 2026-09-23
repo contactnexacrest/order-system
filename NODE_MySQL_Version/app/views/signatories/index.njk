@@ -101,7 +101,7 @@
               <div class="muted small">
                 {{ 'Signature' if a.asset_kind == 'signature' else 'Designation seal' }}: {{ a.label }}
                 {% if a.is_default_for_kind %}<strong>(default)</strong>{% endif %}
-                <form method="post" action="/signatories/user-assets/{{ a.id }}/deactivate" style="display:inline">
+                <form method="post" action="/signatories/user-assets/{{ a.id }}/deactivate" style="display:inline" onsubmit="return confirm('Remove this {{ 'signature' if a.asset_kind == 'signature' else 'designation seal' }}? Documents already generated with it keep their existing image; this only stops it being used going forward.');">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                   <button type="submit" class="btn-sm btn-danger">Remove</button>
                 </form>

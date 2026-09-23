@@ -288,7 +288,7 @@
             <input type="text" name="comments" placeholder="Comments (optional)">
             <button type="submit" class="btn-sm btn-success">Approve</button>
           </form>
-          <form method="post" action="/reviews/{{ myPendingReview.id }}/reject" style="display:inline">
+          <form method="post" action="/reviews/{{ myPendingReview.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this document? It goes back for rework.');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <input type="text" name="comments" placeholder="Reason (mandatory)" required>
             <button type="submit" class="btn-sm btn-danger">Reject</button>
@@ -337,7 +337,7 @@
                   {% elif log.status == 'approved' %}
                     Approved — will send once its scheduled time arrives.
                     {% if permissions.approve_email_send or log.requested_by == currentUser.id %}
-                    <form method="post" action="/email-log/{{ log.id }}/cancel" style="margin-top:4px">
+                    <form method="post" action="/email-log/{{ log.id }}/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
                       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                       <input type="hidden" name="order_id" value="{{ order.id }}">
                       <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
@@ -347,7 +347,7 @@
                   {% else %}
                     Awaiting Level-2 approval.
                     {% if permissions.approve_email_send or log.requested_by == currentUser.id %}
-                    <form method="post" action="/email-log/{{ log.id }}/cancel" style="margin-top:4px">
+                    <form method="post" action="/email-log/{{ log.id }}/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
                       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                       <input type="hidden" name="order_id" value="{{ order.id }}">
                       <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
@@ -474,7 +474,7 @@
           <button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
       {% else %}
-        <form method="post" action="/orders/{{ order.id }}/payment/advance/clear">
+        <form method="post" action="/orders/{{ order.id }}/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Cleared On<input type="date" name="advance_cleared_at"></label>
           <button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
@@ -655,7 +655,7 @@
               <button type="submit" class="btn-sm">Record Freight Remittance</button>
             </form>
           {% else %}
-            <form method="post" action="/orders/{{ order.id }}/payment/freight/clear">
+            <form method="post" action="/orders/{{ order.id }}/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <label>Cleared On<input type="date" name="freight_cleared_at"></label>
               <button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
@@ -764,7 +764,7 @@
             <button type="submit" class="btn-sm">Record Balance Remittance</button>
           </form>
         {% else %}
-          <form method="post" action="/orders/{{ order.id }}/payment/balance/clear">
+          <form method="post" action="/orders/{{ order.id }}/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Cleared On<input type="date" name="balance_cleared_at"></label>
             <button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>

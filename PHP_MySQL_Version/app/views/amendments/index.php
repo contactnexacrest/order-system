@@ -54,7 +54,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
               <?= Csrf::field() ?>
               <button type="submit" class="btn-sm btn-success">MD Approve</button>
             </form>
-            <form method="post" action="/amendments/<?= (int) $a['id'] ?>/reject" style="display:inline">
+            <form method="post" action="/amendments/<?= (int) $a['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this payment terms amendment?');">
               <?= Csrf::field() ?>
               <button type="submit" class="btn-sm btn-danger">Reject</button>
             </form>

@@ -34,7 +34,7 @@
           <div class="btn-row">
             {% for img in p.images %}
               <span class="muted small">{{ img.original_filename }}
-                <form method="post" action="/orders/{{ order.id }}/annexure/images/{{ img.id }}/remove" style="display:inline">
+                <form method="post" action="/orders/{{ order.id }}/annexure/images/{{ img.id }}/remove" style="display:inline" onsubmit="return confirm('Remove this image from Annexure A?');">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                   <button type="submit" class="btn-sm btn-danger">&times;</button>
                 </form>
