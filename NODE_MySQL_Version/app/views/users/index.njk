@@ -8,7 +8,7 @@
       <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>2FA</th><th>Last Login</th><th>Actions</th></tr>
       {% for u in users %}
       <tr>
-        <td>{{ u.name }}</td>
+        <td>{{ u.name }}{% if u.is_protected_account %} <span class="badge badge-protected">Protected founder</span>{% endif %}</td>
         <td>{{ u.email }}</td>
         <td>{{ u.role_name or '—' }}</td>
         <td>
@@ -23,6 +23,9 @@
         <td>{{ 'On' if u.two_fa_enabled else '—' }}</td>
         <td>{{ u.last_login_at or 'Never' }}</td>
         <td>
+          {% if u.is_protected_account %}
+            <span class="muted small">Protected — cannot be edited, deactivated, or password-reset by anyone else. They can recover their own login via "Forgot password" on the login screen.</span>
+          {% else %}
           <a href="/users/{{ u.id }}/edit" class="btn-sm btn-secondary">Edit</a>
           <form method="post" action="/users/{{ u.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if u.is_active else 'Reactivate' }} {{ u.name }}?');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -36,6 +39,7 @@
               <button type="submit" class="btn-sm btn-danger">Force Reset</button>
             </form>
           </details>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

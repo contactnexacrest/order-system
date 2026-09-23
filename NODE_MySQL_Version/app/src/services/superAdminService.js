@@ -2,6 +2,7 @@
 
 const db = require('../config/db');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const userRepository = require('../repositories/userRepository');
 
 // Port of App\Services\SuperAdminService.
 
@@ -24,7 +25,7 @@ async function isEffective(userId) {
 }
 
 async function permanentSuperAdmins() {
-  return db.query('SELECT id, name, email FROM users WHERE is_super_admin = 1 AND is_active = 1 ORDER BY name');
+  return db.query('SELECT id, name, email, is_protected_account FROM users WHERE is_super_admin = 1 AND is_active = 1 ORDER BY name');
 }
 
 async function activeDelegations() {
@@ -99,6 +100,12 @@ async function setPermanentFlag(userId, isSuperAdminFlag, changedBy, reason) {
   }
   if (!isSuperAdminFlag && (await permanentSuperAdmins()).length <= 1) {
     throw new Error('Cannot remove the last remaining Super Admin — promote someone else first.');
+  }
+  if (!isSuperAdminFlag) {
+    const target = await userRepository.findById(userId);
+    if (target && parseInt(target.is_protected_account, 10) === 1) {
+      throw new Error('This is a protected founder account — Super Admin status can never be removed from it.');
+    }
   }
 
   await db.execute('UPDATE users SET is_super_admin = :flag WHERE id = :id', { flag: isSuperAdminFlag ? 1 : 0, id: userId });

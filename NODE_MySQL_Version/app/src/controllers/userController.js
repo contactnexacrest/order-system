@@ -74,6 +74,11 @@ async function editForm(req, res) {
     res.redirect('/users');
     return;
   }
+  if (parseInt(target.is_protected_account, 10) === 1) {
+    flash.set(req, 'error', 'This is a protected founder account — its details can never be changed through the application, by anyone, including other Super Admins.');
+    res.redirect('/users');
+    return;
+  }
   const roles = await lookupRepository.roles();
   res.renderView('users/edit', { target, roles }, 'layout/base');
 }
@@ -83,6 +88,11 @@ async function update(req, res) {
   const target = await userRepository.findById(userId);
   if (!target) {
     flash.set(req, 'error', 'User not found.');
+    res.redirect('/users');
+    return;
+  }
+  if (parseInt(target.is_protected_account, 10) === 1) {
+    flash.set(req, 'error', 'This is a protected founder account — its details can never be changed through the application, by anyone, including other Super Admins.');
     res.redirect('/users');
     return;
   }
@@ -147,6 +157,11 @@ async function toggleActive(req, res) {
     res.redirect('/users');
     return;
   }
+  if (parseInt(target.is_protected_account, 10) === 1) {
+    flash.set(req, 'error', 'This is a protected founder account and can never be deactivated through the application.');
+    res.redirect('/users');
+    return;
+  }
 
   const newState = !target.is_active;
   await userRepository.setActive(userId, newState);
@@ -169,6 +184,11 @@ async function forceResetPassword(req, res) {
   const target = await userRepository.findById(userId);
   if (!target) {
     flash.set(req, 'error', 'User not found.');
+    res.redirect('/users');
+    return;
+  }
+  if (parseInt(target.is_protected_account, 10) === 1) {
+    flash.set(req, 'error', 'This is a protected founder account — its password can only be reset by that person themselves, via "Forgot password" on the login screen.');
     res.redirect('/users');
     return;
   }

@@ -7,6 +7,7 @@ const env = require('../config/env');
 const flash = require('../helpers/flash');
 const sniffMime = require('../helpers/sniffMime');
 const signatoryRepository = require('../repositories/signatoryRepository');
+const userRepository = require('../repositories/userRepository');
 
 /**
  * Port of App\Controllers\SignatoryController — admin screen for the
@@ -57,6 +58,13 @@ async function setEligibility(req, res) {
   const userId = parseInt(req.params.id, 10) || 0;
   const eligible = String(req.body.eligible || '0') === '1';
   const designationId = req.body.designation_id !== undefined && req.body.designation_id !== '' ? parseInt(req.body.designation_id, 10) : null;
+
+  const target = await userRepository.findById(userId);
+  if (target && parseInt(target.is_protected_account, 10) === 1) {
+    flash.set(req, 'error', 'This is a protected founder account — their signatory eligibility and designation can never be changed through the application.');
+    res.redirect('/signatories');
+    return;
+  }
 
   if (eligible && designationId === null) {
     flash.set(req, 'error', 'Pick a designation before marking this person signatory-eligible.');

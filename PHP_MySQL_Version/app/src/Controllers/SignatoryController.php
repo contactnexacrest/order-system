@@ -8,6 +8,7 @@ use App\Config\Env;
 use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\SignatoryRepository;
+use App\Repositories\UserRepository;
 use App\Services\AuthService;
 
 /**
@@ -70,6 +71,13 @@ final class SignatoryController
         $userId = (int) ($params['id'] ?? 0);
         $eligible = ($_POST['eligible'] ?? '0') === '1';
         $designationId = ($_POST['designation_id'] ?? '') !== '' ? (int) $_POST['designation_id'] : null;
+
+        $target = UserRepository::findById($userId);
+        if ($target && (int) $target['is_protected_account'] === 1) {
+            Flash::set('error', 'This is a protected founder account — their signatory eligibility and designation can never be changed through the application.');
+            header('Location: /signatories');
+            return;
+        }
 
         if ($eligible && $designationId === null) {
             Flash::set('error', 'Pick a designation before marking this person signatory-eligible.');

@@ -20,7 +20,7 @@ async function toggleDesignationActive(id) {
 
 async function usersWithSignatoryInfo() {
   return db.query(
-    `SELECT u.id, u.name, u.email, u.is_signatory_eligible, u.designation_id, d.title AS designation_title
+    `SELECT u.id, u.name, u.email, u.is_signatory_eligible, u.designation_id, u.is_protected_account, d.title AS designation_title
      FROM users u LEFT JOIN designations d ON d.id = u.designation_id
      WHERE u.is_active = 1
      ORDER BY u.name`

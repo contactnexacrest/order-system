@@ -79,8 +79,11 @@
       <tr><th>Name</th><th>Designation &amp; Eligibility</th><th>Signature / Designation Seal</th></tr>
       <?php foreach ($users as $u): ?>
       <tr>
-        <td><?= htmlspecialchars($u['name']) ?><br><span class="muted small"><?= htmlspecialchars($u['email']) ?></span></td>
+        <td><?= htmlspecialchars($u['name']) ?><?php if ((int) $u['is_protected_account'] === 1): ?> <span class="badge badge-protected">Protected founder</span><?php endif; ?><br><span class="muted small"><?= htmlspecialchars($u['email']) ?></span></td>
         <td>
+          <?php if ((int) $u['is_protected_account'] === 1): ?>
+            <span class="muted small">Protected — eligibility and designation locked.</span>
+          <?php else: ?>
           <form method="post" action="/signatories/users/<?= (int) $u['id'] ?>/eligibility" style="display:flex;gap:4px;align-items:center">
             <?= Csrf::field() ?>
             <select name="designation_id">
@@ -92,6 +95,7 @@
             <input type="hidden" name="eligible" value="<?= $u['is_signatory_eligible'] ? '0' : '1' ?>">
             <button type="submit" class="btn-sm"><?= $u['is_signatory_eligible'] ? 'Revoke' : 'Grant' ?></button>
           </form>
+          <?php endif; ?>
         </td>
         <td>
           <?php if ($u['is_signatory_eligible']): ?>

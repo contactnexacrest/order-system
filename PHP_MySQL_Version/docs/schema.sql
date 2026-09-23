@@ -1671,6 +1671,69 @@ CREATE TABLE reference_library_documents (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION Z — PROTECTED FOUNDER ACCOUNTS (added 2026-09-23)
+-- ================================================================
+-- A stronger tier above the ordinary Super Admin: is_super_admin lets an
+-- account act with unrestricted permission, but any Super Admin (including
+-- one only temporarily delegated) can still edit or promote/demote any
+-- OTHER account, including another Super Admin's identity fields, via the
+-- Users and Super Admin screens — nothing before this stopped that.
+-- is_protected_account marks the company's founder accounts, whose name,
+-- login email, role, designation, signatory eligibility, active/Super
+-- Admin status can never change through the application again once set,
+-- by anyone — not even another Super Admin, and not even themselves,
+-- since there's no self-service profile edit distinct from the admin
+-- Users screen. Enforced twice, deliberately: the application layer gives
+-- a clean flash-message refusal at each call site that could touch these
+-- fields (UserController::update/toggleActive/forceResetPassword,
+-- SuperAdminService::setPermanentFlag, SignatoryController::setEligibility)
+-- and the trigger below is the real, unbypassable backstop — it fires
+-- regardless of which code path or DB user issues the statement, exactly
+-- like Section N's trg_users_super_admin_bd/bu.
+--
+-- Deliberately NOT covered (both by design): password_hash and its
+-- sibling columns (force_password_change, password_changed_at,
+-- failed_login_count, locked_until, two_fa_*) — the protected person can
+-- always recover their own login via the existing self-service
+-- /forgot-password email flow, which is what UserController's
+-- forceResetPassword refusal message points them to; and
+-- user_signature_assets (their uploaded signature/seal image files) —
+-- refreshing a scanned signature is a legitimate, expected maintenance
+-- action, not an identity change, and stays available to anyone holding
+-- manage_signatories.
+ALTER TABLE users ADD COLUMN is_protected_account TINYINT(1) NOT NULL DEFAULT 0 AFTER is_super_admin;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_users_protected_bd BEFORE DELETE ON users
+FOR EACH ROW
+BEGIN
+  IF OLD.is_protected_account = 1 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot delete a protected founder account.';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_users_protected_bu BEFORE UPDATE ON users
+FOR EACH ROW
+BEGIN
+  IF OLD.is_protected_account = 1 AND (
+       NOT (OLD.name <=> NEW.name) OR
+       NOT (OLD.email <=> NEW.email) OR
+       NOT (OLD.phone <=> NEW.phone) OR
+       NOT (OLD.role_id <=> NEW.role_id) OR
+       NOT (OLD.designation_id <=> NEW.designation_id) OR
+       NOT (OLD.is_signatory_eligible <=> NEW.is_signatory_eligible) OR
+       NOT (OLD.is_super_admin <=> NEW.is_super_admin) OR
+       NOT (OLD.is_active <=> NEW.is_active) OR
+       NOT (OLD.is_protected_account <=> NEW.is_protected_account)
+     ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot change a protected founder account — its identity, role, designation, eligibility and Super Admin/active status can never be edited through the application.';
+  END IF;
+END$$
+
+DELIMITER ;
+
+-- ================================================================
 -- END OF SCHEMA — 65 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1687,4 +1750,5 @@ CREATE TABLE reference_library_documents (
 -- Section W (order archiving) added 2026-09-23.
 -- Section X (role & permission management) added 2026-09-23.
 -- Section Y (custom reference library entries) added 2026-09-23.
+-- Section Z (protected founder accounts) added 2026-09-23.
 -- ================================================================

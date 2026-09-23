@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Config\Database;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\UserRepository;
 
 /**
  * The Super Admin tier: unrestricted everywhere, including self-approval on
@@ -48,7 +49,7 @@ final class SuperAdminService
     public static function permanentSuperAdmins(): array
     {
         return Database::connection()
-            ->query('SELECT id, name, email FROM users WHERE is_super_admin = 1 AND is_active = 1 ORDER BY name')
+            ->query('SELECT id, name, email, is_protected_account FROM users WHERE is_super_admin = 1 AND is_active = 1 ORDER BY name')
             ->fetchAll();
     }
 
@@ -152,6 +153,12 @@ final class SuperAdminService
         }
         if (!$isSuperAdmin && count(self::permanentSuperAdmins()) <= 1) {
             throw new \RuntimeException('Cannot remove the last remaining Super Admin — promote someone else first.');
+        }
+        if (!$isSuperAdmin) {
+            $target = UserRepository::findById($userId);
+            if ($target && (int) $target['is_protected_account'] === 1) {
+                throw new \RuntimeException('This is a protected founder account — Super Admin status can never be removed from it.');
+            }
         }
 
         $pdo = Database::connection();

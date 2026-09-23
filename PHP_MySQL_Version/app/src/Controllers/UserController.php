@@ -82,6 +82,11 @@ final class UserController
             header('Location: /users');
             return;
         }
+        if ((int) $target['is_protected_account'] === 1) {
+            Flash::set('error', 'This is a protected founder account — its details can never be changed through the application, by anyone, including other Super Admins.');
+            header('Location: /users');
+            return;
+        }
         View::render('users/edit', [
             'target' => $target,
             'roles' => LookupRepository::roles(),
@@ -94,6 +99,11 @@ final class UserController
         $target = UserRepository::findById($userId);
         if (!$target) {
             Flash::set('error', 'User not found.');
+            header('Location: /users');
+            return;
+        }
+        if ((int) $target['is_protected_account'] === 1) {
+            Flash::set('error', 'This is a protected founder account — its details can never be changed through the application, by anyone, including other Super Admins.');
             header('Location: /users');
             return;
         }
@@ -167,6 +177,11 @@ final class UserController
             header('Location: /users');
             return;
         }
+        if ((int) $target['is_protected_account'] === 1) {
+            Flash::set('error', 'This is a protected founder account and can never be deactivated through the application.');
+            header('Location: /users');
+            return;
+        }
 
         $newState = !((bool) $target['is_active']);
         UserRepository::setActive($userId, $newState);
@@ -190,6 +205,11 @@ final class UserController
         $target = UserRepository::findById($userId);
         if (!$target) {
             Flash::set('error', 'User not found.');
+            header('Location: /users');
+            return;
+        }
+        if ((int) $target['is_protected_account'] === 1) {
+            Flash::set('error', 'This is a protected founder account — its password can only be reset by that person themselves, via "Forgot password" on the login screen.');
             header('Location: /users');
             return;
         }

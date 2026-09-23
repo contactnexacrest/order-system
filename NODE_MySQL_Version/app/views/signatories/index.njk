@@ -78,8 +78,11 @@
       <tr><th>Name</th><th>Designation &amp; Eligibility</th><th>Signature / Designation Seal</th></tr>
       {% for u in users %}
       <tr>
-        <td>{{ u.name }}<br><span class="muted small">{{ u.email }}</span></td>
+        <td>{{ u.name }}{% if u.is_protected_account %} <span class="badge badge-protected">Protected founder</span>{% endif %}<br><span class="muted small">{{ u.email }}</span></td>
         <td>
+          {% if u.is_protected_account %}
+            <span class="muted small">Protected — eligibility and designation locked.</span>
+          {% else %}
           <form method="post" action="/signatories/users/{{ u.id }}/eligibility" style="display:flex;gap:4px;align-items:center">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <select name="designation_id">
@@ -93,6 +96,7 @@
             <input type="hidden" name="eligible" value="{{ '0' if u.is_signatory_eligible else '1' }}">
             <button type="submit" class="btn-sm">{{ 'Revoke' if u.is_signatory_eligible else 'Grant' }}</button>
           </form>
+          {% endif %}
         </td>
         <td>
           {% if u.is_signatory_eligible %}

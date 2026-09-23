@@ -9,7 +9,7 @@
       <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>2FA</th><th>Last Login</th><th>Actions</th></tr>
       <?php foreach ($users as $u): ?>
       <tr>
-        <td><?= htmlspecialchars($u['name']) ?></td>
+        <td><?= htmlspecialchars($u['name']) ?><?php if ((int) $u['is_protected_account'] === 1): ?> <span class="badge badge-protected">Protected founder</span><?php endif; ?></td>
         <td><?= htmlspecialchars($u['email']) ?></td>
         <td><?= htmlspecialchars($u['role_name'] ?? '—') ?></td>
         <td>
@@ -24,6 +24,9 @@
         <td><?= $u['two_fa_enabled'] ? 'On' : '—' ?></td>
         <td><?= htmlspecialchars($u['last_login_at'] ?? 'Never') ?></td>
         <td>
+          <?php if ((int) $u['is_protected_account'] === 1): ?>
+            <span class="muted small">Protected — cannot be edited, deactivated, or password-reset by anyone else. They can recover their own login via "Forgot password" on the login screen.</span>
+          <?php else: ?>
           <a href="/users/<?= (int) $u['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
           <form method="post" action="/users/<?= (int) $u['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($u['name'])) ?>?');">
             <?= Csrf::field() ?>
@@ -37,6 +40,7 @@
               <button type="submit" class="btn-sm btn-danger">Force Reset</button>
             </form>
           </details>
+          <?php endif; ?>
         </td>
       </tr>
       <?php endforeach; ?>

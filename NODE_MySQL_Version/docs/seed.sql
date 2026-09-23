@@ -591,26 +591,33 @@ FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
 -- images, extracted from the source documents (Gulmohar Sontakke) and
 -- supplied directly by the company (Arti Sontakke).
 -- ================================================================
-INSERT INTO designations (title, is_active) VALUES ('Director', 1);
+-- 'Director' kept as a generic, unused-by-default title for any future
+-- signatory who isn't a protected founder account. Gulmohar and Arti each
+-- get their own specific designation below instead, since that title is
+-- what's printed on generated documents next to their signature/seal.
+INSERT INTO designations (title, is_active) VALUES
+  ('Director', 1),
+  ('Founder & Managing Director', 1),
+  ('Founder & Executive Director', 1);
 
 -- Gulmohar Sontakke already exists as the seeded Admin login
--- (admin@nexacrest.placeholder) — mark her signatory-eligible with the
--- Director designation and set her as the company's global default
--- signatory, matching the existing company_settings.md_name/md_title.
+-- (admin@nexacrest.placeholder) — mark her signatory-eligible with her
+-- own designation and set her as the company's global default signatory,
+-- matching the existing company_settings.md_name/md_title.
 UPDATE users u
-JOIN designations d ON d.title = 'Director'
+JOIN designations d ON d.title = 'Founder & Managing Director'
 SET u.designation_id = d.id, u.is_signatory_eligible = 1
 WHERE u.email = 'admin@nexacrest.placeholder';
 
--- Role deliberately conservative (Viewer / Auditor, read-only) — this
--- account exists so Arti Sontakke can be a signatory on documents; it does
--- NOT assume her actual operational role in the business. Admin should
--- change role_id from the Users screen to whatever is actually correct.
+-- Role: Managing Director — she IS one of the company's two founders and
+-- will be marked is_protected_account below (Section Z), so this is a
+-- one-time correction, not something meant to be revisited from the
+-- Users screen the way an ordinary account's role would be.
 INSERT INTO users (name, email, phone, password_hash, role_id, designation_id, is_signatory_eligible, is_active, force_password_change, two_fa_enabled)
 SELECT 'Arti Sontakke', 'arti.sontakke@nexacrest.placeholder', NULL,
        '$2y$12$SRa3a47hKlgsRGskEZfWJerGPgxLI8jSnVlckkHENnfs9VRao/You',
        r.id, d.id, 1, 1, 1, 0
-FROM roles r, designations d WHERE r.name = 'Viewer / Auditor' AND d.title = 'Director';
+FROM roles r, designations d WHERE r.name = 'Managing Director' AND d.title = 'Founder & Executive Director';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, 1, u.id
@@ -625,14 +632,34 @@ SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/
        (SELECT id FROM users WHERE email = 'admin@nexacrest.placeholder')
 FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
 
+INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
+SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/arti_sontakke_signature_default.png', 'image/png', 1, 1, u.id
+FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
+
 -- ================================================================
 -- SUPER ADMIN TIER (Section N, added 2026-09-20)
--- The seeded admin login is the initial permanent Super Admin — real-world
--- Gulmohar Sontakke is NexaCrest's Founder & Managing Director, the
--- obvious first holder of the unrestricted tier. Promote/demote further
--- holders from /super-admin once logged in.
+-- Both founders are the initial permanent Super Admins — real-world
+-- Gulmohar Sontakke is NexaCrest's Founder & Managing Director and Arti
+-- Sontakke its Founder & Executive Director, the obvious first holders of
+-- the unrestricted tier. Promote/demote further (non-founder) holders
+-- from /super-admin once logged in.
 -- ================================================================
-UPDATE users SET is_super_admin = 1 WHERE email = 'admin@nexacrest.placeholder';
+UPDATE users SET is_super_admin = 1
+WHERE email IN ('admin@nexacrest.placeholder', 'arti.sontakke@nexacrest.placeholder');
+
+-- ================================================================
+-- PROTECTED FOUNDER ACCOUNTS (Section Z, added 2026-09-23)
+-- Locks both founders' identity/role/designation/eligibility/Super Admin
+-- status from ever being changed again through the application, by
+-- anyone (see schema.sql Section Z for the enforcing trigger and
+-- UserController/SuperAdminService/SignatoryController for the matching
+-- application-layer refusals). Set LAST, deliberately, after every field
+-- above is already correct — once this flag is 1, none of those fields,
+-- including this one, can be changed by any INSERT/UPDATE statement,
+-- this seed script included.
+-- ================================================================
+UPDATE users SET is_protected_account = 1
+WHERE email IN ('admin@nexacrest.placeholder', 'arti.sontakke@nexacrest.placeholder');
 
 -- Global default signatory = Gulmohar Sontakke (matches legacy md_name).
 INSERT INTO company_default_signatory (id, user_id, updated_by)

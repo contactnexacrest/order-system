@@ -8,10 +8,12 @@
       <tr><th>Name</th><th>Email</th><th>Action</th></tr>
       {% for sa in superAdmins %}
       <tr>
-        <td>{{ sa.name }}</td>
+        <td>{{ sa.name }}{% if sa.is_protected_account %} <span class="badge badge-protected">Protected founder</span>{% endif %}</td>
         <td>{{ sa.email }}</td>
         <td>
-          {% if superAdmins.length > 1 %}
+          {% if sa.is_protected_account %}
+            <span class="muted small">Protected founder account — Super Admin status can never be removed.</span>
+          {% elif superAdmins.length > 1 %}
           <form method="post" action="/super-admin/set-permanent" style="display:flex;gap:4px;align-items:center" onsubmit="return confirm('Remove Super Admin status from this person?');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <input type="hidden" name="target_id" value="{{ sa.id }}">

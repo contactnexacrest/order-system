@@ -9,10 +9,12 @@
       <tr><th>Name</th><th>Email</th><th>Action</th></tr>
       <?php foreach ($superAdmins as $sa): ?>
       <tr>
-        <td><?= htmlspecialchars($sa['name']) ?></td>
+        <td><?= htmlspecialchars($sa['name']) ?><?php if ((int) $sa['is_protected_account'] === 1): ?> <span class="badge badge-protected">Protected founder</span><?php endif; ?></td>
         <td><?= htmlspecialchars($sa['email']) ?></td>
         <td>
-          <?php if (count($superAdmins) > 1): ?>
+          <?php if ((int) $sa['is_protected_account'] === 1): ?>
+            <span class="muted small">Protected founder account — Super Admin status can never be removed.</span>
+          <?php elseif (count($superAdmins) > 1): ?>
           <form method="post" action="/super-admin/set-permanent" style="display:flex;gap:4px;align-items:center" onsubmit="return confirm('Remove Super Admin status from this person?');">
             <?= Csrf::field() ?>
             <input type="hidden" name="target_id" value="<?= (int) $sa['id'] ?>">
