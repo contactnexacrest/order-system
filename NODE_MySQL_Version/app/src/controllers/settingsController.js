@@ -4,6 +4,7 @@ const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
+const zohoMailService = require('../services/zohoMailService');
 
 // Port of App\Controllers\SettingsController.
 
@@ -80,4 +81,31 @@ async function update(req, res) {
   res.redirect('/settings');
 }
 
-module.exports = { index, update };
+/**
+ * docs/schema.sql Section AI — calls zohoMailService directly (never
+ * through mailSenderService's fallback) so a real Zoho error surfaces here
+ * instead of silently succeeding via SMTP, which would be useless for
+ * actually verifying the Zoho credentials just entered.
+ */
+async function testZohoEmail(req, res) {
+  const to = String(req.body.test_to || '').trim();
+  if (to === '' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    flash.set(req, 'error', 'Enter a valid email address to send the test to.');
+    res.redirect('/settings');
+    return;
+  }
+
+  try {
+    await zohoMailService.send(
+      to,
+      'NexaCrest — Zoho Mail test',
+      `This is a test email sent from the NexaCrest order system's Zoho Mail integration.\n\nIf you received this, the connection is working.\n\nSent by ${req.user.name}.`
+    );
+    flash.set(req, 'success', `Test email sent via Zoho Mail to ${to}.`);
+  } catch (e) {
+    flash.set(req, 'error', `Zoho test send failed: ${e.message}`);
+  }
+  res.redirect('/settings');
+}
+
+module.exports = { index, update, testZohoEmail };

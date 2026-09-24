@@ -58,7 +58,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('view_product_pricing',      'View product pricing',          'See product pricing, supplier list, and misc charges.', 'catalog'),
   ('manage_product_catalog',    'Manage product catalog',        'Create, edit, and delete products, suppliers, images, and misc charges.', 'catalog'),
   ('view_archived_orders',      'View archived orders',          'See orders that have been archived out of the default listing. Archiving never deletes anything — this only gates who can look an archived order up.', 'orders'),
-  ('manage_hs_codes',           'Manage HS code master list',    'Add, edit, and deactivate HS codes in the master list order creation picks from — kept separate from ordinary order-entry access so a new code always goes through a privileged person first.', 'catalog');
+  ('manage_hs_codes',           'Manage HS code master list',    'Add, edit, and deactivate HS codes in the master list order creation picks from — kept separate from ordinary order-entry access so a new code always goes through a privileged person first.', 'catalog'),
+  ('manage_email_templates',    'Manage email templates',        'Add or edit email templates used when composing a send (never delete — every past send keeps its own frozen copy in the email log regardless).', 'admin');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -406,7 +407,8 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
   ('buyer_approval',        'pdf,jpg,jpeg,png,eml,msg', 5242880, 'Buyer''s written approval (e.g. quantity shortfall, draft BL sign-off).'),
   ('product_image',         'jpg,jpeg,png,webp', 5242880, 'Product image/technical drawing attached to an Annexure A entry.'),
   ('buyer_po_copy',         'pdf,jpg,jpeg,png,eml,msg', 10485760, 'Buyer''s actual signed Purchase Order (Stage 2 gate evidence — Addition beyond the spec''s named key list: recordBuyerPo() previously only captured a reference number typed by staff, with no copy of the PO itself on file).'),
-  ('supplier_po_ack',       'pdf,jpg,jpeg,png,eml,msg', 10485760, 'Supplier''s signed acknowledgment of the Supplier PO (Stage 5 gate evidence — same addition/rationale as buyer_po_copy).');
+  ('supplier_po_ack',       'pdf,jpg,jpeg,png,eml,msg', 10485760, 'Supplier''s signed acknowledgment of the Supplier PO (Stage 5 gate evidence — same addition/rationale as buyer_po_copy).'),
+  ('order_comment_media',   'jpg,jpeg,png,gif,webp,mp4,mov,webm,pdf', 52428800, 'Images/videos/files attached to an order progress chat comment (50 MB per file). Attachments over mailSenderService''s direct-attach cap are sent to the client as a portal download link instead of an email attachment.');
 
 -- ================================================================
 -- COMPANY_SETTINGS — every key schema.sql reserves for this table.
@@ -468,7 +470,15 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('client_number_format',  'SC-CL-{NNNN}', 'string', 'formats', 'Placeholder client numbering format — confirm against your actual convention.', 0),
   ('order_ref_format',      'SC/OC/{YYYY}/{NNN}', 'string', 'formats', 'Placeholder order reference format — confirm against your actual convention.', 0),
   ('dispute_response_days_n', '10', 'number', 'disputes', 'WORKING days allowed for a dispute response before escalation — must match the "ten (10) working days" figure in the Dispute Resolution & Public Communications clause below verbatim, since that clause is the legally binding promise printed on QT/PI/OC/BUYERPO. (Corrected from an earlier placeholder of 7, which did not match the clause text.) response_due_date is computed via WorkingDaysCalculator, which skips weekly_off_days and company_holidays — plain calendar-day arithmetic would silently undercount the deadline by counting Sundays/holidays as working days.', 0),
-  ('weekly_off_days', 'sunday', 'string', 'disputes', 'Comma-separated lowercase weekday name(s) that never count as a working day, used by WorkingDaysCalculator (Addition beyond the spec''s named key list — needed to make dispute_response_days_n''s "working days" figure actually computable; NexaCrest''s standard Mon-Sat working week per this same section''s holiday calendar).', 0);
+  ('weekly_off_days', 'sunday', 'string', 'disputes', 'Comma-separated lowercase weekday name(s) that never count as a working day, used by WorkingDaysCalculator (Addition beyond the spec''s named key list — needed to make dispute_response_days_n''s "working days" figure actually computable; NexaCrest''s standard Mon-Sat working week per this same section''s holiday calendar).', 0),
+  ('zoho_mail_enabled',   '0', 'boolean', 'zoho', 'Master on/off switch for sending through the Zoho Mail API. Off by default (no credentials configured yet) — when off, or on any Zoho send failure, mail goes out through the existing SMTP path instead. Never a hard dependency.', 0),
+  ('zoho_client_id',      '', 'string',  'zoho', 'Zoho API Console self-client OAuth Client ID.', 1),
+  ('zoho_client_secret',  '', 'string',  'zoho', 'Zoho API Console self-client OAuth Client Secret.', 1),
+  ('zoho_refresh_token',  '', 'string',  'zoho', 'Zoho OAuth refresh token (mail.send scope) — exchanged for a short-lived access token on each send.', 1),
+  ('zoho_account_id',     '', 'string',  'zoho', 'Zoho Mail account ID (from Zoho Mail API''s accounts endpoint) that mail is sent from.', 1),
+  ('zoho_from_address',   '', 'string',  'zoho', 'The Zoho mailbox address mail is sent from — must be one of the Zoho account''s own verified addresses.', 0),
+  ('zoho_accounts_domain', 'accounts.zoho.com', 'string', 'zoho', 'Zoho OAuth token endpoint domain — Zoho is region-specific (accounts.zoho.com / .eu / .in / .com.cn / .com.au, matching whichever data center the Zoho One account lives in).', 0),
+  ('zoho_api_domain',      'mail.zoho.com', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0);
 
 -- Addition beyond the spec's named key list: the signature/seal on generated
 -- documents are electronic marks, not a scan of a wet-ink signature or a
@@ -530,31 +540,31 @@ SELECT id, 1 FROM document_types WHERE code IN ('QT', 'ANNEXA', 'PI', 'OC', 'BUY
 -- ================================================================
 INSERT INTO email_templates (template_key, subject, body, footer) VALUES
   ('send_qt', 'Quotation {document_reference} — {company_name}',
-   'Dear {buyer_contact_person},\n\nPlease find attached our Quotation {document_reference} dated {generated_date} for your reference (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nThis quotation is valid until {quotation_valid_until}. Please let us know if you have any questions or would like to proceed.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nPlease find attached our Quotation {document_reference} dated {generated_date} for your reference (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nThis quotation is valid until {quotation_valid_until}. Please let us know if you have any questions or would like to proceed.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_pi', 'Proforma Invoice {document_reference} — {company_name}',
-   'Dear {buyer_contact_person},\n\nPlease find attached Proforma Invoice {document_reference} dated {generated_date}, issued against Quotation {quotation_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nThis Proforma Invoice is valid until {pi_valid_until}. Kindly arrange the advance payment as per the terms stated to enable us to commence production.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nPlease find attached Proforma Invoice {document_reference} dated {generated_date}, issued against Quotation {quotation_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nThis Proforma Invoice is valid until {pi_valid_until}. Kindly arrange the advance payment as per the terms stated to enable us to commence production.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_oc', 'Order Confirmation {document_reference} — {company_name}',
-   'Dear {buyer_contact_person},\n\nWe are pleased to confirm your order. Please find attached Order Confirmation {document_reference} dated {generated_date}, issued against Proforma Invoice {pi_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nProduction will proceed as per the schedule stated in the attached document.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nWe are pleased to confirm your order. Please find attached Order Confirmation {document_reference} dated {generated_date}, issued against Proforma Invoice {pi_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nProduction will proceed as per the schedule stated in the attached document.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_ci', 'Commercial Invoice {document_reference} — {company_name}',
-   'Dear {buyer_contact_person},\n\nPlease find attached Commercial Invoice {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nKindly review the invoice value and payment settlement details and arrange the balance payment as per the terms stated.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nPlease find attached Commercial Invoice {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nKindly review the invoice value and payment settlement details and arrange the balance payment as per the terms stated.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_fdn', 'Freight Debit Note {document_reference} — Payment Required Before Shipment',
-   'Dear {buyer_contact_person},\n\nPlease find attached Freight Debit Note {document_reference} dated {generated_date} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nPayment is required within 3 working days of this Debit Note''s date. We will confirm shipment booking only upon receipt of full freight payment.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nPlease find attached Freight Debit Note {document_reference} dated {generated_date} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nPayment is required within 3 working days of this Debit Note''s date. We will confirm shipment booking only upon receipt of full freight payment.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('payment_followup', 'Payment Follow-Up — Order {order_reference}',
-   'Dear {buyer_contact_person},\n\nThis is a follow-up regarding the pending payment on your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). Kindly arrange the payment at your earliest convenience and share the remittance copy so we can proceed.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nThis is a follow-up regarding the pending payment on your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). Kindly arrange the payment at your earliest convenience and share the remittance copy so we can proceed.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('shipment_readiness', 'Shipment Readiness Confirmation — Order {order_reference}',
-   'Dear {buyer_contact_person},\n\nWe are pleased to confirm that your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}) is packed and ready for shipment. Please find the relevant shipment details attached.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nWe are pleased to confirm that your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}) is packed and ready for shipment. Please find the relevant shipment details attached.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('bl_copy_sent', 'Bill of Lading Copy — Order {order_reference}',
-   'Dear {buyer_contact_person},\n\nPlease find attached the scanned copy of the Bill of Lading for your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). BL originals will be couriered upon clearance of the balance payment, per the agreed terms.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nPlease find attached the scanned copy of the Bill of Lading for your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). BL originals will be couriered upon clearance of the balance payment, per the agreed terms.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('balance_receipt_confirmation', 'Balance Payment Received — Order {order_reference}',
-   'Dear {buyer_contact_person},\n\nWe confirm receipt and clearance of the balance payment for your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). Thank you for your business — we are proceeding with final despatch formalities.\n\nRegards,\n{sender_name}\n{sender_title}',
+   'Dear {buyer_contact_person},\n\nWe confirm receipt and clearance of the balance payment for your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). Thank you for your business — we are proceeding with final despatch formalities.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}');
 
 -- ================================================================

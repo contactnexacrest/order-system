@@ -1,0 +1,23 @@
+<div class="card page-wide">
+  <h1>{{ 'Edit Email Template' if template else 'New Email Template' }}</h1>
+  <p class="muted">Use any of these tokens in the subject/body/footer — they're substituted with the real order/document/sender values when a staff member composes a send: {{ availableTokens | join(', ') }}</p>
+
+  <form method="post" action="{{ '/email-templates/' ~ template.id ~ '/update' if template else '/email-templates' }}">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+    {% if template %}
+      <label>Template Key<input type="text" value="{{ template.template_key }}" disabled></label>
+    {% else %}
+      <label>Template Key * <span class="muted small">(lowercase, letters/numbers/underscores only — cannot be changed after creation)</span>
+        <input type="text" name="template_key" placeholder="e.g. payment_followup" pattern="[a-z0-9_]+" required>
+      </label>
+    {% endif %}
+
+    <label>Subject *<input type="text" name="subject" value="{{ template.subject or '' }}" required></label>
+    <label>Body *<textarea name="body" rows="10" required>{{ template.body or '' }}</textarea></label>
+    <label>Footer<textarea name="footer" rows="3">{{ template.footer or '' }}</textarea></label>
+
+    <button type="submit" class="btn-sm btn-accent">{{ 'Save Changes' if template else 'Create Template' }}</button>
+    <a class="btn-sm" href="/email-templates">Cancel</a>
+  </form>
+</div>

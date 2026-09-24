@@ -83,10 +83,23 @@ async function sendPlainText(toEmail, subject, body, opts = {}) {
  * @returns {Promise<boolean>}
  */
 async function sendWithAttachment(toEmail, subject, body, attachmentPath, attachmentName, opts = {}) {
+  return sendWithAttachments(toEmail, subject, body, [{ path: attachmentPath, name: attachmentName }], opts);
+}
+
+/**
+ * Order progress chat (docs/schema.sql Section AI) can carry several
+ * images/videos on one comment — this is the general form
+ * sendWithAttachment() above now delegates to.
+ * @param {Array<{path: string, name: string}>} attachments
+ * @param {{isSecurityEmail?: boolean}} [opts]
+ * @returns {Promise<boolean>}
+ */
+async function sendWithAttachments(toEmail, subject, body, attachments, opts = {}) {
   const to = await resolveRecipient(toEmail, !!opts.isSecurityEmail, subject);
   const t = transport();
   if (!t) {
-    console.error(`[EMAIL NOT SENT — no SMTP configured] To: ${to} | Subject: ${subject} | Attachment: ${attachmentName}`);
+    const names = attachments.map((a) => a.name).join(', ');
+    console.error(`[EMAIL NOT SENT — no SMTP configured] To: ${to} | Subject: ${subject} | Attachments: ${names}`);
     return false;
   }
   try {
@@ -95,7 +108,7 @@ async function sendWithAttachment(toEmail, subject, body, attachmentPath, attach
       to,
       subject,
       text: body,
-      attachments: [{ filename: attachmentName, path: attachmentPath }],
+      attachments: attachments.map((a) => ({ filename: a.name, path: a.path })),
     });
     return true;
   } catch (e) {
@@ -104,4 +117,4 @@ async function sendWithAttachment(toEmail, subject, body, attachmentPath, attach
   }
 }
 
-module.exports = { sendPlainText, sendWithAttachment };
+module.exports = { sendPlainText, sendWithAttachment, sendWithAttachments };

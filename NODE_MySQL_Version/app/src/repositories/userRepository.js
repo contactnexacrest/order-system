@@ -95,8 +95,14 @@ async function adminForceResetPassword(userId, tempPasswordHash) {
   );
 }
 
+/** docs/schema.sql Section AI — self-service email signature, appended to every email that user sends through the system. */
+async function updateSignature(userId, signature) {
+  await db.execute('UPDATE users SET email_signature = :signature WHERE id = :id', { signature, id: userId });
+}
+
 module.exports = {
   findByEmail, findById, incrementFailedLogins, resetFailedLogins, lockUntil,
   updateLastLogin, updatePassword, flagPasswordExpired, setTwoFactor,
   listActive, listAllForAdmin, create, update, setActive, adminForceResetPassword,
+  updateSignature,
 };

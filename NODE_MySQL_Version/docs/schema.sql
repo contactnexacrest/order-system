@@ -1988,7 +1988,86 @@ ALTER TABLE documents
   ADD COLUMN client_revision_number INT NULL AFTER revision_number;
 
 -- ================================================================
--- END OF SCHEMA — 69 tables. All open schema questions resolved
+-- SECTION AI — ORDER PROGRESS CHAT, EMAIL TEMPLATE CRUD, PER-USER
+-- SIGNATURE, ZOHO MAIL INTEGRATION (added 2026-09-24)
+--
+-- order_comments / order_comment_attachments: a two-way chat thread per
+-- order. A staff post triggers an immediate email to the client carrying
+-- the comment text and, where practical, the attachments (an oversized
+-- attachment gets a portal download link instead — see
+-- orderCommentService's MAX_DIRECT_ATTACH_BYTES). A client post never
+-- emails the client back (they're already in their own portal) — it
+-- raises an in-app notification to staff instead, the same pattern
+-- already used for client-side dispute/payment-report events.
+--
+-- email_templates gains is_active/created_by/created_at so a template can
+-- be added or edited (governed by manage_email_templates) but never
+-- deleted — email_log already freezes subject/body at send time
+-- (body_snapshot), so a template's current state is irrelevant to what
+-- was actually sent two years ago; is_active only controls whether it's
+-- still offered for a NEW send.
+--
+-- users.email_signature: one plain-text signature per user, appended to
+-- every email that user sends through the system (matches the existing
+-- plain-text email convention — no HTML emails introduced).
+--
+-- company_settings gains the Zoho Mail integration's configuration.
+-- zoho_mail_enabled is a plain on/off switch (default off, since no
+-- credentials exist yet); when on, mailSenderService tries the Zoho Mail
+-- API first and, on ANY failure at all (bad/missing credentials, network
+-- error, malformed response), falls straight through to the existing
+-- SMTP path with no error ever surfaced to the caller — Zoho is strictly
+-- an optional enhancement layer, never a dependency the app can be
+-- blocked by.
+-- ================================================================
+CREATE TABLE order_comments (
+  id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                BIGINT UNSIGNED NOT NULL,
+  author_type             ENUM('staff','client') NOT NULL,
+  author_user_id          BIGINT UNSIGNED NULL,   -- set when author_type = 'staff'
+  author_client_id        BIGINT UNSIGNED NULL,   -- set when author_type = 'client'
+  body                    TEXT NULL,              -- comment text; NULL allowed for an attachment-only post
+  email_sent              TINYINT(1) NOT NULL DEFAULT 0,  -- whether this staff comment's client email actually went out
+  created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (author_user_id) REFERENCES users(id),
+  FOREIGN KEY (author_client_id) REFERENCES clients(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_comment_attachments (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  comment_id    BIGINT UNSIGNED NOT NULL,
+  file_store_id BIGINT UNSIGNED NOT NULL,
+  FOREIGN KEY (comment_id) REFERENCES order_comments(id),
+  FOREIGN KEY (file_store_id) REFERENCES file_store(id)
+) ENGINE=InnoDB;
+
+INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description) VALUES
+  ('order_comment_media', 'jpg,jpeg,png,gif,webp,mp4,mov,webm,pdf', 52428800, 'Images/videos/files attached to an order progress chat comment (50 MB per file). Attachments over mailSenderService''s direct-attach cap are sent to the client as a portal download link instead of an email attachment.');
+
+ALTER TABLE email_templates
+  ADD COLUMN is_active  TINYINT(1) NOT NULL DEFAULT 1 AFTER footer,
+  ADD COLUMN created_by BIGINT UNSIGNED NULL AFTER is_active,
+  ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER created_by;
+
+ALTER TABLE users
+  ADD COLUMN email_signature TEXT NULL AFTER phone;
+
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('zoho_mail_enabled',   '0', 'boolean', 'zoho', 'Master on/off switch for sending through the Zoho Mail API. Off by default (no credentials configured yet) — when off, or on any Zoho send failure, mail goes out through the existing SMTP path instead. Never a hard dependency.', 0),
+  ('zoho_client_id',      '', 'string',  'zoho', 'Zoho API Console self-client OAuth Client ID.', 1),
+  ('zoho_client_secret',  '', 'string',  'zoho', 'Zoho API Console self-client OAuth Client Secret.', 1),
+  ('zoho_refresh_token',  '', 'string',  'zoho', 'Zoho OAuth refresh token (mail.send scope) — exchanged for a short-lived access token on each send.', 1),
+  ('zoho_account_id',     '', 'string',  'zoho', 'Zoho Mail account ID (from Zoho Mail API''s accounts endpoint) that mail is sent from.', 1),
+  ('zoho_from_address',   '', 'string',  'zoho', 'The Zoho mailbox address mail is sent from — must be one of the Zoho account''s own verified addresses.', 0),
+  ('zoho_accounts_domain', 'accounts.zoho.com', 'string', 'zoho', 'Zoho OAuth token endpoint domain — Zoho is region-specific (accounts.zoho.com / .eu / .in / .com.cn / .com.au, matching whichever data center the Zoho One account lives in).', 0),
+  ('zoho_api_domain',      'mail.zoho.com', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0);
+
+INSERT INTO permissions (permission_key, name, description, category) VALUES
+  ('manage_email_templates', 'Manage email templates', 'Add or edit email templates used when composing a send (never delete — every past send keeps its own frozen copy in the email log regardless).', 'admin');
+
+-- ================================================================
+-- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
@@ -2013,4 +2092,6 @@ ALTER TABLE documents
 -- Section AF (per-order dispute visibility toggle) added 2026-09-24.
 -- Section AG (reference number sequence counter) added 2026-09-24.
 -- Section AH (client-facing document revision number) added 2026-09-24.
+-- Section AI (order progress chat, email template CRUD, per-user
+-- signature, Zoho Mail integration) added 2026-09-24.
 -- ================================================================

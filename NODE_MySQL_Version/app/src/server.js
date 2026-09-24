@@ -68,6 +68,9 @@ const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const watermarkController = require('./controllers/watermarkController');
+const orderCommentController = require('./controllers/orderCommentController');
+const emailTemplateController = require('./controllers/emailTemplateController');
+const accountController = require('./controllers/accountController');
 const superAdminOnly = require('./middleware/superAdminOnly');
 const clientAuth = require('./middleware/clientAuth');
 
@@ -211,6 +214,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 // generous enough not to reject a valid upload before fileUploadService
 // gets a chance to check it against the DB-configured limit.
 const uploadLarge = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+// Order progress chat attachments (docs/schema.sql Section AI) — images and
+// videos, up to file_upload_contexts.order_comment_media's real 50MB/file
+// limit (fileUploadService enforces that from the DB; this instance's cap
+// just has to be generous enough not to reject a valid upload first).
+const uploadMedia = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -273,6 +281,18 @@ app.get('/', requireAuth, asyncHandler(dashboardController.index));
 
 app.get('/settings', requireAuth, requirePermission('manage_company_settings'), asyncHandler(settingsController.index));
 app.post('/settings/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.update));
+app.post('/settings/test-zoho-email', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testZohoEmail));
+
+// docs/schema.sql Section AI — email template CRUD (add/edit, never delete).
+app.get('/email-templates', requireAuth, requirePermission('manage_email_templates'), asyncHandler(emailTemplateController.index));
+app.get('/email-templates/create', requireAuth, requirePermission('manage_email_templates'), asyncHandler(emailTemplateController.create));
+app.post('/email-templates', requireAuth, requirePermission('manage_email_templates'), verifyCsrf, asyncHandler(emailTemplateController.store));
+app.get('/email-templates/:id/edit', requireAuth, requirePermission('manage_email_templates'), asyncHandler(emailTemplateController.edit));
+app.post('/email-templates/:id/update', requireAuth, requirePermission('manage_email_templates'), verifyCsrf, asyncHandler(emailTemplateController.update));
+app.post('/email-templates/:id/toggle-active', requireAuth, requirePermission('manage_email_templates'), verifyCsrf, asyncHandler(emailTemplateController.toggleActive));
+
+app.get('/account', requireAuth, asyncHandler(accountController.edit));
+app.post('/account/signature', requireAuth, verifyCsrf, asyncHandler(accountController.updateSignature));
 app.get('/holidays', requireAuth, requirePermission('manage_company_settings'), asyncHandler(holidayController.index));
 app.post('/holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.create));
 app.post('/holidays/:id/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.update));
@@ -380,6 +400,10 @@ app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('ma
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
 app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 
+// docs/schema.sql Section AI — order progress chat.
+app.post('/orders/:id/comments', requireAuth, requirePermission('manage_orders'), uploadMedia.array('attachments'), verifyCsrf, asyncHandler(orderCommentController.post));
+app.get('/orders/:id/comment-attachments/:fileId/download', requireAuth, requirePermission('download_pdf'), asyncHandler(orderCommentController.downloadAttachment));
+
 // Annexure A — Product Technical Specifications (schema tables shipped
 // with no screen ever built against them; this is that missing piece).
 app.get('/orders/:id/annexure', requireAuth, requirePermission('manage_orders'), asyncHandler(annexureController.index));
@@ -458,6 +482,7 @@ app.post('/reviews/:reviewId/approve', requireAuth, verifyCsrf, asyncHandler(rev
 app.post('/reviews/:reviewId/reject', requireAuth, verifyCsrf, asyncHandler(reviewController.reject));
 app.post('/documents/:documentId/cross-verify', requireAuth, requirePermission('cross_verify_documents'), verifyCsrf, asyncHandler(reviewController.crossVerify));
 
+app.get('/orders/:id/email/compose', requireAuth, requirePermission('generate_documents'), asyncHandler(emailDispatchController.composeGeneric));
 app.get('/orders/:id/documents/:documentId/send', requireAuth, requirePermission('generate_documents'), asyncHandler(emailDispatchController.compose));
 app.post('/orders/:id/documents/:documentId/send', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(emailDispatchController.requestSend));
 app.get('/email-approvals', requireAuth, requirePermission('approve_email_send'), asyncHandler(emailDispatchController.approvalQueue));
@@ -528,6 +553,8 @@ app.get('/client', requireClientAuth, asyncHandler(clientPortalController.dashbo
 app.get('/client/account', requireClientAuth, asyncHandler(clientPortalController.showAccount));
 app.post('/client/account/password', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.changePassword));
 app.get('/client/orders/:id', requireClientAuth, asyncHandler(clientPortalController.showOrder));
+app.post('/client/orders/:id/comments', requireClientAuth, uploadMedia.array('attachments'), verifyCsrf, asyncHandler(clientPortalController.postComment));
+app.get('/client/orders/:id/comment-attachments/:fileId/download', requireClientAuth, asyncHandler(clientPortalController.downloadCommentAttachment));
 app.post('/client/orders/:id/report-payment', requireClientAuth, uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(clientPortalController.reportPayment));
 app.post('/client/orders/:id/acknowledge-oc', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.acknowledgeOc));
 app.post('/client/orders/:id/disputes', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.raiseDispute));

@@ -12,7 +12,7 @@ const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowle
 const orderRepository = require('../repositories/orderRepository');
 const permissionRepository = require('../repositories/permissionRepository');
 const userRepository = require('../repositories/userRepository');
-const emailService = require('./emailService');
+const mailSenderService = require('./mailSenderService');
 const documentDataAssembler = require('./documentDataAssembler');
 const fs = require('fs');
 
@@ -38,46 +38,65 @@ async function tokensFor(order, document, sender) {
   const orderId = order.id;
   const qtDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'QT');
   const piDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
+  const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
+
+  let signature = (sender && sender.email_signature ? String(sender.email_signature).trim() : '');
+  if (signature === '') {
+    signature = `${(sender && sender.name) || (await companySettingsRepository.get('md_name')) || ''}\n${(await companySettingsRepository.get('md_title')) || ''}`;
+  }
 
   return {
     '{buyer_contact_person}': order.contact_person || 'Sir/Madam',
     '{buyer_company_name}': order.company_legal_name,
-    '{document_reference}': document.document_reference || '—',
-    '{generated_date}': documentDataAssembler.formatDate(document.generated_at),
+    '{document_reference}': (document && document.document_reference) || '—',
+    '{generated_date}': document ? documentDataAssembler.formatDate(document.generated_at) : '—',
     '{order_reference}': order.order_reference,
     '{buyer_inquiry_ref}': order.buyer_inquiry_ref,
     '{quotation_ref}': (qtDoc && qtDoc.document_reference) || '—',
     '{quotation_valid_until}': order.quotation_valid_until ? documentDataAssembler.formatDate(order.quotation_valid_until) : '—',
     '{pi_ref}': (piDoc && piDoc.document_reference) || '—',
     '{pi_valid_until}': order.pi_valid_until ? documentDataAssembler.formatDate(order.pi_valid_until) : '—',
+    '{oc_ref}': (ocDoc && ocDoc.document_reference) || '—',
     '{company_name}': (await companySettingsRepository.get('legal_name')) || '',
     '{company_email}': (await companySettingsRepository.get('email')) || '',
     '{company_phone}': (await companySettingsRepository.get('phone')) || '',
     '{sender_name}': (sender && sender.name) || (await companySettingsRepository.get('md_name')) || '',
     '{sender_title}': (await companySettingsRepository.get('md_title')) || '',
+    '{sender_signature}': signature,
   };
 }
 
-/** @returns {subject, body, recipient_email, document, order} */
+/**
+ * documentId is nullable so a generic, non-document template (e.g. a
+ * payment reminder — docs/schema.sql Section AI's email template CRUD)
+ * can be previewed/composed against just the order. A template tied to
+ * an actual document send still requires it to be approved/sent first.
+ *
+ * @returns {subject, body, recipient_email, document, order}
+ */
 async function buildPreview(orderId, documentId, templateKey, senderUserId) {
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
   }
-  const document = await documentRepository.find(documentId);
-  if (!document || document.order_id !== orderId) {
-    throw new Error(`Document ${documentId} not found for this order`);
-  }
-  if (document.status !== 'approved' && document.status !== 'sent') {
-    throw new Error('Only an approved document can be sent to the buyer — it must clear internal review first (Section 9).');
+
+  let document = null;
+  if (documentId !== null && documentId !== undefined) {
+    document = await documentRepository.find(documentId);
+    if (!document || document.order_id !== orderId) {
+      throw new Error(`Document ${documentId} not found for this order`);
+    }
+    if (document.status !== 'approved' && document.status !== 'sent') {
+      throw new Error('Only an approved document can be sent to the buyer — it must clear internal review first (Section 9).');
+    }
   }
   if (!order.client_email) {
     throw new Error('This client has no email address on file.');
   }
 
   const template = await emailTemplateRepository.find(templateKey);
-  if (!template) {
-    throw new Error(`Unknown email template: ${templateKey}`);
+  if (!template || !template.is_active) {
+    throw new Error(`Unknown or inactive email template: ${templateKey}`);
   }
 
   const sender = await userRepository.findById(senderUserId);
@@ -203,12 +222,11 @@ async function dispatch(emailLogRow) {
     return false;
   }
 
-  const sent = await emailService.sendWithAttachment(
+  const sent = await mailSenderService.send(
     emailLogRow.recipient_email,
     emailLogRow.subject,
     emailLogRow.body_snapshot,
-    file.server_path,
-    file.original_filename
+    [{ path: file.server_path, name: file.original_filename }]
   );
 
   if (sent) {

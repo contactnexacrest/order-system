@@ -51,21 +51,75 @@ async function handleUpload(
     throw new Error('No file was uploaded, or the upload failed.');
   }
 
+  return storeOne(
+    upload.buffer,
+    originalFilenameOverride || upload.originalname,
+    upload.mimetype || 'application/octet-stream',
+    contextKey,
+    subPath,
+    clientId,
+    orderId,
+    uploadedBy,
+    receivedFrom,
+    documentTypeLabel
+  );
+}
+
+/**
+ * Multiple files under one field (`upload.array(formFieldName)` middleware,
+ * e.g. the order progress chat's image/video attachments). Every file must
+ * individually pass the same context validation as handleUpload(); no
+ * files chosen is fine and simply returns [].
+ *
+ * @return {Promise<number[]>} file_store ids, in upload order
+ */
+async function handleMultipleUploads(
+  req,
+  formFieldName,
+  contextKey,
+  subPath,
+  clientId,
+  orderId,
+  uploadedBy,
+  receivedFrom = null,
+  documentTypeLabel = null
+) {
+  const files = req.files || [];
+  const ids = [];
+  for (const file of files) {
+    ids.push(
+      await storeOne(
+        file.buffer,
+        file.originalname,
+        file.mimetype || 'application/octet-stream',
+        contextKey,
+        subPath,
+        clientId,
+        orderId,
+        uploadedBy,
+        receivedFrom,
+        documentTypeLabel
+      )
+    );
+  }
+  return ids;
+}
+
+async function storeOne(buffer, originalName, mimeType, contextKey, subPath, clientId, orderId, uploadedBy, receivedFrom, documentTypeLabel) {
   const context = await findContext(contextKey);
   if (!context) {
     throw new Error(`Unknown upload context: ${contextKey}`);
   }
 
-  const originalName = originalFilenameOverride || upload.originalname;
   const extension = path.extname(originalName).replace(/^\./, '').toLowerCase();
   const allowed = String(context.allowed_extensions).toLowerCase().split(',').map((s) => s.trim());
   if (!allowed.includes(extension)) {
     throw new Error(`File type .${extension} is not allowed for this upload (allowed: ${context.allowed_extensions}).`);
   }
 
-  if (upload.size > parseInt(context.max_size_bytes, 10)) {
+  if (buffer.length > parseInt(context.max_size_bytes, 10)) {
     const maxMb = Math.round((parseInt(context.max_size_bytes, 10) / 1048576) * 10) / 10;
-    throw new Error(`File is too large — maximum is ${maxMb} MB for this upload.`);
+    throw new Error(`File "${originalName}" is too large — maximum is ${maxMb} MB for this upload.`);
   }
 
   const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
@@ -75,7 +129,7 @@ async function handleUpload(
   const uuidFilename = `${crypto.randomBytes(16).toString('hex')}.${extension}`;
   const targetPath = path.join(targetDir, uuidFilename);
 
-  fs.writeFileSync(targetPath, upload.buffer);
+  fs.writeFileSync(targetPath, buffer);
 
   return fileStoreRepository.insertReceived(
     clientId,
@@ -84,11 +138,16 @@ async function handleUpload(
     uuidFilename,
     originalName,
     fs.statSync(targetPath).size,
-    upload.mimetype || 'application/octet-stream',
+    mimeType,
     uploadedBy,
     receivedFrom,
     documentTypeLabel
   );
 }
 
-module.exports = { handleUpload };
+/** Same sanitization documentGenerationService uses for its own storage folder names — kept in sync so every caller building a storage subPath does it identically. */
+function sanitizePathSegment(value) {
+  return String(value).replace(/[^A-Za-z0-9_-]+/g, '-') || 'x';
+}
+
+module.exports = { handleUpload, handleMultipleUploads, sanitizePathSegment };

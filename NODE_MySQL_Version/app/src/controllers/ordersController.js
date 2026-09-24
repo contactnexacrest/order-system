@@ -8,6 +8,7 @@ const adminOverrideRepository = require('../repositories/adminOverrideRepository
 const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
+const orderCommentRepository = require('../repositories/orderCommentRepository');
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const hsCodeRepository = require('../repositories/hsCodeRepository');
@@ -365,6 +366,7 @@ async function show(req, res) {
       piIntake: await piIntakeRepository.latestForOrder(orderId),
       clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
       ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
+      comments: await orderCommentRepository.forOrder(orderId),
     },
     'layout/base'
   );

@@ -19,6 +19,21 @@ const emailDispatchService = require('../services/emailDispatchService');
 async function compose(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const documentId = parseInt(req.params.documentId, 10);
+  await renderCompose(req, res, orderId, documentId);
+}
+
+/**
+ * Same screen, no document — for a generic template (docs/schema.sql
+ * Section AI's email template CRUD; e.g. a payment reminder) that isn't
+ * tied to sending a specific buyer-facing PDF. Preview + copy only, no
+ * approval-queue submission (see email/compose.njk).
+ */
+async function composeGeneric(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  await renderCompose(req, res, orderId, null);
+}
+
+async function renderCompose(req, res, orderId, documentId) {
   const templateKey = String(req.query.template_key || '').trim() || null;
 
   let preview = null;
@@ -35,7 +50,7 @@ async function compose(req, res) {
     'email/compose',
     {
       order: await orderRepository.find(orderId),
-      document: await documentRepository.find(documentId),
+      document: documentId ? await documentRepository.find(documentId) : null,
       orderId,
       documentId,
       templates: await emailTemplateRepository.all(),
@@ -123,4 +138,4 @@ async function cancel(req, res) {
   res.redirect(redirectTo);
 }
 
-module.exports = { compose, requestSend, approvalQueue, approve, reject, cancel };
+module.exports = { compose, composeGeneric, requestSend, approvalQueue, approve, reject, cancel };

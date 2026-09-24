@@ -13,11 +13,13 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const disputeRepository = require('../repositories/disputeRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const clientPortalService = require('../services/clientPortalService');
+const orderCommentService = require('../services/orderCommentService');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const fileUploadService = require('../services/fileUploadService');
 const stageGateService = require('../services/stageGateService');
@@ -154,7 +156,62 @@ async function showOrder(req, res) {
     documents: await documentRepository.customerFacingForOrder(orderId),
     paymentReports: await clientPaymentReportRepository.forOrder(orderId),
     ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
+    comments: await orderCommentRepository.forOrder(orderId),
   }, 'layout/client');
+}
+
+/** docs/schema.sql Section AI — the client's side of the order progress chat. */
+async function postComment(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const body = String(req.body.body || '').trim();
+  try {
+    const subPath = `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/comment_attachments`;
+    const fileIds = await fileUploadService.handleMultipleUploads(
+      req,
+      'attachments',
+      'order_comment_media',
+      subPath,
+      clientId,
+      orderId,
+      null,
+      'Buyer',
+      'Order Update Attachment'
+    );
+    await orderCommentService.postAsClient(orderId, clientId, body !== '' ? body : null, fileIds);
+    flash.set(req, 'success', 'Message sent.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect(`/client/orders/${orderId}#order-updates`);
+}
+
+/** Client download of a comment attachment — same ownership check as every other client-facing file. */
+async function downloadCommentAttachment(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const fileId = parseInt(req.params.fileId, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const file = await orderCommentRepository.findAttachmentForOrder(fileId, orderId);
+  if (!file || !fs.existsSync(file.server_path)) {
+    res.status(404).send('File not found.');
+    return;
+  }
+  const safeDownloadName = file.original_filename.replace(/[\x00-\x1F\x7F"/\\]/g, '');
+  res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeDownloadName}"`);
+  fs.createReadStream(file.server_path).pipe(res);
 }
 
 /**
@@ -362,4 +419,5 @@ async function changePassword(req, res) {
 module.exports = {
   showLogin, login, logout, showSetPassword, setPassword, dashboard, showOrder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
+  postComment, downloadCommentAttachment,
 };
