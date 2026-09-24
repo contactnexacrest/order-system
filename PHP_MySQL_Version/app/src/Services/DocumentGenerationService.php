@@ -287,18 +287,52 @@ final class DocumentGenerationService
         $stmt = Database::connection()->query(
             "SELECT * FROM watermark_settings WHERE scope = 'global' AND is_draft_mode = 1 LIMIT 1"
         );
-        $row = $stmt->fetch();
+        return self::watermarkFromRow($stmt->fetch() ?: null);
+    }
+
+    /**
+     * mode ('text'|'image'|'both') decides what the Twig watermark block
+     * actually renders (see _layout.html.twig) — both a text overlay and
+     * an image overlay can be present on the same document at once,
+     * they're independent layers, not mutually exclusive.
+     *
+     * @param array<string,mixed>|null $row a watermark_settings row
+     */
+    private static function watermarkFromRow(?array $row): array
+    {
         if (!$row) {
             return ['enabled' => false];
         }
+        $mode = $row['mode'] ?? 'text';
+        $imageDataUri = null;
+        if (($mode === 'image' || $mode === 'both') && !empty($row['image_asset_id'])) {
+            $assetStmt = Database::connection()->prepare('SELECT * FROM assets WHERE id = :id');
+            $assetStmt->execute(['id' => $row['image_asset_id']]);
+            $imageDataUri = self::assetDataUri($assetStmt->fetch() ?: null);
+        }
         return [
-            'enabled'  => true,
-            'text'     => $row['text_content'],
-            'color'    => $row['color'],
-            'opacity'  => $row['opacity'],
-            'angle'    => $row['angle'],
-            'font_size' => $row['font_size'],
+            'enabled'        => true,
+            'mode'           => $mode,
+            'show_text'      => $mode === 'text' || $mode === 'both',
+            'show_image'     => ($mode === 'image' || $mode === 'both') && $imageDataUri !== null,
+            'text'           => $row['text_content'],
+            'color'          => $row['color'],
+            'opacity'        => $row['opacity'],
+            'angle'          => $row['angle'],
+            'font_size'      => $row['font_size'],
+            'image_data_uri' => $imageDataUri,
+            'image_opacity'  => $row['image_opacity'] ?? 0.15,
+            'image_position' => $row['image_position'] ?? 'center',
         ];
+    }
+
+    /** @param array<string,mixed>|null $asset */
+    private static function assetDataUri(?array $asset): ?string
+    {
+        if (!$asset || !is_file($asset['server_path'])) {
+            return null;
+        }
+        return 'data:' . ($asset['mime_type'] ?: 'image/png') . ';base64,' . base64_encode((string) file_get_contents($asset['server_path']));
     }
 
     /**
@@ -312,18 +346,7 @@ final class DocumentGenerationService
         $stmt = Database::connection()->query(
             "SELECT * FROM watermark_settings WHERE scope = 'global' AND is_draft_mode = 0 LIMIT 1"
         );
-        $row = $stmt->fetch();
-        if (!$row) {
-            return ['enabled' => false];
-        }
-        return [
-            'enabled'  => true,
-            'text'     => $row['text_content'],
-            'color'    => $row['color'],
-            'opacity'  => $row['opacity'],
-            'angle'    => $row['angle'],
-            'font_size' => $row['font_size'],
-        ];
+        return self::watermarkFromRow($stmt->fetch() ?: null);
     }
 
     /**

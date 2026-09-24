@@ -44,7 +44,7 @@ $isActive = static function (string $path) use ($currentPath): bool {
 $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/disputes');
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log') || $isActive('/email-approvals');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
-    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes');
+    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -106,6 +106,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canSettings): ?><a href="/settings" class="<?= $isActive('/settings') ? 'active' : '' ?>">Company Settings</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>
           <?php if ($canManageHsCodes): ?><a href="/hs-codes" class="<?= $isActive('/hs-codes') ? 'active' : '' ?>">HS Codes</a><?php endif; ?>
+          <?php if ($canSettings): ?><a href="/watermarks" class="<?= $isActive('/watermarks') ? 'active' : '' ?>">Watermarks</a><?php endif; ?>
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
           <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>

@@ -145,16 +145,28 @@
   table.annexure-images td { border: 1px solid #D7DEE6; padding: 4pt; text-align: center; }
   table.annexure-images img { max-width: 220px; max-height: 160px; }
 
-  {% if watermark.enabled %}
-  .watermark { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
+  {% if watermark.enabled and watermark.show_text %}
+  .watermark-text { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
     opacity: {{ watermark.opacity }}; transform: rotate(-{{ watermark.angle }}deg); z-index: 0; }
+  {% endif %}
+  {% if watermark.enabled and watermark.show_image %}
+  .watermark-image { position: fixed;
+    {% if watermark.image_position == 'center' %}top: 35%; left: 25%; width: 50%;
+    {% elseif watermark.image_position == 'top-left' %}top: 20pt; left: 20pt; width: 25%;
+    {% elseif watermark.image_position == 'top-right' %}top: 20pt; right: 20pt; width: 25%;
+    {% elseif watermark.image_position == 'bottom-left' %}bottom: 20pt; left: 20pt; width: 25%;
+    {% elseif watermark.image_position == 'bottom-right' %}bottom: 20pt; right: 20pt; width: 25%;
+    {% else %}top: 35%; left: 25%; width: 50%;
+    {% endif %}
+    opacity: {{ watermark.image_opacity }}; z-index: 0; }
   {% endif %}
   {% block extra_style %}{% endblock %}
 </style>
 </head>
 <body>
 
-{% if watermark.enabled %}<div class="watermark">{{ watermark.text }}</div>{% endif %}
+{% if watermark.enabled and watermark.show_image %}<img class="watermark-image" src="{{ watermark.image_data_uri }}">{% endif %}
+{% if watermark.enabled and watermark.show_text %}<div class="watermark-text">{{ watermark.text }}</div>{% endif %}
 
 <table class="doc-header"><tr>
   {% if assets.logo_data_uri %}<td class="logo-cell"><img src="{{ assets.logo_data_uri }}"></td>{% endif %}
