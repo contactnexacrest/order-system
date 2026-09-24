@@ -1,10 +1,29 @@
+{% set locked = client.is_data_locked == 1 %}
 <div class="card">
   <h1>Edit Client</h1>
   <p class="muted small"><a href="/clients/{{ client.id }}">&larr; Back to Client</a></p>
   <p class="muted">Buyer Inquiry Ref: <strong>{{ client.client_unique_number }}</strong> — changed only via the Admin Override on the client's page, not here.</p>
+
+  {% if locked %}
+    <div class="review-banner bad" style="margin-bottom:14px">
+      🔒 <span><strong>This client's details are locked, permanently.</strong> Locked {{ client.data_locked_at }} — {{ client.data_locked_reason or '' }}. These fields can never be edited again through the normal form; if something genuinely needs to change, the correct path is a brand-new client record, not an edit here.</span>
+    </div>
+    {% if not isSuperAdmin %}
+      <p class="muted small">All fields below are read-only.</p>
+    {% else %}
+      <div class="review-banner warn" style="margin-bottom:14px">
+        ⚠ <span><strong>Super Admin override available</strong> — for a genuine staff data-entry mistake only, never a client-requested change. Check the box below and give a specific reason to make an edit anyway; it will be fully logged.</span>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="review-banner warn" style="margin-bottom:14px">
+      ℹ <span>Once this client confirms their details (PI-details form) or an order's advance payment is recorded, whichever happens first, these details lock permanently — no further edits, by anyone but a Super Admin fixing a genuine mistake. Get everything right before that point.</span>
+    </div>
+  {% endif %}
+
   <form method="post" action="/clients/{{ client.id }}/update">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <fieldset>
+    <fieldset {{ 'disabled' if (locked and not isSuperAdmin) }}>
       <legend>Buyer / Consignee</legend>
       <label>Company Legal Name *<input type="text" name="company_legal_name" value="{{ client.company_legal_name }}" required></label>
       <label>Billing Address *<textarea name="billing_address" rows="2" required>{{ client.billing_address }}</textarea></label>
@@ -15,12 +34,21 @@
       <label>Certificate of Origin Type<input type="text" name="coo_type" value="{{ client.coo_type or '' }}" placeholder="e.g. Non-Preferential"></label>
       <label>Notify Party <small class="muted">(leave blank for "SAME as buyer")</small><input type="text" name="notify_party" value="{{ client.notify_party or '' }}"></label>
     </fieldset>
-    <fieldset>
+    <fieldset {{ 'disabled' if (locked and not isSuperAdmin) }}>
       <legend>Contact</legend>
       <label>Contact Person<input type="text" name="contact_person" value="{{ client.contact_person or '' }}"></label>
       <label>Email<input type="email" name="email" value="{{ client.email or '' }}"></label>
       <label>Phone<input type="text" name="phone" value="{{ client.phone or '' }}"></label>
     </fieldset>
-    <button type="submit">Save Changes</button>
+
+    {% if locked and isSuperAdmin %}
+      <fieldset>
+        <legend>Super Admin Override</legend>
+        <label><input type="checkbox" name="override_lock" value="1"> Override the lock for this save (staff data-entry error only)</label>
+        <label>Reason (required, min. 10 characters)<input type="text" name="override_reason" style="width:400px"></label>
+      </fieldset>
+    {% endif %}
+
+    <button type="submit" {{ 'disabled' if (locked and not isSuperAdmin) }}>Save Changes</button>
   </form>
 </div>

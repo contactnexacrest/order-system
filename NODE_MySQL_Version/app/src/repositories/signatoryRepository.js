@@ -92,6 +92,10 @@ async function deactivateUserAsset(id) {
   await db.execute('UPDATE user_signature_assets SET is_active = 0 WHERE id = :id', { id });
 }
 
+async function findUserAsset(id) {
+  return db.queryOne('SELECT * FROM user_signature_assets WHERE id = :id', { id });
+}
+
 async function globalDefaultSignatoryUserId() {
   const row = await db.queryOne('SELECT user_id FROM company_default_signatory WHERE id = 1');
   return row ? row.user_id : null;
@@ -137,7 +141,7 @@ module.exports = {
   findDesignation, designationUsageCount, designationAssignedToProtectedAccount,
   updateDesignationTitle, deleteDesignation,
   usersWithSignatoryInfo, eligibleSignatories, setEligibility,
-  assetsForUser, addUserAsset, deactivateUserAsset,
+  assetsForUser, addUserAsset, deactivateUserAsset, findUserAsset,
   globalDefaultSignatoryUserId, setGlobalDefaultSignatory,
   documentTypeSignatories, setDocumentTypeSignatory,
 };

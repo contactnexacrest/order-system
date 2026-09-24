@@ -66,6 +66,8 @@ const superAdminController = require('./controllers/superAdminController');
 const permissionAdminController = require('./controllers/permissionAdminController');
 const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
+const hsCodeController = require('./controllers/hsCodeController');
+const watermarkController = require('./controllers/watermarkController');
 const superAdminOnly = require('./middleware/superAdminOnly');
 const clientAuth = require('./middleware/clientAuth');
 
@@ -275,6 +277,15 @@ app.get('/holidays', requireAuth, requirePermission('manage_company_settings'), 
 app.post('/holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.create));
 app.post('/holidays/:id/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.update));
 app.post('/holidays/:id/delete', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.remove));
+
+app.get('/hs-codes', requireAuth, requirePermission('manage_hs_codes'), asyncHandler(hsCodeController.index));
+app.post('/hs-codes', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.create));
+app.post('/hs-codes/:id/update', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.update));
+app.post('/hs-codes/:id/toggle', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.toggleActive));
+app.post('/hs-codes/:id/delete', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.remove));
+
+app.get('/watermarks', requireAuth, requirePermission('manage_company_settings'), asyncHandler(watermarkController.index));
+app.post('/watermarks/:which', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(watermarkController.update));
 app.get('/reference-docs', requireAuth, asyncHandler(referenceDocController.index));
 app.get('/reference-docs/custom/create', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.customCreateForm));
 app.post('/reference-docs/custom', requireAuth, requirePermission('manage_company_settings'), uploadLarge.single('file'), verifyCsrf, asyncHandler(referenceDocController.customCreate));
@@ -302,6 +313,7 @@ app.post('/signatories/designations/:id/delete', requireAuth, requirePermission(
 app.post('/signatories/users/:id/eligibility', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setEligibility));
 app.post('/signatories/users/:id/upload', requireAuth, requirePermission('manage_signatories'), upload.single('file'), verifyCsrf, asyncHandler(signatoryController.uploadUserAsset));
 app.post('/signatories/user-assets/:id/deactivate', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.deactivateUserAsset));
+app.get('/signatories/user-assets/:id/preview', requireAuth, requirePermission('manage_signatories'), asyncHandler(signatoryController.previewUserAsset));
 app.post('/signatories/global-default', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setGlobalDefault));
 app.post('/signatories/document-types/:id', requireAuth, requirePermission('manage_signatories'), verifyCsrf, asyncHandler(signatoryController.setDocumentTypeDefault));
 

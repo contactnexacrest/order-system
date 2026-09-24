@@ -38,7 +38,8 @@ a.js-slow-download.is-loading{pointer-events:none;opacity:0.7;}
   height:100vh;overflow-y:auto;
 }
 .sidebar-brand{display:flex;align-items:center;gap:10px;padding:0 8px 20px;flex:0 0 auto;}
-.sidebar-brand-mark{width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.sidebar-brand-mark{width:32px;height:32px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;overflow:hidden;}
+.sidebar-brand-mark img{width:100%;height:100%;object-fit:cover;}
 .sidebar-brand-name{color:#fff;font-size:17px;font-weight:700;letter-spacing:-0.01em;}
 .nav-toggle-checkbox{position:absolute;opacity:0;pointer-events:none;}
 .nav-toggle-label{display:none;color:#fff;font-size:1.4rem;line-height:1;padding:0.1rem 0.3rem;cursor:pointer;}
@@ -88,7 +89,8 @@ a.js-slow-download.is-loading{pointer-events:none;opacity:0.7;}
 .bare-wrap{max-width:420px;margin:0 auto;padding-top:3rem;}
 .bare-brand{display:flex;align-items:center;justify-content:center;gap:10px;font-size:1.2rem;font-weight:700;letter-spacing:-0.01em;color:var(--navy);margin-bottom:1.25rem;}
 .bare-brand span{color:var(--ink-soft);font-weight:500;}
-.bare-brand-mark{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:var(--navy);flex:0 0 auto;}
+.bare-brand-mark{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--line);flex:0 0 auto;overflow:hidden;}
+.bare-brand-mark img{width:100%;height:100%;object-fit:cover;}
 .client-topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;row-gap:0.4rem;background:var(--navy);color:#fff;padding:0.85rem 1.5rem;}
 .client-topbar .topbar-brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:1.05rem;letter-spacing:-0.01em;}
 .topbar-brand span{color:rgba(255,255,255,0.72);font-weight:400;}
@@ -132,7 +134,8 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .protected-row{background:var(--gold-soft);border-left:3px solid var(--gold);padding-left:0.6rem;}
 .lock-icon{margin-right:0.3rem;}
 .unlock-btn{margin-left:0.5rem;}
-input[readonly],textarea[readonly]{background:var(--line);color:var(--ink);opacity:0.75;cursor:not-allowed;}
+input[readonly],textarea[readonly],
+fieldset[disabled] input,fieldset[disabled] textarea,fieldset[disabled] select{background:var(--line);color:var(--ink);opacity:0.75;cursor:not-allowed;}
 .asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.25rem;}
 .asset-tile{border:1px solid var(--line);border-radius:12px;padding:1rem;}
 .asset-tile h3{margin-top:0;font-size:1rem;color:var(--navy);}
@@ -167,11 +170,38 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .product-row input{margin-top:0;}
 .remove-row{background:var(--danger);padding:0.5rem 0.7rem;}
 .remove-row:hover{background:#7e3221;}
-.stage-track{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1.25rem;}
-.stage-chip{flex:1 1 100px;border-radius:999px;padding:0.5rem 0.7rem;font-size:0.75rem;font-weight:600;text-align:center;border:1px solid var(--line);color:var(--ink-soft);}
-.stage-chip.locked{background:var(--bg);}
-.stage-chip.in_progress{background:var(--gold-soft);color:var(--gold-strong);border-color:var(--gold);}
-.stage-chip.gate_passed{background:var(--success-soft);color:var(--success);border-color:var(--success);}
+.stage-track{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.65rem;margin-bottom:1.25rem;}
+.stage-chip{border:1px solid var(--line);border-top:3px solid var(--line);border-radius:12px;padding:0.7rem 0.85rem;background:#fff;}
+.stage-chip .stage-chip-num{font-size:0.68rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+.stage-chip .stage-chip-name{font-size:0.84rem;font-weight:700;color:var(--ink);margin:0.2rem 0 0.5rem;line-height:1.3;min-height:2.2em;}
+.stage-chip .stage-chip-status{display:inline-flex;align-items:center;font-size:0.7rem;font-weight:600;padding:2px 9px;border-radius:999px;}
+.stage-chip.locked{border-top-color:var(--line);}
+.stage-chip.locked .stage-chip-status{background:var(--bg);color:var(--ink-soft);}
+.stage-chip.in_progress{border-top-color:var(--gold);}
+.stage-chip.in_progress .stage-chip-status{background:var(--gold-soft);color:var(--gold-strong);}
+.stage-chip.gate_passed{border-top-color:var(--success);}
+.stage-chip.gate_passed .stage-chip-status{background:var(--success-soft);color:var(--success);}
+
+/* --- Review/Approval/Send-to-Buyer: split into numbered steps --- */
+.review-steps{display:flex;flex-direction:column;gap:0;margin-top:0.5rem;}
+.review-step{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:12px 0;border-top:1px solid var(--line);}
+.review-step:first-child{border-top:none;padding-top:0;}
+.review-step:last-child{padding-bottom:0;}
+.review-step-num{width:26px;height:26px;border-radius:50%;background:var(--navy-soft);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-top:1px;flex:0 0 auto;}
+.review-step-num.is-done{background:var(--success-soft);color:var(--success);}
+.review-step-num.is-warn{background:var(--gold-soft);color:var(--gold-strong);}
+.review-step-num.is-bad{background:var(--danger-soft);color:var(--danger);}
+.review-step-body h3{margin:0 0 6px;font-size:0.92rem;font-weight:700;}
+.review-banner{display:flex;align-items:flex-start;gap:8px;border-radius:8px;padding:8px 11px;margin:4px 0 8px;font-size:0.82rem;line-height:1.5;}
+.review-banner.warn{background:var(--gold-soft);color:var(--gold-strong);}
+.review-banner.info{background:var(--navy-soft);color:var(--navy);}
+.review-banner.good{background:var(--success-soft);color:var(--success);}
+.review-banner.bad{background:var(--danger-soft);color:var(--danger);}
+.review-pill{display:inline-flex;align-items:center;gap:4px;font-size:0.7rem;font-weight:600;padding:2px 9px;border-radius:999px;margin-left:6px;}
+.review-pill.warn{background:var(--gold-soft);color:var(--gold-strong);}
+.review-pill.info{background:var(--navy-soft);color:var(--navy);}
+.review-pill.good{background:var(--success-soft);color:var(--success);}
+.review-pill.bad{background:var(--danger-soft);color:var(--danger);}
 .section{margin-bottom:1.75rem;}
 .section h2{font-size:1rem;font-weight:700;color:var(--ink);border-left:3px solid var(--gold);padding-left:0.6rem;margin-bottom:0.7rem;}
 .kv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem 1.5rem;}

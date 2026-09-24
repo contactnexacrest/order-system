@@ -172,6 +172,18 @@ async function deactivateUserAsset(req, res) {
   res.redirect('/signatories');
 }
 
+/** Mirrors assetController.preview() — storage lives outside public/, so this is the only way a browser sees one of these. */
+async function previewUserAsset(req, res) {
+  const asset = await signatoryRepository.findUserAsset(parseInt(req.params.id, 10) || 0);
+  if (!asset || !fs.existsSync(asset.server_path)) {
+    res.status(404).end();
+    return;
+  }
+  res.set('Content-Type', asset.mime_type || 'application/octet-stream');
+  res.set('Cache-Control', 'private, max-age=60');
+  fs.createReadStream(asset.server_path).pipe(res);
+}
+
 async function setGlobalDefault(req, res) {
   const userId = parseInt(req.body.user_id, 10) || 0;
   if (userId <= 0) {
@@ -196,5 +208,5 @@ async function setDocumentTypeDefault(req, res) {
 
 module.exports = {
   index, createDesignation, toggleDesignation, updateDesignation, deleteDesignation, setEligibility,
-  uploadUserAsset, deactivateUserAsset, setGlobalDefault, setDocumentTypeDefault,
+  uploadUserAsset, deactivateUserAsset, previewUserAsset, setGlobalDefault, setDocumentTypeDefault,
 };

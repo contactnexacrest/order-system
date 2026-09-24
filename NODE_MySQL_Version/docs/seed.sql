@@ -24,6 +24,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 INSERT INTO roles (name, description, is_system_role) VALUES
   ('Admin',               'Full system access, including user/role administration and audit log.', 1),
   ('Managing Director',   'Full business authority: approvals, all order/document actions, reporting.', 0),
+  ('Executive Director',  'Full business authority: approvals, all order/document actions, reporting.', 0),
   ('Export Executive',    'Day-to-day order handling, quotations through order confirmation, document generation.', 0),
   ('Accounts Executive',  'Payment tracking, balance follow-up, financial reporting.', 0),
   ('Logistics Executive', 'Packing, freight, BL instruction, shipping-stage documents.', 0),
@@ -56,7 +57,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('browse_product_catalog',    'Browse product catalog',        'Browse the full product catalog list, not just search results.', 'catalog'),
   ('view_product_pricing',      'View product pricing',          'See product pricing, supplier list, and misc charges.', 'catalog'),
   ('manage_product_catalog',    'Manage product catalog',        'Create, edit, and delete products, suppliers, images, and misc charges.', 'catalog'),
-  ('view_archived_orders',      'View archived orders',          'See orders that have been archived out of the default listing. Archiving never deletes anything — this only gates who can look an archived order up.', 'orders');
+  ('view_archived_orders',      'View archived orders',          'See orders that have been archived out of the default listing. Archiving never deletes anything — this only gates who can look an archived order up.', 'orders'),
+  ('manage_hs_codes',           'Manage HS code master list',    'Add, edit, and deactivate HS codes in the master list order creation picks from — kept separate from ordinary order-entry access so a new code always goes through a privileged person first.', 'catalog');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -64,7 +66,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
-WHERE r.name IN ('Admin', 'Managing Director');
+WHERE r.name IN ('Admin', 'Managing Director', 'Executive Director');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
@@ -97,10 +99,10 @@ WHERE r.name = 'Viewer / Auditor'
 -- means you'll be made to set a new one on first login regardless.
 -- ================================================================
 INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
-SELECT 'Gulmohar Sontakke', 'admin@nexacrest.placeholder', NULL,
+SELECT 'Gulmohar Sontakke', 'gulmohar.sontakke@nexacrestinternational.com', NULL,
        '$2y$12$SRa3a47hKlgsRGskEZfWJerGPgxLI8jSnVlckkHENnfs9VRao/You',
        r.id, 1, 1, 0
-FROM roles r WHERE r.name = 'Admin';
+FROM roles r WHERE r.name = 'Managing Director';
 
 -- ================================================================
 -- CURRENCIES / PORTS / INCOTERMS (minimal, DB-editable via Admin later)
@@ -206,7 +208,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Quantity Tolerance' AND dt.code IN ('QT','PI','OC');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (30, 'Cancellation', 'Cancellation: Orders may not be cancelled after production has commenced. Cancellation before production commencement is subject to written agreement and recovery of costs incurred. The {advance_pct}% advance is non-refundable once production has commenced.', 'active', 0);
+  (30, 'Cancellation', 'Cancellation: Once the advance payment is received, this order is final and binding. It cannot be cancelled, modified, or refunded for any reason, whether or not production has yet commenced.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Cancellation' AND dt.code IN ('QT','PI','OC');
@@ -224,7 +226,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Import Clearance & Destination Charges' AND dt.code IN ('QT','PI');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (60, 'Production Commencement', 'Production commences only after {advance_pct}% advance payment is received and CLEARED in NexaCrest''s bank account. Remittance copy alone does not constitute payment receipt. Please allow 1–2 banking days for clearance confirmation before expecting production to commence.', 'active', 0);
+  (60, 'Production Commencement', 'Production commences only after {advance_pct}% advance payment is received and CLEARED in NexaCrest''s bank account, and the Order Confirmation has been acknowledged. Remittance copy alone does not constitute payment receipt. Please allow 1–2 banking days for clearance confirmation before expecting production to commence. If the Order Confirmation is not acknowledged within 48 hours of being sent, it is treated as accepted and production proceeds.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Production Commencement' AND dt.code IN ('QT','PI');
@@ -566,23 +568,23 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
 -- (Set 1's embedded media) rather than generic placeholders.
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'logo', 'NexaCrest Logo', '__STORAGE_BASE_PATH__/assets/logos/logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'signature', 'Gulmohar Sontakke — Signature (legacy global slot, superseded by user_signature_assets)', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'seal', 'Company Seal', '__STORAGE_BASE_PATH__/assets/seals/company_seal.png', 'image/png', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'watermark', 'Watermark — Logo', '__STORAGE_BASE_PATH__/assets/watermarks/watermark_logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'email_header', 'Email Header — Logo', '__STORAGE_BASE_PATH__/assets/email_headers/email_header_logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 -- ================================================================
 -- SIGNATORIES & DESIGNATIONS (Section M, added 2026-09-20)
@@ -601,40 +603,40 @@ INSERT INTO designations (title, is_active) VALUES
   ('Founder & Executive Director', 1);
 
 -- Gulmohar Sontakke already exists as the seeded Admin login
--- (admin@nexacrest.placeholder) — mark her signatory-eligible with her
+-- (gulmohar.sontakke@nexacrestinternational.com) — mark her signatory-eligible with her
 -- own designation and set her as the company's global default signatory,
 -- matching the existing company_settings.md_name/md_title.
 UPDATE users u
 JOIN designations d ON d.title = 'Founder & Managing Director'
 SET u.designation_id = d.id, u.is_signatory_eligible = 1
-WHERE u.email = 'admin@nexacrest.placeholder';
+WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
--- Role: Managing Director — she IS one of the company's two founders and
--- will be marked is_protected_account below (Section Z), so this is a
--- one-time correction, not something meant to be revisited from the
--- Users screen the way an ordinary account's role would be.
+-- Role: Executive Director, matching her real designation — she IS one of
+-- the company's two founders and will be marked is_protected_account below
+-- (Section Z), so this is a one-time correction, not something meant to be
+-- revisited from the Users screen the way an ordinary account's role would be.
 INSERT INTO users (name, email, phone, password_hash, role_id, designation_id, is_signatory_eligible, is_active, force_password_change, two_fa_enabled)
-SELECT 'Arti Sontakke', 'arti.sontakke@nexacrest.placeholder', NULL,
+SELECT 'Arti Sontakke', 'arti.sontakke@nexacrestinternational.com', NULL,
        '$2y$12$SRa3a47hKlgsRGskEZfWJerGPgxLI8jSnVlckkHENnfs9VRao/You',
        r.id, d.id, 1, 1, 1, 0
-FROM roles r, designations d WHERE r.name = 'Managing Director' AND d.title = 'Founder & Executive Director';
+FROM roles r, designations d WHERE r.name = 'Executive Director' AND d.title = 'Founder & Executive Director';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/gulmohar_sontakke_director_seal.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/arti_sontakke_director_seal.webp', 'image/webp', 1, 1,
-       (SELECT id FROM users WHERE email = 'admin@nexacrest.placeholder')
-FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
+       (SELECT id FROM users WHERE email = 'gulmohar.sontakke@nexacrestinternational.com')
+FROM users u WHERE u.email = 'arti.sontakke@nexacrestinternational.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/arti_sontakke_signature_default.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
+FROM users u WHERE u.email = 'arti.sontakke@nexacrestinternational.com';
 
 -- ================================================================
 -- SUPER ADMIN TIER (Section N, added 2026-09-20)
@@ -645,7 +647,7 @@ FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
 -- from /super-admin once logged in.
 -- ================================================================
 UPDATE users SET is_super_admin = 1
-WHERE email IN ('admin@nexacrest.placeholder', 'arti.sontakke@nexacrest.placeholder');
+WHERE email IN ('gulmohar.sontakke@nexacrestinternational.com', 'arti.sontakke@nexacrestinternational.com');
 
 -- ================================================================
 -- PROTECTED FOUNDER ACCOUNTS (Section Z, added 2026-09-23)
@@ -659,21 +661,23 @@ WHERE email IN ('admin@nexacrest.placeholder', 'arti.sontakke@nexacrest.placehol
 -- this seed script included.
 -- ================================================================
 UPDATE users SET is_protected_account = 1
-WHERE email IN ('admin@nexacrest.placeholder', 'arti.sontakke@nexacrest.placeholder');
+WHERE email IN ('gulmohar.sontakke@nexacrestinternational.com', 'arti.sontakke@nexacrestinternational.com');
 
 -- Global default signatory = Gulmohar Sontakke (matches legacy md_name).
 INSERT INTO company_default_signatory (id, user_id, updated_by)
-SELECT 1, u.id, u.id FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+SELECT 1, u.id, u.id FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
--- Per the explicit business rule (Payment Terms Amendment is legally
--- signed by a Director in that capacity, using the personal designation
--- seal) — every other document type falls back to the global default
--- (company seal, standard MD signature block) unless an admin sets
--- another per-document-type row here.
+-- The personal designation seal is DocumentDataAssembler::signatoryBlock()'s
+-- default for every document type (confirmed against the real source
+-- templates — PI, OC, and this Amendment all carry it), so this row is a
+-- harmless, explicit reaffirmation for AMD specifically, not what makes
+-- it happen. An admin can still override any document type to the
+-- company seal instead from the Signatories screen's per-document-type
+-- table if ever needed.
 INSERT INTO document_type_signatories (document_type_id, user_id, use_designation_seal, updated_by)
 SELECT dt.id, u.id, 1, u.id
 FROM document_types dt, users u
-WHERE dt.code = 'AMD' AND u.email = 'admin@nexacrest.placeholder';
+WHERE dt.code = 'AMD' AND u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 -- ================================================================
 -- INTERNAL REFERENCE LIBRARY (Section R, added 2026-09-21)
@@ -1071,6 +1075,17 @@ Follow the same 9-stage flow as Tier A, with two differences:
 
 Everything else — Quotation through Closure — follows the same Stage Gate Reference as Tier A.'
 FROM document_types dt WHERE dt.code = 'SOP_B_SALES';
+
+-- ================================================================
+-- HS CODE MASTER LIST (Section AB) — seeded with the one code the app
+-- used to default to ('6802.93', wrong format — a dot, not a plain 6/8
+-- digit string). Migrated here as '680293'. Add your real remaining
+-- codes from /hs-codes once logged in; this is a starting point, not a
+-- complete tariff list.
+-- ================================================================
+INSERT INTO hs_codes (code, description, is_active, created_by)
+SELECT '680293', 'Worked monumental or building stone (granite, etc.) and articles thereof', 1, u.id
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 SET FOREIGN_KEY_CHECKS = 1;
 

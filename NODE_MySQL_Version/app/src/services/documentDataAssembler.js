@@ -436,7 +436,7 @@ async function assetsBlock() {
  */
 async function signatoryBlock(documentTypeId, overrideUserId = null) {
   let userId = overrideUserId;
-  let useDesignationSeal = false;
+  let useDesignationSeal = true;
 
   if (userId === null) {
     const row = await db.queryOne(

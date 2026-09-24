@@ -347,15 +347,43 @@ async function docxEnabledFor(documentTypeId) {
 
 async function draftWatermark() {
   const row = await db.queryOne("SELECT * FROM watermark_settings WHERE scope = 'global' AND is_draft_mode = 1 LIMIT 1");
+  return watermarkFromRow(row);
+}
+
+/**
+ * mode ('text'|'image'|'both') decides what the Nunjucks watermark block
+ * actually renders (see _layout.njk) — both a text overlay and an image
+ * overlay can be present on the same document at once, they're independent
+ * layers, not mutually exclusive.
+ */
+async function watermarkFromRow(row) {
   if (!row) return { enabled: false };
+  const mode = row.mode || 'text';
+  let imageDataUri = null;
+  if ((mode === 'image' || mode === 'both') && row.image_asset_id) {
+    const asset = await db.queryOne('SELECT * FROM assets WHERE id = :id', { id: row.image_asset_id });
+    imageDataUri = assetDataUri(asset);
+  }
   return {
     enabled: true,
+    mode,
+    show_text: mode === 'text' || mode === 'both',
+    show_image: (mode === 'image' || mode === 'both') && imageDataUri !== null,
     text: row.text_content,
     color: row.color,
     opacity: row.opacity,
     angle: row.angle,
     font_size: row.font_size,
+    image_data_uri: imageDataUri,
+    image_opacity: row.image_opacity != null ? row.image_opacity : 0.15,
+    image_position: row.image_position || 'center',
   };
+}
+
+function assetDataUri(asset) {
+  if (!asset || !fs.existsSync(asset.server_path)) return null;
+  const buf = fs.readFileSync(asset.server_path);
+  return `data:${asset.mime_type || 'image/png'};base64,${buf.toString('base64')}`;
 }
 
 /**
@@ -366,15 +394,7 @@ async function draftWatermark() {
  */
 async function finalWatermark() {
   const row = await db.queryOne("SELECT * FROM watermark_settings WHERE scope = 'global' AND is_draft_mode = 0 LIMIT 1");
-  if (!row) return { enabled: false };
-  return {
-    enabled: true,
-    text: row.text_content,
-    color: row.color,
-    opacity: row.opacity,
-    angle: row.angle,
-    font_size: row.font_size,
-  };
+  return watermarkFromRow(row);
 }
 
 /**

@@ -1812,7 +1812,118 @@ CREATE TABLE pi_intake_submissions (
 CREATE INDEX idx_pi_intake_order ON pi_intake_submissions(order_id);
 
 -- ================================================================
--- END OF SCHEMA — 65 tables. All open schema questions resolved
+-- SECTION AB — HS CODE MASTER LIST (added 2026-09-24)
+-- Order creation previously let staff type any HS code freehand (even the
+-- built-in default, '6802.93', was wrong — real Indian HS codes are 6 or
+-- 8 plain digits, no dot). This closes that gap: HS codes now live in one
+-- permission-gated master table, and the order-creation form can only
+-- pick a code that already exists here — a brand new code has to go
+-- through this table first, under a privileged person's eye, so a typo
+-- can never silently end up on an order.
+-- ================================================================
+CREATE TABLE hs_codes (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  code         VARCHAR(8) NOT NULL UNIQUE,   -- 6 or 8 digits, enforced in the app layer
+  description  VARCHAR(255) NOT NULL,
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  created_by   BIGINT UNSIGNED NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION AC — CLIENT DATA LOCK (added 2026-09-24)
+-- Once a client's own details have been consented to (via the PI-details
+-- form) or real money is in motion (staff records the advance
+-- remittance, whichever happens first), those details are locked for
+-- life — enforced at the application layer (ClientController::update()),
+-- the same way every other business rule in this app is enforced, not by
+-- a rigid DB trigger. Matches the existing peer-approved protected-field
+-- pattern (Section L) rather than the founder-account hard-lock pattern
+-- (Section Z) — this needs a narrow, logged Super-Admin override for a
+-- genuine staff data-entry error, which an unconditional DB trigger can't
+-- distinguish from an ordinary edit attempt.
+-- ================================================================
+ALTER TABLE clients
+  ADD COLUMN is_data_locked TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active,
+  ADD COLUMN data_locked_at TIMESTAMP NULL AFTER is_data_locked,
+  ADD COLUMN data_locked_reason VARCHAR(255) NULL AFTER data_locked_at;
+
+-- ================================================================
+-- SECTION AD — CLIENT PAYMENT SELF-REPORT (added 2026-09-24)
+-- Lets a client tell staff "I've paid" straight from their portal — a
+-- transaction reference plus optional screenshot of the remittance advice,
+-- for any leg (advance/balance/freight) of an order. Purely informational:
+-- staff still verify the real bank statement by hand before calling
+-- OrderPaymentStatusRepository::recordAdvanceReceived() (or balance/
+-- freight) as before — a self-report never writes to order_payment_status
+-- and never gates a stage on its own.
+-- ================================================================
+CREATE TABLE client_payment_reports (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id            BIGINT UNSIGNED NOT NULL,
+  payment_type        ENUM('advance','balance','freight') NOT NULL,
+  transaction_ref     VARCHAR(150) NOT NULL,
+  payer_bank_details  VARCHAR(255) NULL,
+  amount              DECIMAL(14,2) NULL,
+  payment_date        DATE NULL,
+  screenshot_file_id  BIGINT UNSIGNED NULL,
+  status              ENUM('new','reviewed') NOT NULL DEFAULT 'new',
+  reviewed_by         BIGINT UNSIGNED NULL,
+  reviewed_at         TIMESTAMP NULL,
+  reported_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (screenshot_file_id) REFERENCES file_store(id),
+  FOREIGN KEY (reviewed_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION AE — BUYER OC ACKNOWLEDGMENT (added 2026-09-24)
+-- Replaces the old staff-only "Confirm Buyer Acknowledged Order" button at
+-- the Stage 4->5 gate with a real acknowledgment: the buyer sees a
+-- read-only recap of the sent Order Confirmation in their portal with a
+-- single "I acknowledge and confirm to proceed" button (no decline/dispute
+-- option shown, so as not to plant doubt at this stage); replying to the
+-- email is equally valid evidence, which staff record with a mandatory
+-- note; and if the buyer does neither within 48 hours of the OC being
+-- emailed, it auto-confirms (app/cron/auto_confirm_oc_acknowledgments.php).
+-- One row per order (UNIQUE order_id) — a resend of the OC (e.g. after a
+-- stage-regeneration cascade) upserts sent_at/due_at/document_id and clears
+-- any earlier acknowledgment, since the buyer is being asked to confirm
+-- the newly-sent version, not the one they may have already acknowledged.
+-- ================================================================
+CREATE TABLE order_oc_acknowledgments (
+  id                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id           BIGINT UNSIGNED NOT NULL UNIQUE,
+  document_id        BIGINT UNSIGNED NOT NULL,
+  sent_at            TIMESTAMP NOT NULL,
+  due_at             TIMESTAMP NOT NULL,
+  acknowledged_at    TIMESTAMP NULL,
+  acknowledged_via   ENUM('client_portal','staff_recorded_email','auto_48h') NULL,
+  acknowledged_note  VARCHAR(500) NULL,
+  recorded_by        BIGINT UNSIGNED NULL,   -- NULL for client_portal/auto_48h; the staff user for staff_recorded_email
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (document_id) REFERENCES documents(id),
+  FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION AF — PER-ORDER DISPUTE VISIBILITY TOGGLE (added 2026-09-24)
+-- Whether the client portal shows a "Raise a Dispute" button for THIS
+-- order — default off, so an already-happy order never gets one and the
+-- button never invites a dispute where nothing prompted it. Staff flip it
+-- on (manage_orders, the same permission that already gates every other
+-- order-level action) once there's a real reason to give the buyer a
+-- direct channel. Deliberately a plain per-order flag, not a role/
+-- permission gate on the client side — the client portal has no
+-- permission system of its own, and this decision is always made per
+-- order, by staff, not per client.
+-- ================================================================
+ALTER TABLE orders
+  ADD COLUMN dispute_button_visible_to_client TINYINT(1) NOT NULL DEFAULT 0 AFTER is_archived;
+
+-- ================================================================
+-- END OF SCHEMA — 68 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
@@ -1830,4 +1941,9 @@ CREATE INDEX idx_pi_intake_order ON pi_intake_submissions(order_id);
 -- Section Y (custom reference library entries) added 2026-09-23.
 -- Section Z (protected founder accounts) added 2026-09-23.
 -- Section AA (client self-correction + PI-stage intake) added 2026-09-23.
+-- Section AB (HS code master list) added 2026-09-24.
+-- Section AC (client data lock) added 2026-09-24.
+-- Section AD (client payment self-report) added 2026-09-24.
+-- Section AE (buyer OC acknowledgment) added 2026-09-24.
+-- Section AF (per-order dispute visibility toggle) added 2026-09-24.
 -- ================================================================

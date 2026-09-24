@@ -14,13 +14,13 @@
 {% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data %}
 {% set opsGroupActive = (currentPath | startswith('/clients')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/disputes')) %}
 {% set insightsGroupActive = (currentPath | startswith('/reports')) or (currentPath | startswith('/audit-log')) or (currentPath | startswith('/email-approvals')) %}
-{% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) %}
+{% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/hs-codes')) or (currentPath | startswith('/watermarks')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) %}
 {% set ordersActive = currentPath === '/orders' or ((currentPath | startswith('/orders/')) and not (currentPath | startswith('/orders/archived'))) %}
 <div class="app-shell">
 <header class="sidebar">
   <div class="sidebar-brand">
     <span class="sidebar-brand-mark" aria-hidden="true">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 8c0-2 2-3.4 4.5-3.4S16 6.2 16 9s-2 3.6-4.5 3.6S7 14.2 7 17s2 3.4 4.5 3.4S16 18.8 16 16" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"></path></svg>
+      <img src="/img/logo.jpg" alt="">
     </span>
     <span class="sidebar-brand-name">NexaCrest</span>
   </div>
@@ -42,7 +42,7 @@
           <a href="/clients" class="{{ 'active' if (currentPath | startswith('/clients')) else '' }}">Clients</a>
           <a href="/orders" class="{{ 'active' if ordersActive else '' }}">Orders</a>
           {% if permissions.view_archived_orders %}<a href="/orders/archived" class="{{ 'active' if (currentPath | startswith('/orders/archived')) else '' }}">Archived Orders</a>{% endif %}
-          <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Client Requests</a>
+          <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Quotation Intake Review</a>
           <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review</a>
           <a href="/disputes" class="{{ 'active' if (currentPath | startswith('/disputes')) else '' }}">Disputes</a>
         </div>
@@ -64,6 +64,8 @@
         <div class="nav-dropdown">
           {% if permissions.manage_company_settings %}<a href="/settings" class="{{ 'active' if (currentPath | startswith('/settings')) else '' }}">Company Settings</a>{% endif %}
           {% if permissions.manage_company_settings %}<a href="/holidays" class="{{ 'active' if (currentPath | startswith('/holidays')) else '' }}">Holiday Calendar</a>{% endif %}
+          {% if permissions.manage_hs_codes %}<a href="/hs-codes" class="{{ 'active' if (currentPath | startswith('/hs-codes')) else '' }}">HS Codes</a>{% endif %}
+          {% if permissions.manage_company_settings %}<a href="/watermarks" class="{{ 'active' if (currentPath | startswith('/watermarks')) else '' }}">Watermarks</a>{% endif %}
           {% if permissions.manage_assets %}<a href="/company-assets" class="{{ 'active' if (currentPath | startswith('/company-assets')) else '' }}">Assets</a>{% endif %}
           {% if permissions.manage_signatories %}<a href="/signatories" class="{{ 'active' if (currentPath | startswith('/signatories')) else '' }}">Signatories</a>{% endif %}
           {% if permissions.manage_permissions %}<a href="/admin/permissions" class="{{ 'active' if (currentPath | startswith('/admin/permissions')) else '' }}">Permissions</a>{% endif %}

@@ -99,7 +99,8 @@
         <td>{{ u.name }}{% if u.is_protected_account %} <span class="badge badge-protected">Protected founder</span>{% endif %}<br><span class="muted small">{{ u.email }}</span></td>
         <td>
           {% if u.is_protected_account %}
-            <span class="muted small">Protected — eligibility and designation locked.</span>
+            <div><strong>{{ u.designation_title or '(no designation)' }}</strong></div>
+            <span class="muted small">Protected — designation locked.</span>
           {% else %}
           <form method="post" action="/signatories/users/{{ u.id }}/eligibility" style="display:flex;gap:4px;align-items:center">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -120,13 +121,16 @@
           {% if u.is_signatory_eligible %}
             {% for a in (userAssets[u.id] or []) %}
               {% if a.is_active %}
-              <div class="muted small">
-                {{ 'Signature' if a.asset_kind == 'signature' else 'Designation seal' }}: {{ a.label }}
-                {% if a.is_default_for_kind %}<strong>(default)</strong>{% endif %}
-                <form method="post" action="/signatories/user-assets/{{ a.id }}/deactivate" style="display:inline" onsubmit="return confirm('Remove this {{ 'signature' if a.asset_kind == 'signature' else 'designation seal' }}? Documents already generated with it keep their existing image; this only stops it being used going forward.');">
-                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                  <button type="submit" class="btn-sm btn-danger">Remove</button>
-                </form>
+              <div class="muted small" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <img src="/signatories/user-assets/{{ a.id }}/preview" alt="" style="width:48px;height:48px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff;flex:0 0 auto;">
+                <span>
+                  {{ 'Signature' if a.asset_kind == 'signature' else 'Designation seal' }} for <strong>{{ u.name }}</strong>: {{ a.label }}
+                  {% if a.is_default_for_kind %}<strong>(default)</strong>{% endif %}
+                  <form method="post" action="/signatories/user-assets/{{ a.id }}/deactivate" style="display:inline" onsubmit="return confirm('Remove this {{ 'signature' if a.asset_kind == 'signature' else 'designation seal' }}? Documents already generated with it keep their existing image; this only stops it being used going forward.');">
+                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                    <button type="submit" class="btn-sm btn-danger">Remove</button>
+                  </form>
+                </span>
               </div>
               {% endif %}
             {% endfor %}

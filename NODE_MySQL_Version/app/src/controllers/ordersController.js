@@ -9,6 +9,7 @@ const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
+const hsCodeRepository = require('../repositories/hsCodeRepository');
 const disputeRepository = require('../repositories/disputeRepository');
 const documentCrossVerificationRepository = require('../repositories/documentCrossVerificationRepository');
 const documentRepository = require('../repositories/documentRepository');
@@ -149,6 +150,7 @@ async function create(req, res) {
       paymentPresets: await lookupRepository.paymentPresets(),
       cooTypes: await lookupRepository.dropdownOptions('coo_type'),
       containerTypes: await lookupRepository.dropdownOptions('container_type'),
+      hsCodes: await hsCodeRepository.active(),
       preselectedClientId,
     },
     'layout/base'
@@ -182,6 +184,23 @@ async function store(req, res) {
     flash.set(req, 'error', 'At least one product line (with a description) is required.');
     res.redirect(`/orders/create?client_id=${clientId}`);
     return;
+  }
+
+  // HS code must come from the master list (docs/schema.sql Section AB) —
+  // never freehand — so a typo or an invalid code can never reach an
+  // order. Checked here, before anything is written, so a bad code never
+  // leaves a half-created order behind.
+  {
+    const hsCodesInput = [].concat(body.product_hs_code || []);
+    for (let i = 0; i < descriptions.length; i++) {
+      if (str(descriptions[i]) === '') continue;
+      const hsCode = str(hsCodesInput[i]);
+      if (hsCode === '' || !(await hsCodeRepository.isActiveCode(hsCode))) {
+        flash.set(req, 'error', `HS code "${hsCode}" is not on the HS Code master list — add it there first (HS Codes, under Admin) before using it on an order.`);
+        res.redirect(`/orders/create?client_id=${clientId}`);
+        return;
+      }
+    }
   }
 
   const portOfDischargeId = body.port_of_discharge_id ? parseInt(body.port_of_discharge_id, 10) : null;
@@ -260,7 +279,7 @@ async function store(req, res) {
       quantityIsTbc,
       str(units[i]) || null,
       str(unitPrices[i]) || null,
-      str(hsCodes[i]) || '6802.93'
+      str(hsCodes[i])
     );
   }
 
@@ -504,6 +523,19 @@ async function recordAdvancePayment(req, res) {
     return;
   }
   await orderPaymentStatusRepository.recordAdvanceReceived(orderId, amount, receivedAt);
+
+  // docs/schema.sql Section AC — fallback lock trigger. The PI-details
+  // form (client's own consent) is the primary trigger; if a client never
+  // completes that, real money moving is the latest point client data can
+  // still be safely editable. A no-op if the PI-details consent already
+  // locked this client first.
+  {
+    const order = await orderRepository.find(orderId);
+    if (order) {
+      await clientRepository.lockData(order.client_id, 'Auto-locked: advance remittance recorded before client PI-details consent');
+    }
+  }
+
   flash.set(req, 'success', 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
   res.redirect(`/orders/${orderId}`);
 }

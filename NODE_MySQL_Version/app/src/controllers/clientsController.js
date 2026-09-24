@@ -8,6 +8,7 @@ const adminOverrideRepository = require('../repositories/adminOverrideRepository
 const auditLogRepository = require('../repositories/auditLogRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const testModeService = require('../services/testModeService');
+const superAdminService = require('../services/superAdminService');
 
 // Port of App\Controllers\ClientController.
 
@@ -104,6 +105,19 @@ async function update(req, res) {
     return;
   }
 
+  let overrideReason = null;
+  if (client.is_data_locked) {
+    const isSuperAdmin = await superAdminService.isEffective(req.user.id);
+    const overrideChecked = !!req.body.override_lock;
+    const reasonError = reasonValidator.check(req.body.override_reason);
+    if (!isSuperAdmin || !overrideChecked || reasonError) {
+      flash.set(req, 'error', "This client's details are locked and can no longer be edited. A Super Admin can override this only for a genuine staff data-entry error, with a reason.");
+      res.redirect(`/clients/${clientId}/edit`);
+      return;
+    }
+    overrideReason = String(req.body.override_reason).trim();
+  }
+
   const data = {
     company_legal_name: companyLegalName,
     billing_address: billingAddress,
@@ -125,8 +139,16 @@ async function update(req, res) {
 
   await clientRepository.update(clientId, data);
 
+  if (overrideReason) {
+    await auditLogRepository.log(user.id, 'CLIENT_LOCK_OVERRIDDEN', 'clients', clientId, null, null, null, overrideReason);
+  }
   for (const [field, oldVal, newVal] of changes) {
-    await auditLogRepository.log(user.id, 'CLIENT_UPDATED', 'clients', clientId, field, oldVal !== null && oldVal !== undefined ? String(oldVal) : null, newVal !== null && newVal !== undefined ? String(newVal) : null);
+    await auditLogRepository.log(
+      user.id, 'CLIENT_UPDATED', 'clients', clientId, field,
+      oldVal !== null && oldVal !== undefined ? String(oldVal) : null,
+      newVal !== null && newVal !== undefined ? String(newVal) : null,
+      overrideReason
+    );
   }
 
   flash.set(req, 'success', `${companyLegalName} updated.`);

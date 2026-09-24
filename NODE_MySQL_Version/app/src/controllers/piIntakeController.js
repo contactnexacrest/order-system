@@ -73,6 +73,11 @@ async function submit(req, res) {
     res.redirect(`/pi-details/${token}`);
     return;
   }
+  if (!req.body.confirm_lock) {
+    flash.set(req, 'error', 'Please check the confirmation box — the details above must be confirmed as correct before this form can be submitted.');
+    res.redirect(`/pi-details/${token}`);
+    return;
+  }
 
   await piIntakeRepository.submit(submission.id, data, req.ip || null);
   res.renderView('pi_intake/thank_you', {}, 'layout/bare');

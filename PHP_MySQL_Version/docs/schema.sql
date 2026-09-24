@@ -1945,4 +1945,7 @@ ALTER TABLE orders
 -- Section AA (client self-correction + PI-stage intake) added 2026-09-23.
 -- Section AB (HS code master list) added 2026-09-24.
 -- Section AC (client data lock) added 2026-09-24.
+-- Section AD (client payment self-report) added 2026-09-24.
+-- Section AE (buyer OC acknowledgment) added 2026-09-24.
+-- Section AF (per-order dispute visibility toggle) added 2026-09-24.
 -- ================================================================

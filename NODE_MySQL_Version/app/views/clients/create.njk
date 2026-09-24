@@ -1,6 +1,9 @@
 <div class="card">
   <h1>New Client</h1>
   <p class="muted">A Buyer Inquiry Ref is generated automatically and reused on every order and document for this client.</p>
+  <div class="review-banner warn" style="margin-bottom:14px">
+    ℹ <span>Once this client confirms their details (PI-details form) or an order's advance payment is recorded, whichever happens first, these details lock permanently — no further edits, by anyone but a Super Admin fixing a genuine mistake. Get everything right before that point.</span>
+  </div>
   <form method="post" action="/clients">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <fieldset>

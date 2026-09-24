@@ -92,4 +92,19 @@ async function markTest(id) {
   await db.execute('UPDATE clients SET is_test_data = 1 WHERE id = :id', { id });
 }
 
-module.exports = { all, find, allInactive, create, update, setActive, markSample, markTest };
+/**
+ * docs/schema.sql Section AC — fires from either of the two trigger
+ * points (PI-details client consent, or the fallback advance-remittance
+ * trigger), whichever happens first. Only ever fires once — idempotent
+ * so both trigger points can safely call it without checking who got
+ * there first.
+ */
+async function lockData(id, reason) {
+  await db.execute(
+    `UPDATE clients SET is_data_locked = 1, data_locked_at = NOW(), data_locked_reason = :reason
+     WHERE id = :id AND is_data_locked = 0`,
+    { id, reason }
+  );
+}
+
+module.exports = { all, find, allInactive, create, update, setActive, markSample, markTest, lockData };

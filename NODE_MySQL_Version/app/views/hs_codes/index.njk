@@ -1,0 +1,43 @@
+<div class="card page-wide">
+  <h1>HS Code Master List</h1>
+  <p class="muted">Order creation's HS Code field only offers codes from this list — a new code has to be added here first. Format is strict: exactly 6 or 8 digits, no dots or other characters, matching the real Indian HS code convention.</p>
+
+  <div class="section">
+    <table class="list">
+      <tr><th>Code</th><th>Description</th><th>Status</th><th>Action</th></tr>
+      {% if not codes or codes.length == 0 %}
+      <tr><td colspan="4" class="muted">No HS codes yet — add the first one below.</td></tr>
+      {% endif %}
+      {% for c in codes %}
+      <tr>
+        <td><code>{{ c.code }}</code></td>
+        <td>
+          <form method="post" action="/hs-codes/{{ c.id }}/update" style="display:flex;gap:8px;align-items:center">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="text" name="description" value="{{ c.description }}" required style="width:320px">
+            <button type="submit" class="btn-sm">Save</button>
+          </form>
+        </td>
+        <td><span class="badge {{ 'badge-active' if c.is_active else 'badge-inactive' }}">{{ 'Active' if c.is_active else 'Inactive' }}</span></td>
+        <td>
+          <form method="post" action="/hs-codes/{{ c.id }}/toggle" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm">{{ 'Deactivate' if c.is_active else 'Reactivate' }}</button>
+          </form>
+          <form method="post" action="/hs-codes/{{ c.id }}/delete" style="display:inline" onsubmit="return confirm('Delete HS code {{ c.code }}? Only possible if it has never been used on an order.');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <form method="post" action="/hs-codes" style="margin-top:8px;display:flex;gap:8px;align-items:center">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="text" name="code" placeholder="e.g. 680293" pattern="\d{6}|\d{8}" title="Exactly 6 or 8 digits, no dots" required style="width:140px">
+      <input type="text" name="description" placeholder="Description" required style="width:320px">
+      <button type="submit" class="btn-sm btn-accent">Add HS Code</button>
+    </form>
+  </div>
+</div>
