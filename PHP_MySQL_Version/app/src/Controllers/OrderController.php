@@ -18,6 +18,7 @@ use App\Repositories\DocumentRepository;
 use App\Repositories\DocumentReviewRepository;
 use App\Repositories\EmailLogRepository;
 use App\Repositories\FileStoreRepository;
+use App\Repositories\HsCodeRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCrateRepository;
@@ -142,6 +143,7 @@ final class OrderController
             'cooTypes'        => LookupRepository::dropdownOptions('coo_type'),
             'containerTypes'  => LookupRepository::dropdownOptions('container_type'),
             'preselectedClientId' => $preselectedClientId,
+            'hsCodes'         => HsCodeRepository::active(),
         ], 'layout/base');
     }
 
@@ -178,6 +180,22 @@ final class OrderController
             Flash::set('error', 'At least one product line (with a description) is required.');
             header('Location: /orders/create?client_id=' . $clientId);
             return;
+        }
+
+        // HS code must come from the master list (docs/schema.sql Section AB) —
+        // never freehand — so a typo or an invalid code can never reach an
+        // order. Checked here, before anything is written, so a bad code
+        // never leaves a half-created order behind.
+        foreach ($descriptions as $i => $description) {
+            if (trim((string) $description) === '') {
+                continue;
+            }
+            $hsCode = trim((string) ($_POST['product_hs_code'][$i] ?? ''));
+            if ($hsCode === '' || !HsCodeRepository::isActiveCode($hsCode)) {
+                Flash::set('error', "HS code \"{$hsCode}\" is not on the HS Code master list — add it there first (HS Codes, under Admin) before using it on an order.");
+                header('Location: /orders/create?client_id=' . $clientId);
+                return;
+            }
         }
 
         $portOfDischargeId = !empty($_POST['port_of_discharge_id']) ? (int) $_POST['port_of_discharge_id'] : null;
@@ -246,7 +264,7 @@ final class OrderController
                 $quantityIsTbc,
                 trim((string) ($_POST['product_unit'][$i] ?? '')) ?: null,
                 trim((string) ($_POST['product_unit_price'][$i] ?? '')) ?: null,
-                trim((string) ($_POST['product_hs_code'][$i] ?? '')) ?: '6802.93'
+                trim((string) ($_POST['product_hs_code'][$i] ?? ''))
             );
         }
 

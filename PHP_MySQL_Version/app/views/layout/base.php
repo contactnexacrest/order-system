@@ -13,6 +13,7 @@ $can = static fn(string $perm): bool => $current && PermissionService::can((int)
 // is actually visible to this user's permissions.
 $canOrders = $can('manage_orders');
 $canSettings = $can('manage_company_settings');
+$canManageHsCodes = $can('manage_hs_codes');
 $canAssets = $can('manage_assets');
 $canSignatories = $can('manage_signatories');
 $canPermissions = $can('manage_permissions');
@@ -43,7 +44,7 @@ $isActive = static function (string $path) use ($currentPath): bool {
 $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/disputes');
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log') || $isActive('/email-approvals');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
-    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data');
+    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -104,6 +105,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <div class="nav-dropdown">
           <?php if ($canSettings): ?><a href="/settings" class="<?= $isActive('/settings') ? 'active' : '' ?>">Company Settings</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>
+          <?php if ($canManageHsCodes): ?><a href="/hs-codes" class="<?= $isActive('/hs-codes') ? 'active' : '' ?>">HS Codes</a><?php endif; ?>
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
           <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>

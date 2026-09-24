@@ -23,6 +23,7 @@ use App\Controllers\FileStoreController;
 use App\Controllers\EmailDispatchController;
 use App\Controllers\FieldProtectionController;
 use App\Controllers\HolidayController;
+use App\Controllers\HsCodeController;
 use App\Controllers\ReferenceDocController;
 use App\Controllers\NotificationController;
 use App\Controllers\OrderController;
@@ -68,6 +69,7 @@ $emailDispatch = new EmailDispatchController();
 $amendments = new AmendmentController();
 $disputes = new DisputeController();
 $holidays = new HolidayController();
+$hsCodes = new HsCodeController();
 $referenceDocs = new ReferenceDocController();
 $auditLog = new AuditLogController();
 $notifications = new NotificationController();
@@ -127,6 +129,12 @@ $router->get('/holidays', [$holidays, 'index'], [SessionAuth::required(), Permis
 $router->post('/holidays', [$holidays, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/holidays/{id}/update', [$holidays, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/holidays/{id}/delete', [$holidays, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+
+$router->get('/hs-codes', [$hsCodes, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes')]);
+$router->post('/hs-codes', [$hsCodes, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
+$router->post('/hs-codes/{id}/update', [$hsCodes, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
+$router->post('/hs-codes/{id}/toggle', [$hsCodes, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
+$router->post('/hs-codes/{id}/delete', [$hsCodes, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
 $router->get('/reference-docs', [$referenceDocs, 'index'], [SessionAuth::required()]);
 $router->get('/reference-docs/custom/create', [$referenceDocs, 'customCreateForm'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/reference-docs/custom', [$referenceDocs, 'customCreate'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);

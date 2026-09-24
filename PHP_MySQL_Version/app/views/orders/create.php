@@ -110,11 +110,19 @@
           <label>Qty<input type="text" name="product_quantity[]"></label>
           <label>Unit<input type="text" name="product_unit[]" placeholder="SQM/PCS"></label>
           <label>Unit Price<input type="text" name="product_unit_price[]"></label>
-          <label>HS Code<input type="text" name="product_hs_code[]" placeholder="6802.93"></label>
+          <label>HS Code<input type="text" name="product_hs_code[]" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
           <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
         </div>
       </div>
       <div class="btn-row"><button type="button" class="btn-secondary btn-sm" id="add-product-row">+ Add product line</button></div>
+      <datalist id="hs_code_list">
+        <?php foreach ($hsCodes as $hc): ?>
+          <option value="<?= htmlspecialchars($hc['code']) ?>"><?= htmlspecialchars($hc['description']) ?></option>
+        <?php endforeach; ?>
+      </datalist>
+      <?php if (empty($hsCodes)): ?>
+        <p class="muted small">No HS codes on the master list yet — <a href="/hs-codes">add one</a> before creating this order.</p>
+      <?php endif; ?>
     </fieldset>
 
     <fieldset>

@@ -1814,7 +1814,27 @@ CREATE TABLE pi_intake_submissions (
 CREATE INDEX idx_pi_intake_order ON pi_intake_submissions(order_id);
 
 -- ================================================================
--- END OF SCHEMA — 65 tables. All open schema questions resolved
+-- SECTION AB — HS CODE MASTER LIST (added 2026-09-24)
+-- Order creation previously let staff type any HS code freehand (even the
+-- built-in default, '6802.93', was wrong — real Indian HS codes are 6 or
+-- 8 plain digits, no dot). This closes that gap: HS codes now live in one
+-- permission-gated master table, and the order-creation form can only
+-- pick a code that already exists here — a brand new code has to go
+-- through this table first, under a privileged person's eye, so a typo
+-- can never silently end up on an order.
+-- ================================================================
+CREATE TABLE hs_codes (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  code         VARCHAR(8) NOT NULL UNIQUE,   -- 6 or 8 digits, enforced in the app layer
+  description  VARCHAR(255) NOT NULL,
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  created_by   BIGINT UNSIGNED NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- END OF SCHEMA — 66 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
@@ -1832,4 +1852,5 @@ CREATE INDEX idx_pi_intake_order ON pi_intake_submissions(order_id);
 -- Section Y (custom reference library entries) added 2026-09-23.
 -- Section Z (protected founder accounts) added 2026-09-23.
 -- Section AA (client self-correction + PI-stage intake) added 2026-09-23.
+-- Section AB (HS code master list) added 2026-09-24.
 -- ================================================================

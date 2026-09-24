@@ -57,7 +57,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('browse_product_catalog',    'Browse product catalog',        'Browse the full product catalog list, not just search results.', 'catalog'),
   ('view_product_pricing',      'View product pricing',          'See product pricing, supplier list, and misc charges.', 'catalog'),
   ('manage_product_catalog',    'Manage product catalog',        'Create, edit, and delete products, suppliers, images, and misc charges.', 'catalog'),
-  ('view_archived_orders',      'View archived orders',          'See orders that have been archived out of the default listing. Archiving never deletes anything — this only gates who can look an archived order up.', 'orders');
+  ('view_archived_orders',      'View archived orders',          'See orders that have been archived out of the default listing. Archiving never deletes anything — this only gates who can look an archived order up.', 'orders'),
+  ('manage_hs_codes',           'Manage HS code master list',    'Add, edit, and deactivate HS codes in the master list order creation picks from — kept separate from ordinary order-entry access so a new code always goes through a privileged person first.', 'catalog');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -1074,6 +1075,17 @@ Follow the same 9-stage flow as Tier A, with two differences:
 
 Everything else — Quotation through Closure — follows the same Stage Gate Reference as Tier A.'
 FROM document_types dt WHERE dt.code = 'SOP_B_SALES';
+
+-- ================================================================
+-- HS CODE MASTER LIST (Section AB) — seeded with the one code the app
+-- used to default to ('6802.93', wrong format — a dot, not a plain 6/8
+-- digit string). Migrated here as '680293'. Add your real remaining
+-- codes from /hs-codes once logged in; this is a starting point, not a
+-- complete tariff list.
+-- ================================================================
+INSERT INTO hs_codes (code, description, is_active, created_by)
+SELECT '680293', 'Worked monumental or building stone (granite, etc.) and articles thereof', 1, u.id
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 SET FOREIGN_KEY_CHECKS = 1;
 
