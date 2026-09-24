@@ -10,6 +10,7 @@ use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Services\AuthService;
+use App\Services\ZohoMailService;
 
 final class SettingsController
 {
@@ -104,6 +105,35 @@ final class SettingsController
         }
 
         Flash::set('success', count($toApply) . ' setting(s) updated.');
+        header('Location: /settings');
+    }
+
+    /**
+     * docs/schema.sql Section AI — calls ZohoMailService directly (never
+     * through MailSenderService's fallback) so a real Zoho error surfaces
+     * here instead of silently succeeding via SMTP, which would be
+     * useless for actually verifying the Zoho credentials just entered.
+     */
+    public function testZohoEmail(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $to = trim((string) ($_POST['test_to'] ?? ''));
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            Flash::set('error', 'Enter a valid email address to send the test to.');
+            header('Location: /settings');
+            return;
+        }
+
+        try {
+            ZohoMailService::send(
+                $to,
+                'NexaCrest — Zoho Mail test',
+                "This is a test email sent from the NexaCrest order system's Zoho Mail integration.\n\nIf you received this, the connection is working.\n\nSent by {$user['name']}."
+            );
+            Flash::set('success', "Test email sent via Zoho Mail to {$to}.");
+        } catch (\Throwable $e) {
+            Flash::set('error', 'Zoho test send failed: ' . $e->getMessage());
+        }
         header('Location: /settings');
     }
 }

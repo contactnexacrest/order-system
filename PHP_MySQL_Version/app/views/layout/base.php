@@ -14,6 +14,7 @@ $can = static fn(string $perm): bool => $current && PermissionService::can((int)
 $canOrders = $can('manage_orders');
 $canSettings = $can('manage_company_settings');
 $canManageHsCodes = $can('manage_hs_codes');
+$canManageEmailTemplates = $can('manage_email_templates');
 $canAssets = $can('manage_assets');
 $canSignatories = $can('manage_signatories');
 $canPermissions = $can('manage_permissions');
@@ -44,7 +45,7 @@ $isActive = static function (string $path) use ($currentPath): bool {
 $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/disputes');
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log') || $isActive('/email-approvals');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
-    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks');
+    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -106,6 +107,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canSettings): ?><a href="/settings" class="<?= $isActive('/settings') ? 'active' : '' ?>">Company Settings</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>
           <?php if ($canManageHsCodes): ?><a href="/hs-codes" class="<?= $isActive('/hs-codes') ? 'active' : '' ?>">HS Codes</a><?php endif; ?>
+          <?php if ($canManageEmailTemplates): ?><a href="/email-templates" class="<?= $isActive('/email-templates') ? 'active' : '' ?>">Email Templates</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/watermarks" class="<?= $isActive('/watermarks') ? 'active' : '' ?>">Watermarks</a><?php endif; ?>
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
           <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>
@@ -128,10 +130,10 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
         Notifications<?= $unreadCount > 0 ? ' <span class="nav-badge">' . (int) $unreadCount . '</span>' : '' ?>
       </a>
-      <div class="sidebar-user-card">
+      <a href="/account" class="sidebar-user-card">
         <span class="sidebar-user-avatar"><?= htmlspecialchars(mb_strtoupper(mb_substr($current['name'], 0, 1))) ?></span>
         <span class="sidebar-user-name"><?= htmlspecialchars($current['name']) ?></span>
-      </div>
+      </a>
       <a href="/logout" class="sidebar-logout">Log out</a>
     <?php endif; ?>
   </div>

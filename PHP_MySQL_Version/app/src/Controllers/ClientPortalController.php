@@ -10,11 +10,13 @@ use App\Repositories\ClientPasswordResetTokenRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
+use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Services\ClientPortalService;
 use App\Services\FileUploadService;
+use App\Services\OrderCommentService;
 use App\Services\PasswordPolicyService;
 
 /**
@@ -148,7 +150,69 @@ final class ClientPortalController
             'documents' => DocumentRepository::customerFacingForOrder($orderId),
             'paymentReports' => ClientPaymentReportRepository::forOrder($orderId),
             'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
+            'comments' => OrderCommentRepository::forOrder($orderId),
         ], 'layout/client');
+    }
+
+    /** docs/schema.sql Section AI — the client's side of the order progress chat. */
+    public function postComment(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $body = trim((string) ($_POST['body'] ?? ''));
+        try {
+            $subPath = 'clients/' . FileUploadService::sanitizePathSegment((string) $order['client_unique_number'])
+                . '/' . FileUploadService::sanitizePathSegment((string) $order['order_reference'])
+                . '/comment_attachments';
+            $fileIds = FileUploadService::handleMultipleUploads(
+                'attachments',
+                'order_comment_media',
+                $subPath,
+                $clientId,
+                $orderId,
+                null,
+                'Buyer',
+                'Order Update Attachment'
+            );
+            OrderCommentService::postAsClient($orderId, $clientId, $body !== '' ? $body : null, $fileIds);
+            Flash::set('success', 'Message sent.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header("Location: /client/orders/{$orderId}#order-updates");
+    }
+
+    /** Client download of a comment attachment — same ownership check as every other client-facing file. */
+    public function downloadCommentAttachment(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $fileId = (int) ($params['fileId'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $file = OrderCommentRepository::findAttachmentForOrder($fileId, $orderId);
+        if (!$file || !is_file($file['server_path'])) {
+            http_response_code(404);
+            echo 'File not found.';
+            return;
+        }
+        $safeDownloadName = preg_replace('/[\x00-\x1F\x7F"\/\\\\]/', '', $file['original_filename']) ?? $file['original_filename'];
+        header('Content-Type: ' . ($file['mime_type'] ?: 'application/octet-stream'));
+        header('Content-Disposition: attachment; filename="' . $safeDownloadName . '"');
+        header('Content-Length: ' . filesize($file['server_path']));
+        readfile($file['server_path']);
     }
 
     /**

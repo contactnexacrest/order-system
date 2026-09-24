@@ -28,27 +28,38 @@ use App\Repositories\UserRepository;
  */
 final class EmailDispatchService
 {
-    /** @return array{subject:string, body:string, recipient_email:string, document:array, order:array} */
-    public static function buildPreview(int $orderId, int $documentId, string $templateKey, int $senderUserId): array
+    /**
+     * $documentId is nullable so a generic, non-document template (e.g. a
+     * payment reminder — docs/schema.sql Section AI's email template CRUD)
+     * can be previewed/composed against just the order. A template tied to
+     * an actual document send still requires it to be approved/sent first.
+     *
+     * @return array{subject:string, body:string, recipient_email:string, document:?array, order:array}
+     */
+    public static function buildPreview(int $orderId, ?int $documentId, string $templateKey, int $senderUserId): array
     {
         $order = OrderRepository::find($orderId);
         if (!$order) {
             throw new \RuntimeException("Order {$orderId} not found");
         }
-        $document = DocumentRepository::find($documentId);
-        if (!$document || (int) $document['order_id'] !== $orderId) {
-            throw new \RuntimeException("Document {$documentId} not found for this order");
-        }
-        if ($document['status'] !== 'approved' && $document['status'] !== 'sent') {
-            throw new \RuntimeException('Only an approved document can be sent to the buyer — it must clear internal review first (Section 9).');
+
+        $document = null;
+        if ($documentId !== null) {
+            $document = DocumentRepository::find($documentId);
+            if (!$document || (int) $document['order_id'] !== $orderId) {
+                throw new \RuntimeException("Document {$documentId} not found for this order");
+            }
+            if ($document['status'] !== 'approved' && $document['status'] !== 'sent') {
+                throw new \RuntimeException('Only an approved document can be sent to the buyer — it must clear internal review first (Section 9).');
+            }
         }
         if (empty($order['client_email'])) {
             throw new \RuntimeException('This client has no email address on file.');
         }
 
         $template = EmailTemplateRepository::find($templateKey);
-        if (!$template) {
-            throw new \RuntimeException("Unknown email template: {$templateKey}");
+        if (!$template || !$template['is_active']) {
+            throw new \RuntimeException("Unknown or inactive email template: {$templateKey}");
         }
 
         $sender = UserRepository::findById($senderUserId);
@@ -182,12 +193,11 @@ final class EmailDispatchService
             return false;
         }
 
-        $sent = EmailService::sendWithAttachment(
+        $sent = MailSenderService::send(
             $emailLogRow['recipient_email'],
             $emailLogRow['subject'],
             $emailLogRow['body_snapshot'],
-            $file['server_path'],
-            $file['original_filename']
+            [['path' => $file['server_path'], 'name' => $file['original_filename']]]
         );
 
         if ($sent) {
@@ -218,28 +228,37 @@ final class EmailDispatchService
     }
 
     /** @return array<string,string> */
-    private static function tokensFor(array $order, array $document, ?array $sender): array
+    private static function tokensFor(array $order, ?array $document, ?array $sender): array
     {
         $orderId = (int) $order['id'];
         $qtDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'QT');
         $piDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
+        $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
+
+        $signature = trim((string) ($sender['email_signature'] ?? ''));
+        if ($signature === '') {
+            $signature = ($sender['name'] ?? (string) CompanySettingsRepository::get('md_name'))
+                . "\n" . (string) CompanySettingsRepository::get('md_title');
+        }
 
         return [
             '{buyer_contact_person}' => $order['contact_person'] ?: 'Sir/Madam',
             '{buyer_company_name}'   => $order['company_legal_name'],
             '{document_reference}'   => $document['document_reference'] ?? '—',
-            '{generated_date}'       => (new \DateTimeImmutable((string) $document['generated_at']))->format('d F Y'),
+            '{generated_date}'       => $document ? (new \DateTimeImmutable((string) $document['generated_at']))->format('d F Y') : '—',
             '{order_reference}'      => $order['order_reference'],
             '{buyer_inquiry_ref}'    => $order['buyer_inquiry_ref'],
             '{quotation_ref}'        => $qtDoc['document_reference'] ?? '—',
             '{quotation_valid_until}' => $order['quotation_valid_until'] ? (new \DateTimeImmutable($order['quotation_valid_until']))->format('d F Y') : '—',
             '{pi_ref}'               => $piDoc['document_reference'] ?? '—',
             '{pi_valid_until}'       => $order['pi_valid_until'] ? (new \DateTimeImmutable($order['pi_valid_until']))->format('d F Y') : '—',
+            '{oc_ref}'               => $ocDoc['document_reference'] ?? '—',
             '{company_name}'         => (string) CompanySettingsRepository::get('legal_name'),
             '{company_email}'        => (string) CompanySettingsRepository::get('email'),
             '{company_phone}'        => (string) CompanySettingsRepository::get('phone'),
             '{sender_name}'          => $sender['name'] ?? (string) CompanySettingsRepository::get('md_name'),
             '{sender_title}'         => (string) CompanySettingsRepository::get('md_title'),
+            '{sender_signature}'     => $signature,
         ];
     }
 }

@@ -98,6 +98,19 @@ final class EmailService
      */
     public static function sendWithAttachment(string $toEmail, string $subject, string $body, string $attachmentPath, string $attachmentName, bool $isSecurityEmail = false): bool
     {
+        return self::sendWithAttachments($toEmail, $subject, $body, [['path' => $attachmentPath, 'name' => $attachmentName]], $isSecurityEmail);
+    }
+
+    /**
+     * Order progress chat (docs/schema.sql Section AI) can carry several
+     * images/videos on one comment — this is the general form
+     * sendWithAttachment() above now delegates to.
+     *
+     * @param array<int, array{path:string, name:string}> $attachments
+     * @return bool true if actually handed to a transport, false if only logged (dev fallback)
+     */
+    public static function sendWithAttachments(string $toEmail, string $subject, string $body, array $attachments, bool $isSecurityEmail = false): bool
+    {
         $to = self::resolveRecipient($toEmail, $isSecurityEmail, $subject);
         $smtpHost = Env::get('SMTP_HOST');
         $hasPhpMailer = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
@@ -120,8 +133,10 @@ final class EmailService
                 $mail->addAddress($to);
                 $mail->Subject = $subject;
                 $mail->Body    = $body;
-                if (is_file($attachmentPath)) {
-                    $mail->addAttachment($attachmentPath, $attachmentName);
+                foreach ($attachments as $att) {
+                    if (is_file($att['path'])) {
+                        $mail->addAttachment($att['path'], $att['name']);
+                    }
                 }
                 $mail->send();
                 return true;
@@ -131,7 +146,8 @@ final class EmailService
             }
         }
 
-        error_log("[EMAIL NOT SENT — no SMTP configured or PHPMailer not installed] To: {$to} | Subject: {$subject} | Attachment: {$attachmentName}");
+        $names = implode(', ', array_column($attachments, 'name'));
+        error_log("[EMAIL NOT SENT — no SMTP configured or PHPMailer not installed] To: {$to} | Subject: {$subject} | Attachments: {$names}");
         return false;
     }
 }

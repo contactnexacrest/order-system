@@ -256,6 +256,53 @@ $orderClosed = $order['status'] === 'complete';
     <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>/annexure"><?= $order['include_annexure_a'] ? 'Manage Annexure A product entries &amp; images' : 'Enable / manage Annexure A' ?></a></p>
   </div>
 
+  <div class="section" id="order-updates">
+    <h2>Order Updates</h2>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted. Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.</p>
+    <div class="chat-thread">
+      <?php if (empty($comments)): ?>
+        <p class="chat-empty">No updates posted yet.</p>
+      <?php endif; ?>
+      <?php foreach ($comments as $c): ?>
+        <?php $isStaff = $c['author_type'] === 'staff'; ?>
+        <div class="chat-bubble-row <?= $isStaff ? 'staff' : 'client' ?>">
+          <div class="chat-bubble <?= $isStaff ? 'staff' : 'client' ?>">
+            <div class="chat-bubble-meta">
+              <span class="who"><?= $isStaff ? 'Staff' : 'Client' ?> — <?= htmlspecialchars($isStaff ? ($c['staff_name'] ?? 'Unknown') : ($c['client_name'] ?? 'Unknown')) ?></span>
+              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?= $isStaff ? ($c['email_sent'] ? ' · emailed' : ' · not emailed (no client email on file)') : '' ?></span>
+            </div>
+            <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
+            <?php if (!empty($c['attachments'])): ?>
+              <div class="chat-attachments">
+                <?php foreach ($c['attachments'] as $att): ?>
+                  <?php
+                    $mime = (string) ($att['mime_type'] ?? '');
+                    $url = "/orders/{$order['id']}/comment-attachments/{$att['file_id']}/download";
+                  ?>
+                  <?php if (str_starts_with($mime, 'image/')): ?>
+                    <a href="<?= $url ?>" target="_blank"><img class="chat-attachment-image" src="<?= $url ?>" alt="<?= htmlspecialchars($att['original_filename']) ?>"></a>
+                  <?php elseif (str_starts_with($mime, 'video/')): ?>
+                    <video class="chat-attachment-video" controls src="<?= $url ?>"></video>
+                  <?php else: ?>
+                    <a class="chat-attachment-file" href="<?= $url ?>"><?= htmlspecialchars($att['original_filename']) ?></a>
+                  <?php endif; ?>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
+      <?= Csrf::field() ?>
+      <textarea name="body" placeholder="Write an update for the client…"></textarea>
+      <div class="chat-post-form-row">
+        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
+        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
+      </div>
+    </form>
+  </div>
+
   <div class="section">
     <h2>Review, Approval &amp; Send to Buyer</h2>
     <p class="muted">A document generated above starts life <strong>draft</strong> with the DRAFT watermark. Assign at least one reviewer to move it to review; once every assigned reviewer approves (minimum required per document type), it's re-watermarked as final and can be sent to the buyer. The buyer only ever receives that final watermarked PDF — never the internal DOCX, never an unwatermarked copy.</p>

@@ -22,6 +22,7 @@ use App\Repositories\FileStoreRepository;
 use App\Repositories\HsCodeRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
+use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPackingRepository;
@@ -355,6 +356,7 @@ final class OrderController
             'piIntake' => PiIntakeRepository::latestForOrder($orderId),
             'clientPaymentReports' => ClientPaymentReportRepository::forOrder($orderId),
             'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
+            'comments' => OrderCommentRepository::forOrder($orderId),
         ], 'layout/base');
     }
 

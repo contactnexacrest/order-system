@@ -46,6 +46,53 @@
     </table>
   </div>
 
+  <div class="section" id="order-updates">
+    <h2>Order Updates</h2>
+    <p class="muted">A running conversation with our team about this order. Post a message any time — you can attach photos or videos too.</p>
+    <div class="chat-thread">
+      <?php if (empty($comments)): ?>
+        <p class="chat-empty">No updates yet.</p>
+      <?php endif; ?>
+      <?php foreach ($comments as $c): ?>
+        <?php $isStaff = $c['author_type'] === 'staff'; ?>
+        <div class="chat-bubble-row <?= $isStaff ? 'client' : 'staff' ?>">
+          <div class="chat-bubble <?= $isStaff ? 'client' : 'staff' ?>">
+            <div class="chat-bubble-meta">
+              <span class="who"><?= $isStaff ? 'Our Team' : 'You' ?></span>
+              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?></span>
+            </div>
+            <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
+            <?php if (!empty($c['attachments'])): ?>
+              <div class="chat-attachments">
+                <?php foreach ($c['attachments'] as $att): ?>
+                  <?php
+                    $mime = (string) ($att['mime_type'] ?? '');
+                    $url = "/client/orders/{$order['id']}/comment-attachments/{$att['file_id']}/download";
+                  ?>
+                  <?php if (str_starts_with($mime, 'image/')): ?>
+                    <a href="<?= $url ?>" target="_blank"><img class="chat-attachment-image" src="<?= $url ?>" alt="<?= htmlspecialchars($att['original_filename']) ?>"></a>
+                  <?php elseif (str_starts_with($mime, 'video/')): ?>
+                    <video class="chat-attachment-video" controls src="<?= $url ?>"></video>
+                  <?php else: ?>
+                    <a class="chat-attachment-file" href="<?= $url ?>"><?= htmlspecialchars($att['original_filename']) ?></a>
+                  <?php endif; ?>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <form class="chat-post-form" method="post" action="/client/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
+      <?= Csrf::field() ?>
+      <textarea name="body" placeholder="Write a message…"></textarea>
+      <div class="chat-post-form-row">
+        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
+        <button type="submit" class="btn-sm" data-loading-text="Sending…">Send</button>
+      </div>
+    </form>
+  </div>
+
   <div class="section">
     <h2>Report a Payment</h2>
     <p class="muted">Made a payment on this order? Let us know the transaction details below — our team will verify it against our bank statement before updating your order.</p>

@@ -64,6 +64,18 @@
     </label>
     <button type="submit">Save changes</button>
   </form>
+
+  <?php if (isset($grouped['zoho'])): ?>
+  <div class="section">
+    <h2>Test Zoho Mail Connection</h2>
+    <p class="muted">Sends a real email straight through Zoho (bypassing the SMTP fallback) so you can confirm the credentials above actually work. Save your changes above first.</p>
+    <form method="post" action="/settings/test-zoho-email" style="display:flex;gap:8px;align-items:center">
+      <?= Csrf::field() ?>
+      <input type="email" name="test_to" placeholder="you@example.com" required style="width:260px">
+      <button type="submit" class="btn-sm">Send Test Email</button>
+    </form>
+  </div>
+  <?php endif; ?>
 </div>
 <script>
 function unlockRow(btn) {

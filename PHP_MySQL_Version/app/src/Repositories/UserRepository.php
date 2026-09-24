@@ -181,4 +181,12 @@ final class UserRepository
              WHERE id = :id'
         )->execute(['hash' => $tempPasswordHash, 'id' => $userId]);
     }
+
+    /** docs/schema.sql Section AI — self-service email signature, appended to every email that user sends through the system. */
+    public static function updateSignature(int $userId, ?string $signature): void
+    {
+        Database::connection()->prepare(
+            'UPDATE users SET email_signature = :signature WHERE id = :id'
+        )->execute(['signature' => $signature, 'id' => $userId]);
+    }
 }

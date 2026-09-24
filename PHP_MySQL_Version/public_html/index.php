@@ -27,6 +27,9 @@ use App\Controllers\HsCodeController;
 use App\Controllers\WatermarkController;
 use App\Controllers\ReferenceDocController;
 use App\Controllers\NotificationController;
+use App\Controllers\AccountController;
+use App\Controllers\EmailTemplateController;
+use App\Controllers\OrderCommentController;
 use App\Controllers\OrderController;
 use App\Controllers\ReportController;
 use App\Controllers\ReviewController;
@@ -62,6 +65,9 @@ $piIntake = new PiIntakeController();
 $piIntakeReview = new PiIntakeReviewController();
 $clientPortal = new ClientPortalController();
 $orders = new OrderController();
+$orderComments = new OrderCommentController();
+$emailTemplates = new EmailTemplateController();
+$account = new AccountController();
 $annexure = new AnnexureController();
 $documents = new DocumentController();
 $fileStore = new FileStoreController();
@@ -127,6 +133,7 @@ $router->get('/', [$dashboard, 'index'], [SessionAuth::required()]);
 
 $router->get('/settings', [$settings, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/settings/test-zoho-email', [$settings, 'testZohoEmail'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->get('/holidays', [$holidays, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/holidays', [$holidays, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/holidays/{id}/update', [$holidays, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
@@ -137,6 +144,17 @@ $router->post('/hs-codes', [$hsCodes, 'create'], [SessionAuth::required(), Permi
 $router->post('/hs-codes/{id}/update', [$hsCodes, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
 $router->post('/hs-codes/{id}/toggle', [$hsCodes, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
 $router->post('/hs-codes/{id}/delete', [$hsCodes, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
+
+// docs/schema.sql Section AI — email template CRUD (add/edit, never delete).
+$router->get('/email-templates', [$emailTemplates, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates')]);
+$router->get('/email-templates/create', [$emailTemplates, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates')]);
+$router->post('/email-templates', [$emailTemplates, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates'), CsrfCheck::verify()]);
+$router->get('/email-templates/{id}/edit', [$emailTemplates, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates')]);
+$router->post('/email-templates/{id}/update', [$emailTemplates, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates'), CsrfCheck::verify()]);
+$router->post('/email-templates/{id}/toggle-active', [$emailTemplates, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates'), CsrfCheck::verify()]);
+
+$router->get('/account', [$account, 'edit'], [SessionAuth::required()]);
+$router->post('/account/signature', [$account, 'updateSignature'], [SessionAuth::required(), CsrfCheck::verify()]);
 
 $router->get('/watermarks', [$watermarks, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/watermarks/{which}', [$watermarks, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
@@ -235,6 +253,10 @@ $router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayme
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
+// docs/schema.sql Section AI — order progress chat.
+$router->post('/orders/{id}/comments', [$orderComments, 'post'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->get('/orders/{id}/comment-attachments/{fileId}/download', [$orderComments, 'downloadAttachment'], [SessionAuth::required(), PermissionCheck::requires('download_pdf')]);
+
 // Annexure A — Product Technical Specifications (schema tables shipped
 // with no screen ever built against them; this is that missing piece).
 $router->get('/orders/{id}/annexure', [$annexure, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
@@ -287,6 +309,7 @@ $router->post('/reviews/{reviewId}/reject', [$reviews, 'reject'], [SessionAuth::
 $router->post('/documents/{documentId}/cross-verify', [$reviews, 'crossVerify'], [SessionAuth::required(), PermissionCheck::requires('cross_verify_documents'), CsrfCheck::verify()]);
 
 // Deferred email send (Section 10), 2-level approval.
+$router->get('/orders/{id}/email/compose', [$emailDispatch, 'composeGeneric'], [SessionAuth::required(), PermissionCheck::requires('generate_documents')]);
 $router->get('/orders/{id}/documents/{documentId}/send', [$emailDispatch, 'compose'], [SessionAuth::required(), PermissionCheck::requires('generate_documents')]);
 $router->post('/orders/{id}/documents/{documentId}/send', [$emailDispatch, 'requestSend'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->get('/email-approvals', [$emailDispatch, 'approvalQueue'], [SessionAuth::required(), PermissionCheck::requires('approve_email_send')]);
@@ -366,6 +389,8 @@ $router->get('/client/orders/{id}', [$clientPortal, 'showOrder'], [ClientAuth::r
 $router->post('/client/orders/{id}/report-payment', [$clientPortal, 'reportPayment'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/acknowledge-oc', [$clientPortal, 'acknowledgeOc'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/disputes', [$clientPortal, 'raiseDispute'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->post('/client/orders/{id}/comments', [$clientPortal, 'postComment'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->get('/client/orders/{id}/comment-attachments/{fileId}/download', [$clientPortal, 'downloadCommentAttachment'], [ClientAuth::required()]);
 $router->get('/client/documents/{id}/download', [$clientPortal, 'downloadDocument'], [ClientAuth::required()]);
 
 $router->get('/sample-data', [$sampleData, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_sample_data')]);

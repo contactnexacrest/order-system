@@ -27,6 +27,23 @@ final class EmailDispatchController
     {
         $orderId = (int) $params['id'];
         $documentId = (int) $params['documentId'];
+        $this->renderCompose($orderId, $documentId);
+    }
+
+    /**
+     * Same screen, no document — for a generic template (docs/schema.sql
+     * Section AI's email template CRUD; e.g. a payment reminder) that isn't
+     * tied to sending a specific buyer-facing PDF. Preview + copy only, no
+     * approval-queue submission (see email/compose.php).
+     */
+    public function composeGeneric(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $this->renderCompose($orderId, null);
+    }
+
+    private function renderCompose(int $orderId, ?int $documentId): void
+    {
         $templateKey = trim((string) ($_GET['template_key'] ?? '')) ?: null;
 
         $preview = null;
@@ -41,7 +58,7 @@ final class EmailDispatchController
 
         View::render('email/compose', [
             'order'        => OrderRepository::find($orderId),
-            'document'     => DocumentRepository::find($documentId),
+            'document'     => $documentId ? DocumentRepository::find($documentId) : null,
             'orderId'      => $orderId,
             'documentId'   => $documentId,
             'templates'    => EmailTemplateRepository::all(),
