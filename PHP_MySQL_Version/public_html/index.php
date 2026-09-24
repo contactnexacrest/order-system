@@ -156,6 +156,7 @@ $router->post('/signatories/designations/{id}/delete', [$signatories, 'deleteDes
 $router->post('/signatories/users/{id}/eligibility', [$signatories, 'setEligibility'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/users/{id}/upload', [$signatories, 'uploadUserAsset'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/user-assets/{id}/deactivate', [$signatories, 'deactivateUserAsset'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
+$router->get('/signatories/user-assets/{id}/preview', [$signatories, 'previewUserAsset'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories')]);
 $router->post('/signatories/global-default', [$signatories, 'setGlobalDefault'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 $router->post('/signatories/document-types/{id}', [$signatories, 'setDocumentTypeDefault'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 

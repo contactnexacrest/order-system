@@ -666,11 +666,13 @@ WHERE email IN ('gulmohar.sontakke@nexacrestinternational.com', 'arti.sontakke@n
 INSERT INTO company_default_signatory (id, user_id, updated_by)
 SELECT 1, u.id, u.id FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
--- Per the explicit business rule (Payment Terms Amendment is legally
--- signed by a Director in that capacity, using the personal designation
--- seal) — every other document type falls back to the global default
--- (company seal, standard MD signature block) unless an admin sets
--- another per-document-type row here.
+-- The personal designation seal is DocumentDataAssembler::signatoryBlock()'s
+-- default for every document type (confirmed against the real source
+-- templates — PI, OC, and this Amendment all carry it), so this row is a
+-- harmless, explicit reaffirmation for AMD specifically, not what makes
+-- it happen. An admin can still override any document type to the
+-- company seal instead from the Signatories screen's per-document-type
+-- table if ever needed.
 INSERT INTO document_type_signatories (document_type_id, user_id, use_designation_seal, updated_by)
 SELECT dt.id, u.id, 1, u.id
 FROM document_types dt, users u

@@ -155,6 +155,14 @@ final class SignatoryRepository
         Database::connection()->prepare('UPDATE user_signature_assets SET is_active = 0 WHERE id = :id')->execute(['id' => $id]);
     }
 
+    public static function findUserAsset(int $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM user_signature_assets WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
     public static function globalDefaultSignatoryUserId(): ?int
     {
         $row = Database::connection()->query('SELECT user_id FROM company_default_signatory WHERE id = 1')->fetch();

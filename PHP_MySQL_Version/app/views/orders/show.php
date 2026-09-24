@@ -83,8 +83,9 @@ $orderClosed = $order['status'] === 'complete';
   <div class="stage-track">
     <?php foreach ($stages as $s): ?>
       <div class="stage-chip <?= htmlspecialchars($s['status']) ?>">
-        <?= (int) $s['stage_number'] ?>. <?= htmlspecialchars($s['stage_name']) ?><br>
-        <span class="muted small"><?= htmlspecialchars(str_replace('_', ' ', $s['status'])) ?></span>
+        <div class="stage-chip-num">Stage <?= (int) $s['stage_number'] ?></div>
+        <div class="stage-chip-name"><?= htmlspecialchars($s['stage_name']) ?></div>
+        <span class="stage-chip-status"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $s['status']))) ?></span>
       </div>
     <?php endforeach; ?>
   </div>

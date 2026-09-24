@@ -100,7 +100,8 @@
         <td><?= htmlspecialchars($u['name']) ?><?php if ((int) $u['is_protected_account'] === 1): ?> <span class="badge badge-protected">Protected founder</span><?php endif; ?><br><span class="muted small"><?= htmlspecialchars($u['email']) ?></span></td>
         <td>
           <?php if ((int) $u['is_protected_account'] === 1): ?>
-            <span class="muted small">Protected — eligibility and designation locked.</span>
+            <div><strong><?= $u['designation_title'] ? htmlspecialchars($u['designation_title']) : '(no designation)' ?></strong></div>
+            <span class="muted small">Protected — designation locked.</span>
           <?php else: ?>
           <form method="post" action="/signatories/users/<?= (int) $u['id'] ?>/eligibility" style="display:flex;gap:4px;align-items:center">
             <?= Csrf::field() ?>
@@ -118,13 +119,16 @@
         <td>
           <?php if ($u['is_signatory_eligible']): ?>
             <?php foreach (($userAssets[$u['id']] ?? []) as $a): if (!$a['is_active']) continue; ?>
-              <div class="muted small">
-                <?= $a['asset_kind'] === 'signature' ? 'Signature' : 'Designation seal' ?>: <?= htmlspecialchars($a['label']) ?>
-                <?php if ($a['is_default_for_kind']): ?><strong>(default)</strong><?php endif; ?>
-                <form method="post" action="/signatories/user-assets/<?= (int) $a['id'] ?>/deactivate" style="display:inline" onsubmit="return confirm('Remove this <?= $a['asset_kind'] === 'signature' ? 'signature' : 'designation seal' ?>? Documents already generated with it keep their existing image; this only stops it being used going forward.');">
-                  <?= Csrf::field() ?>
-                  <button type="submit" class="btn-sm btn-danger">Remove</button>
-                </form>
+              <div class="muted small" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <img src="/signatories/user-assets/<?= (int) $a['id'] ?>/preview" alt="" style="width:48px;height:48px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff;flex:0 0 auto;">
+                <span>
+                  <?= $a['asset_kind'] === 'signature' ? 'Signature' : 'Designation seal' ?> for <strong><?= htmlspecialchars($u['name']) ?></strong>: <?= htmlspecialchars($a['label']) ?>
+                  <?php if ($a['is_default_for_kind']): ?><strong>(default)</strong><?php endif; ?>
+                  <form method="post" action="/signatories/user-assets/<?= (int) $a['id'] ?>/deactivate" style="display:inline" onsubmit="return confirm('Remove this <?= $a['asset_kind'] === 'signature' ? 'signature' : 'designation seal' ?>? Documents already generated with it keep their existing image; this only stops it being used going forward.');">
+                    <?= Csrf::field() ?>
+                    <button type="submit" class="btn-sm btn-danger">Remove</button>
+                  </form>
+                </span>
               </div>
             <?php endforeach; ?>
             <details style="margin-top:4px">

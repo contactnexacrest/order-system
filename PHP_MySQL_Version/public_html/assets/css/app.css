@@ -169,11 +169,17 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .product-row input{margin-top:0;}
 .remove-row{background:var(--danger);padding:0.5rem 0.7rem;}
 .remove-row:hover{background:#7e3221;}
-.stage-track{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1.25rem;}
-.stage-chip{flex:1 1 100px;border-radius:999px;padding:0.5rem 0.7rem;font-size:0.75rem;font-weight:600;text-align:center;border:1px solid var(--line);color:var(--ink-soft);}
-.stage-chip.locked{background:var(--bg);}
-.stage-chip.in_progress{background:var(--gold-soft);color:var(--gold-strong);border-color:var(--gold);}
-.stage-chip.gate_passed{background:var(--success-soft);color:var(--success);border-color:var(--success);}
+.stage-track{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.65rem;margin-bottom:1.25rem;}
+.stage-chip{border:1px solid var(--line);border-top:3px solid var(--line);border-radius:12px;padding:0.7rem 0.85rem;background:#fff;}
+.stage-chip .stage-chip-num{font-size:0.68rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+.stage-chip .stage-chip-name{font-size:0.84rem;font-weight:700;color:var(--ink);margin:0.2rem 0 0.5rem;line-height:1.3;min-height:2.2em;}
+.stage-chip .stage-chip-status{display:inline-flex;align-items:center;font-size:0.7rem;font-weight:600;padding:2px 9px;border-radius:999px;}
+.stage-chip.locked{border-top-color:var(--line);}
+.stage-chip.locked .stage-chip-status{background:var(--bg);color:var(--ink-soft);}
+.stage-chip.in_progress{border-top-color:var(--gold);}
+.stage-chip.in_progress .stage-chip-status{background:var(--gold-soft);color:var(--gold-strong);}
+.stage-chip.gate_passed{border-top-color:var(--success);}
+.stage-chip.gate_passed .stage-chip-status{background:var(--success-soft);color:var(--success);}
 .section{margin-bottom:1.75rem;}
 .section h2{font-size:1rem;font-weight:700;color:var(--ink);border-left:3px solid var(--gold);padding-left:0.6rem;margin-bottom:0.7rem;}
 .kv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem 1.5rem;}

@@ -440,13 +440,20 @@ final class DocumentDataAssembler
      * The chosen signatory's name/designation/signature/seal are returned
      * ready to render AND ready to snapshot onto the documents row, so a
      * later change to any default never alters how a past document reads.
+     *
+     * Default is the personal designation seal, not the company seal —
+     * confirmed against the real source templates (PI, OC, and the
+     * Payment Terms Amendment all embed the signatory's own designation
+     * seal in the "Authorised Signatory" block, not just AMD as an earlier
+     * build assumed). A document_type_signatories row can still override
+     * this to the company seal per document type if ever needed.
      */
     public static function signatoryBlock(int $documentTypeId, ?int $overrideUserId = null): array
     {
         $pdo = \App\Config\Database::connection();
 
         $userId = $overrideUserId;
-        $useDesignationSeal = false;
+        $useDesignationSeal = true;
 
         if ($userId === null) {
             $stmt = $pdo->prepare(

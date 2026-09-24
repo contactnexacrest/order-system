@@ -9,22 +9,22 @@
     <fieldset>
       <legend>Your Details</legend>
       <label>Company Legal Name *
-        <input type="text" name="company_legal_name" placeholder="e.g., KŐ BT egyéni vállalkozó" required>
+        <input type="text" name="company_legal_name" placeholder="e.g., Test Company Ltd" required>
       </label>
       <label>Billing Address *
-        <textarea name="billing_address" placeholder="e.g., István K. u. 40., Csorvás, Hungary" required></textarea>
+        <textarea name="billing_address" placeholder="e.g., 123 Example Street, Test City, Country" required></textarea>
       </label>
       <label>VAT / EORI / Tax Reg. No. *
         <input type="text" name="vat_eori_tax_no" placeholder="UK: EORI No. | France: SIRET + TVA No. | Norway: Org. No. + MVA" required>
       </label>
       <label>Contact Person *
-        <input type="text" name="contact_person" placeholder="e.g., Gábor Szekeres" required>
+        <input type="text" name="contact_person" placeholder="e.g., John Doe" required>
       </label>
       <label>Email *
-        <input type="email" name="email" placeholder="e.g., gabor@company.com" required>
+        <input type="email" name="email" placeholder="e.g., name@example.com" required>
       </label>
       <label>Phone
-        <input type="text" name="phone" placeholder="e.g., +36 30 878 0373">
+        <input type="text" name="phone" placeholder="e.g., +1 555 123 4567">
       </label>
       <label>Country of Destination *
         <input type="text" name="country_of_destination" placeholder="e.g., Hungary / United Kingdom / France / Norway" required>

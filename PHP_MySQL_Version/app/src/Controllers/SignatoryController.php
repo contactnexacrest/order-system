@@ -200,6 +200,19 @@ final class SignatoryController
         header('Location: /signatories');
     }
 
+    /** Thumbnail preview for one user's signature/designation-seal asset — same pattern as AssetController::preview(). */
+    public function previewUserAsset(array $params): void
+    {
+        $asset = SignatoryRepository::findUserAsset((int) ($params['id'] ?? 0));
+        if (!$asset || !is_file($asset['server_path'])) {
+            http_response_code(404);
+            return;
+        }
+        header('Content-Type: ' . ($asset['mime_type'] ?: 'application/octet-stream'));
+        header('Cache-Control: private, max-age=60');
+        readfile($asset['server_path']);
+    }
+
     public function setGlobalDefault(array $params): void
     {
         $user = AuthService::currentUser();
