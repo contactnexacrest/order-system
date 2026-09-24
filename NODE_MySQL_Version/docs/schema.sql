@@ -1923,7 +1923,72 @@ ALTER TABLE orders
   ADD COLUMN dispute_button_visible_to_client TINYINT(1) NOT NULL DEFAULT 0 AFTER is_archived;
 
 -- ================================================================
--- END OF SCHEMA — 68 tables. All open schema questions resolved
+-- SECTION AG — REFERENCE NUMBER SEQUENCE COUNTER (added 2026-09-24)
+-- ReferenceNumberService previously derived {NNN} from
+-- `SELECT COUNT(*) ... WHERE DATE(created_at) = CURDATE()` against the
+-- live clients/documents/amendments tables. That undercounts as soon as
+-- any same-day row is deleted — e.g. loading the Sample Data Playground,
+-- clearing it, then loading it again — and can then re-mint a number
+-- that's still held by a surviving row (a real client created earlier
+-- that same day), raising a duplicate-key error on client_unique_number
+-- or amendment_reference. A persistent, monotonic counter row per
+-- (scope, day) fixes this: it only ever goes up, so a delete elsewhere
+-- can never cause a number to be reissued.
+-- ================================================================
+CREATE TABLE reference_sequences (
+  scope_key   VARCHAR(150) NOT NULL,
+  last_seq    INT UNSIGNED NOT NULL DEFAULT 0,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (scope_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One-time backfill for a database that already has same-day rows at the
+-- moment this migration is applied (a fresh install has none, so this is a
+-- no-op there) — seeds each scope's counter from the highest {NNN} already
+-- in use that day, so the very first number minted after upgrading can
+-- never collide with one already on a real row. {NNN} is always the last 3
+-- characters of the rendered reference (see referenceNumberService.render).
+INSERT INTO reference_sequences (scope_key, last_seq)
+SELECT CONCAT('client_unique:', DATE_FORMAT(created_at, '%Y%m%d')), MAX(CAST(RIGHT(client_unique_number, 3) AS UNSIGNED))
+FROM clients
+GROUP BY DATE_FORMAT(created_at, '%Y%m%d')
+ON DUPLICATE KEY UPDATE last_seq = GREATEST(last_seq, VALUES(last_seq));
+
+INSERT INTO reference_sequences (scope_key, last_seq)
+SELECT CONCAT('document:', document_type_id, ':', DATE_FORMAT(generated_at, '%Y%m%d')), MAX(CAST(RIGHT(document_reference, 3) AS UNSIGNED))
+FROM documents
+WHERE document_reference IS NOT NULL
+GROUP BY document_type_id, DATE_FORMAT(generated_at, '%Y%m%d')
+ON DUPLICATE KEY UPDATE last_seq = GREATEST(last_seq, VALUES(last_seq));
+
+INSERT INTO reference_sequences (scope_key, last_seq)
+SELECT CONCAT('amendment:', DATE_FORMAT(created_at, '%Y%m%d')), MAX(CAST(RIGHT(amendment_reference, 3) AS UNSIGNED))
+FROM amendments
+GROUP BY DATE_FORMAT(created_at, '%Y%m%d')
+ON DUPLICATE KEY UPDATE last_seq = GREATEST(last_seq, VALUES(last_seq));
+
+-- ================================================================
+-- SECTION AH — CLIENT-FACING DOCUMENT REVISION NUMBER (added 2026-09-24)
+-- documents.revision_number increments on every regeneration for any
+-- reason, including an internal staff correction the client never sees —
+-- exactly the number that should stay purely internal. client_revision_number
+-- is a second, independent count: how many times a document of this
+-- (order, document_type) had already been actually SENT to the client at
+-- the moment this row was generated. It only grows when a prior document
+-- of the same order+type reached status 'sent' or 'superseded' — an
+-- internal-only correction never bumps it, however many times staff
+-- regenerate before the first real send. This is the number printed as
+-- "Rev.NN" inside the buyer-facing PDF body and used in the PDF's
+-- download filename (documentGenerationService.generate()); the internal
+-- documents.revision_number is unaffected and keeps showing on staff-only
+-- surfaces (order detail page, review notifications, reports) for full
+-- internal traceability.
+-- ================================================================
+ALTER TABLE documents
+  ADD COLUMN client_revision_number INT NULL AFTER revision_number;
+
+-- ================================================================
+-- END OF SCHEMA — 69 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.
@@ -1946,4 +2011,6 @@ ALTER TABLE orders
 -- Section AD (client payment self-report) added 2026-09-24.
 -- Section AE (buyer OC acknowledgment) added 2026-09-24.
 -- Section AF (per-order dispute visibility toggle) added 2026-09-24.
+-- Section AG (reference number sequence counter) added 2026-09-24.
+-- Section AH (client-facing document revision number) added 2026-09-24.
 -- ================================================================

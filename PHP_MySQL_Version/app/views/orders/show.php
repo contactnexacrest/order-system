@@ -123,12 +123,12 @@ $orderClosed = $order['status'] === 'complete';
   <div class="section">
     <h2>Documents</h2>
     <table class="list">
-      <tr><th>Type</th><th>Reference</th><th>Rev.</th><th>Generated</th><th>Status</th><th>Download</th></tr>
+      <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th></tr>
       <?php foreach ($documents as $d): ?>
       <tr>
         <td><?= htmlspecialchars($d['document_type_code']) ?></td>
         <td><?= htmlspecialchars($d['document_reference'] ?? '—') ?></td>
-        <td><?= (int) $d['revision_number'] ?></td>
+        <td><?= (int) $d['revision_number'] ?><?php if ($d['client_revision_number'] !== null): ?> <span class="muted small">(client: <?= (int) $d['client_revision_number'] ?>)</span><?php endif; ?></td>
         <td><?= htmlspecialchars($d['generated_at']) ?></td>
         <td><?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?></td>
         <td>

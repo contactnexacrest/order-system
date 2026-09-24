@@ -31,11 +31,9 @@ final class ReferenceNumberService
     public static function generateClientUniqueNumber(): string
     {
         $format = CompanySettingsRepository::get('master_tracking_ref_format') ?? 'NC/SC/{YYYY}/{DDMM}{NNN}';
-        $stmt = Database::connection()->query(
-            "SELECT COUNT(*) AS c FROM clients WHERE DATE(created_at) = CURDATE()"
-        );
-        $seq = ((int) $stmt->fetch()['c']) + 1;
-        return self::render($format, $seq);
+        $now = new \DateTimeImmutable();
+        $seq = self::nextSeq('client_unique:' . $now->format('Ymd'));
+        return self::render($format, $seq, $now);
     }
 
     /**
@@ -53,13 +51,10 @@ final class ReferenceNumberService
             return null;
         }
 
-        $stmt = $pdo->prepare(
-            "SELECT COUNT(*) AS c FROM documents WHERE document_type_id = :type_id AND DATE(generated_at) = CURDATE()"
-        );
-        $stmt->execute(['type_id' => $documentTypeId]);
-        $seq = ((int) $stmt->fetch()['c']) + 1;
+        $now = new \DateTimeImmutable();
+        $seq = self::nextSeq('document:' . $documentTypeId . ':' . $now->format('Ymd'));
 
-        return self::render($row['ref_format'], $seq);
+        return self::render($row['ref_format'], $seq, $now);
     }
 
     /**
@@ -83,10 +78,32 @@ final class ReferenceNumberService
             return null;
         }
 
-        $stmt = $pdo->query("SELECT COUNT(*) AS c FROM amendments WHERE DATE(created_at) = CURDATE()");
-        $seq = ((int) $stmt->fetch()['c']) + 1;
+        $now = new \DateTimeImmutable();
+        $seq = self::nextSeq('amendment:' . $now->format('Ymd'));
 
-        return self::render($row['ref_format'], $seq);
+        return self::render($row['ref_format'], $seq, $now);
+    }
+
+    /**
+     * Next value in a persistent, monotonic per-scope counter (docs/schema.sql
+     * Section AG) — atomic via INSERT ... ON DUPLICATE KEY UPDATE, so it's
+     * safe under concurrent calls and, critically, immune to any same-day
+     * row being deleted elsewhere (Sample Data Playground load/clear cycles
+     * being the case that surfaced the bug this replaced: COUNT(*) against
+     * the live table would drop after a clear and could then re-mint a
+     * number still held by a surviving real row).
+     */
+    private static function nextSeq(string $scopeKey): int
+    {
+        $pdo = Database::connection();
+        $pdo->prepare(
+            'INSERT INTO reference_sequences (scope_key, last_seq) VALUES (:key, 1)
+             ON DUPLICATE KEY UPDATE last_seq = last_seq + 1'
+        )->execute(['key' => $scopeKey]);
+
+        $stmt = $pdo->prepare('SELECT last_seq FROM reference_sequences WHERE scope_key = :key');
+        $stmt->execute(['key' => $scopeKey]);
+        return (int) $stmt->fetch()['last_seq'];
     }
 
     /**
@@ -94,11 +111,12 @@ final class ReferenceNumberService
      * number, every document reference, amendment reference) — the TEST-
      * prefix (docs/schema.sql Section V, requirement: test reference
      * numbers must be identifiable) is applied exactly once here rather
-     * than at each of the three call sites above.
+     * than at each of the three call sites above. $now is passed in from
+     * the caller so the {YYYY}/{DDMM} rendered here always matches the
+     * same clock instant used to compute the counter's scope key.
      */
-    private static function render(string $format, int $seq): string
+    private static function render(string $format, int $seq, \DateTimeImmutable $now): string
     {
-        $now = new \DateTimeImmutable();
         $replacements = [
             '{YYYY}' => $now->format('Y'),
             '{DDMM}' => $now->format('dm'),

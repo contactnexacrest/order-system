@@ -51,6 +51,23 @@ async function findLatestForOrderAndType(orderId, documentTypeId) {
   );
 }
 
+/**
+ * How many prior documents of this (order, type) actually reached the
+ * client — 'sent' (currently with the client) or 'superseded' (was sent,
+ * later replaced by a newer send). Used to compute client_revision_number
+ * (docs/schema.sql Section AH): purely a count of past real sends, so an
+ * internal-only regeneration between sends never moves it.
+ */
+async function countPriorSent(orderId, documentTypeId) {
+  const row = await db.queryOne(
+    `SELECT COUNT(*) AS c FROM documents
+     WHERE order_id = :order_id AND document_type_id = :document_type_id
+       AND status IN ('sent', 'superseded')`,
+    { order_id: orderId, document_type_id: documentTypeId }
+  );
+  return parseInt(row.c, 10);
+}
+
 /** Looks up the latest generated document of a given type CODE for an order, for cross-referencing on a later-stage document. */
 async function findLatestForOrderAndTypeCode(orderId, documentTypeCode) {
   return db.queryOne(
@@ -87,19 +104,19 @@ async function markSent(id) {
  *        switch or LUT renewal must never alter how a document that was
  *        already generated reads. See schema.sql SECTION P.
  */
-async function create(orderId, documentTypeId, documentReference, revisionNumber, pdfFileId, docxFileId, generatedBy, signatory = null, companySnapshot = null) {
+async function create(orderId, documentTypeId, documentReference, revisionNumber, pdfFileId, docxFileId, generatedBy, signatory = null, companySnapshot = null, clientRevisionNumber = null) {
   const result = await db.execute(
     `INSERT INTO documents
-        (order_id, document_type_id, document_reference, revision_number, status, generated_by, docx_file_id, pdf_file_id,
+        (order_id, document_type_id, document_reference, revision_number, client_revision_number, status, generated_by, docx_file_id, pdf_file_id,
          signatory_user_id, signatory_name_snapshot, signatory_designation_snapshot,
          signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal, company_snapshot_json)
      VALUES
-        (:order_id, :document_type_id, :document_reference, :revision_number, 'draft', :generated_by, :docx_file_id, :pdf_file_id,
+        (:order_id, :document_type_id, :document_reference, :revision_number, :client_revision_number, 'draft', :generated_by, :docx_file_id, :pdf_file_id,
          :signatory_user_id, :signatory_name_snapshot, :signatory_designation_snapshot,
          :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal, :company_snapshot_json)`,
     {
       order_id: orderId, document_type_id: documentTypeId, document_reference: documentReference,
-      revision_number: revisionNumber, generated_by: generatedBy, docx_file_id: docxFileId, pdf_file_id: pdfFileId,
+      revision_number: revisionNumber, client_revision_number: clientRevisionNumber, generated_by: generatedBy, docx_file_id: docxFileId, pdf_file_id: pdfFileId,
       signatory_user_id: signatory ? signatory.user_id : null,
       signatory_name_snapshot: signatory ? signatory.name : null,
       signatory_designation_snapshot: signatory ? signatory.designation : null,
@@ -114,5 +131,5 @@ async function create(orderId, documentTypeId, documentReference, revisionNumber
 
 module.exports = {
   customerFacingForOrder, forOrder, find, findLatestForOrderAndType, findLatestForOrderAndTypeCode,
-  markApproved, markInReview, markDraft, markSent, create,
+  countPriorSent, markApproved, markInReview, markDraft, markSent, create,
 };

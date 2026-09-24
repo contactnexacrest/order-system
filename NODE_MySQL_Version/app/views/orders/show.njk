@@ -111,12 +111,12 @@
   <div class="section">
     <h2>Documents</h2>
     <table class="list">
-      <tr><th>Type</th><th>Reference</th><th>Rev.</th><th>Generated</th><th>Status</th><th>Download</th></tr>
+      <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th></tr>
       {% for d in documents %}
       <tr>
         <td>{{ d.document_type_code }}</td>
         <td>{{ d.document_reference or '—' }}</td>
-        <td>{{ d.revision_number }}</td>
+        <td>{{ d.revision_number }}{% if d.client_revision_number != null %} <span class="muted small">(client: {{ d.client_revision_number }})</span>{% endif %}</td>
         <td>{{ d.generated_at }}</td>
         <td>{{ d.status | replace('_', ' ') }}</td>
         <td>

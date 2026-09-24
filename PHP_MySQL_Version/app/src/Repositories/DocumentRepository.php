@@ -59,6 +59,24 @@ final class DocumentRepository
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * How many prior documents of this (order, type) actually reached the
+     * client — 'sent' (currently with the client) or 'superseded' (was sent,
+     * later replaced by a newer send). Used to compute client_revision_number
+     * (docs/schema.sql Section AH): purely a count of past real sends, so an
+     * internal-only regeneration between sends never moves it.
+     */
+    public static function countPriorSent(int $orderId, int $documentTypeId): int
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT COUNT(*) AS c FROM documents
+             WHERE order_id = :order_id AND document_type_id = :document_type_id
+               AND status IN ('sent', 'superseded')"
+        );
+        $stmt->execute(['order_id' => $orderId, 'document_type_id' => $documentTypeId]);
+        return (int) $stmt->fetch()['c'];
+    }
+
     public static function findLatestForOrderAndType(int $orderId, int $documentTypeId): ?array
     {
         $stmt = Database::connection()->prepare(
@@ -146,16 +164,17 @@ final class DocumentRepository
         ?int $docxFileId,
         ?int $generatedBy,
         ?array $signatory = null,
-        ?array $companySnapshot = null
+        ?array $companySnapshot = null,
+        ?int $clientRevisionNumber = null
     ): int {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'INSERT INTO documents
-                (order_id, document_type_id, document_reference, revision_number, status, generated_by, docx_file_id, pdf_file_id,
+                (order_id, document_type_id, document_reference, revision_number, client_revision_number, status, generated_by, docx_file_id, pdf_file_id,
                  signatory_user_id, signatory_name_snapshot, signatory_designation_snapshot,
                  signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal, company_snapshot_json)
              VALUES
-                (:order_id, :document_type_id, :document_reference, :revision_number, \'draft\', :generated_by, :docx_file_id, :pdf_file_id,
+                (:order_id, :document_type_id, :document_reference, :revision_number, :client_revision_number, \'draft\', :generated_by, :docx_file_id, :pdf_file_id,
                  :signatory_user_id, :signatory_name_snapshot, :signatory_designation_snapshot,
                  :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal, :company_snapshot_json)'
         );
@@ -164,6 +183,7 @@ final class DocumentRepository
             'document_type_id'   => $documentTypeId,
             'document_reference' => $documentReference,
             'revision_number'    => $revisionNumber,
+            'client_revision_number' => $clientRevisionNumber,
             'generated_by'       => $generatedBy,
             'docx_file_id'       => $docxFileId,
             'pdf_file_id'        => $pdfFileId,

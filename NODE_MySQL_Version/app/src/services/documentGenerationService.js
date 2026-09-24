@@ -125,6 +125,14 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   const existing = await documentRepository.findLatestForOrderAndType(orderId, docType.id);
   const revisionNumber = existing ? parseInt(existing.revision_number, 10) + 1 : 0;
 
+  // Client-facing revision (docs/schema.sql Section AH) — how many
+  // documents of this (order, type) the client has actually already been
+  // sent. Deliberately NOT derived from revisionNumber: staff can
+  // regenerate as many times as needed to fix an internal mistake before
+  // the first real send, and none of that churn should ever reach the
+  // client as a jump from "Rev.00" to "Rev.09".
+  const clientRevisionNumber = await documentRepository.countPriorSent(orderId, docType.id);
+
   const documentReference =
     (existing && existing.document_reference) ||
     (await preAssignedReferenceFor(documentTypeCode, orderId)) ||
@@ -141,6 +149,8 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
       document_reference: documentReference,
       revision_number: revisionNumber,
       revision_label: `Rev.${String(revisionNumber).padStart(2, '0')}`,
+      client_revision_number: clientRevisionNumber,
+      client_revision_label: `Rev.${String(clientRevisionNumber).padStart(2, '0')}`,
       generated_date: formatNow(),
     },
     watermark,
@@ -180,7 +190,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     null,
     pdfPath,
     pdfUuidName,
-    `${documentTypeCode} ${filenameSafeReference} Rev.${revisionNumber}.pdf`,
+    `${documentTypeCode} ${filenameSafeReference} Rev.${clientRevisionNumber}.pdf`,
     pdfBytes.length,
     'application/pdf',
     generatedByUserId,
@@ -217,13 +227,15 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     docxFileId,
     generatedByUserId,
     signatory,
-    data.company
+    data.company,
+    clientRevisionNumber
   );
 
   return {
     document_id: documentId,
     document_reference: documentReference,
     revision_number: revisionNumber,
+    client_revision_number: clientRevisionNumber,
     pdf_file_id: pdfFileId,
     docx_file_id: docxFileId,
   };
@@ -435,6 +447,8 @@ async function finalizeApproval(documentId) {
       document_reference: document.document_reference,
       revision_number: document.revision_number,
       revision_label: `Rev.${String(document.revision_number).padStart(2, '0')}`,
+      client_revision_number: document.client_revision_number,
+      client_revision_label: `Rev.${String(document.client_revision_number).padStart(2, '0')}`,
       generated_date: documentDataAssembler.formatDate(document.generated_at),
     },
     watermark: await finalWatermark(),
@@ -481,7 +495,7 @@ async function finalizeApproval(documentId) {
     null,
     finalPath,
     finalUuidName,
-    `${documentTypeCode} ${filenameSafeReference} Rev.${document.revision_number} (approved).pdf`,
+    `${documentTypeCode} ${filenameSafeReference} Rev.${document.client_revision_number} (approved).pdf`,
     pdfBytes.length,
     'application/pdf',
     null,

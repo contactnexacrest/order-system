@@ -13,7 +13,7 @@
 <p class="placeholder-italic" style="font-size:9pt; margin:0 0 4pt;">This Purchase Order is issued by NexaCrest International Private Limited to the named supplier for material procurement. Supplier fills Section 7 only. All other sections are issued by NexaCrest.</p>
 <table class="meta">
   <tr>
-    <td><span class="label">PO NUMBER *</span><span class="value">{{ meta.document_reference }} {{ meta.revision_label }}</span></td>
+    <td><span class="label">PO NUMBER *</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
     <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
     <td><span class="label">BUYER ORDER REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
     <td><span class="label">EXPORT ORDER REF *</span><span class="value">{{ order.pi_ref or order.quotation_ref or '—' }}</span></td>

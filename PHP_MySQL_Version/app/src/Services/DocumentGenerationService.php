@@ -62,6 +62,14 @@ final class DocumentGenerationService
         $existing = DocumentRepository::findLatestForOrderAndType($orderId, (int) $docType['id']);
         $revisionNumber = $existing ? ((int) $existing['revision_number']) + 1 : 0;
 
+        // Client-facing revision (docs/schema.sql Section AH) — how many
+        // documents of this (order, type) the client has actually already
+        // been sent. Deliberately NOT derived from $revisionNumber: staff
+        // can regenerate as many times as needed to fix an internal mistake
+        // before the first real send, and none of that churn should ever
+        // reach the client as a jump from "Rev.00" to "Rev.09".
+        $clientRevisionNumber = DocumentRepository::countPriorSent($orderId, (int) $docType['id']);
+
         $documentReference = $existing['document_reference']
             ?? self::preAssignedReferenceFor($documentTypeCode, $orderId)
             ?? ReferenceNumberService::generateDocumentRef((int) $docType['id']);
@@ -75,6 +83,8 @@ final class DocumentGenerationService
                 'document_reference' => $documentReference,
                 'revision_number'    => $revisionNumber,
                 'revision_label'     => 'Rev.' . str_pad((string) $revisionNumber, 2, '0', STR_PAD_LEFT),
+                'client_revision_number' => $clientRevisionNumber,
+                'client_revision_label'  => 'Rev.' . str_pad((string) $clientRevisionNumber, 2, '0', STR_PAD_LEFT),
                 'generated_date'     => (new \DateTimeImmutable())->format('d F Y'),
             ],
             'watermark' => $watermark,
@@ -116,7 +126,7 @@ final class DocumentGenerationService
             null,
             $pdfPath,
             $pdfUuidName,
-            "{$documentTypeCode} {$filenameSafeReference} Rev.{$revisionNumber}.pdf",
+            "{$documentTypeCode} {$filenameSafeReference} Rev.{$clientRevisionNumber}.pdf",
             strlen($pdfBytes),
             'application/pdf',
             $generatedByUserId,
@@ -152,13 +162,15 @@ final class DocumentGenerationService
             $docxFileId,
             $generatedByUserId,
             $signatory,
-            $data['company']
+            $data['company'],
+            $clientRevisionNumber
         );
 
         return [
             'document_id'        => $documentId,
             'document_reference' => $documentReference,
             'revision_number'    => $revisionNumber,
+            'client_revision_number' => $clientRevisionNumber,
             'pdf_file_id'        => $pdfFileId,
             'docx_file_id'       => $docxFileId,
         ];
@@ -387,6 +399,8 @@ final class DocumentGenerationService
                 'document_reference' => $document['document_reference'],
                 'revision_number'    => (int) $document['revision_number'],
                 'revision_label'     => 'Rev.' . str_pad((string) $document['revision_number'], 2, '0', STR_PAD_LEFT),
+                'client_revision_number' => (int) $document['client_revision_number'],
+                'client_revision_label'  => 'Rev.' . str_pad((string) $document['client_revision_number'], 2, '0', STR_PAD_LEFT),
                 'generated_date'     => (new \DateTimeImmutable($document['generated_at']))->format('d F Y'),
             ],
             'watermark' => self::finalWatermark(),
@@ -438,7 +452,7 @@ final class DocumentGenerationService
             null,
             $finalPath,
             $finalUuidName,
-            "{$documentTypeCode} {$filenameSafeReference} Rev.{$document['revision_number']} (approved).pdf",
+            "{$documentTypeCode} {$filenameSafeReference} Rev.{$document['client_revision_number']} (approved).pdf",
             strlen($pdfBytes),
             'application/pdf',
             null,

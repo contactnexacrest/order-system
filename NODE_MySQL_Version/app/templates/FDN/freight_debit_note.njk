@@ -5,7 +5,7 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td><span class="label">DEBIT NOTE NO. *</span><span class="value">{{ meta.document_reference }} {{ meta.revision_label }}</span></td>
+    <td><span class="label">DEBIT NOTE NO. *</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
     <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
     <td><span class="label">PI REFERENCE *</span><span class="value">{{ order.pi_ref or '—' }}</span></td>
     <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>

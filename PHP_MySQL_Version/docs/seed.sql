@@ -416,9 +416,7 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
 -- Company/bank/LUT values below are the REAL values found in your own
 -- source documents (01_Quotation.docx, 02_ProformaInvoice.docx), not
 -- placeholders — pulled directly during Phase B while building the QT/PI/OC
--- templates against those actual documents. Only bank_pincode wasn't shown
--- in the extracted table text (the bank address string didn't break the
--- pincode out separately) and stays a placeholder below.
+-- templates against those actual documents.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
   ('legal_name',            'NexaCrest International Private Limited', 'string', 'company', 'Full legal company name as it appears on all documents.', 0),
   ('registered_office',     'No. 33, T Ramaiah Garden, 2 Hulimavu Village, Hulimavu, Bangalore South, Bengaluru, Karnataka – 560076, India', 'string', 'company', 'Registered office address.', 0),
@@ -427,7 +425,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('iec_pan',               'AAKCN8733G',                               'string', 'company', 'Import Export Code / PAN.', 1),
   ('md_name',               'Gulmohar Sontakke',                        'string', 'company', 'Founder & Managing Director name, for document signature blocks.', 0),
   ('md_title',              'Founder & Managing Director',              'string', 'company', 'MD title as shown on documents.', 0),
-  ('director_name',         'PLACEHOLDER — Director Name',              'string', 'company', 'Director name, if a director signature is used on any document (open question — confirm whether this is needed; QT/PI/OC templates only show the MD signature block).', 0),
+  ('director_name',         'Gulmohar Sontakke',                        'string', 'company', 'Director name, if a director signature is used on any document (open question — confirm whether this is needed; QT/PI/OC templates only show the MD signature block).', 0),
   ('director_title',        'Director',                                 'string', 'company', 'Director title as shown on documents.', 0),
   ('phone',                 '+91-7676463030',                           'string', 'company', 'Company contact phone number.', 0),
   ('email',                 'gulmohar.sontakke@nexacrestinternational.com', 'string', 'company', 'Company contact email address.', 0),
@@ -437,11 +435,11 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('swift_bic',             'SBININBB949',                              'string', 'bank',    'SWIFT/BIC code.', 1),
   ('ifsc',                  'SBIN0064074',                              'string', 'bank',    'IFSC code.', 1),
   ('bank_address',          '1st Floor, 117, 7th Block Industrial Layout, Koramangala, Bengaluru – 560095, India', 'string', 'bank', 'Bank branch address.', 1),
-  ('bank_pincode',          'PLACEHOLDER-PINCODE',                      'string', 'bank',    'Bank branch pincode (not broken out separately in the source PI template — likely 560095, confirm before relying on it separately from bank_address).', 1),
+  ('bank_pincode',          '560095',                                    'string', 'bank',    'Bank branch pincode.', 1),
   ('lut_number',            'ZD290626057408W',                         'string', 'lut',     'Letter of Undertaking (LUT) ARN/number for zero-rated export.', 1),
   ('lut_valid_fy',          'FY 2026-27',                                'string', 'lut',     'Financial year the current LUT is valid for.', 1),
   ('lut_expiry_date',       '2027-03-31',                                'date',   'lut',     'LUT expiry date — placeholder (FY 2026-27 end date assumed as 31 March 2027) — the source PI template states the FY but not an explicit expiry date; confirm the real one.', 1),
-  ('rcmc_number',           'PLACEHOLDER-RCMC-NUMBER',                  'string', 'capexil', 'CAPEXIL RCMC (Registration-cum-Membership Certificate) number — required on the COO Preparation Sheet (Phase C). Placeholder — confirm the real number from the RCMC certificate.', 1),
+  ('rcmc_number',           'RCMC/CAPEXIL/03217/2026-2027',             'string', 'capexil', 'CAPEXIL RCMC (Registration-cum-Membership Certificate) number — required on the COO Preparation Sheet (Phase C).', 1),
   ('rcmc_valid_until',      '2027-03-31',                                'date',   'capexil', 'CAPEXIL RCMC certificate expiry date — placeholder, renew annually. Alerts configured via rcmc_alert_days_a/rcmc_escalation_days_b below.', 1),
   ('rbi_purpose_code_advance', 'P0103', 'string', 'rbi', 'RBI purpose code for advance payment wires.', 0),
   ('rbi_purpose_code_balance', 'P0102', 'string', 'rbi', 'RBI purpose code for balance payment wires.', 0),
