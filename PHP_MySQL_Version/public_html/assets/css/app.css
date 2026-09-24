@@ -134,7 +134,8 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .protected-row{background:var(--gold-soft);border-left:3px solid var(--gold);padding-left:0.6rem;}
 .lock-icon{margin-right:0.3rem;}
 .unlock-btn{margin-left:0.5rem;}
-input[readonly],textarea[readonly]{background:var(--line);color:var(--ink);opacity:0.75;cursor:not-allowed;}
+input[readonly],textarea[readonly],
+fieldset[disabled] input,fieldset[disabled] textarea,fieldset[disabled] select{background:var(--line);color:var(--ink);opacity:0.75;cursor:not-allowed;}
 .asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.25rem;}
 .asset-tile{border:1px solid var(--line);border-radius:12px;padding:1rem;}
 .asset-tile h3{margin-top:0;font-size:1rem;color:var(--navy);}
