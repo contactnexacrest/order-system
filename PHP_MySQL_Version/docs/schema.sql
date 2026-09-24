@@ -1880,7 +1880,37 @@ CREATE TABLE client_payment_reports (
 ) ENGINE=InnoDB;
 
 -- ================================================================
--- END OF SCHEMA — 67 tables. All open schema questions resolved
+-- SECTION AE — BUYER OC ACKNOWLEDGMENT (added 2026-09-24)
+-- Replaces the old staff-only "Confirm Buyer Acknowledged Order" button at
+-- the Stage 4->5 gate with a real acknowledgment: the buyer sees a
+-- read-only recap of the sent Order Confirmation in their portal with a
+-- single "I acknowledge and confirm to proceed" button (no decline/dispute
+-- option shown, so as not to plant doubt at this stage); replying to the
+-- email is equally valid evidence, which staff record with a mandatory
+-- note; and if the buyer does neither within 48 hours of the OC being
+-- emailed, it auto-confirms (app/cron/auto_confirm_oc_acknowledgments.php).
+-- One row per order (UNIQUE order_id) — a resend of the OC (e.g. after a
+-- stage-regeneration cascade) upserts sent_at/due_at/document_id and clears
+-- any earlier acknowledgment, since the buyer is being asked to confirm
+-- the newly-sent version, not the one they may have already acknowledged.
+-- ================================================================
+CREATE TABLE order_oc_acknowledgments (
+  id                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id           BIGINT UNSIGNED NOT NULL UNIQUE,
+  document_id        BIGINT UNSIGNED NOT NULL,
+  sent_at            TIMESTAMP NOT NULL,
+  due_at             TIMESTAMP NOT NULL,
+  acknowledged_at    TIMESTAMP NULL,
+  acknowledged_via   ENUM('client_portal','staff_recorded_email','auto_48h') NULL,
+  acknowledged_note  VARCHAR(500) NULL,
+  recorded_by        BIGINT UNSIGNED NULL,   -- NULL for client_portal/auto_48h; the staff user for staff_recorded_email
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (document_id) REFERENCES documents(id),
+  FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- END OF SCHEMA — 68 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.

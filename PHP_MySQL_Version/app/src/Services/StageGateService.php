@@ -27,7 +27,7 @@ use App\Repositories\OrderStageRepository;
  */
 final class StageGateService
 {
-    public static function passAndUnlockNext(int $orderId, int $stageNumber, int $userId): void
+    public static function passAndUnlockNext(int $orderId, int $stageNumber, ?int $userId): void
     {
         $current = OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
         if (!$current || $current['status'] === 'gate_passed') {

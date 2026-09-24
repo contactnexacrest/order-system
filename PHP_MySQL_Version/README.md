@@ -317,13 +317,14 @@ Send to Buyer" section appears per generated document, plus new
 
 ### Bluehost cron setup
 
-Two new scheduled jobs, both plain PHP scripts meant to be run via
+Three scheduled jobs, all plain PHP scripts meant to be run via
 cPanel → Cron Jobs (Bluehost's equivalent of a systemd timer — there is no
 persistent worker process on shared hosting, which is exactly why these
 exist as polling scripts rather than a queue consumer):
 
 ```
 */10 * * * *  php /home/yourcpaneluser/nexacrest_webapp/app/cron/dispatch_deferred_emails.php >> /home/yourcpaneluser/logs/dispatch_deferred_emails.log 2>&1
+*/15 * * * *  php /home/yourcpaneluser/nexacrest_webapp/app/cron/auto_confirm_oc_acknowledgments.php >> /home/yourcpaneluser/logs/auto_confirm_oc_acknowledgments.log 2>&1
 0 6 * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/check_alerts.php >> /home/yourcpaneluser/logs/check_alerts.log 2>&1
 ```
 
@@ -331,6 +332,13 @@ exist as polling scripts rather than a queue consumer):
   every `email_log` row that's `approved` and due
   (`scheduled_at <= NOW()`). Safe to run more often; each row is only ever
   picked up once (marked `sent`/`failed` immediately).
+- `auto_confirm_oc_acknowledgments.php` — recommended every 15 minutes.
+  Auto-confirms any Order Confirmation the buyer hasn't acknowledged
+  (client portal button, or a staff-recorded email reply) within 48 hours
+  of it being emailed, unlocking Stage 5 (docs/schema.sql Section AE).
+  Idempotent — a row is only ever picked up once it has `acknowledged_at
+  IS NULL AND due_at <= NOW()`, and acknowledging it (by any means) before
+  this runs removes it from that set.
 - `check_alerts.php` — recommended once daily. Checks LUT/RCMC expiry
   against their configured alert/escalation thresholds, freight payment
   overdue (FDN issued, not yet cleared, past
@@ -339,8 +347,8 @@ exist as polling scripts rather than a queue consumer):
   this has a same-day dedup guard so it doesn't re-notify on every run
   while a condition remains unresolved).
 
-Both scripts print a one-line summary to stdout and exit 0 on success —
-redirect that to a log file (as above) so a Bluehost cron failure notice
+All three scripts print a one-line summary to stdout and exit 0 on
+success — redirect that to a log file (as above) so a Bluehost cron failure notice
 actually tells you something.
 
 ### Bluehost database backups (Section 14)

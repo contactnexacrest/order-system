@@ -648,13 +648,29 @@ $orderClosed = $order['status'] === 'complete';
   <div class="section">
     <h2>Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
     <?php if ($buyerAcknowledged): ?>
-      <p>Buyer has acknowledged the Order Confirmation.</p>
+      <?php if ($ocAcknowledgment && $ocAcknowledgment['acknowledged_via'] === 'client_portal'): ?>
+        <p>Buyer acknowledged the Order Confirmation themselves in the client portal on <?= htmlspecialchars(Dates::human($ocAcknowledgment['acknowledged_at'])) ?>.</p>
+      <?php elseif ($ocAcknowledgment && $ocAcknowledgment['acknowledged_via'] === 'staff_recorded_email'): ?>
+        <p>Acknowledgement recorded from the buyer's email reply on <?= htmlspecialchars(Dates::human($ocAcknowledgment['acknowledged_at'])) ?>.</p>
+        <p class="muted small">Evidence/note: <?= nl2br(htmlspecialchars($ocAcknowledgment['acknowledged_note'] ?? '')) ?></p>
+      <?php elseif ($ocAcknowledgment && $ocAcknowledgment['acknowledged_via'] === 'auto_48h'): ?>
+        <p>No response from the buyer within 48 hours of the Order Confirmation being emailed — auto-confirmed on <?= htmlspecialchars(Dates::human($ocAcknowledgment['acknowledged_at'])) ?>.</p>
+      <?php else: ?>
+        <p>Buyer has acknowledged the Order Confirmation.</p>
+      <?php endif; ?>
     <?php elseif ($stage4 && $stage4['status'] !== 'locked'): ?>
-      <p class="muted">Generate the Order Confirmation above and send it to the buyer, then confirm their acknowledgement here.</p>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-acknowledged">
-        <?= Csrf::field() ?>
-        <button type="submit" class="btn-sm btn-success">Confirm Buyer Acknowledged Order (unlocks Stage 5)</button>
-      </form>
+      <?php if ($ocAcknowledgment && $ocAcknowledgment['acknowledged_at'] === null): ?>
+        <div class="review-banner info">
+          ℹ <span>Order Confirmation emailed to the buyer on <?= htmlspecialchars(Dates::human($ocAcknowledgment['sent_at'])) ?>. Awaiting their acknowledgement — the client can confirm it directly in their portal, or reply to the email (record that below). If there's no response by <?= htmlspecialchars(Dates::human($ocAcknowledgment['due_at'])) ?>, it auto-confirms and Stage 5 unlocks on its own.</span>
+        </div>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
+          <?= Csrf::field() ?>
+          <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
+          <button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Stage 5)</button>
+        </form>
+      <?php else: ?>
+        <p class="muted">Generate the Order Confirmation above and send it to the buyer — once sent, they can acknowledge it from their portal (or reply by email, which you can record here), and it auto-confirms after 48 hours with no response.</p>
+      <?php endif; ?>
     <?php else: ?>
       <p class="muted">Clear the advance payment first to unlock this gate.</p>
     <?php endif; ?>

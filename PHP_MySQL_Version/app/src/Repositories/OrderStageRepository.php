@@ -55,7 +55,7 @@ final class OrderStageRepository
         return $stmt->fetch() ?: null;
     }
 
-    public static function passGate(int $orderStageId, int $userId): void
+    public static function passGate(int $orderStageId, ?int $userId): void
     {
         Database::connection()->prepare(
             "UPDATE order_stages SET status = 'gate_passed', gate_passed_at = NOW(), gate_passed_by = :user_id

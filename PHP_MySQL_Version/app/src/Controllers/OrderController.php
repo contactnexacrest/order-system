@@ -25,6 +25,7 @@ use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPackingRepository;
+use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductionRepository;
 use App\Repositories\OrderProductRepository;
@@ -353,6 +354,7 @@ final class OrderController
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
             'piIntake' => PiIntakeRepository::latestForOrder($orderId),
             'clientPaymentReports' => ClientPaymentReportRepository::forOrder($orderId),
+            'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
         ], 'layout/base');
     }
 
@@ -621,13 +623,37 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
-    /** Stage 4->5 gate: buyer acknowledges the Order Confirmation (never built in Phase B). */
-    public function confirmBuyerAcknowledged(array $params): void
+    /**
+     * Stage 4->5 gate: staff records a buyer's Order Confirmation
+     * acknowledgment that arrived by reply-to-the-email rather than through
+     * the client portal button (docs/schema.sql Section AE). Replaces the
+     * old staff-only "Confirm Buyer Acknowledged Order" button, which never
+     * required any evidence the buyer had actually agreed to anything — a
+     * mandatory note (the reply itself, quoted, is normal practice here) is
+     * this feature's substitute for that missing evidence.
+     */
+    public function recordOcAcknowledgment(array $params): void
     {
         $orderId = (int) $params['id'];
+        $ack = OrderOcAcknowledgmentRepository::find($orderId);
+        if (!$ack || $ack['acknowledged_at'] !== null) {
+            Flash::set('error', 'No pending Order Confirmation acknowledgment for this order — send the OC to the buyer first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $note = trim((string) ($_POST['acknowledged_note'] ?? ''));
+        if ($error = ReasonValidator::check($note)) {
+            Flash::set('error', 'Describe the evidence (e.g. quote the buyer\'s email reply): ' . $error);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
         $user = AuthService::currentUser();
+        OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'staff_recorded_email', $note, (int) $user['id']);
         StageGateService::passAndUnlockNext($orderId, 4, (int) $user['id']);
-        Flash::set('success', 'Buyer acknowledgement of the Order Confirmation recorded. Stage 5 (Supplier PO) unlocked.');
+        AuditLogRepository::log((int) $user['id'], 'OC_ACKNOWLEDGED_VIA_EMAIL', 'orders', $orderId, null, null, null, $note);
+        Flash::set('success', 'Buyer acknowledgement recorded. Stage 5 (Supplier PO) unlocked.');
         header("Location: /orders/{$orderId}");
     }
 

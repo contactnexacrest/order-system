@@ -10,6 +10,8 @@ use App\Repositories\ClientPasswordResetTokenRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
+use App\Repositories\OrderOcAcknowledgmentRepository;
+use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Services\ClientPortalService;
 use App\Services\FileUploadService;
@@ -19,9 +21,11 @@ use App\Services\PasswordPolicyService;
  * The client-facing portal — structurally separate screens from the staff
  * app (own layout, own nav, own session key via ClientPortalService).
  * Read-only for the client's own profile/order data throughout (no
- * editing, no audit visibility) — the two exceptions are the client's own
- * password, and reportPayment()/below, which is purely an informational
- * note to staff and never writes to the order/payment records itself.
+ * editing, no audit visibility) — the exceptions are the client's own
+ * password; reportPayment(), which is purely an informational note to
+ * staff and never writes to the order/payment records itself; and
+ * acknowledgeOc(), the one real state change a client can trigger, gated
+ * to only ever move the Stage 4->5 gate forward, never anything else.
  */
 final class ClientPortalController
 {
@@ -139,9 +143,44 @@ final class ClientPortalController
         View::render('client_portal/order_show', [
             'client' => ClientPortalService::currentClient(),
             'order' => $order,
+            'products' => OrderProductRepository::forOrder($orderId),
+            'totalFobValue' => OrderProductRepository::totalFobValue($orderId),
             'documents' => DocumentRepository::customerFacingForOrder($orderId),
             'paymentReports' => ClientPaymentReportRepository::forOrder($orderId),
+            'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
         ], 'layout/client');
+    }
+
+    /**
+     * The client's own Order Confirmation acknowledgment — the single
+     * button offered (docs/schema.sql Section AE). Deliberately no
+     * decline/dispute option here: raising doubt at this exact step isn't
+     * the confirmed design, and a genuine dispute has its own channel
+     * (the per-order dispute button, where enabled) once the order is
+     * further along.
+     */
+    public function acknowledgeOc(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $ack = OrderOcAcknowledgmentRepository::find($orderId);
+        if (!$ack || $ack['acknowledged_at'] !== null) {
+            Flash::set('error', 'There is nothing awaiting your acknowledgement on this order.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
+
+        OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'client_portal', null, null);
+        \App\Services\StageGateService::passAndUnlockNext($orderId, 4, null);
+        Flash::set('success', 'Thank you — your acknowledgement has been recorded and your order is moving to production.');
+        header("Location: /client/orders/{$orderId}");
     }
 
     /**

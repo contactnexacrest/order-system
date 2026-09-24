@@ -331,7 +331,7 @@ final class ReportRepository
         );
     }
 
-    /** Spec item #12 — OC sent, buyer's countersigned acknowledgement not yet recorded (confirmBuyerAcknowledged). */
+    /** Spec item #12 — OC sent, buyer's acknowledgement not yet recorded (OrderOcAcknowledgmentRepository — client portal, staff-recorded email reply, or 48h auto-confirm). */
     private static function ocAwaitingAcknowledgement(): array
     {
         return self::queueRows(

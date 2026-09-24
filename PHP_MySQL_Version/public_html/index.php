@@ -245,7 +245,7 @@ $router->post('/orders/{id}/annexure/products/{productId}/images', [$annexure, '
 $router->post('/orders/{id}/annexure/images/{imageId}/remove', [$annexure, 'removeImage'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 // --- Phase C: Stages 4-9 ---
-$router->post('/orders/{id}/buyer-acknowledged', [$orders, 'confirmBuyerAcknowledged'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/oc-acknowledgment', [$orders, 'recordOcAcknowledgment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/suppliers', [$orders, 'createSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
@@ -363,6 +363,7 @@ $router->get('/client/account', [$clientPortal, 'showAccount'], [ClientAuth::req
 $router->post('/client/account/password', [$clientPortal, 'changePassword'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->get('/client/orders/{id}', [$clientPortal, 'showOrder'], [ClientAuth::required()]);
 $router->post('/client/orders/{id}/report-payment', [$clientPortal, 'reportPayment'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->post('/client/orders/{id}/acknowledge-oc', [$clientPortal, 'acknowledgeOc'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->get('/client/documents/{id}/download', [$clientPortal, 'downloadDocument'], [ClientAuth::required()]);
 
 $router->get('/sample-data', [$sampleData, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_sample_data')]);

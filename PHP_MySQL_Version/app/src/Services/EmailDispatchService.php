@@ -194,6 +194,22 @@ final class EmailDispatchService
             EmailLogRepository::markSent((int) $emailLogRow['id']);
             DocumentRepository::markSent((int) $document['id']);
             AuditLogRepository::log(null, 'EMAIL_SENT', 'email_log', (int) $emailLogRow['id'], 'recipient_email', null, $emailLogRow['recipient_email']);
+
+            // docs/schema.sql Section AE — the Order Confirmation just went
+            // out to the buyer, so this is the moment the 48-hour
+            // acknowledgment clock starts (OrderController::
+            // recordOcAcknowledgment() / ClientPortalController::
+            // acknowledgeOc() / the auto_confirm_oc_acknowledgments.php cron
+            // are the three ways it later resolves).
+            if ($document['document_type_code'] === 'OC' && $document['order_id'] !== null) {
+                $now = new \DateTimeImmutable();
+                \App\Repositories\OrderOcAcknowledgmentRepository::recordSent(
+                    (int) $document['order_id'],
+                    (int) $document['id'],
+                    $now->format('Y-m-d H:i:s'),
+                    $now->modify('+48 hours')->format('Y-m-d H:i:s')
+                );
+            }
         } else {
             EmailLogRepository::markFailed((int) $emailLogRow['id']);
         }
