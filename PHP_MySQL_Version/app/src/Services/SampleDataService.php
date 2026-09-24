@@ -16,6 +16,7 @@ use App\Repositories\FileStoreRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderAnnexureRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
+use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPackingRepository;
@@ -182,6 +183,7 @@ final class SampleDataService
             ['Garden bench, stone composite', '150 x 45 x 45 cm', 'Sandblasted'],
         ]);
         self::advanceSampleOrderBJourney($orderB1Id, $clientBId, $supplierId, $userId, $reviewerUserId);
+        self::addSampleOrderComments($orderB1Id, $clientBId, $userId);
 
         // --- Client C: CIF, "Established Buyer — Post-BL" preset — the
         // only order that runs through the CFR/CIF Freight Payment stage,
@@ -197,6 +199,7 @@ final class SampleDataService
         ], 'Rotterdam, Netherlands');
         self::advanceSampleOrderToStage9($orderC1Id, $supplierId, $userId);
         self::addSampleDispute($orderC1Id, $userId);
+        self::addSampleDisputeComments($orderC1Id, $clientCId, $userId);
 
         // --- Client D: a lost order ---
         $clientDId = self::createSampleClient(
@@ -1008,6 +1011,13 @@ final class SampleDataService
      */
     private static function attachSampleAnnexureImage(int $orderId, int $annexureProductId, string $subPath, string $originalFilename, int $uploadedBy): void
     {
+        $fileId = self::attachSamplePngFile($orderId, $subPath, $originalFilename, $uploadedBy, 'Annexure product image');
+        OrderAnnexureRepository::addImage($annexureProductId, $fileId);
+    }
+
+    /** A minimal but genuinely valid 1x1 PNG, saved under $subPath and registered in file_store. */
+    private static function attachSamplePngFile(int $orderId, string $subPath, string $originalFilename, int $uploadedBy, string $documentTypeLabel): int
+    {
         $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
         $targetDir = "{$storageBase}/{$subPath}";
         if (!is_dir($targetDir)) {
@@ -1015,11 +1025,10 @@ final class SampleDataService
         }
         $uuidFilename = bin2hex(random_bytes(16)) . '.png';
         $targetPath = "{$targetDir}/{$uuidFilename}";
-        // A minimal but genuinely valid 1x1 PNG.
         $pngBytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
         file_put_contents($targetPath, $pngBytes);
 
-        $fileId = FileStoreRepository::insertReceived(
+        return FileStoreRepository::insertReceived(
             null,
             $orderId,
             $targetPath,
@@ -1029,9 +1038,46 @@ final class SampleDataService
             'image/png',
             $uploadedBy,
             null,
-            'Annexure product image'
+            $documentTypeLabel
         );
-        OrderAnnexureRepository::addImage($annexureProductId, $fileId);
+    }
+
+    /**
+     * Order-progress chat thread (Section AI) on a fully-advanced sample
+     * order — a mixed staff/client conversation, including one staff
+     * message with a photo attachment, so the chat UI has something real
+     * to demonstrate straight after loading sample data.
+     */
+    private static function addSampleOrderComments(int $orderId, int $clientId, int $userId): void
+    {
+        $order = OrderRepository::find($orderId);
+        $subPath = 'clients/' . self::pathSafe((string) $order['client_unique_number']) . '/' . self::pathSafe((string) $order['order_reference']) . '/comment_attachments';
+
+        $c1 = OrderCommentRepository::create($orderId, 'staff', $userId, null, 'Good news — production on your order has started and is progressing on schedule. We will share progress photos shortly.');
+        OrderCommentRepository::markEmailSent($c1);
+
+        OrderCommentRepository::create($orderId, 'client', null, $clientId, 'Thank you for the update! Please do share the photos once ready.');
+
+        $c3 = OrderCommentRepository::create($orderId, 'staff', $userId, null, 'Here are a couple of photos from the production floor — everything is on track for the planned dispatch date.');
+        $photoFileId = self::attachSamplePngFile($orderId, $subPath, 'Production photo.png', $userId, 'Order chat attachment');
+        OrderCommentRepository::attachFile($c3, $photoFileId);
+        OrderCommentRepository::markEmailSent($c3);
+
+        OrderCommentRepository::create($orderId, 'client', null, $clientId, 'These look great, thank you for keeping us posted!');
+    }
+
+    /** A shorter chat thread tied to the sample dispute — the conversation a buyer and staff would actually have around it. */
+    private static function addSampleDisputeComments(int $orderId, int $clientId, int $userId): void
+    {
+        OrderCommentRepository::create($orderId, 'client', null, $clientId, 'We found a shortage of 2 pieces when the container was destuffed at the port — could you please look into this?');
+
+        $c2 = OrderCommentRepository::create($orderId, 'staff', $userId, null, "We're sorry to hear that — we've logged this as a formal dispute and are checking with our supplier right away. We'll update you within a few days.");
+        OrderCommentRepository::markEmailSent($c2);
+
+        $c3 = OrderCommentRepository::create($orderId, 'staff', $userId, null, 'Update: our supplier has confirmed the short-shipment and a credit note has been issued, applied to your next order. Thank you for your patience.');
+        OrderCommentRepository::markEmailSent($c3);
+
+        OrderCommentRepository::create($orderId, 'client', null, $clientId, 'Thank you for resolving this so quickly — much appreciated.');
     }
 
     private static function pathSafe(string $value): string

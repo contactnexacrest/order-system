@@ -93,6 +93,7 @@ final class SampleDataRepository
         $annexureProductIds = $orderIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM order_annexure_products WHERE order_id IN (%s)', $orderIds)) : [];
         $supplierPoIds = $orderIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM order_supplier_po WHERE order_id IN (%s)', $orderIds)) : [];
         $clientLoginIds = $clientIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM client_logins WHERE client_id IN (%s)', $clientIds)) : [];
+        $commentIds = $orderIds ? self::intColumn($pdo, self::inQuery('SELECT id FROM order_comments WHERE order_id IN (%s)', $orderIds)) : [];
 
         // file_store rows belong to the order and/or the client directly.
         $fileRows = [];
@@ -119,6 +120,9 @@ final class SampleDataRepository
             }
             if ($disputeIds) {
                 $pdo->exec(self::inQuery('DELETE FROM dispute_documents WHERE dispute_id IN (%s)', $disputeIds));
+            }
+            if ($commentIds) {
+                $pdo->exec(self::inQuery('DELETE FROM order_comment_attachments WHERE comment_id IN (%s)', $commentIds));
             }
             if ($orderIds) {
                 $pdo->exec(self::inQuery('DELETE FROM disputes WHERE order_id IN (%s)', $orderIds));
@@ -177,7 +181,7 @@ final class SampleDataRepository
                 foreach ([
                     'order_stages', 'order_products', 'order_payment_status', 'order_production',
                     'order_supplier_po', 'order_packing', 'order_crates', 'order_freight', 'order_shipping',
-                    'pi_intake_submissions',
+                    'pi_intake_submissions', 'order_comments',
                 ] as $table) {
                     $pdo->exec(self::inQuery("DELETE FROM {$table} WHERE order_id IN (%s)", $orderIds));
                 }

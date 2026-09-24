@@ -7,6 +7,7 @@ const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderAnnexureRepository = require('../repositories/orderAnnexureRepository');
+const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderCrateRepository = require('../repositories/orderCrateRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPackingRepository = require('../repositories/orderPackingRepository');
@@ -171,6 +172,7 @@ async function load(userId) {
     ['Garden bench, stone composite', '150 x 45 x 45 cm', 'Sandblasted'],
   ]);
   await advanceSampleOrderBJourney(orderB1Id, clientBId, supplierId, userId, reviewerUserId);
+  await addSampleOrderComments(orderB1Id, clientBId, userId);
 
   // --- Client C: CIF, "Established Buyer — Post-BL" preset — the only
   // order that runs through the CFR/CIF Freight Payment stage, pushed all
@@ -186,6 +188,7 @@ async function load(userId) {
   ], 'Rotterdam, Netherlands');
   await advanceSampleOrderToStage9(orderC1Id, supplierId, userId);
   await addSampleDispute(orderC1Id, userId);
+  await addSampleDisputeComments(orderC1Id, clientCId, userId);
 
   // --- Client D: a lost order ---
   const clientDId = await createSampleClient(
@@ -955,16 +958,21 @@ async function attachSamplePlaceholderFile(clientId, orderId, subPath, originalF
  * showing as a broken image.
  */
 async function attachSampleAnnexureImage(orderId, annexureProductId, subPath, originalFilename, uploadedBy) {
+  const fileId = await attachSamplePngFile(orderId, subPath, originalFilename, uploadedBy, 'Annexure product image');
+  await orderAnnexureRepository.addImage(annexureProductId, fileId);
+}
+
+/** A minimal but genuinely valid 1x1 PNG, saved under subPath and registered in file_store. */
+async function attachSamplePngFile(orderId, subPath, originalFilename, uploadedBy, documentTypeLabel) {
   const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
   const targetDir = `${storageBase}/${subPath}`;
   fs.mkdirSync(targetDir, { recursive: true });
   const uuidFilename = `${crypto.randomBytes(16).toString('hex')}.png`;
   const targetPath = `${targetDir}/${uuidFilename}`;
-  // A minimal but genuinely valid 1x1 PNG.
   const pngBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
   fs.writeFileSync(targetPath, pngBytes);
 
-  const fileId = await fileStoreRepository.insertReceived(
+  return fileStoreRepository.insertReceived(
     null,
     orderId,
     targetPath,
@@ -974,9 +982,44 @@ async function attachSampleAnnexureImage(orderId, annexureProductId, subPath, or
     'image/png',
     uploadedBy,
     null,
-    'Annexure product image'
+    documentTypeLabel
   );
-  await orderAnnexureRepository.addImage(annexureProductId, fileId);
+}
+
+/**
+ * Order-progress chat thread (Section AI) on a fully-advanced sample order —
+ * a mixed staff/client conversation, including one staff message with a
+ * photo attachment, so the chat UI has something real to demonstrate
+ * straight after loading sample data.
+ */
+async function addSampleOrderComments(orderId, clientId, userId) {
+  const order = await orderRepository.find(orderId);
+  const subPath = `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/comment_attachments`;
+
+  const c1 = await orderCommentRepository.create(orderId, 'staff', userId, null, 'Good news — production on your order has started and is progressing on schedule. We will share progress photos shortly.');
+  await orderCommentRepository.markEmailSent(c1);
+
+  await orderCommentRepository.create(orderId, 'client', null, clientId, 'Thank you for the update! Please do share the photos once ready.');
+
+  const c3 = await orderCommentRepository.create(orderId, 'staff', userId, null, 'Here are a couple of photos from the production floor — everything is on track for the planned dispatch date.');
+  const photoFileId = await attachSamplePngFile(orderId, subPath, 'Production photo.png', userId, 'Order chat attachment');
+  await orderCommentRepository.attachFile(c3, photoFileId);
+  await orderCommentRepository.markEmailSent(c3);
+
+  await orderCommentRepository.create(orderId, 'client', null, clientId, 'These look great, thank you for keeping us posted!');
+}
+
+/** A shorter chat thread tied to the sample dispute — the conversation a buyer and staff would actually have around it. */
+async function addSampleDisputeComments(orderId, clientId, userId) {
+  await orderCommentRepository.create(orderId, 'client', null, clientId, 'We found a shortage of 2 pieces when the container was destuffed at the port — could you please look into this?');
+
+  const c2 = await orderCommentRepository.create(orderId, 'staff', userId, null, "We're sorry to hear that — we've logged this as a formal dispute and are checking with our supplier right away. We'll update you within a few days.");
+  await orderCommentRepository.markEmailSent(c2);
+
+  const c3 = await orderCommentRepository.create(orderId, 'staff', userId, null, 'Update: our supplier has confirmed the short-shipment and a credit note has been issued, applied to your next order. Thank you for your patience.');
+  await orderCommentRepository.markEmailSent(c3);
+
+  await orderCommentRepository.create(orderId, 'client', null, clientId, 'Thank you for resolving this so quickly — much appreciated.');
 }
 
 function pathSafe(value) {

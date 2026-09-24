@@ -80,6 +80,7 @@ async function clearAll() {
   const annexureProductIds = orderIds.length ? await intColumn(inQuery('SELECT id FROM order_annexure_products WHERE order_id IN (%s)', orderIds)) : [];
   const supplierPoIds = orderIds.length ? await intColumn(inQuery('SELECT id FROM order_supplier_po WHERE order_id IN (%s)', orderIds)) : [];
   const clientLoginIds = clientIds.length ? await intColumn(inQuery('SELECT id FROM client_logins WHERE client_id IN (%s)', clientIds)) : [];
+  const commentIds = orderIds.length ? await intColumn(inQuery('SELECT id FROM order_comments WHERE order_id IN (%s)', orderIds)) : [];
 
   // file_store rows belong to the order and/or the client directly.
   let fileRows = [];
@@ -105,6 +106,9 @@ async function clearAll() {
     }
     if (disputeIds.length) {
       await conn.execute(inQuery('DELETE FROM dispute_documents WHERE dispute_id IN (%s)', disputeIds));
+    }
+    if (commentIds.length) {
+      await conn.execute(inQuery('DELETE FROM order_comment_attachments WHERE comment_id IN (%s)', commentIds));
     }
     if (orderIds.length) {
       await conn.execute(inQuery('DELETE FROM disputes WHERE order_id IN (%s)', orderIds));
@@ -163,7 +167,7 @@ async function clearAll() {
       const tables = [
         'order_stages', 'order_products', 'order_payment_status', 'order_production',
         'order_supplier_po', 'order_packing', 'order_crates', 'order_freight', 'order_shipping',
-        'pi_intake_submissions',
+        'pi_intake_submissions', 'order_comments',
       ];
       for (const table of tables) {
         await conn.execute(inQuery(`DELETE FROM ${table} WHERE order_id IN (%s)`, orderIds));

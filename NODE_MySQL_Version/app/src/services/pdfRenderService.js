@@ -79,7 +79,13 @@ async function renderOnce(html, allowRetry) {
     throw err;
   }
   try {
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    // 'load' rather than 'networkidle0': the HTML is fully self-contained
+    // (every image is a base64 data: URI, per the class comment above), so
+    // there is no post-load network activity to wait out — and waiting for
+    // it anyway made this hang indefinitely in sandboxed/offline network
+    // environments where Chromium's own background requests (e.g. a
+    // favicon probe) never resolve either way.
+    await page.setContent(html, { waitUntil: 'load' });
     const pdf = await page.pdf({
       format: 'A4',
       landscape: false,
