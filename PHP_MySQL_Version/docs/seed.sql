@@ -208,7 +208,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Quantity Tolerance' AND dt.code IN ('QT','PI','OC');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (30, 'Cancellation', 'Cancellation: Orders may not be cancelled after production has commenced. Cancellation before production commencement is subject to written agreement and recovery of costs incurred. The {advance_pct}% advance is non-refundable once production has commenced.', 'active', 0);
+  (30, 'Cancellation', 'Cancellation: Once the advance payment is received, this order is final and binding. It cannot be cancelled, modified, or refunded for any reason, whether or not production has yet commenced.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Cancellation' AND dt.code IN ('QT','PI','OC');
@@ -226,7 +226,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Import Clearance & Destination Charges' AND dt.code IN ('QT','PI');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (60, 'Production Commencement', 'Production commences only after {advance_pct}% advance payment is received and CLEARED in NexaCrest''s bank account. Remittance copy alone does not constitute payment receipt. Please allow 1–2 banking days for clearance confirmation before expecting production to commence.', 'active', 0);
+  (60, 'Production Commencement', 'Production commences only after {advance_pct}% advance payment is received and CLEARED in NexaCrest''s bank account, and the Order Confirmation has been acknowledged. Remittance copy alone does not constitute payment receipt. Please allow 1–2 banking days for clearance confirmation before expecting production to commence. If the Order Confirmation is not acknowledged within 48 hours of being sent, it is treated as accepted and production proceeds.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Production Commencement' AND dt.code IN ('QT','PI');
