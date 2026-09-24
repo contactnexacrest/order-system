@@ -83,4 +83,16 @@
       </table>
     <?php endif; ?>
   </div>
+
+  <?php if ((int) $order['dispute_button_visible_to_client'] === 1): ?>
+  <div class="section">
+    <h2>Raise a Dispute</h2>
+    <p class="muted">If something about this order isn't right, let us know here — our team will respond within the timeframe set out in your order terms.</p>
+    <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/disputes">
+      <?= Csrf::field() ?>
+      <label>Describe the issue *<textarea name="description" rows="4" required></textarea></label>
+      <button type="submit">Raise a Dispute</button>
+    </form>
+  </div>
+  <?php endif; ?>
 </div>

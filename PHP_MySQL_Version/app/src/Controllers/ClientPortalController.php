@@ -184,6 +184,45 @@ final class ClientPortalController
     }
 
     /**
+     * docs/schema.sql Section AF — only reachable when staff have switched
+     * the per-order flag on; re-checked here server-side (not just hidden
+     * in the view) so a client can't file one on an order it wasn't
+     * enabled for by guessing the URL.
+     */
+    public function raiseDispute(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        if ((int) $order['dispute_button_visible_to_client'] !== 1) {
+            Flash::set('error', 'Disputes cannot be raised on this order from the portal.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
+
+        $description = trim((string) ($_POST['description'] ?? ''));
+        if ($description === '') {
+            Flash::set('error', 'Please describe the issue before submitting.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
+
+        $noticeDate = date('Y-m-d');
+        $responseDays = (int) (\App\Repositories\CompanySettingsRepository::get('dispute_response_days_n') ?? '10');
+        $responseDueDate = \App\Services\WorkingDaysCalculator::addWorkingDays($noticeDate, $responseDays);
+        $disputeId = \App\Repositories\DisputeRepository::create($orderId, $noticeDate, 'Buyer (via client portal)', $description, null, $responseDueDate);
+        \App\Repositories\AuditLogRepository::log(null, 'DISPUTE_RAISED', 'disputes', $disputeId, null, null, $description, 'Raised by the client via the client portal.');
+
+        Flash::set('success', 'Your dispute has been logged — our team will respond by ' . $responseDueDate . '.');
+        header("Location: /client/orders/{$orderId}");
+    }
+
+    /**
      * Client's own "I've paid" note — transaction ref + optional screenshot
      * of the remittance advice. Purely informational (docs/schema.sql
      * Section AD): staff still verify the real bank statement by hand

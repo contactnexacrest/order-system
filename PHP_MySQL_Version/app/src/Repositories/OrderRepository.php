@@ -204,6 +204,14 @@ final class OrderRepository
         )->execute(['text' => $text, 'id' => $orderId]);
     }
 
+    /** docs/schema.sql Section AF — staff-controlled, per order, default off. */
+    public static function setDisputeButtonVisible(int $orderId, bool $visible): void
+    {
+        Database::connection()->prepare(
+            'UPDATE orders SET dispute_button_visible_to_client = :visible WHERE id = :id'
+        )->execute(['visible' => $visible ? 1 : 0, 'id' => $orderId]);
+    }
+
     /** Stage 9 closure gate: full document set couriered to buyer — order.status='complete' and locked (Business Rule #17). */
     public static function markComplete(int $orderId): void
     {

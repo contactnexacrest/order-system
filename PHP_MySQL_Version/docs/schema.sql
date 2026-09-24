@@ -1910,6 +1910,21 @@ CREATE TABLE order_oc_acknowledgments (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION AF — PER-ORDER DISPUTE VISIBILITY TOGGLE (added 2026-09-24)
+-- Whether the client portal shows a "Raise a Dispute" button for THIS
+-- order — default off, so an already-happy order never gets one and the
+-- button never invites a dispute where nothing prompted it. Staff flip it
+-- on (manage_orders, the same permission that already gates every other
+-- order-level action) once there's a real reason to give the buyer a
+-- direct channel. Deliberately a plain per-order flag, not a role/
+-- permission gate on the client side — the client portal has no
+-- permission system of its own, and this decision is always made per
+-- order, by staff, not per client.
+-- ================================================================
+ALTER TABLE orders
+  ADD COLUMN dispute_button_visible_to_client TINYINT(1) NOT NULL DEFAULT 0 AFTER is_archived;
+
+-- ================================================================
 -- END OF SCHEMA — 68 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.

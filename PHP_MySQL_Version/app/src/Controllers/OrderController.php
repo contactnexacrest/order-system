@@ -623,6 +623,18 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /** docs/schema.sql Section AF — per-order, staff-controlled, default off. */
+    public function setDisputeButtonVisible(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $visible = !empty($_POST['dispute_button_visible_to_client']);
+        OrderRepository::setDisputeButtonVisible($orderId, $visible);
+        $user = AuthService::currentUser();
+        AuditLogRepository::log((int) $user['id'], 'DISPUTE_BUTTON_VISIBILITY_CHANGED', 'orders', $orderId, 'dispute_button_visible_to_client', null, $visible ? '1' : '0');
+        Flash::set('success', $visible ? 'The client can now raise a dispute on this order from their portal.' : 'The "Raise a Dispute" button is now hidden from the client for this order.');
+        header("Location: /orders/{$orderId}");
+    }
+
     /**
      * Stage 4->5 gate: staff records a buyer's Order Confirmation
      * acknowledgment that arrived by reply-to-the-email rather than through

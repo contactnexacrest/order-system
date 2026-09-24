@@ -493,6 +493,15 @@ $orderClosed = $order['status'] === 'complete';
 
   <div class="section">
     <h2>Amendments &amp; Disputes</h2>
+    <?php if ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/dispute-visibility" style="margin-bottom:10px">
+      <?= Csrf::field() ?>
+      <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
+        <input type="checkbox" name="dispute_button_visible_to_client" value="1" onchange="this.form.submit()" <?= (int) $order['dispute_button_visible_to_client'] === 1 ? 'checked' : '' ?>>
+        Show "Raise a Dispute" button to the client in their portal for this order
+      </label>
+    </form>
+    <?php endif; ?>
     <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Payment Terms Amendments (<?= (int) $amendmentCount ?>)</a>
        &nbsp;·&nbsp;
        <a href="/orders/<?= (int) $order['id'] ?>/disputes">Disputes (<?= (int) $openDisputeCount ?> open)</a>
