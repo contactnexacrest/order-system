@@ -262,136 +262,196 @@ $orderClosed = $order['status'] === 'complete';
       $reviews = $reviewsByDocument[(int) $d['id']] ?? [];
       $crossVerifications = $crossVerificationsByDocument[(int) $d['id']] ?? [];
       $myPendingReview = null;
+      $anyRejected = false;
       foreach ($reviews as $r) {
           if ((int) $r['reviewer_id'] === (int) $currentUser['id'] && $r['status'] === 'pending') {
               $myPendingReview = $r;
           }
+          if ($r['status'] === 'rejected') {
+              $anyRejected = true;
+          }
+      }
+      // Drives Step 2's banner/number styling — the whole point being that
+      // a generating team member can never lose track of an unreviewed
+      // document: it stays visibly flagged until a reviewer is assigned,
+      // then shows exactly who has it and what they decided.
+      if (empty($reviews)) {
+          $reviewState = 'not_sent';
+      } elseif ($anyRejected && $d['status'] === 'draft') {
+          $reviewState = 'rejected';
+      } elseif ($d['status'] === 'approved' || $d['status'] === 'sent') {
+          $reviewState = 'approved';
+      } else {
+          $reviewState = 'under_review';
+      }
+      $sendApplies = !in_array($d['document_type_code'], ['AMD', 'SUPPO', 'COOPREP', 'BLI'], true);
+      $emailLogs = $emailLogByDocument[(int) $d['id']] ?? [];
+      $hasPendingSend = false;
+      foreach ($emailLogs as $log) {
+          if ($log['status'] === 'pending_approval' || $log['status'] === 'approved') {
+              $hasPendingSend = true;
+          }
       }
     ?>
       <details>
-        <summary><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?> Rev.<?= (int) $d['revision_number'] ?> — <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?></summary>
-
-        <?php if (empty($reviews)): ?>
-          <form method="post" action="/documents/<?= (int) $d['id'] ?>/reviewers">
-            <?= Csrf::field() ?>
-            <label>Assign reviewer(s) * (minimum required: <?= (int) ($d['min_reviewers_default'] ?? 1) ?>)
-              <select name="reviewer_ids[]" multiple size="4" required style="min-width:220px">
-                <?php foreach ($activeUsers as $u): ?>
-                  <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role_name'] ?? '—') ?>)</option>
-                <?php endforeach; ?>
-              </select>
-            </label>
-            <button type="submit" class="btn-sm">Assign Reviewers</button>
-          </form>
-        <?php else: ?>
-          <table class="list">
-            <tr><th>Reviewer</th><th>Status</th><th>Comments</th><th>Reviewed</th></tr>
-            <?php foreach ($reviews as $r): ?>
-              <tr>
-                <td><?= htmlspecialchars($r['reviewer_name']) ?></td>
-                <td><?= htmlspecialchars($r['status']) ?></td>
-                <td><?= htmlspecialchars($r['comments'] ?? '') ?></td>
-                <td><?= htmlspecialchars($r['reviewed_at'] ?? '—') ?></td>
-              </tr>
-            <?php endforeach; ?>
-          </table>
-        <?php endif; ?>
-
-        <?php if ($myPendingReview): ?>
-          <form method="post" action="/reviews/<?= (int) $myPendingReview['id'] ?>/approve" style="display:inline">
-            <?= Csrf::field() ?>
-            <input type="text" name="comments" placeholder="Comments (optional)">
-            <button type="submit" class="btn-sm btn-success">Approve</button>
-          </form>
-          <form method="post" action="/reviews/<?= (int) $myPendingReview['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this document? It goes back for rework.');">
-            <?= Csrf::field() ?>
-            <input type="text" name="comments" placeholder="Reason (mandatory)" required>
-            <button type="submit" class="btn-sm btn-danger">Reject</button>
-          </form>
-        <?php endif; ?>
-
-        <form method="post" action="/documents/<?= (int) $d['id'] ?>/cross-verify" style="margin-top:6px">
-          <?= Csrf::field() ?>
-          <select name="result" required>
-            <option value="pass">Cross-verify: Pass</option>
-            <option value="fail">Cross-verify: Fail</option>
-          </select>
-          <input type="text" name="comments" placeholder="Comments (optional)">
-          <button type="submit" class="btn-sm">Record Cross-Verification</button>
-        </form>
-        <?php if (!empty($crossVerifications)): ?>
-          <p class="muted small">
-            <?php foreach ($crossVerifications as $cv): ?>
-              <?= htmlspecialchars($cv['verified_by_name']) ?>: <?= htmlspecialchars($cv['result']) ?> (<?= htmlspecialchars($cv['verified_at']) ?>)<br>
-            <?php endforeach; ?>
-          </p>
-        <?php endif; ?>
-
-        <?php
-          $emailLogs = $emailLogByDocument[(int) $d['id']] ?? [];
-          $hasPendingSend = false;
-          foreach ($emailLogs as $log) {
-              if ($log['status'] === 'pending_approval' || $log['status'] === 'approved') {
-                  $hasPendingSend = true;
-              }
-          }
-        ?>
-        <?php if (!empty($emailLogs)): ?>
-          <table class="list" style="margin-top:6px">
-            <tr><th>Sent To</th><th>Status</th><th>Requested</th><th>Detail</th></tr>
-            <?php foreach ($emailLogs as $log): ?>
-              <tr>
-                <td><?= htmlspecialchars($log['recipient_email']) ?></td>
-                <td><?= htmlspecialchars(str_replace('_', ' ', $log['status'])) ?></td>
-                <td><?= htmlspecialchars($log['created_at']) ?></td>
-                <td>
-                  <?php
-                    $canCancelThis = $currentUser && (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'approve_email_send') || (int) $log['requested_by'] === (int) $currentUser['id']);
-                  ?>
-                  <?php if ($log['status'] === 'sent'): ?>
-                    Sent <?= htmlspecialchars($log['sent_at'] ?? '') ?>
-                  <?php elseif ($log['status'] === 'rejected'): ?>
-                    Rejected: <?= htmlspecialchars($log['rejection_reason'] ?? '') ?>
-                  <?php elseif ($log['status'] === 'failed'): ?>
-                    Dispatch failed — check mail server configuration and retry.
-                  <?php elseif ($log['status'] === 'cancelled'): ?>
-                    Cancelled: <?= htmlspecialchars($log['cancellation_reason'] ?? '') ?>
-                  <?php elseif ($log['status'] === 'approved'): ?>
-                    Approved — will send once its scheduled time arrives.
-                    <?php if ($canCancelThis): ?>
-                    <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
-                      <?= Csrf::field() ?>
-                      <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                      <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
-                      <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
-                    </form>
-                    <?php endif; ?>
-                  <?php else: ?>
-                    Awaiting Level-2 approval.
-                    <?php if ($canCancelThis): ?>
-                    <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
-                      <?= Csrf::field() ?>
-                      <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                      <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
-                      <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
-                    </form>
-                    <?php endif; ?>
-                  <?php endif; ?>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-          </table>
-        <?php endif; ?>
-
-        <?php if ($d['status'] === 'approved' && $d['document_type_code'] !== 'AMD' && $d['document_type_code'] !== 'SUPPO' && $d['document_type_code'] !== 'COOPREP' && $d['document_type_code'] !== 'BLI'): ?>
-          <?php if ($hasPendingSend): ?>
-            <p class="muted">A send to the buyer is already in progress for this document (see above) — no new send can be submitted until it's sent, rejected, or fails.</p>
-          <?php else: ?>
-            <p><a href="/orders/<?= (int) $order['id'] ?>/documents/<?= (int) $d['id'] ?>/send" class="btn-sm">Send to Buyer (deferred, 2-level approval)</a></p>
+        <summary>
+          <?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?> Rev.<?= (int) $d['revision_number'] ?> — <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?>
+          <?php if ($reviewState === 'not_sent'): ?><span class="review-pill warn">⚠ Not sent for review</span>
+          <?php elseif ($reviewState === 'under_review'): ?><span class="review-pill info">Under review</span>
+          <?php elseif ($reviewState === 'rejected'): ?><span class="review-pill bad">Rejected — back to draft</span>
+          <?php elseif ($reviewState === 'approved'): ?><span class="review-pill good">✓ Approved</span>
           <?php endif; ?>
-        <?php elseif ($d['status'] === 'sent'): ?>
-          <p class="muted">Already sent to buyer.</p>
-        <?php endif; ?>
+        </summary>
+
+        <div class="review-steps">
+          <!-- Step 1: Assign Reviewers -->
+          <div class="review-step">
+            <div class="review-step-num <?= empty($reviews) ? 'is-warn' : 'is-done' ?>">1</div>
+            <div class="review-step-body">
+              <h3>Assign Reviewers<?php if (!empty($reviews)): ?><span class="review-pill info">Assigned</span><?php endif; ?></h3>
+              <?php if (empty($reviews)): ?>
+                <form method="post" action="/documents/<?= (int) $d['id'] ?>/reviewers">
+                  <?= Csrf::field() ?>
+                  <label>Assign reviewer(s) * (minimum required: <?= (int) ($d['min_reviewers_default'] ?? 1) ?>)
+                    <select name="reviewer_ids[]" multiple size="4" required style="min-width:220px">
+                      <?php foreach ($activeUsers as $u): ?>
+                        <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role_name'] ?? '—') ?>)</option>
+                      <?php endforeach; ?>
+                    </select>
+                  </label>
+                  <button type="submit" class="btn-sm">Assign Reviewers</button>
+                </form>
+              <?php else: ?>
+                <table class="list">
+                  <tr><th>Reviewer</th><th>Status</th><th>Comments</th><th>Reviewed</th></tr>
+                  <?php foreach ($reviews as $r): ?>
+                    <tr>
+                      <td><?= htmlspecialchars($r['reviewer_name']) ?></td>
+                      <td><?= htmlspecialchars($r['status']) ?></td>
+                      <td><?= htmlspecialchars($r['comments'] ?? '') ?></td>
+                      <td><?= htmlspecialchars($r['reviewed_at'] ?? '—') ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </table>
+              <?php endif; ?>
+            </div>
+          </div>
+
+          <!-- Step 2: Approval Status -->
+          <div class="review-step">
+            <div class="review-step-num <?= $reviewState === 'approved' ? 'is-done' : ($reviewState === 'rejected' ? 'is-bad' : ($reviewState === 'not_sent' ? 'is-warn' : '')) ?>">2</div>
+            <div class="review-step-body">
+              <h3>Approval Status</h3>
+              <?php if ($reviewState === 'not_sent'): ?>
+                <div class="review-banner warn">⚠ <span><strong>Not yet sent for review.</strong> This document cannot be finalized or sent to the buyer until at least one reviewer is assigned above. Assign one now, before moving on to your next task.</span></div>
+              <?php elseif ($reviewState === 'under_review'): ?>
+                <div class="review-banner info">◔ <span><strong>Under review<?php $pendingNames = array_map(fn($r) => $r['reviewer_name'], array_filter($reviews, fn($r) => $r['status'] === 'pending')); if ($pendingNames): ?> — with <?= htmlspecialchars(implode(', ', $pendingNames)) ?><?php endif; ?>.</strong> If this sits too long, follow up with them directly.</span></div>
+              <?php elseif ($reviewState === 'rejected'): ?>
+                <div class="review-banner bad">✕ <span><strong>Rejected — back to draft.</strong> Fix the issue raised and regenerate this document.</span></div>
+              <?php elseif ($reviewState === 'approved'): ?>
+                <div class="review-banner good">✓ <span><strong>Approved.</strong> The FINAL watermarked PDF has been generated — clear to proceed to Send to Buyer below.</span></div>
+              <?php endif; ?>
+
+              <?php if ($myPendingReview): ?>
+                <form method="post" action="/reviews/<?= (int) $myPendingReview['id'] ?>/approve" style="display:inline">
+                  <?= Csrf::field() ?>
+                  <input type="text" name="comments" placeholder="Comments (optional)">
+                  <button type="submit" class="btn-sm btn-success">Approve</button>
+                </form>
+                <form method="post" action="/reviews/<?= (int) $myPendingReview['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this document? It goes back for rework.');">
+                  <?= Csrf::field() ?>
+                  <input type="text" name="comments" placeholder="Reason (mandatory)" required>
+                  <button type="submit" class="btn-sm btn-danger">Reject</button>
+                </form>
+              <?php endif; ?>
+
+              <form method="post" action="/documents/<?= (int) $d['id'] ?>/cross-verify" style="margin-top:6px">
+                <?= Csrf::field() ?>
+                <select name="result" required>
+                  <option value="pass">Cross-verify: Pass</option>
+                  <option value="fail">Cross-verify: Fail</option>
+                </select>
+                <input type="text" name="comments" placeholder="Comments (optional)">
+                <button type="submit" class="btn-sm">Record Cross-Verification</button>
+              </form>
+              <?php if (!empty($crossVerifications)): ?>
+                <p class="muted small">
+                  <?php foreach ($crossVerifications as $cv): ?>
+                    <?= htmlspecialchars($cv['verified_by_name']) ?>: <?= htmlspecialchars($cv['result']) ?> (<?= htmlspecialchars($cv['verified_at']) ?>)<br>
+                  <?php endforeach; ?>
+                </p>
+              <?php endif; ?>
+            </div>
+          </div>
+
+          <!-- Step 3: Send to Buyer -->
+          <?php if ($sendApplies): ?>
+          <div class="review-step">
+            <div class="review-step-num <?= $d['status'] === 'sent' ? 'is-done' : '' ?>">3</div>
+            <div class="review-step-body">
+              <h3>Send to Buyer</h3>
+              <?php if (!empty($emailLogs)): ?>
+                <table class="list" style="margin-top:6px">
+                  <tr><th>Sent To</th><th>Status</th><th>Requested</th><th>Detail</th></tr>
+                  <?php foreach ($emailLogs as $log): ?>
+                    <tr>
+                      <td><?= htmlspecialchars($log['recipient_email']) ?></td>
+                      <td><?= htmlspecialchars(str_replace('_', ' ', $log['status'])) ?></td>
+                      <td><?= htmlspecialchars($log['created_at']) ?></td>
+                      <td>
+                        <?php
+                          $canCancelThis = $currentUser && (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'approve_email_send') || (int) $log['requested_by'] === (int) $currentUser['id']);
+                        ?>
+                        <?php if ($log['status'] === 'sent'): ?>
+                          Sent <?= htmlspecialchars($log['sent_at'] ?? '') ?>
+                        <?php elseif ($log['status'] === 'rejected'): ?>
+                          Rejected: <?= htmlspecialchars($log['rejection_reason'] ?? '') ?>
+                        <?php elseif ($log['status'] === 'failed'): ?>
+                          Dispatch failed — check mail server configuration and retry.
+                        <?php elseif ($log['status'] === 'cancelled'): ?>
+                          Cancelled: <?= htmlspecialchars($log['cancellation_reason'] ?? '') ?>
+                        <?php elseif ($log['status'] === 'approved'): ?>
+                          Approved — will send once its scheduled time arrives.
+                          <?php if ($canCancelThis): ?>
+                          <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
+                            <?= Csrf::field() ?>
+                            <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                            <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
+                          </form>
+                          <?php endif; ?>
+                        <?php else: ?>
+                          Awaiting Level-2 approval.
+                          <?php if ($canCancelThis): ?>
+                          <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
+                            <?= Csrf::field() ?>
+                            <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                            <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
+                          </form>
+                          <?php endif; ?>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </table>
+              <?php endif; ?>
+
+              <?php if ($d['status'] === 'approved'): ?>
+                <?php if ($hasPendingSend): ?>
+                  <p class="muted">A send to the buyer is already in progress for this document (see above) — no new send can be submitted until it's sent, rejected, or fails.</p>
+                <?php else: ?>
+                  <p><a href="/orders/<?= (int) $order['id'] ?>/documents/<?= (int) $d['id'] ?>/send" class="btn-sm btn-accent">Send to Buyer (deferred, 2-level approval)</a></p>
+                <?php endif; ?>
+              <?php elseif ($d['status'] === 'sent'): ?>
+                <p class="muted">Already sent to buyer.</p>
+              <?php else: ?>
+                <p class="muted small">Waiting on approval above before this document can be sent.</p>
+              <?php endif; ?>
+            </div>
+          </div>
+          <?php endif; ?>
+        </div>
       </details>
     <?php endforeach; ?>
   </div>

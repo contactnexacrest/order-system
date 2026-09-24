@@ -180,6 +180,27 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .stage-chip.in_progress .stage-chip-status{background:var(--gold-soft);color:var(--gold-strong);}
 .stage-chip.gate_passed{border-top-color:var(--success);}
 .stage-chip.gate_passed .stage-chip-status{background:var(--success-soft);color:var(--success);}
+
+/* --- Review/Approval/Send-to-Buyer: split into numbered steps --- */
+.review-steps{display:flex;flex-direction:column;gap:0;margin-top:0.5rem;}
+.review-step{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:12px 0;border-top:1px solid var(--line);}
+.review-step:first-child{border-top:none;padding-top:0;}
+.review-step:last-child{padding-bottom:0;}
+.review-step-num{width:26px;height:26px;border-radius:50%;background:var(--navy-soft);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-top:1px;flex:0 0 auto;}
+.review-step-num.is-done{background:var(--success-soft);color:var(--success);}
+.review-step-num.is-warn{background:var(--gold-soft);color:var(--gold-strong);}
+.review-step-num.is-bad{background:var(--danger-soft);color:var(--danger);}
+.review-step-body h3{margin:0 0 6px;font-size:0.92rem;font-weight:700;}
+.review-banner{display:flex;align-items:flex-start;gap:8px;border-radius:8px;padding:8px 11px;margin:4px 0 8px;font-size:0.82rem;line-height:1.5;}
+.review-banner.warn{background:var(--gold-soft);color:var(--gold-strong);}
+.review-banner.info{background:var(--navy-soft);color:var(--navy);}
+.review-banner.good{background:var(--success-soft);color:var(--success);}
+.review-banner.bad{background:var(--danger-soft);color:var(--danger);}
+.review-pill{display:inline-flex;align-items:center;gap:4px;font-size:0.7rem;font-weight:600;padding:2px 9px;border-radius:999px;margin-left:6px;}
+.review-pill.warn{background:var(--gold-soft);color:var(--gold-strong);}
+.review-pill.info{background:var(--navy-soft);color:var(--navy);}
+.review-pill.good{background:var(--success-soft);color:var(--success);}
+.review-pill.bad{background:var(--danger-soft);color:var(--danger);}
 .section{margin-bottom:1.75rem;}
 .section h2{font-size:1rem;font-weight:700;color:var(--ink);border-left:3px solid var(--gold);padding-left:0.6rem;margin-bottom:0.7rem;}
 .kv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem 1.5rem;}
