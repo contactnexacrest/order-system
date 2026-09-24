@@ -104,6 +104,20 @@ final class ClientRepository
             ->execute(['active' => $active ? 1 : 0, 'id' => $id]);
     }
 
+    /**
+     * Permanent — nothing in this app ever sets is_data_locked back to 0.
+     * Called once, from whichever of the two trigger points happens first:
+     * the client's own PI-details consent, or staff recording the advance
+     * remittance if the client never gets there first (docs/schema.sql
+     * Section AC).
+     */
+    public static function lockData(int $id, string $reason): void
+    {
+        Database::connection()->prepare(
+            'UPDATE clients SET is_data_locked = 1, data_locked_at = NOW(), data_locked_reason = :reason WHERE id = :id AND is_data_locked = 0'
+        )->execute(['reason' => $reason, 'id' => $id]);
+    }
+
     /** Phase E follow-up — flags a client as Sample Data Playground content (see SampleDataService). */
     public static function markSample(int $id): void
     {

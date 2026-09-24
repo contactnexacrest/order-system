@@ -532,6 +532,17 @@ final class OrderController
             return;
         }
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
+
+        // docs/schema.sql Section AC — fallback lock trigger. The PI-details
+        // form (client's own consent) is the primary trigger; if a client
+        // never completes that, real money moving is the latest point
+        // client data can still be safely editable. A no-op if the
+        // PI-details consent already locked this client first.
+        $order = OrderRepository::find($orderId);
+        if ($order) {
+            ClientRepository::lockData((int) $order['client_id'], 'Auto-locked: advance remittance recorded before client PI-details consent');
+        }
+
         Flash::set('success', 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }

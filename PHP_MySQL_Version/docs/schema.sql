@@ -1834,6 +1834,24 @@ CREATE TABLE hs_codes (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION AC — CLIENT DATA LOCK (added 2026-09-24)
+-- Once a client's own details have been consented to (via the PI-details
+-- form) or real money is in motion (staff records the advance
+-- remittance, whichever happens first), those details are locked for
+-- life — enforced at the application layer (ClientController::update()),
+-- the same way every other business rule in this app is enforced, not by
+-- a rigid DB trigger. Matches the existing peer-approved protected-field
+-- pattern (Section L) rather than the founder-account hard-lock pattern
+-- (Section Z) — this needs a narrow, logged Super-Admin override for a
+-- genuine staff data-entry error, which an unconditional DB trigger can't
+-- distinguish from an ordinary edit attempt.
+-- ================================================================
+ALTER TABLE clients
+  ADD COLUMN is_data_locked TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active,
+  ADD COLUMN data_locked_at TIMESTAMP NULL AFTER is_data_locked,
+  ADD COLUMN data_locked_reason VARCHAR(255) NULL AFTER data_locked_at;
+
+-- ================================================================
 -- END OF SCHEMA — 66 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -1853,4 +1871,5 @@ CREATE TABLE hs_codes (
 -- Section Z (protected founder accounts) added 2026-09-23.
 -- Section AA (client self-correction + PI-stage intake) added 2026-09-23.
 -- Section AB (HS code master list) added 2026-09-24.
+-- Section AC (client data lock) added 2026-09-24.
 -- ================================================================

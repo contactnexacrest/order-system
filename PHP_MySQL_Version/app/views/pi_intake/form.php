@@ -76,6 +76,13 @@
       </label>
     </fieldset>
 
+    <fieldset>
+      <legend>Confirmation</legend>
+      <p>By submitting this form, you confirm that the company/consignee details above are correct and complete, exactly as they should appear on all shipping and financial documents for this order.</p>
+      <p><strong>Once submitted, these details are locked permanently and can never be edited again</strong> — not by you, and not by NexaCrest, through the ordinary course of business. We will use exactly what you have entered here for every document issued on this order from this point onward. If something genuinely needs to be corrected after this point, the only way to do so is to set up a brand-new client record from scratch — there is no edit option once locked. In the rare case where NexaCrest itself made a data-entry mistake in applying your submission, a senior administrator can correct it, but this is never available for a change of mind on your side.</p>
+      <label><input type="checkbox" name="confirm_lock" value="1" required> I confirm the above is correct and understand it will be locked.</label>
+    </fieldset>
+
     <button type="submit">Submit PI Details</button>
   </form>
 </div>

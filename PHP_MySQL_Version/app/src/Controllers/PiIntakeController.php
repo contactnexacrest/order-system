@@ -80,6 +80,11 @@ final class PiIntakeController
             header("Location: /pi-details/{$token}");
             return;
         }
+        if (empty($_POST['confirm_lock'])) {
+            Flash::set('error', 'Please check the confirmation box — the details above must be confirmed as correct before this form can be submitted.');
+            header("Location: /pi-details/{$token}");
+            return;
+        }
 
         PiIntakeRepository::submit((int) $submission['id'], $data, $_SERVER['REMOTE_ADDR'] ?? null);
         View::render('pi_intake/thank_you', [], 'layout/bare');

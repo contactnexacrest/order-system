@@ -13,6 +13,7 @@ use App\Repositories\ClientRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AuthService;
 use App\Services\ReferenceNumberService;
+use App\Services\SuperAdminService;
 use App\Services\TestModeService;
 
 final class ClientController
@@ -87,7 +88,11 @@ final class ClientController
             echo 'Client not found.';
             return;
         }
-        View::render('clients/edit', ['client' => $client], 'layout/base');
+        $user = AuthService::currentUser();
+        View::render('clients/edit', [
+            'client' => $client,
+            'isSuperAdmin' => SuperAdminService::isEffective((int) $user['id']),
+        ], 'layout/base');
     }
 
     /**
@@ -114,6 +119,28 @@ final class ClientController
             return;
         }
 
+        $user = AuthService::currentUser();
+        if ((int) $client['is_data_locked'] === 1) {
+            // Locked forever once consented to (PI-details) or advance-in-motion
+            // (Record Advance Remittance) — see docs/schema.sql Section AC. The
+            // one narrow escape hatch: a Super Admin fixing their own or
+            // another staff member's data-entry mistake, never a client-
+            // requested change, mandatory reason, fully audit-logged.
+            $isOverride = !empty($_POST['override_lock']) && SuperAdminService::isEffective((int) $user['id']);
+            if (!$isOverride) {
+                Flash::set('error', 'This client\'s details are locked and can never be edited — create a new client record instead. (A Super Admin can override this only to fix a genuine staff data-entry error, never a client-requested change.)');
+                header("Location: /clients/{$clientId}/edit");
+                return;
+            }
+            $overrideReason = trim((string) ($_POST['override_reason'] ?? ''));
+            $reasonError = ReasonValidator::check($overrideReason);
+            if ($reasonError !== null) {
+                Flash::set('error', $reasonError);
+                header("Location: /clients/{$clientId}/edit");
+                return;
+            }
+        }
+
         $data = [
             'company_legal_name'    => $companyLegalName,
             'billing_address'       => $billingAddress,
@@ -128,7 +155,6 @@ final class ClientController
             'notify_party'          => trim((string) ($_POST['notify_party'] ?? '')) ?: null,
         ];
 
-        $user = AuthService::currentUser();
         $changes = array_filter(
             array_map(
                 static fn(string $field) => [$field, $client[$field] ?? null, $data[$field] ?? null],
@@ -147,8 +173,12 @@ final class ClientController
                 $clientId,
                 $field,
                 $oldVal !== null ? (string) $oldVal : null,
-                $newVal !== null ? (string) $newVal : null
+                $newVal !== null ? (string) $newVal : null,
+                (int) $client['is_data_locked'] === 1 ? trim((string) ($_POST['override_reason'] ?? '')) : null
             );
+        }
+        if ((int) $client['is_data_locked'] === 1) {
+            AuditLogRepository::log((int) $user['id'], 'CLIENT_LOCK_OVERRIDDEN', 'clients', $clientId, null, null, null, trim((string) ($_POST['override_reason'] ?? '')));
         }
 
         Flash::set('success', "{$companyLegalName} updated.");

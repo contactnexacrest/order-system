@@ -72,6 +72,14 @@ final class PiIntakeReviewController
             OrderRepository::setBuyersPoRef((int) $order['id'], $submission['buyer_po_ref']);
         }
 
+        // docs/schema.sql Section AC — the client explicitly consented to
+        // this exact data being locked when they checked the box on the
+        // PI-details form; applying it here is the moment that consent
+        // takes effect. A no-op if OrderController::recordAdvancePayment()
+        // already locked this client first (ClientRepository::lockData()
+        // only ever fires once).
+        ClientRepository::lockData((int) $order['client_id'], "Client consented via PI-details form, applied by {$user['name']}");
+
         PiIntakeRepository::markApplied($id, (int) $user['id']);
         AuditLogRepository::log(
             (int) $user['id'], 'PI_INTAKE_APPLIED', 'orders', (int) $order['id'],
