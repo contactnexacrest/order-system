@@ -7,17 +7,21 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\ClientPasswordResetTokenRepository;
+use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\OrderRepository;
 use App\Services\ClientPortalService;
+use App\Services\FileUploadService;
 use App\Services\PasswordPolicyService;
 
 /**
  * The client-facing portal — structurally separate screens from the staff
  * app (own layout, own nav, own session key via ClientPortalService).
- * Read-only throughout except the client's own password: no editing of
- * profile info, no audit visibility, per the confirmed scope.
+ * Read-only for the client's own profile/order data throughout (no
+ * editing, no audit visibility) — the two exceptions are the client's own
+ * password, and reportPayment()/below, which is purely an informational
+ * note to staff and never writes to the order/payment records itself.
  */
 final class ClientPortalController
 {
@@ -136,7 +140,71 @@ final class ClientPortalController
             'client' => ClientPortalService::currentClient(),
             'order' => $order,
             'documents' => DocumentRepository::customerFacingForOrder($orderId),
+            'paymentReports' => ClientPaymentReportRepository::forOrder($orderId),
         ], 'layout/client');
+    }
+
+    /**
+     * Client's own "I've paid" note — transaction ref + optional screenshot
+     * of the remittance advice. Purely informational (docs/schema.sql
+     * Section AD): staff still verify the real bank statement by hand
+     * before recording the payment the normal way: nothing here ever
+     * touches order_payment_status or unlocks a stage gate.
+     */
+    public function reportPayment(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $paymentType = (string) ($_POST['payment_type'] ?? '');
+        $transactionRef = trim((string) ($_POST['transaction_ref'] ?? ''));
+        if (!in_array($paymentType, ['advance', 'balance', 'freight'], true) || $transactionRef === '') {
+            Flash::set('error', 'Select which payment this is for and enter the transaction ID/UTR.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
+
+        $screenshotFileId = null;
+        if (!empty($_FILES['screenshot']['name'])) {
+            try {
+                $screenshotFileId = FileUploadService::handleUpload(
+                    'screenshot',
+                    'received_remittance',
+                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/client_payment_reports',
+                    $clientId,
+                    $orderId,
+                    null,
+                    null,
+                    'Client (self-reported)',
+                    'Client payment self-report screenshot'
+                );
+            } catch (\Throwable $e) {
+                Flash::set('error', $e->getMessage());
+                header("Location: /client/orders/{$orderId}");
+                return;
+            }
+        }
+
+        $amount = trim((string) ($_POST['amount'] ?? ''));
+        $paymentDate = trim((string) ($_POST['payment_date'] ?? ''));
+        ClientPaymentReportRepository::create(
+            $orderId,
+            $paymentType,
+            $transactionRef,
+            trim((string) ($_POST['payer_bank_details'] ?? '')) ?: null,
+            $amount !== '' ? (float) $amount : null,
+            $paymentDate !== '' ? $paymentDate : null,
+            $screenshotFileId
+        );
+
+        Flash::set('success', 'Thank you — we have noted your payment details. Our team will verify this against our bank statement and update your order.');
+        header("Location: /client/orders/{$orderId}");
     }
 
     public function downloadDocument(array $params): void

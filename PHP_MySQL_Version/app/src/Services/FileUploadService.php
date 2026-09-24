@@ -31,7 +31,7 @@ final class FileUploadService
         string $subPath,
         ?int $clientId,
         ?int $orderId,
-        int $uploadedBy,
+        ?int $uploadedBy,
         ?string $originalFilenameOverride = null,
         ?string $receivedFrom = null,
         ?string $documentTypeLabel = null

@@ -1,5 +1,6 @@
 <?php
 use App\Helpers\Csrf;
+use App\Helpers\Dates;
 use App\Services\AuthService;
 use App\Services\PermissionService;
 
@@ -598,6 +599,33 @@ $orderClosed = $order['status'] === 'complete';
       <?php endif; ?>
     <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
+    <?php endif; ?>
+
+    <?php if (!empty($clientPaymentReports)): ?>
+      <h3 style="margin-top:16px">Client-Reported Payments</h3>
+      <p class="muted small">Purely informational — the client submitted these themselves. Always verify against the actual bank statement before recording a payment above.</p>
+      <table class="list">
+        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Bank / Payer Details</th><th>Reported</th><th>Status</th><th></th></tr>
+        <?php foreach ($clientPaymentReports as $r): ?>
+        <tr>
+          <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
+          <td><?= htmlspecialchars($r['transaction_ref']) ?></td>
+          <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) : '—' ?></td>
+          <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
+          <td><?= htmlspecialchars($r['payer_bank_details'] ?? '—') ?></td>
+          <td><?= htmlspecialchars(Dates::human($r['reported_at'])) ?></td>
+          <td><?= $r['status'] === 'reviewed' ? 'Reviewed by ' . htmlspecialchars($r['reviewed_by_name'] ?? '—') : 'New' ?></td>
+          <td>
+            <?php if ($r['status'] !== 'reviewed'): ?>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment-reports/<?= (int) $r['id'] ?>/reviewed">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm">Mark Reviewed</button>
+            </form>
+            <?php endif; ?>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
     <?php endif; ?>
   </div>
 

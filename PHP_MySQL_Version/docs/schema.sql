@@ -1852,7 +1852,35 @@ ALTER TABLE clients
   ADD COLUMN data_locked_reason VARCHAR(255) NULL AFTER data_locked_at;
 
 -- ================================================================
--- END OF SCHEMA — 66 tables. All open schema questions resolved
+-- SECTION AD — CLIENT PAYMENT SELF-REPORT (added 2026-09-24)
+-- Lets a client tell staff "I've paid" straight from their portal — a
+-- transaction reference plus optional screenshot of the remittance advice,
+-- for any leg (advance/balance/freight) of an order. Purely informational:
+-- staff still verify the real bank statement by hand before calling
+-- OrderPaymentStatusRepository::recordAdvanceReceived() (or balance/
+-- freight) as before — a self-report never writes to order_payment_status
+-- and never gates a stage on its own.
+-- ================================================================
+CREATE TABLE client_payment_reports (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id            BIGINT UNSIGNED NOT NULL,
+  payment_type        ENUM('advance','balance','freight') NOT NULL,
+  transaction_ref     VARCHAR(150) NOT NULL,
+  payer_bank_details  VARCHAR(255) NULL,
+  amount              DECIMAL(14,2) NULL,
+  payment_date        DATE NULL,
+  screenshot_file_id  BIGINT UNSIGNED NULL,
+  status              ENUM('new','reviewed') NOT NULL DEFAULT 'new',
+  reviewed_by         BIGINT UNSIGNED NULL,
+  reviewed_at         TIMESTAMP NULL,
+  reported_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (screenshot_file_id) REFERENCES file_store(id),
+  FOREIGN KEY (reviewed_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- END OF SCHEMA — 67 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
 -- Section M (signatories & designations) added 2026-09-20.

@@ -10,6 +10,7 @@ use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AmendmentRepository;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DisputeRepository;
@@ -351,6 +352,7 @@ final class OrderController
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
             'piIntake' => PiIntakeRepository::latestForOrder($orderId),
+            'clientPaymentReports' => ClientPaymentReportRepository::forOrder($orderId),
         ], 'layout/base');
     }
 
@@ -544,6 +546,29 @@ final class OrderController
         }
 
         Flash::set('success', 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Acknowledges a client's self-reported payment (docs/schema.sql
+     * Section AD) as seen — purely a bookkeeping marker for staff, never a
+     * substitute for actually verifying the bank statement and recording
+     * the payment via recordAdvancePayment()/recordBalancePayment()/
+     * recordFreightPayment() as before.
+     */
+    public function markPaymentReportReviewed(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $reportId = (int) ($params['reportId'] ?? 0);
+        $report = ClientPaymentReportRepository::find($reportId);
+        if (!$report || (int) $report['order_id'] !== $orderId) {
+            Flash::set('error', 'Payment report not found.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $user = AuthService::currentUser();
+        ClientPaymentReportRepository::markReviewed($reportId, (int) $user['id']);
+        Flash::set('success', 'Payment report marked reviewed.');
         header("Location: /orders/{$orderId}");
     }
 
