@@ -10,7 +10,7 @@
   </form>
 
   <?php if ($canManage): ?>
-    <p><a class="btn-sm btn-success" href="/products/create">+ Add Product</a></p>
+    <p><a class="btn-sm btn-accent" href="/products/create">+ Add Product</a></p>
   <?php endif; ?>
 
   <?php if (!$canBrowse && !$searched): ?>

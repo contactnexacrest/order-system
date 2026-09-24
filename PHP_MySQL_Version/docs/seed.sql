@@ -24,6 +24,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 INSERT INTO roles (name, description, is_system_role) VALUES
   ('Admin',               'Full system access, including user/role administration and audit log.', 1),
   ('Managing Director',   'Full business authority: approvals, all order/document actions, reporting.', 0),
+  ('Executive Director',  'Full business authority: approvals, all order/document actions, reporting.', 0),
   ('Export Executive',    'Day-to-day order handling, quotations through order confirmation, document generation.', 0),
   ('Accounts Executive',  'Payment tracking, balance follow-up, financial reporting.', 0),
   ('Logistics Executive', 'Packing, freight, BL instruction, shipping-stage documents.', 0),
@@ -64,7 +65,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
-WHERE r.name IN ('Admin', 'Managing Director');
+WHERE r.name IN ('Admin', 'Managing Director', 'Executive Director');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
@@ -97,10 +98,10 @@ WHERE r.name = 'Viewer / Auditor'
 -- means you'll be made to set a new one on first login regardless.
 -- ================================================================
 INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
-SELECT 'Gulmohar Sontakke', 'admin@nexacrest.placeholder', NULL,
+SELECT 'Gulmohar Sontakke', 'gulmohar.sontakke@nexacrestinternational.com', NULL,
        '$2y$12$SRa3a47hKlgsRGskEZfWJerGPgxLI8jSnVlckkHENnfs9VRao/You',
        r.id, 1, 1, 0
-FROM roles r WHERE r.name = 'Admin';
+FROM roles r WHERE r.name = 'Managing Director';
 
 -- ================================================================
 -- CURRENCIES / PORTS / INCOTERMS (minimal, DB-editable via Admin later)
@@ -566,23 +567,23 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
 -- (Set 1's embedded media) rather than generic placeholders.
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'logo', 'NexaCrest Logo', '__STORAGE_BASE_PATH__/assets/logos/logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'signature', 'Gulmohar Sontakke — Signature (legacy global slot, superseded by user_signature_assets)', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'seal', 'Company Seal', '__STORAGE_BASE_PATH__/assets/seals/company_seal.png', 'image/png', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'watermark', 'Watermark — Logo', '__STORAGE_BASE_PATH__/assets/watermarks/watermark_logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'email_header', 'Email Header — Logo', '__STORAGE_BASE_PATH__/assets/email_headers/email_header_logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 -- ================================================================
 -- SIGNATORIES & DESIGNATIONS (Section M, added 2026-09-20)
@@ -601,40 +602,40 @@ INSERT INTO designations (title, is_active) VALUES
   ('Founder & Executive Director', 1);
 
 -- Gulmohar Sontakke already exists as the seeded Admin login
--- (admin@nexacrest.placeholder) — mark her signatory-eligible with her
+-- (gulmohar.sontakke@nexacrestinternational.com) — mark her signatory-eligible with her
 -- own designation and set her as the company's global default signatory,
 -- matching the existing company_settings.md_name/md_title.
 UPDATE users u
 JOIN designations d ON d.title = 'Founder & Managing Director'
 SET u.designation_id = d.id, u.is_signatory_eligible = 1
-WHERE u.email = 'admin@nexacrest.placeholder';
+WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
--- Role: Managing Director — she IS one of the company's two founders and
--- will be marked is_protected_account below (Section Z), so this is a
--- one-time correction, not something meant to be revisited from the
--- Users screen the way an ordinary account's role would be.
+-- Role: Executive Director, matching her real designation — she IS one of
+-- the company's two founders and will be marked is_protected_account below
+-- (Section Z), so this is a one-time correction, not something meant to be
+-- revisited from the Users screen the way an ordinary account's role would be.
 INSERT INTO users (name, email, phone, password_hash, role_id, designation_id, is_signatory_eligible, is_active, force_password_change, two_fa_enabled)
-SELECT 'Arti Sontakke', 'arti.sontakke@nexacrest.placeholder', NULL,
+SELECT 'Arti Sontakke', 'arti.sontakke@nexacrestinternational.com', NULL,
        '$2y$12$SRa3a47hKlgsRGskEZfWJerGPgxLI8jSnVlckkHENnfs9VRao/You',
        r.id, d.id, 1, 1, 1, 0
-FROM roles r, designations d WHERE r.name = 'Managing Director' AND d.title = 'Founder & Executive Director';
+FROM roles r, designations d WHERE r.name = 'Executive Director' AND d.title = 'Founder & Executive Director';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/gulmohar_sontakke_director_seal.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/arti_sontakke_director_seal.webp', 'image/webp', 1, 1,
-       (SELECT id FROM users WHERE email = 'admin@nexacrest.placeholder')
-FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
+       (SELECT id FROM users WHERE email = 'gulmohar.sontakke@nexacrestinternational.com')
+FROM users u WHERE u.email = 'arti.sontakke@nexacrestinternational.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
 SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/arti_sontakke_signature_default.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
+FROM users u WHERE u.email = 'arti.sontakke@nexacrestinternational.com';
 
 -- ================================================================
 -- SUPER ADMIN TIER (Section N, added 2026-09-20)
@@ -645,7 +646,7 @@ FROM users u WHERE u.email = 'arti.sontakke@nexacrest.placeholder';
 -- from /super-admin once logged in.
 -- ================================================================
 UPDATE users SET is_super_admin = 1
-WHERE email IN ('admin@nexacrest.placeholder', 'arti.sontakke@nexacrest.placeholder');
+WHERE email IN ('gulmohar.sontakke@nexacrestinternational.com', 'arti.sontakke@nexacrestinternational.com');
 
 -- ================================================================
 -- PROTECTED FOUNDER ACCOUNTS (Section Z, added 2026-09-23)
@@ -659,11 +660,11 @@ WHERE email IN ('admin@nexacrest.placeholder', 'arti.sontakke@nexacrest.placehol
 -- this seed script included.
 -- ================================================================
 UPDATE users SET is_protected_account = 1
-WHERE email IN ('admin@nexacrest.placeholder', 'arti.sontakke@nexacrest.placeholder');
+WHERE email IN ('gulmohar.sontakke@nexacrestinternational.com', 'arti.sontakke@nexacrestinternational.com');
 
 -- Global default signatory = Gulmohar Sontakke (matches legacy md_name).
 INSERT INTO company_default_signatory (id, user_id, updated_by)
-SELECT 1, u.id, u.id FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
+SELECT 1, u.id, u.id FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 -- Per the explicit business rule (Payment Terms Amendment is legally
 -- signed by a Director in that capacity, using the personal designation
@@ -673,7 +674,7 @@ SELECT 1, u.id, u.id FROM users u WHERE u.email = 'admin@nexacrest.placeholder';
 INSERT INTO document_type_signatories (document_type_id, user_id, use_designation_seal, updated_by)
 SELECT dt.id, u.id, 1, u.id
 FROM document_types dt, users u
-WHERE dt.code = 'AMD' AND u.email = 'admin@nexacrest.placeholder';
+WHERE dt.code = 'AMD' AND u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 -- ================================================================
 -- INTERNAL REFERENCE LIBRARY (Section R, added 2026-09-21)

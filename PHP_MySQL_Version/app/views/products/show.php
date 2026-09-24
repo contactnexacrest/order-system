@@ -150,7 +150,7 @@
             <label>CHA Cost override<input type="number" step="0.01" name="cha_cost"></label>
             <label>Notes<textarea name="notes" rows="2"></textarea></label>
             <label><input type="checkbox" name="is_primary" value="1"> Primary supplier</label>
-            <button type="submit" class="btn-sm btn-success">Add Supplier</button>
+            <button type="submit" class="btn-sm btn-accent">Add Supplier</button>
           </form>
         </div>
       </details>
@@ -186,7 +186,7 @@
         <input type="text" name="label" placeholder="e.g. Bank charges" required>
         <input type="number" step="0.01" name="amount" placeholder="Amount" required>
         <input type="text" name="notes" placeholder="Notes (optional)">
-        <button type="submit" class="btn-sm btn-success">Add</button>
+        <button type="submit" class="btn-sm btn-accent">Add</button>
       </form>
     <?php endif; ?>
   </div>

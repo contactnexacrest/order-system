@@ -31,7 +31,7 @@
       <?= Csrf::field() ?>
       <input type="text" name="name" placeholder="Role name" required style="width:200px">
       <input type="text" name="description" placeholder="Description (optional)" style="width:320px">
-      <button type="submit" class="btn-sm btn-success">Create Role</button>
+      <button type="submit" class="btn-sm btn-accent">Create Role</button>
     </form>
   </div>
 
@@ -87,7 +87,7 @@
       <input type="text" name="name" placeholder="Display name" required style="width:200px">
       <input type="text" name="category" placeholder="Category (optional)" style="width:140px">
       <input type="text" name="description" placeholder="Description (optional)" style="width:280px">
-      <button type="submit" class="btn-sm btn-success">Create Permission</button>
+      <button type="submit" class="btn-sm btn-accent">Create Permission</button>
     </form>
   </div>
 

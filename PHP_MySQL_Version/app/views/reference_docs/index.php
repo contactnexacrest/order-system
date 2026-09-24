@@ -56,7 +56,7 @@ $canManageSettings = $currentUser && PermissionService::can((int) $currentUser['
       <?php endif; ?>
     </table>
     <?php if ($canManageSettings): ?>
-    <p><a href="/reference-docs/custom/create" class="btn-sm btn-success">+ Add Reference Document</a></p>
+    <p><a href="/reference-docs/custom/create" class="btn-sm btn-accent">+ Add Reference Document</a></p>
     <?php endif; ?>
   </div>
 </div>

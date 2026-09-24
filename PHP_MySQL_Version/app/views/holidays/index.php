@@ -28,7 +28,7 @@
       <?= Csrf::field() ?>
       <input type="date" name="holiday_date" required>
       <input type="text" name="description" placeholder="e.g. Diwali" required style="width:240px">
-      <button type="submit" class="btn-sm btn-success">Add Holiday</button>
+      <button type="submit" class="btn-sm btn-accent">Add Holiday</button>
     </form>
   </div>
 </div>

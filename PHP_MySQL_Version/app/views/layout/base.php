@@ -60,7 +60,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
 <header class="sidebar">
   <div class="sidebar-brand">
     <span class="sidebar-brand-mark" aria-hidden="true">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 8c0-2 2-3.4 4.5-3.4S16 6.2 16 9s-2 3.6-4.5 3.6S7 14.2 7 17s2 3.4 4.5 3.4S16 18.8 16 16" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"></path></svg>
+      <img src="/assets/img/logo.jpg" alt="">
     </span>
     <span class="sidebar-brand-name">NexaCrest</span>
   </div>
@@ -82,7 +82,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a>
           <a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a>
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
-          <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Client Requests</a>
+          <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review</a>
           <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review</a>
           <a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a>
         </div>
