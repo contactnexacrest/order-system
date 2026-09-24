@@ -7,9 +7,11 @@ const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const hsCodeRepository = require('../repositories/hsCodeRepository');
+const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const disputeRepository = require('../repositories/disputeRepository');
 const documentCrossVerificationRepository = require('../repositories/documentCrossVerificationRepository');
 const documentRepository = require('../repositories/documentRepository');
@@ -361,6 +363,8 @@ async function show(req, res) {
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
       piIntake: await piIntakeRepository.latestForOrder(orderId),
+      clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
+      ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
     },
     'layout/base'
   );
@@ -540,6 +544,28 @@ async function recordAdvancePayment(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * Acknowledges a client's self-reported payment (docs/schema.sql Section
+ * AD) as seen — purely a bookkeeping marker for staff, never a substitute
+ * for actually verifying the bank statement and recording the payment via
+ * recordAdvancePayment()/recordBalancePayment()/recordFreightPayment() as
+ * before.
+ */
+async function markPaymentReportReviewed(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const reportId = parseInt(req.params.reportId, 10) || 0;
+  const report = await clientPaymentReportRepository.find(reportId);
+  if (!report || report.order_id !== orderId) {
+    flash.set(req, 'error', 'Payment report not found.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const user = req.user;
+  await clientPaymentReportRepository.markReviewed(reportId, user.id);
+  flash.set(req, 'success', 'Payment report marked reviewed.');
+  res.redirect(`/orders/${orderId}`);
+}
+
 /** Stage 2->3 gate: advance payment marked cleared in NexaCrest's bank account. */
 async function clearAdvancePayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -589,11 +615,48 @@ async function updateProductionStatus(req, res) {
 }
 
 /** Stage 4->5 gate: buyer acknowledges the Order Confirmation. */
-async function confirmBuyerAcknowledged(req, res) {
+/**
+ * Stage 4->5 gate: staff records a buyer's Order Confirmation
+ * acknowledgment that arrived by reply-to-the-email rather than through
+ * the client portal button (docs/schema.sql Section AE). Replaces the
+ * old staff-only "Confirm Buyer Acknowledged Order" button, which never
+ * required any evidence the buyer had actually agreed to anything — a
+ * mandatory note (the reply itself, quoted, is normal practice here) is
+ * this feature's substitute for that missing evidence.
+ */
+async function recordOcAcknowledgment(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  const ack = await orderOcAcknowledgmentRepository.find(orderId);
+  if (!ack || ack.acknowledged_at !== null) {
+    flash.set(req, 'error', 'No pending Order Confirmation acknowledgment for this order — send the OC to the buyer first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const note = String(req.body.acknowledged_note || '').trim();
+  const reasonError = reasonValidator.check(note);
+  if (reasonError) {
+    flash.set(req, 'error', `Describe the evidence (e.g. quote the buyer's email reply): ${reasonError}`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
   const user = req.user;
+  await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'staff_recorded_email', note, user.id);
   await stageGateService.passAndUnlockNext(orderId, 4, user.id);
-  flash.set(req, 'success', 'Buyer acknowledgement of the Order Confirmation recorded. Stage 5 (Supplier PO) unlocked.');
+  await auditLogRepository.log(user.id, 'OC_ACKNOWLEDGED_VIA_EMAIL', 'orders', orderId, null, null, null, note);
+  flash.set(req, 'success', 'Buyer acknowledgement recorded. Stage 5 (Supplier PO) unlocked.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+/** docs/schema.sql Section AF — per-order, staff-controlled, default off. */
+async function setDisputeButtonVisible(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const visible = !!req.body.dispute_button_visible_to_client;
+  await orderRepository.setDisputeButtonVisible(orderId, visible);
+  const user = req.user;
+  await auditLogRepository.log(user.id, 'DISPUTE_BUTTON_VISIBILITY_CHANGED', 'orders', orderId, 'dispute_button_visible_to_client', null, visible ? '1' : '0');
+  flash.set(req, 'success', visible ? 'The client can now raise a dispute on this order from their portal.' : 'The "Raise a Dispute" button is now hidden from the client for this order.');
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -1062,8 +1125,8 @@ async function markLost(req, res) {
 
 module.exports = {
   index, archivedIndex, archive, unarchive, create, store, show, downloadDossier, generatePiFormLink,
-  recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, clearAdvancePayment, updateProductionStatus,
-  confirmBuyerAcknowledged, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,
+  recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment, updateProductionStatus,
+  recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, recordBlIssued, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

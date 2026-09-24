@@ -469,6 +469,15 @@
 
   <div class="section">
     <h2>Amendments &amp; Disputes</h2>
+    {% if permissions.manage_orders %}
+    <form method="post" action="/orders/{{ order.id }}/dispute-visibility" style="margin-bottom:10px">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
+        <input type="checkbox" name="dispute_button_visible_to_client" value="1" onchange="this.form.submit()" {{ 'checked' if order.dispute_button_visible_to_client == 1 }}>
+        Show "Raise a Dispute" button to the client in their portal for this order
+      </label>
+    </form>
+    {% endif %}
     <p><a href="/orders/{{ order.id }}/amendments">Payment Terms Amendments ({{ amendmentCount }})</a>
        &nbsp;&middot;&nbsp;
        <a href="/orders/{{ order.id }}/disputes">Disputes ({{ openDisputeCount }} open)</a>
@@ -576,6 +585,33 @@
     {% elif not stage3 or stage3.status == 'locked' %}
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
     {% endif %}
+
+    {% if clientPaymentReports and clientPaymentReports.length > 0 %}
+      <h3 style="margin-top:16px">Client-Reported Payments</h3>
+      <p class="muted small">Purely informational — the client submitted these themselves. Always verify against the actual bank statement before recording a payment above.</p>
+      <table class="list">
+        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Bank / Payer Details</th><th>Reported</th><th>Status</th><th></th></tr>
+        {% for r in clientPaymentReports %}
+        <tr>
+          <td>{{ r.payment_type | capitalize }}</td>
+          <td>{{ r.transaction_ref }}</td>
+          <td>{{ (r.amount | money) if r.amount != null else '—' }}</td>
+          <td>{{ r.payment_date or '—' }}</td>
+          <td>{{ r.payer_bank_details or '—' }}</td>
+          <td>{{ r.reported_at | humanDate }}</td>
+          <td>{{ ('Reviewed by ' + (r.reviewed_by_name or '—')) if r.status == 'reviewed' else 'New' }}</td>
+          <td>
+            {% if r.status != 'reviewed' %}
+            <form method="post" action="/orders/{{ order.id }}/payment-reports/{{ r.id }}/reviewed">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm">Mark Reviewed</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
   </div>
 
   <div class="section">
@@ -597,13 +633,29 @@
   <div class="section">
     <h2>Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
     {% if buyerAcknowledged %}
-      <p>Buyer has acknowledged the Order Confirmation.</p>
+      {% if ocAcknowledgment and ocAcknowledgment.acknowledged_via == 'client_portal' %}
+        <p>Buyer acknowledged the Order Confirmation themselves in the client portal on {{ ocAcknowledgment.acknowledged_at | humanDate }}.</p>
+      {% elif ocAcknowledgment and ocAcknowledgment.acknowledged_via == 'staff_recorded_email' %}
+        <p>Acknowledgement recorded from the buyer's email reply on {{ ocAcknowledgment.acknowledged_at | humanDate }}.</p>
+        <p class="muted small">Evidence/note: {{ (ocAcknowledgment.acknowledged_note or '') | nl2br }}</p>
+      {% elif ocAcknowledgment and ocAcknowledgment.acknowledged_via == 'auto_48h' %}
+        <p>No response from the buyer within 48 hours of the Order Confirmation being emailed — auto-confirmed on {{ ocAcknowledgment.acknowledged_at | humanDate }}.</p>
+      {% else %}
+        <p>Buyer has acknowledged the Order Confirmation.</p>
+      {% endif %}
     {% elif stage4 and stage4.status != 'locked' %}
-      <p class="muted">Generate the Order Confirmation above and send it to the buyer, then confirm their acknowledgement here.</p>
-      <form method="post" action="/orders/{{ order.id }}/buyer-acknowledged">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <button type="submit" class="btn-sm btn-success">Confirm Buyer Acknowledged Order (unlocks Stage 5)</button>
-      </form>
+      {% if ocAcknowledgment and ocAcknowledgment.acknowledged_at == null %}
+        <div class="review-banner info">
+          ℹ <span>Order Confirmation emailed to the buyer on {{ ocAcknowledgment.sent_at | humanDate }}. Awaiting their acknowledgement — the client can confirm it directly in their portal, or reply to the email (record that below). If there's no response by {{ ocAcknowledgment.due_at | humanDate }}, it auto-confirms and Stage 5 unlocks on its own.</span>
+        </div>
+        <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
+          <button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Stage 5)</button>
+        </form>
+      {% else %}
+        <p class="muted">Generate the Order Confirmation above and send it to the buyer — once sent, they can acknowledge it from their portal (or reply by email, which you can record here), and it auto-confirms after 48 hours with no response.</p>
+      {% endif %}
     {% else %}
       <p class="muted">Clear the advance payment first to unlock this gate.</p>
     {% endif %}

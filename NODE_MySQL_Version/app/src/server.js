@@ -375,8 +375,10 @@ app.post('/orders/:id/unarchive', requireAuth, requirePermission('manage_orders'
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
 app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
 app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordAdvancePayment));
+app.post('/orders/:id/payment-reports/:reportId/reviewed', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.markPaymentReportReviewed));
 app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
+app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 
 // Annexure A — Product Technical Specifications (schema tables shipped
 // with no screen ever built against them; this is that missing piece).
@@ -388,7 +390,7 @@ app.post('/orders/:id/annexure/products/:productId/delete', requireAuth, require
 app.post('/orders/:id/annexure/products/:productId/images', requireAuth, requirePermission('manage_orders'), upload.single('image'), verifyCsrf, asyncHandler(annexureController.uploadImage));
 app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.removeImage));
 
-app.post('/orders/:id/buyer-acknowledged', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.confirmBuyerAcknowledged));
+app.post('/orders/:id/oc-acknowledgment', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordOcAcknowledgment));
 
 app.post('/orders/:id/suppliers', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.createSupplier));
 app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
@@ -526,6 +528,9 @@ app.get('/client', requireClientAuth, asyncHandler(clientPortalController.dashbo
 app.get('/client/account', requireClientAuth, asyncHandler(clientPortalController.showAccount));
 app.post('/client/account/password', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.changePassword));
 app.get('/client/orders/:id', requireClientAuth, asyncHandler(clientPortalController.showOrder));
+app.post('/client/orders/:id/report-payment', requireClientAuth, uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(clientPortalController.reportPayment));
+app.post('/client/orders/:id/acknowledge-oc', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.acknowledgeOc));
+app.post('/client/orders/:id/disputes', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.raiseDispute));
 app.get('/client/documents/:id/download', requireClientAuth, asyncHandler(clientPortalController.downloadDocument));
 
 // --- 404 fallback (mirrors the PHP Router's default) ---

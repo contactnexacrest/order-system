@@ -239,7 +239,7 @@ or demoing the app.
 
 ## Background jobs
 
-Two jobs need to run outside the request/response cycle:
+Three jobs need to run outside the request/response cycle:
 
 - **`src/jobs/checkAlerts.js`** — run once daily. Checks LUT/RCMC
   certificate expiry against their configured alert/escalation thresholds,
@@ -253,22 +253,31 @@ Two jobs need to run outside the request/response cycle:
   and due (`scheduled_at <= NOW()`, or `NULL` meaning "immediate"). Safe to
   run as often as you like — each row is only ever picked up once, marked
   `sent`/`failed` immediately.
+- **`src/jobs/autoConfirmOcAcknowledgments.js`** — run every 15 minutes.
+  Auto-confirms any Order Confirmation the buyer hasn't acknowledged
+  (client portal button, or a staff-recorded email reply) within 48 hours
+  of it being emailed, unlocking Stage 5 (docs/schema.sql Section AE).
+  Idempotent — a row is only ever picked up once it has
+  `acknowledged_at IS NULL AND due_at <= NOW()`, and acknowledging it (by
+  any means) before this runs removes it from that set.
 
-Both are plain Node scripts, runnable directly and printing a one-line
-summary to stdout, exit code 0 on success:
+All three are plain Node scripts, runnable directly and printing a
+one-line summary to stdout, exit code 0 on success:
 
 ```bash
 node src/jobs/checkAlerts.js
 node src/jobs/dispatchDeferredEmails.js
+node src/jobs/autoConfirmOcAcknowledgments.js
 ```
 
-**Pick exactly one of these two ways to run them — never both, or alerts
-and deferred emails double-fire:**
+**Pick exactly one of these two ways to run them — never both, or the
+same job double-fires:**
 
 **Option 1 — external cron (recommended: simplest, and independent of the
-web process's own uptime).** Add two crontab entries:
+web process's own uptime).** Add three crontab entries:
 ```
 */10 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dispatchDeferredEmails.js >> /var/log/nexacrest/dispatch_deferred_emails.log 2>&1
+*/15 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/autoConfirmOcAcknowledgments.js >> /var/log/nexacrest/auto_confirm_oc_acknowledgments.log 2>&1
 0 2 * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/checkAlerts.js >> /var/log/nexacrest/check_alerts.log 2>&1
 ```
 (`sudo mkdir -p /var/log/nexacrest` first.) Use the full path to `node`
@@ -278,9 +287,10 @@ shell's.
 **Option 2 — in-process, via node-cron.** Set `RUN_JOBS_IN_PROCESS=true`
 in `.env` and restart the app (`pm2 restart nexacrest`). `src/server.js`
 then starts `src/jobs/scheduler.js`, which runs `checkAlerts` daily at
-02:00 and `dispatchDeferredEmails` every 10 minutes inside the same
+02:00, `dispatchDeferredEmails` every 10 minutes, and
+`autoConfirmOcAcknowledgments` every 15 minutes, all inside the same
 process — nothing else to configure, but job execution is then tied to
-the web process's uptime (a restart briefly pauses both jobs, and if you
+the web process's uptime (a restart briefly pauses all three jobs, and if you
 run multiple app instances behind a load balancer for scaling, each
 instance would independently fire the jobs — stick to a single instance,
 or use Option 1, if you ever scale out).

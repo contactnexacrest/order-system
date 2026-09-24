@@ -5,20 +5,42 @@ const crypto = require('crypto');
 
 const flash = require('../helpers/flash');
 const passwordHash = require('../helpers/passwordHash');
+const reasonValidator = require('../helpers/reasonValidator');
 const clientPasswordResetTokenRepository = require('../repositories/clientPasswordResetTokenRepository');
 const clientLoginRepository = require('../repositories/clientLoginRepository');
+const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
+const companySettingsRepository = require('../repositories/companySettingsRepository');
+const disputeRepository = require('../repositories/disputeRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
+const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
+const auditLogRepository = require('../repositories/auditLogRepository');
 const clientPortalService = require('../services/clientPortalService');
 const passwordPolicyService = require('../services/passwordPolicyService');
+const fileUploadService = require('../services/fileUploadService');
+const stageGateService = require('../services/stageGateService');
+const workingDaysCalculator = require('../services/workingDaysCalculator');
+
+function todayYmd() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function sanitizePathSegment(value) {
+  return String(value).replace(/[^A-Za-z0-9_-]+/g, '-');
+}
 
 /**
  * Port of App\Controllers\ClientPortalController. The client-facing
  * portal — structurally separate screens from the staff app (own layout,
- * own nav, own session key via clientPortalService). Read-only throughout
- * except the client's own password: no editing of profile info, no audit
- * visibility, per the confirmed scope.
+ * own nav, own session key via clientPortalService). Read-only for the
+ * client's own profile/order data throughout (no editing, no audit
+ * visibility) — the exceptions are the client's own password;
+ * reportPayment(), which is purely an informational note to staff and
+ * never writes to the order/payment records itself; and acknowledgeOc(),
+ * the one real state change a client can trigger, gated to only ever
+ * move the Stage 4->5 gate forward, never anything else.
  */
 
 function showLogin(req, res) {
@@ -127,8 +149,140 @@ async function showOrder(req, res) {
   res.renderView('client_portal/order_show', {
     client: await clientPortalService.currentClient(req),
     order,
+    products: await orderProductRepository.forOrder(orderId),
+    totalFobValue: await orderProductRepository.totalFobValue(orderId),
     documents: await documentRepository.customerFacingForOrder(orderId),
+    paymentReports: await clientPaymentReportRepository.forOrder(orderId),
+    ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
   }, 'layout/client');
+}
+
+/**
+ * Client's own "I've paid" note — transaction ref + optional screenshot
+ * of the remittance advice. Purely informational (docs/schema.sql
+ * Section AD): staff still verify the real bank statement by hand before
+ * recording the payment the normal way; nothing here ever touches
+ * order_payment_status or unlocks a stage gate.
+ */
+async function reportPayment(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const paymentType = String(req.body.payment_type || '');
+  const transactionRef = String(req.body.transaction_ref || '').trim();
+  if (!['advance', 'balance', 'freight'].includes(paymentType) || transactionRef === '') {
+    flash.set(req, 'error', 'Select which payment this is for and enter the transaction ID/UTR.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+
+  let screenshotFileId = null;
+  if (req.file) {
+    try {
+      screenshotFileId = await fileUploadService.handleUpload(
+        req,
+        'screenshot',
+        'received_remittance',
+        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/client_payment_reports`,
+        clientId,
+        orderId,
+        null,
+        null,
+        'Client (self-reported)',
+        'Client payment self-report screenshot'
+      );
+    } catch (e) {
+      flash.set(req, 'error', e.message);
+      res.redirect(`/client/orders/${orderId}`);
+      return;
+    }
+  }
+
+  const amount = String(req.body.amount || '').trim();
+  const paymentDate = String(req.body.payment_date || '').trim();
+  await clientPaymentReportRepository.create(
+    orderId,
+    paymentType,
+    transactionRef,
+    String(req.body.payer_bank_details || '').trim() || null,
+    amount !== '' ? parseFloat(amount) : null,
+    paymentDate !== '' ? paymentDate : null,
+    screenshotFileId
+  );
+
+  flash.set(req, 'success', 'Thank you — we have noted your payment details. Our team will verify this against our bank statement and update your order.');
+  res.redirect(`/client/orders/${orderId}`);
+}
+
+/**
+ * The client's own Order Confirmation acknowledgment — the single button
+ * offered (docs/schema.sql Section AE). Deliberately no decline/dispute
+ * option here: raising doubt at this exact step isn't the confirmed
+ * design, and a genuine dispute has its own channel (the per-order
+ * dispute button, where enabled) once the order is further along.
+ */
+async function acknowledgeOc(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const ack = await orderOcAcknowledgmentRepository.find(orderId);
+  if (!ack || ack.acknowledged_at !== null) {
+    flash.set(req, 'error', 'There is nothing awaiting your acknowledgement on this order.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+
+  await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'client_portal', null, null);
+  await stageGateService.passAndUnlockNext(orderId, 4, null);
+  flash.set(req, 'success', 'Thank you — your acknowledgement has been recorded and your order is moving to production.');
+  res.redirect(`/client/orders/${orderId}`);
+}
+
+/**
+ * docs/schema.sql Section AF — only reachable when staff have switched
+ * the per-order flag on; re-checked here server-side (not just hidden in
+ * the view) so a client can't file one on an order it wasn't enabled for
+ * by guessing the URL.
+ */
+async function raiseDispute(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  if (order.dispute_button_visible_to_client !== 1) {
+    flash.set(req, 'error', 'Disputes cannot be raised on this order from the portal.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+
+  const description = String(req.body.description || '').trim();
+  if (description === '') {
+    flash.set(req, 'error', 'Please describe the issue before submitting.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+
+  const noticeDate = todayYmd();
+  const responseDays = parseInt((await companySettingsRepository.get('dispute_response_days_n')) || '10', 10);
+  const responseDueDate = await workingDaysCalculator.addWorkingDays(noticeDate, responseDays);
+  const disputeId = await disputeRepository.create(orderId, noticeDate, 'Buyer (via client portal)', description, null, responseDueDate);
+  await auditLogRepository.log(null, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description, 'Raised by the client via the client portal.');
+
+  flash.set(req, 'success', `Your dispute has been logged — our team will respond by ${responseDueDate}.`);
+  res.redirect(`/client/orders/${orderId}`);
 }
 
 async function downloadDocument(req, res) {
@@ -207,5 +361,5 @@ async function changePassword(req, res) {
 
 module.exports = {
   showLogin, login, logout, showSetPassword, setPassword, dashboard, showOrder,
-  downloadDocument, showAccount, changePassword,
+  downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
 };

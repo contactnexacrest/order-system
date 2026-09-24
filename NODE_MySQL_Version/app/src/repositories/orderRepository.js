@@ -171,6 +171,14 @@ async function setEstShipmentDate(orderId, text) {
   await db.execute('UPDATE orders SET est_shipment_date_text = :text WHERE id = :id', { text, id: orderId });
 }
 
+/** docs/schema.sql Section AF — staff-controlled, per order, default off. */
+async function setDisputeButtonVisible(orderId, visible) {
+  await db.execute(
+    'UPDATE orders SET dispute_button_visible_to_client = :visible WHERE id = :id',
+    { visible: visible ? 1 : 0, id: orderId }
+  );
+}
+
 async function markComplete(orderId) {
   await db.execute("UPDATE orders SET status = 'complete', is_locked = 1 WHERE id = :id", { id: orderId });
 }
@@ -220,5 +228,5 @@ async function setIncludeAnnexureA(orderId, include) {
 module.exports = {
   all, allArchived, archive, unarchive, find, nextSequenceForClient, create, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
-  setIncludeAnnexureA,
+  setIncludeAnnexureA, setDisputeButtonVisible,
 };

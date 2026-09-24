@@ -3,6 +3,7 @@
 const cron = require('node-cron');
 const checkAlerts = require('./checkAlerts');
 const dispatchDeferredEmails = require('./dispatchDeferredEmails');
+const autoConfirmOcAcknowledgments = require('./autoConfirmOcAcknowledgments');
 const logger = require('../helpers/logger');
 
 /**
@@ -58,7 +59,15 @@ function start() {
     })
   );
 
-  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min).');
+  // Every 15 minutes — auto-confirm any Order Confirmation the buyer
+  // hasn't acknowledged within 48 hours (docs/schema.sql Section AE).
+  tasks.push(
+    cron.schedule('*/15 * * * *', () => {
+      autoConfirmOcAcknowledgments.run().catch((e) => logger.error('scheduler:autoConfirmOcAcknowledgments', e));
+    })
+  );
+
+  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min).');
   return tasks;
 }
 

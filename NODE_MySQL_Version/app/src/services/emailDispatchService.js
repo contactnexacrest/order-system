@@ -8,6 +8,7 @@ const emailLogRepository = require('../repositories/emailLogRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
 const notificationRepository = require('../repositories/notificationRepository');
+const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderRepository = require('../repositories/orderRepository');
 const permissionRepository = require('../repositories/permissionRepository');
 const userRepository = require('../repositories/userRepository');
@@ -214,6 +215,19 @@ async function dispatch(emailLogRow) {
     await emailLogRepository.markSent(emailLogRow.id);
     await documentRepository.markSent(document.id);
     await auditLogRepository.log(null, 'EMAIL_SENT', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email);
+
+    // docs/schema.sql Section AE — the Order Confirmation just went out to
+    // the buyer, so this is the moment the 48-hour acknowledgment clock
+    // starts (ordersController.recordOcAcknowledgment() /
+    // clientPortalController.acknowledgeOc() / the
+    // autoConfirmOcAcknowledgments cron are the three ways it later
+    // resolves).
+    if (document.document_type_code === 'OC' && document.order_id !== null && document.order_id !== undefined) {
+      const now = new Date();
+      const due = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      const fmt = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+      await orderOcAcknowledgmentRepository.recordSent(document.order_id, document.id, fmt(now), fmt(due));
+    }
   } else {
     await emailLogRepository.markFailed(emailLogRow.id);
   }
