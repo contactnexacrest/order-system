@@ -202,13 +202,14 @@ storage/
    `APP_ENV` isn't `local`, so HTTPS-only cookies work correctly the moment
    Nginx is terminating TLS in front of it — no further code change needed.
 
-9. **Log in** at `https://www.example.com/login` with the seeded Admin
-   account:
-   - Email: `admin@nexacrest.placeholder`
+9. **Log in** at `https://www.example.com/login` with a seeded account
+   (both are Super Admin, both the same password):
+   - Email: `gulmohar.sontakke@nexacrestinternational.com`
+   - Email: `arti.sontakke@nexacrestinternational.com`
    - Password: `ChangeMe#2026`
 
    You'll be forced onto `/force-password-change` immediately (by design —
-   `force_password_change` is set on the seeded row).
+   `force_password_change` is set on both seeded rows).
 
 ## Using the app
 

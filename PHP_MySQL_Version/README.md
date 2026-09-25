@@ -149,12 +149,14 @@ correctly once the password is changed.
      happens to share a name with a real folder under `public_html/` will
      404 instead of reaching the app (this bit us once during Phase A
      testing — see `docs/ARCHITECTURE.md`).
-6. **Log in.** Default seeded account:
-   - Email: `admin@nexacrest.placeholder`
+6. **Log in.** Default seeded accounts (both Super Admin, both the same
+   password):
+   - Email: `gulmohar.sontakke@nexacrestinternational.com`
+   - Email: `arti.sontakke@nexacrestinternational.com`
    - Password: `ChangeMe#2026`
 
    You'll be forced to set a new password on first login (by design —
-   `force_password_change` is set on the seeded user).
+   `force_password_change` is set on both seeded users).
 
 ## Using Phase B: clients, orders, documents
 
