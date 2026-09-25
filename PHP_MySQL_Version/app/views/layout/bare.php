@@ -7,6 +7,7 @@
 <title>NexaCrest International — Export Operations</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/css/app.css">
+<script src="/assets/js/app.js" defer></script>
 </head>
 <body class="bare">
 <div class="bare-wrap">
