@@ -114,6 +114,8 @@
   </tr>
   <tr>
     <td class="v" style="vertical-align:top;">
+      {% if signatory.signature_data_uri %}<img class="signature-img" src="{{ signatory.signature_data_uri }}"><br>{% endif %}
+      {% if signatory.seal_data_uri %}<img class="seal-img" src="{{ signatory.seal_data_uri }}"><br>{% endif %}
       <p style="margin:8pt 0 0;"><strong style="color:#17233A;">{{ signatory.name }}</strong><br>{{ signatory.designation }}<br><span style="font-size:8.5pt; color:#555555;">{{ company.legal_name }}</span></p>
     </td>
     <td class="v" style="vertical-align:top; background:#EAF3DE;">
