@@ -37,7 +37,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('manage_users',              'Manage users',               'Create/edit/deactivate user accounts and assign roles.', 'admin'),
   ('manage_permissions',        'Manage roles & permissions', 'Edit role/user permission matrix.',                     'admin'),
   ('manage_company_settings',   'Manage company settings',    'Edit company_settings key-value configuration.',        'admin'),
-  ('manage_assets',             'Manage assets',               'Upload/replace logo, signature, seal, watermark, email header.', 'admin'),
+  ('manage_assets',             'Manage assets',               'Upload/replace logo, signature, seal, watermark.', 'admin'),
   ('view_audit_log',            'View audit log',              'View the immutable system audit trail.',                'admin'),
   ('manage_report_definitions', 'Manage saved reports',         'Create/edit/delete saved report definitions.',          'reports'),
   ('view_reports',              'View reports',                 'Run and view reports and dashboards.',                  'reports'),
@@ -588,10 +588,6 @@ FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'watermark', 'Watermark — Logo', '__STORAGE_BASE_PATH__/assets/watermarks/watermark_logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
-
-INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
-SELECT 'email_header', 'Email Header — Logo', '__STORAGE_BASE_PATH__/assets/email_headers/email_header_logo.jpg', 'image/jpeg', 1, u.id
 FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 -- ================================================================

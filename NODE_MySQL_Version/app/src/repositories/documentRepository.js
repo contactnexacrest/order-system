@@ -109,11 +109,11 @@ async function create(orderId, documentTypeId, documentReference, revisionNumber
     `INSERT INTO documents
         (order_id, document_type_id, document_reference, revision_number, client_revision_number, status, generated_by, docx_file_id, pdf_file_id,
          signatory_user_id, signatory_name_snapshot, signatory_designation_snapshot,
-         signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal, company_snapshot_json)
+         signature_asset_id_snapshot, seal_asset_id_snapshot, company_seal_asset_id_snapshot, used_designation_seal, company_snapshot_json)
      VALUES
         (:order_id, :document_type_id, :document_reference, :revision_number, :client_revision_number, 'draft', :generated_by, :docx_file_id, :pdf_file_id,
          :signatory_user_id, :signatory_name_snapshot, :signatory_designation_snapshot,
-         :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal, :company_snapshot_json)`,
+         :signature_asset_id_snapshot, :seal_asset_id_snapshot, :company_seal_asset_id_snapshot, :used_designation_seal, :company_snapshot_json)`,
     {
       order_id: orderId, document_type_id: documentTypeId, document_reference: documentReference,
       revision_number: revisionNumber, client_revision_number: clientRevisionNumber, generated_by: generatedBy, docx_file_id: docxFileId, pdf_file_id: pdfFileId,
@@ -122,6 +122,7 @@ async function create(orderId, documentTypeId, documentReference, revisionNumber
       signatory_designation_snapshot: signatory ? signatory.designation : null,
       signature_asset_id_snapshot: signatory ? signatory.signature_asset_id : null,
       seal_asset_id_snapshot: signatory ? signatory.seal_asset_id : null,
+      company_seal_asset_id_snapshot: signatory ? signatory.company_seal_asset_id : null,
       used_designation_seal: signatory && signatory.used_designation_seal ? 1 : 0,
       company_snapshot_json: companySnapshot !== null ? JSON.stringify(companySnapshot) : null,
     }

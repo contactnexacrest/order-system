@@ -817,8 +817,8 @@ chasing, and how many did we actually lose" — `orders.status` only had
 
 Everything in `company_settings` marked `PLACEHOLDER` in `docs/seed.sql` —
 `director_name`, `bank_pincode`, `lut_expiry_date` (assumed FY-end; confirm
-the real date) — plus the login email/password above, and all five asset
-images (logo, MD signature, company seal, watermark, email header)
+the real date) — plus the login email/password above, and all four asset
+images (logo, MD signature, company seal, watermark)
 currently showing a labeled placeholder graphic. Replace assets from the
 in-app **Assets** screen (`/company-assets`) — no code changes needed, just
 upload the real file. Replace settings from the **Company Settings** screen

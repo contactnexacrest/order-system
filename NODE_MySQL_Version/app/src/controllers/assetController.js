@@ -11,7 +11,7 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 
 // Port of App\Controllers\AssetController.
 
-const ALLOWED_TYPES = ['logo', 'signature', 'seal', 'watermark', 'email_header'];
+const ALLOWED_TYPES = ['logo', 'signature', 'seal', 'watermark'];
 const ALLOWED_MIME = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/svg+xml': 'svg' };
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -148,7 +148,6 @@ function folderFor(assetType) {
     signature: 'signatures',
     seal: 'seals',
     watermark: 'watermarks',
-    email_header: 'email_headers',
   }[assetType] || 'misc';
 }
 

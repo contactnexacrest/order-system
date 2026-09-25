@@ -12,6 +12,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderRepository = require('../repositories/orderRepository');
+const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const termsClauseRepository = require('../repositories/termsClauseRepository');
 const documentDataAssembler = require('./documentDataAssembler');
@@ -26,6 +27,16 @@ const docxDocumentBuilder = require('./docx/docxDocumentBuilder');
  * Twig+Dompdf / Twig+PHPWord split, see README's Phase B scope note).
  */
 const TEMPLATES_DIR = path.join(__dirname, '..', '..', 'templates');
+
+/**
+ * Thrown by generate() when an order is locked or the target document
+ * type's stage hasn't unlocked yet — a distinct type (rather than a plain
+ * Error) so the controller can show its message to the user directly
+ * instead of the generic "check the server log" treatment every other
+ * generation failure gets. The message itself is always safe to show: it
+ * only ever describes order/stage state, never internal detail.
+ */
+class StageGateBlockedError extends Error {}
 
 let njkEnv = null;
 function templatesEnvironment() {
@@ -92,7 +103,7 @@ function fontsBlock() {
   return fontsBlockCache;
 }
 
-async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null, generateDocx = false) {
+async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null, generateDocx = false, allowOverride = false) {
   const docType = await findDocumentType(documentTypeCode);
   if (!docType) {
     throw new Error(`Unknown document type: ${documentTypeCode}`);
@@ -101,6 +112,38 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
+  }
+
+  // Real, dangerous gap this closes (found 2026-09-25): the order-detail
+  // view only ever hides a "Generate"/"Regenerate" button once the order
+  // is locked/complete or the relevant stage hasn't unlocked yet —
+  // generate() itself never checked either condition, so posting the
+  // route directly (or a bug in the view's own condition) could still
+  // generate ANY document type at ANY time, including regenerating an
+  // early-stage document (QT, PI, ...) after the order has already closed.
+  // allowOverride is the one deliberately narrow escape hatch — callers
+  // must have already verified the caller holds edit_locked_data (Super
+  // Admin bypasses this check automatically — see permissionService.can())
+  // and captured a mandatory reason before setting it true; see
+  // documentController.js's generate().
+  if (!allowOverride) {
+    if (order.is_locked) {
+      throw new StageGateBlockedError(
+        `Order #${orderId} is locked (status: ${order.status}) — documents can no longer be generated or regenerated for it. ` +
+        'A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.'
+      );
+    }
+
+    const requiredStage = stageSequenceFor(documentTypeCode);
+    if (requiredStage !== null) {
+      const stage = await orderStageRepository.findByOrderAndStageNumber(orderId, requiredStage);
+      if (!stage || stage.status === 'locked') {
+        throw new StageGateBlockedError(
+          `Stage ${requiredStage} isn't open yet for order #${orderId} — ${documentTypeCode} can't be generated out of sequence. ` +
+          'A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.'
+        );
+      }
+    }
   }
 
   // Real bug this fixes: orderRepository.setPiDates() existed but was never
@@ -267,13 +310,18 @@ async function findDocumentType(code) {
 
 /**
  * Where a document type sits in the order lifecycle (stages_master
- * sequence) — used only to detect a stage-regeneration cascade risk,
- * never for anything that affects rendering itself. Two types can
- * legitimately share a stage (ANNEXA rides with QT; PL and BLI both
- * belong to the packing/BL stage) since both are produced from the same
- * stage's data and neither is "downstream" of the other. AMD and COOPREP
- * aren't part of the buyer-facing document sequence a regeneration would
- * meaningfully cascade into, so they're excluded.
+ * sequence) — used both to detect a stage-regeneration cascade risk
+ * (downstreamDocumentsAtRisk() below) AND, since 2026-09-25, as the
+ * server-side stage-gate check in generate() itself — the order-detail
+ * view already hides a document type's "Generate" button until its stage
+ * unlocks, but generate() never verified that server-side, so posting the
+ * route directly could generate any document type at any time regardless
+ * of stage. Two types can legitimately share a stage (ANNEXA rides with
+ * QT; PL and BLI both belong to the packing/BL stage) since both are
+ * produced from the same stage's data and neither is "downstream" of the
+ * other. AMD isn't part of the buyer-facing document sequence a
+ * regeneration would meaningfully cascade into, so it's excluded (it has
+ * its own approval workflow instead — see amendmentService.js).
  */
 function stageSequenceFor(code) {
   switch (code) {
@@ -295,6 +343,8 @@ function stageSequenceFor(code) {
       return 7;
     case 'CI':
       return 8;
+    case 'COOPREP':
+      return 9;
     default:
       return null;
   }
@@ -797,4 +847,5 @@ module.exports = {
   documentTypeIdFor,
   downstreamDocumentsAtRisk,
   templatesEnvironment,
+  StageGateBlockedError,
 };

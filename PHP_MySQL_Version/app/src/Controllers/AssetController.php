@@ -13,7 +13,7 @@ use App\Services\AuthService;
 
 final class AssetController
 {
-    private const ALLOWED_TYPES = ['logo', 'signature', 'seal', 'watermark', 'email_header'];
+    private const ALLOWED_TYPES = ['logo', 'signature', 'seal', 'watermark'];
     private const ALLOWED_MIME = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/svg+xml' => 'svg'];
     private const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -161,7 +161,6 @@ final class AssetController
             'signature'     => 'signatures',
             'seal'          => 'seals',
             'watermark'     => 'watermarks',
-            'email_header'  => 'email_headers',
             default         => 'misc',
         };
     }

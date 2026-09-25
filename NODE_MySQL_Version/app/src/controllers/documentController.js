@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const flash = require('../helpers/flash');
+const auditLogRepository = require('../repositories/auditLogRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
 const documentGenerationService = require('../services/documentGenerationService');
@@ -29,14 +30,55 @@ async function generate(req, res) {
   // form. DOCX is the real optional toggle.
   const generateDocx = !!req.body.generate_docx;
 
+  // Narrow, audited escape hatch for generate()'s own locked-order /
+  // out-of-sequence-stage guard (see that method's docblock) — never trust
+  // the checkbox alone: re-check the permission server-side (Super Admin
+  // bypasses it automatically — req.permissions already has every key set
+  // true for one, see sessionAuth.js) and require a real reason before it
+  // does anything.
+  const overrideRequested = !!req.body.override_gate;
+  const overrideReason = String(req.body.override_reason || '').trim();
+  let allowOverride = false;
+  if (overrideRequested) {
+    if (!req.permissions || !req.permissions.edit_locked_data) {
+      flash.set(req, 'error', 'You do not have permission to override a locked order or out-of-sequence stage.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    if (overrideReason.length < 10) {
+      flash.set(req, 'error', 'A reason (at least 10 characters) is required to force-generate a document out of sequence or on a locked order.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    allowOverride = true;
+  }
+
   let result;
   try {
-    result = await documentGenerationService.generate(orderId, type, user.id, null, generateDocx);
+    result = await documentGenerationService.generate(orderId, type, user.id, null, generateDocx, allowOverride);
   } catch (e) {
+    if (e instanceof documentGenerationService.StageGateBlockedError) {
+      flash.set(req, 'error', e.message);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
     console.error(`[DOCUMENT GENERATION FAILED] order=${orderId} type=${type} —`, e);
     flash.set(req, 'error', 'Document generation failed. Check the server error log for details.');
     res.redirect(`/orders/${orderId}`);
     return;
+  }
+
+  if (allowOverride) {
+    await auditLogRepository.log(
+      user.id,
+      'DOCUMENT_GATE_OVERRIDE',
+      'orders',
+      orderId,
+      'document_type',
+      null,
+      type,
+      overrideReason
+    );
   }
 
   // QT generation is Stage 1's gate — passing it here (rather than inside

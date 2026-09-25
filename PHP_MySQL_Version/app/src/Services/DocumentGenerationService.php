@@ -11,6 +11,7 @@ use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\OrderRepository;
+use App\Repositories\OrderStageRepository;
 use App\Repositories\TermsClauseRepository;
 use Dompdf\Dompdf;
 use Dompdf\Options as DompdfOptions;
@@ -25,7 +26,7 @@ use Twig\Loader\FilesystemLoader as TwigFilesystemLoader;
  */
 final class DocumentGenerationService
 {
-    public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null, bool $generateDocx = false): array
+    public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null, bool $generateDocx = false, bool $allowOverride = false): array
     {
         $pdo = Database::connection();
 
@@ -37,6 +38,39 @@ final class DocumentGenerationService
         $order = OrderRepository::find($orderId);
         if (!$order) {
             throw new \RuntimeException("Order {$orderId} not found");
+        }
+
+        // Real, dangerous gap this closes (found 2026-09-25): the order-
+        // detail view only ever hides a "Generate"/"Regenerate" button once
+        // the order is locked/complete or the relevant stage hasn't
+        // unlocked yet — generate() itself never checked either condition,
+        // so posting the route directly (or a bug in the view's own
+        // condition) could still generate ANY document type at ANY time,
+        // including regenerating an early-stage document (QT, PI, ...)
+        // after the order has already closed. $allowOverride is the one
+        // deliberately narrow escape hatch — callers must have already
+        // verified the caller holds edit_locked_data (Super Admin bypasses
+        // this check automatically — see PermissionService::can()) and
+        // captured a mandatory reason before setting it true; see
+        // DocumentController::generate().
+        if (!$allowOverride) {
+            if ((bool) ($order['is_locked'] ?? false)) {
+                throw new StageGateBlockedException(
+                    "Order #{$orderId} is locked (status: {$order['status']}) — documents can no longer be generated or regenerated for it. " .
+                    'A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.'
+                );
+            }
+
+            $requiredStage = self::stageSequenceFor($documentTypeCode);
+            if ($requiredStage !== null) {
+                $stage = OrderStageRepository::findByOrderAndStageNumber($orderId, $requiredStage);
+                if (!$stage || $stage['status'] === 'locked') {
+                    throw new StageGateBlockedException(
+                        "Stage {$requiredStage} isn't open yet for order #{$orderId} — {$documentTypeCode} can't be generated out of sequence. " .
+                        'A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.'
+                    );
+                }
+            }
         }
 
         // Real bug this fixes: OrderRepository::setPiDates() existed but was
@@ -200,13 +234,19 @@ final class DocumentGenerationService
 
     /**
      * Where a document type sits in the order lifecycle (stages_master
-     * sequence) — used only to detect a stage-regeneration cascade risk,
-     * never for anything that affects rendering itself. Two types can
-     * legitimately share a stage (ANNEXA rides with QT; PL and BLI both
-     * belong to the packing/BL stage) since both are produced from the
-     * same stage's data and neither is "downstream" of the other. AMD and
-     * COOPREP aren't part of the buyer-facing document sequence a
-     * regeneration would meaningfully cascade into, so they're excluded.
+     * sequence) — used both to detect a stage-regeneration cascade risk
+     * (downstreamDocumentsAtRisk() below) AND, since 2026-09-25, as the
+     * server-side stage-gate check in generate() itself (requiredStageGate()
+     * below) — the order-detail view already hides a document type's
+     * "Generate" button until its stage unlocks, but generate() never
+     * verified that server-side, so posting the route directly could
+     * generate any document type at any time regardless of stage. Two
+     * types can legitimately share a stage (ANNEXA rides with QT; PL and
+     * BLI both belong to the packing/BL stage) since both are produced
+     * from the same stage's data and neither is "downstream" of the
+     * other. AMD isn't part of the buyer-facing document sequence a
+     * regeneration would meaningfully cascade into, so it's excluded (it
+     * has its own approval workflow instead — see AmendmentService).
      */
     private static function stageSequenceFor(string $code): ?int
     {
@@ -219,6 +259,7 @@ final class DocumentGenerationService
             'FDN' => 6,
             'PL', 'BLI' => 7,
             'CI' => 8,
+            'COOPREP' => 9,
             default => null,
         };
     }

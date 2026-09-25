@@ -7,7 +7,7 @@ $canDelete = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !=
 ?>
 <div class="card">
   <h1>Asset Management</h1>
-  <p class="muted">The real logo, company seal, and legacy default signature/watermark/email-header files are shown below. Per-signatory signatures and designation seals are managed from <a href="/signatories">Signatories &amp; Designations</a>.</p>
+  <p class="muted">The real logo, company seal, and legacy default signature/watermark files are shown below. Per-signatory signatures and designation seals are managed from <a href="/signatories">Signatories &amp; Designations</a>.</p>
 
   <div class="asset-grid">
     <?php
@@ -16,7 +16,6 @@ $canDelete = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !=
       'signature'    => 'Signature (legacy global fallback)',
       'seal'         => 'Company Seal',
       'watermark'    => 'PDF Watermark',
-      'email_header' => 'Email Header',
     ];
     foreach ($types as $type => $label):
       $current = $active[$type][0] ?? null;

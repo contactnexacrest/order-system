@@ -172,11 +172,11 @@ final class DocumentRepository
             'INSERT INTO documents
                 (order_id, document_type_id, document_reference, revision_number, client_revision_number, status, generated_by, docx_file_id, pdf_file_id,
                  signatory_user_id, signatory_name_snapshot, signatory_designation_snapshot,
-                 signature_asset_id_snapshot, seal_asset_id_snapshot, used_designation_seal, company_snapshot_json)
+                 signature_asset_id_snapshot, seal_asset_id_snapshot, company_seal_asset_id_snapshot, used_designation_seal, company_snapshot_json)
              VALUES
                 (:order_id, :document_type_id, :document_reference, :revision_number, :client_revision_number, \'draft\', :generated_by, :docx_file_id, :pdf_file_id,
                  :signatory_user_id, :signatory_name_snapshot, :signatory_designation_snapshot,
-                 :signature_asset_id_snapshot, :seal_asset_id_snapshot, :used_designation_seal, :company_snapshot_json)'
+                 :signature_asset_id_snapshot, :seal_asset_id_snapshot, :company_seal_asset_id_snapshot, :used_designation_seal, :company_snapshot_json)'
         );
         $stmt->execute([
             'order_id'           => $orderId,
@@ -192,6 +192,7 @@ final class DocumentRepository
             'signatory_designation_snapshot' => $signatory['designation'] ?? null,
             'signature_asset_id_snapshot' => $signatory['signature_asset_id'] ?? null,
             'seal_asset_id_snapshot' => $signatory['seal_asset_id'] ?? null,
+            'company_seal_asset_id_snapshot' => $signatory['company_seal_asset_id'] ?? null,
             'used_designation_seal' => !empty($signatory['used_designation_seal']) ? 1 : 0,
             'company_snapshot_json' => $companySnapshot !== null ? json_encode($companySnapshot) : null,
         ]);

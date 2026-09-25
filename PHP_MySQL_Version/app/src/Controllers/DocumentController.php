@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
 use App\Services\AuthService;
 use App\Services\DocumentGenerationService;
+use App\Services\PermissionService;
+use App\Services\StageGateBlockedException;
 use App\Services\StageGateService;
 
 final class DocumentController
@@ -34,13 +37,53 @@ final class DocumentController
         // clarity in the form. DOCX is the real optional toggle.
         $generateDocx = !empty($_POST['generate_docx']);
 
+        // Narrow, audited escape hatch for generate()'s own locked-order /
+        // out-of-sequence-stage guard (see that method's docblock) — never
+        // trust the checkbox alone: re-check the permission server-side
+        // (Super Admin bypasses it automatically — PermissionService::can())
+        // and require a real reason before it does anything.
+        $overrideRequested = !empty($_POST['override_gate']);
+        $overrideReason = trim((string) ($_POST['override_reason'] ?? ''));
+        $allowOverride = false;
+        if ($overrideRequested) {
+            $canOverride = PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'edit_locked_data');
+            if (!$canOverride) {
+                Flash::set('error', 'You do not have permission to override a locked order or out-of-sequence stage.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            if ($overrideReason === '' || mb_strlen($overrideReason) < 10) {
+                Flash::set('error', 'A reason (at least 10 characters) is required to force-generate a document out of sequence or on a locked order.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            $allowOverride = true;
+        }
+
         try {
-            $result = DocumentGenerationService::generate($orderId, $type, (int) $user['id'], null, $generateDocx);
+            $result = DocumentGenerationService::generate($orderId, $type, (int) $user['id'], null, $generateDocx, $allowOverride);
+        } catch (StageGateBlockedException $e) {
+            Flash::set('error', $e->getMessage());
+            header("Location: /orders/{$orderId}");
+            return;
         } catch (\Throwable $e) {
             error_log('[DOCUMENT GENERATION FAILED] order=' . $orderId . ' type=' . $type . ' — ' . $e->getMessage());
             Flash::set('error', 'Document generation failed. Check the server error log for details.');
             header("Location: /orders/{$orderId}");
             return;
+        }
+
+        if ($allowOverride) {
+            AuditLogRepository::log(
+                (int) $user['id'],
+                'DOCUMENT_GATE_OVERRIDE',
+                'orders',
+                $orderId,
+                'document_type',
+                null,
+                $type,
+                $overrideReason
+            );
         }
 
         // QT generation is Stage 1's gate — passing it here (rather than

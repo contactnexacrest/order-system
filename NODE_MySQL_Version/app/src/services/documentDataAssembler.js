@@ -430,22 +430,33 @@ async function assetsBlock() {
  *   2. document_type_signatories — a per-document-type default (e.g.
  *      Payment Terms Amendment always uses the Director designation seal).
  *   3. company_default_signatory — the global fallback.
- * The chosen signatory's name/designation/signature/seal are returned
- * ready to render AND ready to snapshot onto the documents row, so a
- * later change to any default never alters how a past document reads.
+ * The chosen signatory's name/designation/signature are returned ready to
+ * render AND ready to snapshot onto the documents row, so a later change
+ * to any default never alters how a past document reads.
+ *
+ * Every reference document (confirmed 2026-09-25 against a real signed
+ * Proforma Invoice) shows BOTH seals side by side, never one OR the other:
+ * the generic company seal under "For <Company Name>", and the signatory's
+ * own designation seal (with their signature) under "Authorised
+ * Signatory". document_type_signatories.use_designation_seal is kept for
+ * history but no longer branches which single seal to show — that
+ * either/or was the bug. company_seal_data_uri is always the active
+ * company seal; seal_data_uri is always the resolved signatory's own
+ * designation seal (null if they don't have one uploaded yet).
  */
 async function signatoryBlock(documentTypeId, overrideUserId = null) {
+  const companySeal = await assetRepository.findActiveByType('seal');
+  const companySealDataUri = assetDataUri(companySeal);
+
   let userId = overrideUserId;
-  let useDesignationSeal = true;
 
   if (userId === null) {
     const row = await db.queryOne(
-      'SELECT user_id, use_designation_seal FROM document_type_signatories WHERE document_type_id = :dt',
+      'SELECT user_id FROM document_type_signatories WHERE document_type_id = :dt',
       { dt: documentTypeId }
     );
     if (row) {
       userId = row.user_id;
-      useDesignationSeal = !!row.use_designation_seal;
     }
   }
 
@@ -457,8 +468,8 @@ async function signatoryBlock(documentTypeId, overrideUserId = null) {
   if (userId === null) {
     // No signatory configured at all — fall back to the legacy
     // company_settings md_name/md_title + the single global `assets`
-    // signature/seal rows, so a fresh install with no signatory set up
-    // yet still renders a usable document.
+    // signature row, so a fresh install with no signatory set up yet
+    // still renders a usable document.
     const company = await companyBlock();
     const assets = await assetsBlock();
     return {
@@ -467,8 +478,10 @@ async function signatoryBlock(documentTypeId, overrideUserId = null) {
       designation: company.md_title,
       signature_data_uri: assets.signature_data_uri,
       seal_data_uri: assets.seal_data_uri,
+      company_seal_data_uri: companySealDataUri,
       signature_asset_id: null,
       seal_asset_id: null,
+      company_seal_asset_id: companySeal ? companySeal.id : null,
       used_designation_seal: false,
     };
   }
@@ -486,15 +499,8 @@ async function signatoryBlock(documentTypeId, overrideUserId = null) {
   const signatureAsset = await userSignatureAsset(userId, 'signature');
   const signatureDataUri = assetDataUri(signatureAsset);
 
-  let sealAsset = null;
-  let sealDataUri = null;
-  if (useDesignationSeal) {
-    sealAsset = await userSignatureAsset(userId, 'designation_seal');
-    sealDataUri = assetDataUri(sealAsset);
-  } else {
-    sealAsset = await assetRepository.findActiveByType('seal');
-    sealDataUri = assetDataUri(sealAsset);
-  }
+  const sealAsset = await userSignatureAsset(userId, 'designation_seal');
+  const sealDataUri = assetDataUri(sealAsset);
 
   return {
     user_id: user.id,
@@ -502,9 +508,11 @@ async function signatoryBlock(documentTypeId, overrideUserId = null) {
     designation: user.designation || '',
     signature_data_uri: signatureDataUri,
     seal_data_uri: sealDataUri,
+    company_seal_data_uri: companySealDataUri,
     signature_asset_id: signatureAsset ? signatureAsset.id : null,
     seal_asset_id: sealAsset ? sealAsset.id : null,
-    used_designation_seal: useDesignationSeal,
+    company_seal_asset_id: companySeal ? companySeal.id : null,
+    used_designation_seal: true,
   };
 }
 
@@ -529,6 +537,7 @@ async function signatoryFromSnapshot(document) {
       designation: document.signatory_designation_snapshot || company.md_title,
       signature_data_uri: assets.signature_data_uri,
       seal_data_uri: assets.seal_data_uri,
+      company_seal_data_uri: assets.seal_data_uri,
     };
   }
 
@@ -538,11 +547,26 @@ async function signatoryFromSnapshot(document) {
     signatureDataUri = assetDataUri(asset);
   }
 
+  // The signatory's own designation seal — seal_asset_id_snapshot's
+  // meaning before 2026-09-25 depended on used_designation_seal (either/or
+  // with the company seal, the bug this fixes); kept here so documents
+  // generated before this fix still re-render the one seal they actually
+  // had. Documents generated after this fix always populate this from
+  // user_signature_assets.
   let sealDataUri = null;
   if (document.seal_asset_id_snapshot) {
     const sealTable = document.used_designation_seal ? 'user_signature_assets' : 'assets';
     const asset = await db.queryOne(`SELECT * FROM ${sealTable} WHERE id = :id`, { id: document.seal_asset_id_snapshot });
     sealDataUri = assetDataUri(asset);
+  }
+
+  // The generic company seal, snapshotted separately (added 2026-09-25) —
+  // null for documents generated before this fix, same graceful
+  // degradation as every other missing asset.
+  let companySealDataUri = null;
+  if (document.company_seal_asset_id_snapshot) {
+    const asset = await db.queryOne('SELECT * FROM assets WHERE id = :id', { id: document.company_seal_asset_id_snapshot });
+    companySealDataUri = assetDataUri(asset);
   }
 
   return {
@@ -551,6 +575,7 @@ async function signatoryFromSnapshot(document) {
     designation: document.signatory_designation_snapshot,
     signature_data_uri: signatureDataUri,
     seal_data_uri: sealDataUri,
+    company_seal_data_uri: companySealDataUri,
   };
 }
 

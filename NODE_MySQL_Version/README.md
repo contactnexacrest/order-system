@@ -53,8 +53,8 @@ scripts/
   backup_db.sh            daily DB backup template — see "Database backups"
   backup_storage.sh       daily storage/ backup template — see "Backing up storage/"
 storage/
-  assets/                 5 placeholder brand images (logo, signature,
-                          seal, watermark, email header) — see step 3 of
+  assets/                 4 placeholder brand images (logo, signature,
+                          seal, watermark) — see step 3 of
                           "First-time setup" for the one-time path fix
                           these need. Replace them for real from
                           `/company-assets` once you're logged in.
@@ -110,8 +110,8 @@ storage/
    This creates all 52 tables and seeds: the roles/permissions matrix, one
    Admin login, company settings (with `PLACEHOLDER` values you must
    replace — see below), lookup tables (incoterms, currencies, ports, T&C
-   clauses, payment presets), and 5 placeholder brand assets (logo,
-   signature, seal, watermark, email header).
+   clauses, payment presets), and 4 placeholder brand assets (logo,
+   signature, seal, watermark).
 
    **Fix the storage path in the seeded asset rows.** `seed.sql` inserts
    asset rows with a literal placeholder path token — in BOTH the `assets`
@@ -534,8 +534,8 @@ Everything in `company_settings` marked `PLACEHOLDER` in `docs/seed.sql` —
 `director_name`, `bank_pincode`, `lut_expiry_date` (confirm the real date),
 `client_number_format`/`order_ref_format` (confirm against your actual
 numbering convention), `rcmc_number`/`rcmc_valid_until` — plus the seeded
-Admin login email/password, and all five asset images (logo, MD signature,
-company seal, watermark, email header) currently showing a labeled
+Admin login email/password, and all four asset images (logo, MD signature,
+company seal, watermark) currently showing a labeled
 placeholder graphic. Replace assets from `/company-assets`, settings from
 `/settings` — no code or file changes needed either way.
 

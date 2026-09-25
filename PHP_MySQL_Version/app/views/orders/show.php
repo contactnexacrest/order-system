@@ -591,6 +591,29 @@ $orderClosed = $order['status'] === 'complete';
   </script>
   <?php endif; ?>
 
+  <?php if ($canEditLockedData): ?>
+  <div class="section" style="border-color:#D9822B;">
+    <h2>Force-Generate a Document (privileged override)</h2>
+    <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" onsubmit="return confirmFieldOverride(this, 'generating this document out of sequence');">
+      <?= Csrf::field() ?>
+      <input type="hidden" name="override_gate" value="1">
+      <label>Document Type
+        <select name="document_type" required>
+          <?php foreach (['QT' => 'Quotation', 'BUYERPO' => 'Buyer PO', 'PI' => 'Proforma Invoice', 'OC' => 'Order Confirmation', 'SUPPO' => 'Supplier PO', 'FDN' => 'Freight Debit Note', 'PL' => 'Packing List', 'BLI' => 'BL Instruction Sheet', 'CI' => 'Commercial Invoice', 'COOPREP' => 'COO Prep Sheet (internal)'] as $code => $label): ?>
+            <option value="<?= $code ?>"><?= htmlspecialchars($label) ?> (<?= $code ?>)</option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> Also generate DOCX</label>
+      <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
+        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+      </label>
+      <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
+    </form>
+  </div>
+  <?php endif; ?>
+
   <div class="section">
     <h2>Stage 2 — Buyer PO</h2>
     <?php if ($hasBuyerPo): ?>

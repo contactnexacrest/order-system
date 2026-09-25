@@ -333,7 +333,7 @@ CREATE TABLE login_attempts (
 
 CREATE TABLE assets (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  asset_type    ENUM('logo','signature','seal','watermark','email_header') NOT NULL,
+  asset_type    ENUM('logo','signature','seal','watermark') NOT NULL,
   name          VARCHAR(150) NOT NULL,
   server_path   VARCHAR(500) NOT NULL,
   mime_type     VARCHAR(100) NULL,
@@ -1076,7 +1076,7 @@ DELIMITER ;
 -- circular seals reading "DIRECTOR / <name>", distinct from the plain
 -- company seal). Kept as a separate table rather than overloading `assets`
 -- so the existing single-active-row-per-type semantics in
--- AssetRepository::replace() (logo/watermark/email_header/seal) are not
+-- AssetRepository::replace() (logo/watermark/seal) are not
 -- touched at all — this is purely additive.
 
 CREATE TABLE designations (
@@ -1140,9 +1140,20 @@ ALTER TABLE documents
   ADD COLUMN signatory_name_snapshot       VARCHAR(150) NULL,
   ADD COLUMN signatory_designation_snapshot VARCHAR(100) NULL,
   ADD COLUMN signature_asset_id_snapshot   BIGINT UNSIGNED NULL,
-  ADD COLUMN seal_asset_id_snapshot        BIGINT UNSIGNED NULL,   -- either the company seal (assets.id) or a designation seal (user_signature_assets.id) — see used_designation_seal
+  ADD COLUMN seal_asset_id_snapshot        BIGINT UNSIGNED NULL,   -- the signatory's own designation seal (user_signature_assets.id) — used_designation_seal kept for history, no longer branches which seal this is (see company_seal_asset_id_snapshot below)
   ADD COLUMN used_designation_seal         TINYINT(1) NOT NULL DEFAULT 0,
   ADD CONSTRAINT fk_documents_signatory FOREIGN KEY (signatory_user_id) REFERENCES users(id);
+
+-- Every reference document shows BOTH seals side by side — the generic
+-- company seal under "For <Company Name>" and the signatory's own
+-- designation seal under "Authorised Signatory" next to their signature —
+-- never one OR the other. seal_asset_id_snapshot above already pins the
+-- signatory's seal; this pins the company seal (assets.id) the same way,
+-- so a later company-seal replacement never alters how a past document
+-- reads. Added 2026-09-25 fixing a real bug: the signature block had been
+-- showing only whichever single seal used_designation_seal picked.
+ALTER TABLE documents
+  ADD COLUMN company_seal_asset_id_snapshot BIGINT UNSIGNED NULL;
 
 -- ================================================================
 -- SECTION N — SUPER ADMIN TIER (added 2026-09-20)
