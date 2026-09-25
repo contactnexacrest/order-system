@@ -151,6 +151,11 @@ table.list{width:100%;border-collapse:collapse;margin-bottom:1rem;}
 table.list th{text-align:left;background:var(--navy-soft);color:var(--navy);padding:0.55rem 0.7rem;font-size:0.82rem;font-weight:700;}
 table.list td{padding:0.55rem 0.7rem;border-bottom:1px solid var(--line);font-size:0.88rem;vertical-align:top;}
 table.list tr:hover td{background:var(--bg);}
+.table-scroll{position:relative;overflow-x:auto;}
+.table-scroll.is-scrollable:not(.at-start)::before,
+.table-scroll.is-scrollable:not(.at-end)::after{content:"";position:absolute;top:0;bottom:0;width:18px;pointer-events:none;z-index:2;}
+.table-scroll.is-scrollable:not(.at-start)::before{left:0;background:linear-gradient(to right, rgba(23,35,58,0.14), transparent);}
+.table-scroll.is-scrollable:not(.at-end)::after{right:0;background:linear-gradient(to left, rgba(23,35,58,0.14), transparent);}
 .btn-row{display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.75rem;}
 .btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .btn-secondary{background:var(--surface);color:var(--navy);border:1px solid var(--navy);}

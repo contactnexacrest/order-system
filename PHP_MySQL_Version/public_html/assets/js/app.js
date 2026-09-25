@@ -33,6 +33,28 @@
     });
   }
 
+  function initTableScrollShadows() {
+    // Wraps every table.list at runtime so a scroll-shadow hint can be shown
+    // on the edge(s) that have more content off-screen — no per-view markup
+    // needed, same "no per-page wiring" approach as the rest of this file.
+    document.querySelectorAll('table.list').forEach(function (table) {
+      if (table.closest('.table-scroll')) return;
+      var wrapper = document.createElement('div');
+      wrapper.className = 'table-scroll';
+      table.parentNode.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
+      var update = function () {
+        var scrollable = wrapper.scrollWidth > wrapper.clientWidth + 1;
+        wrapper.classList.toggle('is-scrollable', scrollable);
+        wrapper.classList.toggle('at-start', wrapper.scrollLeft <= 0);
+        wrapper.classList.toggle('at-end', wrapper.scrollLeft + wrapper.clientWidth >= wrapper.scrollWidth - 1);
+      };
+      wrapper.addEventListener('scroll', update);
+      window.addEventListener('resize', update);
+      update();
+    });
+  }
+
   function init() {
     // Bound on document, not per-form, so every current and future POST
     // form sitewide gets a disabled/"Working…" submit button for free —
@@ -50,6 +72,7 @@
     });
 
     initSlowDownloadLinks();
+    initTableScrollShadows();
   }
 
   if (document.readyState === 'loading') {
