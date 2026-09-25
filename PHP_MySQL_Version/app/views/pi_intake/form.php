@@ -1,8 +1,8 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card">
-  <h1>Proforma Invoice (PI) Form</h1>
+  <h1>Proforma Invoice Details Form</h1>
   <p class="muted">Order <?= htmlspecialchars($submission['order_reference']) ?> — <?= htmlspecialchars($submission['client_company_legal_name']) ?></p>
-  <p class="muted">Complete after accepting the Quotation — we will issue your PI within 24 hours. Fields marked * are required. Confirm your details exactly as they appear on official documents.</p>
+  <p class="muted">We need these details to issue your Proforma Invoice — product information was already confirmed in your Quotation. Complete after accepting the Quotation; we will issue your PI within 24 hours. Fields marked * are required. Confirm your details exactly as they appear on official documents.</p>
 
   <form method="post" action="/pi-details/<?= htmlspecialchars($token) ?>">
     <?= Csrf::field() ?>

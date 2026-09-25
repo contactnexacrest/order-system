@@ -1,7 +1,7 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card">
-  <h1>Quotation Intake</h1>
-  <p class="muted">Complete and submit — we will review your request and prepare your Quotation within 24 hours. Fields marked * are required.</p>
+  <h1>Quotation Details Form</h1>
+  <p class="muted">We need these details to prepare your Quotation — no product information required here. Complete and submit; we'll review and send your Quotation within 24 hours. Fields marked * are required.</p>
 
   <form method="post" action="/quotation-details/submit">
     <?= Csrf::field() ?>
