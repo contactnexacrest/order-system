@@ -87,7 +87,7 @@ a.js-slow-download.is-loading{pointer-events:none;opacity:0.7;}
 
 /* --- Bare/client-portal shells (login, set-password, client portal) --- */
 .bare{min-height:100vh;}
-.bare-wrap{max-width:420px;margin:0 auto;padding-top:3rem;}
+.bare-wrap{max-width:420px;margin:0 auto;padding:3rem 1rem 1.5rem;}
 .bare-brand{display:flex;align-items:center;justify-content:center;gap:10px;font-size:1.2rem;font-weight:700;letter-spacing:-0.01em;color:var(--navy);margin-bottom:1.25rem;}
 .bare-brand span{color:var(--ink-soft);font-weight:500;}
 .bare-brand-mark{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--line);flex:0 0 auto;overflow:hidden;}

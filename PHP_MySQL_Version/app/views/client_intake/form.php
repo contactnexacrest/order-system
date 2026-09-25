@@ -1,6 +1,6 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card">
-  <h1>Request a Quotation</h1>
+  <h1>Quotation Intake</h1>
   <p class="muted">Complete and submit — we will review your request and prepare your Quotation within 24 hours. Fields marked * are required.</p>
 
   <form method="post" action="/quotation-details/submit">
