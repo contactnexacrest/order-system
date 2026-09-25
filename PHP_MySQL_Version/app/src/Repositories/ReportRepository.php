@@ -37,7 +37,7 @@ final class ReportRepository
         if ($client && (int) $client['is_test_data'] !== $isTestMode) {
             // A real client while Test Mode is on, or a test client while
             // it's off — never shown, same contract as "client not found".
-            return ['client' => null, 'orders' => [], 'documents' => [], 'payments' => [], 'products' => [], 'total_fob_value' => 0.0, 'total_cleared' => 0.0];
+            return ['client' => null, 'orders' => [], 'documents' => [], 'payments' => [], 'products' => [], 'total_fob_value_by_currency' => [], 'total_cleared_by_currency' => []];
         }
 
         $orders = $pdo->prepare(
@@ -58,8 +58,14 @@ final class ReportRepository
         $documents = [];
         $payments = [];
         $products = [];
-        $totalFob = 0.0;
-        $totalCleared = 0.0;
+        // Keyed by currency_code — see "currency-blind totals" fix below.
+        // A single client can have orders in different currencies (currency_id
+        // lives on `orders`, not `clients`), so a single scalar total would
+        // silently add e.g. USD and EUR amounts together as if they were the
+        // same unit. Every row below carries its own order's currency_code
+        // (joined in SQL, not assumed), and totals are grouped by it.
+        $totalFobByCurrency = [];
+        $totalClearedByCurrency = [];
 
         if ($orderIds) {
             $in = implode(',', array_fill(0, count($orderIds), '?'));
@@ -73,31 +79,42 @@ final class ReportRepository
             $documents = $stmt->fetchAll();
 
             $stmt = $pdo->prepare(
-                "SELECT order_id, advance_amount, advance_cleared_at, balance_amount, balance_cleared_at,
-                        freight_amount, freight_cleared_at
-                 FROM order_payment_status WHERE order_id IN ($in)"
+                "SELECT ops.order_id, ops.advance_amount, ops.advance_cleared_at, ops.balance_amount, ops.balance_cleared_at,
+                        ops.freight_amount, ops.freight_cleared_at, cur.code AS currency_code
+                 FROM order_payment_status ops
+                 JOIN orders o2 ON o2.id = ops.order_id
+                 JOIN currencies cur ON cur.id = o2.currency_id
+                 WHERE ops.order_id IN ($in)"
             );
             $stmt->execute($orderIds);
             $payments = $stmt->fetchAll();
             foreach ($payments as $p) {
+                $cc = $p['currency_code'];
                 if ($p['advance_cleared_at']) {
-                    $totalCleared += (float) $p['advance_amount'];
+                    $totalClearedByCurrency[$cc] = ($totalClearedByCurrency[$cc] ?? 0.0) + (float) $p['advance_amount'];
                 }
                 if ($p['balance_cleared_at']) {
-                    $totalCleared += (float) $p['balance_amount'];
+                    $totalClearedByCurrency[$cc] = ($totalClearedByCurrency[$cc] ?? 0.0) + (float) $p['balance_amount'];
                 }
             }
 
             $stmt = $pdo->prepare(
-                "SELECT order_id, description, quantity, quantity_is_tbc, unit, unit_price, fob_value
-                 FROM order_products WHERE order_id IN ($in) AND is_active = 1 ORDER BY order_id, line_no"
+                "SELECT p.order_id, p.description, p.quantity, p.quantity_is_tbc, p.unit, p.unit_price, p.fob_value, cur.code AS currency_code
+                 FROM order_products p
+                 JOIN orders o2 ON o2.id = p.order_id
+                 JOIN currencies cur ON cur.id = o2.currency_id
+                 WHERE p.order_id IN ($in) AND p.is_active = 1 ORDER BY p.order_id, p.line_no"
             );
             $stmt->execute($orderIds);
             $products = $stmt->fetchAll();
             foreach ($products as $prod) {
-                $totalFob += (float) ($prod['fob_value'] ?? 0);
+                $cc = $prod['currency_code'];
+                $totalFobByCurrency[$cc] = ($totalFobByCurrency[$cc] ?? 0.0) + (float) ($prod['fob_value'] ?? 0);
             }
         }
+
+        ksort($totalFobByCurrency);
+        ksort($totalClearedByCurrency);
 
         return [
             'client' => $client,
@@ -105,8 +122,8 @@ final class ReportRepository
             'documents' => $documents,
             'payments' => $payments,
             'products' => $products,
-            'total_fob_value' => $totalFob,
-            'total_cleared' => $totalCleared,
+            'total_fob_value_by_currency' => $totalFobByCurrency,
+            'total_cleared_by_currency' => $totalClearedByCurrency,
         ];
     }
 
@@ -230,6 +247,50 @@ final class ReportRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * Summary statistics for the Aggregate Report — computed from the exact
+     * same row set aggregate() returns (never a second, separate query), so
+     * the summary numbers and the detail table beneath them can never
+     * disagree about what's included. Pass it the same $rows the caller
+     * already fetched from aggregate() and/or is about to render/export.
+     *
+     * @param array<int, array<string,mixed>> $rows
+     * @return array<string,mixed>
+     */
+    public static function aggregateSummary(array $rows): array
+    {
+        $fobByCurrency = [];
+        $byStage = [];
+        $byStatus = [];
+        $byCountry = [];
+
+        foreach ($rows as $r) {
+            $cc = $r['currency_code'];
+            $fobByCurrency[$cc] = ($fobByCurrency[$cc] ?? 0.0) + (float) $r['total_fob_value'];
+
+            $stage = $r['current_stage_name'] ?? 'Quotation';
+            $byStage[$stage] = ($byStage[$stage] ?? 0) + 1;
+
+            $byStatus[$r['status']] = ($byStatus[$r['status']] ?? 0) + 1;
+
+            $country = $r['country_of_destination'] ?? '—';
+            $byCountry[$country] = ($byCountry[$country] ?? 0) + 1;
+        }
+
+        ksort($fobByCurrency);
+        arsort($byStage);
+        arsort($byStatus);
+        arsort($byCountry);
+
+        return [
+            'total_orders' => count($rows),
+            'fob_by_currency' => $fobByCurrency,
+            'by_stage' => $byStage,
+            'by_status' => $byStatus,
+            'by_country' => $byCountry,
+        ];
+    }
+
     /** @return string[] distinct country_of_destination values seeded so far, for the aggregate filter dropdown */
     public static function distinctCountries(): array
     {
@@ -237,6 +298,119 @@ final class ReportRepository
             "SELECT DISTINCT country_of_destination FROM clients WHERE country_of_destination IS NOT NULL AND country_of_destination != '' ORDER BY country_of_destination"
         );
         return array_column($stmt->fetchAll(), 'country_of_destination');
+    }
+
+    // ================================================================
+    // PAYMENTS / FINANCIAL REPORT
+    // ================================================================
+    //
+    // "Consolidated financial visibility" was missing entirely before this:
+    // the dashboard only ever showed two overdue lists, and the per-client
+    // report only ever showed one client's own payments. This answers
+    // "how much have we actually collected vs. how much is still
+    // outstanding, across the whole business, by currency" in one place.
+    //
+    // Correctness discipline: the per-currency summary below is computed in
+    // PHP from the SAME $rows the detail table renders — never a second,
+    // independent SQL query — so the two can never disagree about what a
+    // given order contributed. "Outstanding" only counts an amount that was
+    // actually invoiced (order_payment_status.*_amount IS NOT NULL); an
+    // order with no freight amount set (e.g. FOB terms, buyer arranges
+    // freight) contributes nothing to the freight bucket at all, not a
+    // false "0 outstanding".
+
+    /**
+     * @return array{rows: array<int,array<string,mixed>>, by_currency: array<string,array<string,float>>}
+     */
+    public static function paymentsReport(?string $dateFrom, ?string $dateTo): array
+    {
+        $where = ['o.is_test_data = :is_test_data'];
+        $params = ['is_test_data' => self::isTestModeFlag()];
+        if ($dateFrom) {
+            $where[] = 'DATE(o.created_at) >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $where[] = 'DATE(o.created_at) <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+
+        $sql = "SELECT o.id, o.order_reference, o.status, o.created_at, c.company_legal_name, cur.code AS currency_code,
+                       ops.advance_amount, ops.advance_cleared_at,
+                       ops.balance_amount, ops.balance_cleared_at,
+                       ops.freight_amount, ops.freight_cleared_at
+                FROM orders o
+                JOIN clients c ON c.id = o.client_id
+                JOIN currencies cur ON cur.id = o.currency_id
+                LEFT JOIN order_payment_status ops ON ops.order_id = o.id
+                WHERE " . implode(' AND ', $where) . '
+                ORDER BY o.created_at DESC';
+
+        $stmt = Database::connection()->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        // Per-row outstanding, computed once here and reused everywhere
+        // (view table, CSV export) — nobody else re-derives this formula.
+        foreach ($rows as &$row) {
+            $row['advance_outstanding'] = $row['advance_amount'] !== null
+                ? round((float) $row['advance_amount'] - ($row['advance_cleared_at'] ? (float) $row['advance_amount'] : 0.0), 2)
+                : null;
+            $row['balance_outstanding'] = $row['balance_amount'] !== null
+                ? round((float) $row['balance_amount'] - ($row['balance_cleared_at'] ? (float) $row['balance_amount'] : 0.0), 2)
+                : null;
+            $row['freight_outstanding'] = $row['freight_amount'] !== null
+                ? round((float) $row['freight_amount'] - ($row['freight_cleared_at'] ? (float) $row['freight_amount'] : 0.0), 2)
+                : null;
+        }
+        unset($row);
+
+        $byCurrency = [];
+        foreach ($rows as $r) {
+            $cc = $r['currency_code'];
+            if (!isset($byCurrency[$cc])) {
+                $byCurrency[$cc] = [
+                    'advance_invoiced' => 0.0, 'advance_cleared' => 0.0,
+                    'balance_invoiced' => 0.0, 'balance_cleared' => 0.0,
+                    'freight_invoiced' => 0.0, 'freight_cleared' => 0.0,
+                ];
+            }
+            if ($r['advance_amount'] !== null) {
+                $byCurrency[$cc]['advance_invoiced'] += (float) $r['advance_amount'];
+                if ($r['advance_cleared_at']) {
+                    $byCurrency[$cc]['advance_cleared'] += (float) $r['advance_amount'];
+                }
+            }
+            if ($r['balance_amount'] !== null) {
+                $byCurrency[$cc]['balance_invoiced'] += (float) $r['balance_amount'];
+                if ($r['balance_cleared_at']) {
+                    $byCurrency[$cc]['balance_cleared'] += (float) $r['balance_amount'];
+                }
+            }
+            if ($r['freight_amount'] !== null) {
+                $byCurrency[$cc]['freight_invoiced'] += (float) $r['freight_amount'];
+                if ($r['freight_cleared_at']) {
+                    $byCurrency[$cc]['freight_cleared'] += (float) $r['freight_amount'];
+                }
+            }
+        }
+
+        foreach ($byCurrency as $cc => &$b) {
+            $b['advance_outstanding'] = round($b['advance_invoiced'] - $b['advance_cleared'], 2);
+            $b['balance_outstanding'] = round($b['balance_invoiced'] - $b['balance_cleared'], 2);
+            $b['freight_outstanding'] = round($b['freight_invoiced'] - $b['freight_cleared'], 2);
+            $b['total_outstanding'] = round($b['advance_outstanding'] + $b['balance_outstanding'] + $b['freight_outstanding'], 2);
+            $b['advance_invoiced'] = round($b['advance_invoiced'], 2);
+            $b['advance_cleared'] = round($b['advance_cleared'], 2);
+            $b['balance_invoiced'] = round($b['balance_invoiced'], 2);
+            $b['balance_cleared'] = round($b['balance_cleared'], 2);
+            $b['freight_invoiced'] = round($b['freight_invoiced'], 2);
+            $b['freight_cleared'] = round($b['freight_cleared'], 2);
+        }
+        unset($b);
+        ksort($byCurrency);
+
+        return ['rows' => $rows, 'by_currency' => $byCurrency];
     }
 
     // ================================================================
@@ -509,5 +683,343 @@ final class ReportRepository
             'piLost' => self::lostCount(true, $dateFrom, $dateTo), // #10
             'amendments' => self::amendmentCount($dateFrom, $dateTo), // #13
         ];
+    }
+
+    // ================================================================
+    // DISPUTE REPORT
+    // ================================================================
+    // Disputes previously only ever surfaced as generic audit_log rows
+    // inside the per-order report — no cross-order view of "how many are
+    // open, how old is the oldest one, how long do we typically take to
+    // resolve one." days_open is computed once, in SQL, per row; the
+    // status/avg-resolution summary below is folded from those SAME rows
+    // in PHP — never a second, independent query — so it can't disagree
+    // with the detail table.
+
+    /** @return array{rows: array<int,array<string,mixed>>, by_status: array<string,int>, open_count: int, avg_resolution_days: ?float} */
+    public static function disputesReport(?string $dateFrom, ?string $dateTo): array
+    {
+        $where = ['o.is_test_data = :is_test_data'];
+        $params = ['is_test_data' => self::isTestModeFlag()];
+        if ($dateFrom) {
+            $where[] = 'd.notice_date >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $where[] = 'd.notice_date <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+
+        $sql = "SELECT d.id, d.order_id, o.order_reference, c.company_legal_name, d.notice_date, d.from_party,
+                       d.status, d.response_due_date, d.resolved_at, d.created_at,
+                       DATEDIFF(COALESCE(d.resolved_at, NOW()), d.notice_date) AS days_open
+                FROM disputes d
+                JOIN orders o ON o.id = d.order_id
+                JOIN clients c ON c.id = o.client_id
+                WHERE " . implode(' AND ', $where) . '
+                ORDER BY d.notice_date DESC';
+
+        $stmt = Database::connection()->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $byStatus = [];
+        $openCount = 0;
+        $resolvedDaysSum = 0;
+        $resolvedCount = 0;
+        foreach ($rows as $r) {
+            $byStatus[$r['status']] = ($byStatus[$r['status']] ?? 0) + 1;
+            if ($r['status'] !== 'Resolved') {
+                $openCount++;
+            } else {
+                $resolvedDaysSum += (int) $r['days_open'];
+                $resolvedCount++;
+            }
+        }
+        arsort($byStatus);
+
+        return [
+            'rows' => $rows,
+            'by_status' => $byStatus,
+            'open_count' => $openCount,
+            'avg_resolution_days' => $resolvedCount > 0 ? round($resolvedDaysSum / $resolvedCount, 1) : null,
+        ];
+    }
+
+    // ================================================================
+    // AMENDMENT REPORT
+    // ================================================================
+    // Amendments previously only ever surfaced as a bare count in the
+    // funnel section, or as generic audit_log rows in the per-order
+    // report. This lists every amendment with its actual terms and a
+    // status/requested-by breakdown folded from the same rows.
+
+    /** @return array{rows: array<int,array<string,mixed>>, by_status: array<string,int>, by_requested_by: array<string,int>} */
+    public static function amendmentsReport(?string $dateFrom, ?string $dateTo): array
+    {
+        $where = ['o.is_test_data = :is_test_data'];
+        $params = ['is_test_data' => self::isTestModeFlag()];
+        if ($dateFrom) {
+            $where[] = 'DATE(a.created_at) >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $where[] = 'DATE(a.created_at) <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+
+        $sql = "SELECT a.id, a.amendment_reference, a.order_id, o.order_reference, c.company_legal_name,
+                       a.reason, a.requested_by, a.status, a.effective_from, a.created_at,
+                       a.amended_advance_amount, a.amended_balance_amount, cur.code AS currency_code
+                FROM amendments a
+                JOIN orders o ON o.id = a.order_id
+                JOIN clients c ON c.id = o.client_id
+                JOIN currencies cur ON cur.id = o.currency_id
+                WHERE " . implode(' AND ', $where) . '
+                ORDER BY a.created_at DESC';
+
+        $stmt = Database::connection()->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $byStatus = [];
+        $byRequestedBy = [];
+        foreach ($rows as $r) {
+            $byStatus[$r['status']] = ($byStatus[$r['status']] ?? 0) + 1;
+            $byRequestedBy[$r['requested_by']] = ($byRequestedBy[$r['requested_by']] ?? 0) + 1;
+        }
+        arsort($byStatus);
+        arsort($byRequestedBy);
+
+        return ['rows' => $rows, 'by_status' => $byStatus, 'by_requested_by' => $byRequestedBy];
+    }
+
+    // ================================================================
+    // ORDER/CLIENT SEARCH — Reports hub
+    // ================================================================
+    // The Reports index previously just told staff to already know the
+    // numeric order id ("go directly to /reports/order/<id>"). This is a
+    // plain partial-match lookup by order reference or client company
+    // name, scoped to the current Test Mode state like every other query
+    // in this file, capped at 25 rows (a search box, not a full listing).
+
+    /** @return array<int, array<string,mixed>> */
+    public static function searchOrders(string $query): array
+    {
+        $query = trim($query);
+        if ($query === '') {
+            return [];
+        }
+        $stmt = Database::connection()->prepare(
+            'SELECT o.id, o.order_reference, o.status, o.created_at, c.company_legal_name
+             FROM orders o JOIN clients c ON c.id = o.client_id
+             WHERE o.is_test_data = :is_test_data
+               AND (o.order_reference LIKE :q OR c.company_legal_name LIKE :q2)
+             ORDER BY o.created_at DESC
+             LIMIT 25'
+        );
+        $like = '%' . $query . '%';
+        $stmt->execute(['is_test_data' => self::isTestModeFlag(), 'q' => $like, 'q2' => $like]);
+        return $stmt->fetchAll();
+    }
+
+    // ================================================================
+    // MONTH-OVER-MONTH TRENDS
+    // ================================================================
+    // Everything else in this file is either a point-in-time snapshot
+    // (Queues) or a single flat date-range total (Funnel, Aggregate) —
+    // there was no way to see whether the business is growing or slowing
+    // month to month. Builds the canonical list of the last N months
+    // FIRST (so a month with zero activity still appears as a zero row,
+    // never silently dropped), then merges each GROUP BY query's rows
+    // into it by month key.
+
+    /** @return array<int, array<string,mixed>> one row per month, oldest first */
+    public static function monthlyTrends(int $months = 12): array
+    {
+        $isTestMode = self::isTestModeFlag();
+        $pdo = Database::connection();
+
+        $end = new \DateTimeImmutable('first day of this month');
+        $monthKeys = [];
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $monthKeys[] = $end->modify("-{$i} months")->format('Y-m');
+        }
+
+        $result = [];
+        foreach ($monthKeys as $mk) {
+            $result[$mk] = ['month' => $mk, 'orders_created' => 0, 'quotations_sent' => 0, 'pi_sent' => 0, 'lost' => 0, 'fob_by_currency' => []];
+        }
+        $fromDate = $monthKeys[0] . '-01';
+
+        $stmt = $pdo->prepare(
+            "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COUNT(*) AS n
+             FROM orders WHERE is_test_data = :t AND created_at >= :from GROUP BY ym"
+        );
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        foreach ($stmt->fetchAll() as $row) {
+            if (isset($result[$row['ym']])) {
+                $result[$row['ym']]['orders_created'] = (int) $row['n'];
+            }
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS ym, cur.code AS cc, COALESCE(SUM(p.fob_value), 0) AS total
+             FROM orders o
+             JOIN currencies cur ON cur.id = o.currency_id
+             JOIN order_products p ON p.order_id = o.id AND p.is_active = 1
+             WHERE o.is_test_data = :t AND o.created_at >= :from GROUP BY ym, cc"
+        );
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        foreach ($stmt->fetchAll() as $row) {
+            if (isset($result[$row['ym']])) {
+                $result[$row['ym']]['fob_by_currency'][$row['cc']] = round((float) $row['total'], 2);
+            }
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT DATE_FORMAT(el.sent_at, '%Y-%m') AS ym, COUNT(DISTINCT el.document_id) AS n
+             FROM email_log el
+             JOIN documents doc ON doc.id = el.document_id
+             JOIN document_types dt ON dt.id = doc.document_type_id
+             JOIN orders o ON o.id = doc.order_id
+             WHERE dt.code = 'QT' AND el.status = 'sent' AND o.is_test_data = :t AND el.sent_at >= :from
+             GROUP BY ym"
+        );
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        foreach ($stmt->fetchAll() as $row) {
+            if (isset($result[$row['ym']])) {
+                $result[$row['ym']]['quotations_sent'] = (int) $row['n'];
+            }
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT DATE_FORMAT(el.sent_at, '%Y-%m') AS ym, COUNT(DISTINCT el.document_id) AS n
+             FROM email_log el
+             JOIN documents doc ON doc.id = el.document_id
+             JOIN document_types dt ON dt.id = doc.document_type_id
+             JOIN orders o ON o.id = doc.order_id
+             WHERE dt.code = 'PI' AND el.status = 'sent' AND o.is_test_data = :t AND el.sent_at >= :from
+             GROUP BY ym"
+        );
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        foreach ($stmt->fetchAll() as $row) {
+            if (isset($result[$row['ym']])) {
+                $result[$row['ym']]['pi_sent'] = (int) $row['n'];
+            }
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT DATE_FORMAT(lost_at, '%Y-%m') AS ym, COUNT(*) AS n
+             FROM orders WHERE is_test_data = :t AND status = 'lost' AND lost_at >= :from GROUP BY ym"
+        );
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        foreach ($stmt->fetchAll() as $row) {
+            if (isset($result[$row['ym']])) {
+                $result[$row['ym']]['lost'] = (int) $row['n'];
+            }
+        }
+
+        return array_values($result);
+    }
+
+    // ================================================================
+    // STAFF PRODUCTIVITY REPORT
+    // ================================================================
+    // Deliberately scoped to two straightforward, reliably-attributable
+    // GROUP BY queries — documents.generated_by (who actually generated
+    // each document) and audit_log.user_id (overall activity level) — and
+    // NOT a derived "average turnaround per staff member" metric. Orders
+    // themselves carry no created_by column, so any "who initiated this
+    // order" figure would have to be inferred (e.g. via the first QT
+    // document), which risks being subtly wrong. Given the explicit
+    // requirement that every number here be trustworthy, a smaller set of
+    // unambiguous counts beats a larger set with a shaky derived figure.
+    // Gated on the view_staff_reports permission (Admin/MD/ED only by
+    // default), not the general view_reports every other report here
+    // uses, since this shows individual staff activity rather than
+    // business data.
+
+    /** @return array<int, array<string,mixed>> one row per user, sorted by name */
+    public static function staffProductivity(?string $dateFrom, ?string $dateTo): array
+    {
+        $isTestMode = self::isTestModeFlag();
+        $pdo = Database::connection();
+
+        $docWhere = ['o.is_test_data = :is_test_data'];
+        $docParams = ['is_test_data' => $isTestMode];
+        if ($dateFrom) {
+            $docWhere[] = 'DATE(d.generated_at) >= :date_from';
+            $docParams['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $docWhere[] = 'DATE(d.generated_at) <= :date_to';
+            $docParams['date_to'] = $dateTo;
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT u.id AS user_id, u.name AS user_name, dt.code AS type_code, COUNT(*) AS n
+             FROM documents d
+             JOIN document_types dt ON dt.id = d.document_type_id
+             JOIN orders o ON o.id = d.order_id
+             LEFT JOIN users u ON u.id = d.generated_by
+             WHERE ' . implode(' AND ', $docWhere) . '
+             GROUP BY u.id, u.name, dt.code
+             ORDER BY u.name, dt.code'
+        );
+        $stmt->execute($docParams);
+
+        $byUser = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $uid = $r['user_id'] !== null ? (int) $r['user_id'] : 0;
+            if (!isset($byUser[$uid])) {
+                $byUser[$uid] = [
+                    'user_id' => $uid,
+                    'user_name' => $r['user_name'] ?? 'Unattributed (system-generated)',
+                    'documents_total' => 0,
+                    'by_type' => [],
+                    'audit_actions' => 0,
+                ];
+            }
+            $byUser[$uid]['by_type'][$r['type_code']] = (int) $r['n'];
+            $byUser[$uid]['documents_total'] += (int) $r['n'];
+        }
+
+        // audit_log carries no test-data flag of its own — Test Mode
+        // deliberately never writes audit_log rows for test records at all
+        // (see docs/schema.sql Section V / README), so no is_test_data
+        // filter is needed or even possible here.
+        $auditWhere = [];
+        $auditParams = [];
+        if ($dateFrom) {
+            $auditWhere[] = 'DATE(al.created_at) >= :date_from';
+            $auditParams['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $auditWhere[] = 'DATE(al.created_at) <= :date_to';
+            $auditParams['date_to'] = $dateTo;
+        }
+        $auditSql = 'SELECT al.user_id, u.name AS user_name, COUNT(*) AS n
+                     FROM audit_log al LEFT JOIN users u ON u.id = al.user_id'
+                  . ($auditWhere ? ' WHERE ' . implode(' AND ', $auditWhere) : '')
+                  . ' GROUP BY al.user_id, u.name';
+        $stmt = $pdo->prepare($auditSql);
+        $stmt->execute($auditParams);
+        foreach ($stmt->fetchAll() as $r) {
+            $uid = $r['user_id'] !== null ? (int) $r['user_id'] : 0;
+            if (!isset($byUser[$uid])) {
+                $byUser[$uid] = [
+                    'user_id' => $uid,
+                    'user_name' => $r['user_name'] ?? 'System',
+                    'documents_total' => 0,
+                    'by_type' => [],
+                    'audit_actions' => 0,
+                ];
+            }
+            $byUser[$uid]['audit_actions'] = (int) $r['n'];
+        }
+
+        usort($byUser, static fn(array $a, array $b): int => strcmp((string) $a['user_name'], (string) $b['user_name']));
+        return array_values($byUser);
     }
 }

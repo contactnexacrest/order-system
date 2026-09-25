@@ -8,9 +8,24 @@
 
   <div class="section">
     <h2>Totals</h2>
+    <p class="muted small">Totals are broken down by currency — a client's orders can be in different currencies, so a single combined number would be meaningless.</p>
     <div class="kv-grid">
-      <div><span class="k">Total FOB Value (all orders)</span><span class="v">{{ total_fob_value | money }}</span></div>
-      <div><span class="k">Total Payments Cleared</span><span class="v">{{ total_cleared | money }}</span></div>
+      <div>
+        <span class="k">Total FOB Value (all orders)</span>
+        <span class="v">
+          {% if not total_fob_value_by_currency or (total_fob_value_by_currency | length) == 0 %}—{% else %}
+            {% for cc, amt in total_fob_value_by_currency %}{{ cc }} {{ amt | money }}<br>{% endfor %}
+          {% endif %}
+        </span>
+      </div>
+      <div>
+        <span class="k">Total Payments Cleared</span>
+        <span class="v">
+          {% if not total_cleared_by_currency or (total_cleared_by_currency | length) == 0 %}—{% else %}
+            {% for cc, amt in total_cleared_by_currency %}{{ cc }} {{ amt | money }}<br>{% endfor %}
+          {% endif %}
+        </span>
+      </div>
       <div><span class="k">Order Count</span><span class="v">{{ orders.length }}</span></div>
       <div><span class="k">Contact Email</span><span class="v">{{ (client.email or '—') if canViewFullEmail else (client.email | maskEmail) }}</span></div>
     </div>

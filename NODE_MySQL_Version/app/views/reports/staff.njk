@@ -1,0 +1,33 @@
+<div class="card page-wide">
+  <h1>Staff Productivity Report</h1>
+  <p class="muted">Documents generated per user (from each document's own generated-by record) and overall system activity (audit log actions). Deliberately limited to these two directly-attributable counts — see the code comment on <code>staffProductivity()</code> for why a "turnaround time per staff member" figure was left out rather than risk a shaky derived number.</p>
+
+  <form method="get" action="/reports/staff" class="section">
+    <div class="kv-grid">
+      <label>Date From (documents generated)<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
+      <label>Date To (documents generated)<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm">Run</button>
+    </div>
+  </form>
+
+  <div class="section">
+    <table class="list">
+      <tr><th>User</th><th>Documents Generated (by type)</th><th>Documents Total</th><th>Audit Log Actions</th></tr>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.user_name }}</td>
+        <td>
+          {% if not r.by_type or (r.by_type | length) == 0 %}—{% else %}
+            {% for type, n in r.by_type %}{{ type }}: {{ n }}<br>{% endfor %}
+          {% endif %}
+        </td>
+        <td>{{ r.documents_total }}</td>
+        <td>{{ r.audit_actions }}</td>
+      </tr>
+      {% endfor %}
+      {% if not rows or rows.length == 0 %}<tr><td colspan="4" class="muted">No activity in this range.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>

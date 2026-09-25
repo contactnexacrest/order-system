@@ -18,6 +18,7 @@ function str(v, fallback = '') {
 
 async function index(req, res) {
   const user = req.user;
+  const query = str(req.query.q);
   res.renderView(
     'reports/index',
     {
@@ -26,6 +27,9 @@ async function index(req, res) {
       stages: await lookupRepository.stagesMaster(),
       countries: await reportRepository.distinctCountries(),
       savedReports: await reportDefinitionRepository.visibleTo(user.id),
+      searchQuery: query,
+      searchResults: query !== '' ? await reportRepository.searchOrders(query) : [],
+      canViewStaffReports: !!(req.permissions && req.permissions.view_staff_reports),
     },
     'layout/base'
   );
@@ -119,6 +123,7 @@ async function aggregate(req, res) {
     'reports/aggregate',
     {
       rows,
+      summary: reportRepository.aggregateSummary(rows),
       incoterms: await lookupRepository.incoterms(),
       stages: await lookupRepository.stagesMaster(),
       countries: await reportRepository.distinctCountries(),
@@ -141,6 +146,46 @@ async function queues(req, res) {
   const dateFrom = str(req.query.date_from) || defaultDateFrom();
   const dateTo = str(req.query.date_to) || defaultDateTo();
 
+  if (req.query.format === 'csv') {
+    const section = str(req.query.section) || 'queues';
+    if (section === 'funnel') {
+      const funnel = await reportRepository.funnelActivity(dateFrom, dateTo);
+      const labels = {
+        quotationsSent: 'Quotations sent (all)',
+        quotationsLost: 'Quotations lost (marked lost before reaching PI)',
+        quotationsWon: 'Quotations won (reached PI)',
+        piSent: 'PI sent (all)',
+        piLost: 'PI lost (marked lost after reaching PI, before CI)',
+        amendments: 'Amendments',
+      };
+      const rows = Object.keys(labels).map((key) => ({ Metric: labels[key], Count: funnel[key] }));
+      csv.stream(res, `funnel_activity_${dateFrom}_to_${dateTo}.csv`, ['Metric', 'Count'], rows);
+      return;
+    }
+
+    const queueData = await reportRepository.operationsQueues();
+    const bucketLabels = {
+      quotationAwaitingSend: 'Quotation drafted, not yet sent to buyer',
+      buyerPoAwaited: "Quotation sent - waiting on buyer's PO",
+      orderAcceptanceAwaitingSend: 'Our Order-Acceptance (PO) not yet sent to buyer',
+      piStage: 'Sitting at PI stage',
+      ocAwaitingSend: 'Order Confirmation drafted, not yet sent',
+      ocAwaitingAck: "Order Confirmation sent - awaiting buyer's acknowledgement",
+      supplierPoNeeded: 'Reached Supplier PO stage - nothing drafted for our supplier yet',
+      blAwaitingSend: 'CI issued - scanned BL not yet sent to buyer',
+      balanceAwaited: 'Scanned BL sent - balance payment not yet received',
+      hardCopyAwaited: 'Balance received - hard-copy document set not yet couriered',
+    };
+    const rows = [];
+    for (const [key, label] of Object.entries(bucketLabels)) {
+      for (const o of queueData[key]) {
+        rows.push({ Queue: label, 'Order Ref': o.order_reference, Client: o.company_legal_name, Created: o.created_at });
+      }
+    }
+    csv.stream(res, 'operations_queues.csv', ['Queue', 'Order Ref', 'Client', 'Created'], rows);
+    return;
+  }
+
   const [queueData, funnel] = await Promise.all([
     reportRepository.operationsQueues(),
     reportRepository.funnelActivity(dateFrom, dateTo),
@@ -152,7 +197,143 @@ async function queues(req, res) {
       queues: queueData,
       funnel,
       filters: { dateFrom, dateTo },
+      dateFilterQuery: querystring.stringify({ date_from: dateFrom, date_to: dateTo }),
     },
+    'layout/base'
+  );
+}
+
+/** Cross-order dispute report — closes the gap where disputes only ever showed up as generic audit-log rows. */
+async function disputes(req, res) {
+  const dateFrom = str(req.query.date_from) || null;
+  const dateTo = str(req.query.date_to) || null;
+
+  const data = await reportRepository.disputesReport(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const rows = data.rows.map((r) => ({
+      'Order Ref': r.order_reference,
+      Client: r.company_legal_name,
+      'Notice Date': r.notice_date,
+      'From Party': r.from_party ?? '',
+      Status: r.status,
+      'Response Due': r.response_due_date ?? '',
+      'Resolved At': r.resolved_at ?? '',
+      'Days Open': r.days_open,
+    }));
+    csv.stream(res, 'disputes_report.csv', ['Order Ref', 'Client', 'Notice Date', 'From Party', 'Status', 'Response Due', 'Resolved At', 'Days Open'], rows);
+    return;
+  }
+
+  res.renderView(
+    'reports/disputes',
+    {
+      rows: data.rows,
+      byStatus: data.by_status,
+      openCount: data.open_count,
+      avgResolutionDays: data.avg_resolution_days,
+      filters: { dateFrom, dateTo },
+    },
+    'layout/base'
+  );
+}
+
+/** Cross-order amendment report — closes the gap where amendments only ever showed a bare count in the funnel section. */
+async function amendments(req, res) {
+  const dateFrom = str(req.query.date_from) || null;
+  const dateTo = str(req.query.date_to) || null;
+
+  const data = await reportRepository.amendmentsReport(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const rows = data.rows.map((r) => ({
+      'Amendment Ref': r.amendment_reference,
+      'Order Ref': r.order_reference,
+      Client: r.company_legal_name,
+      'Requested By': r.requested_by,
+      Status: r.status,
+      Reason: r.reason,
+      Currency: r.currency_code,
+      'Amended Advance': r.amended_advance_amount ?? '',
+      'Amended Balance': r.amended_balance_amount ?? '',
+      'Effective From': r.effective_from ?? '',
+      Created: r.created_at,
+    }));
+    csv.stream(res, 'amendments_report.csv', ['Amendment Ref', 'Order Ref', 'Client', 'Requested By', 'Status', 'Reason', 'Currency', 'Amended Advance', 'Amended Balance', 'Effective From', 'Created'], rows);
+    return;
+  }
+
+  res.renderView(
+    'reports/amendments',
+    {
+      rows: data.rows,
+      byStatus: data.by_status,
+      byRequestedBy: data.by_requested_by,
+      filters: { dateFrom, dateTo },
+    },
+    'layout/base'
+  );
+}
+
+/** Month-over-month trend view — everything else in this module is either a snapshot or a single flat total. */
+async function trends(req, res) {
+  res.renderView('reports/trends', { months: await reportRepository.monthlyTrends(12) }, 'layout/base');
+}
+
+/** Staff productivity report — gated on view_staff_reports, not view_reports, since it shows individual activity. */
+async function staff(req, res) {
+  const dateFrom = str(req.query.date_from) || null;
+  const dateTo = str(req.query.date_to) || null;
+  res.renderView(
+    'reports/staff',
+    { rows: await reportRepository.staffProductivity(dateFrom, dateTo), filters: { dateFrom, dateTo } },
+    'layout/base'
+  );
+}
+
+/**
+ * Consolidated financial/payments report (added to close a real gap:
+ * neither the dashboard's two overdue lists nor the per-client report's
+ * own totals ever showed collected-vs-outstanding across the whole
+ * business). Filtered the same way as the Aggregate Report (order
+ * created_at date range) for predictable, consistent semantics.
+ */
+async function payments(req, res) {
+  const dateFrom = str(req.query.date_from) || null;
+  const dateTo = str(req.query.date_to) || null;
+
+  const data = await reportRepository.paymentsReport(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const rows = data.rows.map((r) => ({
+      'Order Ref': r.order_reference,
+      Client: r.company_legal_name,
+      Currency: r.currency_code,
+      Status: r.status,
+      'Advance Invoiced': r.advance_amount ?? '',
+      'Advance Cleared': r.advance_cleared_at ? 'Yes' : (r.advance_amount !== null ? 'No' : ''),
+      'Advance Outstanding': r.advance_outstanding !== null ? r.advance_outstanding.toFixed(2) : '',
+      'Balance Invoiced': r.balance_amount ?? '',
+      'Balance Cleared': r.balance_cleared_at ? 'Yes' : (r.balance_amount !== null ? 'No' : ''),
+      'Balance Outstanding': r.balance_outstanding !== null ? r.balance_outstanding.toFixed(2) : '',
+      'Freight Invoiced': r.freight_amount ?? '',
+      'Freight Cleared': r.freight_cleared_at ? 'Yes' : (r.freight_amount !== null ? 'No' : ''),
+      'Freight Outstanding': r.freight_outstanding !== null ? r.freight_outstanding.toFixed(2) : '',
+      Created: r.created_at,
+    }));
+    csv.stream(res, 'payments_report.csv', [
+      'Order Ref', 'Client', 'Currency', 'Status',
+      'Advance Invoiced', 'Advance Cleared', 'Advance Outstanding',
+      'Balance Invoiced', 'Balance Cleared', 'Balance Outstanding',
+      'Freight Invoiced', 'Freight Cleared', 'Freight Outstanding',
+      'Created',
+    ], rows);
+    return;
+  }
+
+  res.renderView(
+    'reports/payments',
+    { rows: data.rows, byCurrency: data.by_currency, filters: { dateFrom, dateTo } },
     'layout/base'
   );
 }
@@ -252,4 +433,7 @@ async function deleteDefinition(req, res) {
   res.redirect('/reports');
 }
 
-module.exports = { index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition };
+module.exports = {
+  index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
+  payments, disputes, amendments, trends, staff,
+};

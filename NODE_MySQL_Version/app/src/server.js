@@ -520,6 +520,11 @@ app.get('/reports/client/:clientId', requireAuth, requirePermission('view_report
 app.get('/reports/order/:orderId', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.order));
 app.get('/reports/aggregate', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.aggregate));
 app.get('/reports/queues', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.queues));
+app.get('/reports/payments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.payments));
+app.get('/reports/disputes', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.disputes));
+app.get('/reports/amendments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.amendments));
+app.get('/reports/trends', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.trends));
+app.get('/reports/staff', requireAuth, requirePermission('view_staff_reports'), asyncHandler(reportController.staff));
 app.post('/reports/save', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.saveDefinition));
 app.get('/reports/saved/:reportId/run', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.runDefinition));
 app.post('/reports/saved/:reportId/update', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.updateDefinition));

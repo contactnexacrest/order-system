@@ -1,6 +1,9 @@
 <div class="card page-wide">
   <h1>Operations Queues</h1>
   <p class="muted">Snapshot buckets below are "right now" — no date filter applies to them. The funnel activity section at the bottom is date-ranged.</p>
+  <div class="btn-row">
+    <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/queues?format=csv&section=queues">Export Queues CSV</a>
+  </div>
 
   <div class="section">
     <h2>Quotation &amp; Buyer PO</h2>
@@ -89,6 +92,7 @@
       </div>
       <div class="btn-row">
         <button type="submit" class="btn-sm">Run</button>
+        <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/queues?{{ dateFilterQuery }}&format=csv&section=funnel">Export Funnel CSV</a>
       </div>
     </form>
     <table class="list">

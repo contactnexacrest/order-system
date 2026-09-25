@@ -37,6 +37,38 @@
     </div>
   </form>
 
+  <div class="section">
+    <h2>Summary</h2>
+    <p class="muted small">Computed from exactly the <?= count($rows) ?> order(s) listed below — never a separate count, so this can never disagree with the table.</p>
+    <div class="kv-grid">
+      <div><span class="k">Total Orders</span><span class="v"><?= (int) $summary['total_orders'] ?></span></div>
+      <div>
+        <span class="k">Total FOB Value</span>
+        <span class="v">
+          <?php if (empty($summary['fob_by_currency'])): ?>—<?php else: ?>
+            <?php foreach ($summary['fob_by_currency'] as $cc => $amt): ?>
+              <?= htmlspecialchars($cc) ?> <?= number_format($amt, 2) ?><br>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </span>
+      </div>
+    </div>
+    <div class="kv-grid" style="margin-top:0.75rem;">
+      <div>
+        <span class="k">By Stage</span>
+        <span class="v"><?php foreach ($summary['by_stage'] as $stage => $n): ?><?= htmlspecialchars($stage) ?>: <?= (int) $n ?><br><?php endforeach; ?><?= empty($summary['by_stage']) ? '—' : '' ?></span>
+      </div>
+      <div>
+        <span class="k">By Status</span>
+        <span class="v"><?php foreach ($summary['by_status'] as $status => $n): ?><?= htmlspecialchars(ucfirst($status)) ?>: <?= (int) $n ?><br><?php endforeach; ?><?= empty($summary['by_status']) ? '—' : '' ?></span>
+      </div>
+      <div>
+        <span class="k">By Country</span>
+        <span class="v"><?php foreach ($summary['by_country'] as $country2 => $n): ?><?= htmlspecialchars($country2) ?>: <?= (int) $n ?><br><?php endforeach; ?><?= empty($summary['by_country']) ? '—' : '' ?></span>
+      </div>
+    </div>
+  </div>
+
   <?php if ($canManageDefinitions): ?>
   <form method="post" action="/reports/save" class="section">
     <?= Csrf::field() ?>

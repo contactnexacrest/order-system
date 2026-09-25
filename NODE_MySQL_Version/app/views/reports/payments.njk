@@ -1,0 +1,77 @@
+<div class="card page-wide">
+  <h1>Payments Report</h1>
+  <p class="muted">Collected vs. outstanding, broken down by currency — filtered by order created date, same as the Aggregate Report.</p>
+
+  <form method="get" action="/reports/payments" class="section">
+    <div class="kv-grid">
+      <label>Date From<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
+      <label>Date To<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm">Run</button>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/payments?date_from={{ filters.dateFrom or '' }}&date_to={{ filters.dateTo or '' }}&format=csv">Export CSV</a>
+    </div>
+  </form>
+
+  <div class="section">
+    <h2>Summary by Currency</h2>
+    <p class="muted small">Computed from exactly the {{ rows.length }} order(s) listed below — never a separate query, so this can never disagree with the table.</p>
+    {% if not byCurrency or (byCurrency | length) == 0 %}
+      <p class="muted">No payment records match these filters.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Currency</th><th>Advance Invoiced</th><th>Advance Cleared</th><th>Advance Outstanding</th><th>Balance Invoiced</th><th>Balance Cleared</th><th>Balance Outstanding</th><th>Freight Invoiced</th><th>Freight Cleared</th><th>Freight Outstanding</th><th>Total Outstanding</th></tr>
+        {% for cc, b in byCurrency %}
+        <tr>
+          <td><strong>{{ cc }}</strong></td>
+          <td>{{ b.advance_invoiced | money }}</td>
+          <td>{{ b.advance_cleared | money }}</td>
+          <td>{{ b.advance_outstanding | money }}</td>
+          <td>{{ b.balance_invoiced | money }}</td>
+          <td>{{ b.balance_cleared | money }}</td>
+          <td>{{ b.balance_outstanding | money }}</td>
+          <td>{{ b.freight_invoiced | money }}</td>
+          <td>{{ b.freight_cleared | money }}</td>
+          <td>{{ b.freight_outstanding | money }}</td>
+          <td><strong>{{ b.total_outstanding | money }}</strong></td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Order Detail</h2>
+    <table class="list">
+      <tr><th>Order Ref</th><th>Client</th><th>Currency</th><th>Status</th><th>Advance</th><th>Balance</th><th>Freight</th><th>Created</th></tr>
+      {% for r in rows %}
+      <tr>
+        <td><a href="/orders/{{ r.id }}">{{ r.order_reference }}</a></td>
+        <td>{{ r.company_legal_name }}</td>
+        <td>{{ r.currency_code }}</td>
+        <td>{{ r.status | capitalize }}</td>
+        <td>
+          {% if r.advance_amount == null %}—{% else %}
+            {{ r.advance_amount | money }}
+            {% if r.advance_cleared_at %}<span class="badge badge-success">Cleared</span>{% else %}<span class="badge badge-warning">Outstanding {{ r.advance_outstanding | money }}</span>{% endif %}
+          {% endif %}
+        </td>
+        <td>
+          {% if r.balance_amount == null %}—{% else %}
+            {{ r.balance_amount | money }}
+            {% if r.balance_cleared_at %}<span class="badge badge-success">Cleared</span>{% else %}<span class="badge badge-warning">Outstanding {{ r.balance_outstanding | money }}</span>{% endif %}
+          {% endif %}
+        </td>
+        <td>
+          {% if r.freight_amount == null %}—{% else %}
+            {{ r.freight_amount | money }}
+            {% if r.freight_cleared_at %}<span class="badge badge-success">Cleared</span>{% else %}<span class="badge badge-warning">Outstanding {{ r.freight_outstanding | money }}</span>{% endif %}
+          {% endif %}
+        </td>
+        <td>{{ r.created_at }}</td>
+      </tr>
+      {% endfor %}
+      {% if not rows or rows.length == 0 %}<tr><td colspan="8" class="muted">No orders match these filters.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>

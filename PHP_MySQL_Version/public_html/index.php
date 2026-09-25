@@ -351,6 +351,11 @@ $router->get('/reports/client/{clientId}', [$reports, 'client'], [SessionAuth::r
 $router->get('/reports/order/{orderId}', [$reports, 'order'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/aggregate', [$reports, 'aggregate'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/queues', [$reports, 'queues'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/payments', [$reports, 'payments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/disputes', [$reports, 'disputes'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/amendments', [$reports, 'amendments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/trends', [$reports, 'trends'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/staff', [$reports, 'staff'], [SessionAuth::required(), PermissionCheck::requires('view_staff_reports')]);
 $router->post('/reports/save', [$reports, 'saveDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
 $router->get('/reports/saved/{reportId}/run', [$reports, 'runDefinition'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->post('/reports/saved/{reportId}/update', [$reports, 'updateDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);

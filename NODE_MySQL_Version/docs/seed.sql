@@ -51,7 +51,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('approve_email_send',        'Approve email send (Level 2)',  'Level-2 approval for a deferred client email before it actually sends (Section 10 — Email & Deferred Send System).', 'documents'),
   ('manage_sample_data',        'Manage sample data',            'Load/clear the Sample Data Playground (test clients/orders only — never real data).', 'admin'),
   ('manage_field_protection',   'Manage field protection',       'Request or approve locking/unlocking a protected field (company setting, T&C clause, or payment preset). Approving your own request is blocked — a different privileged user must confirm.', 'admin'),
-  ('delete_assets',             'Delete assets',                 'Permanently remove a superseded (inactive) logo/signature/seal/watermark/email-header upload. The currently active asset for a type can never be deleted this way — replace it first.', 'admin'),
+  ('delete_assets',             'Delete assets',                 'Permanently remove a superseded (inactive) logo/signature/seal/watermark upload. The currently active asset for a type can never be deleted this way — replace it first.', 'admin'),
   ('manage_signatories',        'Manage signatories & designations', 'Manage the designations list, mark a user as signatory-eligible, upload their signature/designation-seal images, and set the global and per-document-type default signatory.', 'admin'),
   ('view_product_catalog',      'View product catalog',          'Search and view individual products in the internal product catalog.', 'catalog'),
   ('browse_product_catalog',    'Browse product catalog',        'Browse the full product catalog list, not just search results.', 'catalog'),
@@ -59,7 +59,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('manage_product_catalog',    'Manage product catalog',        'Create, edit, and delete products, suppliers, images, and misc charges.', 'catalog'),
   ('view_archived_orders',      'View archived orders',          'See orders that have been archived out of the default listing. Archiving never deletes anything — this only gates who can look an archived order up.', 'orders'),
   ('manage_hs_codes',           'Manage HS code master list',    'Add, edit, and deactivate HS codes in the master list order creation picks from — kept separate from ordinary order-entry access so a new code always goes through a privileged person first.', 'catalog'),
-  ('manage_email_templates',    'Manage email templates',        'Add or edit email templates used when composing a send (never delete — every past send keeps its own frozen copy in the email log regardless).', 'admin');
+  ('manage_email_templates',    'Manage email templates',        'Add or edit email templates used when composing a send (never delete — every past send keeps its own frozen copy in the email log regardless).', 'admin'),
+  ('view_staff_reports',        'View staff productivity reports', 'View the Staff Productivity report (documents generated and audit-log activity per user) — kept separate from view_reports since it shows individual staff activity, not just business data.', 'reports');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)

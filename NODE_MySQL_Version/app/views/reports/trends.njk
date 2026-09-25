@@ -1,0 +1,24 @@
+<div class="card page-wide">
+  <h1>Trends — Last 12 Months</h1>
+  <p class="muted">Month-over-month activity. Months with no activity still appear as a zero row, so gaps in the business are as visible as growth.</p>
+
+  <div class="section">
+    <table class="list">
+      <tr><th>Month</th><th>Orders Created</th><th>Quotations Sent</th><th>PI Sent</th><th>Lost</th><th>Total FOB Value</th></tr>
+      {% for m in months %}
+      <tr>
+        <td>{{ m.month }}</td>
+        <td>{{ m.orders_created }}</td>
+        <td>{{ m.quotations_sent }}</td>
+        <td>{{ m.pi_sent }}</td>
+        <td>{{ m.lost }}</td>
+        <td>
+          {% if not m.fob_by_currency or (m.fob_by_currency | length) == 0 %}—{% else %}
+            {% for cc, amt in m.fob_by_currency %}{{ cc }} {{ amt | money }}<br>{% endfor %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

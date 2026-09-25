@@ -9,9 +9,28 @@
 
   <div class="section">
     <h2>Totals</h2>
+    <p class="muted small">Totals are broken down by currency — a client's orders can be in different currencies, so a single combined number would be meaningless.</p>
     <div class="kv-grid">
-      <div><span class="k">Total FOB Value (all orders)</span><span class="v"><?= number_format($total_fob_value, 2) ?></span></div>
-      <div><span class="k">Total Payments Cleared</span><span class="v"><?= number_format($total_cleared, 2) ?></span></div>
+      <div>
+        <span class="k">Total FOB Value (all orders)</span>
+        <span class="v">
+          <?php if (empty($total_fob_value_by_currency)): ?>—<?php else: ?>
+            <?php foreach ($total_fob_value_by_currency as $cc => $amt): ?>
+              <?= htmlspecialchars($cc) ?> <?= number_format($amt, 2) ?><br>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </span>
+      </div>
+      <div>
+        <span class="k">Total Payments Cleared</span>
+        <span class="v">
+          <?php if (empty($total_cleared_by_currency)): ?>—<?php else: ?>
+            <?php foreach ($total_cleared_by_currency as $cc => $amt): ?>
+              <?= htmlspecialchars($cc) ?> <?= number_format($amt, 2) ?><br>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </span>
+      </div>
       <div><span class="k">Order Count</span><span class="v"><?= count($orders) ?></span></div>
       <div><span class="k">Contact Email</span><span class="v"><?= $canViewFullEmail ? htmlspecialchars($client['email'] ?? '—') : htmlspecialchars(Mask::email($client['email'] ?? null)) ?></span></div>
     </div>
