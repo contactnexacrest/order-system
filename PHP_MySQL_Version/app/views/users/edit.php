@@ -1,5 +1,6 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/users">&larr; Back to Users</a></p>
   <h1>Edit User — <?= htmlspecialchars($target['name']) ?></h1>
   <form method="post" action="/users/<?= (int) $target['id'] ?>/update">
     <?= Csrf::field() ?>

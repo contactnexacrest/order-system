@@ -1,5 +1,6 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/orders/<?= (int) $orderId ?>">&larr; Back to Order</a></p>
   <?php if ($documentId): ?>
     <h1>Send to Buyer — <?= htmlspecialchars($document['document_type_code'] ?? '') ?> <?= htmlspecialchars($document['document_reference'] ?? '—') ?></h1>
   <?php else: ?>

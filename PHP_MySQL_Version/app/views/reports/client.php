@@ -1,5 +1,6 @@
 <?php use App\Helpers\Mask; ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Client Report — <?= htmlspecialchars($client['company_legal_name']) ?></h1>
   <p class="muted">Buyer Inquiry Ref: <strong><?= htmlspecialchars($client['client_unique_number']) ?></strong></p>
   <div class="btn-row">

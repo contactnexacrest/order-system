@@ -8,6 +8,7 @@ $canViewFullEmail = $__u && PermissionService::can((int) $__u['id'], $__u['role_
 $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'edit_locked_data');
 ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
   <h1><?= htmlspecialchars($client['company_legal_name']) ?></h1>
   <p class="muted">
     Buyer Inquiry Ref: <strong><?= htmlspecialchars($client['client_unique_number']) ?></strong>

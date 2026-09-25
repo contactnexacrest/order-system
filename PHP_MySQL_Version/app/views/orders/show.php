@@ -33,6 +33,7 @@ $balanceCleared = $stage8 && $stage8['status'] === 'gate_passed';
 $orderClosed = $order['status'] === 'complete';
 ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/orders">&larr; Back to Orders</a></p>
   <h1><?= htmlspecialchars($order['order_reference']) ?>
     <?php if ($order['status'] !== 'active'): ?><span class="badge badge-<?= htmlspecialchars($order['status']) ?>"><?= htmlspecialchars($order['status']) ?></span><?php endif; ?>
   </h1>

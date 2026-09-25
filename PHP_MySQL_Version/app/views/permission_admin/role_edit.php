@@ -1,5 +1,6 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/admin/permissions">&larr; Back to Permissions</a></p>
   <h1>Edit Role — <?= htmlspecialchars($role['name']) ?></h1>
   <form method="post" action="/admin/roles/<?= (int) $role['id'] ?>/update">
     <?= Csrf::field() ?>

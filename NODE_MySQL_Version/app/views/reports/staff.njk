@@ -1,4 +1,5 @@
 <div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Staff Productivity Report</h1>
   <p class="muted">Documents generated per user (from each document's own generated-by record) and overall system activity (audit log actions). Deliberately limited to these two directly-attributable counts — see the code comment on <code>staffProductivity()</code> for why a "turnaround time per staff member" figure was left out rather than risk a shaky derived number.</p>
 

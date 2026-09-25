@@ -1,4 +1,5 @@
 <div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Dispute Report</h1>
   <p class="muted">Every dispute across all orders — filtered by notice date. "Days Open" counts from notice date to today for open disputes, or to resolution for resolved ones.</p>
 

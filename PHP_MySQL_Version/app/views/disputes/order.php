@@ -1,5 +1,6 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>">&larr; Back to Order</a></p>
   <h1>Disputes — <?= htmlspecialchars($order['order_reference']) ?></h1>
   <p class="muted"><?= htmlspecialchars($order['company_legal_name']) ?></p>
 

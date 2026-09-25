@@ -1,5 +1,6 @@
 <?php use App\Helpers\Csrf; use App\Helpers\View; ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/products">&larr; Back to Products</a></p>
   <h1><?= View::e($product['name']) ?> <span class="badge <?= $product['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $product['is_active'] ? 'Active' : 'Inactive' ?></span></h1>
   <p class="muted">HS Code: <strong><?= View::e($product['hs_code']) ?></strong> &nbsp;·&nbsp; Origin: <?= View::e($product['origin'] ?? '—') ?></p>
 

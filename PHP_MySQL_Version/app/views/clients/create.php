@@ -1,5 +1,6 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card">
+  <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
   <h1>New Client</h1>
   <p class="muted">A Buyer Inquiry Ref is generated automatically and reused on every order and document for this client.</p>
   <div class="review-banner warn" style="margin-bottom:14px">

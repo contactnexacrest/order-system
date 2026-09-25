@@ -1,4 +1,5 @@
 <div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Payments Report</h1>
   <p class="muted">Collected vs. outstanding, broken down by currency — filtered by order created date, same as the Aggregate Report.</p>
 

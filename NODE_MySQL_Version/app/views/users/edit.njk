@@ -1,4 +1,5 @@
 <div class="card page-wide">
+  <p class="muted small"><a href="/users">&larr; Back to Users</a></p>
   <h1>Edit User — {{ target.name }}</h1>
   <form method="post" action="/users/{{ target.id }}/update">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">

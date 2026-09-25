@@ -1,4 +1,5 @@
 <div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Amendment Report</h1>
   <p class="muted">Every amendment across all orders — filtered by date created.</p>
 

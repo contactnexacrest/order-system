@@ -1,4 +1,5 @@
 <div class="card page-wide">
+  <p class="muted small"><a href="/products">&larr; Back to Products</a></p>
   <h1>{{ product.name }} <span class="badge {{ 'badge-active' if product.is_active else 'badge-inactive' }}">{{ 'Active' if product.is_active else 'Inactive' }}</span></h1>
   <p class="muted">HS Code: <strong>{{ product.hs_code }}</strong> &nbsp;·&nbsp; Origin: {{ product.origin or '—' }}</p>
 

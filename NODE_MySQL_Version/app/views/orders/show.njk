@@ -21,6 +21,7 @@
 {% set orderClosed = order.status == 'complete' %}
 
 <div class="card page-wide">
+  <p class="muted small"><a href="/orders">&larr; Back to Orders</a></p>
   <h1>{{ order.order_reference }}
     {% if order.status != 'active' %}<span class="badge badge-{{ order.status }}">{{ order.status }}</span>{% endif %}
   </h1>

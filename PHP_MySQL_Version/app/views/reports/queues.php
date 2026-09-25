@@ -18,6 +18,7 @@ if (!function_exists('nc_order_links')) {
 }
 ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Operations Queues</h1>
   <p class="muted">Snapshot buckets below are "right now" — no date filter applies to them. The funnel activity section at the bottom is date-ranged.</p>
   <div class="btn-row">

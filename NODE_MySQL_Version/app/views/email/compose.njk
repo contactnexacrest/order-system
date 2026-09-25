@@ -1,4 +1,5 @@
 <div class="card page-wide">
+  <p class="muted small"><a href="/orders/{{ orderId }}">&larr; Back to Order</a></p>
   {% if documentId %}
     <h1>Send to Buyer — {{ document.document_type_code or '' }} {{ document.document_reference or '—' }}</h1>
   {% else %}

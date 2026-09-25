@@ -1,5 +1,6 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/orders">&larr; Back to Orders</a></p>
   <h1>New Order</h1>
   <form method="post" action="/orders">
     <?= Csrf::field() ?>

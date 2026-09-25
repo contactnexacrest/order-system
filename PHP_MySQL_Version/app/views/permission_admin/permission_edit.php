@@ -1,5 +1,6 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
+  <p class="muted small"><a href="/admin/permissions">&larr; Back to Permissions</a></p>
   <h1>Edit Permission — <?= htmlspecialchars($permission['name']) ?></h1>
   <p class="muted small">Key: <code><?= htmlspecialchars($permission['permission_key']) ?></code> (immutable — every permission check in code refers to this exact string).</p>
   <form method="post" action="/admin/permission-definitions/<?= (int) $permission['id'] ?>/update">
