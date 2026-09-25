@@ -2044,8 +2044,12 @@ CREATE TABLE order_comment_attachments (
   FOREIGN KEY (file_store_id) REFERENCES file_store(id)
 ) ENGINE=InnoDB;
 
-INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description) VALUES
-  ('order_comment_media', 'jpg,jpeg,png,gif,webp,mp4,mov,webm,pdf', 52428800, 'Images/videos/files attached to an order progress chat comment (50 MB per file). Attachments over MailSenderService''s direct-attach cap are sent to the client as a portal download link instead of an email attachment.');
+-- 'order_comment_media' file_upload_contexts row, the zoho_* company_settings
+-- rows, and the manage_email_templates permission are seeded in seed.sql,
+-- not here — schema.sql stays structure-only for everything added from
+-- Section AI onward (they used to also be inserted here, which duplicated
+-- seed.sql's own rows and made a fresh import fail on the second file with
+-- a duplicate-key error; fixed 2026-09-25).
 
 ALTER TABLE email_templates
   ADD COLUMN is_active  TINYINT(1) NOT NULL DEFAULT 1 AFTER footer,
@@ -2054,19 +2058,6 @@ ALTER TABLE email_templates
 
 ALTER TABLE users
   ADD COLUMN email_signature TEXT NULL AFTER phone;
-
-INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('zoho_mail_enabled',   '0', 'boolean', 'zoho', 'Master on/off switch for sending through the Zoho Mail API. Off by default (no credentials configured yet) — when off, or on any Zoho send failure, mail goes out through the existing SMTP path instead. Never a hard dependency.', 0),
-  ('zoho_client_id',      '', 'string',  'zoho', 'Zoho API Console self-client OAuth Client ID.', 1),
-  ('zoho_client_secret',  '', 'string',  'zoho', 'Zoho API Console self-client OAuth Client Secret.', 1),
-  ('zoho_refresh_token',  '', 'string',  'zoho', 'Zoho OAuth refresh token (mail.send scope) — exchanged for a short-lived access token on each send.', 1),
-  ('zoho_account_id',     '', 'string',  'zoho', 'Zoho Mail account ID (from Zoho Mail API''s accounts endpoint) that mail is sent from.', 1),
-  ('zoho_from_address',   '', 'string',  'zoho', 'The Zoho mailbox address mail is sent from — must be one of the Zoho account''s own verified addresses.', 0),
-  ('zoho_accounts_domain', 'accounts.zoho.com', 'string', 'zoho', 'Zoho OAuth token endpoint domain — Zoho is region-specific (accounts.zoho.com / .eu / .in / .com.cn / .com.au, matching whichever data center the Zoho One account lives in).', 0),
-  ('zoho_api_domain',      'mail.zoho.com', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0);
-
-INSERT INTO permissions (permission_key, name, description, category) VALUES
-  ('manage_email_templates', 'Manage email templates', 'Add or edit email templates used when composing a send (never delete — every past send keeps its own frozen copy in the email log regardless).', 'admin');
 
 -- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
