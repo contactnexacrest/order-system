@@ -149,6 +149,44 @@ final class OrderPaymentStatusRepository
         )->execute(['order_id' => $orderId]);
     }
 
+    // ----------------------------------------------------------------
+    // CA / Accounting module (Phase 2) — assumed exchange rate (for the
+    // forex gain/loss shown in the register) and per-leg FIRC/eBRC
+    // references. Same inr_actual_edit gating as Phase 1's INR-actual
+    // fields — this is the same CA financial-data set, not a new
+    // permission tier.
+    // ----------------------------------------------------------------
+
+    public static function setAssumedExchangeRate(int $orderId, float $rate, int $setBy): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status
+             SET assumed_exchange_rate = :rate, assumed_exchange_rate_set_at = NOW(), assumed_exchange_rate_set_by = :set_by
+             WHERE order_id = :order_id'
+        )->execute(['rate' => $rate, 'set_by' => $setBy, 'order_id' => $orderId]);
+    }
+
+    public static function setAdvanceFirc(int $orderId, string $reference, string $receivedAt): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status SET advance_firc_reference = :ref, advance_firc_received_at = :received_at WHERE order_id = :order_id'
+        )->execute(['ref' => $reference, 'received_at' => $receivedAt, 'order_id' => $orderId]);
+    }
+
+    public static function setBalanceFirc(int $orderId, string $reference, string $receivedAt): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status SET balance_firc_reference = :ref, balance_firc_received_at = :received_at WHERE order_id = :order_id'
+        )->execute(['ref' => $reference, 'received_at' => $receivedAt, 'order_id' => $orderId]);
+    }
+
+    public static function setFreightFirc(int $orderId, string $reference, string $receivedAt): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status SET freight_firc_reference = :ref, freight_firc_received_at = :received_at WHERE order_id = :order_id'
+        )->execute(['ref' => $reference, 'received_at' => $receivedAt, 'order_id' => $orderId]);
+    }
+
     /**
      * Every order with at least one cleared settlement leg, for the CA
      * module's settlement register (CaRepository). Joined here rather than

@@ -128,9 +128,46 @@ async function clearedSettlements() {
   );
 }
 
+// ----------------------------------------------------------------
+// CA / Accounting module (Phase 2) — assumed exchange rate (for the
+// forex gain/loss shown in the register) and per-leg FIRC/eBRC
+// references. Same inr_actual_edit gating as Phase 1's INR-actual
+// fields — this is the same CA financial-data set, not a new
+// permission tier.
+// ----------------------------------------------------------------
+
+async function setAssumedExchangeRate(orderId, rate, setBy) {
+  await db.execute(
+    'UPDATE order_payment_status SET assumed_exchange_rate = :rate, assumed_exchange_rate_set_at = NOW(), assumed_exchange_rate_set_by = :set_by WHERE order_id = :order_id',
+    { rate, set_by: setBy, order_id: orderId }
+  );
+}
+
+async function setAdvanceFirc(orderId, reference, receivedAt) {
+  await db.execute(
+    'UPDATE order_payment_status SET advance_firc_reference = :ref, advance_firc_received_at = :received_at WHERE order_id = :order_id',
+    { ref: reference, received_at: receivedAt, order_id: orderId }
+  );
+}
+
+async function setBalanceFirc(orderId, reference, receivedAt) {
+  await db.execute(
+    'UPDATE order_payment_status SET balance_firc_reference = :ref, balance_firc_received_at = :received_at WHERE order_id = :order_id',
+    { ref: reference, received_at: receivedAt, order_id: orderId }
+  );
+}
+
+async function setFreightFirc(orderId, reference, receivedAt) {
+  await db.execute(
+    'UPDATE order_payment_status SET freight_firc_reference = :ref, freight_firc_received_at = :received_at WHERE order_id = :order_id',
+    { ref: reference, received_at: receivedAt, order_id: orderId }
+  );
+}
+
 module.exports = {
   initializeForOrder, find, recordAdvanceReceived, markAdvanceCleared, setBalanceAmount,
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
   setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,
   setFreightInrActual, clearFreightInrActual, clearedSettlements,
+  setAssumedExchangeRate, setAdvanceFirc, setBalanceFirc, setFreightFirc,
 };

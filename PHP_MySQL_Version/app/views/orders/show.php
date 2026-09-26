@@ -19,6 +19,40 @@ $usersById = [];
 foreach ($activeUsers as $u) {
     $usersById[(int) $u['id']] = $u['name'];
 }
+$renderExchangeRateWidget = function () use ($payment, $order, $canViewInrActual, $canEditInrActual, $usersById): void {
+    if (!$canViewInrActual) {
+        return;
+    }
+    $rate = $payment['assumed_exchange_rate'] ?? null;
+    $setBy = $payment['assumed_exchange_rate_set_by'] ?? null;
+    $setByName = $setBy !== null ? ($usersById[(int) $setBy] ?? ('User #' . $setBy)) : null;
+    ?>
+    <div class="review-banner info" style="margin-top:10px;">
+      <div style="width:100%;">
+        <strong>Assumed Exchange Rate (CA/Accounting)</strong><br>
+        <?php if ($rate !== null): ?>
+          <span>1 unit foreign currency = &#8377;<?= number_format((float) $rate, 4) ?> — set <?= htmlspecialchars((string) ($payment['assumed_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
+          <?php if ($canEditInrActual): ?>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/exchange-rate" style="margin-top:6px;">
+              <?= Csrf::field() ?>
+              <label>Update Rate<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
+              <button type="submit" class="btn-sm">Update</button>
+            </form>
+          <?php endif; ?>
+        <?php elseif ($canEditInrActual): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/exchange-rate">
+            <?= Csrf::field() ?>
+            <label>Assumed Rate (INR per unit foreign currency) *<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
+            <button type="submit" class="btn-sm">Record Rate</button>
+          </form>
+        <?php else: ?>
+          <span class="muted">Not yet recorded.</span>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php
+};
+
 $renderInrActualWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canDeleteInrActual, $usersById): void {
     $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
     if ($clearedAt === null || !$canViewInrActual) {
@@ -28,6 +62,13 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
     $recordedAt = $payment[$leg . '_inr_actual_recorded_at'] ?? null;
     $recordedBy = $payment[$leg . '_inr_actual_recorded_by'] ?? null;
     $recordedByName = $recordedBy !== null ? ($usersById[(int) $recordedBy] ?? ('User #' . $recordedBy)) : null;
+    $assumedRate = $payment['assumed_exchange_rate'] ?? null;
+    $foreignAmount = $payment[$leg . '_amount'] ?? null;
+    $forexGainLoss = ($amount !== null && $assumedRate !== null && $foreignAmount !== null)
+        ? (float) $amount - ((float) $foreignAmount * (float) $assumedRate)
+        : null;
+    $fircReference = $payment[$leg . '_firc_reference'] ?? null;
+    $fircReceivedAt = $payment[$leg . '_firc_received_at'] ?? null;
     ?>
     <div class="review-banner info" style="margin-top:10px;">
       <div style="width:100%;">
@@ -40,6 +81,9 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
               <button type="submit" class="btn-sm btn-danger">Remove</button>
             </form>
           <?php endif; ?>
+          <?php if ($forexGainLoss !== null): ?>
+            <br><span class="muted small">Forex <?= $forexGainLoss >= 0 ? 'gain' : 'loss' ?>: &#8377;<?= number_format(abs($forexGainLoss), 2) ?> vs. the assumed rate.</span>
+          <?php endif; ?>
         <?php elseif ($canEditInrActual): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/inr-actual">
             <?= Csrf::field() ?>
@@ -49,6 +93,22 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
         <?php else: ?>
           <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
         <?php endif; ?>
+
+        <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
+          <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
+          <?php if ($fircReference !== null): ?>
+            <span class="muted small"><?= htmlspecialchars($fircReference) ?> (received <?= htmlspecialchars((string) $fircReceivedAt) ?>)</span>
+          <?php elseif ($canEditInrActual): ?>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/firc">
+              <?= Csrf::field() ?>
+              <label>FIRC/eBRC Reference *<input type="text" name="<?= $leg ?>_firc_reference" required></label>
+              <label>Received On<input type="date" name="<?= $leg ?>_firc_received_at" value="<?= date('Y-m-d') ?>"></label>
+              <button type="submit" class="btn-sm">Record FIRC/eBRC</button>
+            </form>
+          <?php else: ?>
+            <span class="muted small">Not yet recorded.</span>
+          <?php endif; ?>
+        </div>
       </div>
     </div>
     <?php
@@ -768,6 +828,7 @@ $orderClosed = $order['status'] === 'complete';
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
     <?php endif; ?>
 
+    <?php $renderExchangeRateWidget(); ?>
     <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
 
     <?php if (!empty($clientPaymentReports)): ?>

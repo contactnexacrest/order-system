@@ -1102,6 +1102,75 @@ async function deleteFreightInrActual(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+// ----------------------------------------------------------------
+// CA / Accounting module (Phase 2) — assumed exchange rate (one per
+// order, for the register's forex gain/loss column) and per-leg
+// FIRC/eBRC references. Same inr_actual_edit gating as Phase 1.
+// ----------------------------------------------------------------
+
+async function recordAssumedExchangeRate(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const rate = parseFloat(req.body.assumed_exchange_rate || 0);
+  if (!(rate > 0)) {
+    flash.set(req, 'error', 'Enter the assumed INR exchange rate for this order.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  await orderPaymentStatusRepository.setAssumedExchangeRate(orderId, rate, user.id);
+  await auditLogRepository.log(user.id, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'assumed_exchange_rate', null, String(rate));
+  flash.set(req, 'success', 'Assumed exchange rate recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function recordAdvanceFirc(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const reference = str(req.body.advance_firc_reference);
+  if (!reference) {
+    flash.set(req, 'error', 'Enter the FIRC/eBRC reference.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const receivedAt = str(req.body.advance_firc_received_at) || todayYmd();
+  await orderPaymentStatusRepository.setAdvanceFirc(orderId, reference, receivedAt);
+  await auditLogRepository.log(user.id, 'CA_FIRC_RECORDED', 'order_payment_status', orderId, 'advance_firc_reference', null, reference);
+  flash.set(req, 'success', 'Advance FIRC/eBRC reference recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function recordBalanceFirc(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const reference = str(req.body.balance_firc_reference);
+  if (!reference) {
+    flash.set(req, 'error', 'Enter the FIRC/eBRC reference.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const receivedAt = str(req.body.balance_firc_received_at) || todayYmd();
+  await orderPaymentStatusRepository.setBalanceFirc(orderId, reference, receivedAt);
+  await auditLogRepository.log(user.id, 'CA_FIRC_RECORDED', 'order_payment_status', orderId, 'balance_firc_reference', null, reference);
+  flash.set(req, 'success', 'Balance FIRC/eBRC reference recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function recordFreightFirc(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const reference = str(req.body.freight_firc_reference);
+  if (!reference) {
+    flash.set(req, 'error', 'Enter the FIRC/eBRC reference.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const receivedAt = str(req.body.freight_firc_received_at) || todayYmd();
+  await orderPaymentStatusRepository.setFreightFirc(orderId, reference, receivedAt);
+  await auditLogRepository.log(user.id, 'CA_FIRC_RECORDED', 'order_payment_status', orderId, 'freight_firc_reference', null, reference);
+  flash.set(req, 'success', 'Freight FIRC/eBRC reference recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
 async function recordBlOriginalsReceived(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const count = parseInt(req.body.bl_originals_count || 3, 10);
@@ -1231,4 +1300,5 @@ module.exports = {
   closeOrder, overrideStatusLock, markLost,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,
+  recordAssumedExchangeRate, recordAdvanceFirc, recordBalanceFirc, recordFreightFirc,
 };

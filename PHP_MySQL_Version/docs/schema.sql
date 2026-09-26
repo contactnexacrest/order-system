@@ -576,6 +576,26 @@ CREATE TABLE order_payment_status (
   freight_inr_actual_recorded_at  TIMESTAMP NULL,
   freight_inr_actual_recorded_by  BIGINT UNSIGNED NULL,
 
+  -- CA / Accounting module (Phase 2). assumed_exchange_rate is the
+  -- INR-per-unit-foreign-currency rate booked for this order (entered
+  -- once, by whoever holds inr_actual_edit — typically at PI/quotation
+  -- stage) purely so the register can show a forex gain/loss per leg
+  -- (inr_actual - foreign_amount * assumed_exchange_rate) once the real
+  -- INR actual is recorded — it is never used to derive the INR actual
+  -- itself, which always comes from the bank-confirmed figure. The
+  -- *_firc_reference/_firc_received_at pair per leg records the bank's
+  -- Foreign Inward Remittance Certificate / RBI eBRC reference for that
+  -- settlement, so a CA can see which realizations still lack proof.
+  assumed_exchange_rate           DECIMAL(10,4) NULL,
+  assumed_exchange_rate_set_at    TIMESTAMP NULL,
+  assumed_exchange_rate_set_by    BIGINT UNSIGNED NULL,
+  advance_firc_reference          VARCHAR(100) NULL,
+  advance_firc_received_at        DATE NULL,
+  balance_firc_reference          VARCHAR(100) NULL,
+  balance_firc_received_at        DATE NULL,
+  freight_firc_reference          VARCHAR(100) NULL,
+  freight_firc_received_at        DATE NULL,
+
   FOREIGN KEY (order_id) REFERENCES orders(id)
 ) ENGINE=InnoDB;
 

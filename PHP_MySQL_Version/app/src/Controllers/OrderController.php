@@ -1116,6 +1116,79 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    // ----------------------------------------------------------------
+    // CA / Accounting module (Phase 2) — assumed exchange rate (one per
+    // order, for the register's forex gain/loss column) and per-leg
+    // FIRC/eBRC references. Same inr_actual_edit gating as Phase 1.
+    // ----------------------------------------------------------------
+
+    public function recordAssumedExchangeRate(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $rate = (float) ($_POST['assumed_exchange_rate'] ?? 0);
+        if ($rate <= 0) {
+            Flash::set('error', 'Enter the assumed INR exchange rate for this order.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        OrderPaymentStatusRepository::setAssumedExchangeRate($orderId, $rate, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'assumed_exchange_rate', null, (string) $rate);
+        Flash::set('success', 'Assumed exchange rate recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function recordAdvanceFirc(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $reference = trim((string) ($_POST['advance_firc_reference'] ?? ''));
+        if ($reference === '') {
+            Flash::set('error', 'Enter the FIRC/eBRC reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $receivedAt = trim((string) ($_POST['advance_firc_received_at'] ?? '')) ?: date('Y-m-d');
+        OrderPaymentStatusRepository::setAdvanceFirc($orderId, $reference, $receivedAt);
+        AuditLogRepository::log((int) $user['id'], 'CA_FIRC_RECORDED', 'order_payment_status', $orderId, 'advance_firc_reference', null, $reference);
+        Flash::set('success', 'Advance FIRC/eBRC reference recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function recordBalanceFirc(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $reference = trim((string) ($_POST['balance_firc_reference'] ?? ''));
+        if ($reference === '') {
+            Flash::set('error', 'Enter the FIRC/eBRC reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $receivedAt = trim((string) ($_POST['balance_firc_received_at'] ?? '')) ?: date('Y-m-d');
+        OrderPaymentStatusRepository::setBalanceFirc($orderId, $reference, $receivedAt);
+        AuditLogRepository::log((int) $user['id'], 'CA_FIRC_RECORDED', 'order_payment_status', $orderId, 'balance_firc_reference', null, $reference);
+        Flash::set('success', 'Balance FIRC/eBRC reference recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function recordFreightFirc(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $reference = trim((string) ($_POST['freight_firc_reference'] ?? ''));
+        if ($reference === '') {
+            Flash::set('error', 'Enter the FIRC/eBRC reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $receivedAt = trim((string) ($_POST['freight_firc_received_at'] ?? '')) ?: date('Y-m-d');
+        OrderPaymentStatusRepository::setFreightFirc($orderId, $reference, $receivedAt);
+        AuditLogRepository::log((int) $user['id'], 'CA_FIRC_RECORDED', 'order_payment_status', $orderId, 'freight_firc_reference', null, $reference);
+        Flash::set('success', 'Freight FIRC/eBRC reference recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
     public function recordBlOriginalsReceived(array $params): void
     {
         $orderId = (int) $params['id'];

@@ -1,0 +1,86 @@
+<div class="card page-wide">
+  <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
+  <h1>Revenue Report</h1>
+  <p class="muted">Financial-year or calendar-year revenue, computed from the INR Settlement Register — independent of the order-pipeline Reports module (own tables, own totals, no shared queries between the two).</p>
+
+  <form method="get" action="/ca/reports" class="section">
+    <div class="kv-grid">
+      <label>View By
+        <select name="mode" onchange="this.form.submit()">
+          <option value="fy" {{ 'selected' if mode == 'fy' else '' }}>Financial Year (1 Apr – 31 Mar)</option>
+          <option value="calendar" {{ 'selected' if mode == 'calendar' else '' }}>Calendar Year</option>
+        </select>
+      </label>
+      <label>{{ 'Financial Year' if mode == 'fy' else 'Calendar Year' }}
+        <select name="period" onchange="this.form.submit()">
+          {% set periods = availableFy if mode == 'fy' else availableCalendar %}
+          {% if periods.length == 0 %}
+            <option value="{{ period }}">{{ period }} (no data yet)</option>
+          {% endif %}
+          {% for p in periods %}
+            <option value="{{ p }}" {{ 'selected' if (p | string) == period else '' }}>{{ ('FY ' ~ p) if mode == 'fy' else p }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <noscript><button type="submit" class="btn-sm">Run</button></noscript>
+    </div>
+  </form>
+
+  <div class="section">
+    <h2>GST / LUT Export Declaration</h2>
+    <p class="muted small">This business exports under LUT (Letter of Undertaking) — every revenue entry below is a zero-rated export invoice, not a domestic taxable sale.</p>
+    <div class="kv-grid">
+      <div><span class="k">GSTIN</span><span class="v">{{ gstin or '—' }}</span></div>
+      <div><span class="k">LUT Number</span><span class="v">{{ lutNumber or '—' }}</span></div>
+      <div><span class="k">LUT Valid For</span><span class="v">{{ lutValidFy or '—' }}</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Summary — {{ ('FY ' ~ period) if mode == 'fy' else period }} ({{ report.from }} to {{ report.to }})</h2>
+    <div class="kv-grid">
+      <div><span class="k">Settlement Legs</span><span class="v">{{ report.legCount }}</span></div>
+      <div><span class="k">Total INR Realized</span><span class="v">&#8377;{{ report.totalInrActual | money }}</span></div>
+      <div><span class="k">Net Forex Gain/(Loss)</span><span class="v">&#8377;{{ (report.totalForexGainLoss | abs) | money }} {{ 'gain' if report.totalForexGainLoss >= 0 else 'loss' }}</span></div>
+      <div><span class="k">Legs Missing INR Actual</span><span class="v">{{ report.legsMissingInr }}</span></div>
+    </div>
+
+    {% if report.byCurrency | length > 0 %}
+      <table class="list" style="margin-top:12px;">
+        <tr><th>Currency</th><th>Foreign Total</th><th>INR Realized</th><th>Legs</th></tr>
+        {% for cc, b in report.byCurrency %}
+        <tr>
+          <td><strong>{{ cc }}</strong></td>
+          <td>{{ b.foreign_total | money }}</td>
+          <td>&#8377;{{ b.inr_actual_total | money }}</td>
+          <td>{{ b.leg_count }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <p class="muted">No settlement legs cleared in this period.</p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Legs in This Period</h2>
+    {% if report.rows.length == 0 %}
+      <p class="muted">Nothing to show.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Cleared On</th><th>Foreign Amount</th><th>INR Actual</th><th>Forex Gain/(Loss)</th></tr>
+        {% for r in report.rows %}
+        <tr>
+          <td><a href="/orders/{{ r.order_id }}">{{ r.buyer_inquiry_ref }}</a></td>
+          <td>{{ r.company_legal_name }}</td>
+          <td>{{ r.leg | capitalize }}</td>
+          <td>{{ r.cleared_at }}</td>
+          <td>{{ (r.foreign_amount | money) if r.foreign_amount != null else '—' }} {{ r.currency_code }}</td>
+          <td>{% if r.inr_actual != null %}&#8377;{{ r.inr_actual | money }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if r.forex_gain_loss != null %}&#8377;{{ (r.forex_gain_loss | abs) | money }} {{ 'gain' if r.forex_gain_loss >= 0 else 'loss' }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+</div>

@@ -1,9 +1,44 @@
+{% macro exchangeRateWidget() %}
+  {% if canViewInrActual %}
+    {% set rate = payment.assumed_exchange_rate %}
+    {% set setBy = payment.assumed_exchange_rate_set_by %}
+    <div class="review-banner info" style="margin-top:10px;">
+      <div style="width:100%;">
+        <strong>Assumed Exchange Rate (CA/Accounting)</strong><br>
+        {% if rate != null %}
+          <span>1 unit foreign currency = &#8377;{{ rate | money }} — set {{ payment.assumed_exchange_rate_set_at }}{% if setBy %} by {{ usersById[setBy] or ('User #' ~ setBy) }}{% endif %}. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
+          {% if canEditInrActual %}
+            <form method="post" action="/orders/{{ order.id }}/payment/exchange-rate" style="margin-top:6px;">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <label>Update Rate<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
+              <button type="submit" class="btn-sm">Update</button>
+            </form>
+          {% endif %}
+        {% elif canEditInrActual %}
+          <form method="post" action="/orders/{{ order.id }}/payment/exchange-rate">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Assumed Rate (INR per unit foreign currency) *<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
+            <button type="submit" class="btn-sm">Record Rate</button>
+          </form>
+        {% else %}
+          <span class="muted">Not yet recorded.</span>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% endmacro %}
+
 {% macro inrActualWidget(leg, label) %}
   {% set clearedAt = payment[leg ~ '_cleared_at'] %}
   {% if clearedAt and canViewInrActual %}
     {% set amount = payment[leg ~ '_inr_actual'] %}
     {% set recordedAt = payment[leg ~ '_inr_actual_recorded_at'] %}
     {% set recordedBy = payment[leg ~ '_inr_actual_recorded_by'] %}
+    {% set assumedRate = payment.assumed_exchange_rate %}
+    {% set foreignAmount = payment[leg ~ '_amount'] %}
+    {% set forexGainLoss = (amount - (foreignAmount * assumedRate)) if (amount != null and assumedRate != null and foreignAmount != null) else null %}
+    {% set fircReference = payment[leg ~ '_firc_reference'] %}
+    {% set fircReceivedAt = payment[leg ~ '_firc_received_at'] %}
     <div class="review-banner info" style="margin-top:10px;">
       <div style="width:100%;">
         <strong>{{ label }} — INR Actual (CA/Accounting)</strong><br>
@@ -15,6 +50,9 @@
               <button type="submit" class="btn-sm btn-danger">Remove</button>
             </form>
           {% endif %}
+          {% if forexGainLoss != null %}
+            <br><span class="muted small">Forex {{ 'gain' if forexGainLoss >= 0 else 'loss' }}: &#8377;{{ (forexGainLoss | abs) | money }} vs. the assumed rate.</span>
+          {% endif %}
         {% elif canEditInrActual %}
           <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/inr-actual">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -24,6 +62,22 @@
         {% else %}
           <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
         {% endif %}
+
+        <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
+          <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
+          {% if fircReference != null %}
+            <span class="muted small">{{ fircReference }} (received {{ fircReceivedAt }})</span>
+          {% elif canEditInrActual %}
+            <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/firc">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <label>FIRC/eBRC Reference *<input type="text" name="{{ leg }}_firc_reference" required></label>
+              <label>Received On<input type="date" name="{{ leg }}_firc_received_at"></label>
+              <button type="submit" class="btn-sm">Record FIRC/eBRC</button>
+            </form>
+          {% else %}
+            <span class="muted small">Not yet recorded.</span>
+          {% endif %}
+        </div>
       </div>
     </div>
   {% endif %}
@@ -727,6 +781,7 @@
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
     {% endif %}
 
+    {{ exchangeRateWidget() }}
     {{ inrActualWidget('advance', 'Advance Payment') }}
 
     {% if clientPaymentReports and clientPaymentReports.length > 0 %}

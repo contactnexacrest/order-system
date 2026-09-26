@@ -402,6 +402,11 @@ app.post('/orders/:id/unarchive', requireAuth, requirePermission('manage_orders'
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
 app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
 app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.index));
+app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
+app.post('/orders/:id/payment/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAssumedExchangeRate));
+app.post('/orders/:id/payment/advance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceFirc));
+app.post('/orders/:id/payment/balance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceFirc));
+app.post('/orders/:id/payment/freight/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordFreightFirc));
 app.post('/orders/:id/payment/advance/inr-actual', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceInrActual));
 app.post('/orders/:id/payment/advance/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), verifyCsrf, asyncHandler(ordersController.deleteAdvanceInrActual));
 app.post('/orders/:id/payment/balance/inr-actual', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceInrActual));
