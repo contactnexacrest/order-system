@@ -23,6 +23,9 @@ storage/internal/reference_library/*
 storage/font_cache/*
 !storage/font_cache/.gitkeep
 
+# PHPUnit's own cache (test result/coverage cache, regenerated automatically)
+app/.phpunit.cache/
+
 # OS/editor noise
 .DS_Store
 *.swp
