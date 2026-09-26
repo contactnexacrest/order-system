@@ -125,6 +125,24 @@ abstract class DbTestCase extends TestCase
         return $orderId;
     }
 
+    /** A minimal real file_store row (RECEIVED origin), returns its id. */
+    protected function createTestFile(?int $orderId = null, ?int $clientId = null): int
+    {
+        $pdo = \App\Config\Database::connection();
+        $stmt = $pdo->prepare(
+            'INSERT INTO file_store (client_id, order_id, file_origin, server_path, uuid_filename, original_filename, file_size_bytes, mime_type)
+             VALUES (:client_id, :order_id, \'RECEIVED\', :path, :uuid, :orig, 1024, \'application/pdf\')'
+        );
+        $stmt->execute([
+            'client_id' => $clientId,
+            'order_id'  => $orderId,
+            'path'      => '/tmp/phpunit-test-file-' . bin2hex(random_bytes(4)) . '.pdf',
+            'uuid'      => bin2hex(random_bytes(16)) . '.pdf',
+            'orig'      => 'test-file.pdf',
+        ]);
+        return (int) $pdo->lastInsertId();
+    }
+
     /** @return array<int,string> stage_number => status */
     protected function stageStatuses(int $orderId): array
     {

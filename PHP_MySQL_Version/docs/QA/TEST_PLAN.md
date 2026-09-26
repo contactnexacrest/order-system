@@ -236,8 +236,17 @@ Infrastructure (QA-2) is live on both stacks:
 
 ## 8. What QA-4 builds, in order
 
-1. Extend QA-1's stage-gate regression coverage to all 9 stages (P0.1).
-2. Client-portal cross-tenant isolation suite (P0.2).
+1. ✅ Extend QA-1's stage-gate regression coverage to all 9 stages (P0.1)
+   — `StageGateServiceTest`/`stageGate.test.js`.
+2. ✅ Client-portal cross-tenant isolation suite (P0.2) — all 10
+   `/client/orders/{id}/...` and `/client/documents/{id}/download` routes,
+   each hit with a real second client's real resource behind it (not a
+   nonexistent id, so a removed ownership check would genuinely be caught):
+   `ClientPortalCrossTenantTest.php` (direct controller invocation — PHP
+   has no HTTP-level test harness) and `clientPortalCrossTenant.test.js`
+   (real Supertest HTTP requests, the natural fit on Node). Both suites
+   were verified to actually fail when the ownership check they pin was
+   temporarily removed, then reverted.
 3. CA FY-lock enforcement suite across all CA write routes (P0.3).
 4. Amendment/document-review/email-approval gate suite (P0.4).
 5. A systematic pass over every `manage_*`-gated write route asking

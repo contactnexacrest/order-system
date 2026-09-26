@@ -76,17 +76,6 @@ final class WetSignatureGuardTest extends DbTestCase
         self::assertFalse(WetSignatureGuardService::supplierPoBlocked($supplierPoId));
     }
 
-    private function createTestFile(int $orderId): int
-    {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare(
-            "INSERT INTO file_store (order_id, file_origin, server_path, uuid_filename, original_filename, file_size_bytes, mime_type)
-             VALUES (:order_id, 'RECEIVED', '/tmp/phpunit-test-file.pdf', :uuid, 'signed-copy.pdf', 1024, 'application/pdf')"
-        );
-        $stmt->execute(['order_id' => $orderId, 'uuid' => bin2hex(random_bytes(16)) . '.pdf']);
-        return (int) $pdo->lastInsertId();
-    }
-
     private function createTestSupplierPo(int $orderId): int
     {
         $pdo = Database::connection();
