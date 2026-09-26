@@ -1,6 +1,7 @@
 'use strict';
 
 const caRepository = require('../repositories/caRepository');
+const caExpenseRepository = require('../repositories/caExpenseRepository');
 const userRepository = require('../repositories/userRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const financialYear = require('../helpers/financialYear');
@@ -79,15 +80,43 @@ async function zohoSync(req, res) {
 
 async function runZohoSync(req, res) {
   const user = req.user;
-  const result = await caSyncService.syncPendingRevenue('manual', user.id);
-  if (result.failed > 0) {
-    flash.set(req, 'warning', `Sync finished: ${result.synced} pushed, ${result.failed} failed — see the log below for details.`);
-  } else if (result.synced > 0) {
-    flash.set(req, 'success', `Sync finished: ${result.synced} settlement leg(s) pushed to Zoho Books.`);
+  const result = await caSyncService.runFullSync('manual', user.id);
+  const { revenue, expenses } = result;
+
+  if (revenue.failed > 0 || expenses.failed > 0) {
+    flash.set(req, 'warning', `Sync finished: ${revenue.synced} payment(s) pushed, ${expenses.imported} expense(s) imported, ${revenue.failed + expenses.failed} failed — see the log below for details.`);
+  } else if (revenue.synced > 0 || expenses.imported > 0) {
+    flash.set(req, 'success', `Sync finished: ${revenue.synced} payment(s) pushed, ${expenses.imported} expense(s) imported.`);
   } else {
     flash.set(req, 'success', "Sync ran — nothing was pending (or Zoho Books isn't configured yet). See the log below.");
   }
   res.redirect('/ca/zoho-sync');
 }
 
-module.exports = { index, reports, zohoSync, runZohoSync };
+/**
+ * Expenses imported one-way from Zoho Books (Phase 4). No create/edit
+ * path for the expense data itself here — only the local-only TDS
+ * annotation, which never pushes back to Zoho.
+ */
+async function expenses(req, res) {
+  res.renderView('ca/expenses', {
+    expenses: await caExpenseRepository.all(),
+    usersById: await usersById(),
+    canEditTds: !!req.permissions.inr_actual_edit,
+  }, 'layout/base');
+}
+
+async function setExpenseTds(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const user = req.user;
+  const isTdsApplicable = !!req.body.is_tds_applicable;
+  const tdsAmount = isTdsApplicable && String(req.body.tds_amount || '').trim() !== ''
+    ? parseFloat(req.body.tds_amount)
+    : null;
+
+  await caExpenseRepository.setTds(id, isTdsApplicable, tdsAmount, user.id);
+  flash.set(req, 'success', 'Expense TDS details updated.');
+  res.redirect('/ca/expenses');
+}
+
+module.exports = { index, reports, zohoSync, runZohoSync, expenses, setExpenseTds };

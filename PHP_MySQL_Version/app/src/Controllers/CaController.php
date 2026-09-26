@@ -7,12 +7,14 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\FinancialYear;
 use App\Helpers\View;
+use App\Repositories\CaExpenseRepository;
 use App\Repositories\CaRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\UserRepository;
 use App\Repositories\ZohoSyncLogRepository;
 use App\Services\AuthService;
 use App\Services\CaSyncService;
+use App\Services\PermissionService;
 use App\Services\ZohoBooksService;
 
 /**
@@ -93,14 +95,48 @@ final class CaController
     public function runZohoSync(array $params): void
     {
         $user = AuthService::currentUser();
-        $result = CaSyncService::syncPendingRevenue('manual', (int) $user['id']);
-        if ($result['failed'] > 0) {
-            Flash::set('warning', "Sync finished: {$result['synced']} pushed, {$result['failed']} failed — see the log below for details.");
-        } elseif ($result['synced'] > 0) {
-            Flash::set('success', "Sync finished: {$result['synced']} settlement leg(s) pushed to Zoho Books.");
+        $result = CaSyncService::runFullSync('manual', (int) $user['id']);
+        $revenue = $result['revenue'];
+        $expenses = $result['expenses'];
+
+        if ($revenue['failed'] > 0 || $expenses['failed'] > 0) {
+            Flash::set('warning', "Sync finished: {$revenue['synced']} payment(s) pushed, {$expenses['imported']} expense(s) imported, " . ($revenue['failed'] + $expenses['failed']) . ' failed — see the log below for details.');
+        } elseif ($revenue['synced'] > 0 || $expenses['imported'] > 0) {
+            Flash::set('success', "Sync finished: {$revenue['synced']} payment(s) pushed, {$expenses['imported']} expense(s) imported.");
         } else {
             Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
         }
         header('Location: /ca/zoho-sync');
+    }
+
+    /**
+     * Expenses imported one-way from Zoho Books (Phase 4). No create/edit
+     * path for the expense data itself here — only the local-only TDS
+     * annotation, which never pushes back to Zoho.
+     */
+    public function expenses(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+
+        View::render('ca/expenses', [
+            'expenses' => CaExpenseRepository::all(),
+            'usersById' => $this->usersById(),
+            'canEditTds' => PermissionService::can((int) $user['id'], $roleId, 'inr_actual_edit'),
+        ], 'layout/base');
+    }
+
+    public function setExpenseTds(array $params): void
+    {
+        $id = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $isTdsApplicable = !empty($_POST['is_tds_applicable']);
+        $tdsAmount = $isTdsApplicable && trim((string) ($_POST['tds_amount'] ?? '')) !== ''
+            ? (float) $_POST['tds_amount']
+            : null;
+
+        CaExpenseRepository::setTds($id, $isTdsApplicable, $tdsAmount, (int) $user['id']);
+        Flash::set('success', 'Expense TDS details updated.');
+        header('Location: /ca/expenses');
     }
 }

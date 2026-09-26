@@ -1017,6 +1017,32 @@ CREATE TABLE zoho_sync_log (
   INDEX idx_zoho_sync_time (created_at)
 ) ENGINE=InnoDB;
 
+-- CA / Accounting module (Phase 4) — expenses, imported one-way from Zoho
+-- Books (the reverse direction of Phase 3's revenue push, per the module's
+-- own brief: "we may give salary to employees, pay to supplier/travel
+-- expenses etc... from zoho we will export and in our system, we will
+-- import"). No manual expense entry here by design — Zoho Books stays the
+-- one place expenses are actually entered; this is a read-only mirror for
+-- CA/reconciliation reporting. zoho_expense_id is the dedup key: an
+-- import run never re-inserts a row it has already pulled.
+CREATE TABLE ca_expenses (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  zoho_expense_id     VARCHAR(50) NOT NULL UNIQUE,
+  category            VARCHAR(150) NOT NULL,       -- Zoho Books' own expense account/category name, not a locally re-invented taxonomy
+  description         VARCHAR(500) NULL,
+  vendor_name         VARCHAR(255) NULL,
+  amount              DECIMAL(14,2) NOT NULL,
+  currency_code       VARCHAR(10) NOT NULL DEFAULT 'INR',
+  expense_date        DATE NOT NULL,
+  is_tds_applicable   TINYINT(1) NOT NULL DEFAULT 0,  -- set locally after import (Zoho Books' own TDS fields aren't assumed present) — see ca-04-expenses.md
+  tds_amount          DECIMAL(14,2) NULL,
+  tds_set_by          BIGINT UNSIGNED NULL,
+  tds_set_at          TIMESTAMP NULL,
+  imported_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (tds_set_by) REFERENCES users(id),
+  INDEX idx_ca_expenses_date (expense_date)
+) ENGINE=InnoDB;
+
 -- ================================================================
 -- SECTION K — 2FA BACKUP CODES & SAVED REPORT DEFINITIONS
 -- (Resolved 2026-09-18 — see ARCHITECTURE.md "Open questions", now closed)

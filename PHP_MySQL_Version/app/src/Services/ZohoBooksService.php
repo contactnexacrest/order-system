@@ -8,13 +8,15 @@ use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
 
 /**
- * CA / Accounting module (Phase 3) — pushes a settled revenue leg to Zoho
- * Books as a Customer Payment, via the OAuth self-client refresh-token
- * flow (same shape as ZohoMailService, a separate credential set since
- * Zoho Mail and Zoho Books are different API scopes). Every public method
- * here either returns a result or throws — CaSyncService is the one place
- * that catches those throws, logs them to zoho_sync_log, and moves on to
- * the next leg, so this class is free to fail loudly and correctly on any
+ * CA / Accounting module — the Zoho Books connection. Phase 3 pushes a
+ * settled revenue leg as a Customer Payment (one-way, this system to
+ * Zoho); Phase 4 imports expenses (one-way, Zoho to this system) — both
+ * via the same OAuth self-client refresh-token flow (same shape as
+ * ZohoMailService, a separate credential set since Zoho Mail and Zoho
+ * Books are different API scopes). Every public method here either
+ * returns a result or throws — CaSyncService is the one place that
+ * catches those throws, logs them to zoho_sync_log, and moves on to the
+ * next item, so this class is free to fail loudly and correctly on any
  * bad response.
  *
  * NOTE: written against Zoho Books API v3's documented shape
@@ -76,6 +78,57 @@ final class ZohoBooksService
         }
 
         return $paymentId;
+    }
+
+    /**
+     * Every expense recorded in Zoho Books (Phase 4 — one-way import, the
+     * reverse direction of pushRevenuePayment()). Reads only the Expenses
+     * list endpoint's own summary fields — never a per-item detail call —
+     * so an import with hundreds of expenses stays a handful of requests;
+     * see ca-04-expenses.md for why Zoho's own TDS fields aren't read here.
+     *
+     * @throws \RuntimeException on any missing config, HTTP failure, or unexpected response
+     * @return array<int, array{zohoExpenseId:string, category:string, description:?string, vendorName:?string, amount:float, currencyCode:string, expenseDate:string}>
+     */
+    public static function listExpenses(): array
+    {
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+
+        $expenses = [];
+        $page = 1;
+        do {
+            $response = self::request(
+                'GET',
+                "https://{$config['apiDomain']}/books/v3/expenses?organization_id=" . rawurlencode($config['organizationId']) . "&page={$page}&per_page=200",
+                [],
+                self::authHeaders($accessToken)
+            );
+            $decoded = json_decode($response['body'], true);
+            if ($response['status'] < 200 || $response['status'] >= 300 || !is_array($decoded) || !isset($decoded['expenses'])) {
+                throw new \RuntimeException('Zoho Books expense list failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+
+            foreach ($decoded['expenses'] as $row) {
+                if (empty($row['expense_id'])) {
+                    continue;
+                }
+                $expenses[] = [
+                    'zohoExpenseId' => (string) $row['expense_id'],
+                    'category' => (string) ($row['account_name'] ?? 'Uncategorized'),
+                    'description' => $row['description'] ?? null,
+                    'vendorName' => $row['vendor_name'] ?? null,
+                    'amount' => (float) ($row['total'] ?? 0),
+                    'currencyCode' => (string) ($row['currency_code'] ?? 'INR'),
+                    'expenseDate' => (string) ($row['date'] ?? date('Y-m-d')),
+                ];
+            }
+
+            $hasMore = (bool) ($decoded['page_context']['has_more_page'] ?? false);
+            $page++;
+        } while ($hasMore);
+
+        return $expenses;
     }
 
     /** @return array{clientId:string, clientSecret:string, refreshToken:string, organizationId:string, depositAccountId:string, accountsDomain:string, apiDomain:string} */

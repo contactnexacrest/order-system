@@ -4,14 +4,16 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const clientRepository = require('../repositories/clientRepository');
 
 /**
- * CA / Accounting module (Phase 3) — pushes a settled revenue leg to Zoho
- * Books as a Customer Payment, via the OAuth self-client refresh-token
- * flow (same shape as zohoMailService, a separate credential set since
- * Zoho Mail and Zoho Books are different API scopes). Every public
- * function here either returns a result or throws — caSyncService is the
- * one place that catches those throws, logs them to zoho_sync_log, and
- * moves on to the next leg, so this module is free to fail loudly and
- * correctly on any bad response.
+ * CA / Accounting module — the Zoho Books connection. Phase 3 pushes a
+ * settled revenue leg as a Customer Payment (one-way, this system to
+ * Zoho); Phase 4 imports expenses (one-way, Zoho to this system) — both
+ * via the same OAuth self-client refresh-token flow (same shape as
+ * zohoMailService, a separate credential set since Zoho Mail and Zoho
+ * Books are different API scopes). Every public function here either
+ * returns a result or throws — caSyncService is the one place that
+ * catches those throws, logs them to zoho_sync_log, and moves on to the
+ * next item, so this module is free to fail loudly and correctly on any
+ * bad response.
  *
  * NOTE: written against Zoho Books API v3's documented shape
  * (accounts.zoho.com OAuth token endpoint; www.zohoapis.com/books/v3/...
@@ -57,6 +59,54 @@ async function pushRevenuePayment(clientId, companyLegalName, amountInr, date, r
     throw new Error(`Zoho Books customer payment failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
   }
   return paymentId;
+}
+
+/**
+ * Every expense recorded in Zoho Books (Phase 4 — one-way import, the
+ * reverse direction of pushRevenuePayment()). Reads only the Expenses
+ * list endpoint's own summary fields — never a per-item detail call — so
+ * an import with hundreds of expenses stays a handful of requests; see
+ * ca-04-expenses.md for why Zoho's own TDS fields aren't read here.
+ *
+ * @throws on any missing config, HTTP failure, or unexpected response
+ */
+async function listExpenses() {
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+
+  const expenses = [];
+  let page = 1;
+  let hasMore = true;
+  while (hasMore) {
+    const res = await request(
+      'GET',
+      `https://${config.apiDomain}/books/v3/expenses?organization_id=${encodeURIComponent(config.organizationId)}&page=${page}&per_page=200`,
+      null,
+      authHeaders(accessToken)
+    );
+    const decoded = safeJson(res.body);
+    if (!res.ok || !decoded || !Array.isArray(decoded.expenses)) {
+      throw new Error(`Zoho Books expense list failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+    }
+
+    for (const row of decoded.expenses) {
+      if (!row.expense_id) continue;
+      expenses.push({
+        zohoExpenseId: String(row.expense_id),
+        category: row.account_name || 'Uncategorized',
+        description: row.description || null,
+        vendorName: row.vendor_name || null,
+        amount: parseFloat(row.total || 0),
+        currencyCode: row.currency_code || 'INR',
+        expenseDate: row.date || new Date().toISOString().slice(0, 10),
+      });
+    }
+
+    hasMore = !!(decoded.page_context && decoded.page_context.has_more_page);
+    page += 1;
+  }
+
+  return expenses;
 }
 
 async function loadConfig() {
@@ -158,4 +208,4 @@ function safeJson(text) {
   }
 }
 
-module.exports = { isEnabled, pushRevenuePayment };
+module.exports = { isEnabled, pushRevenuePayment, listExpenses };

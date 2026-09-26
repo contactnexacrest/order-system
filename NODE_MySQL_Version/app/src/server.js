@@ -405,6 +405,8 @@ app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(ca
 app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
 app.post('/ca/zoho-sync/run', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.runZohoSync));
+app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.expenses));
+app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
 app.post('/orders/:id/payment/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAssumedExchangeRate));
 app.post('/orders/:id/payment/advance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceFirc));
 app.post('/orders/:id/payment/balance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceFirc));
