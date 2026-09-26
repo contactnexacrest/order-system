@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\ReasonValidator;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
@@ -152,5 +153,55 @@ final class DocumentController
         header('Content-Disposition: attachment; filename="' . $safeDownloadName . '"');
         header('Content-Length: ' . (string) $file['file_size_bytes']);
         readfile($file['server_path']);
+    }
+
+    /**
+     * Deletes a mistaken draft document — draft only, never in_review or
+     * beyond (those are superseded by a new revision, not deleted). Requires
+     * a real reason, same ReasonValidator::MIN_LENGTH rule as every other
+     * reason field, recorded to the audit trail before the row is gone.
+     */
+    public function delete(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $documentId = (int) $params['documentId'];
+        $user = AuthService::currentUser();
+
+        $document = DocumentRepository::find($documentId);
+        if (!$document || (int) $document['order_id'] !== $orderId) {
+            Flash::set('error', 'Document not found.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if ($document['status'] !== 'draft') {
+            Flash::set('error', 'Only a draft document can be deleted — this one has moved past draft status.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        $reasonError = ReasonValidator::check($reason);
+        if ($reasonError !== null) {
+            Flash::set('error', $reasonError);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $reference = $document['document_reference'] ?? ($document['document_type_code'] . ' Rev.' . $document['revision_number']);
+        DocumentRepository::deleteDraft($documentId);
+
+        AuditLogRepository::log(
+            (int) $user['id'],
+            'DOCUMENT_DRAFT_DELETED',
+            'orders',
+            $orderId,
+            'document',
+            $reference,
+            null,
+            $reason
+        );
+
+        Flash::set('success', "Draft document {$reference} deleted.");
+        header("Location: /orders/{$orderId}");
     }
 }

@@ -439,6 +439,7 @@ app.post('/orders/:id/close', requireAuth, requirePermission('manage_orders'), v
 app.post('/orders/:id/mark-lost', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.markLost));
 
 app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));
+app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.deleteDraft));
 app.get('/documents/:documentId/download', requireAuth, requirePermission('download_pdf'), asyncHandler(documentController.download));
 app.get('/file-store/:id/download', requireAuth, requirePermission('manage_orders'), asyncHandler(fileStoreController.download));
 

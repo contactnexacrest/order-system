@@ -130,7 +130,42 @@ async function create(orderId, documentTypeId, documentReference, revisionNumber
   return result.insertId;
 }
 
+/**
+ * Hard-deletes a mistaken draft — the only status this is ever allowed for
+ * (callers must check status === 'draft' before calling this; a document
+ * that's gone to review/approval/sent is never deleted, only superseded by
+ * a new revision). The generated PDF/DOCX themselves are never hard-deleted
+ * (file_store.is_active is soft-delete only, per schema.sql SECTION G) —
+ * this just soft-deletes them and detaches every other table that can
+ * reference this document_id, then removes the documents row itself. Runs
+ * in one transaction so a mistake never leaves the row half-deleted.
+ */
+async function deleteDraft(id) {
+  await db.transaction(async (tx) => {
+    const row = await tx.queryOne('SELECT pdf_file_id, docx_file_id FROM documents WHERE id = :id', { id });
+
+    for (const table of ['document_reviews', 'document_cross_verifications', 'document_revisions']) {
+      await tx.execute(`DELETE FROM ${table} WHERE document_id = :id`, { id });
+    }
+    for (const table of ['email_log', 'watermark_settings', 'amendments']) {
+      await tx.execute(`UPDATE ${table} SET document_id = NULL WHERE document_id = :id`, { id });
+    }
+    await tx.execute('UPDATE file_store SET linked_document_id = NULL WHERE linked_document_id = :id', { id });
+    await tx.execute('UPDATE order_freight SET fdn_document_id = NULL WHERE fdn_document_id = :id', { id });
+
+    if (row) {
+      for (const fileId of [row.pdf_file_id, row.docx_file_id]) {
+        if (fileId !== null) {
+          await tx.execute('UPDATE file_store SET is_active = 0 WHERE id = :id', { id: fileId });
+        }
+      }
+    }
+
+    await tx.execute('DELETE FROM documents WHERE id = :id', { id });
+  });
+}
+
 module.exports = {
   customerFacingForOrder, forOrder, find, findLatestForOrderAndType, findLatestForOrderAndTypeCode,
-  countPriorSent, markApproved, markInReview, markDraft, markSent, create,
+  countPriorSent, markApproved, markInReview, markDraft, markSent, create, deleteDraft,
 };

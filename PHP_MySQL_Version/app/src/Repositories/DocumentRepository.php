@@ -198,4 +198,49 @@ final class DocumentRepository
         ]);
         return (int) $pdo->lastInsertId();
     }
+
+    /**
+     * Hard-deletes a mistaken draft — the only status this is ever allowed
+     * for (callers must check status === 'draft' before calling this; a
+     * document that's gone to review/approval/sent is never deleted, only
+     * superseded by a new revision). The generated PDF/DOCX themselves are
+     * never hard-deleted (file_store.is_active is soft-delete only, per
+     * schema.sql SECTION G) — this just soft-deletes them and detaches
+     * every other table that can reference this document_id, then removes
+     * the documents row itself. Runs in one transaction so a mistake never
+     * leaves the row half-deleted.
+     */
+    public static function deleteDraft(int $id): void
+    {
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $doc = $pdo->prepare('SELECT pdf_file_id, docx_file_id FROM documents WHERE id = :id');
+            $doc->execute(['id' => $id]);
+            $row = $doc->fetch();
+
+            foreach (['document_reviews', 'document_cross_verifications', 'document_revisions'] as $table) {
+                $pdo->prepare("DELETE FROM {$table} WHERE document_id = :id")->execute(['id' => $id]);
+            }
+            foreach (['email_log', 'watermark_settings', 'amendments', 'file_store'] as $table) {
+                $column = $table === 'file_store' ? 'linked_document_id' : ($table === 'amendments' ? 'document_id' : 'document_id');
+                $pdo->prepare("UPDATE {$table} SET {$column} = NULL WHERE {$column} = :id")->execute(['id' => $id]);
+            }
+            $pdo->prepare('UPDATE order_freight SET fdn_document_id = NULL WHERE fdn_document_id = :id')->execute(['id' => $id]);
+
+            if ($row) {
+                foreach ([$row['pdf_file_id'], $row['docx_file_id']] as $fileId) {
+                    if ($fileId !== null) {
+                        $pdo->prepare('UPDATE file_store SET is_active = 0 WHERE id = :id')->execute(['id' => $fileId]);
+                    }
+                }
+            }
+
+            $pdo->prepare('DELETE FROM documents WHERE id = :id')->execute(['id' => $id]);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
 }

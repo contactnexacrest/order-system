@@ -132,7 +132,7 @@ $orderClosed = $order['status'] === 'complete';
   <div class="section">
     <h2>Documents</h2>
     <table class="list">
-      <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th></tr>
+      <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th><th></th></tr>
       <?php foreach ($documents as $d): ?>
       <tr>
         <td><?= htmlspecialchars($d['document_type_code']) ?></td>
@@ -144,12 +144,35 @@ $orderClosed = $order['status'] === 'complete';
           <?php if ($d['pdf_file_id']): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf">PDF</a><?php endif; ?>
           <?php if ($d['docx_file_id']): ?> · <a href="/documents/<?= (int) $d['id'] ?>/download?format=docx">DOCX (internal)</a><?php endif; ?>
         </td>
+        <td>
+          <?php if ($d['status'] === 'draft'): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/<?= (int) $d['id'] ?>/delete" onsubmit="return confirmDeleteDraft(this);">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="reason" class="delete-draft-reason">
+            <button type="button" class="btn-sm btn-danger" onclick="promptDeleteDraft(this)">Delete Draft</button>
+          </form>
+          <?php endif; ?>
+        </td>
       </tr>
       <?php endforeach; ?>
       <?php if (empty($documents)): ?>
-      <tr><td colspan="6" class="muted">No documents generated yet.</td></tr>
+      <tr><td colspan="7" class="muted">No documents generated yet.</td></tr>
       <?php endif; ?>
     </table>
+    <script>
+      function promptDeleteDraft(btn) {
+        var form = btn.closest('form');
+        var reason = prompt('Why is this draft document being deleted? (required, at least 10 characters — recorded in the audit log)');
+        if (!reason || reason.trim().length < 10) { return; }
+        form.querySelector('.delete-draft-reason').value = reason.trim();
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      }
+      function confirmDeleteDraft(form) {
+        var reason = form.querySelector('.delete-draft-reason').value;
+        if (!reason) { return false; }
+        return confirm('Delete this draft document? This cannot be undone.');
+      }
+    </script>
 
     <div class="btn-row">
       <?php if ($stage1 && $stage1['status'] !== 'locked'): ?>

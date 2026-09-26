@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
@@ -150,4 +151,53 @@ async function download(req, res) {
   fs.createReadStream(file.server_path).pipe(res);
 }
 
-module.exports = { generate, download };
+/**
+ * Deletes a mistaken draft document — draft only, never in_review or
+ * beyond (those are superseded by a new revision, not deleted). Requires a
+ * real reason, same reasonValidator.MIN_LENGTH rule as every other reason
+ * field, recorded to the audit trail before the row is gone.
+ */
+async function deleteDraft(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const documentId = parseInt(req.params.documentId, 10);
+  const user = req.user;
+
+  const document = await documentRepository.find(documentId);
+  if (!document || document.order_id !== orderId) {
+    flash.set(req, 'error', 'Document not found.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (document.status !== 'draft') {
+    flash.set(req, 'error', 'Only a draft document can be deleted — this one has moved past draft status.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const reason = String(req.body.reason || '').trim();
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const reference = document.document_reference || `${document.document_type_code} Rev.${document.revision_number}`;
+  await documentRepository.deleteDraft(documentId);
+
+  await auditLogRepository.log(
+    user.id,
+    'DOCUMENT_DRAFT_DELETED',
+    'orders',
+    orderId,
+    'document',
+    reference,
+    null,
+    reason
+  );
+
+  flash.set(req, 'success', `Draft document ${reference} deleted.`);
+  res.redirect(`/orders/${orderId}`);
+}
+
+module.exports = { generate, download, deleteDraft };

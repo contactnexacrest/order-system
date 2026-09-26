@@ -120,7 +120,7 @@
   <div class="section">
     <h2>Documents</h2>
     <table class="list">
-      <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th></tr>
+      <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th><th></th></tr>
       {% for d in documents %}
       <tr>
         <td>{{ d.document_type_code }}</td>
@@ -132,12 +132,35 @@
           {% if d.pdf_file_id %}<a href="/documents/{{ d.id }}/download?format=pdf">PDF</a>{% endif %}
           {% if d.docx_file_id %} &middot; <a href="/documents/{{ d.id }}/download?format=docx">DOCX (internal)</a>{% endif %}
         </td>
+        <td>
+          {% if d.status == 'draft' %}
+          <form method="post" action="/orders/{{ order.id }}/documents/{{ d.id }}/delete" onsubmit="return confirmDeleteDraft(this);">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="reason" class="delete-draft-reason">
+            <button type="button" class="btn-sm btn-danger" onclick="promptDeleteDraft(this)">Delete Draft</button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
       {% if not documents or documents.length == 0 %}
-      <tr><td colspan="6" class="muted">No documents generated yet.</td></tr>
+      <tr><td colspan="7" class="muted">No documents generated yet.</td></tr>
       {% endif %}
     </table>
+    <script>
+      function promptDeleteDraft(btn) {
+        var form = btn.closest('form');
+        var reason = prompt('Why is this draft document being deleted? (required, at least 10 characters — recorded in the audit log)');
+        if (!reason || reason.trim().length < 10) { return; }
+        form.querySelector('.delete-draft-reason').value = reason.trim();
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      }
+      function confirmDeleteDraft(form) {
+        var reason = form.querySelector('.delete-draft-reason').value;
+        if (!reason) { return false; }
+        return confirm('Delete this draft document? This cannot be undone.');
+      }
+    </script>
 
     <div class="btn-row">
       {% if stage1 and stage1.status != 'locked' %}
