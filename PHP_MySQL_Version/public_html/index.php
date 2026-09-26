@@ -396,6 +396,7 @@ $router->post('/client/orders/{id}/acknowledge-oc', [$clientPortal, 'acknowledge
 $router->post('/client/orders/{id}/disputes', [$clientPortal, 'raiseDispute'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/comments', [$clientPortal, 'postComment'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->get('/client/orders/{id}/comment-attachments/{fileId}/download', [$clientPortal, 'downloadCommentAttachment'], [ClientAuth::required()]);
+$router->get('/client/orders/{id}/payment-reports/{reportId}/screenshot', [$clientPortal, 'downloadPaymentScreenshot'], [ClientAuth::required()]);
 $router->get('/client/documents/{id}/download', [$clientPortal, 'downloadDocument'], [ClientAuth::required()]);
 
 $router->get('/sample-data', [$sampleData, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_sample_data')]);

@@ -215,6 +215,39 @@ final class ClientPortalController
         readfile($file['server_path']);
     }
 
+    /** A client's own previously-uploaded payment screenshot — same ownership-check pattern as downloadCommentAttachment(). */
+    public function downloadPaymentScreenshot(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $reportId = (int) ($params['reportId'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $report = ClientPaymentReportRepository::find($reportId);
+        if (!$report || (int) $report['order_id'] !== $orderId || !$report['screenshot_file_id']) {
+            http_response_code(404);
+            echo 'Attachment not found.';
+            return;
+        }
+
+        $file = FileStoreRepository::find((int) $report['screenshot_file_id']);
+        if (!$file || !is_file($file['server_path'])) {
+            http_response_code(404);
+            echo 'File is missing from storage.';
+            return;
+        }
+        $safeDownloadName = preg_replace('/[\x00-\x1F\x7F"\/\\\\]/', '', $file['original_filename']) ?? $file['original_filename'];
+        header('Content-Type: ' . ($file['mime_type'] ?: 'application/octet-stream'));
+        header('Content-Disposition: attachment; filename="' . $safeDownloadName . '"');
+        header('Content-Length: ' . filesize($file['server_path']));
+        readfile($file['server_path']);
+    }
+
     /**
      * The client's own Order Confirmation acknowledgment — the single
      * button offered (docs/schema.sql Section AE). Deliberately no

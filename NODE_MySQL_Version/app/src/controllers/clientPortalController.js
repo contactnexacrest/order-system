@@ -214,6 +214,34 @@ async function downloadCommentAttachment(req, res) {
   fs.createReadStream(file.server_path).pipe(res);
 }
 
+/** A client's own previously-uploaded payment screenshot — same ownership-check pattern as downloadCommentAttachment(). */
+async function downloadPaymentScreenshot(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const reportId = parseInt(req.params.reportId, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const report = await clientPaymentReportRepository.find(reportId);
+  if (!report || report.order_id !== orderId || !report.screenshot_file_id) {
+    res.status(404).send('Attachment not found.');
+    return;
+  }
+
+  const file = await fileStoreRepository.find(report.screenshot_file_id);
+  if (!file || !fs.existsSync(file.server_path)) {
+    res.status(404).send('File is missing from storage.');
+    return;
+  }
+  const safeDownloadName = file.original_filename.replace(/[\x00-\x1F\x7F"/\\]/g, '');
+  res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeDownloadName}"`);
+  fs.createReadStream(file.server_path).pipe(res);
+}
+
 /**
  * Client's own "I've paid" note — transaction ref + optional screenshot
  * of the remittance advice. Purely informational (docs/schema.sql
@@ -419,5 +447,5 @@ async function changePassword(req, res) {
 module.exports = {
   showLogin, login, logout, showSetPassword, setPassword, dashboard, showOrder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
-  postComment, downloadCommentAttachment,
+  postComment, downloadCommentAttachment, downloadPaymentScreenshot,
 };

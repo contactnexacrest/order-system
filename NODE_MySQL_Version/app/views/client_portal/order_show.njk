@@ -108,7 +108,7 @@
     {% if paymentReports and paymentReports.length > 0 %}
       <h3 style="margin-top:20px">Previously Reported</h3>
       <table class="list">
-        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Status</th></tr>
+        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Status</th><th>Attachment</th></tr>
         {% for r in paymentReports %}
         <tr>
           <td>{{ r.payment_type | capitalize }}</td>
@@ -116,6 +116,18 @@
           <td>{{ (r.amount | money) if r.amount != null else '—' }}</td>
           <td>{{ r.payment_date or '—' }}</td>
           <td>{{ 'Reviewed by our team' if r.status == 'reviewed' else 'Received — pending review' }}</td>
+          <td>
+            {% if r.screenshot_file_id %}
+              {% set screenshotUrl = '/client/orders/' ~ order.id ~ '/payment-reports/' ~ r.id ~ '/screenshot' %}
+              {% if r.screenshot_mime_type and r.screenshot_mime_type.startsWith('image/') %}
+                <a href="{{ screenshotUrl }}" target="_blank"><img src="{{ screenshotUrl }}" alt="Payment screenshot" class="asset-preview" style="max-height:60px;"></a>
+              {% else %}
+                <a href="{{ screenshotUrl }}" target="_blank">View attachment</a>
+              {% endif %}
+            {% else %}
+              <span class="muted small">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </table>

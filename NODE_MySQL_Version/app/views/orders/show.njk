@@ -666,7 +666,7 @@
       <h3 style="margin-top:16px">Client-Reported Payments</h3>
       <p class="muted small">Purely informational — the client submitted these themselves. Always verify against the actual bank statement before recording a payment above.</p>
       <table class="list">
-        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Bank / Payer Details</th><th>Reported</th><th>Status</th><th></th></tr>
+        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Bank / Payer Details</th><th>Attachment</th><th>Reported</th><th>Status</th><th></th></tr>
         {% for r in clientPaymentReports %}
         <tr>
           <td>{{ r.payment_type | capitalize }}</td>
@@ -674,6 +674,18 @@
           <td>{{ (r.amount | money) if r.amount != null else '—' }}</td>
           <td>{{ r.payment_date or '—' }}</td>
           <td>{{ r.payer_bank_details or '—' }}</td>
+          <td>
+            {% if r.screenshot_file_id %}
+              {% set screenshotUrl = '/file-store/' ~ r.screenshot_file_id ~ '/download' %}
+              {% if r.screenshot_mime_type and r.screenshot_mime_type.startsWith('image/') %}
+                <a href="{{ screenshotUrl }}" target="_blank"><img src="{{ screenshotUrl }}" alt="Payment screenshot" class="asset-preview" style="max-height:60px;"></a>
+              {% else %}
+                <a href="{{ screenshotUrl }}" target="_blank">View attachment</a>
+              {% endif %}
+            {% else %}
+              <span class="muted small">—</span>
+            {% endif %}
+          </td>
           <td>{{ r.reported_at | humanDate }}</td>
           <td>{{ ('Reviewed by ' + (r.reviewed_by_name or '—')) if r.status == 'reviewed' else 'New' }}</td>
           <td>

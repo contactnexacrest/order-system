@@ -560,6 +560,7 @@ app.post('/client/account/password', requireClientAuth, verifyCsrf, asyncHandler
 app.get('/client/orders/:id', requireClientAuth, asyncHandler(clientPortalController.showOrder));
 app.post('/client/orders/:id/comments', requireClientAuth, uploadMedia.array('attachments'), verifyCsrf, asyncHandler(clientPortalController.postComment));
 app.get('/client/orders/:id/comment-attachments/:fileId/download', requireClientAuth, asyncHandler(clientPortalController.downloadCommentAttachment));
+app.get('/client/orders/:id/payment-reports/:reportId/screenshot', requireClientAuth, asyncHandler(clientPortalController.downloadPaymentScreenshot));
 app.post('/client/orders/:id/report-payment', requireClientAuth, uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(clientPortalController.reportPayment));
 app.post('/client/orders/:id/acknowledge-oc', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.acknowledgeOc));
 app.post('/client/orders/:id/disputes', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.raiseDispute));

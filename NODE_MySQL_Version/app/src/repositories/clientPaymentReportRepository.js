@@ -33,9 +33,10 @@ async function create(orderId, paymentType, transactionRef, payerBankDetails, am
 /** Newest first, for both the client's own view and the staff order page. */
 async function forOrder(orderId) {
   return db.query(
-    `SELECT r.*, u.name AS reviewed_by_name
+    `SELECT r.*, u.name AS reviewed_by_name, fs.mime_type AS screenshot_mime_type, fs.original_filename AS screenshot_filename
      FROM client_payment_reports r
      LEFT JOIN users u ON u.id = r.reviewed_by
+     LEFT JOIN file_store fs ON fs.id = r.screenshot_file_id
      WHERE r.order_id = :order_id
      ORDER BY r.reported_at DESC`,
     { order_id: orderId }

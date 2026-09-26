@@ -693,7 +693,7 @@ $orderClosed = $order['status'] === 'complete';
       <h3 style="margin-top:16px">Client-Reported Payments</h3>
       <p class="muted small">Purely informational — the client submitted these themselves. Always verify against the actual bank statement before recording a payment above.</p>
       <table class="list">
-        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Bank / Payer Details</th><th>Reported</th><th>Status</th><th></th></tr>
+        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Bank / Payer Details</th><th>Attachment</th><th>Reported</th><th>Status</th><th></th></tr>
         <?php foreach ($clientPaymentReports as $r): ?>
         <tr>
           <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
@@ -701,6 +701,18 @@ $orderClosed = $order['status'] === 'complete';
           <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) : '—' ?></td>
           <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
           <td><?= htmlspecialchars($r['payer_bank_details'] ?? '—') ?></td>
+          <td>
+            <?php if (!empty($r['screenshot_file_id'])): ?>
+              <?php $screenshotUrl = '/file-store/' . (int) $r['screenshot_file_id'] . '/download'; ?>
+              <?php if (str_starts_with((string) $r['screenshot_mime_type'], 'image/')): ?>
+                <a href="<?= $screenshotUrl ?>" target="_blank"><img src="<?= $screenshotUrl ?>" alt="Payment screenshot" class="asset-preview" style="max-height:60px;"></a>
+              <?php else: ?>
+                <a href="<?= $screenshotUrl ?>" target="_blank">View attachment</a>
+              <?php endif; ?>
+            <?php else: ?>
+              <span class="muted small">—</span>
+            <?php endif; ?>
+          </td>
           <td><?= htmlspecialchars(Dates::human($r['reported_at'])) ?></td>
           <td><?= $r['status'] === 'reviewed' ? 'Reviewed by ' . htmlspecialchars($r['reviewed_by_name'] ?? '—') : 'New' ?></td>
           <td>

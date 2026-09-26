@@ -117,7 +117,7 @@
     <?php if (!empty($paymentReports)): ?>
       <h3 style="margin-top:20px">Previously Reported</h3>
       <table class="list">
-        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Status</th></tr>
+        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Status</th><th>Attachment</th></tr>
         <?php foreach ($paymentReports as $r): ?>
         <tr>
           <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
@@ -125,6 +125,18 @@
           <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) : '—' ?></td>
           <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
           <td><?= $r['status'] === 'reviewed' ? 'Reviewed by our team' : 'Received — pending review' ?></td>
+          <td>
+            <?php if (!empty($r['screenshot_file_id'])): ?>
+              <?php $screenshotUrl = '/client/orders/' . (int) $order['id'] . '/payment-reports/' . (int) $r['id'] . '/screenshot'; ?>
+              <?php if (str_starts_with((string) $r['screenshot_mime_type'], 'image/')): ?>
+                <a href="<?= $screenshotUrl ?>" target="_blank"><img src="<?= $screenshotUrl ?>" alt="Payment screenshot" class="asset-preview" style="max-height:60px;"></a>
+              <?php else: ?>
+                <a href="<?= $screenshotUrl ?>" target="_blank">View attachment</a>
+              <?php endif; ?>
+            <?php else: ?>
+              <span class="muted small">—</span>
+            <?php endif; ?>
+          </td>
         </tr>
         <?php endforeach; ?>
       </table>

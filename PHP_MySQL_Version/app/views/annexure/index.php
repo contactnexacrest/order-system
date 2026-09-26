@@ -34,12 +34,14 @@
           <strong>Images</strong>
           <div class="btn-row">
             <?php foreach ($p['images'] as $img): ?>
-              <span class="muted small"><?= htmlspecialchars($img['original_filename']) ?>
-                <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/images/<?= (int) $img['id'] ?>/remove" style="display:inline" onsubmit="return confirm('Remove this image from Annexure A?');">
+              <div class="thumb-card">
+                <img src="/file-store/<?= (int) $img['file_id'] ?>/download" alt="<?= htmlspecialchars($img['original_filename']) ?>" class="asset-preview">
+                <span class="muted small"><?= htmlspecialchars($img['original_filename']) ?></span>
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/images/<?= (int) $img['id'] ?>/remove" onsubmit="return confirm('Remove this image from Annexure A?');">
                   <?= Csrf::field() ?>
                   <button type="submit" class="btn-sm btn-danger">&times;</button>
                 </form>
-              </span>
+              </div>
             <?php endforeach; ?>
             <?php if (empty($p['images'])): ?><span class="muted small">No images uploaded yet.</span><?php endif; ?>
           </div>
