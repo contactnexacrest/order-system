@@ -125,6 +125,19 @@ abstract class DbTestCase extends TestCase
         return $orderId;
     }
 
+    /** A minimal real staff user with the given role, returns its id. */
+    protected function createTestUser(string $roleName): int
+    {
+        $pdo = \App\Config\Database::connection();
+        $roleId = (int) $pdo->query('SELECT id FROM roles WHERE name = ' . $pdo->quote($roleName))->fetchColumn();
+        $stmt = $pdo->prepare(
+            "INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
+             VALUES ('PHPUnit Test User', :email, NULL, 'x', :role_id, 1, 0, 0)"
+        );
+        $stmt->execute(['email' => 'phpunit-user-' . bin2hex(random_bytes(4)) . '@nexacrest.test', 'role_id' => $roleId]);
+        return (int) $pdo->lastInsertId();
+    }
+
     /** A minimal real file_store row (RECEIVED origin), returns its id. */
     protected function createTestFile(?int $orderId = null, ?int $clientId = null): int
     {

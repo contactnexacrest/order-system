@@ -247,7 +247,16 @@ Infrastructure (QA-2) is live on both stacks:
    (real Supertest HTTP requests, the natural fit on Node). Both suites
    were verified to actually fail when the ownership check they pin was
    temporarily removed, then reverted.
-3. CA FY-lock enforcement suite across all CA write routes (P0.3).
+3. ✅ CA FY-lock enforcement suite across all CA write routes (P0.3) —
+   `CaFyLockGuardTest.php`/`caFyLockGuard.test.js` pin the single choke
+   point (`CaFyLockGuard::allow()` / `caFyLockGuard.allow()`) all 18 CA
+   write call sites delegate to: blocked with no override, allowed once
+   the date isn't in a locked year, allowed-with-audit-log-and-warning
+   through the override, and a null date never blocked. Each suite also
+   drives one representative route (`recordAdvanceInrActual`) end to end
+   — real controller/HTTP call, real database check — and both were
+   verified to actually fail when that route's guard call was temporarily
+   removed, then reverted.
 4. Amendment/document-review/email-approval gate suite (P0.4).
 5. A systematic pass over every `manage_*`-gated write route asking
    Section 6's P0.5 question, fixing what QA-1-style bugs turn up.
