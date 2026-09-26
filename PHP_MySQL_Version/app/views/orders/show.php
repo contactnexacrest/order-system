@@ -2,6 +2,7 @@
 use App\Config\Env;
 use App\Helpers\Csrf;
 use App\Helpers\Dates;
+use App\Repositories\CaFyLockRepository;
 use App\Services\AuthService;
 use App\Services\PermissionService;
 
@@ -26,19 +27,30 @@ $renderExchangeRateWidget = function () use ($payment, $order, $canViewInrActual
     $rate = $payment['assumed_exchange_rate'] ?? null;
     $setBy = $payment['assumed_exchange_rate_set_by'] ?? null;
     $setByName = $setBy !== null ? ($usersById[(int) $setBy] ?? ('User #' . $setBy)) : null;
+    $lockMessage = null;
+    foreach (['advance_cleared_at', 'balance_cleared_at', 'freight_cleared_at'] as $col) {
+        $lockMessage = CaFyLockRepository::lockMessageForDate($payment[$col] ?? null);
+        if ($lockMessage !== null) {
+            break;
+        }
+    }
     ?>
     <div class="review-banner info" style="margin-top:10px;">
       <div style="width:100%;">
         <strong>Assumed Exchange Rate (CA/Accounting)</strong><br>
         <?php if ($rate !== null): ?>
           <span>1 unit foreign currency = &#8377;<?= number_format((float) $rate, 4) ?> — set <?= htmlspecialchars((string) ($payment['assumed_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
-          <?php if ($canEditInrActual): ?>
+          <?php if ($lockMessage !== null): ?>
+            <br><span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
+          <?php elseif ($canEditInrActual): ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/exchange-rate" style="margin-top:6px;">
               <?= Csrf::field() ?>
               <label>Update Rate<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
               <button type="submit" class="btn-sm">Update</button>
             </form>
           <?php endif; ?>
+        <?php elseif ($lockMessage !== null): ?>
+          <span class="muted">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
         <?php elseif ($canEditInrActual): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/exchange-rate">
             <?= Csrf::field() ?>
@@ -69,13 +81,14 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
         : null;
     $fircReference = $payment[$leg . '_firc_reference'] ?? null;
     $fircReceivedAt = $payment[$leg . '_firc_received_at'] ?? null;
+    $lockMessage = CaFyLockRepository::lockMessageForDate($clearedAt);
     ?>
     <div class="review-banner info" style="margin-top:10px;">
       <div style="width:100%;">
         <strong><?= htmlspecialchars($label) ?> — INR Actual (CA/Accounting)</strong><br>
         <?php if ($amount !== null): ?>
           <span>&#8377;<?= number_format((float) $amount, 2) ?> credited — recorded <?= htmlspecialchars((string) $recordedAt) ?><?= $recordedByName ? ' by ' . htmlspecialchars($recordedByName) : '' ?></span>
-          <?php if ($canDeleteInrActual): ?>
+          <?php if ($lockMessage === null && $canDeleteInrActual): ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/inr-actual/delete" style="display:inline; margin-left:8px;" onsubmit="return confirm('Remove the recorded INR actual amount for this leg? Only do this to correct a mis-entry.');">
               <?= Csrf::field() ?>
               <button type="submit" class="btn-sm btn-danger">Remove</button>
@@ -84,6 +97,8 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
           <?php if ($forexGainLoss !== null): ?>
             <br><span class="muted small">Forex <?= $forexGainLoss >= 0 ? 'gain' : 'loss' ?>: &#8377;<?= number_format(abs($forexGainLoss), 2) ?> vs. the assumed rate.</span>
           <?php endif; ?>
+        <?php elseif ($lockMessage !== null): ?>
+          <span class="muted">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
         <?php elseif ($canEditInrActual): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/inr-actual">
             <?= Csrf::field() ?>
@@ -98,6 +113,8 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
           <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
           <?php if ($fircReference !== null): ?>
             <span class="muted small"><?= htmlspecialchars($fircReference) ?> (received <?= htmlspecialchars((string) $fircReceivedAt) ?>)</span>
+          <?php elseif ($lockMessage !== null): ?>
+            <span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
           <?php elseif ($canEditInrActual): ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/firc">
               <?= Csrf::field() ?>

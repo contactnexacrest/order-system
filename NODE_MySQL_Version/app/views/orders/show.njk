@@ -2,18 +2,23 @@
   {% if canViewInrActual %}
     {% set rate = payment.assumed_exchange_rate %}
     {% set setBy = payment.assumed_exchange_rate_set_by %}
+    {% set lockMessage = caLockMessages.exchangeRate %}
     <div class="review-banner info" style="margin-top:10px;">
       <div style="width:100%;">
         <strong>Assumed Exchange Rate (CA/Accounting)</strong><br>
         {% if rate != null %}
           <span>1 unit foreign currency = &#8377;{{ rate | money }} — set {{ payment.assumed_exchange_rate_set_at }}{% if setBy %} by {{ usersById[setBy] or ('User #' ~ setBy) }}{% endif %}. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
-          {% if canEditInrActual %}
+          {% if lockMessage != null %}
+            <br><span class="muted small">&#128274; {{ lockMessage }}</span>
+          {% elif canEditInrActual %}
             <form method="post" action="/orders/{{ order.id }}/payment/exchange-rate" style="margin-top:6px;">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <label>Update Rate<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
               <button type="submit" class="btn-sm">Update</button>
             </form>
           {% endif %}
+        {% elif lockMessage != null %}
+          <span class="muted">&#128274; {{ lockMessage }}</span>
         {% elif canEditInrActual %}
           <form method="post" action="/orders/{{ order.id }}/payment/exchange-rate">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -39,12 +44,13 @@
     {% set forexGainLoss = (amount - (foreignAmount * assumedRate)) if (amount != null and assumedRate != null and foreignAmount != null) else null %}
     {% set fircReference = payment[leg ~ '_firc_reference'] %}
     {% set fircReceivedAt = payment[leg ~ '_firc_received_at'] %}
+    {% set lockMessage = caLockMessages[leg] %}
     <div class="review-banner info" style="margin-top:10px;">
       <div style="width:100%;">
         <strong>{{ label }} — INR Actual (CA/Accounting)</strong><br>
         {% if amount != null %}
           <span>&#8377;{{ amount | money }} credited — recorded {{ recordedAt }}{% if recordedBy %} by {{ usersById[recordedBy] or ('User #' ~ recordedBy) }}{% endif %}</span>
-          {% if canDeleteInrActual %}
+          {% if lockMessage == null and canDeleteInrActual %}
             <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/inr-actual/delete" style="display:inline; margin-left:8px;" onsubmit="return confirm('Remove the recorded INR actual amount for this leg? Only do this to correct a mis-entry.');">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-danger">Remove</button>
@@ -53,6 +59,8 @@
           {% if forexGainLoss != null %}
             <br><span class="muted small">Forex {{ 'gain' if forexGainLoss >= 0 else 'loss' }}: &#8377;{{ (forexGainLoss | abs) | money }} vs. the assumed rate.</span>
           {% endif %}
+        {% elif lockMessage != null %}
+          <span class="muted">&#128274; {{ lockMessage }}</span>
         {% elif canEditInrActual %}
           <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/inr-actual">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -67,6 +75,8 @@
           <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
           {% if fircReference != null %}
             <span class="muted small">{{ fircReference }} (received {{ fircReceivedAt }})</span>
+          {% elif lockMessage != null %}
+            <span class="muted small">&#128274; {{ lockMessage }}</span>
           {% elif canEditInrActual %}
             <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/firc">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">

@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const financialYear = require('../helpers/financialYear');
 
 // CA / Accounting module (Phase 4) — expenses imported one-way from Zoho
 // Books. No create/update path for the expense data itself (Zoho Books
@@ -41,6 +42,12 @@ async function totalAll() {
   return parseFloat(row.total);
 }
 
+/** FY labels with at least one imported expense — for the FY Lock page's picker (Phase 6). */
+async function availableFinancialYears() {
+  const rows = await db.query('SELECT expense_date FROM ca_expenses');
+  return financialYear.labelsPresentIn(rows.map((r) => r.expense_date));
+}
+
 /** Local-only TDS annotation — never written back to Zoho Books. */
 async function setTds(id, isTdsApplicable, tdsAmount, userId) {
   await db.execute(
@@ -51,4 +58,4 @@ async function setTds(id, isTdsApplicable, tdsAmount, userId) {
   );
 }
 
-module.exports = { existsByZohoId, insert, all, find, setTds, totalAll };
+module.exports = { existsByZohoId, insert, all, find, setTds, totalAll, availableFinancialYears };

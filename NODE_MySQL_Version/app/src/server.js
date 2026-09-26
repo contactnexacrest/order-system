@@ -413,6 +413,9 @@ app.post('/ca/bank-statement/:id/match-revenue', requireAuth, requirePermission(
 app.post('/ca/bank-statement/:id/match-expense', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.matchBankLineToExpense));
 app.post('/ca/bank-statement/:id/unmatch', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.unmatchBankLine));
 app.get('/ca/reconciliation', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reconciliation));
+app.get('/ca/fy-locks', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.fyLocks));
+app.post('/ca/fy-locks/lock', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.lockFinancialYear));
+app.post('/ca/fy-locks/unlock', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.unlockFinancialYear));
 app.post('/orders/:id/payment/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAssumedExchangeRate));
 app.post('/orders/:id/payment/advance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceFirc));
 app.post('/orders/:id/payment/balance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceFirc));

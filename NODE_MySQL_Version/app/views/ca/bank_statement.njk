@@ -30,16 +30,24 @@
           <td>
             {% if l.matched_order_id != null %}
               Revenue: <a href="/orders/{{ l.matched_order_id }}">{{ l.matched_order_ref }}</a> — {{ l.matched_leg | capitalize }}
-              <form method="post" action="/ca/bank-statement/{{ l.id }}/unmatch" style="display:inline;">
-                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
-              </form>
+              {% if l.matchLockMessage != null %}
+                <br><span class="muted small">&#128274; {{ l.matchLockMessage }}</span>
+              {% else %}
+                <form method="post" action="/ca/bank-statement/{{ l.id }}/unmatch" style="display:inline;">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+                </form>
+              {% endif %}
             {% elif l.matched_expense_id != null %}
               Expense: {{ l.matched_expense_category }}{% if l.matched_expense_vendor %} ({{ l.matched_expense_vendor }}){% endif %}
-              <form method="post" action="/ca/bank-statement/{{ l.id }}/unmatch" style="display:inline;">
-                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
-              </form>
+              {% if l.matchLockMessage != null %}
+                <br><span class="muted small">&#128274; {{ l.matchLockMessage }}</span>
+              {% else %}
+                <form method="post" action="/ca/bank-statement/{{ l.id }}/unmatch" style="display:inline;">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+                </form>
+              {% endif %}
             {% else %}
               {% if l.credit_amount != null %}
                 <form method="post" action="/ca/bank-statement/{{ l.id }}/match-revenue" style="display:flex; gap:4px;">

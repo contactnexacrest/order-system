@@ -1,0 +1,71 @@
+<div class="card page-wide">
+  <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
+  <h1>Financial Year Lock</h1>
+  <p class="muted">Once a financial year is locked here, every CA write path that touches that year's data — recording or removing an INR actual, the assumed exchange rate, a FIRC/eBRC reference, an expense's TDS annotation, and matching/unmatching a bank statement line — is blocked, so a closed year's numbers can't be quietly changed after the CA has signed off on them.</p>
+
+  <div class="section">
+    <h2>Financial Years</h2>
+    {% if years.length == 0 %}
+      <p class="muted">No financial year has any CA activity yet.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Financial Year</th><th>Status</th><th>Action</th></tr>
+        {% for fy in years %}
+          {% set isLocked = fy in lockedYears %}
+          <tr>
+            <td>{{ fy }}</td>
+            <td>
+              {% if isLocked %}
+                <span style="color:var(--danger)">Locked</span>
+              {% else %}
+                <span style="color:var(--success)">Open</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if isLocked %}
+                <form method="post" action="/ca/fy-locks/unlock" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <input type="hidden" name="financial_year" value="{{ fy }}">
+                  <input type="text" name="unlock_reason" placeholder="Reason for reopening *" required style="min-width:220px;">
+                  <button type="submit" class="btn-sm btn-secondary" onclick="return confirm('Reopen FY {{ fy }} for CA data entry?');">Unlock</button>
+                </form>
+              {% else %}
+                <form method="post" action="/ca/fy-locks/lock" onsubmit="return confirm('Lock FY {{ fy }}? No CA data entry against that year will be accepted until it is reopened.');">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <input type="hidden" name="financial_year" value="{{ fy }}">
+                  <button type="submit" class="btn-sm">Lock</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Lock / Unlock History</h2>
+    <p class="muted small">Independent of the main system audit log — every lock and unlock, who did it and (for an unlock) why, stays on record even after a year is reopened and re-locked.</p>
+    {% if history.length == 0 %}
+      <p class="muted">No financial year has ever been locked.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Financial Year</th><th>Locked</th><th>Unlocked</th><th>Unlock Reason</th></tr>
+        {% for row in history %}
+        <tr>
+          <td>{{ row.financial_year }}</td>
+          <td>{{ row.locked_at }}{% if row.locked_by %} by {{ usersById[row.locked_by] or ('User #' ~ row.locked_by) }}{% endif %}</td>
+          <td>
+            {% if row.unlocked_at != null %}
+              {{ row.unlocked_at }}{% if row.unlocked_by %} by {{ usersById[row.unlocked_by] or ('User #' ~ row.unlocked_by) }}{% endif %}
+            {% else %}
+              <span class="muted">Still locked</span>
+            {% endif %}
+          </td>
+          <td class="muted small">{{ row.unlock_reason or '' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+</div>

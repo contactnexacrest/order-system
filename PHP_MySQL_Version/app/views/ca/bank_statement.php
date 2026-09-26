@@ -28,18 +28,31 @@
           <td><?= $l['credit_amount'] !== null ? number_format((float) $l['credit_amount'], 2) : '—' ?></td>
           <td><?= $l['debit_amount'] !== null ? number_format((float) $l['debit_amount'], 2) : '—' ?></td>
           <td>
+            <?php
+              $matchLockMessage = $l['matched_order_id'] !== null
+                  ? \App\Repositories\CaFyLockRepository::lockMessageForDate($l['matched_leg_cleared_at'] ?? null)
+                  : ($l['matched_expense_id'] !== null ? \App\Repositories\CaFyLockRepository::lockMessageForDate($l['matched_expense_date'] ?? null) : null);
+            ?>
             <?php if ($l['matched_order_id'] !== null): ?>
               Revenue: <a href="/orders/<?= (int) $l['matched_order_id'] ?>"><?= htmlspecialchars($l['matched_order_ref']) ?></a> — <?= htmlspecialchars(ucfirst($l['matched_leg'])) ?>
-              <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/unmatch" style="display:inline;">
-                <?= \App\Helpers\Csrf::field() ?>
-                <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
-              </form>
+              <?php if ($matchLockMessage !== null): ?>
+                <br><span class="muted small">&#128274; <?= htmlspecialchars($matchLockMessage) ?></span>
+              <?php else: ?>
+                <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/unmatch" style="display:inline;">
+                  <?= \App\Helpers\Csrf::field() ?>
+                  <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+                </form>
+              <?php endif; ?>
             <?php elseif ($l['matched_expense_id'] !== null): ?>
               Expense: <?= htmlspecialchars($l['matched_expense_category']) ?><?= $l['matched_expense_vendor'] ? ' (' . htmlspecialchars($l['matched_expense_vendor']) . ')' : '' ?>
-              <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/unmatch" style="display:inline;">
-                <?= \App\Helpers\Csrf::field() ?>
-                <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
-              </form>
+              <?php if ($matchLockMessage !== null): ?>
+                <br><span class="muted small">&#128274; <?= htmlspecialchars($matchLockMessage) ?></span>
+              <?php else: ?>
+                <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/unmatch" style="display:inline;">
+                  <?= \App\Helpers\Csrf::field() ?>
+                  <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+                </form>
+              <?php endif; ?>
             <?php else: ?>
               <?php if ($l['credit_amount'] !== null): ?>
                 <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/match-revenue" style="display:flex; gap:4px;">

@@ -3,6 +3,8 @@
 const caRepository = require('../repositories/caRepository');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
 const caBankStatementRepository = require('../repositories/caBankStatementRepository');
+const caFyLockRepository = require('../repositories/caFyLockRepository');
+const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const userRepository = require('../repositories/userRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const financialYear = require('../helpers/financialYear');
@@ -102,8 +104,13 @@ async function runZohoSync(req, res) {
  * annotation, which never pushes back to Zoho.
  */
 async function expenses(req, res) {
+  const allExpenses = await caExpenseRepository.all();
+  for (const e of allExpenses) {
+    e.lockMessage = await caFyLockRepository.lockMessageForDate(e.expense_date);
+  }
+
   res.renderView('ca/expenses', {
-    expenses: await caExpenseRepository.all(),
+    expenses: allExpenses,
     usersById: await usersById(),
     canEditTds: !!req.permissions.inr_actual_edit,
   }, 'layout/base');
@@ -112,6 +119,15 @@ async function expenses(req, res) {
 async function setExpenseTds(req, res) {
   const id = parseInt(req.params.id, 10);
   const user = req.user;
+
+  const expense = await caExpenseRepository.find(id);
+  const lockMessage = expense ? await caFyLockRepository.lockMessageForDate(expense.expense_date) : null;
+  if (lockMessage) {
+    flash.set(req, 'error', lockMessage);
+    res.redirect('/ca/expenses');
+    return;
+  }
+
   const isTdsApplicable = !!req.body.is_tds_applicable;
   const tdsAmount = isTdsApplicable && String(req.body.tds_amount || '').trim() !== ''
     ? parseFloat(req.body.tds_amount)
@@ -133,10 +149,36 @@ async function bankStatement(req, res) {
   const matchedExpenseIds = await caBankStatementRepository.matchedExpenseIds();
   const allExpenses = await caExpenseRepository.all();
 
+  // Phase 6: a leg/expense whose own date falls in a locked financial year
+  // is left off the matching pickers entirely — matching it now would be a
+  // new entry against a year the CA has already closed, exactly the kind
+  // of backdated change the lock exists to prevent.
+  const candidateLegs = await caRepository.legsWithInrActualUnmatched(matchedRevenueKeys);
+  const unmatchedRevenueLegs = [];
+  for (const leg of candidateLegs) {
+    if (!(await caFyLockRepository.lockMessageForDate(leg.cleared_at))) {
+      unmatchedRevenueLegs.push(leg);
+    }
+  }
+  const candidateExpenses = allExpenses.filter((e) => !matchedExpenseIds.includes(e.id));
+  const unmatchedExpenses = [];
+  for (const e of candidateExpenses) {
+    if (!(await caFyLockRepository.lockMessageForDate(e.expense_date))) {
+      unmatchedExpenses.push(e);
+    }
+  }
+
+  const lines = await caBankStatementRepository.all();
+  for (const l of lines) {
+    l.matchLockMessage = l.matched_order_id !== null
+      ? await caFyLockRepository.lockMessageForDate(l.matched_leg_cleared_at)
+      : (l.matched_expense_id !== null ? await caFyLockRepository.lockMessageForDate(l.matched_expense_date) : null);
+  }
+
   res.renderView('ca/bank_statement', {
-    lines: await caBankStatementRepository.all(),
-    unmatchedRevenueLegs: await caRepository.legsWithInrActualUnmatched(matchedRevenueKeys),
-    unmatchedExpenses: allExpenses.filter((e) => !matchedExpenseIds.includes(e.id)),
+    lines,
+    unmatchedRevenueLegs,
+    unmatchedExpenses,
   }, 'layout/base');
 }
 
@@ -186,6 +228,15 @@ async function matchBankLineToRevenue(req, res) {
     res.redirect('/ca/bank-statement');
     return;
   }
+
+  const ops = (await orderPaymentStatusRepository.find(orderId)) || {};
+  const lockMessage = await caFyLockRepository.lockMessageForDate(ops[`${leg}_cleared_at`] ?? null);
+  if (lockMessage) {
+    flash.set(req, 'error', lockMessage);
+    res.redirect('/ca/bank-statement');
+    return;
+  }
+
   await caBankStatementRepository.matchToRevenue(lineId, orderId, leg, user.id);
   flash.set(req, 'success', 'Bank line matched to the settlement leg.');
   res.redirect('/ca/bank-statement');
@@ -200,13 +251,40 @@ async function matchBankLineToExpense(req, res) {
     res.redirect('/ca/bank-statement');
     return;
   }
+
+  const expense = await caExpenseRepository.find(expenseId);
+  const lockMessage = expense ? await caFyLockRepository.lockMessageForDate(expense.expense_date) : null;
+  if (lockMessage) {
+    flash.set(req, 'error', lockMessage);
+    res.redirect('/ca/bank-statement');
+    return;
+  }
+
   await caBankStatementRepository.matchToExpense(lineId, expenseId, user.id);
   flash.set(req, 'success', 'Bank line matched to the expense.');
   res.redirect('/ca/bank-statement');
 }
 
 async function unmatchBankLine(req, res) {
-  await caBankStatementRepository.unmatch(parseInt(req.params.id, 10));
+  const lineId = parseInt(req.params.id, 10);
+  const line = await caBankStatementRepository.find(lineId);
+  let lockMessage = null;
+  if (line) {
+    if (line.matched_order_id !== null && line.matched_leg !== null) {
+      const ops = (await orderPaymentStatusRepository.find(line.matched_order_id)) || {};
+      lockMessage = await caFyLockRepository.lockMessageForDate(ops[`${line.matched_leg}_cleared_at`] ?? null);
+    } else if (line.matched_expense_id !== null) {
+      const expense = await caExpenseRepository.find(line.matched_expense_id);
+      lockMessage = expense ? await caFyLockRepository.lockMessageForDate(expense.expense_date) : null;
+    }
+  }
+  if (lockMessage) {
+    flash.set(req, 'error', lockMessage);
+    res.redirect('/ca/bank-statement');
+    return;
+  }
+
+  await caBankStatementRepository.unmatch(lineId);
   flash.set(req, 'success', 'Match removed.');
   res.redirect('/ca/bank-statement');
 }
@@ -234,7 +312,66 @@ async function reconciliation(req, res) {
   }, 'layout/base');
 }
 
+/**
+ * Year-end financial year lock (Phase 6) — gated on ca_module_manage, the
+ * same admin tier as the Zoho Books sync page, since locking a year is an
+ * administrative action with a wider blast radius than routine CA data
+ * entry.
+ */
+async function fyLocks(req, res) {
+  const years = Array.from(new Set([
+    ...(await caRepository.availableFinancialYears()),
+    ...(await caExpenseRepository.availableFinancialYears()),
+    financialYear.current(),
+  ])).sort().reverse();
+
+  res.renderView('ca/fy_locks', {
+    years,
+    lockedYears: await caFyLockRepository.lockedYears(),
+    history: await caFyLockRepository.history(),
+    usersById: await usersById(),
+  }, 'layout/base');
+}
+
+async function lockFinancialYear(req, res) {
+  const user = req.user;
+  const fy = String(req.body.financial_year || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(fy)) {
+    flash.set(req, 'error', 'Choose a valid financial year to lock.');
+    res.redirect('/ca/fy-locks');
+    return;
+  }
+  if (await caFyLockRepository.isLocked(fy)) {
+    flash.set(req, 'error', `FY ${fy} is already locked.`);
+    res.redirect('/ca/fy-locks');
+    return;
+  }
+  await caFyLockRepository.lock(fy, user.id);
+  flash.set(req, 'success', `FY ${fy} locked. No CA data entry against that year will be accepted until it's reopened.`);
+  res.redirect('/ca/fy-locks');
+}
+
+async function unlockFinancialYear(req, res) {
+  const user = req.user;
+  const fy = String(req.body.financial_year || '').trim();
+  const reason = String(req.body.unlock_reason || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(fy) || reason === '') {
+    flash.set(req, 'error', 'Enter a reason for reopening this financial year.');
+    res.redirect('/ca/fy-locks');
+    return;
+  }
+  if (!(await caFyLockRepository.isLocked(fy))) {
+    flash.set(req, 'error', `FY ${fy} isn't currently locked.`);
+    res.redirect('/ca/fy-locks');
+    return;
+  }
+  await caFyLockRepository.unlock(fy, user.id, reason);
+  flash.set(req, 'success', `FY ${fy} reopened for CA data entry.`);
+  res.redirect('/ca/fy-locks');
+}
+
 module.exports = {
   index, reports, zohoSync, runZohoSync, expenses, setExpenseTds,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
+  fyLocks, lockFinancialYear, unlockFinancialYear,
 };

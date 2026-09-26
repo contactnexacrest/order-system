@@ -66,7 +66,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('inr_actual_view',           'View INR actual settlement amounts', 'See the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
   ('inr_actual_edit',           'Add/edit INR actual settlement amounts', 'Record or correct the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
   ('inr_actual_delete',         'Delete INR actual settlement amounts', 'Remove a recorded INR actual amount (e.g. to correct a mis-entry) — kept separate from edit since this is a destructive correction, not routine data entry.', 'ca'),
-  ('ca_module_manage',          'Manage CA / Accounting integrations', 'Trigger a Zoho Books sync and view its log — kept separate from ca_module_view since this calls an external API and can expose sync error detail, not just read the register.', 'ca');
+  ('ca_module_manage',          'Manage CA / Accounting integrations', 'Trigger a Zoho Books sync and view its log, and lock/unlock a financial year for CA data entry — kept separate from ca_module_view since these are administrative actions with a wider blast radius than routine data entry, not just reading the register.', 'ca');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)

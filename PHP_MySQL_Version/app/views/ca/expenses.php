@@ -19,7 +19,8 @@
           <td class="muted small"><?= htmlspecialchars((string) ($e['description'] ?? '')) ?></td>
           <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
           <td>
-            <?php if ($canEditTds): ?>
+            <?php $expenseLockMessage = \App\Repositories\CaFyLockRepository::lockMessageForDate($e['expense_date']); ?>
+            <?php if ($canEditTds && $expenseLockMessage === null): ?>
               <form method="post" action="/ca/expenses/<?= (int) $e['id'] ?>/tds" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                 <?= \App\Helpers\Csrf::field() ?>
                 <label style="display:flex; gap:4px; align-items:center;">
@@ -33,6 +34,9 @@
                 Yes<?= $e['tds_amount'] !== null ? ' (' . number_format((float) $e['tds_amount'], 2) . ')' : '' ?>
               <?php else: ?>
                 <span class="muted">No</span>
+              <?php endif; ?>
+              <?php if ($expenseLockMessage !== null): ?>
+                <br><span class="muted small">&#128274; <?= htmlspecialchars($expenseLockMessage) ?></span>
               <?php endif; ?>
             <?php endif; ?>
           </td>

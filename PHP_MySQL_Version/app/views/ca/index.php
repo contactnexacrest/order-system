@@ -1,6 +1,6 @@
 <div class="card page-wide">
   <h1>CA / Accounting</h1>
-  <p class="muted">Independent of the order-pipeline system — nothing here affects order stages, and nothing in the order reports feeds this. <a href="/ca/reports">FY / calendar-year revenue reports &rarr;</a> &middot; <a href="/ca/expenses">Expenses &rarr;</a> &middot; <a href="/ca/bank-statement">Bank statement &rarr;</a> &middot; <a href="/ca/reconciliation">Reconciliation &rarr;</a> &middot; <a href="/ca/zoho-sync">Zoho Books sync &rarr;</a></p>
+  <p class="muted">Independent of the order-pipeline system — nothing here affects order stages, and nothing in the order reports feeds this. <a href="/ca/reports">FY / calendar-year revenue reports &rarr;</a> &middot; <a href="/ca/expenses">Expenses &rarr;</a> &middot; <a href="/ca/bank-statement">Bank statement &rarr;</a> &middot; <a href="/ca/reconciliation">Reconciliation &rarr;</a> &middot; <a href="/ca/zoho-sync">Zoho Books sync &rarr;</a> &middot; <a href="/ca/fy-locks">Financial Year Lock &rarr;</a></p>
 
   <div class="section">
     <h2>INR Settlement Register</h2>

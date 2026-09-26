@@ -10,6 +10,7 @@ use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AmendmentRepository;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\CaFyLockRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
@@ -1048,6 +1049,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::setAdvanceInrActual($orderId, $amount, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', $orderId, 'advance_inr_actual', null, (string) $amount);
         Flash::set('success', 'Advance INR actual amount recorded.');
@@ -1058,6 +1065,12 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::clearAdvanceInrActual($orderId);
         AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_DELETED', 'order_payment_status', $orderId, 'advance_inr_actual');
         Flash::set('success', 'Advance INR actual amount removed.');
@@ -1074,6 +1087,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::setBalanceInrActual($orderId, $amount, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', $orderId, 'balance_inr_actual', null, (string) $amount);
         Flash::set('success', 'Balance INR actual amount recorded.');
@@ -1084,6 +1103,12 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::clearBalanceInrActual($orderId);
         AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_DELETED', 'order_payment_status', $orderId, 'balance_inr_actual');
         Flash::set('success', 'Balance INR actual amount removed.');
@@ -1100,6 +1125,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::setFreightInrActual($orderId, $amount, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', $orderId, 'freight_inr_actual', null, (string) $amount);
         Flash::set('success', 'Freight INR actual amount recorded.');
@@ -1110,6 +1141,12 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::clearFreightInrActual($orderId);
         AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_DELETED', 'order_payment_status', $orderId, 'freight_inr_actual');
         Flash::set('success', 'Freight INR actual amount removed.');
@@ -1132,6 +1169,18 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Not tied to one leg — changing it would change the forex gain/loss
+        // shown for every cleared leg on the order, so it's blocked if ANY
+        // of them falls in a locked FY, not just one.
+        $ops = OrderPaymentStatusRepository::find($orderId) ?? [];
+        foreach (['advance_cleared_at', 'balance_cleared_at', 'freight_cleared_at'] as $col) {
+            $lockMessage = CaFyLockRepository::lockMessageForDate($ops[$col] ?? null);
+            if ($lockMessage !== null) {
+                Flash::set('error', $lockMessage);
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+        }
         OrderPaymentStatusRepository::setAssumedExchangeRate($orderId, $rate, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'assumed_exchange_rate', null, (string) $rate);
         Flash::set('success', 'Assumed exchange rate recorded.');
@@ -1145,6 +1194,12 @@ final class OrderController
         $reference = trim((string) ($_POST['advance_firc_reference'] ?? ''));
         if ($reference === '') {
             Flash::set('error', 'Enter the FIRC/eBRC reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1165,6 +1220,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $receivedAt = trim((string) ($_POST['balance_firc_received_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::setBalanceFirc($orderId, $reference, $receivedAt);
         AuditLogRepository::log((int) $user['id'], 'CA_FIRC_RECORDED', 'order_payment_status', $orderId, 'balance_firc_reference', null, $reference);
@@ -1179,6 +1240,12 @@ final class OrderController
         $reference = trim((string) ($_POST['freight_firc_reference'] ?? ''));
         if ($reference === '') {
             Flash::set('error', 'Enter the FIRC/eBRC reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
             header("Location: /orders/{$orderId}");
             return;
         }

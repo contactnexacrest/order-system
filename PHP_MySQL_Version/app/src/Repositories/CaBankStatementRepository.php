@@ -54,16 +54,37 @@ final class CaBankStatementRepository
         }
     }
 
-    /** @return array<int, array<string,mixed>> newest first, with matched order/expense info joined in for display */
+    /**
+     * @return array<int, array<string,mixed>> newest first, with matched
+     *         order/expense info joined in for display. Also carries
+     *         matched_leg_cleared_at / matched_expense_date (whichever
+     *         applies, the other is always null) so the view can tell
+     *         whether an existing match falls in a locked financial year
+     *         (Phase 6) without a second query per row.
+     */
     public static function all(): array
     {
         return Database::connection()->query(
-            "SELECT bsl.*, o.buyer_inquiry_ref AS matched_order_ref, ce.category AS matched_expense_category, ce.vendor_name AS matched_expense_vendor
+            "SELECT bsl.*, o.buyer_inquiry_ref AS matched_order_ref, ce.category AS matched_expense_category, ce.vendor_name AS matched_expense_vendor,
+                CASE bsl.matched_leg
+                    WHEN 'advance' THEN ops.advance_cleared_at
+                    WHEN 'balance' THEN ops.balance_cleared_at
+                    WHEN 'freight' THEN ops.freight_cleared_at
+                END AS matched_leg_cleared_at,
+                ce.expense_date AS matched_expense_date
              FROM ca_bank_statement_lines bsl
              LEFT JOIN orders o ON o.id = bsl.matched_order_id
+             LEFT JOIN order_payment_status ops ON ops.order_id = bsl.matched_order_id
              LEFT JOIN ca_expenses ce ON ce.id = bsl.matched_expense_id
              ORDER BY bsl.transaction_date DESC, bsl.id DESC"
         )->fetchAll();
+    }
+
+    public static function find(int $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM ca_bank_statement_lines WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch() ?: null;
     }
 
     /** @return array<int, string> 'orderId:leg' keys currently matched to a bank line */

@@ -9,8 +9,10 @@ use App\Helpers\FinancialYear;
 use App\Helpers\View;
 use App\Repositories\CaBankStatementRepository;
 use App\Repositories\CaExpenseRepository;
+use App\Repositories\CaFyLockRepository;
 use App\Repositories\CaRepository;
 use App\Repositories\CompanySettingsRepository;
+use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\UserRepository;
 use App\Repositories\ZohoSyncLogRepository;
 use App\Services\AuthService;
@@ -132,6 +134,15 @@ final class CaController
     {
         $id = (int) $params['id'];
         $user = AuthService::currentUser();
+
+        $expense = CaExpenseRepository::find($id);
+        $lockMessage = $expense !== null ? CaFyLockRepository::lockMessageForDate($expense['expense_date']) : null;
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header('Location: /ca/expenses');
+            return;
+        }
+
         $isTdsApplicable = !empty($_POST['is_tds_applicable']);
         $tdsAmount = $isTdsApplicable && trim((string) ($_POST['tds_amount'] ?? '')) !== ''
             ? (float) $_POST['tds_amount']
@@ -153,13 +164,24 @@ final class CaController
         $matchedRevenueKeys = CaBankStatementRepository::matchedRevenueKeys();
         $matchedExpenseIds = CaBankStatementRepository::matchedExpenseIds();
 
+        // Phase 6: a leg/expense whose own date falls in a locked financial
+        // year is left off the matching pickers entirely — matching it now
+        // would be a new entry against a year the CA has already closed,
+        // exactly the kind of backdated change the lock exists to prevent.
+        $unmatchedRevenueLegs = array_values(array_filter(
+            CaRepository::legsWithInrActualUnmatched($matchedRevenueKeys),
+            static fn(array $leg): bool => CaFyLockRepository::lockMessageForDate($leg['cleared_at']) === null
+        ));
+        $unmatchedExpenses = array_values(array_filter(
+            CaExpenseRepository::all(),
+            static fn(array $e): bool => !in_array((int) $e['id'], $matchedExpenseIds, true)
+                && CaFyLockRepository::lockMessageForDate($e['expense_date']) === null
+        ));
+
         View::render('ca/bank_statement', [
             'lines' => CaBankStatementRepository::all(),
-            'unmatchedRevenueLegs' => CaRepository::legsWithInrActualUnmatched($matchedRevenueKeys),
-            'unmatchedExpenses' => array_values(array_filter(
-                CaExpenseRepository::all(),
-                static fn(array $e): bool => !in_array((int) $e['id'], $matchedExpenseIds, true)
-            )),
+            'unmatchedRevenueLegs' => $unmatchedRevenueLegs,
+            'unmatchedExpenses' => $unmatchedExpenses,
         ], 'layout/base');
     }
 
@@ -213,6 +235,16 @@ final class CaController
             header('Location: /ca/bank-statement');
             return;
         }
+
+        $ops = OrderPaymentStatusRepository::find($orderId) ?? [];
+        $clearedAt = $ops[$leg . '_cleared_at'] ?? null;
+        $lockMessage = CaFyLockRepository::lockMessageForDate($clearedAt);
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header('Location: /ca/bank-statement');
+            return;
+        }
+
         CaBankStatementRepository::matchToRevenue($lineId, $orderId, $leg, (int) $user['id']);
         Flash::set('success', 'Bank line matched to the settlement leg.');
         header('Location: /ca/bank-statement');
@@ -228,6 +260,15 @@ final class CaController
             header('Location: /ca/bank-statement');
             return;
         }
+
+        $expense = CaExpenseRepository::find($expenseId);
+        $lockMessage = $expense !== null ? CaFyLockRepository::lockMessageForDate($expense['expense_date']) : null;
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header('Location: /ca/bank-statement');
+            return;
+        }
+
         CaBankStatementRepository::matchToExpense($lineId, $expenseId, (int) $user['id']);
         Flash::set('success', 'Bank line matched to the expense.');
         header('Location: /ca/bank-statement');
@@ -235,7 +276,25 @@ final class CaController
 
     public function unmatchBankLine(array $params): void
     {
-        CaBankStatementRepository::unmatch((int) $params['id']);
+        $lineId = (int) $params['id'];
+        $line = CaBankStatementRepository::find($lineId);
+        $lockMessage = null;
+        if ($line !== null) {
+            if ($line['matched_order_id'] !== null && $line['matched_leg'] !== null) {
+                $ops = OrderPaymentStatusRepository::find((int) $line['matched_order_id']) ?? [];
+                $lockMessage = CaFyLockRepository::lockMessageForDate($ops[$line['matched_leg'] . '_cleared_at'] ?? null);
+            } elseif ($line['matched_expense_id'] !== null) {
+                $expense = CaExpenseRepository::find((int) $line['matched_expense_id']);
+                $lockMessage = $expense !== null ? CaFyLockRepository::lockMessageForDate($expense['expense_date']) : null;
+            }
+        }
+        if ($lockMessage !== null) {
+            Flash::set('error', $lockMessage);
+            header('Location: /ca/bank-statement');
+            return;
+        }
+
+        CaBankStatementRepository::unmatch($lineId);
         Flash::set('success', 'Match removed.');
         header('Location: /ca/bank-statement');
     }
@@ -266,5 +325,69 @@ final class CaController
                 static fn(array $l): bool => $l['matched_order_id'] === null && $l['matched_expense_id'] === null
             )),
         ], 'layout/base');
+    }
+
+    /**
+     * Year-end financial year lock (Phase 6) — gated on ca_module_manage,
+     * the same admin tier as the Zoho Books sync page, since locking a year
+     * is an administrative action with a wider blast radius than routine
+     * CA data entry.
+     */
+    public function fyLocks(array $params): void
+    {
+        $years = array_values(array_unique(array_merge(
+            CaRepository::availableFinancialYears(),
+            CaExpenseRepository::availableFinancialYears(),
+            [FinancialYear::current()]
+        )));
+        rsort($years);
+
+        $lockedYears = CaFyLockRepository::lockedYears();
+
+        View::render('ca/fy_locks', [
+            'years' => $years,
+            'lockedYears' => $lockedYears,
+            'history' => CaFyLockRepository::history(),
+            'usersById' => $this->usersById(),
+        ], 'layout/base');
+    }
+
+    public function lockFinancialYear(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $fy = trim((string) ($_POST['financial_year'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}$/', $fy)) {
+            Flash::set('error', 'Choose a valid financial year to lock.');
+            header('Location: /ca/fy-locks');
+            return;
+        }
+        if (CaFyLockRepository::isLocked($fy)) {
+            Flash::set('error', "FY {$fy} is already locked.");
+            header('Location: /ca/fy-locks');
+            return;
+        }
+        CaFyLockRepository::lock($fy, (int) $user['id']);
+        Flash::set('success', "FY {$fy} locked. No CA data entry against that year will be accepted until it's reopened.");
+        header('Location: /ca/fy-locks');
+    }
+
+    public function unlockFinancialYear(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $fy = trim((string) ($_POST['financial_year'] ?? ''));
+        $reason = trim((string) ($_POST['unlock_reason'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}$/', $fy) || $reason === '') {
+            Flash::set('error', 'Enter a reason for reopening this financial year.');
+            header('Location: /ca/fy-locks');
+            return;
+        }
+        if (!CaFyLockRepository::isLocked($fy)) {
+            Flash::set('error', "FY {$fy} isn't currently locked.");
+            header('Location: /ca/fy-locks');
+            return;
+        }
+        CaFyLockRepository::unlock($fy, (int) $user['id'], $reason);
+        Flash::set('success', "FY {$fy} reopened for CA data entry.");
+        header('Location: /ca/fy-locks');
     }
 }

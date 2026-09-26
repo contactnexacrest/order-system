@@ -268,6 +268,9 @@ $router->post('/ca/bank-statement/{id}/match-revenue', [$ca, 'matchBankLineToRev
 $router->post('/ca/bank-statement/{id}/match-expense', [$ca, 'matchBankLineToExpense'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/bank-statement/{id}/unmatch', [$ca, 'unmatchBankLine'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->get('/ca/reconciliation', [$ca, 'reconciliation'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->get('/ca/fy-locks', [$ca, 'fyLocks'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
+$router->post('/ca/fy-locks/lock', [$ca, 'lockFinancialYear'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
+$router->post('/ca/fy-locks/unlock', [$ca, 'unlockFinancialYear'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/exchange-rate', [$orders, 'recordAssumedExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/advance/firc', [$orders, 'recordAdvanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/balance/firc', [$orders, 'recordBalanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);

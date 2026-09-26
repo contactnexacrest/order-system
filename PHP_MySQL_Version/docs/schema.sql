@@ -1076,6 +1076,24 @@ CREATE TABLE ca_bank_statement_lines (
   INDEX idx_ca_bank_lines_date (transaction_date)
 ) ENGINE=InnoDB;
 
+-- CA / Accounting module (Phase 6) — year-end financial year lock. A row
+-- with unlocked_at IS NULL means that financial_year is currently locked;
+-- unlocking stamps this row rather than deleting it, and re-locking the
+-- same year inserts a fresh row, so the full lock/unlock history for every
+-- year is always on record (append-only, like zoho_sync_log).
+CREATE TABLE ca_fy_locks (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  financial_year VARCHAR(7) NOT NULL,   -- e.g. '2025-26'
+  locked_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  locked_by     BIGINT UNSIGNED NOT NULL,
+  unlocked_at   TIMESTAMP NULL,
+  unlocked_by   BIGINT UNSIGNED NULL,
+  unlock_reason VARCHAR(500) NULL,
+  FOREIGN KEY (locked_by) REFERENCES users(id),
+  FOREIGN KEY (unlocked_by) REFERENCES users(id),
+  INDEX idx_ca_fy_locks_fy (financial_year)
+) ENGINE=InnoDB;
+
 -- ================================================================
 -- SECTION K — 2FA BACKUP CODES & SAVED REPORT DEFINITIONS
 -- (Resolved 2026-09-18 — see ARCHITECTURE.md "Open questions", now closed)

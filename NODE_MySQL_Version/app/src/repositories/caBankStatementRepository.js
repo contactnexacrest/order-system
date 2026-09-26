@@ -35,15 +35,32 @@ async function insertLine(lineHash, transactionDate, description, reference, cre
   }
 }
 
-/** @returns newest first, with matched order/expense info joined in for display */
+/**
+ * @returns newest first, with matched order/expense info joined in for
+ *          display. Also carries matched_leg_cleared_at / matched_expense_date
+ *          (whichever applies, the other is always null) so the view can
+ *          tell whether an existing match falls in a locked financial year
+ *          (Phase 6) without a second query per row.
+ */
 async function all() {
   return db.query(
-    `SELECT bsl.*, o.buyer_inquiry_ref AS matched_order_ref, ce.category AS matched_expense_category, ce.vendor_name AS matched_expense_vendor
+    `SELECT bsl.*, o.buyer_inquiry_ref AS matched_order_ref, ce.category AS matched_expense_category, ce.vendor_name AS matched_expense_vendor,
+        CASE bsl.matched_leg
+          WHEN 'advance' THEN ops.advance_cleared_at
+          WHEN 'balance' THEN ops.balance_cleared_at
+          WHEN 'freight' THEN ops.freight_cleared_at
+        END AS matched_leg_cleared_at,
+        ce.expense_date AS matched_expense_date
      FROM ca_bank_statement_lines bsl
      LEFT JOIN orders o ON o.id = bsl.matched_order_id
+     LEFT JOIN order_payment_status ops ON ops.order_id = bsl.matched_order_id
      LEFT JOIN ca_expenses ce ON ce.id = bsl.matched_expense_id
      ORDER BY bsl.transaction_date DESC, bsl.id DESC`
   );
+}
+
+async function find(id) {
+  return db.queryOne('SELECT * FROM ca_bank_statement_lines WHERE id = :id', { id });
 }
 
 /** @returns {Promise<string[]>} 'orderId:leg' keys currently matched to a bank line */
@@ -105,4 +122,4 @@ async function totals() {
   };
 }
 
-module.exports = { insertLine, all, matchedRevenueKeys, matchedExpenseIds, matchToRevenue, matchToExpense, unmatch, totals };
+module.exports = { insertLine, all, find, matchedRevenueKeys, matchedExpenseIds, matchToRevenue, matchToExpense, unmatch, totals };
