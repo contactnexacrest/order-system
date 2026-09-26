@@ -28,7 +28,8 @@ INSERT INTO roles (name, description, is_system_role) VALUES
   ('Export Executive',    'Day-to-day order handling, quotations through order confirmation, document generation.', 0),
   ('Accounts Executive',  'Payment tracking, balance follow-up, financial reporting.', 0),
   ('Logistics Executive', 'Packing, freight, BL instruction, shipping-stage documents.', 0),
-  ('Viewer / Auditor',    'Read-only access to reports and audit trail.', 0);
+  ('Viewer / Auditor',    'Read-only access to reports and audit trail.', 0),
+  ('CA / Chartered Accountant', 'External or in-house Chartered Accountant — view-only access to the CA/Accounting module for statutory bookkeeping. No order-management access.', 0);
 
 -- ================================================================
 -- PERMISSIONS
@@ -60,7 +61,11 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('view_archived_orders',      'View archived orders',          'See orders that have been archived out of the default listing. Archiving never deletes anything — this only gates who can look an archived order up.', 'orders'),
   ('manage_hs_codes',           'Manage HS code master list',    'Add, edit, and deactivate HS codes in the master list order creation picks from — kept separate from ordinary order-entry access so a new code always goes through a privileged person first.', 'catalog'),
   ('manage_email_templates',    'Manage email templates',        'Add or edit email templates used when composing a send (never delete — every past send keeps its own frozen copy in the email log regardless).', 'admin'),
-  ('view_staff_reports',        'View staff productivity reports', 'View the Staff Productivity report (documents generated and audit-log activity per user) — kept separate from view_reports since it shows individual staff activity, not just business data.', 'reports');
+  ('view_staff_reports',        'View staff productivity reports', 'View the Staff Productivity report (documents generated and audit-log activity per user) — kept separate from view_reports since it shows individual staff activity, not just business data.', 'reports'),
+  ('ca_module_view',            'View CA / Accounting module',   'View the CA/Accounting module (independent of the order-pipeline system) — the INR settlement register and, as later phases land, revenue/expense/reconciliation reports.', 'ca'),
+  ('inr_actual_view',           'View INR actual settlement amounts', 'See the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
+  ('inr_actual_edit',           'Add/edit INR actual settlement amounts', 'Record or correct the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
+  ('inr_actual_delete',         'Delete INR actual settlement amounts', 'Remove a recorded INR actual amount (e.g. to correct a mis-entry) — kept separate from edit since this is a destructive correction, not routine data entry.', 'ca');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -80,7 +85,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Accounts Executive'
-  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders');
+  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
@@ -93,6 +98,12 @@ SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Viewer / Auditor'
   AND p.permission_key IN ('view_reports','view_audit_log','view_product_catalog');
+
+INSERT INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1
+FROM roles r CROSS JOIN permissions p
+WHERE r.name = 'CA / Chartered Accountant'
+  AND p.permission_key IN ('ca_module_view','inr_actual_view');
 
 -- ================================================================
 -- USERS — one seeded account to get in the door.

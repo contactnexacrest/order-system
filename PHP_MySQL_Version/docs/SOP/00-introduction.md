@@ -110,6 +110,13 @@ role does them, since that assignment is configurable per organisation —
 see [Admin & Settings](./15-admin-settings.md) for how to check or change
 who can do what.
 
+## The CA / Accounting module
+
+A separate module exists for Chartered Accountant / accounting work,
+entirely independent of the 9 stages above — it has its own section in
+this SOP's chapter list ("CA / Accounting"), starting with
+[CA / Accounting — Overview & Permissions](./ca-01-overview.md).
+
 ## A running example
 
 Several chapters follow one real order end-to-end (referred to as

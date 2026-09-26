@@ -334,6 +334,9 @@ async function show(req, res) {
   }
 
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  const activeUsers = await userRepository.listActive();
+  const usersById = {};
+  for (const u of activeUsers) usersById[u.id] = u.name;
   const piIntake = await piIntakeRepository.latestForOrder(orderId);
   let piFormFullLink = null;
   if (
@@ -356,7 +359,7 @@ async function show(req, res) {
       reviewsByDocument,
       crossVerificationsByDocument,
       emailLogByDocument,
-      activeUsers: await userRepository.listActive(),
+      activeUsers,
       fobTotal: await orderProductRepository.totalFobValue(orderId),
       suppliers: await supplierRepository.all(),
       supplierPo,
@@ -377,6 +380,10 @@ async function show(req, res) {
       clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
       ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
       comments: await orderCommentRepository.forOrder(orderId),
+      canViewInrActual: !!req.permissions.inr_actual_view,
+      canEditInrActual: !!req.permissions.inr_actual_edit,
+      canDeleteInrActual: !!req.permissions.inr_actual_delete,
+      usersById,
     },
     'layout/base'
   );
@@ -1016,6 +1023,85 @@ async function clearBalancePayment(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+// ----------------------------------------------------------------
+// CA / Accounting module (Phase 1) — INR actual settlement amounts.
+// Routes are gated on inr_actual_edit/inr_actual_delete (see server.js);
+// every write is audit-logged since this is exactly the kind of field an
+// auditor/CA will want a trail on.
+// ----------------------------------------------------------------
+
+async function recordAdvanceInrActual(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const amount = parseFloat(req.body.advance_inr_actual || 0);
+  if (!(amount > 0)) {
+    flash.set(req, 'error', 'Enter the actual INR amount credited to the bank.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  await orderPaymentStatusRepository.setAdvanceInrActual(orderId, amount, user.id);
+  await auditLogRepository.log(user.id, 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', orderId, 'advance_inr_actual', null, String(amount));
+  flash.set(req, 'success', 'Advance INR actual amount recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function deleteAdvanceInrActual(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  await orderPaymentStatusRepository.clearAdvanceInrActual(orderId);
+  await auditLogRepository.log(user.id, 'CA_INR_ACTUAL_DELETED', 'order_payment_status', orderId, 'advance_inr_actual');
+  flash.set(req, 'success', 'Advance INR actual amount removed.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function recordBalanceInrActual(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const amount = parseFloat(req.body.balance_inr_actual || 0);
+  if (!(amount > 0)) {
+    flash.set(req, 'error', 'Enter the actual INR amount credited to the bank.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  await orderPaymentStatusRepository.setBalanceInrActual(orderId, amount, user.id);
+  await auditLogRepository.log(user.id, 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', orderId, 'balance_inr_actual', null, String(amount));
+  flash.set(req, 'success', 'Balance INR actual amount recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function deleteBalanceInrActual(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  await orderPaymentStatusRepository.clearBalanceInrActual(orderId);
+  await auditLogRepository.log(user.id, 'CA_INR_ACTUAL_DELETED', 'order_payment_status', orderId, 'balance_inr_actual');
+  flash.set(req, 'success', 'Balance INR actual amount removed.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function recordFreightInrActual(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const amount = parseFloat(req.body.freight_inr_actual || 0);
+  if (!(amount > 0)) {
+    flash.set(req, 'error', 'Enter the actual INR amount credited to the bank.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  await orderPaymentStatusRepository.setFreightInrActual(orderId, amount, user.id);
+  await auditLogRepository.log(user.id, 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', orderId, 'freight_inr_actual', null, String(amount));
+  flash.set(req, 'success', 'Freight INR actual amount recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function deleteFreightInrActual(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  await orderPaymentStatusRepository.clearFreightInrActual(orderId);
+  await auditLogRepository.log(user.id, 'CA_INR_ACTUAL_DELETED', 'order_payment_status', orderId, 'freight_inr_actual');
+  flash.set(req, 'success', 'Freight INR actual amount removed.');
+  res.redirect(`/orders/${orderId}`);
+}
+
 async function recordBlOriginalsReceived(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const count = parseInt(req.body.bl_originals_count || 3, 10);
@@ -1143,4 +1229,6 @@ module.exports = {
   savePacking, saveShipping, recordBlIssued, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   closeOrder, overrideStatusLock, markLost,
+  recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
+  recordFreightInrActual, deleteFreightInrActual,
 };

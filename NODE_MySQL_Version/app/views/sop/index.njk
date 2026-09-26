@@ -4,9 +4,17 @@
       <p class="muted small" style="margin-top:0;">Chapters</p>
       <ul class="sop-chapter-list">
         {% for ch in chapters %}
-          <li><a href="/sop/{{ ch.slug }}">{{ ch.title }}</a></li>
+          {% if ch.category == 'main' %}<li><a href="/sop/{{ ch.slug }}">{{ ch.title }}</a></li>{% endif %}
         {% endfor %}
       </ul>
+      {% if chapters | selectattr('category', 'equalto', 'ca') | list | length > 0 %}
+        <p class="muted small">CA / Accounting</p>
+        <ul class="sop-chapter-list">
+          {% for ch in chapters %}
+            {% if ch.category == 'ca' %}<li><a href="/sop/{{ ch.slug }}">{{ ch.title }}</a></li>{% endif %}
+          {% endfor %}
+        </ul>
+      {% endif %}
     </nav>
     <div class="sop-content">
       {% if contentHtml %}

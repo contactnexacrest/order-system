@@ -37,9 +37,16 @@ final class SopController
     }
 
     /**
-     * @return array<int, array{slug:string, title:string}> every chapter
-     *         file present right now, in filename order (which is how the
-     *         00-, 01-, 02- prefixes were chosen to sort).
+     * @return array<int, array{slug:string, title:string, category:string}>
+     *         every chapter file present right now, in filename order
+     *         (which is how the 00-, 01-, 02- prefixes were chosen to
+     *         sort). A `ca-` prefix (sorting after every numbered chapter,
+     *         since digits sort before letters) marks a chapter as
+     *         belonging to the CA / Accounting module rather than the main
+     *         order-pipeline SOP — see the standing rule in this repo's
+     *         history: every new module ships with its own SOP chapter(s),
+     *         grouped under their own heading rather than mixed into the
+     *         numbered list.
      */
     private function chapters(): array
     {
@@ -54,8 +61,9 @@ final class SopController
                 continue;
             }
             $chapters[] = [
-                'slug'  => $slug,
-                'title' => $this->extractTitle($path) ?? $slug,
+                'slug'     => $slug,
+                'title'    => $this->extractTitle($path) ?? $slug,
+                'category' => str_starts_with($slug, 'ca-') ? 'ca' : 'main',
             ];
         }
         return $chapters;

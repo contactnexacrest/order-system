@@ -554,6 +554,28 @@ CREATE TABLE order_payment_status (
   balance_due_date            DATE NULL,     -- computed: BL date + balance_days (option B) or shipment-readiness + balance_days (option A)
   followup_sent_at            TIMESTAMP NULL,
   escalated_to_md_at          TIMESTAMP NULL,
+
+  -- CA / Accounting module (Phase 1) — every order here is quoted and
+  -- settled in a foreign currency only; for Indian accounting/GST/RBI
+  -- purposes the actual INR amount credited to the bank must also be on
+  -- record. Captured as a deliberately separate, permission-gated action
+  -- from "Mark Cleared" (which stays gated on manage_orders, since
+  -- whoever confirms the bank credit isn't necessarily an accounts
+  -- person) rather than a required field on that same form — but the
+  -- expectation, per SOP, is that it's entered the same day the leg is
+  -- cleared, before the day's exchange rate is forgotten. Recording it
+  -- later than that reintroduces exactly the forex-drift mismatch this
+  -- column exists to prevent.
+  advance_inr_actual              DECIMAL(14,2) NULL,
+  advance_inr_actual_recorded_at  TIMESTAMP NULL,
+  advance_inr_actual_recorded_by  BIGINT UNSIGNED NULL,
+  balance_inr_actual              DECIMAL(14,2) NULL,
+  balance_inr_actual_recorded_at  TIMESTAMP NULL,
+  balance_inr_actual_recorded_by  BIGINT UNSIGNED NULL,
+  freight_inr_actual              DECIMAL(14,2) NULL,
+  freight_inr_actual_recorded_at  TIMESTAMP NULL,
+  freight_inr_actual_recorded_by  BIGINT UNSIGNED NULL,
+
   FOREIGN KEY (order_id) REFERENCES orders(id)
 ) ENGINE=InnoDB;
 

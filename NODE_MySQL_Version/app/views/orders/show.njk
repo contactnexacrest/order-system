@@ -1,3 +1,34 @@
+{% macro inrActualWidget(leg, label) %}
+  {% set clearedAt = payment[leg ~ '_cleared_at'] %}
+  {% if clearedAt and canViewInrActual %}
+    {% set amount = payment[leg ~ '_inr_actual'] %}
+    {% set recordedAt = payment[leg ~ '_inr_actual_recorded_at'] %}
+    {% set recordedBy = payment[leg ~ '_inr_actual_recorded_by'] %}
+    <div class="review-banner info" style="margin-top:10px;">
+      <div style="width:100%;">
+        <strong>{{ label }} — INR Actual (CA/Accounting)</strong><br>
+        {% if amount != null %}
+          <span>&#8377;{{ amount | money }} credited — recorded {{ recordedAt }}{% if recordedBy %} by {{ usersById[recordedBy] or ('User #' ~ recordedBy) }}{% endif %}</span>
+          {% if canDeleteInrActual %}
+            <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/inr-actual/delete" style="display:inline; margin-left:8px;" onsubmit="return confirm('Remove the recorded INR actual amount for this leg? Only do this to correct a mis-entry.');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-danger">Remove</button>
+            </form>
+          {% endif %}
+        {% elif canEditInrActual %}
+          <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/inr-actual">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>INR Amount Actually Credited *<input type="text" name="{{ leg }}_inr_actual" required></label>
+            <button type="submit" class="btn-sm">Record INR Actual</button>
+          </form>
+        {% else %}
+          <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% endmacro %}
+
 {% set stage1 = stageByNumber[1] %}
 {% set stage2 = stageByNumber[2] %}
 {% set stage3 = stageByNumber[3] %}
@@ -696,6 +727,8 @@
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
     {% endif %}
 
+    {{ inrActualWidget('advance', 'Advance Payment') }}
+
     {% if clientPaymentReports and clientPaymentReports.length > 0 %}
       <h3 style="margin-top:16px">Client-Reported Payments</h3>
       <p class="muted small">Purely informational — the client submitted these themselves. Always verify against the actual bank statement before recording a payment above.</p>
@@ -930,6 +963,7 @@
           {% endif %}
         {% else %}
           <p>Freight payment cleared.</p>
+          {{ inrActualWidget('freight', 'Freight Payment') }}
         {% endif %}
       {% endif %}
     {% endif %}
@@ -1039,6 +1073,7 @@
         {% endif %}
       {% else %}
         <p>Balance payment cleared.</p>
+        {{ inrActualWidget('balance', 'Balance Payment') }}
       {% endif %}
     {% endif %}
   </div>

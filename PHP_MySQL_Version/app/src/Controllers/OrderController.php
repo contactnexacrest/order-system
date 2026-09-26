@@ -284,19 +284,29 @@ final class OrderController
             echo 'Order not found.';
             return;
         }
+        $actor = AuthService::currentUser();
+        $actorRoleId = $actor['role_id'] !== null ? (int) $actor['role_id'] : null;
+
         // Archiving only removes an order from the default listing — direct
         // access by URL/bookmark still needs its own gate, or
         // view_archived_orders would be meaningless (Super Admin already
         // bypasses every permission).
         if ((int) $order['is_archived'] === 1) {
-            $actor = AuthService::currentUser();
-            $canView = PermissionService::can((int) $actor['id'], $actor['role_id'] !== null ? (int) $actor['role_id'] : null, 'view_archived_orders');
+            $canView = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_archived_orders');
             if (!$canView) {
                 http_response_code(403);
                 echo 'This order has been archived. You need the "View archived orders" permission to open it.';
                 return;
             }
         }
+
+        // CA / Accounting module (Phase 1) — INR-actual settlement widgets
+        // on this page are shown/hidden per-permission rather than gated at
+        // the route level, since they're a small part of a page most staff
+        // already have full access to.
+        $canViewInrActual = PermissionService::can((int) $actor['id'], $actorRoleId, 'inr_actual_view');
+        $canEditInrActual = PermissionService::can((int) $actor['id'], $actorRoleId, 'inr_actual_edit');
+        $canDeleteInrActual = PermissionService::can((int) $actor['id'], $actorRoleId, 'inr_actual_delete');
 
         $stages = OrderStageRepository::forOrder($orderId);
         $stageByNumber = [];
@@ -357,6 +367,9 @@ final class OrderController
             'clientPaymentReports' => ClientPaymentReportRepository::forOrder($orderId),
             'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
             'comments' => OrderCommentRepository::forOrder($orderId),
+            'canViewInrActual' => $canViewInrActual,
+            'canEditInrActual' => $canEditInrActual,
+            'canDeleteInrActual' => $canDeleteInrActual,
         ], 'layout/base');
     }
 
@@ -1015,6 +1028,91 @@ final class OrderController
         OrderPaymentStatusRepository::markBalanceCleared($orderId, $clearedAt, (int) $user['id']);
         StageGateService::passAndUnlockNext($orderId, 8, (int) $user['id']);
         Flash::set('success', 'Balance payment cleared. Stage 9 (Document Despatch & Closure) unlocked.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    // ----------------------------------------------------------------
+    // CA / Accounting module (Phase 1) — INR actual settlement amounts.
+    // Routes are gated on inr_actual_edit/inr_actual_delete (see
+    // public_html/index.php); every write is audit-logged since this is
+    // exactly the kind of field an auditor/CA will want a trail on.
+    // ----------------------------------------------------------------
+
+    public function recordAdvanceInrActual(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $amount = (float) ($_POST['advance_inr_actual'] ?? 0);
+        if ($amount <= 0) {
+            Flash::set('error', 'Enter the actual INR amount credited to the bank.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        OrderPaymentStatusRepository::setAdvanceInrActual($orderId, $amount, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', $orderId, 'advance_inr_actual', null, (string) $amount);
+        Flash::set('success', 'Advance INR actual amount recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function deleteAdvanceInrActual(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        OrderPaymentStatusRepository::clearAdvanceInrActual($orderId);
+        AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_DELETED', 'order_payment_status', $orderId, 'advance_inr_actual');
+        Flash::set('success', 'Advance INR actual amount removed.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function recordBalanceInrActual(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $amount = (float) ($_POST['balance_inr_actual'] ?? 0);
+        if ($amount <= 0) {
+            Flash::set('error', 'Enter the actual INR amount credited to the bank.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        OrderPaymentStatusRepository::setBalanceInrActual($orderId, $amount, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', $orderId, 'balance_inr_actual', null, (string) $amount);
+        Flash::set('success', 'Balance INR actual amount recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function deleteBalanceInrActual(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        OrderPaymentStatusRepository::clearBalanceInrActual($orderId);
+        AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_DELETED', 'order_payment_status', $orderId, 'balance_inr_actual');
+        Flash::set('success', 'Balance INR actual amount removed.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function recordFreightInrActual(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $amount = (float) ($_POST['freight_inr_actual'] ?? 0);
+        if ($amount <= 0) {
+            Flash::set('error', 'Enter the actual INR amount credited to the bank.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        OrderPaymentStatusRepository::setFreightInrActual($orderId, $amount, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', $orderId, 'freight_inr_actual', null, (string) $amount);
+        Flash::set('success', 'Freight INR actual amount recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function deleteFreightInrActual(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        OrderPaymentStatusRepository::clearFreightInrActual($orderId);
+        AuditLogRepository::log((int) $user['id'], 'CA_INR_ACTUAL_DELETED', 'order_payment_status', $orderId, 'freight_inr_actual');
+        Flash::set('success', 'Freight INR actual amount removed.');
         header("Location: /orders/{$orderId}");
     }
 

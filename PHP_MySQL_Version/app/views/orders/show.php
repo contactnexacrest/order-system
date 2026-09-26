@@ -11,6 +11,49 @@ $canEditLockedData = PermissionService::can((int) $currentUser['id'], $currentUs
 $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_orders');
 $canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
 
+// CA / Accounting module (Phase 1) — one small widget per settlement leg,
+// rendered inline in the Payment Status section rather than a separate
+// page, since the whole point is capturing the INR actual the same day
+// the leg clears (see schema.sql comment on order_payment_status).
+$usersById = [];
+foreach ($activeUsers as $u) {
+    $usersById[(int) $u['id']] = $u['name'];
+}
+$renderInrActualWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canDeleteInrActual, $usersById): void {
+    $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
+    if ($clearedAt === null || !$canViewInrActual) {
+        return;
+    }
+    $amount = $payment[$leg . '_inr_actual'] ?? null;
+    $recordedAt = $payment[$leg . '_inr_actual_recorded_at'] ?? null;
+    $recordedBy = $payment[$leg . '_inr_actual_recorded_by'] ?? null;
+    $recordedByName = $recordedBy !== null ? ($usersById[(int) $recordedBy] ?? ('User #' . $recordedBy)) : null;
+    ?>
+    <div class="review-banner info" style="margin-top:10px;">
+      <div style="width:100%;">
+        <strong><?= htmlspecialchars($label) ?> — INR Actual (CA/Accounting)</strong><br>
+        <?php if ($amount !== null): ?>
+          <span>&#8377;<?= number_format((float) $amount, 2) ?> credited — recorded <?= htmlspecialchars((string) $recordedAt) ?><?= $recordedByName ? ' by ' . htmlspecialchars($recordedByName) : '' ?></span>
+          <?php if ($canDeleteInrActual): ?>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/inr-actual/delete" style="display:inline; margin-left:8px;" onsubmit="return confirm('Remove the recorded INR actual amount for this leg? Only do this to correct a mis-entry.');">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm btn-danger">Remove</button>
+            </form>
+          <?php endif; ?>
+        <?php elseif ($canEditInrActual): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/inr-actual">
+            <?= Csrf::field() ?>
+            <label>INR Amount Actually Credited *<input type="text" name="<?= $leg ?>_inr_actual" required></label>
+            <button type="submit" class="btn-sm">Record INR Actual</button>
+          </form>
+        <?php else: ?>
+          <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php
+};
+
 $stage1 = $stageByNumber[1] ?? null;
 $stage2 = $stageByNumber[2] ?? null;
 $stage3 = $stageByNumber[3] ?? null;
@@ -725,6 +768,8 @@ $orderClosed = $order['status'] === 'complete';
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
     <?php endif; ?>
 
+    <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
+
     <?php if (!empty($clientPaymentReports)): ?>
       <h3 style="margin-top:16px">Client-Reported Payments</h3>
       <p class="muted small">Purely informational — the client submitted these themselves. Always verify against the actual bank statement before recording a payment above.</p>
@@ -959,6 +1004,7 @@ $orderClosed = $order['status'] === 'complete';
           <?php endif; ?>
         <?php else: ?>
           <p>Freight payment cleared.</p>
+          <?php $renderInrActualWidget('freight', 'Freight Payment'); ?>
         <?php endif; ?>
       <?php endif; ?>
     <?php endif; ?>
@@ -1071,6 +1117,7 @@ $orderClosed = $order['status'] === 'complete';
         <?php endif; ?>
       <?php else: ?>
         <p>Balance payment cleared.</p>
+        <?php $renderInrActualWidget('balance', 'Balance Payment'); ?>
       <?php endif; ?>
     <?php endif; ?>
   </div>

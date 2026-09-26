@@ -27,6 +27,7 @@ $canUsers = $can('manage_users');
 $canSampleData = $can('manage_sample_data');
 $canViewProducts = $can('view_product_catalog');
 $canViewArchivedOrders = $can('view_archived_orders');
+$canCaModule = $can('ca_module_view');
 
 $opsGroupVisible = $canOrders || $canViewArchivedOrders;
 $insightsGroupVisible = $canReports || $canAudit || $canApproveEmail;
@@ -76,6 +77,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
       <a href="/reference-docs" class="<?= $isActive('/reference-docs') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>Reference Library</a>
       <a href="/sop" target="_blank" rel="noopener"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>SOP / Operations Guide</a>
       <a href="/reviews" class="<?= $isActive('/reviews') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>My Reviews</a>
+      <?php if ($canCaModule): ?><a href="/ca" class="<?= $isActive('/ca') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>CA / Accounting</a><?php endif; ?>
       <?php if ($canViewProducts): ?><a href="/products" class="<?= $isActive('/products') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>Products</a><?php endif; ?>
     <?php endif; ?>
     <?php if ($opsGroupVisible): ?>

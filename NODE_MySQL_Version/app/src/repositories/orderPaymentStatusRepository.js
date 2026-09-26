@@ -59,7 +59,78 @@ async function markBalanceCleared(orderId, clearedAt, clearedBy) {
   );
 }
 
+// ----------------------------------------------------------------
+// CA / Accounting module (Phase 1) — INR actual settlement amounts.
+// Gated on inr_actual_edit/inr_actual_delete in ordersController, not
+// tied to the Mark Cleared actions above (see schema.sql comment on
+// order_payment_status for why they're deliberately separate actions).
+// ----------------------------------------------------------------
+
+async function setAdvanceInrActual(orderId, amount, recordedBy) {
+  await db.execute(
+    'UPDATE order_payment_status SET advance_inr_actual = :amount, advance_inr_actual_recorded_at = NOW(), advance_inr_actual_recorded_by = :recorded_by WHERE order_id = :order_id',
+    { amount, recorded_by: recordedBy, order_id: orderId }
+  );
+}
+
+async function clearAdvanceInrActual(orderId) {
+  await db.execute(
+    'UPDATE order_payment_status SET advance_inr_actual = NULL, advance_inr_actual_recorded_at = NULL, advance_inr_actual_recorded_by = NULL WHERE order_id = :order_id',
+    { order_id: orderId }
+  );
+}
+
+async function setBalanceInrActual(orderId, amount, recordedBy) {
+  await db.execute(
+    'UPDATE order_payment_status SET balance_inr_actual = :amount, balance_inr_actual_recorded_at = NOW(), balance_inr_actual_recorded_by = :recorded_by WHERE order_id = :order_id',
+    { amount, recorded_by: recordedBy, order_id: orderId }
+  );
+}
+
+async function clearBalanceInrActual(orderId) {
+  await db.execute(
+    'UPDATE order_payment_status SET balance_inr_actual = NULL, balance_inr_actual_recorded_at = NULL, balance_inr_actual_recorded_by = NULL WHERE order_id = :order_id',
+    { order_id: orderId }
+  );
+}
+
+async function setFreightInrActual(orderId, amount, recordedBy) {
+  await db.execute(
+    'UPDATE order_payment_status SET freight_inr_actual = :amount, freight_inr_actual_recorded_at = NOW(), freight_inr_actual_recorded_by = :recorded_by WHERE order_id = :order_id',
+    { amount, recorded_by: recordedBy, order_id: orderId }
+  );
+}
+
+async function clearFreightInrActual(orderId) {
+  await db.execute(
+    'UPDATE order_payment_status SET freight_inr_actual = NULL, freight_inr_actual_recorded_at = NULL, freight_inr_actual_recorded_by = NULL WHERE order_id = :order_id',
+    { order_id: orderId }
+  );
+}
+
+/**
+ * Every order with at least one cleared settlement leg, for the CA
+ * module's settlement register (caRepository). Joined here rather than
+ * in caRepository since this is still just order_payment_status data —
+ * caRepository flattens the three legs into rows.
+ */
+async function clearedSettlements() {
+  return db.query(
+    `SELECT ops.*, o.buyer_inquiry_ref, o.client_id, c.company_legal_name, cur.code AS currency_code
+     FROM order_payment_status ops
+     JOIN orders o ON o.id = ops.order_id
+     JOIN clients c ON c.id = o.client_id
+     JOIN currencies cur ON cur.id = o.currency_id
+     WHERE ops.advance_cleared_at IS NOT NULL
+        OR ops.balance_cleared_at IS NOT NULL
+        OR ops.freight_cleared_at IS NOT NULL
+     ORDER BY o.id DESC`
+  );
+}
+
 module.exports = {
   initializeForOrder, find, recordAdvanceReceived, markAdvanceCleared, setBalanceAmount,
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
+  setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,
+  setFreightInrActual, clearFreightInrActual, clearedSettlements,
 };

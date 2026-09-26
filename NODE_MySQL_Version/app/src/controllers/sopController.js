@@ -49,7 +49,15 @@ function extractTitle(filePath) {
   return null;
 }
 
-/** @returns {{slug: string, title: string}[]} every chapter file present right now, in filename order. */
+/**
+ * @returns {{slug: string, title: string, category: string}[]} every
+ * chapter file present right now, in filename order (00-, 01-, 02- were
+ * chosen to sort). A `ca-` prefix (sorts after every numbered chapter,
+ * since digits sort before letters) marks a chapter as belonging to the
+ * CA / Accounting module rather than the main order-pipeline SOP — see
+ * the standing rule in this repo's history: every new module ships with
+ * its own SOP chapter(s), grouped under their own heading.
+ */
 function chapters() {
   const files = fs.readdirSync(DOCS_DIR)
     .filter((f) => f.endsWith('.md') && f !== 'README.md')
@@ -57,7 +65,8 @@ function chapters() {
   return files.map((f) => {
     const slug = f.slice(0, -3);
     const title = extractTitle(path.join(DOCS_DIR, f)) || slug;
-    return { slug, title };
+    const category = slug.startsWith('ca-') ? 'ca' : 'main';
+    return { slug, title, category };
   });
 }
 

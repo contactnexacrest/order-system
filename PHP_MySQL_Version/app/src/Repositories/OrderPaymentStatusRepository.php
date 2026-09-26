@@ -87,4 +87,88 @@ final class OrderPaymentStatusRepository
              WHERE order_id = :order_id'
         )->execute(['cleared_at' => $clearedAt, 'cleared_by' => $clearedBy, 'order_id' => $orderId]);
     }
+
+    // ----------------------------------------------------------------
+    // CA / Accounting module (Phase 1) — INR actual settlement amounts.
+    // Gated on inr_actual_edit/inr_actual_delete in OrderController, not
+    // tied to the Mark Cleared actions above (see schema.sql comment on
+    // order_payment_status for why they're deliberately separate actions).
+    // ----------------------------------------------------------------
+
+    public static function setAdvanceInrActual(int $orderId, float $amount, int $recordedBy): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status
+             SET advance_inr_actual = :amount, advance_inr_actual_recorded_at = NOW(), advance_inr_actual_recorded_by = :recorded_by
+             WHERE order_id = :order_id'
+        )->execute(['amount' => $amount, 'recorded_by' => $recordedBy, 'order_id' => $orderId]);
+    }
+
+    public static function clearAdvanceInrActual(int $orderId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status
+             SET advance_inr_actual = NULL, advance_inr_actual_recorded_at = NULL, advance_inr_actual_recorded_by = NULL
+             WHERE order_id = :order_id'
+        )->execute(['order_id' => $orderId]);
+    }
+
+    public static function setBalanceInrActual(int $orderId, float $amount, int $recordedBy): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status
+             SET balance_inr_actual = :amount, balance_inr_actual_recorded_at = NOW(), balance_inr_actual_recorded_by = :recorded_by
+             WHERE order_id = :order_id'
+        )->execute(['amount' => $amount, 'recorded_by' => $recordedBy, 'order_id' => $orderId]);
+    }
+
+    public static function clearBalanceInrActual(int $orderId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status
+             SET balance_inr_actual = NULL, balance_inr_actual_recorded_at = NULL, balance_inr_actual_recorded_by = NULL
+             WHERE order_id = :order_id'
+        )->execute(['order_id' => $orderId]);
+    }
+
+    public static function setFreightInrActual(int $orderId, float $amount, int $recordedBy): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status
+             SET freight_inr_actual = :amount, freight_inr_actual_recorded_at = NOW(), freight_inr_actual_recorded_by = :recorded_by
+             WHERE order_id = :order_id'
+        )->execute(['amount' => $amount, 'recorded_by' => $recordedBy, 'order_id' => $orderId]);
+    }
+
+    public static function clearFreightInrActual(int $orderId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status
+             SET freight_inr_actual = NULL, freight_inr_actual_recorded_at = NULL, freight_inr_actual_recorded_by = NULL
+             WHERE order_id = :order_id'
+        )->execute(['order_id' => $orderId]);
+    }
+
+    /**
+     * Every order with at least one cleared settlement leg, for the CA
+     * module's settlement register (CaRepository). Joined here rather than
+     * in CaRepository since this is still just order_payment_status data —
+     * CaRepository flattens the three legs into rows.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function clearedSettlements(): array
+    {
+        return Database::connection()->query(
+            "SELECT ops.*, o.buyer_inquiry_ref, o.client_id, c.company_legal_name, cur.code AS currency_code
+             FROM order_payment_status ops
+             JOIN orders o ON o.id = ops.order_id
+             JOIN clients c ON c.id = o.client_id
+             JOIN currencies cur ON cur.id = o.currency_id
+             WHERE ops.advance_cleared_at IS NOT NULL
+                OR ops.balance_cleared_at IS NOT NULL
+                OR ops.freight_cleared_at IS NOT NULL
+             ORDER BY o.id DESC"
+        )->fetchAll();
+    }
 }
