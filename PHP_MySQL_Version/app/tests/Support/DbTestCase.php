@@ -92,11 +92,13 @@ abstract class DbTestCase extends TestCase
      * the exact state a genuine new order is in: Stage 1 in_progress,
      * Stages 2-9 locked.
      */
-    protected function createTestOrder(int $clientId): int
+    protected function createTestOrder(int $clientId, string $incotermCode = 'FOB'): int
     {
         $pdo = \App\Config\Database::connection();
 
-        $incotermId = (int) $pdo->query("SELECT id FROM incoterms WHERE code = 'FOB'")->fetchColumn();
+        $incotermStmt = $pdo->prepare('SELECT id FROM incoterms WHERE code = :code');
+        $incotermStmt->execute(['code' => $incotermCode]);
+        $incotermId = (int) $incotermStmt->fetchColumn();
         $currencyId = (int) $pdo->query("SELECT id FROM currencies WHERE code = 'USD'")->fetchColumn();
         $presetId = (int) $pdo->query("SELECT id FROM payment_presets WHERE preset_name = 'Standard — New Buyer'")->fetchColumn();
 

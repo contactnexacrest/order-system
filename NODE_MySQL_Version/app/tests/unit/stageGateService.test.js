@@ -91,4 +91,103 @@ describe('stageGateService.passAndUnlockNext', () => {
     expect(orderStageRepository.unlock).not.toHaveBeenCalled();
     expect(orderRepository.setCurrentStage).not.toHaveBeenCalled();
   });
+
+  // QA-4 (extending QA-1 per docs/QA/TEST_PLAN.md P0.1): every one of
+  // Stages 2-9 must refuse on a freshly created order (only Stage 1
+  // in_progress) — not just the stages QA-1's first pass happened to
+  // cover.
+  it.each([2, 3, 4, 5, 6, 7, 8, 9])('refuses to pass Stage %i while the order is still on Stage 1', async (stageNumber) => {
+    orderStageRepository.findByOrderAndStageNumber.mockImplementation((orderId, n) => {
+      if (n === 1) return Promise.resolve({ id: 10, stage_id: 100, status: 'in_progress' });
+      return Promise.resolve({ id: n * 10, stage_id: n * 100, status: 'locked' });
+    });
+
+    await expect(stageGateService.isUnlocked(1, stageNumber)).resolves.toBe(false);
+    await expect(stageGateService.passAndUnlockNext(1, stageNumber, 42)).resolves.toBe(false);
+    expect(orderStageRepository.passGate).not.toHaveBeenCalled();
+  });
+});
+
+describe('stageGateService — sequential walk through all 9 stages', () => {
+  // A stateful in-memory fake of order_stages, driven by the real
+  // stageGateService calls — this is the positive-path complement to the
+  // locked-stage refusal tests above: proves the QA-1 guard never blocks
+  // genuine in-order progression, and that a skip-ahead attempt from every
+  // intermediate position is still refused mid-walk.
+  function makeFakeStageTable() {
+    const stages = {};
+    for (let n = 1; n <= 9; n++) {
+      stages[n] = { id: n, stage_id: n * 100, status: n === 1 ? 'in_progress' : 'locked' };
+    }
+    return stages;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('succeeds stage by stage while every stage ahead stays refused', async () => {
+    const stages = makeFakeStageTable();
+    orderStageRepository.findByOrderAndStageNumber.mockImplementation((orderId, n) => Promise.resolve(stages[n] ? { ...stages[n] } : null));
+    orderStageRepository.passGate.mockImplementation((id) => {
+      const entry = Object.values(stages).find((s) => s.id === id);
+      if (entry) entry.status = 'gate_passed';
+      return Promise.resolve();
+    });
+    orderStageRepository.unlock.mockImplementation((id) => {
+      const entry = Object.values(stages).find((s) => s.id === id);
+      if (entry) entry.status = 'in_progress';
+      return Promise.resolve();
+    });
+
+    for (let stage = 1; stage <= 9; stage++) {
+      for (let ahead = stage + 1; ahead <= 9; ahead++) {
+        await expect(stageGateService.isUnlocked(1, ahead)).resolves.toBe(false);
+      }
+      await expect(stageGateService.isUnlocked(1, stage)).resolves.toBe(true);
+      await expect(stageGateService.passAndUnlockNext(1, stage, 42)).resolves.toBe(true);
+    }
+
+    for (let n = 1; n <= 9; n++) {
+      expect(stages[n].status).toBe('gate_passed');
+    }
+  });
+});
+
+describe('stageGateService.maybeAutoSkipFreightStage', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  it('auto-skips Stage 6 for an FOB order and unlocks Stage 7', async () => {
+    orderRepository.find.mockResolvedValue({ incoterm_code: 'FOB' });
+    orderStageRepository.findByOrderAndStageNumber.mockImplementation((orderId, n) => {
+      if (n === 6) return Promise.resolve({ id: 60, status: 'in_progress' });
+      if (n === 7) return Promise.resolve({ id: 70, stage_id: 700, status: 'locked' });
+      return Promise.resolve(null);
+    });
+
+    await stageGateService.maybeAutoSkipFreightStage(1, 42);
+
+    expect(orderStageRepository.skip).toHaveBeenCalledWith(60, expect.stringContaining('FOB'));
+    expect(orderStageRepository.unlock).toHaveBeenCalledWith(70);
+    expect(orderRepository.setCurrentStage).toHaveBeenCalledWith(1, 700);
+  });
+
+  it('does NOT skip Stage 6 for a CIF order', async () => {
+    orderRepository.find.mockResolvedValue({ incoterm_code: 'CIF' });
+    orderStageRepository.findByOrderAndStageNumber.mockResolvedValue({ id: 60, status: 'in_progress' });
+
+    await stageGateService.maybeAutoSkipFreightStage(1, 42);
+
+    expect(orderStageRepository.skip).not.toHaveBeenCalled();
+    expect(orderStageRepository.unlock).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op if Stage 6 is not currently in_progress (already passed/skipped, or not yet unlocked)', async () => {
+    orderRepository.find.mockResolvedValue({ incoterm_code: 'FOB' });
+    orderStageRepository.findByOrderAndStageNumber.mockResolvedValue({ id: 60, status: 'gate_passed' });
+
+    await stageGateService.maybeAutoSkipFreightStage(1, 42);
+
+    expect(orderStageRepository.skip).not.toHaveBeenCalled();
+  });
 });

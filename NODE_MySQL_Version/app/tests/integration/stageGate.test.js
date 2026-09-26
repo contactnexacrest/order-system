@@ -92,54 +92,31 @@ describe('Stage-gate integrity (QA-1 regression): closeOrder + other stage-skip 
     await db.pool.end();
   });
 
-  it('refuses to close a freshly created order (Stage 9 still locked) via direct POST, and mutates nothing', async () => {
-    const before = await stageStatuses(orderId);
+  // QA-4 (extending QA-1 per docs/QA/TEST_PLAN.md P0.1): every one of the
+  // 8 stage-advancing routes (Stage 1 has no predecessor to skip) must
+  // refuse on this freshly created order (only Stage 1 in_progress) — not
+  // just the ones QA-1's first pass happened to cover.
+  const advancingRoutes = [
+    { stage: 2, label: 'recordBuyerPo', path: 'buyer-po', fields: { buyers_po_ref: 'HACK-BPO-001' } },
+    { stage: 3, label: 'clearAdvancePayment', path: 'payment/advance/clear', fields: { advance_cleared_at: '2026-01-01' } },
+    { stage: 4, label: 'recordOcAcknowledgment', path: 'oc-acknowledgment', fields: { acknowledged_note: 'Forged evidence, at least ten characters.' } },
+    { stage: 5, label: 'confirmSupplierSigned', path: 'supplier-po/signed', fields: {} },
+    { stage: 6, label: 'clearFreightPayment', path: 'payment/freight/clear', fields: {} },
+    { stage: 7, label: 'recordBlIssued', path: 'bl-issued', fields: { bl_number: 'HACK-BL-001', bl_date: '2026-01-01' } },
+    { stage: 8, label: 'clearBalancePayment', path: 'payment/balance/clear', fields: { balance_cleared_at: '2026-01-01' } },
+    { stage: 9, label: 'closeOrder', path: 'close', fields: { courier_tracking_number: 'HACK-TRACKING-001' } },
+  ];
 
-    const orderPage = await agent.get(`/orders/${orderId}`);
-    const csrf = extractCsrf(orderPage.text);
-    const res = await agent
-      .post(`/orders/${orderId}/close`)
-      .type('form')
-      .send({ _csrf: csrf, courier_tracking_number: 'HACK-TRACKING-001' });
-
-    expect(res.status).toBe(302);
-    const redirected = await agent.get(res.headers.location);
-    const flash = extractFlash(redirected.text);
-    expect(flash).toEqual({ type: 'error', text: expect.stringContaining('has not been unlocked') });
-
-    const after = await stageStatuses(orderId);
-    expect(after).toEqual(before);
-  });
-
-  it('refuses recordBlIssued (Stage 7) on the same still-early order, and mutates nothing', async () => {
-    const before = await stageStatuses(orderId);
-
-    const orderPage = await agent.get(`/orders/${orderId}`);
-    const csrf = extractCsrf(orderPage.text);
-    const res = await agent
-      .post(`/orders/${orderId}/bl-issued`)
-      .type('form')
-      .send({ _csrf: csrf, bl_number: 'HACK-BL-001', bl_date: '2026-01-01' });
-
-    expect(res.status).toBe(302);
-    const redirected = await agent.get(res.headers.location);
-    const flash = extractFlash(redirected.text);
-    expect(flash).toEqual({ type: 'error', text: expect.stringContaining('has not been unlocked') });
-
-    const after = await stageStatuses(orderId);
-    expect(after).toEqual(before);
-  });
-
-  it('refuses recordBuyerPo (Stage 2) while Stage 1 has not yet passed', async () => {
+  it.each(advancingRoutes)('refuses $label (Stage $stage) on a freshly created order, and mutates nothing', async ({ path, fields }) => {
     const before = await stageStatuses(orderId);
     expect(before[1]).toBe('in_progress'); // Stage 1 only passes via QT generation, not exercised here
 
     const orderPage = await agent.get(`/orders/${orderId}`);
     const csrf = extractCsrf(orderPage.text);
     const res = await agent
-      .post(`/orders/${orderId}/buyer-po`)
+      .post(`/orders/${orderId}/${path}`)
       .type('form')
-      .send({ _csrf: csrf, buyers_po_ref: 'HACK-BPO-001' });
+      .send({ _csrf: csrf, ...fields });
 
     expect(res.status).toBe(302);
     const redirected = await agent.get(res.headers.location);
