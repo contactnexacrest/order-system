@@ -1,0 +1,21 @@
+<div class="card page-wide">
+  <p class="muted small"><a href="/ca">&larr; CA / Accounting</a></p>
+  <h1>TDS Payable Summary</h1>
+  <p class="muted">Every month with at least one TDS-applicable expense (annotated on the Expenses page), grouped by month and by the Indian FY quarter it falls in — for reconciling against Form 26Q filings.</p>
+
+  <div class="section">
+    <table class="list">
+      <tr><th>Month</th><th>Quarter</th><th>TDS-Applicable Expenses</th><th>Total Expense Amount</th><th>Total TDS Amount</th></tr>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.month }}</td>
+        <td>{{ r.quarter }}</td>
+        <td>{{ r.expense_count }}</td>
+        <td>{{ r.total_expense_amount | money }}</td>
+        <td>{{ r.total_tds_amount | money }}</td>
+      </tr>
+      {% endfor %}
+      {% if not rows or rows.length == 0 %}<tr><td colspan="5" class="muted">No expense has been marked TDS-applicable yet.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>

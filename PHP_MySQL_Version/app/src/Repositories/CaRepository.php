@@ -199,4 +199,54 @@ final class CaRepository
             'legCount' => count($rows),
         ];
     }
+
+    /**
+     * FY-Close Readiness checklist — closes a real gap: lockFinancialYear()
+     * previously just flipped the lock with nothing shown to the CA first.
+     * Composes entirely from existing repository methods, filtered to this
+     * FY's date bounds — no new queries against tables this class doesn't
+     * already read.
+     *
+     * @return array{revenue: array, pendingZohoSyncCount: int, unmatchedRevenueLegCount: int, unmatchedExpenseCount: int, unmatchedBankLineCount: int, isReady: bool}
+     */
+    public static function fyReadiness(string $fy): array
+    {
+        $bounds = FinancialYear::bounds($fy);
+        $inBounds = static fn(?string $date): bool => $date !== null && substr($date, 0, 10) >= $bounds['start'] && substr($date, 0, 10) <= $bounds['end'];
+
+        $revenue = self::revenueReport('fy', $fy);
+
+        $pendingZohoSyncCount = count(array_filter(
+            self::legsPendingZohoSync(),
+            static fn(array $r) => $inBounds($r['cleared_at'])
+        ));
+
+        $matchedRevenueKeys = CaBankStatementRepository::matchedRevenueKeys();
+        $unmatchedRevenueLegCount = count(array_filter(
+            self::legsWithInrActualUnmatched($matchedRevenueKeys),
+            static fn(array $r) => $inBounds($r['cleared_at'])
+        ));
+
+        $matchedExpenseIds = CaBankStatementRepository::matchedExpenseIds();
+        $unmatchedExpenseCount = count(array_filter(
+            CaExpenseRepository::all(),
+            static fn(array $e) => !in_array((int) $e['id'], $matchedExpenseIds, true) && $inBounds($e['expense_date'])
+        ));
+
+        $unmatchedBankLineCount = count(array_filter(
+            CaBankStatementRepository::all(),
+            static fn(array $l) => $l['matched_order_id'] === null && $l['matched_expense_id'] === null && $inBounds($l['transaction_date'])
+        ));
+
+        return [
+            'revenue' => $revenue,
+            'pendingZohoSyncCount' => $pendingZohoSyncCount,
+            'unmatchedRevenueLegCount' => $unmatchedRevenueLegCount,
+            'unmatchedExpenseCount' => $unmatchedExpenseCount,
+            'unmatchedBankLineCount' => $unmatchedBankLineCount,
+            'isReady' => $pendingZohoSyncCount === 0 && $unmatchedRevenueLegCount === 0
+                && $unmatchedExpenseCount === 0 && $unmatchedBankLineCount === 0
+                && $revenue['legsMissingInr'] === 0,
+        ];
+    }
 }

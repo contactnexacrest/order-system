@@ -57,7 +57,7 @@ async function findLatestForOrder(orderId) {
 }
 
 async function markSigned(id) {
-  await db.execute("UPDATE order_supplier_po SET status = 'signed' WHERE id = :id", { id });
+  await db.execute("UPDATE order_supplier_po SET status = 'signed', signed_at = NOW() WHERE id = :id", { id });
 }
 
 module.exports = { create, findLatestForOrder, markSigned };

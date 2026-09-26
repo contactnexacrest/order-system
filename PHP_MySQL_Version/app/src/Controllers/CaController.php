@@ -133,6 +133,14 @@ final class CaController
         ], 'layout/base');
     }
 
+    /** TDS Payable Summary — closes a real gap: the per-expense TDS flag existed but was never rolled up for compliance filing. */
+    public function tdsSummary(array $params): void
+    {
+        View::render('ca/tds_summary', [
+            'rows' => CaExpenseRepository::tdsSummary(),
+        ], 'layout/base');
+    }
+
     public function setExpenseTds(array $params): void
     {
         $id = (int) $params['id'];
@@ -353,9 +361,21 @@ final class CaController
 
         $lockedYears = CaFyLockRepository::lockedYears();
 
+        // FY-Close Readiness (closes a real gap: locking previously showed
+        // nothing about whether a year was actually ready to close) — only
+        // computed for still-open years, since a locked year's readiness is
+        // moot.
+        $readinessByYear = [];
+        foreach ($years as $fy) {
+            if (!in_array($fy, $lockedYears, true)) {
+                $readinessByYear[$fy] = CaRepository::fyReadiness($fy);
+            }
+        }
+
         View::render('ca/fy_locks', [
             'years' => $years,
             'lockedYears' => $lockedYears,
+            'readinessByYear' => $readinessByYear,
             'history' => CaFyLockRepository::history(),
             'recentOverrides' => AuditLogRepository::search(actionType: 'CA_FY_LOCK_OVERRIDDEN', limit: 20),
             'usersById' => $this->usersById(),

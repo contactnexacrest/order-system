@@ -957,6 +957,300 @@ async function staffProductivity(dateFrom, dateTo) {
   return Object.values(byUser).sort((a, b) => String(a.user_name).localeCompare(String(b.user_name)));
 }
 
+// ================================================================
+// DEBTORS / RECEIVABLES AGEING REPORT — closes a real gap: the Payments
+// report shows each leg's outstanding amount but never how LONG it's
+// been outstanding, which is what actually drives follow-up priority and
+// provisioning decisions.
+//
+// Due-date basis per leg (documented here since it's a judgment call, not
+// a stored field for every leg): advance and freight are each due
+// promptly once invoiced, so age is counted from the order's own
+// created_at; balance already has an explicit computed due date
+// (order_payment_status.balance_due_date, per the payment preset's
+// trigger option) — use that when set, falling back to created_at for
+// the (rare, event-triggered) presets that never populate it.
+// ================================================================
+
+const AGEING_BUCKETS = ['Current (not yet due)', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
+
+function ageingBucket(daysOverdue) {
+  if (daysOverdue === null || daysOverdue <= 0) return AGEING_BUCKETS[0];
+  if (daysOverdue <= 30) return AGEING_BUCKETS[1];
+  if (daysOverdue <= 60) return AGEING_BUCKETS[2];
+  if (daysOverdue <= 90) return AGEING_BUCKETS[3];
+  return AGEING_BUCKETS[4];
+}
+
+function daysBetween(fromDate, toDate) {
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  return Math.floor((toDate.getTime() - fromDate.getTime()) / oneDayMs);
+}
+
+/** @returns {Promise<{rows: Array<object>, by_bucket: object, buckets: Array<string>}>} */
+async function ageingReport() {
+  const isTestMode = await isTestModeFlag();
+
+  const orders = await db.query(
+    `SELECT o.id, o.order_reference, o.created_at, c.company_legal_name, cur.code AS currency_code,
+            ops.advance_amount, ops.advance_cleared_at,
+            ops.balance_amount, ops.balance_cleared_at, ops.balance_due_date,
+            ops.freight_amount, ops.freight_cleared_at
+     FROM orders o
+     JOIN clients c ON c.id = o.client_id
+     JOIN currencies cur ON cur.id = o.currency_id
+     JOIN order_payment_status ops ON ops.order_id = o.id
+     WHERE o.is_test_data = :is_test_data AND o.status NOT IN ('lost')
+       AND (
+         (ops.advance_amount IS NOT NULL AND ops.advance_cleared_at IS NULL) OR
+         (ops.balance_amount IS NOT NULL AND ops.balance_cleared_at IS NULL) OR
+         (ops.freight_amount IS NOT NULL AND ops.freight_cleared_at IS NULL)
+       )
+     ORDER BY o.created_at ASC`,
+    { is_test_data: isTestMode }
+  );
+
+  const today = new Date(new Date().toISOString().slice(0, 10));
+  const rows = [];
+  const byBucket = {};
+  const legs = { advance: 'Advance', balance: 'Balance', freight: 'Freight' };
+
+  for (const o of orders) {
+    const createdAt = new Date(String(o.created_at).slice(0, 10));
+
+    for (const [legKey, legLabel] of Object.entries(legs)) {
+      const amount = o[`${legKey}_amount`];
+      const clearedAt = o[`${legKey}_cleared_at`];
+      if (amount === null || clearedAt !== null) continue; // not invoiced, or already cleared — not a debtor
+
+      const dueDate = legKey === 'balance' && o.balance_due_date !== null
+        ? new Date(String(o.balance_due_date).slice(0, 10))
+        : createdAt;
+
+      const daysOverdue = daysBetween(dueDate, today);
+      const bucket = ageingBucket(daysOverdue);
+      const cc = o.currency_code;
+
+      rows.push({
+        order_id: o.id,
+        order_reference: o.order_reference,
+        company_legal_name: o.company_legal_name,
+        currency_code: cc,
+        leg: legLabel,
+        amount: parseFloat(amount),
+        due_date: dueDate.toISOString().slice(0, 10),
+        days_overdue: Math.max(0, daysOverdue),
+        bucket,
+      });
+
+      byBucket[bucket] ??= {};
+      byBucket[bucket][cc] = (byBucket[bucket][cc] ?? 0) + parseFloat(amount);
+    }
+  }
+
+  rows.sort((a, b) => b.days_overdue - a.days_overdue);
+  for (const bucket of Object.keys(byBucket)) {
+    byBucket[bucket] = sortObjectKeys(byBucket[bucket]);
+  }
+
+  return { rows, by_bucket: byBucket, buckets: AGEING_BUCKETS };
+}
+
+// ================================================================
+// FREIGHT COST REPORT — closes a real gap: freight terms/costs are
+// recorded per order (order_freight, order_payment_status) but never
+// rolled up anywhere to see total freight spend or forwarder split.
+// ================================================================
+
+/** @returns {Promise<{rows: Array<object>, by_forwarder: object}>} */
+async function freightCostReport(dateFrom, dateTo) {
+  const isTestMode = await isTestModeFlag();
+  const where = ['o.is_test_data = :is_test_data', 'fr.id IS NOT NULL'];
+  const params = { is_test_data: isTestMode };
+  if (dateFrom) {
+    where.push('DATE(o.created_at) >= :date_from');
+    params.date_from = dateFrom;
+  }
+  if (dateTo) {
+    where.push('DATE(o.created_at) <= :date_to');
+    params.date_to = dateTo;
+  }
+
+  const rows = await db.query(
+    `SELECT o.id, o.order_reference, o.created_at, c.company_legal_name, cur.code AS currency_code,
+            i.code AS incoterm_code,
+            fr.freight_forwarder_name, fr.confirmed_freight_rate, fr.insurance_amount, fr.freight_cleared_at,
+            ops.freight_amount, ops.freight_cleared_at AS payment_cleared_at
+     FROM orders o
+     JOIN clients c ON c.id = o.client_id
+     JOIN currencies cur ON cur.id = o.currency_id
+     JOIN incoterms i ON i.id = o.incoterm_id
+     JOIN order_freight fr ON fr.order_id = o.id
+     LEFT JOIN order_payment_status ops ON ops.order_id = o.id
+     WHERE ${where.join(' AND ')}
+     ORDER BY o.created_at DESC`,
+    params
+  );
+
+  const byForwarder = {};
+  for (const r of rows) {
+    const forwarder = r.freight_forwarder_name || '(not yet assigned)';
+    const cc = r.currency_code;
+    byForwarder[forwarder] ??= {};
+    byForwarder[forwarder][cc] ??= { order_count: 0, total_rate: 0, total_insurance: 0, total_cleared: 0 };
+    byForwarder[forwarder][cc].order_count++;
+    byForwarder[forwarder][cc].total_rate += parseFloat(r.confirmed_freight_rate ?? 0);
+    byForwarder[forwarder][cc].total_insurance += parseFloat(r.insurance_amount ?? 0);
+    if (r.payment_cleared_at) {
+      byForwarder[forwarder][cc].total_cleared += parseFloat(r.freight_amount ?? 0);
+    }
+  }
+
+  return { rows, by_forwarder: sortObjectKeys(byForwarder) };
+}
+
+// ================================================================
+// PRODUCT-WISE / HS-CODE SALES REPORT — closes a real gap: there is no
+// view anywhere of which products/HS codes actually drive business, only
+// per-order line items.
+// ================================================================
+
+/** @returns {Promise<{rows: Array<object>, by_hs_code: object}>} */
+async function productSalesReport(dateFrom, dateTo) {
+  const isTestMode = await isTestModeFlag();
+  const where = ['o.is_test_data = :is_test_data', 'p.is_active = 1'];
+  const params = { is_test_data: isTestMode };
+  if (dateFrom) {
+    where.push('DATE(o.created_at) >= :date_from');
+    params.date_from = dateFrom;
+  }
+  if (dateTo) {
+    where.push('DATE(o.created_at) <= :date_to');
+    params.date_to = dateTo;
+  }
+
+  const rows = await db.query(
+    `SELECT p.description, p.hs_code, cur.code AS currency_code,
+            COUNT(DISTINCT p.order_id) AS order_count,
+            COALESCE(SUM(p.quantity), 0) AS total_quantity,
+            COALESCE(SUM(p.fob_value), 0) AS total_fob_value
+     FROM order_products p
+     JOIN orders o ON o.id = p.order_id
+     JOIN currencies cur ON cur.id = o.currency_id
+     WHERE ${where.join(' AND ')}
+     GROUP BY p.hs_code, p.description, cur.code
+     ORDER BY total_fob_value DESC`,
+    params
+  );
+
+  const byHsCode = {};
+  for (const r of rows) {
+    const hs = r.hs_code;
+    const cc = r.currency_code;
+    byHsCode[hs] ??= { description: r.description, by_currency: {} };
+    byHsCode[hs].by_currency[cc] ??= { order_count: 0, total_quantity: 0, total_fob_value: 0 };
+    byHsCode[hs].by_currency[cc].order_count += parseInt(r.order_count, 10);
+    byHsCode[hs].by_currency[cc].total_quantity += parseFloat(r.total_quantity);
+    byHsCode[hs].by_currency[cc].total_fob_value += parseFloat(r.total_fob_value);
+  }
+  const sortedEntries = Object.entries(byHsCode).sort(([, a], [, b]) => {
+    const aTotal = Object.values(a.by_currency).reduce((sum, c) => sum + c.total_fob_value, 0);
+    const bTotal = Object.values(b.by_currency).reduce((sum, c) => sum + c.total_fob_value, 0);
+    return bTotal - aTotal;
+  });
+
+  return { rows, by_hs_code: Object.fromEntries(sortedEntries) };
+}
+
+// ================================================================
+// SUPPLIER PERFORMANCE REPORT — closes a real gap: supplier POs are
+// tracked per order but never rolled up to see which suppliers sign
+// fastest or deliver on time. Uses order_supplier_po.signed_at (added
+// alongside this report — see schema.sql Section AK) for signing
+// turnaround, and order_packing.packing_date vs required_delivery_date
+// as the best available on-time-delivery proxy (the schema has no
+// separate "material received from supplier" timestamp — packing cannot
+// start before the material is in hand).
+// ================================================================
+
+/** @returns {Promise<Array<object>>} one row per supplier, most POs first */
+async function supplierPerformanceReport() {
+  const isTestMode = await isTestModeFlag();
+  const rows = await db.query(
+    `SELECT s.id AS supplier_id, s.supplier_legal_name,
+            spo.order_id, spo.created_at, spo.signed_at, spo.required_delivery_date, spo.status,
+            pk.packing_date
+     FROM order_supplier_po spo
+     JOIN suppliers s ON s.id = spo.supplier_id
+     JOIN orders o ON o.id = spo.order_id
+     LEFT JOIN order_packing pk ON pk.order_id = spo.order_id
+     WHERE o.is_test_data = :is_test_data
+     ORDER BY s.supplier_legal_name`,
+    { is_test_data: isTestMode }
+  );
+
+  const bySupplier = {};
+  for (const r of rows) {
+    const sid = r.supplier_id;
+    bySupplier[sid] ??= {
+      supplier_name: r.supplier_legal_name,
+      po_count: 0,
+      signed_count: 0,
+      total_signing_days: 0,
+      delivery_tracked_count: 0,
+      on_time_count: 0,
+    };
+    bySupplier[sid].po_count++;
+
+    if (r.signed_at !== null) {
+      bySupplier[sid].signed_count++;
+      const days = (new Date(r.signed_at).getTime() - new Date(r.created_at).getTime()) / 86400000;
+      bySupplier[sid].total_signing_days += Math.max(0, days);
+    }
+
+    if (r.required_delivery_date !== null && r.packing_date !== null) {
+      bySupplier[sid].delivery_tracked_count++;
+      if (r.packing_date <= r.required_delivery_date) {
+        bySupplier[sid].on_time_count++;
+      }
+    }
+  }
+
+  const result = Object.values(bySupplier).map((s) => ({
+    ...s,
+    avg_signing_days: s.signed_count > 0 ? round2(s.total_signing_days / s.signed_count) : null,
+    on_time_pct: s.delivery_tracked_count > 0 ? round2((100 * s.on_time_count) / s.delivery_tracked_count) : null,
+  }));
+  result.sort((a, b) => b.po_count - a.po_count);
+  return result;
+}
+
+// ================================================================
+// CONVERSION-RATE REPORT — closes a real gap: the Queues/Funnel section
+// shows raw counts (quotations sent/won/lost) but never the actual
+// conversion percentage a sales lead would want at a glance.
+// ================================================================
+
+async function conversionRateReport(dateFrom, dateTo) {
+  const funnel = await funnelActivity(dateFrom, dateTo);
+
+  const quotationsSent = funnel.quotationsSent;
+  const quotationsWon = funnel.quotationsWon;
+  const quotationsLost = funnel.quotationsLost;
+  const piSent = funnel.piSent;
+  const piLost = funnel.piLost;
+
+  return {
+    quotations_sent: quotationsSent,
+    quotation_to_pi_pct: quotationsSent > 0 ? round2((100 * quotationsWon) / quotationsSent) : null,
+    quotation_lost_pct: quotationsSent > 0 ? round2((100 * quotationsLost) / quotationsSent) : null,
+    pi_sent: piSent,
+    pi_to_confirmed_pct: piSent > 0 ? round2((100 * (piSent - piLost)) / piSent) : null,
+    pi_lost_pct: piSent > 0 ? round2((100 * piLost) / piSent) : null,
+    overall_quotation_to_confirmed_pct: quotationsSent > 0 ? round2((100 * (piSent - piLost)) / quotationsSent) : null,
+  };
+}
+
 module.exports = {
   perClient,
   perOrder,
@@ -971,4 +1265,9 @@ module.exports = {
   searchOrders,
   monthlyTrends,
   staffProductivity,
+  ageingReport,
+  freightCostReport,
+  productSalesReport,
+  supplierPerformanceReport,
+  conversionRateReport,
 };

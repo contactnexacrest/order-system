@@ -1,0 +1,56 @@
+<div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
+  <h1>Freight Cost Report</h1>
+  <p class="muted">Confirmed freight/insurance terms and invoiced freight, rolled up by forwarder — filtered by order creation date.</p>
+
+  <form method="get" action="/reports/freight-cost" class="section">
+    <div class="kv-grid">
+      <label>Created From<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
+      <label>Created To<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm">Run</button>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/freight-cost?date_from={{ filters.dateFrom or '' }}&date_to={{ filters.dateTo or '' }}&format=csv">Export CSV</a>
+    </div>
+  </form>
+
+  <div class="section">
+    <h2>By Forwarder</h2>
+    <table class="list">
+      <tr><th>Forwarder</th><th>Currency</th><th>Orders</th><th>Total Confirmed Rate</th><th>Total Insurance</th><th>Total Cleared</th></tr>
+      {% for forwarder, byCurrency in byForwarder %}
+        {% for cc, b in byCurrency %}
+        <tr>
+          <td>{{ forwarder }}</td>
+          <td>{{ cc }}</td>
+          <td>{{ b.order_count }}</td>
+          <td>{{ b.total_rate | money }}</td>
+          <td>{{ b.total_insurance | money }}</td>
+          <td>{{ b.total_cleared | money }}</td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+      {% if not byForwarder or (byForwarder | length) == 0 %}<tr><td colspan="6" class="muted">No orders with freight terms recorded match these filters.</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Orders</h2>
+    <table class="list">
+      <tr><th>Order Ref</th><th>Client</th><th>Incoterm</th><th>Forwarder</th><th>Confirmed Rate</th><th>Insurance</th><th>Invoiced</th><th>Cleared</th></tr>
+      {% for r in rows %}
+      <tr>
+        <td><a href="/orders/{{ r.id }}">{{ r.order_reference }}</a></td>
+        <td>{{ r.company_legal_name }}</td>
+        <td>{{ r.incoterm_code }}</td>
+        <td>{{ r.freight_forwarder_name or '—' }}</td>
+        <td>{{ r.confirmed_freight_rate | money if r.confirmed_freight_rate != null else '—' }}</td>
+        <td>{{ r.insurance_amount | money if r.insurance_amount != null else '—' }}</td>
+        <td>{{ r.freight_amount | money if r.freight_amount != null else '—' }}</td>
+        <td>{{ 'Yes' if r.payment_cleared_at else 'No' }}</td>
+      </tr>
+      {% endfor %}
+      {% if not rows or rows.length == 0 %}<tr><td colspan="8" class="muted">No orders with freight terms recorded match these filters.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>

@@ -27,6 +27,12 @@ $__uid = $__u ? (int) $__u['id'] : 0;
   </div>
 
   <div class="section">
+    <h2>Debtors / Receivables Ageing</h2>
+    <p class="muted">Every outstanding leg, bucketed by how overdue it is — Current, 1-30, 31-60, 61-90, 90+ days.</p>
+    <a class="btn-sm" href="/reports/ageing">Open Ageing Report</a>
+  </div>
+
+  <div class="section">
     <h2>Disputes &amp; Amendments</h2>
     <p class="muted">Status/aging breakdown for disputes, and status/requested-by breakdown for amendments — across all orders.</p>
     <div class="btn-row">
@@ -36,9 +42,22 @@ $__uid = $__u ? (int) $__u['id'] : 0;
   </div>
 
   <div class="section">
-    <h2>Trends</h2>
-    <p class="muted">Orders created, quotations/PI sent, lost, and FOB value — month over month for the last 12 months.</p>
-    <a class="btn-sm" href="/reports/trends">Open Trends</a>
+    <h2>Trends &amp; Conversion</h2>
+    <p class="muted">Orders created, quotations/PI sent, lost, and FOB value month over month; plus the funnel shown as conversion percentages.</p>
+    <div class="btn-row">
+      <a class="btn-sm" href="/reports/trends">Open Trends</a>
+      <a class="btn-sm" href="/reports/conversion">Open Conversion Rate Report</a>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Freight, Products &amp; Suppliers</h2>
+    <p class="muted">Freight cost by forwarder, sales by product/HS code, and supplier signing/delivery performance.</p>
+    <div class="btn-row">
+      <a class="btn-sm" href="/reports/freight-cost">Open Freight Cost Report</a>
+      <a class="btn-sm" href="/reports/products">Open Product Sales Report</a>
+      <a class="btn-sm" href="/reports/suppliers">Open Supplier Performance Report</a>
+    </div>
   </div>
 
   <?php if ($canViewStaffReports): ?>

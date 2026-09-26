@@ -32,10 +32,28 @@ Everything starts from the **Reports** hub:
 
   ![Payments Report — summary by currency, backed by the exact order detail below it](./images/reports_payments.png)
 
+- **Debtors / Receivables Ageing Report** — every outstanding (not yet
+  cleared) advance, balance, or freight leg, bucketed by how overdue it is:
+  Current, 1-30, 31-60, 61-90, 90+ days. Advance and freight are counted
+  overdue from the order's own creation date (due promptly once invoiced);
+  balance uses its own computed due date when the payment preset sets one.
 - **Dispute Report** / **Amendment Report** — status and aging breakdowns
   across every order, not just one at a time.
 - **Trends** — orders created, quotations/PI sent, lost, and FOB value,
   month over month for the last 12 months.
+- **Conversion Rate Report** — the same underlying activity as Operations
+  Queues' funnel section, shown as the percentages a sales lead actually
+  wants at a glance (Quotation &rarr; PI, PI &rarr; Confirmed Order) rather
+  than raw counts.
+- **Freight Cost Report** — confirmed freight/insurance terms and invoiced
+  freight, rolled up by forwarder.
+- **Product / HS-Code Sales Report** — which products/HS codes actually
+  drive FOB value, ranked highest first.
+- **Supplier Performance Report** — per supplier: PO count, average days
+  from PO creation to signature, and on-time delivery rate (packing date
+  vs. the PO's required delivery date — the closest available proxy for
+  "material received on time," since the system has no separate
+  goods-receipt timestamp).
 - **Staff Productivity** — documents generated and audit-log activity per
   user (requires the separate `view_staff_reports` permission — this one
   isn't available to every role by default, unlike the others).

@@ -71,7 +71,7 @@ final class OrderSupplierPoRepository
     public static function markSigned(int $id): void
     {
         Database::connection()->prepare(
-            "UPDATE order_supplier_po SET status = 'signed' WHERE id = :id"
+            "UPDATE order_supplier_po SET status = 'signed', signed_at = NOW() WHERE id = :id"
         )->execute(['id' => $id]);
     }
 }

@@ -9,7 +9,7 @@
       <p class="muted">No financial year has any CA activity yet.</p>
     <?php else: ?>
       <table class="list">
-        <tr><th>Financial Year</th><th>Status</th><th>Action</th></tr>
+        <tr><th>Financial Year</th><th>Status</th><th>Close Readiness</th><th>Action</th></tr>
         <?php foreach ($years as $fy): ?>
           <?php $isLocked = in_array($fy, $lockedYears, true); ?>
           <tr>
@@ -19,6 +19,30 @@
                 <span style="color:var(--danger)">Locked</span>
               <?php else: ?>
                 <span style="color:var(--success)">Open</span>
+              <?php endif; ?>
+            </td>
+            <td>
+              <?php if ($isLocked): ?>
+                <span class="muted">&mdash;</span>
+              <?php else: ?>
+                <?php $r = $readinessByYear[$fy] ?? null; ?>
+                <?php if ($r === null): ?>
+                  <span class="muted">&mdash;</span>
+                <?php elseif ($r['isReady']): ?>
+                  <span style="color:var(--success)">&#10003; Ready to close</span>
+                <?php else: ?>
+                  <span style="color:var(--warning, #b8860b)" title="Not ready to close">
+                    <?php
+                      $issues = [];
+                      if ($r['revenue']['legsMissingInr'] > 0) $issues[] = $r['revenue']['legsMissingInr'] . ' leg(s) missing INR actual';
+                      if ($r['pendingZohoSyncCount'] > 0) $issues[] = $r['pendingZohoSyncCount'] . ' pending Zoho sync';
+                      if ($r['unmatchedRevenueLegCount'] > 0) $issues[] = $r['unmatchedRevenueLegCount'] . ' unmatched revenue leg(s)';
+                      if ($r['unmatchedExpenseCount'] > 0) $issues[] = $r['unmatchedExpenseCount'] . ' unmatched expense(s)';
+                      if ($r['unmatchedBankLineCount'] > 0) $issues[] = $r['unmatchedBankLineCount'] . ' unmatched bank line(s)';
+                      echo htmlspecialchars(implode(', ', $issues));
+                    ?>
+                  </span>
+                <?php endif; ?>
               <?php endif; ?>
             </td>
             <td>

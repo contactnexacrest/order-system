@@ -274,6 +274,7 @@ $router->get('/ca/reports', [$ca, 'reports'], [SessionAuth::required(), Permissi
 $router->get('/ca/zoho-sync', [$ca, 'zohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 $router->post('/ca/zoho-sync/run', [$ca, 'runZohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->get('/ca/expenses', [$ca, 'expenses'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->get('/ca/tds-summary', [$ca, 'tdsSummary'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/expenses/{id}/tds', [$ca, 'setExpenseTds'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->get('/ca/bank-statement', [$ca, 'bankStatement'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/bank-statement/upload', [$ca, 'uploadBankStatement'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
@@ -404,6 +405,11 @@ $router->get('/reports/disputes', [$reports, 'disputes'], [SessionAuth::required
 $router->get('/reports/amendments', [$reports, 'amendments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/trends', [$reports, 'trends'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/staff', [$reports, 'staff'], [SessionAuth::required(), PermissionCheck::requires('view_staff_reports')]);
+$router->get('/reports/ageing', [$reports, 'ageing'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/freight-cost', [$reports, 'freightCost'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/products', [$reports, 'products'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/suppliers', [$reports, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/conversion', [$reports, 'conversion'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->post('/reports/save', [$reports, 'saveDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
 $router->get('/reports/saved/{reportId}/run', [$reports, 'runDefinition'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->post('/reports/saved/{reportId}/update', [$reports, 'updateDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);

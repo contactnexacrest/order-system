@@ -397,4 +397,113 @@ final class ReportController
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
         ], 'layout/base');
     }
+
+    /** Debtors/receivables ageing report — closes a real gap flagged in the CA/Reports review: outstanding amounts existed, "how overdue" did not. */
+    public function ageing(array $params): void
+    {
+        $data = ReportRepository::ageingReport();
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            $rows = array_map(static fn(array $r): array => [
+                'Order Ref' => $r['order_reference'],
+                'Client' => $r['company_legal_name'],
+                'Leg' => $r['leg'],
+                'Currency' => $r['currency_code'],
+                'Amount' => $r['amount'],
+                'Due Date' => $r['due_date'],
+                'Days Overdue' => $r['days_overdue'],
+                'Bucket' => $r['bucket'],
+            ], $data['rows']);
+            Csv::stream('debtors_ageing_report.csv', ['Order Ref', 'Client', 'Leg', 'Currency', 'Amount', 'Due Date', 'Days Overdue', 'Bucket'], $rows);
+        }
+
+        View::render('reports/ageing', $data, 'layout/base');
+    }
+
+    /** Freight cost report — closes a real gap: freight terms/costs were recorded per order but never rolled up. */
+    public function freightCost(array $params): void
+    {
+        $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
+        $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
+
+        $data = ReportRepository::freightCostReport($dateFrom, $dateTo);
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            $rows = array_map(static fn(array $r): array => [
+                'Order Ref' => $r['order_reference'],
+                'Client' => $r['company_legal_name'],
+                'Incoterm' => $r['incoterm_code'],
+                'Currency' => $r['currency_code'],
+                'Forwarder' => $r['freight_forwarder_name'] ?? '',
+                'Confirmed Rate' => $r['confirmed_freight_rate'] ?? '',
+                'Insurance' => $r['insurance_amount'] ?? '',
+                'Invoiced' => $r['freight_amount'] ?? '',
+                'Cleared' => $r['payment_cleared_at'] ? 'Yes' : 'No',
+                'Created' => $r['created_at'],
+            ], $data['rows']);
+            Csv::stream('freight_cost_report.csv', ['Order Ref', 'Client', 'Incoterm', 'Currency', 'Forwarder', 'Confirmed Rate', 'Insurance', 'Invoiced', 'Cleared', 'Created'], $rows);
+        }
+
+        View::render('reports/freight_cost', [
+            'rows' => $data['rows'],
+            'byForwarder' => $data['by_forwarder'],
+            'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
+        ], 'layout/base');
+    }
+
+    /** Product/HS-code sales report — closes a real gap: no view anywhere of which products actually drive business. */
+    public function products(array $params): void
+    {
+        $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
+        $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
+
+        $data = ReportRepository::productSalesReport($dateFrom, $dateTo);
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            $rows = array_map(static fn(array $r): array => [
+                'HS Code' => $r['hs_code'],
+                'Description' => $r['description'],
+                'Currency' => $r['currency_code'],
+                'Order Count' => $r['order_count'],
+                'Total Quantity' => $r['total_quantity'],
+                'Total FOB Value' => $r['total_fob_value'],
+            ], $data['rows']);
+            Csv::stream('product_sales_report.csv', ['HS Code', 'Description', 'Currency', 'Order Count', 'Total Quantity', 'Total FOB Value'], $rows);
+        }
+
+        View::render('reports/products', [
+            'byHsCode' => $data['by_hs_code'],
+            'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
+        ], 'layout/base');
+    }
+
+    /** Supplier performance report — closes a real gap: supplier POs were tracked per order but never rolled up. */
+    public function suppliers(array $params): void
+    {
+        View::render('reports/suppliers', [
+            'rows' => ReportRepository::supplierPerformanceReport(),
+        ], 'layout/base');
+    }
+
+    /**
+     * Conversion-rate report — closes a real gap: the funnel showed raw
+     * counts, never the actual conversion percentage.
+     *
+     * Deliberately NOT keyed as 'data' below — View::capture()'s own
+     * parameter is named $data, and extract(..., EXTR_SKIP) silently skips
+     * any key that collides with an already-defined local variable, so a
+     * 'data' key here would never actually reach the view (caught by
+     * browser-verifying this exact page: every figure came back as an
+     * "Undefined array key" warning).
+     */
+    public function conversion(array $params): void
+    {
+        $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
+        $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
+
+        View::render('reports/conversion', [
+            'conversion' => ReportRepository::conversionRateReport($dateFrom, $dateTo),
+            'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
+        ], 'layout/base');
+    }
 }

@@ -433,7 +433,95 @@ async function deleteDefinition(req, res) {
   res.redirect('/reports');
 }
 
+/** Debtors/receivables ageing report — closes a real gap flagged in the CA/Reports review: outstanding amounts existed, "how overdue" did not. */
+async function ageing(req, res) {
+  const data = await reportRepository.ageingReport();
+
+  if (req.query.format === 'csv') {
+    const rows = data.rows.map((r) => ({
+      'Order Ref': r.order_reference,
+      Client: r.company_legal_name,
+      Leg: r.leg,
+      Currency: r.currency_code,
+      Amount: r.amount,
+      'Due Date': r.due_date,
+      'Days Overdue': r.days_overdue,
+      Bucket: r.bucket,
+    }));
+    csv.stream(res, 'debtors_ageing_report.csv', ['Order Ref', 'Client', 'Leg', 'Currency', 'Amount', 'Due Date', 'Days Overdue', 'Bucket'], rows);
+    return;
+  }
+
+  res.renderView('reports/ageing', data, 'layout/base');
+}
+
+/** Freight cost report — closes a real gap: freight terms/costs were recorded per order but never rolled up. */
+async function freightCost(req, res) {
+  const dateFrom = str(req.query.date_from) || null;
+  const dateTo = str(req.query.date_to) || null;
+
+  const data = await reportRepository.freightCostReport(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const rows = data.rows.map((r) => ({
+      'Order Ref': r.order_reference,
+      Client: r.company_legal_name,
+      Incoterm: r.incoterm_code,
+      Currency: r.currency_code,
+      Forwarder: r.freight_forwarder_name ?? '',
+      'Confirmed Rate': r.confirmed_freight_rate ?? '',
+      Insurance: r.insurance_amount ?? '',
+      Invoiced: r.freight_amount ?? '',
+      Cleared: r.payment_cleared_at ? 'Yes' : 'No',
+      Created: r.created_at,
+    }));
+    csv.stream(res, 'freight_cost_report.csv', ['Order Ref', 'Client', 'Incoterm', 'Currency', 'Forwarder', 'Confirmed Rate', 'Insurance', 'Invoiced', 'Cleared', 'Created'], rows);
+    return;
+  }
+
+  res.renderView('reports/freight_cost', { rows: data.rows, byForwarder: data.by_forwarder, filters: { dateFrom, dateTo } }, 'layout/base');
+}
+
+/** Product/HS-code sales report — closes a real gap: no view anywhere of which products actually drive business. */
+async function products(req, res) {
+  const dateFrom = str(req.query.date_from) || null;
+  const dateTo = str(req.query.date_to) || null;
+
+  const data = await reportRepository.productSalesReport(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const rows = data.rows.map((r) => ({
+      'HS Code': r.hs_code,
+      Description: r.description,
+      Currency: r.currency_code,
+      'Order Count': r.order_count,
+      'Total Quantity': r.total_quantity,
+      'Total FOB Value': r.total_fob_value,
+    }));
+    csv.stream(res, 'product_sales_report.csv', ['HS Code', 'Description', 'Currency', 'Order Count', 'Total Quantity', 'Total FOB Value'], rows);
+    return;
+  }
+
+  res.renderView('reports/products', { byHsCode: data.by_hs_code, filters: { dateFrom, dateTo } }, 'layout/base');
+}
+
+/** Supplier performance report — closes a real gap: supplier POs were tracked per order but never rolled up. */
+async function suppliers(req, res) {
+  res.renderView('reports/suppliers', { rows: await reportRepository.supplierPerformanceReport() }, 'layout/base');
+}
+
+/** Conversion-rate report — closes a real gap: the funnel showed raw counts, never the actual conversion percentage. */
+async function conversion(req, res) {
+  const dateFrom = str(req.query.date_from) || null;
+  const dateTo = str(req.query.date_to) || null;
+  res.renderView(
+    'reports/conversion',
+    { conversion: await reportRepository.conversionRateReport(dateFrom, dateTo), filters: { dateFrom, dateTo } },
+    'layout/base'
+  );
+}
+
 module.exports = {
   index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
-  payments, disputes, amendments, trends, staff,
+  payments, disputes, amendments, trends, staff, ageing, freightCost, products, suppliers, conversion,
 };

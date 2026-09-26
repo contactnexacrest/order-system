@@ -44,6 +44,16 @@ and reporting, and it never writes anything back to Zoho Books. If your
 Zoho Books setup already tracks TDS in its own way, treat this as a
 convenience for cross-checking, not a replacement.
 
+## TDS Payable Summary
+
+**CA / Accounting → TDS Payable Summary** rolls up every TDS-applicable
+expense (the local annotation above) by month and by financial-year
+quarter (Q1 Apr-Jun, Q2 Jul-Sep, Q3 Oct-Dec, Q4 Jan-Mar) — total expense
+amount and total TDS amount in each bucket, so a CA can see at a glance
+what's due for a given quarter's TDS return without re-filtering the
+Expenses list by hand. Expenses never marked TDS-applicable are excluded
+entirely, exactly as they are everywhere else in this module.
+
 ## How to run an import
 
 Exactly the same way revenue gets synced — **CA / Accounting → Zoho Books

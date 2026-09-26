@@ -2282,6 +2282,17 @@ CREATE TABLE order_reorder_request_products (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION AK — SUPPLIER PO SIGNING TIMESTAMP (added 2026-09-26)
+-- ================================================================
+-- Closes a Reports gap: the new Supplier Performance report needs to
+-- measure how long a supplier takes to sign their PO (created_at ->
+-- signed_at), but confirmSupplierSigned() previously only ever flipped
+-- order_supplier_po.status to 'signed' with no timestamp recorded for
+-- when that happened.
+ALTER TABLE order_supplier_po
+  ADD COLUMN signed_at TIMESTAMP NULL;
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2310,4 +2321,5 @@ CREATE TABLE order_reorder_request_products (
 -- Section AI (order progress chat, email template CRUD, per-user
 -- signature, Zoho Mail integration) added 2026-09-24.
 -- Section AJ (client reorder requests) added 2026-09-26.
+-- Section AK (supplier PO signing timestamp) added 2026-09-26.
 -- ================================================================

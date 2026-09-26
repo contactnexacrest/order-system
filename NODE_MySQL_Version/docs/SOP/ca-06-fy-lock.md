@@ -65,6 +65,16 @@ any financial year lock — the lock is scoped entirely to this module's
 own bookkeeping data, consistent with the CA module's independence from
 the order pipeline established in Chapter 1.
 
+## Close Readiness
+
+Before locking a year, **CA / Accounting → Financial Year Lock** also
+shows a **Close Readiness** column for every year: a quick check of
+whether that year's own data looks complete enough to close, flagging
+things like a cleared settlement leg still missing its INR actual. It's
+advisory only — it doesn't block locking the year — but it gives a CA a
+single place to spot loose ends before committing to a lock rather than
+discovering them afterward via an override.
+
 ## Reopening a year
 
 Unlocking requires a reason — the text box is mandatory, so there's

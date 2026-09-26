@@ -329,9 +329,31 @@ async function fyLocks(req, res) {
     financialYear.current(),
   ])).sort().reverse();
 
+  const lockedYears = await caFyLockRepository.lockedYears();
+
+  // FY-Close Readiness (closes a real gap: locking previously showed
+  // nothing about whether a year was actually ready to close) — only
+  // computed for still-open years, since a locked year's readiness is
+  // moot.
+  const readinessByYear = {};
+  for (const fy of years) {
+    if (!lockedYears.includes(fy)) {
+      const r = await caRepository.fyReadiness(fy);
+      const issues = [];
+      if (r.revenue.legsMissingInr > 0) issues.push(`${r.revenue.legsMissingInr} leg(s) missing INR actual`);
+      if (r.pendingZohoSyncCount > 0) issues.push(`${r.pendingZohoSyncCount} pending Zoho sync`);
+      if (r.unmatchedRevenueLegCount > 0) issues.push(`${r.unmatchedRevenueLegCount} unmatched revenue leg(s)`);
+      if (r.unmatchedExpenseCount > 0) issues.push(`${r.unmatchedExpenseCount} unmatched expense(s)`);
+      if (r.unmatchedBankLineCount > 0) issues.push(`${r.unmatchedBankLineCount} unmatched bank line(s)`);
+      r.issuesText = issues.join(', ');
+      readinessByYear[fy] = r;
+    }
+  }
+
   res.renderView('ca/fy_locks', {
     years,
-    lockedYears: await caFyLockRepository.lockedYears(),
+    lockedYears,
+    readinessByYear,
     history: await caFyLockRepository.history(),
     recentOverrides: await auditLogRepository.search({ actionType: 'CA_FY_LOCK_OVERRIDDEN', limit: 20 }),
     usersById: await usersById(),
@@ -375,8 +397,13 @@ async function unlockFinancialYear(req, res) {
   res.redirect('/ca/fy-locks');
 }
 
+/** TDS Payable Summary — closes a real gap: the per-expense TDS flag existed but was never rolled up for compliance filing. */
+async function tdsSummary(req, res) {
+  res.renderView('ca/tds_summary', { rows: await caExpenseRepository.tdsSummary() }, 'layout/base');
+}
+
 module.exports = {
-  index, reports, zohoSync, runZohoSync, expenses, setExpenseTds,
+  index, reports, zohoSync, runZohoSync, expenses, setExpenseTds, tdsSummary,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,
 };

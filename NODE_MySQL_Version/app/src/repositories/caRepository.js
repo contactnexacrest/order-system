@@ -2,6 +2,8 @@
 
 const orderPaymentStatusRepository = require('./orderPaymentStatusRepository');
 const companySettingsRepository = require('./companySettingsRepository');
+const caBankStatementRepository = require('./caBankStatementRepository');
+const caExpenseRepository = require('./caExpenseRepository');
 const financialYear = require('../helpers/financialYear');
 
 // CA / Accounting module — independent of the order-pipeline system
@@ -175,7 +177,44 @@ async function revenueReport(mode, period) {
   };
 }
 
+/**
+ * FY-Close Readiness checklist — closes a real gap: lockFinancialYear()
+ * previously just flipped the lock with nothing shown to the CA first.
+ * Composes entirely from existing repository functions, filtered to this
+ * FY's date bounds — no new queries against tables this module doesn't
+ * already read.
+ */
+async function fyReadiness(fy) {
+  const bounds = financialYear.bounds(fy);
+  const inBounds = (date) => date !== null && date !== undefined && String(date).slice(0, 10) >= bounds.start && String(date).slice(0, 10) <= bounds.end;
+
+  const revenue = await revenueReport('fy', fy);
+
+  const pendingZohoSyncCount = (await legsPendingZohoSync()).filter((r) => inBounds(r.cleared_at)).length;
+
+  const matchedRevenueKeys = await caBankStatementRepository.matchedRevenueKeys();
+  const unmatchedRevenueLegCount = (await legsWithInrActualUnmatched(matchedRevenueKeys)).filter((r) => inBounds(r.cleared_at)).length;
+
+  const matchedExpenseIds = await caBankStatementRepository.matchedExpenseIds();
+  const allExpenses = await caExpenseRepository.all();
+  const unmatchedExpenseCount = allExpenses.filter((e) => !matchedExpenseIds.includes(e.id) && inBounds(e.expense_date)).length;
+
+  const allBankLines = await caBankStatementRepository.all();
+  const unmatchedBankLineCount = allBankLines.filter((l) => l.matched_order_id === null && l.matched_expense_id === null && inBounds(l.transaction_date)).length;
+
+  return {
+    revenue,
+    pendingZohoSyncCount,
+    unmatchedRevenueLegCount,
+    unmatchedExpenseCount,
+    unmatchedBankLineCount,
+    isReady: pendingZohoSyncCount === 0 && unmatchedRevenueLegCount === 0
+      && unmatchedExpenseCount === 0 && unmatchedBankLineCount === 0
+      && revenue.legsMissingInr === 0,
+  };
+}
+
 module.exports = {
   settlementRegister, availableFinancialYears, availableCalendarYears, revenueReport, legsPendingZohoSync,
-  legsWithInrActualUnmatched, totalInrActualAll,
+  legsWithInrActualUnmatched, totalInrActualAll, fyReadiness,
 };

@@ -9,7 +9,7 @@
       <p class="muted">No financial year has any CA activity yet.</p>
     {% else %}
       <table class="list">
-        <tr><th>Financial Year</th><th>Status</th><th>Action</th></tr>
+        <tr><th>Financial Year</th><th>Status</th><th>Close Readiness</th><th>Action</th></tr>
         {% for fy in years %}
           {% set isLocked = fy in lockedYears %}
           <tr>
@@ -19,6 +19,20 @@
                 <span style="color:var(--danger)">Locked</span>
               {% else %}
                 <span style="color:var(--success)">Open</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if isLocked %}
+                <span class="muted">&mdash;</span>
+              {% else %}
+                {% set r = readinessByYear[fy] %}
+                {% if not r %}
+                  <span class="muted">&mdash;</span>
+                {% elif r.isReady %}
+                  <span style="color:var(--success)">&#10003; Ready to close</span>
+                {% else %}
+                  <span style="color:var(--warning, #b8860b)" title="Not ready to close">{{ r.issuesText }}</span>
+                {% endif %}
               {% endif %}
             </td>
             <td>

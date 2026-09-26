@@ -418,6 +418,7 @@ app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHa
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
 app.post('/ca/zoho-sync/run', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.runZohoSync));
 app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.expenses));
+app.get('/ca/tds-summary', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.tdsSummary));
 app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
 app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));
 app.post('/ca/bank-statement/upload', requireAuth, requirePermission('inr_actual_edit'), upload.single('statement'), verifyCsrf, asyncHandler(caController.uploadBankStatement));
@@ -570,6 +571,11 @@ app.get('/reports/disputes', requireAuth, requirePermission('view_reports'), asy
 app.get('/reports/amendments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.amendments));
 app.get('/reports/trends', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.trends));
 app.get('/reports/staff', requireAuth, requirePermission('view_staff_reports'), asyncHandler(reportController.staff));
+app.get('/reports/ageing', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.ageing));
+app.get('/reports/freight-cost', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.freightCost));
+app.get('/reports/products', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.products));
+app.get('/reports/suppliers', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.suppliers));
+app.get('/reports/conversion', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.conversion));
 app.post('/reports/save', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.saveDefinition));
 app.get('/reports/saved/:reportId/run', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.runDefinition));
 app.post('/reports/saved/:reportId/update', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.updateDefinition));

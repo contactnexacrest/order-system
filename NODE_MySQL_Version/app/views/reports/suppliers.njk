@@ -1,0 +1,22 @@
+<div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
+  <h1>Supplier Performance Report</h1>
+  <p class="muted">All-time, per supplier. "Avg Signing Days" is PO creation to signature confirmation. "On-Time %" compares the packing date against the PO's required delivery date — the closest available proxy for "material received on time," since the schema has no separate goods-receipt timestamp.</p>
+
+  <div class="section">
+    <table class="list">
+      <tr><th>Supplier</th><th>POs</th><th>Signed</th><th>Avg Signing Days</th><th>Delivery Tracked</th><th>On-Time %</th></tr>
+      {% for s in rows %}
+      <tr>
+        <td>{{ s.supplier_name }}</td>
+        <td>{{ s.po_count }}</td>
+        <td>{{ s.signed_count }}</td>
+        <td>{{ s.avg_signing_days if s.avg_signing_days != null else '—' }}</td>
+        <td>{{ s.delivery_tracked_count }}</td>
+        <td>{{ (s.on_time_pct ~ '%') if s.on_time_pct != null else '—' }}</td>
+      </tr>
+      {% endfor %}
+      {% if not rows or rows.length == 0 %}<tr><td colspan="6" class="muted">No supplier POs recorded yet.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>
