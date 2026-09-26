@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\ReasonValidator;
 use App\Helpers\View;
 use App\Repositories\ClientPasswordResetTokenRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
+use App\Repositories\HsCodeRepository;
 use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
+use App\Repositories\OrderReorderRequestRepository;
 use App\Services\ClientPortalService;
 use App\Services\FileUploadService;
 use App\Services\OrderCommentService;
@@ -152,6 +155,84 @@ final class ClientPortalController
             'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
             'comments' => OrderCommentRepository::forOrder($orderId),
         ], 'layout/client');
+    }
+
+    /**
+     * Order-Edit feature — a client wants to place a repeat order from one
+     * they've already placed, even long after it closed. Pre-fills the
+     * form from this order's own product lines; the client may edit,
+     * remove, or add lines before submitting. Never becomes a live order
+     * itself — lands in the staff reorder-request review queue exactly
+     * like the intake queues (see ReorderRequestController).
+     */
+    public function showReorderForm(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        View::render('client_portal/reorder', [
+            'client' => ClientPortalService::currentClient(),
+            'order' => $order,
+            'products' => OrderProductRepository::forOrder($orderId),
+        ], 'layout/client');
+    }
+
+    public function submitReorder(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $descriptions = $_POST['product_description'] ?? [];
+        $hasAtLeastOneProduct = false;
+        foreach ($descriptions as $description) {
+            if (trim((string) $description) !== '') {
+                $hasAtLeastOneProduct = true;
+                break;
+            }
+        }
+        if (!$hasAtLeastOneProduct) {
+            Flash::set('error', 'At least one product line (with a description) is required.');
+            header("Location: /client/orders/{$orderId}/reorder");
+            return;
+        }
+
+        $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
+        $requestId = OrderReorderRequestRepository::create($clientId, $orderId, $notes);
+
+        $lineNo = 1;
+        foreach ($descriptions as $i => $description) {
+            $description = trim((string) $description);
+            if ($description === '') {
+                continue;
+            }
+            OrderReorderRequestRepository::addProductLine(
+                $requestId,
+                $lineNo++,
+                $description,
+                trim((string) ($_POST['product_dimensions'][$i] ?? '')) ?: null,
+                trim((string) ($_POST['product_finish'][$i] ?? '')) ?: null,
+                trim((string) ($_POST['product_quantity'][$i] ?? '')) ?: null,
+                !empty($_POST['product_quantity_tbc'][$i]),
+                trim((string) ($_POST['product_unit'][$i] ?? '')) ?: null,
+                null, // pricing is never client-set — staff fills it in when reviewing
+                null  // HS code likewise — staff confirms/assigns from the master list on review
+            );
+        }
+
+        Flash::set('success', 'Reorder request submitted — our team will review it and confirm the new order with you shortly.');
+        header("Location: /client/orders/{$orderId}");
     }
 
     /** docs/schema.sql Section AI — the client's side of the order progress chat. */

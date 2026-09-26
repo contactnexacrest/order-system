@@ -12,7 +12,7 @@
 {% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log or permissions.approve_email_send %}
 {% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data %}
-{% set opsGroupActive = (currentPath | startswith('/clients')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/disputes')) %}
+{% set opsGroupActive = (currentPath | startswith('/clients')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/reorder-requests')) or (currentPath | startswith('/disputes')) %}
 {% set insightsGroupActive = (currentPath | startswith('/reports')) or (currentPath | startswith('/audit-log')) or (currentPath | startswith('/email-approvals')) %}
 {% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/hs-codes')) or (currentPath | startswith('/watermarks')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) or (currentPath | startswith('/email-templates')) %}
 {% set ordersActive = currentPath === '/orders' or ((currentPath | startswith('/orders/')) and not (currentPath | startswith('/orders/archived'))) %}
@@ -46,6 +46,7 @@
           {% if permissions.view_archived_orders %}<a href="/orders/archived" class="{{ 'active' if (currentPath | startswith('/orders/archived')) else '' }}">Archived Orders</a>{% endif %}
           <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Quotation Intake Review</a>
           <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review</a>
+          <a href="/reorder-requests" class="{{ 'active' if (currentPath | startswith('/reorder-requests')) else '' }}">Reorder Requests</a>
           <a href="/disputes" class="{{ 'active' if (currentPath | startswith('/disputes')) else '' }}">Disputes</a>
         </div>
       </details>

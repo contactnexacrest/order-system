@@ -1,0 +1,51 @@
+<div class="card page-wide">
+  <h1>Reorder Requests</h1>
+  <p class="muted">Repeat-order requests submitted by clients from an order already on file. Approving reviews and confirms each product line (HS code, unit price) before it becomes a real order — nothing here becomes live automatically.</p>
+
+  <div class="section">
+    <h2>Pending ({{ pending.length }})</h2>
+    <table class="list">
+      <tr><th>Client</th><th>Source Order</th><th>Notes</th><th>Submitted</th><th>Action</th></tr>
+      {% for r in pending %}
+      <tr>
+        <td>{{ r.company_legal_name }}</td>
+        <td><a href="/orders/{{ r.source_order_id }}">{{ r.source_order_reference }}</a></td>
+        <td>{{ r.notes or '—' }}</td>
+        <td>{{ r.submitted_at }}</td>
+        <td><a href="/reorder-requests/{{ r.id }}" class="btn-sm">Review</a></td>
+      </tr>
+      {% endfor %}
+      {% if not pending or pending.length == 0 %}
+        <tr><td colspan="5" class="muted">No pending reorder requests.</td></tr>
+      {% endif %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Recently Resolved</h2>
+    <table class="list">
+      <tr><th>Client</th><th>Source Order</th><th>Status</th><th>Resolved By</th><th>When</th><th>Result</th></tr>
+      {% for r in resolved %}
+      <tr>
+        <td>{{ r.company_legal_name }}</td>
+        <td><a href="/orders/{{ r.source_order_id }}">{{ r.source_order_reference }}</a></td>
+        <td>{{ r.status | capitalize }}</td>
+        <td>{{ r.reviewed_by_name or '—' }}</td>
+        <td>{{ r.reviewed_at }}</td>
+        <td>
+          {% if r.status == 'approved' and r.new_order_reference %}
+            <a href="/orders/{{ r.new_order_id }}">{{ r.new_order_reference }}</a>
+          {% elif r.status == 'rejected' %}
+            {{ r.rejection_reason or '' }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not resolved or resolved.length == 0 %}
+        <tr><td colspan="6" class="muted">Nothing resolved yet.</td></tr>
+      {% endif %}
+    </table>
+  </div>
+</div>

@@ -9,6 +9,8 @@ const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caFyLockRepository = require('../repositories/caFyLockRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
+const orderDuplicationService = require('../services/orderDuplicationService');
+const orderEditGuard = require('../services/orderEditGuard');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const clientRepository = require('../repositories/clientRepository');
@@ -140,6 +142,26 @@ async function unarchive(req, res) {
   await auditLogRepository.log(req.user.id, 'ORDER_UNARCHIVED', 'orders', orderId, 'is_archived', '1', '0');
   flash.set(req, 'success', `${order.order_reference} restored to the main Orders list.`);
   res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Order-Edit feature — "repeat order" for a client who's ordered before,
+ * even long after the original closed. Never touches the source order
+ * (no gate needed there — nothing about it changes) and the new order
+ * starts fresh at Stage 1, exactly like one created by hand through
+ * /orders/create.
+ */
+async function duplicateOrder(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect('/orders');
+    return;
+  }
+  const newOrderId = await orderDuplicationService.duplicate(orderId, req.user.id);
+  flash.set(req, 'success', `Duplicated ${order.order_reference} into a new order — review and adjust it below before proceeding.`);
+  res.redirect(`/orders/${newOrderId}/edit`);
 }
 
 async function create(req, res) {
@@ -292,6 +314,225 @@ async function store(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * Order-Edit feature — the core fields set once at order creation had no
+ * edit path at all until now. Deliberately excludes payment terms
+ * (advance/balance %, balance trigger/days) — those change through the
+ * Amendments module specifically, never here, so there's exactly one
+ * place that changes payment terms. Freely editable before Order
+ * Confirmation (Stage 4); gated by orderEditGuard from Stage 4 on.
+ */
+async function editDetails(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  res.renderView(
+    'orders/edit_details',
+    {
+      order,
+      incoterms: await lookupRepository.incoterms(),
+      currencies: await lookupRepository.currencies(),
+      loadingPorts: await lookupRepository.ports('loading'),
+      dischargePorts: await lookupRepository.ports('discharge'),
+      cooTypes: await lookupRepository.dropdownOptions('coo_type'),
+      containerTypes: await lookupRepository.dropdownOptions('container_type'),
+      isPostConfirmation: orderEditGuard.isPostConfirmation(order.current_stage_number),
+      canOverride: orderEditGuard.canOverride(req),
+    },
+    'layout/base'
+  );
+}
+
+async function updateDetails(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const body = req.body;
+
+  const incotermId = parseInt(body.incoterm_id || 0, 10);
+  const currencyId = parseInt(body.currency_id || 0, 10);
+  if (!incotermId || !currencyId) {
+    flash.set(req, 'error', 'Incoterm and currency are both required.');
+    res.redirect(`/orders/${orderId}/edit`);
+    return;
+  }
+
+  const reason = str(body.reason);
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'orders', orderId, 'order_details'))) {
+    res.redirect(`/orders/${orderId}/edit`);
+    return;
+  }
+
+  const portOfDischargeId = body.port_of_discharge_id ? parseInt(body.port_of_discharge_id, 10) : null;
+  const portOfDischargeText = str(body.port_of_discharge_text);
+
+  await orderRepository.updateDetails(orderId, {
+    incoterm_id: incotermId,
+    currency_id: currencyId,
+    port_of_loading_id: body.port_of_loading_id ? parseInt(body.port_of_loading_id, 10) : null,
+    port_of_discharge_id: portOfDischargeId,
+    port_of_discharge_text: portOfDischargeId ? null : portOfDischargeText || null,
+    coo_type: str(body.coo_type) || 'TBC',
+    container_type: str(body.container_type) || null,
+    buyers_po_ref: str(body.buyers_po_ref) || 'NIL',
+    special_requirements: str(body.special_requirements) || null,
+    est_lead_time_text: str(body.est_lead_time_text) || null,
+    estimated_total_cbm: str(body.estimated_total_cbm),
+    estimated_gross_weight_kg: str(body.estimated_gross_weight_kg),
+    estimated_net_weight_kg: str(body.estimated_net_weight_kg),
+    estimated_package_count: str(body.estimated_package_count) || null,
+    estimated_package_type: str(body.estimated_package_type) || null,
+    indicative_freight_low: str(body.indicative_freight_low),
+    indicative_freight_high: str(body.indicative_freight_high),
+    indicative_insurance_amount: str(body.indicative_insurance_amount),
+  });
+
+  flash.set(req, 'success', 'Order details updated.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Order-Edit feature — order_products had no add/edit/delete/duplicate
+ * path once the order was created; this closes that gap, gated by
+ * orderEditGuard exactly like updateDetails() above once the order has
+ * reached Order Confirmation.
+ */
+async function addProduct(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const body = req.body;
+  const description = str(body.description);
+  const hsCode = str(body.hs_code);
+  if (description === '') {
+    flash.set(req, 'error', 'Description is required.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (hsCode === '' || !(await hsCodeRepository.isActiveCode(hsCode))) {
+    flash.set(req, 'error', `HS code "${hsCode}" is not on the HS Code master list — add it there first (HS Codes, under Admin).`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const reason = str(body.reason);
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'order_products', orderId, 'product_added'))) {
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  await orderProductRepository.add(
+    orderId,
+    await orderProductRepository.nextLineNo(orderId),
+    description,
+    str(body.dimensions) || null,
+    str(body.finish) || null,
+    str(body.quantity) || null,
+    !!body.quantity_is_tbc,
+    str(body.unit) || null,
+    str(body.unit_price) || null,
+    hsCode
+  );
+  flash.set(req, 'success', 'Product line added.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function updateProduct(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const productId = parseInt(req.params.productId, 10);
+  const order = await orderRepository.find(orderId);
+  const product = await orderProductRepository.find(productId);
+  if (!order || !product || product.order_id !== orderId) {
+    res.status(404).send('Product line not found.');
+    return;
+  }
+  const body = req.body;
+  const description = str(body.description);
+  const hsCode = str(body.hs_code);
+  if (description === '') {
+    flash.set(req, 'error', 'Description is required.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (hsCode === '' || !(await hsCodeRepository.isActiveCode(hsCode))) {
+    flash.set(req, 'error', `HS code "${hsCode}" is not on the HS Code master list — add it there first (HS Codes, under Admin).`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const reason = str(body.reason);
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'order_products', productId, 'product_line'))) {
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  await orderProductRepository.update(
+    productId,
+    description,
+    str(body.dimensions) || null,
+    str(body.finish) || null,
+    str(body.quantity) || null,
+    !!body.quantity_is_tbc,
+    str(body.unit) || null,
+    str(body.unit_price) || null,
+    hsCode
+  );
+  flash.set(req, 'success', 'Product line updated.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function deleteProduct(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const productId = parseInt(req.params.productId, 10);
+  const order = await orderRepository.find(orderId);
+  const product = await orderProductRepository.find(productId);
+  if (!order || !product || product.order_id !== orderId) {
+    res.status(404).send('Product line not found.');
+    return;
+  }
+
+  const reason = str(req.body.reason);
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'order_products', productId, 'product_removed'))) {
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  await orderProductRepository.softDelete(productId);
+  flash.set(req, 'success', 'Product line removed.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+/** Clones a product line — the common case is "same product, just the name or dimension changed". */
+async function duplicateProduct(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const productId = parseInt(req.params.productId, 10);
+  const order = await orderRepository.find(orderId);
+  const product = await orderProductRepository.find(productId);
+  if (!order || !product || product.order_id !== orderId) {
+    res.status(404).send('Product line not found.');
+    return;
+  }
+
+  const reason = str(req.body.reason);
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'order_products', productId, 'product_duplicated'))) {
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  await orderProductRepository.duplicate(productId);
+  flash.set(req, 'success', 'Product line duplicated — edit the copy below to adjust its name or dimensions.');
+  res.redirect(`/orders/${orderId}`);
+}
+
 async function show(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -366,6 +607,10 @@ async function show(req, res) {
     {
       order,
       products: await orderProductRepository.forOrder(orderId),
+      hsCodes: await hsCodeRepository.active(),
+      isPostConfirmationOrder: orderEditGuard.isPostConfirmation(order.current_stage_number),
+      canOverrideOrderEdit: orderEditGuard.canOverride(req),
+      canManageOrders: !!req.permissions.manage_orders,
       stages,
       stageByNumber,
       payment: await orderPaymentStatusRepository.find(orderId),
@@ -1353,7 +1598,8 @@ async function markLost(req, res) {
 }
 
 module.exports = {
-  index, archivedIndex, archive, unarchive, create, store, show, downloadDossier, generatePiFormLink,
+  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, downloadDossier, generatePiFormLink,
+  editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment, updateProductionStatus,
   recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,

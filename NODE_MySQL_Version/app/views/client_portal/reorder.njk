@@ -1,0 +1,70 @@
+<div class="card page-wide">
+  <h1>Reorder — {{ order.order_reference }}</h1>
+  <p class="muted small"><a href="/client/orders/{{ order.id }}">&larr; Back to Order</a></p>
+  <p class="muted">
+    This copies the product lines from this order as a starting point — edit, remove, or add lines
+    below as needed for the repeat order. It doesn't create a new order right away: our team reviews
+    every reorder request and will confirm it with you once it's set up.
+  </p>
+
+  <form method="post" action="/client/orders/{{ order.id }}/reorder">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+    <fieldset>
+      <legend>Products</legend>
+      <div id="product-rows">
+        {% if products and products.length > 0 %}
+          {% for p in products %}
+          <div class="product-row">
+            <label>Description *<input type="text" name="product_description[{{ loop.index0 }}]" value="{{ p.description }}"></label>
+            <label>Dimensions<input type="text" name="product_dimensions[{{ loop.index0 }}]" value="{{ p.dimensions or '' }}"></label>
+            <label>Finish<input type="text" name="product_finish[{{ loop.index0 }}]" value="{{ p.finish or '' }}"></label>
+            <label>Qty<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}"></label>
+            <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty TBC</label>
+            <label>Unit<input type="text" name="product_unit[{{ loop.index0 }}]" value="{{ p.unit or '' }}" placeholder="SQM/PCS"></label>
+            <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="product-row">
+            <label>Description *<input type="text" name="product_description[0]"></label>
+            <label>Dimensions<input type="text" name="product_dimensions[0]"></label>
+            <label>Finish<input type="text" name="product_finish[0]"></label>
+            <label>Qty<input type="text" name="product_quantity[0]"></label>
+            <label><input type="checkbox" name="product_quantity_tbc[0]" value="1" style="display:inline-block;width:auto;"> Qty TBC</label>
+            <label>Unit<input type="text" name="product_unit[0]" placeholder="SQM/PCS"></label>
+            <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
+          </div>
+        {% endif %}
+      </div>
+      <div class="btn-row"><button type="button" class="btn-secondary btn-sm" id="add-product-row">+ Add product line</button></div>
+      <p class="muted small">Pricing and HS codes aren't set here — our team confirms those when reviewing your request.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Anything else we should know?</legend>
+      <textarea name="notes" rows="2" placeholder="e.g. same as before but 2 extra cartons, or a size change on one item"></textarea>
+    </fieldset>
+
+    <button type="submit">Submit Reorder Request</button>
+  </form>
+</div>
+<script>
+(function () {
+  var nextIndex = {{ (products.length if products and products.length > 0 else 1) }};
+  document.getElementById('add-product-row').addEventListener('click', function () {
+    var rows = document.getElementById('product-rows');
+    var clone = rows.firstElementChild.cloneNode(true);
+    clone.querySelectorAll('input[type=text]').forEach(function (el) {
+      el.value = '';
+      el.name = el.name.replace(/\[\d+\]/, '[' + nextIndex + ']');
+    });
+    clone.querySelectorAll('input[type=checkbox]').forEach(function (el) {
+      el.checked = false;
+      el.name = el.name.replace(/\[\d+\]/, '[' + nextIndex + ']');
+    });
+    nextIndex++;
+    rows.appendChild(clone);
+  });
+})();
+</script>

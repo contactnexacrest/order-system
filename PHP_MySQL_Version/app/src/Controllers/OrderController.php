@@ -43,6 +43,8 @@ use App\Services\AuthService;
 use App\Services\CaFyLockGuard;
 use App\Services\EmailService;
 use App\Services\FileUploadService;
+use App\Services\OrderDuplicationService;
+use App\Services\OrderEditGuard;
 use App\Services\PermissionService;
 use App\Services\ReferenceNumberService;
 use App\Services\StageGateService;
@@ -132,6 +134,28 @@ final class OrderController
         AuditLogRepository::log((int) $actor['id'], 'ORDER_UNARCHIVED', 'orders', $orderId, 'is_archived', '1', '0');
         Flash::set('success', "{$order['order_reference']} restored to the main Orders list.");
         header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Order-Edit feature — "repeat order" for a client who's ordered
+     * before, even long after the original closed. Never touches the
+     * source order (no gate needed there — nothing about it changes) and
+     * the new order starts fresh at Stage 1, exactly like one created by
+     * hand through /orders/create.
+     */
+    public function duplicateOrder(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header('Location: /orders');
+            return;
+        }
+        $actor = AuthService::currentUser();
+        $newOrderId = OrderDuplicationService::duplicate($orderId, (int) $actor['id']);
+        Flash::set('success', "Duplicated {$order['order_reference']} into a new order — review and adjust it below before proceeding.");
+        header("Location: /orders/{$newOrderId}/edit");
     }
 
     public function create(array $params): void
@@ -276,6 +300,248 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /**
+     * Order-Edit feature — the core fields set once at order creation had
+     * no edit path at all until now. Deliberately excludes payment terms
+     * (advance/balance %, balance trigger/days) — those change through the
+     * Amendments module specifically, never here, so there's exactly one
+     * place that changes payment terms. Freely editable before Order
+     * Confirmation (Stage 4); gated by OrderEditGuard from Stage 4 on.
+     */
+    public function editDetails(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+
+        View::render('orders/edit_details', [
+            'order'           => $order,
+            'incoterms'       => LookupRepository::incoterms(),
+            'currencies'      => LookupRepository::currencies(),
+            'loadingPorts'    => LookupRepository::ports('loading'),
+            'dischargePorts'  => LookupRepository::ports('discharge'),
+            'cooTypes'        => LookupRepository::dropdownOptions('coo_type'),
+            'containerTypes'  => LookupRepository::dropdownOptions('container_type'),
+            'isPostConfirmation' => OrderEditGuard::isPostConfirmation($order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null),
+            'canOverride'     => OrderEditGuard::canOverride((int) $user['id'], $roleId),
+        ], 'layout/base');
+    }
+
+    public function updateDetails(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+
+        $incotermId = (int) ($_POST['incoterm_id'] ?? 0);
+        $currencyId = (int) ($_POST['currency_id'] ?? 0);
+        if (!$incotermId || !$currencyId) {
+            Flash::set('error', 'Incoterm and currency are both required.');
+            header("Location: /orders/{$orderId}/edit");
+            return;
+        }
+
+        $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'orders', $orderId, 'order_details')) {
+            header("Location: /orders/{$orderId}/edit");
+            return;
+        }
+
+        $portOfDischargeId = !empty($_POST['port_of_discharge_id']) ? (int) $_POST['port_of_discharge_id'] : null;
+        $portOfDischargeText = trim((string) ($_POST['port_of_discharge_text'] ?? ''));
+
+        OrderRepository::updateDetails($orderId, [
+            'incoterm_id'                 => $incotermId,
+            'currency_id'                 => $currencyId,
+            'port_of_loading_id'          => !empty($_POST['port_of_loading_id']) ? (int) $_POST['port_of_loading_id'] : null,
+            'port_of_discharge_id'        => $portOfDischargeId,
+            'port_of_discharge_text'      => $portOfDischargeId ? null : ($portOfDischargeText ?: null),
+            'coo_type'                    => trim((string) ($_POST['coo_type'] ?? '')) ?: 'TBC',
+            'container_type'              => trim((string) ($_POST['container_type'] ?? '')) ?: null,
+            'buyers_po_ref'               => trim((string) ($_POST['buyers_po_ref'] ?? '')) ?: 'NIL',
+            'special_requirements'        => trim((string) ($_POST['special_requirements'] ?? '')) ?: null,
+            'est_lead_time_text'          => trim((string) ($_POST['est_lead_time_text'] ?? '')) ?: null,
+            'estimated_total_cbm'         => trim((string) ($_POST['estimated_total_cbm'] ?? '')),
+            'estimated_gross_weight_kg'   => trim((string) ($_POST['estimated_gross_weight_kg'] ?? '')),
+            'estimated_net_weight_kg'     => trim((string) ($_POST['estimated_net_weight_kg'] ?? '')),
+            'estimated_package_count'     => trim((string) ($_POST['estimated_package_count'] ?? '')) ?: null,
+            'estimated_package_type'      => trim((string) ($_POST['estimated_package_type'] ?? '')) ?: null,
+            'indicative_freight_low'      => trim((string) ($_POST['indicative_freight_low'] ?? '')),
+            'indicative_freight_high'     => trim((string) ($_POST['indicative_freight_high'] ?? '')),
+            'indicative_insurance_amount' => trim((string) ($_POST['indicative_insurance_amount'] ?? '')),
+        ]);
+
+        Flash::set('success', 'Order details updated.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Order-Edit feature — order_products had no add/edit/delete/duplicate
+     * path once the order was created; this closes that gap, gated by
+     * OrderEditGuard exactly like updateDetails() above once the order
+     * has reached Order Confirmation.
+     */
+    public function addProduct(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $description = trim((string) ($_POST['description'] ?? ''));
+        $hsCode = trim((string) ($_POST['hs_code'] ?? ''));
+        if ($description === '') {
+            Flash::set('error', 'Description is required.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if ($hsCode === '' || !HsCodeRepository::isActiveCode($hsCode)) {
+            Flash::set('error', "HS code \"{$hsCode}\" is not on the HS Code master list — add it there first (HS Codes, under Admin).");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'order_products', $orderId, 'product_added')) {
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        OrderProductRepository::add(
+            $orderId,
+            OrderProductRepository::nextLineNo($orderId),
+            $description,
+            trim((string) ($_POST['dimensions'] ?? '')) ?: null,
+            trim((string) ($_POST['finish'] ?? '')) ?: null,
+            trim((string) ($_POST['quantity'] ?? '')) ?: null,
+            !empty($_POST['quantity_is_tbc']),
+            trim((string) ($_POST['unit'] ?? '')) ?: null,
+            trim((string) ($_POST['unit_price'] ?? '')) ?: null,
+            $hsCode
+        );
+        Flash::set('success', 'Product line added.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function updateProduct(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $productId = (int) $params['productId'];
+        $order = OrderRepository::find($orderId);
+        $product = OrderProductRepository::find($productId);
+        if (!$order || !$product || (int) $product['order_id'] !== $orderId) {
+            http_response_code(404);
+            echo 'Product line not found.';
+            return;
+        }
+        $description = trim((string) ($_POST['description'] ?? ''));
+        $hsCode = trim((string) ($_POST['hs_code'] ?? ''));
+        if ($description === '') {
+            Flash::set('error', 'Description is required.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if ($hsCode === '' || !HsCodeRepository::isActiveCode($hsCode)) {
+            Flash::set('error', "HS code \"{$hsCode}\" is not on the HS Code master list — add it there first (HS Codes, under Admin).");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_line')) {
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        OrderProductRepository::update(
+            $productId,
+            $description,
+            trim((string) ($_POST['dimensions'] ?? '')) ?: null,
+            trim((string) ($_POST['finish'] ?? '')) ?: null,
+            trim((string) ($_POST['quantity'] ?? '')) ?: null,
+            !empty($_POST['quantity_is_tbc']),
+            trim((string) ($_POST['unit'] ?? '')) ?: null,
+            trim((string) ($_POST['unit_price'] ?? '')) ?: null,
+            $hsCode
+        );
+        Flash::set('success', 'Product line updated.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function deleteProduct(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $productId = (int) $params['productId'];
+        $order = OrderRepository::find($orderId);
+        $product = OrderProductRepository::find($productId);
+        if (!$order || !$product || (int) $product['order_id'] !== $orderId) {
+            http_response_code(404);
+            echo 'Product line not found.';
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_removed')) {
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        OrderProductRepository::softDelete($productId);
+        Flash::set('success', 'Product line removed.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /** Clones a product line — the common case is "same product, just the name or dimension changed". */
+    public function duplicateProduct(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $productId = (int) $params['productId'];
+        $order = OrderRepository::find($orderId);
+        $product = OrderProductRepository::find($productId);
+        if (!$order || !$product || (int) $product['order_id'] !== $orderId) {
+            http_response_code(404);
+            echo 'Product line not found.';
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_duplicated')) {
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        OrderProductRepository::duplicate($productId);
+        Flash::set('success', 'Product line duplicated — edit the copy below to adjust its name or dimensions.');
+        header("Location: /orders/{$orderId}");
+    }
+
     public function show(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -343,6 +609,7 @@ final class OrderController
         View::render('orders/show', [
             'order'    => $order,
             'products' => OrderProductRepository::forOrder($orderId),
+            'hsCodes'  => HsCodeRepository::active(),
             'stages'   => $stages,
             'stageByNumber' => $stageByNumber,
             'payment'  => OrderPaymentStatusRepository::find($orderId),

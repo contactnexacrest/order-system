@@ -4,6 +4,7 @@ use App\Helpers\Csrf;
 use App\Helpers\Dates;
 use App\Repositories\CaFyLockRepository;
 use App\Services\AuthService;
+use App\Services\OrderEditGuard;
 use App\Services\PermissionService;
 
 $currentUser = AuthService::currentUser();
@@ -13,6 +14,10 @@ $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser
 $canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
 // Phase 7: a narrow exception to a financial year lock — see CaFyLockGuard.
 $canOverrideFyLock = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'ca_fy_lock_override');
+// Order-Edit feature — product-row edits/duplication once Order Confirmation is reached — see OrderEditGuard.
+$isPostConfirmationOrder = OrderEditGuard::isPostConfirmation($order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null);
+$canOverrideOrderEdit = OrderEditGuard::canOverride((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null);
+$canEditProducts = $canManageOrders && (!$isPostConfirmationOrder || $canOverrideOrderEdit);
 
 // CA / Accounting module (Phase 1) — one small widget per settlement leg,
 // rendered inline in the Payment Status section rather than a separate
@@ -180,7 +185,14 @@ $orderClosed = $order['status'] === 'complete';
     Buyer Inquiry Ref: <?= htmlspecialchars($order['buyer_inquiry_ref']) ?> &nbsp;·&nbsp;
     <?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '') ?>
     <?php if ($canViewReports): ?>&nbsp;·&nbsp; <a href="/reports/order/<?= (int) $order['id'] ?>">Full Report</a><?php endif; ?>
+    <?php if ($canManageOrders): ?>&nbsp;·&nbsp; <a href="/orders/<?= (int) $order['id'] ?>/edit">Edit Order Details</a><?php endif; ?>
   </p>
+  <?php if ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/duplicate" style="display:inline" onsubmit="return confirm('Create a new order copying this one\'s client, commercial terms, and product lines? Nothing about this order changes.');">
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm btn-secondary" title="Repeat order — copies client, commercial terms, and product lines into a brand-new order">Duplicate Order</button>
+    </form>
+  <?php endif; ?>
   <?php if ($order['status'] === 'lost'): ?>
     <p class="muted small">Marked lost<?php if ($order['lost_at']): ?> on <?= htmlspecialchars($order['lost_at']) ?><?php endif; ?><?php if ($order['lost_reason']): ?> — reason: <?= htmlspecialchars($order['lost_reason']) ?><?php endif; ?></p>
   <?php endif; ?>
@@ -252,19 +264,82 @@ $orderClosed = $order['status'] === 'complete';
 
   <div class="section">
     <h2>Products</h2>
-    <table class="list">
-      <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
+    <?php if (!$canEditProducts): ?>
+      <table class="list">
+        <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
+        <?php foreach ($products as $i => $p): ?>
+        <tr>
+          <td><?= $i + 1 ?></td>
+          <td><?= htmlspecialchars($p['description']) ?><?php if ($p['dimensions'] || $p['finish']): ?><br><span class="muted small"><?= htmlspecialchars($p['dimensions'] ?? '') ?> <?= htmlspecialchars($p['finish'] ?? '') ?></span><?php endif; ?></td>
+          <td><?= $p['quantity_is_tbc'] ? 'TBC' : htmlspecialchars((string) $p['quantity']) ?></td>
+          <td><?= htmlspecialchars($p['unit'] ?? '') ?></td>
+          <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : 'TBC' ?></td>
+          <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : 'TBC' ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+      <?php if ($isPostConfirmationOrder && $canManageOrders): ?>
+        <p class="notice notice-error">This order has already reached Order Confirmation — editing or duplicating a product line now needs the "Edit an order after confirmation" permission.</p>
+      <?php endif; ?>
+    <?php else: ?>
+      <?php if ($isPostConfirmationOrder): ?>
+        <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required below.</p>
+      <?php endif; ?>
       <?php foreach ($products as $i => $p): ?>
-      <tr>
-        <td><?= $i + 1 ?></td>
-        <td><?= htmlspecialchars($p['description']) ?><?php if ($p['dimensions'] || $p['finish']): ?><br><span class="muted small"><?= htmlspecialchars($p['dimensions'] ?? '') ?> <?= htmlspecialchars($p['finish'] ?? '') ?></span><?php endif; ?></td>
-        <td><?= $p['quantity_is_tbc'] ? 'TBC' : htmlspecialchars((string) $p['quantity']) ?></td>
-        <td><?= htmlspecialchars($p['unit'] ?? '') ?></td>
-        <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : 'TBC' ?></td>
-        <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : 'TBC' ?></td>
-      </tr>
+        <div class="card-nested">
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>">
+            <?= Csrf::field() ?>
+            <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required></label>
+            <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
+            <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
+            <label>Qty<input type="text" name="quantity" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
+            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty TBC</label>
+            <label>Unit<input type="text" name="unit" value="<?= htmlspecialchars($p['unit'] ?? '') ?>"></label>
+            <label>Unit Price<input type="text" name="unit_price" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
+            <label>HS Code<input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" required></label>
+            <?php if ($isPostConfirmationOrder): ?>
+              <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing after confirmation?"></textarea></label>
+            <?php endif; ?>
+            <button type="submit" class="btn-sm"><?= $isPostConfirmationOrder ? 'Override & Save' : 'Save' ?></button>
+          </form>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/duplicate" style="display:inline">
+            <?= Csrf::field() ?>
+            <?php if ($isPostConfirmationOrder): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;"><?php endif; ?>
+            <button type="submit" class="btn-sm btn-secondary" title="Clone this line — handy when only the name or dimensions differ">Duplicate</button>
+          </form>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove this product line?');">
+            <?= Csrf::field() ?>
+            <?php if ($isPostConfirmationOrder): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;"><?php endif; ?>
+            <button type="submit" class="btn-sm btn-danger">Remove</button>
+          </form>
+        </div>
       <?php endforeach; ?>
-    </table>
+      <?php if (empty($products)): ?><p class="muted">No product lines yet.</p><?php endif; ?>
+
+      <div class="card-nested">
+        <strong>Add Product Line</strong>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/products">
+          <?= Csrf::field() ?>
+          <label>Description *<input type="text" name="description" required></label>
+          <label>Dimensions<input type="text" name="dimensions"></label>
+          <label>Finish<input type="text" name="finish"></label>
+          <label>Qty<input type="text" name="quantity"></label>
+          <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty TBC</label>
+          <label>Unit<input type="text" name="unit"></label>
+          <label>Unit Price<input type="text" name="unit_price"></label>
+          <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
+          <?php if ($isPostConfirmationOrder): ?>
+            <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added after confirmation?"></textarea></label>
+          <?php endif; ?>
+          <button type="submit"><?= $isPostConfirmationOrder ? 'Override & Add' : 'Add Product Line' ?></button>
+        </form>
+      </div>
+      <datalist id="hs_code_list_edit">
+        <?php foreach ($hsCodes ?? [] as $hc): ?>
+          <option value="<?= htmlspecialchars($hc['code']) ?>"><?= htmlspecialchars($hc['description'] ?? '') ?></option>
+        <?php endforeach; ?>
+      </datalist>
+    <?php endif; ?>
   </div>
 
   <div class="section">

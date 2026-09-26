@@ -1,6 +1,6 @@
 <div class="card page-wide">
   <h1>Order {{ order.order_reference or ('#' ~ order.id) }}</h1>
-  <p class="muted small"><a href="/client">&larr; Back to My Orders</a></p>
+  <p class="muted small"><a href="/client">&larr; Back to My Orders</a> &nbsp;&middot;&nbsp; <a href="/client/orders/{{ order.id }}/reorder">Reorder This</a></p>
 
   {% if ocAcknowledgment and ocAcknowledgment.acknowledged_at == null %}
   <div class="section">

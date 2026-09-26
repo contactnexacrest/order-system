@@ -17,6 +17,7 @@ const orderCommentRepository = require('../repositories/orderCommentRepository')
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
+const orderReorderRequestRepository = require('../repositories/orderReorderRequestRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const clientPortalService = require('../services/clientPortalService');
 const orderCommentService = require('../services/orderCommentService');
@@ -158,6 +159,72 @@ async function showOrder(req, res) {
     ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
     comments: await orderCommentRepository.forOrder(orderId),
   }, 'layout/client');
+}
+
+/**
+ * Order-Edit feature — a client wants to place a repeat order from one
+ * they've already placed, even long after it closed. Pre-fills the form
+ * from this order's own product lines; the client may edit, remove, or
+ * add lines before submitting. Never becomes a live order itself — lands
+ * in the staff reorder-request review queue exactly like the intake
+ * queues (see reorderRequestController).
+ */
+async function showReorderForm(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  res.renderView('client_portal/reorder', {
+    client: await clientPortalService.currentClient(req),
+    order,
+    products: await orderProductRepository.forOrder(orderId),
+  }, 'layout/client');
+}
+
+async function submitReorder(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const body = req.body;
+  const hasAtLeastOneProduct = Object.values(body.product_description || {}).some((d) => String(d || '').trim() !== '');
+  if (!hasAtLeastOneProduct) {
+    flash.set(req, 'error', 'At least one product line (with a description) is required.');
+    res.redirect(`/client/orders/${orderId}/reorder`);
+    return;
+  }
+
+  const notes = String(body.notes || '').trim() || null;
+  const requestId = await orderReorderRequestRepository.create(clientId, orderId, notes);
+
+  let lineNo = 1;
+  for (const i of Object.keys(body.product_description || {})) {
+    const description = String(body.product_description[i] || '').trim();
+    if (description === '') continue;
+    await orderReorderRequestRepository.addProductLine(
+      requestId,
+      lineNo++,
+      description,
+      String((body.product_dimensions || {})[i] || '').trim() || null,
+      String((body.product_finish || {})[i] || '').trim() || null,
+      String((body.product_quantity || {})[i] || '').trim() || null,
+      !!(body.product_quantity_tbc || {})[i],
+      String((body.product_unit || {})[i] || '').trim() || null,
+      null, // pricing is never client-set — staff fills it in when reviewing
+      null  // HS code likewise — staff confirms/assigns from the master list on review
+    );
+  }
+
+  flash.set(req, 'success', 'Reorder request submitted — our team will review it and confirm the new order with you shortly.');
+  res.redirect(`/client/orders/${orderId}`);
 }
 
 /** docs/schema.sql Section AI — the client's side of the order progress chat. */
@@ -446,6 +513,7 @@ async function changePassword(req, res) {
 
 module.exports = {
   showLogin, login, logout, showSetPassword, setPassword, dashboard, showOrder,
+  showReorderForm, submitReorder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
   postComment, downloadCommentAttachment, downloadPaymentScreenshot,
 };

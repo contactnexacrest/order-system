@@ -1,7 +1,7 @@
 <?php use App\Helpers\Csrf; use App\Helpers\Dates; ?>
 <div class="card page-wide">
   <h1>Order <?= htmlspecialchars($order['order_reference'] ?? ('#' . $order['id'])) ?></h1>
-  <p class="muted small"><a href="/client">&larr; Back to My Orders</a></p>
+  <p class="muted small"><a href="/client">&larr; Back to My Orders</a> &nbsp;·&nbsp; <a href="/client/orders/<?= (int) $order['id'] ?>/reorder">Reorder This</a></p>
 
   <?php if (!empty($ocAcknowledgment) && $ocAcknowledgment['acknowledged_at'] === null): ?>
   <div class="section">

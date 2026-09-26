@@ -43,7 +43,7 @@ $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH
 $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
-$opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/disputes');
+$opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes');
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log') || $isActive('/email-approvals');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates');
@@ -89,6 +89,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
           <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review</a>
           <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review</a>
+          <a href="/reorder-requests" class="<?= $isActive('/reorder-requests') ? 'active' : '' ?>">Reorder Requests</a>
           <a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a>
         </div>
       </details>

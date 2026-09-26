@@ -67,7 +67,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('inr_actual_edit',           'Add/edit INR actual settlement amounts', 'Record or correct the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
   ('inr_actual_delete',         'Delete INR actual settlement amounts', 'Remove a recorded INR actual amount (e.g. to correct a mis-entry) — kept separate from edit since this is a destructive correction, not routine data entry.', 'ca'),
   ('ca_module_manage',          'Manage CA / Accounting integrations', 'Trigger a Zoho Books sync and view its log, and lock/unlock a financial year for CA data entry — kept separate from ca_module_view since these are administrative actions with a wider blast radius than routine data entry, not just reading the register.', 'ca'),
-  ('ca_fy_lock_override',       'Override a financial year lock', 'Push through a single CA entry even while its financial year is locked — for a genuine backdated correction, never routine use. Every use is logged. Kept separate from ca_module_manage, which can reopen a year outright for everyone.', 'ca');
+  ('ca_fy_lock_override',       'Override a financial year lock', 'Push through a single CA entry even while its financial year is locked — for a genuine backdated correction, never routine use. Every use is logged. Kept separate from ca_module_manage, which can reopen a year outright for everyone.', 'ca'),
+  ('edit_order_post_confirmation', 'Edit an order after confirmation', 'Edit order details or product rows once Order Confirmation has been issued (Stage 4+) — a reason is required and every use is logged. Before Stage 4, manage_orders alone is enough.', 'orders');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)

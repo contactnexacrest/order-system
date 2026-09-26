@@ -140,7 +140,14 @@
     Buyer Inquiry Ref: {{ order.buyer_inquiry_ref }} &nbsp;&middot;&nbsp;
     {{ order.incoterm_code }} {{ order.port_of_loading_name or '' }}
     {% if permissions.view_reports %}&nbsp;&middot;&nbsp; <a href="/reports/order/{{ order.id }}">Full Report</a>{% endif %}
+    {% if permissions.manage_orders %}&nbsp;&middot;&nbsp; <a href="/orders/{{ order.id }}/edit">Edit Order Details</a>{% endif %}
   </p>
+  {% if permissions.manage_orders %}
+    <form method="post" action="/orders/{{ order.id }}/duplicate" style="display:inline" onsubmit="return confirm('Create a new order copying this one\'s client, commercial terms, and product lines? Nothing about this order changes.');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm btn-secondary" title="Repeat order — copies client, commercial terms, and product lines into a brand-new order">Duplicate Order</button>
+    </form>
+  {% endif %}
   {% if order.status == 'lost' %}
     <p class="muted small">Marked lost{% if order.lost_at %} on {{ order.lost_at }}{% endif %}{% if order.lost_reason %} — reason: {{ order.lost_reason }}{% endif %}</p>
   {% endif %}
@@ -212,19 +219,83 @@
 
   <div class="section">
     <h2>Products</h2>
-    <table class="list">
-      <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
+    {% set canEditProducts = permissions.manage_orders and (not isPostConfirmationOrder or canOverrideOrderEdit) %}
+    {% if not canEditProducts %}
+      <table class="list">
+        <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
+        {% for p in products %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ p.description }}{% if p.dimensions or p.finish %}<br><span class="muted small">{{ p.dimensions or '' }} {{ p.finish or '' }}</span>{% endif %}</td>
+          <td>{{ 'TBC' if p.quantity_is_tbc else p.quantity }}</td>
+          <td>{{ p.unit or '' }}</td>
+          <td>{{ (p.unit_price | money) if p.unit_price != null else 'TBC' }}</td>
+          <td>{{ (p.fob_value | money) if p.fob_value != null else 'TBC' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% if isPostConfirmationOrder and permissions.manage_orders %}
+        <p class="notice notice-error">This order has already reached Order Confirmation — editing or duplicating a product line now needs the "Edit an order after confirmation" permission.</p>
+      {% endif %}
+    {% else %}
+      {% if isPostConfirmationOrder %}
+        <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required below.</p>
+      {% endif %}
       {% for p in products %}
-      <tr>
-        <td>{{ loop.index }}</td>
-        <td>{{ p.description }}{% if p.dimensions or p.finish %}<br><span class="muted small">{{ p.dimensions or '' }} {{ p.finish or '' }}</span>{% endif %}</td>
-        <td>{{ 'TBC' if p.quantity_is_tbc else p.quantity }}</td>
-        <td>{{ p.unit or '' }}</td>
-        <td>{{ (p.unit_price | money) if p.unit_price != null else 'TBC' }}</td>
-        <td>{{ (p.fob_value | money) if p.fob_value != null else 'TBC' }}</td>
-      </tr>
+        <div class="card-nested">
+          <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Description *<input type="text" name="description" value="{{ p.description }}" required></label>
+            <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}"></label>
+            <label>Finish<input type="text" name="finish" value="{{ p.finish or '' }}"></label>
+            <label>Qty<input type="text" name="quantity" value="{{ p.quantity or '' }}"></label>
+            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty TBC</label>
+            <label>Unit<input type="text" name="unit" value="{{ p.unit or '' }}"></label>
+            <label>Unit Price<input type="text" name="unit_price" value="{{ p.unit_price or '' }}"></label>
+            <label>HS Code<input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" required></label>
+            {% if isPostConfirmationOrder %}
+              <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing after confirmation?"></textarea></label>
+            {% endif %}
+            <button type="submit" class="btn-sm">{{ 'Override & Save' if isPostConfirmationOrder else 'Save' }}</button>
+          </form>
+          <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/duplicate" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            {% if isPostConfirmationOrder %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;">{% endif %}
+            <button type="submit" class="btn-sm btn-secondary" title="Clone this line — handy when only the name or dimensions differ">Duplicate</button>
+          </form>
+          <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Remove this product line?');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            {% if isPostConfirmationOrder %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;">{% endif %}
+            <button type="submit" class="btn-sm btn-danger">Remove</button>
+          </form>
+        </div>
       {% endfor %}
-    </table>
+      {% if not products or products.length == 0 %}<p class="muted">No product lines yet.</p>{% endif %}
+
+      <div class="card-nested">
+        <strong>Add Product Line</strong>
+        <form method="post" action="/orders/{{ order.id }}/products">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Description *<input type="text" name="description" required></label>
+          <label>Dimensions<input type="text" name="dimensions"></label>
+          <label>Finish<input type="text" name="finish"></label>
+          <label>Qty<input type="text" name="quantity"></label>
+          <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty TBC</label>
+          <label>Unit<input type="text" name="unit"></label>
+          <label>Unit Price<input type="text" name="unit_price"></label>
+          <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
+          {% if isPostConfirmationOrder %}
+            <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added after confirmation?"></textarea></label>
+          {% endif %}
+          <button type="submit">{{ 'Override & Add' if isPostConfirmationOrder else 'Add Product Line' }}</button>
+        </form>
+      </div>
+      <datalist id="hs_code_list_edit">
+        {% for hc in hsCodes %}
+          <option value="{{ hc.code }}">{{ hc.description or '' }}</option>
+        {% endfor %}
+      </datalist>
+    {% endif %}
   </div>
 
   <div class="section">

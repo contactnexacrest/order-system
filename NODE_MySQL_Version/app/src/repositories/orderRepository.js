@@ -62,6 +62,7 @@ async function find(id) {
             c.vat_eori_tax_no, c.contact_person, c.email AS client_email, c.phone AS client_phone,
             c.country_of_destination, c.notify_party, c.client_unique_number,
             sm.stage_name AS current_stage_name, sm.stage_slug AS current_stage_slug,
+            sm.stage_number AS current_stage_number,
             i.code AS incoterm_code, cur.code AS currency_code,
             pl.name AS port_of_loading_name, pd.name AS port_of_discharge_name,
             pp.preset_name, pp.advance_trigger_text, pp.requires_md_approval,
@@ -140,6 +141,61 @@ async function create(data, createdBy) {
     }
   );
   return result.insertId;
+}
+
+/**
+ * Order-Edit feature (added 2026-09-26) — the core fields set once at
+ * creation (create()) had no edit path afterward at all. Deliberately
+ * excludes payment_preset_id (payment-terms changes stay routed through
+ * the Amendments module, never here) and every system-generated
+ * identifier (order_reference, sequence_no, client_id, buyer_inquiry_ref).
+ * Caller (ordersController.updateDetails) is responsible for the
+ * orderEditGuard check before calling this.
+ */
+async function updateDetails(orderId, data) {
+  await db.execute(
+    `UPDATE orders SET
+        incoterm_id = :incoterm_id,
+        currency_id = :currency_id,
+        port_of_loading_id = :port_of_loading_id,
+        port_of_discharge_id = :port_of_discharge_id,
+        port_of_discharge_text = :port_of_discharge_text,
+        coo_type = :coo_type,
+        container_type = :container_type,
+        buyers_po_ref = :buyers_po_ref,
+        special_requirements = :special_requirements,
+        est_lead_time_text = :est_lead_time_text,
+        estimated_total_cbm = :estimated_total_cbm,
+        estimated_gross_weight_kg = :estimated_gross_weight_kg,
+        estimated_net_weight_kg = :estimated_net_weight_kg,
+        estimated_package_count = :estimated_package_count,
+        estimated_package_type = :estimated_package_type,
+        indicative_freight_low = :indicative_freight_low,
+        indicative_freight_high = :indicative_freight_high,
+        indicative_insurance_amount = :indicative_insurance_amount
+     WHERE id = :id`,
+    {
+      incoterm_id: data.incoterm_id,
+      currency_id: data.currency_id,
+      port_of_loading_id: data.port_of_loading_id ?? null,
+      port_of_discharge_id: data.port_of_discharge_id ?? null,
+      port_of_discharge_text: data.port_of_discharge_text ?? null,
+      coo_type: data.coo_type ?? 'TBC',
+      container_type: data.container_type ?? null,
+      buyers_po_ref: data.buyers_po_ref || 'NIL',
+      special_requirements: data.special_requirements ?? null,
+      est_lead_time_text: data.est_lead_time_text ?? null,
+      estimated_total_cbm: data.estimated_total_cbm || null,
+      estimated_gross_weight_kg: data.estimated_gross_weight_kg || null,
+      estimated_net_weight_kg: data.estimated_net_weight_kg || null,
+      estimated_package_count: data.estimated_package_count || null,
+      estimated_package_type: data.estimated_package_type || null,
+      indicative_freight_low: data.indicative_freight_low || null,
+      indicative_freight_high: data.indicative_freight_high || null,
+      indicative_insurance_amount: data.indicative_insurance_amount || null,
+      id: orderId,
+    }
+  );
 }
 
 async function markSample(id) {
@@ -226,7 +282,7 @@ async function setIncludeAnnexureA(orderId, include) {
 }
 
 module.exports = {
-  all, allArchived, archive, unarchive, find, nextSequenceForClient, create, markSample, markTest, setCurrentStage, setPiDates,
+  all, allArchived, archive, unarchive, find, nextSequenceForClient, create, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setDisputeButtonVisible,
 };

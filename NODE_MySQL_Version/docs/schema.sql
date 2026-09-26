@@ -2230,6 +2230,58 @@ ALTER TABLE users
   ADD COLUMN email_signature TEXT NULL AFTER phone;
 
 -- ================================================================
+-- SECTION AJ — CLIENT REORDER REQUESTS (added 2026-09-26)
+-- A client wants to place a repeat order from one they've already placed
+-- (even long after it closed) without re-typing everything from scratch,
+-- and without the request skipping staff review the way a brand-new order
+-- never does anywhere else in this system. Deliberately its own table
+-- rather than reusing client_intake_submissions (that form asks for
+-- company legal name/billing address/VAT-EORI — onboarding fields that
+-- make no sense for an existing client with an existing order on file).
+-- The client may edit/add/remove product lines when submitting; every
+-- other commercial term (incoterm, currency, ports, payment preset) comes
+-- from the source order unchanged — staff can still adjust those on the
+-- resulting order after approval, same as any freshly created order.
+-- ================================================================
+CREATE TABLE order_reorder_requests (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  client_id         BIGINT UNSIGNED NOT NULL,
+  source_order_id   BIGINT UNSIGNED NOT NULL,
+  new_order_id      BIGINT UNSIGNED NULL,        -- set once approved and the new order exists
+  notes             TEXT NULL,                   -- client's free-text note (e.g. "same as before, 2 extra cartons")
+  status            ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  submitted_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_by       BIGINT UNSIGNED NULL,
+  reviewed_at       TIMESTAMP NULL,
+  rejection_reason  VARCHAR(500) NULL,
+  FOREIGN KEY (client_id) REFERENCES clients(id),
+  FOREIGN KEY (source_order_id) REFERENCES orders(id),
+  FOREIGN KEY (new_order_id) REFERENCES orders(id),
+  FOREIGN KEY (reviewed_by) REFERENCES users(id),
+  INDEX idx_reorder_requests_status (status)
+) ENGINE=InnoDB;
+
+-- Product lines for a reorder request — pre-filled from the source order's
+-- order_products, client-editable before submission. hs_code/unit_price
+-- are nullable here (never client-set) — staff fills in anything missing
+-- when approving, same validation as a brand-new order (HS code must
+-- already be on the master list before the resulting order can be created).
+CREATE TABLE order_reorder_request_products (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  reorder_request_id    BIGINT UNSIGNED NOT NULL,
+  line_no               INT NOT NULL,
+  description           VARCHAR(500) NOT NULL,
+  dimensions            VARCHAR(150) NULL,
+  finish                VARCHAR(150) NULL,
+  quantity              DECIMAL(14,3) NULL,
+  quantity_is_tbc       TINYINT(1) NOT NULL DEFAULT 0,
+  unit                  VARCHAR(20) NULL,
+  unit_price            DECIMAL(14,2) NULL,
+  hs_code               VARCHAR(20) NULL,
+  FOREIGN KEY (reorder_request_id) REFERENCES order_reorder_requests(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2257,4 +2309,5 @@ ALTER TABLE users
 -- Section AH (client-facing document revision number) added 2026-09-24.
 -- Section AI (order progress chat, email template CRUD, per-user
 -- signature, Zoho Mail integration) added 2026-09-24.
+-- Section AJ (client reorder requests) added 2026-09-26.
 -- ================================================================
