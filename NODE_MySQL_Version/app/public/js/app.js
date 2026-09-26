@@ -55,6 +55,50 @@
     });
   }
 
+  // Sitewide "Reason" min-length hint + blur validation — every reason/
+  // override_reason/resolved_reason field gets an inline "must be at
+  // least N characters" hint and a red error on blur if too short, with
+  // no per-page wiring needed (same approach as initTableScrollShadows).
+  // Mirrors the min length enforced server-side in reasonValidator.js.
+  function initReasonFieldValidation() {
+    var MIN_LENGTH = 10;
+    document.querySelectorAll('input[name*="reason" i]:not([type="hidden"]), textarea[name*="reason" i]').forEach(function (field) {
+      var container = field.closest('label') || field.parentElement;
+      var alreadyHinted = container && /\b\d+\s*characters?\b/i.test(container.textContent);
+      var hint = null;
+      if (!alreadyHinted) {
+        hint = document.createElement('small');
+        hint.className = 'reason-hint muted';
+        hint.textContent = 'Must be at least ' + MIN_LENGTH + ' characters.';
+        field.insertAdjacentElement('afterend', hint);
+      }
+
+      var showError = function () {
+        var val = field.value.trim();
+        var invalid = val.length > 0 && val.length < MIN_LENGTH;
+        field.classList.toggle('field-invalid', invalid);
+        var existingError = field.parentElement.querySelector('.reason-error');
+        if (invalid) {
+          if (hint) hint.style.display = 'none';
+          if (!existingError) {
+            existingError = document.createElement('small');
+            existingError.className = 'reason-error';
+            field.insertAdjacentElement('afterend', existingError);
+          }
+          existingError.textContent = 'Reason must be at least ' + MIN_LENGTH + ' characters (' + val.length + ' so far).';
+        } else if (existingError) {
+          existingError.remove();
+          field.classList.remove('field-invalid');
+          if (hint) hint.style.display = '';
+        }
+      };
+      field.addEventListener('blur', showError);
+      field.addEventListener('input', function () {
+        if (field.classList.contains('field-invalid')) showError();
+      });
+    });
+  }
+
   function init() {
     // Bound on document, not per-form, so every current and future POST
     // form sitewide gets a disabled/"Working…" submit button for free —
@@ -73,6 +117,7 @@
 
     initSlowDownloadLinks();
     initTableScrollShadows();
+    initReasonFieldValidation();
   }
 
   if (document.readyState === 'loading') {

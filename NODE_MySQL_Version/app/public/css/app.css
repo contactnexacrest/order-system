@@ -120,6 +120,9 @@ button:hover{background:var(--navy-strong);}
 .test-mode-banner{background:#8A1F1F;color:#fff;text-align:center;font-weight:700;font-size:0.85rem;padding:0.5rem 1rem;letter-spacing:0.02em;}
 .muted{color:var(--ink-soft);font-size:0.85rem;}
 .muted.small{font-size:0.78rem;}
+.reason-hint{display:block;color:var(--ink-soft);font-size:0.78rem;margin:0.2rem 0 0.5rem;}
+.reason-error{display:block;color:var(--danger);font-size:0.78rem;font-weight:600;margin:0.2rem 0 0.5rem;}
+.field-invalid{border-color:var(--danger) !important;}
 fieldset{border:1px solid var(--line);border-radius:10px;margin-bottom:1.25rem;padding:1rem 1.25rem;}
 legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capitalize;}
 .setting-row{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--line);padding:0.5rem 0;margin-bottom:0;}
