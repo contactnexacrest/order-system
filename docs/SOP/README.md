@@ -33,6 +33,7 @@ implementation detail.
 - [Reports](./14-reports.md) — every reporting screen and what question it answers.
 - [Admin & Settings](./15-admin-settings.md) — roles/permissions, users, signatories, watermarks, HS codes, company settings, email templates.
 - [Test Mode](./16-test-mode.md) — a sandboxed way to rehearse the system without touching real data or sending real email.
+- [Editing, Duplicating & Reordering](./17-order-edit-duplication.md) — changing an order after it's created, cloning a product line or a whole order, and a client's self-service repeat order.
 
 ## The running examples
 
