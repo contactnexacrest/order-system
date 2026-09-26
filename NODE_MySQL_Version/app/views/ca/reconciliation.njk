@@ -1,0 +1,90 @@
+<div class="card page-wide">
+  <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
+  <h1>Reconciliation Summary</h1>
+  <p class="muted">All-time totals — how much of the recorded revenue and imported expenses has actually been matched against the real bank statement. <a href="/ca/bank-statement">Bank statement &amp; matching &rarr;</a></p>
+
+  <div class="section">
+    <h2>Totals</h2>
+    <table class="list">
+      <tr><th></th><th>In This System</th><th>In Bank Statement</th><th>Matched</th><th>Difference</th></tr>
+      <tr>
+        <td><strong>Revenue (Credits)</strong></td>
+        <td>&#8377;{{ totalRevenue | money }}</td>
+        <td>&#8377;{{ bankTotals.totalCredit | money }}</td>
+        <td>&#8377;{{ bankTotals.matchedCredit | money }}</td>
+        <td>
+          {% set diff = totalRevenue - bankTotals.matchedCredit %}
+          &#8377;{{ (diff | abs) | money }} {% if diff != 0 %}{% if diff > 0 %}(revenue not yet matched){% else %}(unexpected){% endif %}{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Expenses (Debits)</strong></td>
+        <td>&#8377;{{ totalExpenses | money }}</td>
+        <td>&#8377;{{ bankTotals.totalDebit | money }}</td>
+        <td>&#8377;{{ bankTotals.matchedDebit | money }}</td>
+        <td>
+          {% set ediff = totalExpenses - bankTotals.matchedDebit %}
+          &#8377;{{ (ediff | abs) | money }} {% if ediff != 0 %}{% if ediff > 0 %}(expenses not yet matched){% else %}(unexpected){% endif %}{% endif %}
+        </td>
+      </tr>
+    </table>
+    <p class="muted small" style="margin-top:8px;">{{ bankTotals.lineCount }} bank statement line(s) imported in total.</p>
+  </div>
+
+  <div class="section">
+    <h2>Revenue Not Yet Matched to the Bank Statement</h2>
+    {% if unmatchedRevenueLegs.length == 0 %}
+      <p class="muted">Every recorded INR actual has a matching bank statement line.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Order Ref</th><th>Leg</th><th>Cleared On</th><th>INR Actual</th></tr>
+        {% for leg in unmatchedRevenueLegs %}
+        <tr>
+          <td><a href="/orders/{{ leg.order_id }}">{{ leg.buyer_inquiry_ref }}</a></td>
+          <td>{{ leg.leg | capitalize }}</td>
+          <td>{{ leg.cleared_at }}</td>
+          <td>&#8377;{{ leg.inr_actual | money }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Expenses Not Yet Matched to the Bank Statement</h2>
+    {% if unmatchedExpenses.length == 0 %}
+      <p class="muted">Every imported expense has a matching bank statement line.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
+        {% for exp in unmatchedExpenses %}
+        <tr>
+          <td>{{ exp.expense_date }}</td>
+          <td>{{ exp.category }}</td>
+          <td>{{ exp.vendor_name or '—' }}</td>
+          <td>{{ exp.amount | money }} {{ exp.currency_code }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Bank Lines Not Yet Matched</h2>
+    {% if unmatchedBankLines.length == 0 %}
+      <p class="muted">Every imported bank statement line has been matched.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Date</th><th>Description</th><th>Credit</th><th>Debit</th></tr>
+        {% for l in unmatchedBankLines %}
+        <tr>
+          <td>{{ l.transaction_date }}</td>
+          <td class="muted small">{{ l.description or '' }}</td>
+          <td>{{ (l.credit_amount | money) if l.credit_amount != null else '—' }}</td>
+          <td>{{ (l.debit_amount | money) if l.debit_amount != null else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+</div>

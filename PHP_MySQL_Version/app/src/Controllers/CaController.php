@@ -7,12 +7,14 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\FinancialYear;
 use App\Helpers\View;
+use App\Repositories\CaBankStatementRepository;
 use App\Repositories\CaExpenseRepository;
 use App\Repositories\CaRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\UserRepository;
 use App\Repositories\ZohoSyncLogRepository;
 use App\Services\AuthService;
+use App\Services\BankStatementCsvParser;
 use App\Services\CaSyncService;
 use App\Services\PermissionService;
 use App\Services\ZohoBooksService;
@@ -138,5 +140,131 @@ final class CaController
         CaExpenseRepository::setTds($id, $isTdsApplicable, $tdsAmount, (int) $user['id']);
         Flash::set('success', 'Expense TDS details updated.');
         header('Location: /ca/expenses');
+    }
+
+    /**
+     * Bank statement lines (Phase 5) — upload a CSV export, then match each
+     * line to a revenue leg or an expense. The two pickers only ever list
+     * items not already matched to some other line, so the same revenue
+     * leg/expense can't accidentally be double-matched.
+     */
+    public function bankStatement(array $params): void
+    {
+        $matchedRevenueKeys = CaBankStatementRepository::matchedRevenueKeys();
+        $matchedExpenseIds = CaBankStatementRepository::matchedExpenseIds();
+
+        View::render('ca/bank_statement', [
+            'lines' => CaBankStatementRepository::all(),
+            'unmatchedRevenueLegs' => CaRepository::legsWithInrActualUnmatched($matchedRevenueKeys),
+            'unmatchedExpenses' => array_values(array_filter(
+                CaExpenseRepository::all(),
+                static fn(array $e): bool => !in_array((int) $e['id'], $matchedExpenseIds, true)
+            )),
+        ], 'layout/base');
+    }
+
+    public function uploadBankStatement(array $params): void
+    {
+        $user = AuthService::currentUser();
+        if (empty($_FILES['statement']) || $_FILES['statement']['error'] !== UPLOAD_ERR_OK) {
+            Flash::set('error', 'No file was uploaded, or the upload failed.');
+            header('Location: /ca/bank-statement');
+            return;
+        }
+        $extension = strtolower((string) pathinfo($_FILES['statement']['name'], PATHINFO_EXTENSION));
+        if ($extension !== 'csv') {
+            Flash::set('error', 'Only .csv files are supported — export your bank statement as CSV first.');
+            header('Location: /ca/bank-statement');
+            return;
+        }
+
+        try {
+            $parsed = BankStatementCsvParser::parse($_FILES['statement']['tmp_name']);
+        } catch (\RuntimeException $e) {
+            Flash::set('error', 'Could not read the file: ' . $e->getMessage());
+            header('Location: /ca/bank-statement');
+            return;
+        }
+
+        $imported = 0;
+        $duplicates = 0;
+        foreach ($parsed['rows'] as $row) {
+            $hash = hash('sha256', implode('|', [$row['date'], (string) $row['description'], (string) $row['reference'], (string) $row['credit'], (string) $row['debit']]));
+            $inserted = CaBankStatementRepository::insertLine($hash, $row['date'], $row['description'], $row['reference'], $row['credit'], $row['debit'], (int) $user['id']);
+            if ($inserted) {
+                $imported++;
+            } else {
+                $duplicates++;
+            }
+        }
+
+        Flash::set('success', "Imported {$imported} line(s). {$duplicates} already-imported duplicate(s) skipped, {$parsed['skipped']} unparseable row(s) skipped.");
+        header('Location: /ca/bank-statement');
+    }
+
+    public function matchBankLineToRevenue(array $params): void
+    {
+        $lineId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $leg = (string) ($_POST['leg'] ?? '');
+        if ($orderId <= 0 || !in_array($leg, ['advance', 'balance', 'freight'], true)) {
+            Flash::set('error', 'Choose a revenue leg to match.');
+            header('Location: /ca/bank-statement');
+            return;
+        }
+        CaBankStatementRepository::matchToRevenue($lineId, $orderId, $leg, (int) $user['id']);
+        Flash::set('success', 'Bank line matched to the settlement leg.');
+        header('Location: /ca/bank-statement');
+    }
+
+    public function matchBankLineToExpense(array $params): void
+    {
+        $lineId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $expenseId = (int) ($_POST['expense_id'] ?? 0);
+        if ($expenseId <= 0) {
+            Flash::set('error', 'Choose an expense to match.');
+            header('Location: /ca/bank-statement');
+            return;
+        }
+        CaBankStatementRepository::matchToExpense($lineId, $expenseId, (int) $user['id']);
+        Flash::set('success', 'Bank line matched to the expense.');
+        header('Location: /ca/bank-statement');
+    }
+
+    public function unmatchBankLine(array $params): void
+    {
+        CaBankStatementRepository::unmatch((int) $params['id']);
+        Flash::set('success', 'Match removed.');
+        header('Location: /ca/bank-statement');
+    }
+
+    /**
+     * All-time reconciliation summary: bank statement totals vs. recorded
+     * revenue/expense totals, plus what's still unmatched on each side.
+     * Deliberately all-time rather than period-filtered for now — see
+     * ca-05-bank-reconciliation.md.
+     */
+    public function reconciliation(array $params): void
+    {
+        $bankTotals = CaBankStatementRepository::totals();
+        $matchedRevenueKeys = CaBankStatementRepository::matchedRevenueKeys();
+        $matchedExpenseIds = CaBankStatementRepository::matchedExpenseIds();
+
+        View::render('ca/reconciliation', [
+            'bankTotals' => $bankTotals,
+            'totalRevenue' => CaRepository::totalInrActualAll(),
+            'totalExpenses' => CaExpenseRepository::totalAll(),
+            'unmatchedRevenueLegs' => CaRepository::legsWithInrActualUnmatched($matchedRevenueKeys),
+            'unmatchedExpenses' => array_values(array_filter(
+                CaExpenseRepository::all(),
+                static fn(array $e): bool => !in_array((int) $e['id'], $matchedExpenseIds, true)
+            )),
+            'unmatchedBankLines' => array_values(array_filter(
+                CaBankStatementRepository::all(),
+                static fn(array $l): bool => $l['matched_order_id'] === null && $l['matched_expense_id'] === null
+            )),
+        ], 'layout/base');
     }
 }

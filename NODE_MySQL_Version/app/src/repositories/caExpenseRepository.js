@@ -35,6 +35,12 @@ async function find(id) {
   return db.queryOne('SELECT * FROM ca_expenses WHERE id = :id', { id });
 }
 
+/** All-time total of every imported expense — used by the reconciliation summary. */
+async function totalAll() {
+  const row = await db.queryOne('SELECT COALESCE(SUM(amount), 0) AS total FROM ca_expenses');
+  return parseFloat(row.total);
+}
+
 /** Local-only TDS annotation — never written back to Zoho Books. */
 async function setTds(id, isTdsApplicable, tdsAmount, userId) {
   await db.execute(
@@ -45,4 +51,4 @@ async function setTds(id, isTdsApplicable, tdsAmount, userId) {
   );
 }
 
-module.exports = { existsByZohoId, insert, all, find, setTds };
+module.exports = { existsByZohoId, insert, all, find, setTds, totalAll };

@@ -262,6 +262,12 @@ $router->get('/ca/zoho-sync', [$ca, 'zohoSync'], [SessionAuth::required(), Permi
 $router->post('/ca/zoho-sync/run', [$ca, 'runZohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->get('/ca/expenses', [$ca, 'expenses'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/expenses/{id}/tds', [$ca, 'setExpenseTds'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->get('/ca/bank-statement', [$ca, 'bankStatement'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->post('/ca/bank-statement/upload', [$ca, 'uploadBankStatement'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/ca/bank-statement/{id}/match-revenue', [$ca, 'matchBankLineToRevenue'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/ca/bank-statement/{id}/match-expense', [$ca, 'matchBankLineToExpense'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/ca/bank-statement/{id}/unmatch', [$ca, 'unmatchBankLine'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->get('/ca/reconciliation', [$ca, 'reconciliation'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/orders/{id}/payment/exchange-rate', [$orders, 'recordAssumedExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/advance/firc', [$orders, 'recordAdvanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/balance/firc', [$orders, 'recordBalanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);

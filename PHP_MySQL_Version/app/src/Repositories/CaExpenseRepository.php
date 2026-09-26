@@ -54,6 +54,12 @@ final class CaExpenseRepository
         return $stmt->fetchAll();
     }
 
+    /** All-time total of every imported expense — used by the reconciliation summary. */
+    public static function totalAll(): float
+    {
+        return (float) Database::connection()->query('SELECT COALESCE(SUM(amount), 0) FROM ca_expenses')->fetchColumn();
+    }
+
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM ca_expenses WHERE id = :id');

@@ -1,0 +1,79 @@
+<div class="card page-wide">
+  <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
+  <h1>Bank Statement</h1>
+  <p class="muted">Upload a CSV export of the bank statement, then match each line to a settlement leg (revenue) or an imported expense. <a href="/ca/reconciliation">Reconciliation summary &rarr;</a></p>
+
+  <div class="section">
+    <h2>Upload Statement</h2>
+    <p class="muted small">CSV only, with a header row. Most bank export formats work — the importer looks for Date, Description/Narration, Reference, and either separate Credit/Debit columns or a single Amount + Type column. Uploading the same date range twice never creates duplicate lines.</p>
+    <form method="post" action="/ca/bank-statement/upload" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="file" name="statement" accept=".csv" required>
+      <button type="submit" class="btn-sm">Upload</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Statement Lines</h2>
+    {% if lines.length == 0 %}
+      <p class="muted">No statement lines imported yet.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Date</th><th>Description</th><th>Reference</th><th>Credit</th><th>Debit</th><th>Match</th></tr>
+        {% for l in lines %}
+        <tr>
+          <td>{{ l.transaction_date }}</td>
+          <td class="muted small">{{ l.description or '' }}</td>
+          <td class="muted small">{{ l.reference or '' }}</td>
+          <td>{{ (l.credit_amount | money) if l.credit_amount != null else '—' }}</td>
+          <td>{{ (l.debit_amount | money) if l.debit_amount != null else '—' }}</td>
+          <td>
+            {% if l.matched_order_id != null %}
+              Revenue: <a href="/orders/{{ l.matched_order_id }}">{{ l.matched_order_ref }}</a> — {{ l.matched_leg | capitalize }}
+              <form method="post" action="/ca/bank-statement/{{ l.id }}/unmatch" style="display:inline;">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+              </form>
+            {% elif l.matched_expense_id != null %}
+              Expense: {{ l.matched_expense_category }}{% if l.matched_expense_vendor %} ({{ l.matched_expense_vendor }}){% endif %}
+              <form method="post" action="/ca/bank-statement/{{ l.id }}/unmatch" style="display:inline;">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+              </form>
+            {% else %}
+              {% if l.credit_amount != null %}
+                <form method="post" action="/ca/bank-statement/{{ l.id }}/match-revenue" style="display:flex; gap:4px;">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <select name="order_leg" onchange="this.form.order_id.value=this.value.split('|')[0]; this.form.leg.value=this.value.split('|')[1];" style="max-width:220px;">
+                    <option value="">Match to revenue leg&hellip;</option>
+                    {% for leg in unmatchedRevenueLegs %}
+                      <option value="{{ leg.order_id }}|{{ leg.leg }}">
+                        {{ leg.buyer_inquiry_ref }} — {{ leg.leg | capitalize }} — &#8377;{{ leg.inr_actual | money }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <input type="hidden" name="order_id">
+                  <input type="hidden" name="leg">
+                  <button type="submit" class="btn-sm">Match</button>
+                </form>
+              {% endif %}
+              {% if l.debit_amount != null %}
+                <form method="post" action="/ca/bank-statement/{{ l.id }}/match-expense" style="display:flex; gap:4px; margin-top:4px;">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <select name="expense_id" style="max-width:220px;">
+                    <option value="">Match to expense&hellip;</option>
+                    {% for exp in unmatchedExpenses %}
+                      <option value="{{ exp.id }}">{{ exp.category }}{% if exp.vendor_name %} ({{ exp.vendor_name }}){% endif %} — {{ exp.amount | money }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn-sm">Match</button>
+                </form>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+</div>

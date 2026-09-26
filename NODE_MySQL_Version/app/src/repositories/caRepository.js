@@ -84,6 +84,26 @@ async function legsPendingZohoSync() {
   return rows.filter((r) => r.inr_actual !== null && r.zoho_synced_at === null);
 }
 
+/**
+ * Every leg with an INR actual on record that hasn't been matched to a
+ * bank statement line yet — what the reconciliation summary
+ * (caController.reconciliation()) lists as outstanding on the revenue
+ * side.
+ *
+ * @param {string[]} matchedKeys 'orderId:leg' keys already matched (caBankStatementRepository.matchedRevenueKeys())
+ */
+async function legsWithInrActualUnmatched(matchedKeys) {
+  const matched = new Set(matchedKeys);
+  const rows = await settlementRegister();
+  return rows.filter((r) => r.inr_actual !== null && !matched.has(`${r.order_id}:${r.leg}`));
+}
+
+/** All-time total of every recorded INR actual — used by the reconciliation summary. */
+async function totalInrActualAll() {
+  const rows = await settlementRegister();
+  return rows.reduce((sum, r) => sum + (r.inr_actual || 0), 0);
+}
+
 /** FY labels (e.g. '2026-27') with at least one cleared leg, newest first. */
 async function availableFinancialYears() {
   const rows = await settlementRegister();
@@ -155,4 +175,7 @@ async function revenueReport(mode, period) {
   };
 }
 
-module.exports = { settlementRegister, availableFinancialYears, availableCalendarYears, revenueReport, legsPendingZohoSync };
+module.exports = {
+  settlementRegister, availableFinancialYears, availableCalendarYears, revenueReport, legsPendingZohoSync,
+  legsWithInrActualUnmatched, totalInrActualAll,
+};

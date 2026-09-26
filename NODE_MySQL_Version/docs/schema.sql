@@ -1043,6 +1043,39 @@ CREATE TABLE ca_expenses (
   INDEX idx_ca_expenses_date (expense_date)
 ) ENGINE=InnoDB;
 
+-- CA / Accounting module (Phase 5) — bank statement reconciliation
+-- (Section 14 of the module brief: revenue + expenses should reconcile
+-- against the real bank statement's credit/debit entries). Lines are
+-- imported from a CSV/Excel export of the bank statement (chosen over
+-- manual entry or a live bank API — see ca-05-bank-reconciliation.md) and
+-- then matched, one at a time, to either a settlement leg (revenue) or a
+-- ca_expenses row (expense). line_hash de-dupes across repeat uploads of
+-- overlapping date ranges — the same statement line uploaded twice is
+-- never inserted twice. A line matches at most one of the two pairs
+-- below; enforcing "at most one" is the application's job, not a DB
+-- constraint, same judgment call as elsewhere in this schema.
+CREATE TABLE ca_bank_statement_lines (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  line_hash           CHAR(64) NOT NULL UNIQUE,   -- sha256(date|description|reference|credit|debit)
+  transaction_date    DATE NOT NULL,
+  description         VARCHAR(500) NULL,
+  reference           VARCHAR(200) NULL,
+  credit_amount       DECIMAL(14,2) NULL,
+  debit_amount        DECIMAL(14,2) NULL,
+  matched_order_id    BIGINT UNSIGNED NULL,        -- + matched_leg together = a revenue match
+  matched_leg         VARCHAR(20) NULL,             -- 'advance' | 'balance' | 'freight'
+  matched_expense_id  BIGINT UNSIGNED NULL,         -- an expense match
+  matched_by          BIGINT UNSIGNED NULL,
+  matched_at          TIMESTAMP NULL,
+  imported_by         BIGINT UNSIGNED NULL,
+  imported_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (matched_order_id) REFERENCES orders(id),
+  FOREIGN KEY (matched_expense_id) REFERENCES ca_expenses(id),
+  FOREIGN KEY (matched_by) REFERENCES users(id),
+  FOREIGN KEY (imported_by) REFERENCES users(id),
+  INDEX idx_ca_bank_lines_date (transaction_date)
+) ENGINE=InnoDB;
+
 -- ================================================================
 -- SECTION K — 2FA BACKUP CODES & SAVED REPORT DEFINITIONS
 -- (Resolved 2026-09-18 — see ARCHITECTURE.md "Open questions", now closed)

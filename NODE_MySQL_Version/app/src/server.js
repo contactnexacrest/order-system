@@ -407,6 +407,12 @@ app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asy
 app.post('/ca/zoho-sync/run', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.runZohoSync));
 app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.expenses));
 app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
+app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));
+app.post('/ca/bank-statement/upload', requireAuth, requirePermission('inr_actual_edit'), upload.single('statement'), verifyCsrf, asyncHandler(caController.uploadBankStatement));
+app.post('/ca/bank-statement/:id/match-revenue', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.matchBankLineToRevenue));
+app.post('/ca/bank-statement/:id/match-expense', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.matchBankLineToExpense));
+app.post('/ca/bank-statement/:id/unmatch', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.unmatchBankLine));
+app.get('/ca/reconciliation', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reconciliation));
 app.post('/orders/:id/payment/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAssumedExchangeRate));
 app.post('/orders/:id/payment/advance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceFirc));
 app.post('/orders/:id/payment/balance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceFirc));

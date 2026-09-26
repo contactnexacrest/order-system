@@ -97,6 +97,34 @@ final class CaRepository
         ));
     }
 
+    /**
+     * Every leg with an INR actual on record that hasn't been matched to a
+     * bank statement line yet — what the reconciliation summary
+     * (CaController::reconciliation()) lists as outstanding on the
+     * revenue side.
+     *
+     * @param array<int,string> $matchedKeys 'orderId:leg' keys already matched (CaBankStatementRepository::matchedRevenueKeys())
+     * @return array<int, array<string,mixed>>
+     */
+    public static function legsWithInrActualUnmatched(array $matchedKeys): array
+    {
+        $matched = array_flip($matchedKeys);
+        return array_values(array_filter(
+            self::settlementRegister(),
+            static fn(array $r): bool => $r['inr_actual'] !== null && !isset($matched[$r['order_id'] . ':' . $r['leg']])
+        ));
+    }
+
+    /** All-time total of every recorded INR actual — used by the reconciliation summary. */
+    public static function totalInrActualAll(): float
+    {
+        $total = 0.0;
+        foreach (self::settlementRegister() as $r) {
+            $total += (float) ($r['inr_actual'] ?? 0);
+        }
+        return $total;
+    }
+
     /** FY labels (e.g. '2026-27') with at least one cleared leg, newest first. @return array<int,string> */
     public static function availableFinancialYears(): array
     {
