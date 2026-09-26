@@ -745,6 +745,11 @@ async function downloadDossier(req, res) {
 async function recordBuyerPo(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 2))) {
+    flash.set(req, 'error', 'Stage 2 has not been unlocked for this order yet — complete Stage 1 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const ref = str(req.body.buyers_po_ref);
   if (ref === '') {
     flash.set(req, 'error', "Buyer's PO / reference number is required to confirm this gate.");
@@ -850,6 +855,11 @@ async function markPaymentReportReviewed(req, res) {
 async function clearAdvancePayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 3))) {
+    flash.set(req, 'error', 'Stage 3 has not been unlocked for this order yet — complete Stage 2 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const clearedAt = str(req.body.advance_cleared_at) || todayYmd();
 
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
@@ -906,6 +916,11 @@ async function updateProductionStatus(req, res) {
  */
 async function recordOcAcknowledgment(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  if (!(await stageGateService.isUnlocked(orderId, 4))) {
+    flash.set(req, 'error', 'Stage 4 has not been unlocked for this order yet — complete Stage 3 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const ack = await orderOcAcknowledgmentRepository.find(orderId);
   if (!ack || ack.acknowledged_at !== null) {
     flash.set(req, 'error', 'No pending Order Confirmation acknowledgment for this order — send the OC to the buyer first.');
@@ -1014,6 +1029,11 @@ async function createSupplier(req, res) {
 async function confirmSupplierSigned(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 5))) {
+    flash.set(req, 'error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
   if (!supplierPo) {
     flash.set(req, 'error', 'Save the Supplier PO terms and generate the document before confirming signature.');
@@ -1101,6 +1121,11 @@ async function recordFreightPayment(req, res) {
 async function clearFreightPayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 6))) {
+    flash.set(req, 'error', 'Stage 6 has not been unlocked for this order yet — complete Stage 5 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const clearedAt = str(req.body.freight_cleared_at) || todayYmd();
   await orderPaymentStatusRepository.markFreightCleared(orderId, clearedAt, user.id);
   await stageGateService.passAndUnlockNext(orderId, 6, user.id);
@@ -1239,6 +1264,11 @@ async function saveShipping(req, res) {
 async function recordBlIssued(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 7))) {
+    flash.set(req, 'error', 'Stage 7 has not been unlocked for this order yet — complete Stage 6 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const blNumber = str(req.body.bl_number);
   const blDate = str(req.body.bl_date) || todayYmd();
   if (blNumber === '') {
@@ -1277,6 +1307,11 @@ async function recordBalancePayment(req, res) {
 async function clearBalancePayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 8))) {
+    flash.set(req, 'error', 'Stage 8 has not been unlocked for this order yet — complete Stage 7 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const clearedAt = str(req.body.balance_cleared_at) || todayYmd();
   await orderPaymentStatusRepository.markBalanceCleared(orderId, clearedAt, user.id);
   await stageGateService.passAndUnlockNext(orderId, 8, user.id);
@@ -1498,6 +1533,11 @@ async function recordBlEndorsed(req, res) {
 async function closeOrder(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 9))) {
+    flash.set(req, 'error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const trackingNumber = str(req.body.courier_tracking_number);
   if (trackingNumber === '') {
     flash.set(req, 'error', 'Courier tracking number is required to close the order.');

@@ -393,6 +393,11 @@ async function acknowledgeOc(req, res) {
     res.redirect(`/client/orders/${orderId}`);
     return;
   }
+  if (!(await stageGateService.isUnlocked(orderId, 4))) {
+    flash.set(req, 'error', 'This order is not currently awaiting acknowledgement.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
 
   await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'client_portal', null, null);
   await stageGateService.passAndUnlockNext(orderId, 4, null);

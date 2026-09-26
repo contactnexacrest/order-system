@@ -354,6 +354,11 @@ final class ClientPortalController
             header("Location: /client/orders/{$orderId}");
             return;
         }
+        if (!\App\Services\StageGateService::isUnlocked($orderId, 4)) {
+            Flash::set('error', 'This order is not currently awaiting acknowledgement.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
 
         OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'client_portal', null, null);
         \App\Services\StageGateService::passAndUnlockNext($orderId, 4, null);

@@ -27,11 +27,27 @@ use App\Repositories\OrderStageRepository;
  */
 final class StageGateService
 {
-    public static function passAndUnlockNext(int $orderId, int $stageNumber, ?int $userId): void
+    /**
+     * @return bool true if the gate was passed (or already had been —
+     *   idempotent), false if stage $stageNumber isn't actually unlocked
+     *   yet (still 'locked', meaning the stage before it hasn't genuinely
+     *   passed). Every caller MUST check this return value and refuse the
+     *   surrounding action on false — without it, any manage_orders holder
+     *   could force-pass any stage on any order by POSTing directly to its
+     *   gate endpoint (e.g. /orders/{id}/close), skipping every stage
+     *   before it with no error at all.
+     */
+    public static function passAndUnlockNext(int $orderId, int $stageNumber, ?int $userId): bool
     {
         $current = OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
-        if (!$current || $current['status'] === 'gate_passed') {
-            return; // already passed, or stage doesn't exist — idempotent no-op
+        if (!$current) {
+            return false; // stage doesn't exist for this order
+        }
+        if ($current['status'] === 'gate_passed') {
+            return true; // already passed — idempotent no-op
+        }
+        if ($current['status'] !== 'in_progress') {
+            return false; // still locked — the stage before this one hasn't passed yet
         }
         OrderStageRepository::passGate((int) $current['id'], $userId);
 
@@ -40,6 +56,7 @@ final class StageGateService
             OrderStageRepository::unlock((int) $next['id']);
             OrderRepository::setCurrentStage($orderId, (int) $next['stage_id']);
         }
+        return true;
     }
 
     /**
@@ -66,6 +83,19 @@ final class StageGateService
             OrderStageRepository::unlock((int) $next['id']);
             OrderRepository::setCurrentStage($orderId, (int) $next['stage_id']);
         }
+    }
+
+    /**
+     * Pre-flight check for a "stage N -> N+1" controller action, called
+     * BEFORE any of that action's own writes — so an out-of-order attempt
+     * (e.g. confirming BL issued on an order that never cleared its
+     * advance payment) is refused before anything is recorded, not just
+     * before the stage-gate row itself is updated.
+     */
+    public static function isUnlocked(int $orderId, int $stageNumber): bool
+    {
+        $stage = OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
+        return $stage !== null && $stage['status'] === 'in_progress';
     }
 
     /** Current stage's status/number for an order, for UI gating decisions. */

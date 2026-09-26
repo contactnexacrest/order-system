@@ -755,6 +755,11 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 2)) {
+            Flash::set('error', 'Stage 2 has not been unlocked for this order yet — complete Stage 1 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $ref = trim((string) ($_POST['buyers_po_ref'] ?? ''));
         if ($ref === '') {
             Flash::set('error', "Buyer's PO / reference number is required to confirm this gate.");
@@ -862,6 +867,11 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 3)) {
+            Flash::set('error', 'Stage 3 has not been unlocked for this order yet — complete Stage 2 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['advance_cleared_at'] ?? '')) ?: date('Y-m-d');
 
         $fobTotal = OrderProductRepository::totalFobValue($orderId);
@@ -930,6 +940,11 @@ final class OrderController
     public function recordOcAcknowledgment(array $params): void
     {
         $orderId = (int) $params['id'];
+        if (!StageGateService::isUnlocked($orderId, 4)) {
+            Flash::set('error', 'Stage 4 has not been unlocked for this order yet — complete Stage 3 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $ack = OrderOcAcknowledgmentRepository::find($orderId);
         if (!$ack || $ack['acknowledged_at'] !== null) {
             Flash::set('error', 'No pending Order Confirmation acknowledgment for this order — send the OC to the buyer first.');
@@ -1028,6 +1043,11 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 5)) {
+            Flash::set('error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         if (!$supplierPo) {
             Flash::set('error', 'Save the Supplier PO terms and generate the document before confirming signature.');
@@ -1117,6 +1137,11 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 6)) {
+            Flash::set('error', 'Stage 6 has not been unlocked for this order yet — complete Stage 5 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['freight_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markFreightCleared($orderId, $clearedAt, (int) $user['id']);
         StageGateService::passAndUnlockNext($orderId, 6, (int) $user['id']);
@@ -1251,6 +1276,11 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 7)) {
+            Flash::set('error', 'Stage 7 has not been unlocked for this order yet — complete Stage 6 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $blNumber = trim((string) ($_POST['bl_number'] ?? ''));
         $blDate = trim((string) ($_POST['bl_date'] ?? '')) ?: date('Y-m-d');
         if ($blNumber === '') {
@@ -1292,6 +1322,11 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 8)) {
+            Flash::set('error', 'Stage 8 has not been unlocked for this order yet — complete Stage 7 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['balance_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markBalanceCleared($orderId, $clearedAt, (int) $user['id']);
         StageGateService::passAndUnlockNext($orderId, 8, (int) $user['id']);
@@ -1536,6 +1571,11 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 9)) {
+            Flash::set('error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $trackingNumber = trim((string) ($_POST['courier_tracking_number'] ?? ''));
         if ($trackingNumber === '') {
             Flash::set('error', 'Courier tracking number is required to close the order.');
