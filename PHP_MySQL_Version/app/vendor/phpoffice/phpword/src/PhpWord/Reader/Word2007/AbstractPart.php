@@ -302,7 +302,7 @@ abstract class AbstractPart
             $nodes = $xmlReader->getElements('w:r|w:hyperlink', $domNode);
             $hasRubyElement = $xmlReader->elementExists('w:r/w:ruby', $domNode);
             if ($nodes->length === 1 && !$hasRubyElement) {
-                $textContent = htmlspecialchars($xmlReader->getValue('w:t', $nodes->item(0)) ?? '', ENT_QUOTES, 'UTF-8');
+                $textContent = htmlspecialchars($xmlReader->getValue('w:t', $nodes->item(0)), ENT_QUOTES, 'UTF-8');
             } else {
                 $textContent = new TextRun($paragraphStyle);
                 foreach ($nodes as $node) {
@@ -369,7 +369,6 @@ abstract class AbstractPart
                     }
                     $formField->setEntries($listEntries);
                     if (null !== $formField->getValue()) {
-                        /** @phpstan-ignore offsetAccess.notFound */
                         $formField->setText($listEntries[$formField->getValue()]);
                     }
 
@@ -529,17 +528,15 @@ abstract class AbstractPart
             $xmlReader->registerNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
 
             $name = $xmlReader->getAttribute('name', $node, 'wp:inline/a:graphic/a:graphicData/pic:pic/pic:nvPicPr/pic:cNvPr');
-            $altText = $xmlReader->getAttribute('descr', $node, 'wp:inline/a:graphic/a:graphicData/pic:pic/pic:nvPicPr/pic:cNvPr');
             $embedId = $xmlReader->getAttribute('r:embed', $node, 'wp:inline/a:graphic/a:graphicData/pic:pic/pic:blipFill/a:blip');
-            if ($name === null && $altText === null && $embedId === null) { // some Converters puts images on a different path
+            if ($name === null && $embedId === null) { // some Converters puts images on a different path
                 $name = $xmlReader->getAttribute('name', $node, 'wp:anchor/a:graphic/a:graphicData/pic:pic/pic:nvPicPr/pic:cNvPr');
-                $altText = $xmlReader->getAttribute('descr', $node, 'wp:anchor/a:graphic/a:graphicData/pic:pic/pic:nvPicPr/pic:cNvPr');
                 $embedId = $xmlReader->getAttribute('r:embed', $node, 'wp:anchor/a:graphic/a:graphicData/pic:pic/pic:blipFill/a:blip');
             }
             $target = $this->getMediaTarget($docPart, $embedId);
             if ($this->hasImageLoading() && null !== $target) {
                 $imageSource = "zip://{$this->docFile}#{$target}";
-                $parent->addImage($imageSource, null, false, $name, $altText);
+                $parent->addImage($imageSource, null, false, $name);
             }
         } elseif ($node->nodeName == 'w:object') {
             // Object
@@ -562,14 +559,14 @@ abstract class AbstractPart
                 if ($fallbackElements->length) {
                     $fallback = $fallbackElements->item(0);
                     // TextRun
-                    $textContent = htmlspecialchars($fallback->nodeValue ?? '', ENT_QUOTES, 'UTF-8');
+                    $textContent = htmlspecialchars($fallback->nodeValue, ENT_QUOTES, 'UTF-8');
 
                     $parent->addText($textContent, $fontStyle, $paragraphStyle);
                 }
             }
         } elseif ($node->nodeName == 'w:t' || $node->nodeName == 'w:delText') {
             // TextRun
-            $textContent = htmlspecialchars($xmlReader->getValue('.', $node) ?? '', ENT_QUOTES, 'UTF-8');
+            $textContent = htmlspecialchars($xmlReader->getValue('.', $node), ENT_QUOTES, 'UTF-8');
 
             if ($runParent->nodeName == 'w:hyperlink') {
                 $rId = $xmlReader->getAttribute('r:id', $runParent);

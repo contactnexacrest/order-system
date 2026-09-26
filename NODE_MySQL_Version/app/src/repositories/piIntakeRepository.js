@@ -17,10 +17,11 @@ const TOKEN_TTL_DAYS = 30;
 async function createLink(orderId, createdBy) {
   const rawToken = crypto.randomBytes(32).toString('hex');
   await db.execute(
-    'INSERT INTO pi_intake_submissions (order_id, access_token_hash, access_token_expires_at, created_by) VALUES (:order_id, :hash, :expires, :created_by)',
+    'INSERT INTO pi_intake_submissions (order_id, access_token_hash, access_token_plain, access_token_expires_at, created_by) VALUES (:order_id, :hash, :plain, :expires, :created_by)',
     {
       order_id: orderId,
       hash: crypto.createHash('sha256').update(rawToken).digest('hex'),
+      plain: rawToken,
       expires: new Date(Date.now() + TOKEN_TTL_DAYS * 86400000).toISOString().slice(0, 19).replace('T', ' '),
       created_by: createdBy,
     }

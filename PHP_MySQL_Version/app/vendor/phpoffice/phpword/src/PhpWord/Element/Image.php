@@ -24,7 +24,6 @@ use PhpOffice\PhpWord\Exception\UnsupportedImageTypeException;
 use PhpOffice\PhpWord\Settings;
 use PhpOffice\PhpWord\Shared\ZipArchive;
 use PhpOffice\PhpWord\Style\Image as ImageStyle;
-use RuntimeException;
 
 /**
  * Image element.
@@ -70,16 +69,9 @@ class Image extends AbstractElement
     /**
      * Name of image.
      *
-     * @var null|string
+     * @var string
      */
     private $name;
-
-    /**
-     * Image alt text.
-     *
-     * @var null|string
-     */
-    private $altText;
 
     /**
      * Image type.
@@ -153,16 +145,14 @@ class Image extends AbstractElement
      * @param string $source
      * @param mixed $style
      * @param bool $watermark
-     * @param null|string $name
-     * @param null|string $altText
+     * @param string $name
      */
-    public function __construct($source, $style = null, $watermark = false, $name = null, $altText = null)
+    public function __construct($source, $style = null, $watermark = false, $name = null)
     {
         $this->source = $source;
         $this->style = $this->setNewStyle(new ImageStyle(), $style, true);
         $this->setIsWatermark($watermark);
         $this->setName($name);
-        $this->setAltText($altText);
 
         $this->checkImage();
     }
@@ -200,27 +190,11 @@ class Image extends AbstractElement
     /**
      * Sets the image name.
      *
-     * @param null|string $value
+     * @param string $value
      */
     public function setName($value): void
     {
         $this->name = $value;
-    }
-
-    /**
-     * Get image alt text.
-     */
-    public function getAltText(): ?string
-    {
-        return $this->altText;
-    }
-
-    /**
-     * Sets the image alt text.
-     */
-    public function setAltText(?string $value): void
-    {
-        $this->altText = $value;
     }
 
     /**
@@ -399,9 +373,6 @@ class Image extends AbstractElement
 
         // Read image binary data and convert to hex/base64 string
         if ($this->sourceType == self::SOURCE_GD) {
-            if (!extension_loaded('gd')) {
-                throw new RuntimeException('The GD extension is required to process GD images.');
-            }
             $imageResource = call_user_func($this->imageCreateFunc, $actualSource);
             if ($this->imageType === 'image/png') {
                 // PNG images need to preserve alpha channel information

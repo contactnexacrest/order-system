@@ -26,6 +26,7 @@ use App\Controllers\HolidayController;
 use App\Controllers\HsCodeController;
 use App\Controllers\WatermarkController;
 use App\Controllers\ReferenceDocController;
+use App\Controllers\SopController;
 use App\Controllers\NotificationController;
 use App\Controllers\AccountController;
 use App\Controllers\EmailTemplateController;
@@ -79,6 +80,7 @@ $holidays = new HolidayController();
 $hsCodes = new HsCodeController();
 $watermarks = new WatermarkController();
 $referenceDocs = new ReferenceDocController();
+$sop = new SopController();
 $auditLog = new AuditLogController();
 $notifications = new NotificationController();
 $reports = new ReportController();
@@ -169,6 +171,11 @@ $router->get('/reference-docs/custom/{id}/download', [$referenceDocs, 'customDow
 $router->get('/reference-docs/{code}', [$referenceDocs, 'show'], [SessionAuth::required()]);
 $router->get('/reference-docs/{code}/edit', [$referenceDocs, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/reference-docs/{code}', [$referenceDocs, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+
+// SOP viewer — reads docs/SOP/*.md live off disk, any logged-in staff member can view.
+$router->get('/sop', [$sop, 'index'], [SessionAuth::required()]);
+$router->get('/sop-assets/{file}', [$sop, 'asset'], [SessionAuth::required()]);
+$router->get('/sop/{chapter}', [$sop, 'show'], [SessionAuth::required()]);
 
 // NOTE: deliberately NOT "/assets" — that path collides with the static
 // public_html/assets/ folder (css/js/img). On Apache, .htaccess's -d check

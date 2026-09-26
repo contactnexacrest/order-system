@@ -1790,6 +1790,13 @@ CREATE TABLE pi_intake_submissions (
   id                              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id                        BIGINT UNSIGNED NOT NULL,
   access_token_hash               VARCHAR(64) NOT NULL,
+  -- Kept in plaintext too (added 2026-09-26), specifically so staff can
+  -- re-display/copy the live link from the order page at any time without
+  -- regenerating it (which would invalidate a copy the client may already
+  -- have). access_token_hash remains what the public /pi-details/{token}
+  -- route actually validates against; this column is for staff-facing
+  -- display only.
+  access_token_plain              VARCHAR(64) NOT NULL,
   access_token_expires_at         DATETIME NOT NULL,
   company_legal_name              VARCHAR(255) NULL,
   billing_address                 TEXT NULL,

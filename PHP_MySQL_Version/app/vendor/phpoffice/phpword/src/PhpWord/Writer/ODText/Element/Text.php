@@ -53,7 +53,6 @@ class Text extends AbstractElement
         if (!$this->withoutP) {
             $xmlWriter->startElement('text:p'); // text:p
         }
-        $this->writeCommentRangeStart();
         if ($element->getTrackChange() != null && $element->getTrackChange()->getChangeType() == TrackChange::DELETED) {
             $xmlWriter->startElement('text:change');
             $xmlWriter->writeAttribute('text:change-id', $element->getTrackChange()->getElementId());
@@ -85,7 +84,6 @@ class Text extends AbstractElement
                 $xmlWriter->endElement();
             }
         }
-        $this->writeCommentRangeEnd();
         if (!$this->withoutP) {
             $xmlWriter->endElement(); // text:p
         }

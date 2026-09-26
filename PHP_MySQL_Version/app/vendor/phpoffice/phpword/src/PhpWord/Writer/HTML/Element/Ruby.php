@@ -100,6 +100,10 @@ class Ruby extends AbstractElement
     private function getParagraphStyleForTextRun(TextRun $textRun, string $extraCSS): string
     {
         $style = '';
+        if (!method_exists($textRun, 'getParagraphStyle')) {
+            return $style;
+        }
+
         $paragraphStyle = $textRun->getParagraphStyle();
         $pStyleIsObject = ($paragraphStyle instanceof Paragraph);
         if ($pStyleIsObject) {

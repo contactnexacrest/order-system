@@ -521,6 +521,17 @@
           &nbsp;&middot;&nbsp; Applied by {{ piIntake.reviewed_by_name or '—' }} on {{ piIntake.reviewed_at }}
         {% endif %}
       </p>
+      {% if piFormFullLink %}
+        <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
+          <span>Current link (valid until {{ piIntake.access_token_expires_at | humanDate }}) — copy and send however you like, no need to regenerate:</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" readonly value="{{ piFormFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ piFormFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+          </div>
+        </div>
+      {% elif piIntake.status == 'awaiting_client' %}
+        <p class="muted small">This link has expired — use Regenerate below to issue a fresh one.</p>
+      {% endif %}
       {% if piIntake.status == 'applied' %}
         <div class="kv-grid">
           <div><span class="k">Confirmed Incoterm</span><span class="v">{{ piIntake.incoterm_confirmed or '—' }}</span></div>

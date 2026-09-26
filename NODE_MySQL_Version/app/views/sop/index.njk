@@ -1,0 +1,20 @@
+<div class="card page-wide">
+  <div class="sop-layout">
+    <nav class="sop-nav">
+      <p class="muted small" style="margin-top:0;">Chapters</p>
+      <ul class="sop-chapter-list">
+        {% for ch in chapters %}
+          <li><a href="/sop/{{ ch.slug }}">{{ ch.title }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+    <div class="sop-content">
+      {% if contentHtml %}
+        {{ contentHtml | safe }}
+      {% else %}
+        <h1>Standard Operating Procedure</h1>
+        <p class="muted">No README.md found in docs/SOP.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>

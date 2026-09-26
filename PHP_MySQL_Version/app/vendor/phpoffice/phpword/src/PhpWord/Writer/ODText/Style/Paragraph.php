@@ -76,7 +76,9 @@ class Paragraph extends AbstractStyle
                 $psm = 'Heading_' . substr($styleName, 2);
                 $stylep = Style::getStyle($psm);
                 if ($stylep instanceof Style\Font) {
-                    $stylep = $stylep->getParagraph();
+                    if (method_exists($stylep, 'getParagraph')) {
+                        $stylep = $stylep->getParagraph();
+                    }
                 }
                 if ($stylep instanceof Style\Paragraph) {
                     if ($stylep->hasPageBreakBefore()) {

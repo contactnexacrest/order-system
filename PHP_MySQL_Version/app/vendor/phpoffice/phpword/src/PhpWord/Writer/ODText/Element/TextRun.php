@@ -40,12 +40,10 @@ class TextRun extends Text
             $pStyle = 'Normal';
         }
         $xmlWriter->writeAttribute('text:style-name', $pStyle);
-        $this->writeCommentRangeStart();
 
         $containerWriter = new Container($xmlWriter, $element);
         $containerWriter->write();
 
-        $this->writeCommentRangeEnd();
         $xmlWriter->endElement();
     }
 }

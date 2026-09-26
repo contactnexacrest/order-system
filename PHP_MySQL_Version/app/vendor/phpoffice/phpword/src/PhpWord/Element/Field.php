@@ -108,7 +108,7 @@ class Field extends AbstractElement
     /**
      * Field text.
      *
-     * @var null|string|TextRun
+     * @var string|TextRun
      */
     protected $text;
 
@@ -217,18 +217,22 @@ class Field extends AbstractElement
     /**
      * Set Field properties.
      *
+     * @param array $properties
+     *
      * @return self
      */
-    public function setProperties(array $properties = [])
+    public function setProperties($properties = [])
     {
-        foreach (array_keys($properties) as $propkey) {
-            if (!(isset($this->fieldsArray[$this->type]['properties'][$propkey]))) {
-                throw new InvalidArgumentException("Invalid property '$propkey'");
+        if (is_array($properties)) {
+            foreach (array_keys($properties) as $propkey) {
+                if (!(isset($this->fieldsArray[$this->type]['properties'][$propkey]))) {
+                    throw new InvalidArgumentException("Invalid property '$propkey'");
+                }
             }
+            $this->properties = array_merge($this->properties, $properties);
         }
-        $this->properties = array_merge($this->properties, $properties);
 
-        return $this;
+        return $this->properties;
     }
 
     /**
@@ -244,18 +248,22 @@ class Field extends AbstractElement
     /**
      * Set Field options.
      *
+     * @param array $options
+     *
      * @return self
      */
-    public function setOptions(array $options = [])
+    public function setOptions($options = [])
     {
-        foreach (array_keys($options) as $optionkey) {
-            if (!(isset($this->fieldsArray[$this->type]['options'][$optionkey])) && substr($optionkey, 0, 1) !== '\\') {
-                throw new InvalidArgumentException("Invalid option '$optionkey', possible values are " . implode(', ', $this->fieldsArray[$this->type]['options']));
+        if (is_array($options)) {
+            foreach (array_keys($options) as $optionkey) {
+                if (!(isset($this->fieldsArray[$this->type]['options'][$optionkey])) && substr($optionkey, 0, 1) !== '\\') {
+                    throw new InvalidArgumentException("Invalid option '$optionkey', possible values are " . implode(', ', $this->fieldsArray[$this->type]['options']));
+                }
             }
+            $this->options = array_merge($this->options, $options);
         }
-        $this->options = array_merge($this->options, $options);
 
-        return $this;
+        return $this->options;
     }
 
     /**
@@ -271,13 +279,13 @@ class Field extends AbstractElement
     /**
      * Set Field text.
      *
-     * @param null|mixed|string|TextRun $text
+     * @param null|string|TextRun $text
      *
      * @return null|string|TextRun
      */
     public function setText($text = null)
     {
-        if (null !== $text) {
+        if (isset($text)) {
             if (is_string($text) || $text instanceof TextRun) {
                 $this->text = $text;
             } else {

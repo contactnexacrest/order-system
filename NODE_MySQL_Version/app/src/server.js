@@ -39,6 +39,7 @@ const dashboardController = require('./controllers/dashboardController');
 const settingsController = require('./controllers/settingsController');
 const holidayController = require('./controllers/holidayController');
 const referenceDocController = require('./controllers/referenceDocController');
+const sopController = require('./controllers/sopController');
 const assetController = require('./controllers/assetController');
 const clientsController = require('./controllers/clientsController');
 const clientIntakeController = require('./controllers/clientIntakeController');
@@ -317,6 +318,11 @@ app.get('/reference-docs/custom/:id/download', requireAuth, asyncHandler(referen
 app.get('/reference-docs/:code', requireAuth, asyncHandler(referenceDocController.show));
 app.get('/reference-docs/:code/edit', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.edit));
 app.post('/reference-docs/:code', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.update));
+
+// SOP viewer — reads docs/SOP/*.md live off disk, any logged-in staff member can view.
+app.get('/sop', requireAuth, asyncHandler(sopController.index));
+app.get('/sop-assets/:file', requireAuth, asyncHandler(sopController.asset));
+app.get('/sop/:chapter', requireAuth, asyncHandler(sopController.show));
 
 // NOTE: deliberately "/company-assets", not "/assets" — that path collides
 // with the static public/ folder (css/js/img), same reasoning as the PHP original.

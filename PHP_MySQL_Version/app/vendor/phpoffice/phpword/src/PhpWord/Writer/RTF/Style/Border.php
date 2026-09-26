@@ -85,7 +85,7 @@ class Border extends AbstractStyle
         if ($rtfWriter !== null) {
             $colorTable = $rtfWriter->getColorTable();
             $index = array_search($color, $colorTable);
-            if ($index !== false) {
+            if ($index !== false && $colorIndex !== null) {
                 $colorIndex = $index + 1;
             }
         }

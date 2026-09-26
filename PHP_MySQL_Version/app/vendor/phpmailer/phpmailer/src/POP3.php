@@ -45,9 +45,8 @@ class POP3
      * The POP3 PHPMailer Version number.
      *
      * @var string
-     * @deprecated This constant will be removed in PHPMailer 8.0. Use `PHPMailer::VERSION` instead.
      */
-    const VERSION = '7.1.1';
+    const VERSION = '6.12.0';
 
     /**
      * Default POP3 port number.
@@ -212,9 +211,9 @@ class POP3
         } else {
             $this->tval = (int) $timeout;
         }
-        $this->do_debug = (int) $debug_level;
-        $this->username = self::stripControls($username);
-        $this->password = self::stripControls($password);
+        $this->do_debug = $debug_level;
+        $this->username = $username;
+        $this->password = $password;
         //Reset the error log
         $this->errors = [];
         //Connect
@@ -319,8 +318,7 @@ class POP3
         if (empty($password)) {
             $password = $this->password;
         }
-        $username = self::stripControls($username);
-        $password = self::stripControls($password);
+
         //Send the Username
         $this->sendString("USER $username" . static::LE);
         $pop3_response = $this->getResponse();
@@ -408,7 +406,7 @@ class POP3
 
     /**
      * Checks the POP3 server response.
-     * Looks for +OK or -ERR.
+     * Looks for for +OK or -ERR.
      *
      * @param string $string
      *
@@ -467,17 +465,5 @@ class POP3
             'Connecting to the POP3 server raised a PHP warning:' .
             "errno: $errno errstr: $errstr; errfile: $errfile; errline: $errline"
         );
-    }
-
-    /**
-     * Strip all control chars from a string.
-     *
-     * @param $string
-     *
-     * @return string
-     */
-    protected static function stripControls($string)
-    {
-        return preg_replace('/[\x00-\x1F\x7F]/u', '', $string);
     }
 }

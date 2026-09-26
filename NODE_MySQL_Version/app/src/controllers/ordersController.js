@@ -334,6 +334,15 @@ async function show(req, res) {
   }
 
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  const piIntake = await piIntakeRepository.latestForOrder(orderId);
+  let piFormFullLink = null;
+  if (
+    piIntake
+    && ['awaiting_client', 'rejected'].includes(piIntake.status)
+    && new Date(piIntake.access_token_expires_at).getTime() > Date.now()
+  ) {
+    piFormFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/pi-details/${piIntake.access_token_plain}`;
+  }
 
   res.renderView(
     'orders/show',
@@ -363,7 +372,8 @@ async function show(req, res) {
       supplierTypes: await lookupRepository.dropdownOptions('supplier_type'),
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
-      piIntake: await piIntakeRepository.latestForOrder(orderId),
+      piIntake,
+      piFormFullLink,
       clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
       ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
       comments: await orderCommentRepository.forOrder(orderId),

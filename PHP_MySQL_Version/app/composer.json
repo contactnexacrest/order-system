@@ -5,8 +5,9 @@
   "require": {
     "php": ">=8.1",
     "dompdf/dompdf": "^3.0",
-    "phpoffice/phpword": "^1.2",
+    "league/commonmark": "^2.4",
     "phpmailer/phpmailer": "^6.9",
+    "phpoffice/phpword": "^1.2",
     "twig/twig": "^3.8"
   },
   "autoload": {

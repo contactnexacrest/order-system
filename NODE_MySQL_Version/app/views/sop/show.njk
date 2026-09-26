@@ -1,0 +1,15 @@
+<div class="card page-wide">
+  <div class="sop-layout">
+    <nav class="sop-nav">
+      <p class="muted small" style="margin-top:0;"><a href="/sop">&larr; SOP Home</a></p>
+      <ul class="sop-chapter-list">
+        {% for ch in chapters %}
+          <li><a href="/sop/{{ ch.slug }}" class="{{ 'active' if ch.slug == currentSlug else '' }}">{{ ch.title }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+    <div class="sop-content">
+      {{ contentHtml | safe }}
+    </div>
+  </div>
+</div>

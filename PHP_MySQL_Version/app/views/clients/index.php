@@ -1,9 +1,11 @@
 <?php
+use App\Config\Env;
 use App\Helpers\Mask;
 use App\Services\AuthService;
 use App\Services\PermissionService;
 $__u = AuthService::currentUser();
 $canViewFullEmail = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_client_email_full');
+$quotationFormLink = rtrim(Env::get('APP_URL', ''), '/') . '/quotation-details';
 ?>
 <div class="card page-wide">
   <div class="page-header-row">
@@ -14,6 +16,14 @@ $canViewFullEmail = $__u && PermissionService::can((int) $__u['id'], $__u['role_
     <div class="btn-row" style="margin-top:0;">
       <a class="btn btn-accent" href="/clients/create">+ New Client</a>
       <a class="btn-sm btn-secondary" href="/clients/inactive">Deactivated Clients</a>
+    </div>
+  </div>
+
+  <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
+    <span>Public Quotation Form — send this to a new lead so they can submit their own details (lands in Quotation Intake Review):</span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="text" readonly value="<?= htmlspecialchars($quotationFormLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+      <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($quotationFormLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
     </div>
   </div>
 

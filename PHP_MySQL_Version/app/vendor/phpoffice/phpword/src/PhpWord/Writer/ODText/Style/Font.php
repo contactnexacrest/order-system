@@ -36,7 +36,7 @@ class Font extends AbstractStyle
         }
         $xmlWriter = $this->getXmlWriter();
 
-        $stylep = $style->getParagraph();
+        $stylep = (method_exists($style, 'getParagraph')) ? $style->getParagraph() : null;
         if ($stylep instanceof \PhpOffice\PhpWord\Style\Paragraph) {
             $temp1 = clone $stylep;
             $temp1->setStyleName($style->getStyleName());

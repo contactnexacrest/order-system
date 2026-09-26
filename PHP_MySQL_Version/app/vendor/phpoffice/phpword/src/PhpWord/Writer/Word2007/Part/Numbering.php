@@ -69,8 +69,10 @@ class Numbering extends AbstractPart
                 $xmlWriter->writeAttribute('w:val', $style->getType());
                 $xmlWriter->endElement(); // w:multiLevelType
 
-                foreach ($levels as $level) {
-                    $this->writeLevel($xmlWriter, $level);
+                if (is_array($levels)) {
+                    foreach ($levels as $level) {
+                        $this->writeLevel($xmlWriter, $level);
+                    }
                 }
                 $xmlWriter->endElement(); // w:abstractNum
             }

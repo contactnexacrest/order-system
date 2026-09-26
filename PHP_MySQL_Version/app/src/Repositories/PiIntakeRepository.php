@@ -24,12 +24,13 @@ final class PiIntakeRepository
         $rawToken = bin2hex(random_bytes(32));
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
-            'INSERT INTO pi_intake_submissions (order_id, access_token_hash, access_token_expires_at, created_by)
-             VALUES (:order_id, :hash, :expires, :created_by)'
+            'INSERT INTO pi_intake_submissions (order_id, access_token_hash, access_token_plain, access_token_expires_at, created_by)
+             VALUES (:order_id, :hash, :plain, :expires, :created_by)'
         );
         $stmt->execute([
             'order_id'    => $orderId,
             'hash'        => hash('sha256', $rawToken),
+            'plain'       => $rawToken,
             'expires'     => date('Y-m-d H:i:s', time() + (self::TOKEN_TTL_DAYS * 86400)),
             'created_by'  => $createdBy,
         ]);

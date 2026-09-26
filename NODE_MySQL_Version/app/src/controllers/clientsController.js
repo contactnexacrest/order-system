@@ -9,12 +9,14 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const testModeService = require('../services/testModeService');
 const superAdminService = require('../services/superAdminService');
+const env = require('../config/env');
 
 // Port of App\Controllers\ClientController.
 
 async function index(req, res) {
   const clients = await clientRepository.all();
-  res.renderView('clients/index', { clients }, 'layout/base');
+  const quotationFormLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/quotation-details`;
+  res.renderView('clients/index', { clients, quotationFormLink }, 'layout/base');
 }
 
 async function inactiveIndex(req, res) {

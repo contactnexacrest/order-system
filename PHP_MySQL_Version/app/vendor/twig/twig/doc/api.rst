@@ -1,0 +1,657 @@
+Twig for Developers
+===================
+
+This chapter describes the API to Twig and not the template language. It will
+be most useful as reference to those implementing the template interface to
+the application and not those who are creating Twig templates.
+
+Basics
+------
+
+Twig uses a central object called the **environment** (of class
+``\Twig\Environment``). Instances of this class are used to store the
+configuration and extensions, and are used to load templates.
+
+Most applications create one ``\Twig\Environment`` object on application
+initialization and use that to load templates. In some cases, it might be useful
+to have multiple environments side by side, with different configurations.
+
+The typical way to configure Twig to load templates for an application looks
+roughly like this::
+
+    require_once '/path/to/vendor/autoload.php';
+
+    $loader = new \Twig\Loader\FilesystemLoader('/path/to/templates');
+    $twig = new \Twig\Environment($loader, [
+        'cache' => '/path/to/compilation_cache',
+    ]);
+
+This creates a template environment with a default configuration and a loader
+that looks up templates in the ``/path/to/templates/`` directory. Different
+loaders are available and you can also write your own if you want to load
+templates from a database or other resources.
+
+.. note::
+
+    Notice that the second argument of the environment is an array of options.
+    The ``cache`` option is a compilation cache directory, where Twig caches
+    the compiled templates to avoid the parsing phase for subsequent
+    requests. It is very different from the cache you might want to add for
+    the evaluated templates. For such a need, you can use any available PHP
+    cache library.
+
+Loading Templates
+-----------------
+
+To load a template, call the ``load()`` method on a Twig environment which
+returns a ``\Twig\TemplateWrapper`` instance::
+
+    $template = $twig->load('index.html.twig');
+
+.. versionadded:: 3.30
+
+    The ``TemplateWrapper::getDefaultEscapeStrategy()`` method was introduced in
+    Twig 3.30.
+
+The wrapper tells which escaping strategy the body of the template was compiled
+with (``false`` when the template is not autoescaped)::
+
+    $strategy = $template->getDefaultEscapeStrategy();
+
+.. caution::
+
+    This describes the template's own source, not its output: ``autoescape``,
+    ``escape``, and anything rendered by a parent, embedded, or included
+    template can use another strategy.
+
+Rendering Templates
+-------------------
+
+To render a template with some variables, call the ``render()`` method::
+
+    echo $template->render(['the' => 'variables', 'go' => 'here']);
+
+.. note::
+
+    The ``display()`` method is a shortcut to output the rendered template.
+
+You can also load and render the template directly via the Environment::
+
+    echo $twig->render('index.html.twig', ['the' => 'variables', 'go' => 'here']);
+
+If a template defines blocks, they can be rendered individually via the
+``renderBlock()`` call::
+
+    echo $template->renderBlock('block_name', ['the' => 'variables', 'go' => 'here']);
+
+.. caution::
+
+    Rendering a block on its own does not run the template body, so macros
+    imported at the top level of the template are missing and the block fails
+    when it calls one. Move the ``import`` or ``from`` tag inside the block.
+    Rendering the whole template first also makes them available, but they then
+    keep the value they resolved to during that render.
+
+Composing Blocks
+----------------
+
+.. versionadded:: 3.29
+
+    The ``BlockChain`` class was introduced in Twig 3.29.
+
+Use ``BlockChain`` when a form, CMS field, data-grid or similar renderer needs
+to select blocks from several templates at runtime. Pass templates from the
+highest to the lowest precedence::
+
+    use Twig\BlockChain;
+
+    $blocks = new BlockChain($twig, [
+        'admin_theme.html.twig',
+        $twig->load('application_theme.html.twig'),
+        'base_theme.html.twig',
+    ]);
+
+    echo $blocks->renderBlock('field_row', ['field' => $field]);
+
+Twig considers each template's blocks, blocks imported with ``use`` and parents
+before moving to the next template. The first definition of each block wins.
+``parent()`` follows the local inheritance or ``use`` hierarchy of the block,
+while nested ``block()`` calls use the composed block set unless they name
+another template.
+
+``BlockChain`` composes blocks, not template bodies or macros. Because chained
+templates share the composed block set, only combine templates that are trusted
+to call one another's blocks. Chained blocks have the same top-level macro
+import limitation as blocks rendered directly.
+
+Every method takes the render context, and the whole chain is resolved against
+it, so a template using a dynamic ``{% extends %}`` behaves exactly as it would
+when rendered directly. The optional third constructor argument provides
+default variables for that resolution, which the render context can override::
+
+    $blocks = new BlockChain($twig, ['application_theme.html.twig'], [
+        'layout' => 'wide_layout.html.twig',
+    ]);
+
+    // resolved against wide_layout.html.twig
+    $blocks->getBlockNames();
+
+    // resolved against narrow_layout.html.twig
+    $blocks->getBlockNames(['layout' => 'narrow_layout.html.twig']);
+
+Pass the same context to ``hasBlock()``, ``getBlockNames()`` and
+``renderBlock()`` to keep them consistent.
+
+A chain also accepts other chains::
+
+    $base = new BlockChain($twig, ['base_theme.html.twig']);
+    $application = new BlockChain($twig, ['application_theme.html.twig', $base]);
+    $admin = new BlockChain($twig, ['admin_theme.html.twig', $application]);
+
+A chained chain keeps its position in the precedence order: templates listed
+before it win, and it wins over templates listed after it. It contributes the
+blocks it composes itself, resolved with its own default variables. Chaining a
+chain never modifies it, so the same chain can be reused in as many others as
+needed.
+
+Streaming Templates
+-------------------
+
+.. versionadded:: 3.18
+
+To stream a template, call the ``stream()`` method::
+
+    $template->stream(['the' => 'variables', 'go' => 'here']);
+
+To stream a specific template block, call the ``streamBlock()`` method::
+
+    $template->streamBlock('block_name', ['the' => 'variables', 'go' => 'here']);
+
+.. note::
+
+    The ``stream()`` and ``streamBlock()`` methods return an iterable.
+
+.. _environment_options:
+
+Environment Options
+-------------------
+
+When creating a new ``\Twig\Environment`` instance, you can pass an array of
+options as the constructor second argument::
+
+    $twig = new \Twig\Environment($loader, ['debug' => true]);
+
+The following options are available:
+
+* ``debug`` *boolean*
+
+  When set to ``true``, the generated templates have a
+  ``__toString()`` method that you can use to display the generated nodes
+  (default to ``false``).
+
+* ``charset`` *string* (defaults to ``utf-8``)
+
+  The charset used by the templates.
+
+* ``cache`` *string* or ``false``
+
+  An absolute path where to store the compiled templates, or
+  ``false`` to disable caching (which is the default).
+
+* ``auto_reload`` *boolean*
+
+  When developing with Twig, it's useful to recompile the
+  template whenever the source code changes. If you don't provide a value for
+  the ``auto_reload`` option, it will be determined automatically based on the
+  ``debug`` value.
+
+.. _environment_options_strict_variables:
+
+* ``strict_variables`` *boolean*
+
+  If set to ``false``, Twig will silently ignore invalid
+  variables (variables and or attributes/methods that do not exist) and
+  replace them with a ``null`` value. When set to ``true``, Twig throws an
+  exception instead (default to ``false``).
+
+* ``autoescape`` *string*
+
+  Sets the default auto-escaping strategy (``name``, ``html``, ``js``, ``css``, ``url``,
+  ``html_attr``, ``html_attr_relaxed``, or a PHP callback that takes the template "filename"
+  and returns the escaping strategy to use -- the callback cannot be a function
+  name to avoid collision with built-in escaping strategies); set it to
+  ``false`` to disable auto-escaping. The ``name`` escaping strategy determines
+  the escaping strategy to use for a template based on the template filename
+  extension (this strategy does not incur any overhead at runtime as
+  auto-escaping is done at compilation time.)
+
+* ``optimizations`` *integer*
+
+  A flag that indicates which optimizations to apply
+  (default to ``-1`` -- all optimizations are enabled; set it to ``0`` to
+  disable).
+
+* ``use_yield`` *boolean*
+
+  ``true``: forces templates to exclusively use ``yield`` instead of ``echo``
+  (all extensions must be yield ready)
+
+  ``false`` (default): allows templates to use a mix of ``yield`` and ``echo``
+  calls to allow for a progressive migration.
+  
+  Switch to ``true`` when possible as this will be the only supported mode in
+  Twig 4.0.
+
+Loaders
+-------
+
+Loaders are responsible for loading templates from a resource such as the file
+system.
+
+Compilation Cache
+~~~~~~~~~~~~~~~~~
+
+All template loaders can cache the compiled templates on the filesystem for
+future reuse. It speeds up Twig a lot as templates are only compiled once.
+
+Built-in Loaders
+~~~~~~~~~~~~~~~~
+
+Here is a list of the built-in loaders:
+
+``\Twig\Loader\FilesystemLoader``
+.................................
+
+``\Twig\Loader\FilesystemLoader`` loads templates from the file system. This loader
+can find templates in folders on the file system and is the preferred way to
+load them::
+
+    $loader = new \Twig\Loader\FilesystemLoader($templateDir);
+
+It can also look for templates in an array of directories::
+
+    $loader = new \Twig\Loader\FilesystemLoader([$templateDir1, $templateDir2]);
+
+With such a configuration, Twig will first look for templates in
+``$templateDir1`` and if they do not exist, it will fallback to look for them
+in the ``$templateDir2``.
+
+You can add or prepend paths via the ``addPath()`` and ``prependPath()``
+methods::
+
+    $loader->addPath($templateDir3);
+    $loader->prependPath($templateDir4);
+
+The filesystem loader also supports namespaced templates. This allows you to group
+your templates under different namespaces which have their own template paths.
+
+When using the ``setPaths()``, ``addPath()``, and ``prependPath()`` methods,
+specify the namespace as the second argument (when not specified, these
+methods act on the "main" namespace)::
+
+    $loader->addPath($templateDir, 'admin');
+
+Namespaced templates can be accessed via the special
+``@namespace_name/template_path`` notation::
+
+    $twig->render('@admin/index.html.twig', []);
+
+``\Twig\Loader\FilesystemLoader`` supports absolute and relative paths. Using relative
+paths is preferred as it makes the cache keys independent of the project root
+directory (for instance, it allows warming the cache from a build server where
+the directory might be different from the one used on production servers)::
+
+    $loader = new \Twig\Loader\FilesystemLoader('templates', getcwd().'/..');
+
+.. note::
+
+    When not passing the root path as a second argument, Twig uses ``getcwd()``
+    for relative paths.
+
+``\Twig\Loader\ArrayLoader``
+............................
+
+``\Twig\Loader\ArrayLoader`` loads a template from a PHP array. It is passed an
+array of strings bound to template names::
+
+    $loader = new \Twig\Loader\ArrayLoader([
+        'index.html.twig' => 'Hello {{ name }}!',
+    ]);
+    $twig = new \Twig\Environment($loader);
+
+    echo $twig->render('index.html.twig', ['name' => 'Fabien']);
+
+This loader is very useful for unit testing. It can also be used for small
+projects where storing all templates in a single PHP file might make sense.
+
+.. tip::
+
+    When using the ``Array`` loader with a cache mechanism, you should know that
+    a new cache key is generated each time a template content "changes" (the
+    cache key being the source code of the template). If you don't want to see
+    your cache grows out of control, you need to take care of clearing the old
+    cache file by yourself.
+
+``\Twig\Loader\ChainLoader``
+............................
+
+``\Twig\Loader\ChainLoader`` delegates the loading of templates to other loaders::
+
+    $loader1 = new \Twig\Loader\ArrayLoader([
+        'base.html.twig' => '{% block content %}{% endblock %}',
+    ]);
+    $loader2 = new \Twig\Loader\ArrayLoader([
+        'index.html.twig' => '{% extends "base.html.twig" %}{% block content %}Hello {{ name }}{% endblock %}',
+        'base.html.twig'  => 'Will never be loaded',
+    ]);
+
+    $loader = new \Twig\Loader\ChainLoader([$loader1, $loader2]);
+
+    $twig = new \Twig\Environment($loader);
+
+When looking for a template, Twig tries each loader in turn and returns as soon
+as the template is found. When rendering the ``index.html.twig`` template from the
+above example, Twig will load it with ``$loader2`` but the ``base.html.twig``
+template will be loaded from ``$loader1``.
+
+.. note::
+
+    You can also add loaders via the ``addLoader()`` method.
+
+Create your own Loader
+~~~~~~~~~~~~~~~~~~~~~~
+
+All loaders implement the ``\Twig\Loader\LoaderInterface``::
+
+    interface \Twig\Loader\LoaderInterface
+    {
+        /**
+         * Returns the source context for a given template logical name.
+         *
+         * @param string $name The template logical name
+         *
+         * @return \Twig\Source
+         *
+         * @throws \Twig\Error\LoaderError When $name is not found
+         */
+        public function getSourceContext($name);
+
+        /**
+         * Gets the cache key to use for the cache for a given template name.
+         *
+         * @param string $name The name of the template to load
+         *
+         * @return string The cache key
+         *
+         * @throws \Twig\Error\LoaderError When $name is not found
+         */
+        public function getCacheKey($name);
+
+        /**
+         * Returns true if the template is still fresh.
+         *
+         * @param string    $name The template name
+         * @param timestamp $time The last modification time of the cached template
+         *
+         * @return bool    true if the template is fresh, false otherwise
+         *
+         * @throws \Twig\Error\LoaderError When $name is not found
+         */
+        public function isFresh($name, $time);
+
+        /**
+         * Check if we have the source code of a template, given its name.
+         *
+         * @param string $name The name of the template to check if we can load
+         *
+         * @return bool    If the template source code is handled by this loader or not
+         */
+        public function exists($name);
+    }
+
+The ``isFresh()`` method must return ``true`` if the current cached template
+is still fresh, given the last modification time, or ``false`` otherwise.
+
+The ``getSourceContext()`` method must return an instance of ``\Twig\Source``.
+
+Using Extensions
+----------------
+
+Twig extensions are packages that add new features to Twig. Register an
+extension via the ``addExtension()`` method::
+
+    $twig->addExtension(new \Twig\Extension\DebugExtension());
+
+Twig comes bundled with the following extensions:
+
+* ``\Twig\Extension\CoreExtension``: Defines all the core features of Twig.
+
+* ``\Twig\Extension\DebugExtension``: Defines the ``dump`` function to help debug
+  template variables.
+
+* ``\Twig\Extension\EscaperExtension``: Adds automatic output-escaping and the
+  possibility to escape/unescape blocks of code.
+
+* ``\Twig\Extension\SandboxExtension``: Adds a sandbox mode to the default Twig
+  environment, making it safe to evaluate untrusted code.
+
+* ``\Twig\Extension\ProfilerExtension``: Enables the built-in Twig profiler.
+
+* ``\Twig\Extension\OptimizerExtension``: Optimizes the node tree before
+  compilation.
+
+* ``\Twig\Extension\StringLoaderExtension``: Defines the ``template_from_string``
+   function to allow loading templates from string in a template.
+
+The Core, Escaper, and Optimizer extensions are registered by default.
+
+Built-in Extensions
+-------------------
+
+This section describes the features added by the built-in extensions.
+
+.. tip::
+
+    Read the chapter about :doc:`extending Twig <advanced>` to learn how to
+    create your own extensions.
+
+Core Extension
+~~~~~~~~~~~~~~
+
+The ``core`` extension defines all the core features of Twig:
+
+* :doc:`Tags <tags/index>`;
+* :doc:`Filters <filters/index>`;
+* :doc:`Functions <functions/index>`;
+* :doc:`Tests <tests/index>`.
+
+Escaper Extension
+~~~~~~~~~~~~~~~~~
+
+The ``escaper`` extension adds automatic output escaping to Twig. It defines a
+tag, ``autoescape``, and a filter, ``raw``.
+
+When creating the escaper extension, you can switch on or off the global
+output escaping strategy::
+
+    $escaper = new \Twig\Extension\EscaperExtension('html');
+    $twig->addExtension($escaper);
+
+If set to ``html``, all variables in templates are escaped (using the ``html``
+escaping strategy), except those using the ``raw`` filter:
+
+.. code-block:: twig
+
+    {{ article.to_html|raw }}
+
+You can also change the escaping mode locally by using the ``autoescape`` tag:
+
+.. code-block:: twig
+
+    {% autoescape 'html' %}
+        {{ var }}
+        {{ var|raw }}      {# var won't be escaped #}
+        {{ var|escape }}   {# var won't be double-escaped #}
+    {% endautoescape %}
+
+.. warning::
+
+    The ``autoescape`` tag has no effect on included files.
+
+The escaping rules are implemented as follows:
+
+* Literals (integers, booleans, arrays, ...) used in the template directly as
+  variables or filter arguments are never automatically escaped:
+
+  .. code-block:: html+twig
+
+        {{ "Twig<br/>" }} {# won't be escaped #}
+
+        {% set text = "Twig<br/>" %}
+        {{ text }} {# will be escaped #}
+
+* Expressions which the result is a literal or a variable marked safe
+  are never automatically escaped:
+
+  .. code-block:: html+twig
+
+        {{ any_value ? "Twig<br/>" : "<br/>Twig" }} {# won't be escaped #}
+
+        {% set text = "Twig<br/>" %}
+        {{ true ? text : "<br/>Twig" }} {# will be escaped #}
+        {{ false ? text : "<br/>Twig" }} {# won't be escaped #}
+
+        {% set text = "Twig<br/>" %}
+        {{ any_value ? text|raw : "<br/>Twig" }} {# won't be escaped #}
+
+* Objects with a ``__toString`` method are converted to strings and
+  escaped. You can mark some classes and/or interfaces as being safe for some
+  strategies via ``EscaperExtension::addSafeClass()``:
+
+  .. code-block:: twig
+
+        // mark objects of class "HtmlGenerator" as safe for the HTML strategy
+        $escaper->addSafeClass('HtmlGenerator', ['html']);
+
+        // mark objects of interface "HtmlGeneratorInterface" as safe for the HTML strategy
+        $escaper->addSafeClass('HtmlGeneratorInterface', ['html']);
+
+        // mark objects of class "HtmlGenerator" as safe for the HTML and JS strategies
+        $escaper->addSafeClass('HtmlGenerator', ['html', 'js']);
+
+        // mark objects of class "HtmlGenerator" as safe for all strategies
+        $escaper->addSafeClass('HtmlGenerator', ['all']);
+
+* Escaping is applied before printing, after any other filter is applied:
+
+  .. code-block:: twig
+
+        {{ var|upper }} {# is equivalent to {{ var|upper|escape }} #}
+
+* The ``raw`` filter should only be used at the end of the filter chain:
+
+  .. code-block:: twig
+
+        {{ var|raw|upper }} {# will be escaped #}
+
+        {{ var|upper|raw }} {# won't be escaped #}
+
+* Automatic escaping is not applied if the last filter in the chain is marked
+  safe for the current context (e.g. ``html`` or ``js``). ``escape`` and
+  ``escape('html')`` are marked safe for HTML, ``escape('js')`` is marked
+  safe for JavaScript, ``raw`` is marked safe for everything.
+
+  .. code-block:: twig
+
+        {% autoescape 'js' %}
+            {{ var|escape('html') }} {# will be escaped for HTML and JavaScript #}
+            {{ var }} {# will be escaped for JavaScript #}
+            {{ var|escape('js') }} {# won't be double-escaped #}
+        {% endautoescape %}
+
+.. note::
+
+    Note that autoescaping has some limitations as escaping is applied on
+    expressions after evaluation. For instance, when working with
+    concatenation, ``{{ value|raw ~ other }}`` won't give the expected result
+    as escaping is applied on the result of the concatenation, not on the
+    individual variables (so, the ``raw`` filter won't have any effect here).
+
+Sandbox Extension
+~~~~~~~~~~~~~~~~~
+
+The ``sandbox`` extension can be used to evaluate untrusted code. Read more
+about it in the :doc:`sandbox` chapter.
+
+Profiler Extension
+~~~~~~~~~~~~~~~~~~
+
+The ``profiler`` extension enables a profiler for Twig templates; it should
+only be used on your development machines as it adds some overhead::
+
+    $profile = new \Twig\Profiler\Profile();
+    $twig->addExtension(new \Twig\Extension\ProfilerExtension($profile));
+
+    $dumper = new \Twig\Profiler\Dumper\TextDumper();
+    echo $dumper->dump($profile);
+
+A profile contains information about time and memory consumption for template,
+block, and macro executions.
+
+You can also dump the data in a `Blackfire.io <https://blackfire.io/>`_
+compatible format::
+
+    $dumper = new \Twig\Profiler\Dumper\BlackfireDumper();
+    file_put_contents('/path/to/profile.prof', $dumper->dump($profile));
+
+Upload the profile to visualize it (create a `free account
+<https://blackfire.io/signup?utm_source=twig&utm_medium=doc&utm_campaign=profiler>`_
+first):
+
+.. code-block:: sh
+
+    blackfire --slot=7 upload /path/to/profile.prof
+
+Optimizer Extension
+~~~~~~~~~~~~~~~~~~~
+
+The ``optimizer`` extension optimizes the node tree before compilation::
+
+    $twig->addExtension(new \Twig\Extension\OptimizerExtension());
+
+By default, all optimizations are turned on. You can select the ones you want
+to enable by passing them to the constructor::
+
+    $optimizer = new \Twig\Extension\OptimizerExtension(\Twig\NodeVisitor\OptimizerNodeVisitor::OPTIMIZE_FOR);
+
+    $twig->addExtension($optimizer);
+
+Twig supports the following optimizations:
+
+* ``\Twig\NodeVisitor\OptimizerNodeVisitor::OPTIMIZE_ALL``, enables all optimizations
+  (this is the default value).
+
+* ``\Twig\NodeVisitor\OptimizerNodeVisitor::OPTIMIZE_NONE``, disables all optimizations.
+  This reduces the compilation time, but it can increase the execution time
+  and the consumed memory.
+
+* ``\Twig\NodeVisitor\OptimizerNodeVisitor::OPTIMIZE_FOR``, optimizes the ``for`` tag by
+  removing the ``loop`` variable creation whenever possible.
+
+Exceptions
+----------
+
+Twig can throw exceptions:
+
+* ``\Twig\Error\Error``: The base exception for all errors.
+
+* ``\Twig\Error\SyntaxError``: Thrown to tell the user that there is a problem with
+  the template syntax.
+
+* ``\Twig\Error\RuntimeError``: Thrown when an error occurs at runtime (when a filter
+  does not exist for instance).
+
+* ``\Twig\Error\LoaderError``: Thrown when an error occurs during template loading.
+
+* ``\Twig\Sandbox\SecurityError``: Thrown when an unallowed tag, filter, or
+  method is called in a sandboxed template.

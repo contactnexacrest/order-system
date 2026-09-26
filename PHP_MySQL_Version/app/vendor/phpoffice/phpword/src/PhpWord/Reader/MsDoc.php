@@ -1218,7 +1218,7 @@ class MsDoc extends AbstractReader implements ReaderInterface
                     $char = self::getInt2d($this->data1Table, $posMem);
                     $posMem += 2;
                     if ($char > 0) {
-                        $xszFfn .= chr($char & 0xFF);
+                        $xszFfn .= chr($char);
                     }
                 } while ($char != 0);
                 // xszAlt
@@ -1230,7 +1230,7 @@ class MsDoc extends AbstractReader implements ReaderInterface
                         if ($char == 0) {
                             break;
                         }
-                        $xszAlt .= chr($char & 0xFF);
+                        $xszAlt .= chr($char);
                     } while ($char != 0);
                 }
                 $this->arrayFonts[] = [

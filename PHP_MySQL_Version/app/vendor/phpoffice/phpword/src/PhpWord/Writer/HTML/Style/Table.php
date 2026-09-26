@@ -35,19 +35,19 @@ class Table extends AbstractStyle
         }
 
         $css = [];
-        if (method_exists($style, 'getLayout')) {
+        if (is_object($style) && method_exists($style, 'getLayout')) {
             if ($style->getLayout() == StyleTable::LAYOUT_FIXED) {
                 $css['table-layout'] = 'fixed';
             } elseif ($style->getLayout() == StyleTable::LAYOUT_AUTO) {
                 $css['table-layout'] = 'auto';
             }
         }
-        if (method_exists($style, 'isBidiVisual')) {
+        if (is_object($style) && method_exists($style, 'isBidiVisual')) {
             if ($style->isBidiVisual()) {
                 $css['direction'] = 'rtl';
             }
         }
-        if (method_exists($style, 'getVAlign')) {
+        if (is_object($style) && method_exists($style, 'getVAlign')) {
             $css['vertical-align'] = $style->getVAlign();
         }
 

@@ -1,4 +1,5 @@
 <?php
+use App\Config\Env;
 use App\Helpers\Csrf;
 use App\Helpers\Dates;
 use App\Services\AuthService;
@@ -548,6 +549,18 @@ $orderClosed = $order['status'] === 'complete';
           &nbsp;·&nbsp; Applied by <?= htmlspecialchars($piIntake['reviewed_by_name'] ?? '—') ?> on <?= htmlspecialchars((string) $piIntake['reviewed_at']) ?>
         <?php endif; ?>
       </p>
+      <?php if (in_array($piIntake['status'], ['awaiting_client', 'rejected'], true) && strtotime((string) $piIntake['access_token_expires_at']) > time()): ?>
+        <?php $piFormFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/pi-details/' . $piIntake['access_token_plain']; ?>
+        <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
+          <span>Current link (valid until <?= htmlspecialchars(Dates::human($piIntake['access_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" readonly value="<?= htmlspecialchars($piFormFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($piFormFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+          </div>
+        </div>
+      <?php elseif ($piIntake['status'] === 'awaiting_client'): ?>
+        <p class="muted small">This link has expired — use Regenerate below to issue a fresh one.</p>
+      <?php endif; ?>
       <?php if ($piIntake['status'] === 'applied'): ?>
         <div class="kv-grid">
           <div><span class="k">Confirmed Incoterm</span><span class="v"><?= htmlspecialchars($piIntake['incoterm_confirmed'] ?? '—') ?></span></div>

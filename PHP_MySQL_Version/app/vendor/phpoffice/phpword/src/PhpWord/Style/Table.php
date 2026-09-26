@@ -23,6 +23,7 @@ use PhpOffice\PhpWord\Settings;
 use PhpOffice\PhpWord\SimpleType\Jc;
 use PhpOffice\PhpWord\SimpleType\JcTable;
 use PhpOffice\PhpWord\SimpleType\TblWidth;
+use PhpOffice\PhpWord\Style;
 
 class Table extends Border
 {
@@ -135,7 +136,7 @@ class Table extends Border
     /**
      * @var null|float|int cell spacing value
      */
-    private $cellSpacing;
+    protected $cellSpacing;
 
     /**
      * @var string Table Layout
@@ -170,29 +171,21 @@ class Table extends Border
 
     /**
      * Create new table style.
+     *
+     * @param mixed $tableStyle
+     * @param mixed $firstRowStyle
      */
-    public function __construct(?array $tableStyle = null, ?array $firstRowStyle = null)
+    public function __construct($tableStyle = null, $firstRowStyle = null)
     {
         // Clone first row from table style, but with certain properties disabled
-        if ($firstRowStyle !== null) {
+        if ($firstRowStyle !== null && is_array($firstRowStyle)) {
             $this->firstRowStyle = clone $this;
             $this->firstRowStyle->isFirstRow = true;
-            unset(
-                $this->firstRowStyle->firstRowStyle,
-                $this->firstRowStyle->borderInsideHSize,
-                $this->firstRowStyle->borderInsideHColor,
-                $this->firstRowStyle->borderInsideVSize,
-                $this->firstRowStyle->borderInsideVColor,
-                $this->firstRowStyle->cellMarginTop,
-                $this->firstRowStyle->cellMarginLeft,
-                $this->firstRowStyle->cellMarginRight,
-                $this->firstRowStyle->cellMarginBottom,
-                $this->firstRowStyle->cellSpacing
-            );
+            unset($this->firstRowStyle->firstRowStyle, $this->firstRowStyle->borderInsideHSize, $this->firstRowStyle->borderInsideHColor, $this->firstRowStyle->borderInsideVSize, $this->firstRowStyle->borderInsideVColor, $this->firstRowStyle->cellMarginTop, $this->firstRowStyle->cellMarginLeft, $this->firstRowStyle->cellMarginRight, $this->firstRowStyle->cellMarginBottom, $this->firstRowStyle->cellSpacing);
             $this->firstRowStyle->setStyleByArray($firstRowStyle);
         }
 
-        if ($tableStyle !== null) {
+        if ($tableStyle !== null && is_array($tableStyle)) {
             $this->setStyleByArray($tableStyle);
         }
     }
@@ -200,11 +193,9 @@ class Table extends Border
     /**
      * @param null|float|int $cellSpacing
      */
-    public function setCellSpacing($cellSpacing = null): self
+    public function setCellSpacing($cellSpacing = null): void
     {
         $this->cellSpacing = $cellSpacing;
-
-        return $this;
     }
 
     /**
