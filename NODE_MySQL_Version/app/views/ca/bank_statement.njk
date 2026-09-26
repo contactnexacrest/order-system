@@ -30,22 +30,28 @@
           <td>
             {% if l.matched_order_id != null %}
               Revenue: <a href="/orders/{{ l.matched_order_id }}">{{ l.matched_order_ref }}</a> — {{ l.matched_leg | capitalize }}
-              {% if l.matchLockMessage != null %}
+              {% if l.matchLockMessage != null and not canOverrideFyLock %}
                 <br><span class="muted small">&#128274; {{ l.matchLockMessage }}</span>
               {% else %}
+                {% if l.matchLockMessage != null %}
+                  <br><span class="muted small">&#9888; {{ l.matchLockMessage }} Unmatching will log an override.</span>
+                {% endif %}
                 <form method="post" action="/ca/bank-statement/{{ l.id }}/unmatch" style="display:inline;">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                  <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+                  <button type="submit" class="btn-sm btn-secondary">{{ 'Override & Unmatch' if l.matchLockMessage != null else 'Unmatch' }}</button>
                 </form>
               {% endif %}
             {% elif l.matched_expense_id != null %}
               Expense: {{ l.matched_expense_category }}{% if l.matched_expense_vendor %} ({{ l.matched_expense_vendor }}){% endif %}
-              {% if l.matchLockMessage != null %}
+              {% if l.matchLockMessage != null and not canOverrideFyLock %}
                 <br><span class="muted small">&#128274; {{ l.matchLockMessage }}</span>
               {% else %}
+                {% if l.matchLockMessage != null %}
+                  <br><span class="muted small">&#9888; {{ l.matchLockMessage }} Unmatching will log an override.</span>
+                {% endif %}
                 <form method="post" action="/ca/bank-statement/{{ l.id }}/unmatch" style="display:inline;">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                  <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+                  <button type="submit" class="btn-sm btn-secondary">{{ 'Override & Unmatch' if l.matchLockMessage != null else 'Unmatch' }}</button>
                 </form>
               {% endif %}
             {% else %}
@@ -56,7 +62,7 @@
                     <option value="">Match to revenue leg&hellip;</option>
                     {% for leg in unmatchedRevenueLegs %}
                       <option value="{{ leg.order_id }}|{{ leg.leg }}">
-                        {{ leg.buyer_inquiry_ref }} — {{ leg.leg | capitalize }} — &#8377;{{ leg.inr_actual | money }}
+                        {{ leg.buyer_inquiry_ref }} — {{ leg.leg | capitalize }} — &#8377;{{ leg.inr_actual | money }}{{ ' (locked FY — override)' if leg.locked else '' }}
                       </option>
                     {% endfor %}
                   </select>
@@ -71,7 +77,7 @@
                   <select name="expense_id" style="max-width:220px;">
                     <option value="">Match to expense&hellip;</option>
                     {% for exp in unmatchedExpenses %}
-                      <option value="{{ exp.id }}">{{ exp.category }}{% if exp.vendor_name %} ({{ exp.vendor_name }}){% endif %} — {{ exp.amount | money }}</option>
+                      <option value="{{ exp.id }}">{{ exp.category }}{% if exp.vendor_name %} ({{ exp.vendor_name }}){% endif %} — {{ exp.amount | money }}{{ ' (locked FY — override)' if exp.locked else '' }}</option>
                     {% endfor %}
                   </select>
                   <button type="submit" class="btn-sm">Match</button>

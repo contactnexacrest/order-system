@@ -10,8 +10,10 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const financialYear = require('../helpers/financialYear');
 const flash = require('../helpers/flash');
 const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
+const auditLogRepository = require('../repositories/auditLogRepository');
 const zohoBooksService = require('../services/zohoBooksService');
 const caSyncService = require('../services/caSyncService');
+const caFyLockGuard = require('../services/caFyLockGuard');
 const bankStatementCsvParser = require('../services/bankStatementCsvParser');
 const crypto = require('crypto');
 
@@ -113,6 +115,7 @@ async function expenses(req, res) {
     expenses: allExpenses,
     usersById: await usersById(),
     canEditTds: !!req.permissions.inr_actual_edit,
+    canOverrideFyLock: caFyLockGuard.canOverride(req),
   }, 'layout/base');
 }
 
@@ -121,9 +124,7 @@ async function setExpenseTds(req, res) {
   const user = req.user;
 
   const expense = await caExpenseRepository.find(id);
-  const lockMessage = expense ? await caFyLockRepository.lockMessageForDate(expense.expense_date) : null;
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, expense ? expense.expense_date : null, 'ca_expenses', id, 'tds'))) {
     res.redirect('/ca/expenses');
     return;
   }
@@ -145,6 +146,7 @@ async function setExpenseTds(req, res) {
  * leg/expense can't accidentally be double-matched.
  */
 async function bankStatement(req, res) {
+  const canOverride = caFyLockGuard.canOverride(req);
   const matchedRevenueKeys = await caBankStatementRepository.matchedRevenueKeys();
   const matchedExpenseIds = await caBankStatementRepository.matchedExpenseIds();
   const allExpenses = await caExpenseRepository.all();
@@ -152,18 +154,24 @@ async function bankStatement(req, res) {
   // Phase 6: a leg/expense whose own date falls in a locked financial year
   // is left off the matching pickers entirely — matching it now would be a
   // new entry against a year the CA has already closed, exactly the kind
-  // of backdated change the lock exists to prevent.
+  // of backdated change the lock exists to prevent. Phase 7: unless the
+  // viewer holds ca_fy_lock_override, in which case they can still see
+  // (and, on submit, log an override for) a locked-FY item.
   const candidateLegs = await caRepository.legsWithInrActualUnmatched(matchedRevenueKeys);
   const unmatchedRevenueLegs = [];
   for (const leg of candidateLegs) {
-    if (!(await caFyLockRepository.lockMessageForDate(leg.cleared_at))) {
+    const locked = !!(await caFyLockRepository.lockMessageForDate(leg.cleared_at));
+    if (canOverride || !locked) {
+      leg.locked = locked;
       unmatchedRevenueLegs.push(leg);
     }
   }
   const candidateExpenses = allExpenses.filter((e) => !matchedExpenseIds.includes(e.id));
   const unmatchedExpenses = [];
   for (const e of candidateExpenses) {
-    if (!(await caFyLockRepository.lockMessageForDate(e.expense_date))) {
+    const locked = !!(await caFyLockRepository.lockMessageForDate(e.expense_date));
+    if (canOverride || !locked) {
+      e.locked = locked;
       unmatchedExpenses.push(e);
     }
   }
@@ -179,6 +187,7 @@ async function bankStatement(req, res) {
     lines,
     unmatchedRevenueLegs,
     unmatchedExpenses,
+    canOverrideFyLock: canOverride,
   }, 'layout/base');
 }
 
@@ -230,9 +239,7 @@ async function matchBankLineToRevenue(req, res) {
   }
 
   const ops = (await orderPaymentStatusRepository.find(orderId)) || {};
-  const lockMessage = await caFyLockRepository.lockMessageForDate(ops[`${leg}_cleared_at`] ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ops[`${leg}_cleared_at`] ?? null, 'order_payment_status', orderId, `${leg}_bank_match`))) {
     res.redirect('/ca/bank-statement');
     return;
   }
@@ -253,9 +260,7 @@ async function matchBankLineToExpense(req, res) {
   }
 
   const expense = await caExpenseRepository.find(expenseId);
-  const lockMessage = expense ? await caFyLockRepository.lockMessageForDate(expense.expense_date) : null;
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, expense ? expense.expense_date : null, 'ca_expenses', expenseId, 'bank_match'))) {
     res.redirect('/ca/bank-statement');
     return;
   }
@@ -268,18 +273,17 @@ async function matchBankLineToExpense(req, res) {
 async function unmatchBankLine(req, res) {
   const lineId = parseInt(req.params.id, 10);
   const line = await caBankStatementRepository.find(lineId);
-  let lockMessage = null;
+  let allowed = true;
   if (line) {
     if (line.matched_order_id !== null && line.matched_leg !== null) {
       const ops = (await orderPaymentStatusRepository.find(line.matched_order_id)) || {};
-      lockMessage = await caFyLockRepository.lockMessageForDate(ops[`${line.matched_leg}_cleared_at`] ?? null);
+      allowed = await caFyLockGuard.allow(req, ops[`${line.matched_leg}_cleared_at`] ?? null, 'order_payment_status', line.matched_order_id, `${line.matched_leg}_bank_unmatch`);
     } else if (line.matched_expense_id !== null) {
       const expense = await caExpenseRepository.find(line.matched_expense_id);
-      lockMessage = expense ? await caFyLockRepository.lockMessageForDate(expense.expense_date) : null;
+      allowed = await caFyLockGuard.allow(req, expense ? expense.expense_date : null, 'ca_expenses', line.matched_expense_id, 'bank_unmatch');
     }
   }
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!allowed) {
     res.redirect('/ca/bank-statement');
     return;
   }
@@ -329,6 +333,7 @@ async function fyLocks(req, res) {
     years,
     lockedYears: await caFyLockRepository.lockedYears(),
     history: await caFyLockRepository.history(),
+    recentOverrides: await auditLogRepository.search({ actionType: 'CA_FY_LOCK_OVERRIDDEN', limit: 20 }),
     usersById: await usersById(),
   }, 'layout/base');
 }

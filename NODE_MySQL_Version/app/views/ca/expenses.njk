@@ -19,14 +19,17 @@
           <td class="muted small">{{ e.description or '' }}</td>
           <td>{{ e.amount | money }} {{ e.currency_code }}</td>
           <td>
-            {% if canEditTds and e.lockMessage == null %}
+            {% if canEditTds and (e.lockMessage == null or canOverrideFyLock) %}
+              {% if e.lockMessage != null %}
+                <span class="muted small" style="display:block;">&#9888; {{ e.lockMessage }} Saving will log an override.</span>
+              {% endif %}
               <form method="post" action="/ca/expenses/{{ e.id }}/tds" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                 <label style="display:flex; gap:4px; align-items:center;">
                   <input type="checkbox" name="is_tds_applicable" value="1" {{ 'checked' if e.is_tds_applicable else '' }}> TDS
                 </label>
                 <input type="text" name="tds_amount" placeholder="Amount" value="{{ e.tds_amount or '' }}" style="width:90px;">
-                <button type="submit" class="btn-sm">Save</button>
+                <button type="submit" class="btn-sm">{{ 'Override & Save' if e.lockMessage != null else 'Save' }}</button>
               </form>
             {% else %}
               {% if e.is_tds_applicable %}

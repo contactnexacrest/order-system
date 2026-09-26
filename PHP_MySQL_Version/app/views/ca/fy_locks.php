@@ -1,7 +1,7 @@
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Financial Year Lock</h1>
-  <p class="muted">Once a financial year is locked here, every CA write path that touches that year's data — recording or removing an INR actual, the assumed exchange rate, a FIRC/eBRC reference, an expense's TDS annotation, and matching/unmatching a bank statement line — is blocked, so a closed year's numbers can't be quietly changed after the CA has signed off on them.</p>
+  <p class="muted">Once a financial year is locked here, every CA write path that touches that year's data — recording or removing an INR actual, the assumed exchange rate, a FIRC/eBRC reference, an expense's TDS annotation, and matching/unmatching a bank statement line — is blocked, so a closed year's numbers can't be quietly changed after the CA has signed off on them. Someone holding the "Override a financial year lock" permission (or a Super Admin) can still push through a single genuine correction — see Recent Overrides below.</p>
 
   <div class="section">
     <h2>Financial Years</h2>
@@ -67,6 +67,27 @@
               <?php endif; ?>
             </td>
             <td class="muted small"><?= htmlspecialchars((string) ($row['unlock_reason'] ?? '')) ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
+    <h2>Recent Overrides</h2>
+    <p class="muted small">Every time someone with the override permission pushes through a CA entry against a locked financial year — also on record in the main audit log under CA_FY_LOCK_OVERRIDDEN.</p>
+    <?php if (empty($recentOverrides)): ?>
+      <p class="muted">No financial year lock has ever been overridden.</p>
+    <?php else: ?>
+      <table class="list">
+        <tr><th>When</th><th>By</th><th>Field</th><th>Detail</th></tr>
+        <?php foreach ($recentOverrides as $row): ?>
+          <?php $byName = $row['user_id'] !== null ? ($usersById[(int) $row['user_id']] ?? ('User #' . $row['user_id'])) : null; ?>
+          <tr>
+            <td><?= htmlspecialchars((string) $row['created_at']) ?></td>
+            <td><?= htmlspecialchars($byName ?? '—') ?></td>
+            <td><?= htmlspecialchars((string) ($row['entity_type'] ?? '')) ?><?= $row['entity_id'] !== null ? ' #' . (int) $row['entity_id'] : '' ?> — <?= htmlspecialchars((string) ($row['field_name'] ?? '')) ?></td>
+            <td class="muted small"><?= htmlspecialchars((string) ($row['new_value'] ?? '')) ?></td>
           </tr>
         <?php endforeach; ?>
       </table>

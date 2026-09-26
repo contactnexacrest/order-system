@@ -80,3 +80,36 @@ when, who unlocked it, when, and why. Re-locking a year after an unlock
 adds a fresh row rather than overwriting the old one, so nothing about a
 year's lock history is ever lost — independent of, and never touching,
 the main system audit log.
+
+## Overriding the lock for a single correction
+
+Reopening a whole year is sometimes more than the situation calls for —
+a CA might need exactly one backdated correction (a missed FIRC reference,
+a forgotten INR actual) without exposing the rest of that year's figures
+to further change while the year sits open. **Override a financial year
+lock** is a separate, narrower permission for exactly this: it lets one
+trusted person push through a single entry against a locked year, without
+unlocking it for anyone else.
+
+A Super Admin always has this — it's one of the permissions the Super
+Admin tier is unconditionally granted, with no separate setup. Anyone
+else needs the permission granted explicitly, either through their role
+or as a per-user override (Admin & Settings → Roles & Permissions).
+
+When someone with this permission opens a locked-year record, the page
+doesn't just show the lock notice — it also shows the normal edit form,
+with a warning that submitting it will be logged as an override, and the
+submit button itself is relabelled ("Override & Record", "Override &
+Unmatch", and so on) so it's never ambiguous that a lock is being
+bypassed. On the Bank Statement page, this also means a locked-year leg
+or expense reappears in the matching dropdowns (marked "locked FY —
+override"), since otherwise there would be no way to complete a genuine
+correction that involves matching.
+
+Every override is recorded twice: once in the main system audit log
+(action `CA_FY_LOCK_OVERRIDDEN`, with the field and the lock message it
+bypassed), and once in the **Recent Overrides** list right here on the
+Financial Year Lock page, so a CA reviewing this page sees every
+exception to a lock they've placed without having to cross-reference the
+audit log separately. Nothing about using the override changes the lock
+itself — the year stays locked for everyone else, exactly as before.

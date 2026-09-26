@@ -8,22 +8,28 @@
         <strong>Assumed Exchange Rate (CA/Accounting)</strong><br>
         {% if rate != null %}
           <span>1 unit foreign currency = &#8377;{{ rate | money }} — set {{ payment.assumed_exchange_rate_set_at }}{% if setBy %} by {{ usersById[setBy] or ('User #' ~ setBy) }}{% endif %}. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
-          {% if lockMessage != null %}
+          {% if lockMessage != null and not canOverrideFyLock %}
             <br><span class="muted small">&#128274; {{ lockMessage }}</span>
           {% elif canEditInrActual %}
+            {% if lockMessage != null %}
+              <p class="muted small" style="margin:6px 0 0;">&#9888; {{ lockMessage }} You hold the override permission — submitting below will be logged.</p>
+            {% endif %}
             <form method="post" action="/orders/{{ order.id }}/payment/exchange-rate" style="margin-top:6px;">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <label>Update Rate<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
-              <button type="submit" class="btn-sm">Update</button>
+              <button type="submit" class="btn-sm">{{ 'Override & Update' if lockMessage != null else 'Update' }}</button>
             </form>
           {% endif %}
-        {% elif lockMessage != null %}
+        {% elif lockMessage != null and not canOverrideFyLock %}
           <span class="muted">&#128274; {{ lockMessage }}</span>
         {% elif canEditInrActual %}
+          {% if lockMessage != null %}
+            <p class="muted small" style="margin:0 0 6px;">&#9888; {{ lockMessage }} You hold the override permission — submitting below will be logged.</p>
+          {% endif %}
           <form method="post" action="/orders/{{ order.id }}/payment/exchange-rate">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Assumed Rate (INR per unit foreign currency) *<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
-            <button type="submit" class="btn-sm">Record Rate</button>
+            <button type="submit" class="btn-sm">{{ 'Override & Record' if lockMessage != null else 'Record Rate' }}</button>
           </form>
         {% else %}
           <span class="muted">Not yet recorded.</span>
@@ -50,7 +56,10 @@
         <strong>{{ label }} — INR Actual (CA/Accounting)</strong><br>
         {% if amount != null %}
           <span>&#8377;{{ amount | money }} credited — recorded {{ recordedAt }}{% if recordedBy %} by {{ usersById[recordedBy] or ('User #' ~ recordedBy) }}{% endif %}</span>
-          {% if lockMessage == null and canDeleteInrActual %}
+          {% if (lockMessage == null or canOverrideFyLock) and canDeleteInrActual %}
+            {% if lockMessage != null %}
+              <span class="muted small">(&#9888; override — logged)</span>
+            {% endif %}
             <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/inr-actual/delete" style="display:inline; margin-left:8px;" onsubmit="return confirm('Remove the recorded INR actual amount for this leg? Only do this to correct a mis-entry.');">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-danger">Remove</button>
@@ -59,13 +68,16 @@
           {% if forexGainLoss != null %}
             <br><span class="muted small">Forex {{ 'gain' if forexGainLoss >= 0 else 'loss' }}: &#8377;{{ (forexGainLoss | abs) | money }} vs. the assumed rate.</span>
           {% endif %}
-        {% elif lockMessage != null %}
+        {% elif lockMessage != null and not canOverrideFyLock %}
           <span class="muted">&#128274; {{ lockMessage }}</span>
         {% elif canEditInrActual %}
+          {% if lockMessage != null %}
+            <p class="muted small" style="margin:0 0 6px;">&#9888; {{ lockMessage }} You hold the override permission — submitting below will be logged.</p>
+          {% endif %}
           <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/inr-actual">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>INR Amount Actually Credited *<input type="text" name="{{ leg }}_inr_actual" required></label>
-            <button type="submit" class="btn-sm">Record INR Actual</button>
+            <button type="submit" class="btn-sm">{{ 'Override & Record' if lockMessage != null else 'Record INR Actual' }}</button>
           </form>
         {% else %}
           <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
@@ -75,14 +87,17 @@
           <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
           {% if fircReference != null %}
             <span class="muted small">{{ fircReference }} (received {{ fircReceivedAt }})</span>
-          {% elif lockMessage != null %}
+          {% elif lockMessage != null and not canOverrideFyLock %}
             <span class="muted small">&#128274; {{ lockMessage }}</span>
           {% elif canEditInrActual %}
+            {% if lockMessage != null %}
+              <p class="muted small" style="margin:0 0 6px;">&#9888; {{ lockMessage }} You hold the override permission — submitting below will be logged.</p>
+            {% endif %}
             <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/firc">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <label>FIRC/eBRC Reference *<input type="text" name="{{ leg }}_firc_reference" required></label>
               <label>Received On<input type="date" name="{{ leg }}_firc_received_at"></label>
-              <button type="submit" class="btn-sm">Record FIRC/eBRC</button>
+              <button type="submit" class="btn-sm">{{ 'Override & Record' if lockMessage != null else 'Record FIRC/eBRC' }}</button>
             </form>
           {% else %}
             <span class="muted small">Not yet recorded.</span>

@@ -20,14 +20,17 @@
           <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
           <td>
             <?php $expenseLockMessage = \App\Repositories\CaFyLockRepository::lockMessageForDate($e['expense_date']); ?>
-            <?php if ($canEditTds && $expenseLockMessage === null): ?>
+            <?php if ($canEditTds && ($expenseLockMessage === null || $canOverrideFyLock)): ?>
+              <?php if ($expenseLockMessage !== null): ?>
+                <span class="muted small" style="display:block;">&#9888; <?= htmlspecialchars($expenseLockMessage) ?> Saving will log an override.</span>
+              <?php endif; ?>
               <form method="post" action="/ca/expenses/<?= (int) $e['id'] ?>/tds" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                 <?= \App\Helpers\Csrf::field() ?>
                 <label style="display:flex; gap:4px; align-items:center;">
                   <input type="checkbox" name="is_tds_applicable" value="1" <?= $e['is_tds_applicable'] ? 'checked' : '' ?>> TDS
                 </label>
                 <input type="text" name="tds_amount" placeholder="Amount" value="<?= htmlspecialchars((string) ($e['tds_amount'] ?? '')) ?>" style="width:90px;">
-                <button type="submit" class="btn-sm">Save</button>
+                <button type="submit" class="btn-sm"><?= $expenseLockMessage !== null ? 'Override &amp; Save' : 'Save' ?></button>
               </form>
             <?php else: ?>
               <?php if ($e['is_tds_applicable']): ?>

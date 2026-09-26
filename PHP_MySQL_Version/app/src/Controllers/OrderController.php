@@ -10,7 +10,6 @@ use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AmendmentRepository;
 use App\Repositories\AuditLogRepository;
-use App\Repositories\CaFyLockRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
@@ -41,6 +40,7 @@ use App\Repositories\SupplierRepository;
 use App\Repositories\UserRepository;
 use App\Config\Env;
 use App\Services\AuthService;
+use App\Services\CaFyLockGuard;
 use App\Services\EmailService;
 use App\Services\FileUploadService;
 use App\Services\PermissionService;
@@ -1049,9 +1049,8 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'advance_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1065,9 +1064,8 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'advance_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1087,9 +1085,8 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'balance_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1103,9 +1100,8 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'balance_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1125,9 +1121,8 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'freight_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1141,9 +1136,8 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'freight_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1172,11 +1166,10 @@ final class OrderController
         // Not tied to one leg — changing it would change the forex gain/loss
         // shown for every cleared leg on the order, so it's blocked if ANY
         // of them falls in a locked FY, not just one.
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $ops = OrderPaymentStatusRepository::find($orderId) ?? [];
         foreach (['advance_cleared_at', 'balance_cleared_at', 'freight_cleared_at'] as $col) {
-            $lockMessage = CaFyLockRepository::lockMessageForDate($ops[$col] ?? null);
-            if ($lockMessage !== null) {
-                Flash::set('error', $lockMessage);
+            if (!CaFyLockGuard::allow($ops[$col] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'assumed_exchange_rate')) {
                 header("Location: /orders/{$orderId}");
                 return;
             }
@@ -1197,9 +1190,8 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'advance_firc_reference')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1220,9 +1212,8 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'balance_firc_reference')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1243,9 +1234,8 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $lockMessage = CaFyLockRepository::lockMessageForDate((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'freight_firc_reference')) {
             header("Location: /orders/{$orderId}");
             return;
         }

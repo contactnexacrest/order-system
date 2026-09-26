@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\FinancialYear;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\CaBankStatementRepository;
 use App\Repositories\CaExpenseRepository;
 use App\Repositories\CaFyLockRepository;
@@ -17,6 +18,7 @@ use App\Repositories\UserRepository;
 use App\Repositories\ZohoSyncLogRepository;
 use App\Services\AuthService;
 use App\Services\BankStatementCsvParser;
+use App\Services\CaFyLockGuard;
 use App\Services\CaSyncService;
 use App\Services\PermissionService;
 use App\Services\ZohoBooksService;
@@ -127,6 +129,7 @@ final class CaController
             'expenses' => CaExpenseRepository::all(),
             'usersById' => $this->usersById(),
             'canEditTds' => PermissionService::can((int) $user['id'], $roleId, 'inr_actual_edit'),
+            'canOverrideFyLock' => CaFyLockGuard::canOverride((int) $user['id'], $roleId),
         ], 'layout/base');
     }
 
@@ -135,10 +138,9 @@ final class CaController
         $id = (int) $params['id'];
         $user = AuthService::currentUser();
 
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $expense = CaExpenseRepository::find($id);
-        $lockMessage = $expense !== null ? CaFyLockRepository::lockMessageForDate($expense['expense_date']) : null;
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        if (!CaFyLockGuard::allow($expense !== null ? $expense['expense_date'] : null, (int) $user['id'], $roleId, 'ca_expenses', $id, 'tds')) {
             header('Location: /ca/expenses');
             return;
         }
@@ -161,6 +163,10 @@ final class CaController
      */
     public function bankStatement(array $params): void
     {
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $canOverride = CaFyLockGuard::canOverride((int) $user['id'], $roleId);
+
         $matchedRevenueKeys = CaBankStatementRepository::matchedRevenueKeys();
         $matchedExpenseIds = CaBankStatementRepository::matchedExpenseIds();
 
@@ -168,20 +174,24 @@ final class CaController
         // year is left off the matching pickers entirely — matching it now
         // would be a new entry against a year the CA has already closed,
         // exactly the kind of backdated change the lock exists to prevent.
+        // Phase 7: unless the viewer holds ca_fy_lock_override, in which
+        // case they can still see (and, on submit, log an override for)
+        // a locked-FY item.
         $unmatchedRevenueLegs = array_values(array_filter(
             CaRepository::legsWithInrActualUnmatched($matchedRevenueKeys),
-            static fn(array $leg): bool => CaFyLockRepository::lockMessageForDate($leg['cleared_at']) === null
+            static fn(array $leg): bool => $canOverride || CaFyLockRepository::lockMessageForDate($leg['cleared_at']) === null
         ));
         $unmatchedExpenses = array_values(array_filter(
             CaExpenseRepository::all(),
             static fn(array $e): bool => !in_array((int) $e['id'], $matchedExpenseIds, true)
-                && CaFyLockRepository::lockMessageForDate($e['expense_date']) === null
+                && ($canOverride || CaFyLockRepository::lockMessageForDate($e['expense_date']) === null)
         ));
 
         View::render('ca/bank_statement', [
             'lines' => CaBankStatementRepository::all(),
             'unmatchedRevenueLegs' => $unmatchedRevenueLegs,
             'unmatchedExpenses' => $unmatchedExpenses,
+            'canOverrideFyLock' => $canOverride,
         ], 'layout/base');
     }
 
@@ -236,11 +246,10 @@ final class CaController
             return;
         }
 
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $ops = OrderPaymentStatusRepository::find($orderId) ?? [];
         $clearedAt = $ops[$leg . '_cleared_at'] ?? null;
-        $lockMessage = CaFyLockRepository::lockMessageForDate($clearedAt);
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        if (!CaFyLockGuard::allow($clearedAt, (int) $user['id'], $roleId, 'order_payment_status', $orderId, "{$leg}_bank_match")) {
             header('Location: /ca/bank-statement');
             return;
         }
@@ -261,10 +270,9 @@ final class CaController
             return;
         }
 
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $expense = CaExpenseRepository::find($expenseId);
-        $lockMessage = $expense !== null ? CaFyLockRepository::lockMessageForDate($expense['expense_date']) : null;
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        if (!CaFyLockGuard::allow($expense !== null ? $expense['expense_date'] : null, (int) $user['id'], $roleId, 'ca_expenses', $expenseId, 'bank_match')) {
             header('Location: /ca/bank-statement');
             return;
         }
@@ -277,19 +285,20 @@ final class CaController
     public function unmatchBankLine(array $params): void
     {
         $lineId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $line = CaBankStatementRepository::find($lineId);
-        $lockMessage = null;
+        $allowed = true;
         if ($line !== null) {
             if ($line['matched_order_id'] !== null && $line['matched_leg'] !== null) {
                 $ops = OrderPaymentStatusRepository::find((int) $line['matched_order_id']) ?? [];
-                $lockMessage = CaFyLockRepository::lockMessageForDate($ops[$line['matched_leg'] . '_cleared_at'] ?? null);
+                $allowed = CaFyLockGuard::allow($ops[$line['matched_leg'] . '_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', (int) $line['matched_order_id'], "{$line['matched_leg']}_bank_unmatch");
             } elseif ($line['matched_expense_id'] !== null) {
                 $expense = CaExpenseRepository::find((int) $line['matched_expense_id']);
-                $lockMessage = $expense !== null ? CaFyLockRepository::lockMessageForDate($expense['expense_date']) : null;
+                $allowed = CaFyLockGuard::allow($expense !== null ? $expense['expense_date'] : null, (int) $user['id'], $roleId, 'ca_expenses', (int) $line['matched_expense_id'], 'bank_unmatch');
             }
         }
-        if ($lockMessage !== null) {
-            Flash::set('error', $lockMessage);
+        if (!$allowed) {
             header('Location: /ca/bank-statement');
             return;
         }
@@ -348,6 +357,7 @@ final class CaController
             'years' => $years,
             'lockedYears' => $lockedYears,
             'history' => CaFyLockRepository::history(),
+            'recentOverrides' => AuditLogRepository::search(actionType: 'CA_FY_LOCK_OVERRIDDEN', limit: 20),
             'usersById' => $this->usersById(),
         ], 'layout/base');
     }

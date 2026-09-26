@@ -8,6 +8,7 @@ const adminOverrideRepository = require('../repositories/adminOverrideRepository
 const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caFyLockRepository = require('../repositories/caFyLockRepository');
+const caFyLockGuard = require('../services/caFyLockGuard');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const clientRepository = require('../repositories/clientRepository');
@@ -396,6 +397,7 @@ async function show(req, res) {
       canViewInrActual: !!req.permissions.inr_actual_view,
       canEditInrActual: !!req.permissions.inr_actual_edit,
       canDeleteInrActual: !!req.permissions.inr_actual_delete,
+      canOverrideFyLock: caFyLockGuard.canOverride(req),
       caLockMessages,
       usersById,
     },
@@ -1053,9 +1055,7 @@ async function recordAdvanceInrActual(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null, 'order_payment_status', orderId, 'advance_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1068,9 +1068,7 @@ async function recordAdvanceInrActual(req, res) {
 async function deleteAdvanceInrActual(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null, 'order_payment_status', orderId, 'advance_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1089,9 +1087,7 @@ async function recordBalanceInrActual(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null, 'order_payment_status', orderId, 'balance_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1104,9 +1100,7 @@ async function recordBalanceInrActual(req, res) {
 async function deleteBalanceInrActual(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null, 'order_payment_status', orderId, 'balance_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1125,9 +1119,7 @@ async function recordFreightInrActual(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null, 'order_payment_status', orderId, 'freight_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1140,9 +1132,7 @@ async function recordFreightInrActual(req, res) {
 async function deleteFreightInrActual(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null, 'order_payment_status', orderId, 'freight_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1172,9 +1162,7 @@ async function recordAssumedExchangeRate(req, res) {
   // them falls in a locked FY, not just one.
   const ops = (await orderPaymentStatusRepository.find(orderId)) || {};
   for (const col of ['advance_cleared_at', 'balance_cleared_at', 'freight_cleared_at']) {
-    const lockMessage = await caFyLockRepository.lockMessageForDate(ops[col] ?? null);
-    if (lockMessage) {
-      flash.set(req, 'error', lockMessage);
+    if (!(await caFyLockGuard.allow(req, ops[col] ?? null, 'order_payment_status', orderId, 'assumed_exchange_rate'))) {
       res.redirect(`/orders/${orderId}`);
       return;
     }
@@ -1194,9 +1182,7 @@ async function recordAdvanceFirc(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null, 'order_payment_status', orderId, 'advance_firc_reference'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1216,9 +1202,7 @@ async function recordBalanceFirc(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null, 'order_payment_status', orderId, 'balance_firc_reference'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1238,9 +1222,7 @@ async function recordFreightFirc(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const lockMessage = await caFyLockRepository.lockMessageForDate(((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null);
-  if (lockMessage) {
-    flash.set(req, 'error', lockMessage);
+  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null, 'order_payment_status', orderId, 'freight_firc_reference'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }

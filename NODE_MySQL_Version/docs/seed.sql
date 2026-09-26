@@ -66,7 +66,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('inr_actual_view',           'View INR actual settlement amounts', 'See the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
   ('inr_actual_edit',           'Add/edit INR actual settlement amounts', 'Record or correct the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
   ('inr_actual_delete',         'Delete INR actual settlement amounts', 'Remove a recorded INR actual amount (e.g. to correct a mis-entry) — kept separate from edit since this is a destructive correction, not routine data entry.', 'ca'),
-  ('ca_module_manage',          'Manage CA / Accounting integrations', 'Trigger a Zoho Books sync and view its log, and lock/unlock a financial year for CA data entry — kept separate from ca_module_view since these are administrative actions with a wider blast radius than routine data entry, not just reading the register.', 'ca');
+  ('ca_module_manage',          'Manage CA / Accounting integrations', 'Trigger a Zoho Books sync and view its log, and lock/unlock a financial year for CA data entry — kept separate from ca_module_view since these are administrative actions with a wider blast radius than routine data entry, not just reading the register.', 'ca'),
+  ('ca_fy_lock_override',       'Override a financial year lock', 'Push through a single CA entry even while its financial year is locked — for a genuine backdated correction, never routine use. Every use is logged. Kept separate from ca_module_manage, which can reopen a year outright for everyone.', 'ca');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -86,7 +87,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Accounts Executive'
-  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage');
+  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1

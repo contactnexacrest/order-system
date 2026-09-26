@@ -35,22 +35,28 @@
             ?>
             <?php if ($l['matched_order_id'] !== null): ?>
               Revenue: <a href="/orders/<?= (int) $l['matched_order_id'] ?>"><?= htmlspecialchars($l['matched_order_ref']) ?></a> — <?= htmlspecialchars(ucfirst($l['matched_leg'])) ?>
-              <?php if ($matchLockMessage !== null): ?>
+              <?php if ($matchLockMessage !== null && !$canOverrideFyLock): ?>
                 <br><span class="muted small">&#128274; <?= htmlspecialchars($matchLockMessage) ?></span>
               <?php else: ?>
+                <?php if ($matchLockMessage !== null): ?>
+                  <br><span class="muted small">&#9888; <?= htmlspecialchars($matchLockMessage) ?> Unmatching will log an override.</span>
+                <?php endif; ?>
                 <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/unmatch" style="display:inline;">
                   <?= \App\Helpers\Csrf::field() ?>
-                  <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+                  <button type="submit" class="btn-sm btn-secondary"><?= $matchLockMessage !== null ? 'Override &amp; Unmatch' : 'Unmatch' ?></button>
                 </form>
               <?php endif; ?>
             <?php elseif ($l['matched_expense_id'] !== null): ?>
               Expense: <?= htmlspecialchars($l['matched_expense_category']) ?><?= $l['matched_expense_vendor'] ? ' (' . htmlspecialchars($l['matched_expense_vendor']) . ')' : '' ?>
-              <?php if ($matchLockMessage !== null): ?>
+              <?php if ($matchLockMessage !== null && !$canOverrideFyLock): ?>
                 <br><span class="muted small">&#128274; <?= htmlspecialchars($matchLockMessage) ?></span>
               <?php else: ?>
+                <?php if ($matchLockMessage !== null): ?>
+                  <br><span class="muted small">&#9888; <?= htmlspecialchars($matchLockMessage) ?> Unmatching will log an override.</span>
+                <?php endif; ?>
                 <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/unmatch" style="display:inline;">
                   <?= \App\Helpers\Csrf::field() ?>
-                  <button type="submit" class="btn-sm btn-secondary">Unmatch</button>
+                  <button type="submit" class="btn-sm btn-secondary"><?= $matchLockMessage !== null ? 'Override &amp; Unmatch' : 'Unmatch' ?></button>
                 </form>
               <?php endif; ?>
             <?php else: ?>
@@ -60,8 +66,9 @@
                   <select name="order_leg" onchange="this.form.order_id.value=this.value.split('|')[0]; this.form.leg.value=this.value.split('|')[1];" style="max-width:220px;">
                     <option value="">Match to revenue leg&hellip;</option>
                     <?php foreach ($unmatchedRevenueLegs as $leg): ?>
+                      <?php $legLocked = \App\Repositories\CaFyLockRepository::lockMessageForDate($leg['cleared_at']) !== null; ?>
                       <option value="<?= (int) $leg['order_id'] ?>|<?= htmlspecialchars($leg['leg']) ?>">
-                        <?= htmlspecialchars($leg['buyer_inquiry_ref']) ?> — <?= htmlspecialchars(ucfirst($leg['leg'])) ?> — &#8377;<?= number_format((float) $leg['inr_actual'], 2) ?>
+                        <?= htmlspecialchars($leg['buyer_inquiry_ref']) ?> — <?= htmlspecialchars(ucfirst($leg['leg'])) ?> — &#8377;<?= number_format((float) $leg['inr_actual'], 2) ?><?= $legLocked ? ' (locked FY — override)' : '' ?>
                       </option>
                     <?php endforeach; ?>
                   </select>
@@ -76,7 +83,8 @@
                   <select name="expense_id" style="max-width:220px;">
                     <option value="">Match to expense&hellip;</option>
                     <?php foreach ($unmatchedExpenses as $exp): ?>
-                      <option value="<?= (int) $exp['id'] ?>"><?= htmlspecialchars($exp['category']) ?><?= $exp['vendor_name'] ? ' (' . htmlspecialchars($exp['vendor_name']) . ')' : '' ?> — <?= number_format((float) $exp['amount'], 2) ?></option>
+                      <?php $expLocked = \App\Repositories\CaFyLockRepository::lockMessageForDate($exp['expense_date']) !== null; ?>
+                      <option value="<?= (int) $exp['id'] ?>"><?= htmlspecialchars($exp['category']) ?><?= $exp['vendor_name'] ? ' (' . htmlspecialchars($exp['vendor_name']) . ')' : '' ?> — <?= number_format((float) $exp['amount'], 2) ?><?= $expLocked ? ' (locked FY — override)' : '' ?></option>
                     <?php endforeach; ?>
                   </select>
                   <button type="submit" class="btn-sm">Match</button>

@@ -11,6 +11,8 @@ $canViewReports = PermissionService::can((int) $currentUser['id'], $currentUser[
 $canEditLockedData = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'edit_locked_data');
 $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_orders');
 $canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
+// Phase 7: a narrow exception to a financial year lock — see CaFyLockGuard.
+$canOverrideFyLock = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'ca_fy_lock_override');
 
 // CA / Accounting module (Phase 1) — one small widget per settlement leg,
 // rendered inline in the Payment Status section rather than a separate
@@ -20,7 +22,7 @@ $usersById = [];
 foreach ($activeUsers as $u) {
     $usersById[(int) $u['id']] = $u['name'];
 }
-$renderExchangeRateWidget = function () use ($payment, $order, $canViewInrActual, $canEditInrActual, $usersById): void {
+$renderExchangeRateWidget = function () use ($payment, $order, $canViewInrActual, $canEditInrActual, $canOverrideFyLock, $usersById): void {
     if (!$canViewInrActual) {
         return;
     }
@@ -40,22 +42,28 @@ $renderExchangeRateWidget = function () use ($payment, $order, $canViewInrActual
         <strong>Assumed Exchange Rate (CA/Accounting)</strong><br>
         <?php if ($rate !== null): ?>
           <span>1 unit foreign currency = &#8377;<?= number_format((float) $rate, 4) ?> — set <?= htmlspecialchars((string) ($payment['assumed_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
-          <?php if ($lockMessage !== null): ?>
+          <?php if ($lockMessage !== null && !$canOverrideFyLock): ?>
             <br><span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
           <?php elseif ($canEditInrActual): ?>
+            <?php if ($lockMessage !== null): ?>
+              <p class="muted small" style="margin:6px 0 0;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
+            <?php endif; ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/exchange-rate" style="margin-top:6px;">
               <?= Csrf::field() ?>
               <label>Update Rate<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
-              <button type="submit" class="btn-sm">Update</button>
+              <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Update' : 'Update' ?></button>
             </form>
           <?php endif; ?>
-        <?php elseif ($lockMessage !== null): ?>
+        <?php elseif ($lockMessage !== null && !$canOverrideFyLock): ?>
           <span class="muted">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
         <?php elseif ($canEditInrActual): ?>
+          <?php if ($lockMessage !== null): ?>
+            <p class="muted small" style="margin:0 0 6px;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
+          <?php endif; ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/exchange-rate">
             <?= Csrf::field() ?>
             <label>Assumed Rate (INR per unit foreign currency) *<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
-            <button type="submit" class="btn-sm">Record Rate</button>
+            <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Record' : 'Record Rate' ?></button>
           </form>
         <?php else: ?>
           <span class="muted">Not yet recorded.</span>
@@ -65,7 +73,7 @@ $renderExchangeRateWidget = function () use ($payment, $order, $canViewInrActual
     <?php
 };
 
-$renderInrActualWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canDeleteInrActual, $usersById): void {
+$renderInrActualWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canDeleteInrActual, $canOverrideFyLock, $usersById): void {
     $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
     if ($clearedAt === null || !$canViewInrActual) {
         return;
@@ -88,7 +96,10 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
         <strong><?= htmlspecialchars($label) ?> — INR Actual (CA/Accounting)</strong><br>
         <?php if ($amount !== null): ?>
           <span>&#8377;<?= number_format((float) $amount, 2) ?> credited — recorded <?= htmlspecialchars((string) $recordedAt) ?><?= $recordedByName ? ' by ' . htmlspecialchars($recordedByName) : '' ?></span>
-          <?php if ($lockMessage === null && $canDeleteInrActual): ?>
+          <?php if (($lockMessage === null || $canOverrideFyLock) && $canDeleteInrActual): ?>
+            <?php if ($lockMessage !== null): ?>
+              <span class="muted small">(&#9888; override — logged)</span>
+            <?php endif; ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/inr-actual/delete" style="display:inline; margin-left:8px;" onsubmit="return confirm('Remove the recorded INR actual amount for this leg? Only do this to correct a mis-entry.');">
               <?= Csrf::field() ?>
               <button type="submit" class="btn-sm btn-danger">Remove</button>
@@ -97,13 +108,16 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
           <?php if ($forexGainLoss !== null): ?>
             <br><span class="muted small">Forex <?= $forexGainLoss >= 0 ? 'gain' : 'loss' ?>: &#8377;<?= number_format(abs($forexGainLoss), 2) ?> vs. the assumed rate.</span>
           <?php endif; ?>
-        <?php elseif ($lockMessage !== null): ?>
+        <?php elseif ($lockMessage !== null && !$canOverrideFyLock): ?>
           <span class="muted">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
         <?php elseif ($canEditInrActual): ?>
+          <?php if ($lockMessage !== null): ?>
+            <p class="muted small" style="margin:0 0 6px;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
+          <?php endif; ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/inr-actual">
             <?= Csrf::field() ?>
             <label>INR Amount Actually Credited *<input type="text" name="<?= $leg ?>_inr_actual" required></label>
-            <button type="submit" class="btn-sm">Record INR Actual</button>
+            <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Record' : 'Record INR Actual' ?></button>
           </form>
         <?php else: ?>
           <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
@@ -113,14 +127,17 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
           <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
           <?php if ($fircReference !== null): ?>
             <span class="muted small"><?= htmlspecialchars($fircReference) ?> (received <?= htmlspecialchars((string) $fircReceivedAt) ?>)</span>
-          <?php elseif ($lockMessage !== null): ?>
+          <?php elseif ($lockMessage !== null && !$canOverrideFyLock): ?>
             <span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
           <?php elseif ($canEditInrActual): ?>
+            <?php if ($lockMessage !== null): ?>
+              <p class="muted small" style="margin:0 0 6px;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
+            <?php endif; ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/firc">
               <?= Csrf::field() ?>
               <label>FIRC/eBRC Reference *<input type="text" name="<?= $leg ?>_firc_reference" required></label>
               <label>Received On<input type="date" name="<?= $leg ?>_firc_received_at" value="<?= date('Y-m-d') ?>"></label>
-              <button type="submit" class="btn-sm">Record FIRC/eBRC</button>
+              <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Record' : 'Record FIRC/eBRC' ?></button>
             </form>
           <?php else: ?>
             <span class="muted small">Not yet recorded.</span>
