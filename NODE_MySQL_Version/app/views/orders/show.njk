@@ -87,7 +87,15 @@
       <div><span class="k">Port of Discharge</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or 'TBC' }}</span></div>
       <div><span class="k">Container Type</span><span class="v">{{ order.container_type or '—' }}</span></div>
       <div><span class="k">Payment Preset</span><span class="v">{{ order.preset_name }}</span></div>
-      <div><span class="k">Buyer's PO Ref</span><span class="v">{{ order.buyers_po_ref or 'NIL' }}</span></div>
+      <div><span class="k">Buyer's PO Ref</span><span class="v">
+        {% if order.buyers_po_ref and order.buyers_po_ref != 'NIL' %}
+          {{ order.buyers_po_ref }}
+        {% elif buyerPoDocuments and buyerPoDocuments.length > 0 %}
+          <span class="muted">Not yet recorded &mdash; {{ buyerPoDocuments.length }} file{{ 's' if buyerPoDocuments.length != 1 else '' }} attached (see Stage 2 below)</span>
+        {% else %}
+          NIL
+        {% endif %}
+      </span></div>
       <div><span class="k">Special Requirements</span><span class="v">{{ order.special_requirements or '—' }}</span></div>
     </div>
   </div>

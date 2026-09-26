@@ -16,6 +16,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const assetRepository = require('../repositories/assetRepository');
 const documentRepository = require('../repositories/documentRepository');
 const orderAnnexureRepository = require('../repositories/orderAnnexureRepository');
+const amendmentRepository = require('../repositories/amendmentRepository');
 const { addWorkingDays } = require('./workingDaysCalculator');
 
 /**
@@ -56,6 +57,18 @@ async function assemble(orderId) {
   const fdnDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'FDN');
   const plDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PL');
 
+  // Item raised 2026-09-26: once an amendment is signed and activated,
+  // orderRepository.applyAmendmentOverride() already makes every
+  // subsequently-generated document use the amended payment terms (via the
+  // COALESCE(*_override, preset) columns orderRepository.find() selects) —
+  // that part worked before this change. What was missing was any VISIBLE
+  // trace on the document itself that its terms were amended, so a reader
+  // had no way to know a document's Section 4/5 figures came from an
+  // amendment rather than the original preset.
+  const activeAmendment = order.has_active_amendment && order.active_amendment_id
+    ? await amendmentRepository.find(order.active_amendment_id)
+    : null;
+
   return {
     company,
     assets,
@@ -79,6 +92,9 @@ async function assemble(orderId) {
       include_annexure_a: !!order.include_annexure_a,
       currency_code: order.currency_code,
       buyers_po_ref: order.buyers_po_ref ?? 'NIL',
+      has_active_amendment: !!activeAmendment,
+      active_amendment_reference: activeAmendment ? activeAmendment.amendment_reference : null,
+      active_amendment_effective_from: activeAmendment ? formatDate(activeAmendment.effective_from) : null,
       quotation_date: formatDate(order.quotation_date),
       quotation_valid_until: formatDate(order.quotation_valid_until),
       pi_date: formatDate(order.pi_date),

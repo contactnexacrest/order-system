@@ -99,7 +99,15 @@ $orderClosed = $order['status'] === 'complete';
       <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'TBC') ?></span></div>
       <div><span class="k">Container Type</span><span class="v"><?= htmlspecialchars($order['container_type'] ?? '—') ?></span></div>
       <div><span class="k">Payment Preset</span><span class="v"><?= htmlspecialchars($order['preset_name']) ?></span></div>
-      <div><span class="k">Buyer's PO Ref</span><span class="v"><?= htmlspecialchars($order['buyers_po_ref'] ?? 'NIL') ?></span></div>
+      <div><span class="k">Buyer's PO Ref</span><span class="v">
+        <?php if (!empty($order['buyers_po_ref']) && $order['buyers_po_ref'] !== 'NIL'): ?>
+          <?= htmlspecialchars($order['buyers_po_ref']) ?>
+        <?php elseif (!empty($buyerPoDocuments)): ?>
+          <span class="muted">Not yet recorded &mdash; <?= count($buyerPoDocuments) ?> file<?= count($buyerPoDocuments) === 1 ? '' : 's' ?> attached (see Stage 2 below)</span>
+        <?php else: ?>
+          NIL
+        <?php endif; ?>
+      </span></div>
       <div><span class="k">Special Requirements</span><span class="v"><?= htmlspecialchars($order['special_requirements'] ?? '—') ?></span></div>
     </div>
   </div>

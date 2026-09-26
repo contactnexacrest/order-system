@@ -14,9 +14,15 @@
 <div class="section-title">PRODUCT {{ loop.index }} &nbsp;— &nbsp;{{ p.name }}</div>
 <table class="kv" style="table-layout:fixed;">
   <tr>
+    {% if p.images is not empty and (p.images|first).data_uri %}
     <td style="width:35%; background:#000000; text-align:center; vertical-align:middle; padding:0; border-color:#000000;">
-      {% if p.images is not empty and (p.images|first).data_uri %}<img src="{{ (p.images|first).data_uri }}" style="max-width:100%; max-height:140pt;">{% endif %}
+      <img src="{{ (p.images|first).data_uri }}" style="max-width:100%; max-height:140pt;">
     </td>
+    {% else %}
+    <td style="width:35%; background:#F1F1F1; text-align:center; vertical-align:middle; padding:0; border-color:#D9D9D9;">
+      <span style="color:#8A8272; font-style:italic; font-size:9pt;">No Image Uploaded</span>
+    </td>
+    {% endif %}
     <td class="v" style="width:65%; vertical-align:top;">
       {% if p.description %}<p style="margin:0 0 4pt; font-weight:bold; color:#17233A;">{{ p.description }}</p>{% endif %}
       {% if p.finish %}<p style="margin:0 0 3pt;"><strong style="color:#17233A;">Surface Finish:</strong> {{ p.finish }}</p>{% endif %}

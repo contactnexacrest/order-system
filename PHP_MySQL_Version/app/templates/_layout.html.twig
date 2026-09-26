@@ -125,7 +125,7 @@
   /* --- Signature block --- */
   .signature-block { margin-top: 14pt; }
   .signature-block table { width: 100%; }
-  .signature-block td { vertical-align: bottom; font-size: 10pt; padding: 2pt 8pt; border: none; }
+  .signature-block td { vertical-align: top; font-size: 10pt; padding: 2pt 8pt; border: none; }
   .signature-block .for-line { font-weight: bold; color: #17233A; }
   .signature-block .auth-label { font-weight: bold; color: #5B6573; }
   .signature-block .signatory-name { font-weight: bold; font-size: 13pt; color: #17233A; }
@@ -183,6 +183,10 @@
 {% block meta_table %}{% endblock %}
 
 {% block banner %}{% endblock %}
+
+{% if order.has_active_amendment is defined and order.has_active_amendment %}
+<div class="banner banner-amber"><span class="label">NOTE:</span> <span class="value">The payment terms stated in this document reflect <strong>Amendment No. {{ order.active_amendment_reference }}</strong>{% if order.active_amendment_effective_from %}, effective from {{ order.active_amendment_effective_from }}{% endif %}, which supersedes the original terms.</span></div>
+{% endif %}
 
 {% block section1 %}
 <div class="section-title">1. {{ section1_title|default('SELLER / EXPORTER') }}</div>

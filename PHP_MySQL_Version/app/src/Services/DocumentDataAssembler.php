@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Repositories\AmendmentRepository;
 use App\Repositories\AssetRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
@@ -59,6 +60,18 @@ final class DocumentDataAssembler
         $fdnDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'FDN');
         $plDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PL');
 
+        // Item raised 2026-09-26: once an amendment is signed and activated,
+        // OrderRepository::applyAmendmentOverride() already makes every
+        // subsequently-generated document use the amended payment terms
+        // (via the COALESCE(*_override, preset) columns OrderRepository::find()
+        // selects) — that part worked before this change. What was missing
+        // was any VISIBLE trace on the document itself that its terms were
+        // amended, so a reader had no way to know a document's Section 4/5
+        // figures came from an amendment rather than the original preset.
+        $activeAmendment = !empty($order['has_active_amendment']) && !empty($order['active_amendment_id'])
+            ? AmendmentRepository::find((int) $order['active_amendment_id'])
+            : null;
+
         return [
             'company' => $company,
             'assets' => $assets,
@@ -82,6 +95,9 @@ final class DocumentDataAssembler
                 'include_annexure_a'   => (bool) ($order['include_annexure_a'] ?? false),
                 'currency_code'        => $order['currency_code'],
                 'buyers_po_ref'        => $order['buyers_po_ref'] ?? 'NIL',
+                'has_active_amendment' => (bool) $activeAmendment,
+                'active_amendment_reference' => $activeAmendment['amendment_reference'] ?? null,
+                'active_amendment_effective_from' => $activeAmendment ? self::formatDate($activeAmendment['effective_from']) : null,
                 'quotation_date'       => self::formatDate($order['quotation_date']),
                 'quotation_valid_until' => self::formatDate($order['quotation_valid_until']),
                 'pi_date'              => self::formatDate($order['pi_date']),

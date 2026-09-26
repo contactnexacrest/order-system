@@ -15,6 +15,7 @@
   --gold:#C9962B; --gold-soft:#F7EAD1; --gold-strong:#A67623;
   --amber:#A67623; --amber-soft:#F7EAD1; --danger:#A5402B; --danger-soft:#F5E2DD;
   --success:#2F6B3E; --success-soft:#E3F0E5;
+  --panel-tint:#EFF3FB;
   --radius:14px;
 }
 *{box-sizing:border-box}
@@ -301,7 +302,7 @@ a.entity-card:hover{text-decoration:none;}
 }
 
 /* --- Order progress chat (docs/schema.sql Section AI) --- */
-#order-updates{background:var(--bg);border-radius:var(--radius);padding:1.25rem 1.5rem;}
+#order-updates{background:var(--panel-tint);border-radius:var(--radius);padding:1.25rem 1.5rem;}
 .chat-thread{display:flex;flex-direction:column;gap:0.9rem;max-height:520px;overflow-y:auto;padding:0.25rem 0.25rem 0.5rem;margin-bottom:1rem;}
 .chat-bubble-row{display:flex;}
 .chat-bubble-row.staff{justify-content:flex-end;}
