@@ -96,8 +96,12 @@ final class AmendmentController
         $amendmentId = (int) $params['amendmentId'];
         $amendment = AmendmentRepository::find($amendmentId);
 
-        \App\Services\AmendmentService::rejectAmendment($amendmentId, (int) AuthService::currentUser()['id']);
-        Flash::set('success', 'Amendment request rejected.');
+        try {
+            \App\Services\AmendmentService::rejectAmendment($amendmentId, (int) AuthService::currentUser()['id']);
+            Flash::set('success', 'Amendment request rejected.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
 
         header('Location: /orders/' . ($amendment['order_id'] ?? '') . '/amendments');
     }

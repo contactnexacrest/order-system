@@ -964,6 +964,17 @@ async function setDisputeButtonVisible(req, res) {
 /** Stage 5: fill the Supplier PO's material/commercial terms — creates order_supplier_po ahead of generating the SUPPO document. */
 async function saveSupplierPo(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  // QA-4 P0.5: confirmSupplierSigned() (below) already gates on Stage 5
+  // being unlocked, but this function — which actually creates the
+  // order_supplier_po row and mints its reference number ahead of
+  // generating the SUPPO document — never did, so holding manage_orders
+  // alone was enough to save/generate a Supplier PO for an order still at
+  // Stage 1, before a Buyer PO, PI or OC even existed.
+  if (!(await stageGateService.isUnlocked(orderId, 5))) {
+    flash.set(req, 'error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const supplierId = parseInt(req.body.supplier_id || 0, 10);
   if (!supplierId) {
     flash.set(req, 'error', 'Select or add a supplier first.');

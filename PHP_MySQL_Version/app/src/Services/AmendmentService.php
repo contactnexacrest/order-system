@@ -128,6 +128,23 @@ final class AmendmentService
 
     public static function rejectAmendment(int $amendmentId, int $userId): void
     {
+        // QA-4 P0.5: every sibling transition here (approveByMd,
+        // generateDocument, attachSignedCopyAndActivate) re-validates the
+        // amendment's current status before acting — this one didn't, and
+        // AmendmentRepository::reject() unconditionally overwrites status to
+        // 'rejected' with no WHERE-clause guard of its own. Without this,
+        // rejecting an already-'active' amendment (whose override was
+        // already applied to the order's payment terms via
+        // attachSignedCopyAndActivate) would silently relabel it 'rejected'
+        // while the order kept the amended terms — or "rejecting" an
+        // already-'rejected' one would just no-op loudly into the audit log.
+        $amendment = AmendmentRepository::find($amendmentId);
+        if (!$amendment) {
+            throw new \RuntimeException("Amendment {$amendmentId} not found");
+        }
+        if ($amendment['status'] !== 'pending') {
+            throw new \RuntimeException('Only a pending amendment can be rejected.');
+        }
         AmendmentRepository::reject($amendmentId);
         AuditLogRepository::log($userId, 'AMENDMENT_REJECTED', 'amendments', $amendmentId);
     }

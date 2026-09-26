@@ -87,8 +87,12 @@ async function reject(req, res) {
   const amendmentId = parseInt(req.params.amendmentId, 10);
   const amendment = await amendmentRepository.find(amendmentId);
 
-  await amendmentService.rejectAmendment(amendmentId, req.user.id);
-  flash.set(req, 'success', 'Amendment request rejected.');
+  try {
+    await amendmentService.rejectAmendment(amendmentId, req.user.id);
+    flash.set(req, 'success', 'Amendment request rejected.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
 
   res.redirect(`/orders/${(amendment && amendment.order_id) || ''}/amendments`);
 }

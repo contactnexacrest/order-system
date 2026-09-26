@@ -90,6 +90,19 @@ final class DisputeController
         $status = (string) ($_POST['status'] ?? '');
         $resolutionNotes = trim((string) ($_POST['resolution_notes'] ?? ''));
 
+        // QA-4 P0.5: this took $_POST['status'] straight into the DB with no
+        // check against the dispute_status dropdown at all (status is a bare
+        // VARCHAR(30), not a DB-level enum) — any value, including one that
+        // doesn't exist in the dropdown Admin manages, would silently save
+        // and then desync every report/filter that matches on the exact
+        // option string (e.g. DisputeRepository::all($statusFilter)).
+        $validStatuses = array_column(LookupRepository::dropdownOptions('dispute_status'), 'option_value');
+        if (!in_array($status, $validStatuses, true)) {
+            Flash::set('error', 'Invalid dispute status.');
+            header("Location: /orders/{$dispute['order_id']}/disputes");
+            return;
+        }
+
         if ($status === 'Resolved') {
             DisputeRepository::resolve($disputeId, $resolutionNotes ?: 'Resolved.');
         } else {

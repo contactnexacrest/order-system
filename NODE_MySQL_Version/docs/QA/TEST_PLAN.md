@@ -274,8 +274,43 @@ Infrastructure (QA-2) is live on both stacks:
    immediately before the actual send attempt in `dispatch()`; verified
    directly by reverting the fix and confirming the new regression test
    fails, then restoring it.
-5. A systematic pass over every `manage_*`-gated write route asking
-   Section 6's P0.5 question, fixing what QA-1-style bugs turn up.
+5. ✅ Systematic pass over every `manage_*`-gated write route asking
+   Section 6's P0.5 question (P0.5) — `PermissionStateSweepTest.php`/
+   `permissionStateSweep.test.js`. One candidate finding was investigated
+   and deliberately left alone: `OrderController::closeOrder()`/
+   `ordersController.closeOrder()` never checks `bl_originals_received_at`/
+   `bl_endorsed_at` before closing an order, which looks QA-1-shaped, but
+   `docs/SOP/09-stage9-despatch-closure.md` explicitly documents this as
+   intentional ("the system trusts staff to follow the real-world process
+   in the right order rather than enforcing it as a hard rule here") — not
+   a bug, so not fixed. Three genuine gaps were found and fixed on both
+   stacks:
+   - `DisputeController::updateStatus()`/`disputeController.updateStatus()`
+     took `status` straight from the request into the DB with no check
+     against the `dispute_status` dropdown at all (`disputes.status` is a
+     bare `VARCHAR(30)`, not a DB-level enum) — any string, including one
+     that doesn't exist in the dropdown Admin manages, would silently save
+     and desync every report/filter that matches on the exact option
+     string. Fixed by validating against `dropdown_options` before writing.
+   - `OrderController::saveSupplierPo()`/`ordersController.saveSupplierPo()`
+     — the method that actually creates `order_supplier_po` and mints its
+     reference number ahead of generating the SUPPO document — never
+     checked Stage 5 was unlocked, unlike `confirmSupplierSigned()` right
+     next to it. Holding `manage_orders` alone was enough to save/generate
+     a Supplier PO for an order still at Stage 1, before a Buyer PO, PI or
+     OC even existed. Fixed by adding the same `isUnlocked($orderId, 5)`
+     gate `confirmSupplierSigned()` already had.
+   - `AmendmentService::rejectAmendment()` never re-checked the amendment's
+     current status, unlike every sibling transition (`approveByMd()`,
+     `generateDocument()`, `attachSignedCopyAndActivate()`) —
+     `AmendmentRepository::reject()` unconditionally overwrites status to
+     `'rejected'` with no `WHERE`-clause guard of its own. Rejecting an
+     already-`active` amendment (whose override was already applied to the
+     order's payment terms) would silently relabel it `'rejected'` while
+     the order kept the amended terms. Fixed by requiring status
+     `'pending'`, mirroring `approveByMd()`'s guard.
+   All three were verified by reverting each fix and confirming its
+   regression test failed with the expected diagnostic, then restoring it.
 6. P1 financial-integrity suites.
 7. P2/P3 suites as capacity allows, prioritized by which modules see the
    most real usage.

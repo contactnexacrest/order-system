@@ -95,6 +95,18 @@ async function updateStatus(req, res) {
   const status = String(req.body.status || '');
   const resolutionNotes = String(req.body.resolution_notes || '').trim();
 
+  // QA-4 P0.5: this took req.body.status straight into the DB with no check
+  // against the dispute_status dropdown at all (status is a bare VARCHAR(30),
+  // not a DB-level enum) — any value, including one that doesn't exist in
+  // the dropdown Admin manages, would silently save and then desync every
+  // report/filter that matches on the exact option string.
+  const validStatuses = (await lookupRepository.dropdownOptions('dispute_status')).map((row) => row.option_value);
+  if (!validStatuses.includes(status)) {
+    flash.set(req, 'error', 'Invalid dispute status.');
+    res.redirect(`/orders/${dispute.order_id}/disputes`);
+    return;
+  }
+
   if (status === 'Resolved') {
     await disputeRepository.resolve(disputeId, resolutionNotes || 'Resolved.');
   } else {

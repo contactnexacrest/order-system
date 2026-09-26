@@ -131,6 +131,21 @@ async function approveByMd(amendmentId, mdUserId) {
 }
 
 async function rejectAmendment(amendmentId, userId) {
+  // QA-4 P0.5: every sibling transition here (approveByMd, generateDocument,
+  // attachSignedCopyAndActivate) re-validates the amendment's current status
+  // before acting — this one didn't, and amendmentRepository.reject()
+  // unconditionally overwrites status to 'rejected' with no WHERE-clause
+  // guard of its own. Without this, rejecting an already-'active' amendment
+  // (whose override was already applied to the order's payment terms via
+  // attachSignedCopyAndActivate) would silently relabel it 'rejected' while
+  // the order kept the amended terms.
+  const amendment = await amendmentRepository.find(amendmentId);
+  if (!amendment) {
+    throw new Error(`Amendment ${amendmentId} not found`);
+  }
+  if (amendment.status !== 'pending') {
+    throw new Error('Only a pending amendment can be rejected.');
+  }
   await amendmentRepository.reject(amendmentId);
   await auditLogRepository.log(userId, 'AMENDMENT_REJECTED', 'amendments', amendmentId);
 }
