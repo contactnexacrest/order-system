@@ -138,6 +138,25 @@ abstract class DbTestCase extends TestCase
         return (int) $pdo->lastInsertId();
     }
 
+    /** A minimal real document row for the given order + document type code, returns its id. */
+    protected function createTestDocument(int $orderId, string $typeCode = 'QT', string $status = 'draft', ?int $pdfFileId = null): int
+    {
+        $pdo = \App\Config\Database::connection();
+        $typeId = (int) $pdo->query('SELECT id FROM document_types WHERE code = ' . $pdo->quote($typeCode))->fetchColumn();
+        $stmt = $pdo->prepare(
+            "INSERT INTO documents (order_id, document_type_id, document_reference, status, pdf_file_id)
+             VALUES (:order_id, :type_id, :ref, :status, :pdf_file_id)"
+        );
+        $stmt->execute([
+            'order_id'    => $orderId,
+            'type_id'     => $typeId,
+            'ref'         => 'PHPUNIT-DOC-' . bin2hex(random_bytes(4)),
+            'status'      => $status,
+            'pdf_file_id' => $pdfFileId,
+        ]);
+        return (int) $pdo->lastInsertId();
+    }
+
     /** A minimal real file_store row (RECEIVED origin), returns its id. */
     protected function createTestFile(?int $orderId = null, ?int $clientId = null): int
     {

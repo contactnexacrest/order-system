@@ -257,7 +257,23 @@ Infrastructure (QA-2) is live on both stacks:
    — real controller/HTTP call, real database check — and both were
    verified to actually fail when that route's guard call was temporarily
    removed, then reverted.
-4. Amendment/document-review/email-approval gate suite (P0.4).
+4. ✅ Amendment/document-review/email-approval gate suite (P0.4) —
+   `AmendmentDocumentEmailGatesTest.php`/`amendmentDocumentEmailGates.test.js`.
+   Amendment: `generateDocument()`/`attachSignedCopyAndActivate()` both
+   already refuse a not-yet-MD-approved amendment (pinned, not a gap).
+   Document review: a document approves only once every required
+   reviewer has approved with none pending/rejected, and a rejection
+   reverts it to draft rather than approving.
+   Email: `buildPreview()`/`requestSend()` already refuse a non-approved
+   document — but a genuine gap was found and fixed here: `dispatch()`
+   never re-checked the document's live status before sending, so a
+   reviewer assigned to an already-approved/sent document who later
+   rejects it (reverting it to `draft` without clearing `pdf_file_id`)
+   left a stale approved PDF still reachable from any send already queued
+   against it. Fixed on both stacks by re-checking `status === 'approved'`
+   immediately before the actual send attempt in `dispatch()`; verified
+   directly by reverting the fix and confirming the new regression test
+   fails, then restoring it.
 5. A systematic pass over every `manage_*`-gated write route asking
    Section 6's P0.5 question, fixing what QA-1-style bugs turn up.
 6. P1 financial-integrity suites.

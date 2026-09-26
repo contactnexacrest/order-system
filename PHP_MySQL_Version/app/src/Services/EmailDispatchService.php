@@ -187,6 +187,18 @@ final class EmailDispatchService
             EmailLogRepository::markFailed((int) $emailLogRow['id']);
             return false;
         }
+        // Defense in depth (QA-4 P0.4): buildPreview()/requestSend() only
+        // ever queued this row while the document was 'approved', but a
+        // reviewer can still be assigned to, and reject, an already-
+        // approved/sent document afterward — ReviewWorkflowService::reject()
+        // unconditionally reverts it to 'draft' without touching pdf_file_id
+        // or looking at any pending send. Without this re-check here, a
+        // stale approved PDF would still go out to the buyer from a send
+        // queued before that rejection.
+        if ($document['status'] !== 'approved') {
+            EmailLogRepository::markFailed((int) $emailLogRow['id']);
+            return false;
+        }
         $file = FileStoreRepository::find((int) $document['pdf_file_id']);
         if (!$file || !is_file($file['server_path'])) {
             EmailLogRepository::markFailed((int) $emailLogRow['id']);

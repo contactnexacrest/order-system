@@ -216,6 +216,17 @@ async function dispatch(emailLogRow) {
     await emailLogRepository.markFailed(emailLogRow.id);
     return false;
   }
+  // Defense in depth (QA-4 P0.4): buildPreview()/requestSend() only ever
+  // queued this row while the document was 'approved', but a reviewer can
+  // still be assigned to, and reject, an already-approved/sent document
+  // afterward — reviewWorkflowService.reject() unconditionally reverts it
+  // to 'draft' without touching pdf_file_id or looking at any pending
+  // send. Without this re-check here, a stale approved PDF would still go
+  // out to the buyer from a send queued before that rejection.
+  if (document.status !== 'approved') {
+    await emailLogRepository.markFailed(emailLogRow.id);
+    return false;
+  }
   const file = await fileStoreRepository.find(document.pdf_file_id);
   if (!file || !fs.existsSync(file.server_path)) {
     await emailLogRepository.markFailed(emailLogRow.id);
