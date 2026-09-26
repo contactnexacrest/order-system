@@ -359,6 +359,7 @@ CREATE TABLE clients (
   country_of_destination VARCHAR(100) NULL,
   coo_type              VARCHAR(50) NULL,               -- from dropdown_options('coo_type')
   notify_party          VARCHAR(255) NULL,
+  zoho_contact_id       VARCHAR(50) NULL,               -- CA / Accounting module (Phase 3) — cached Zoho Books contact_id once this client is first pushed, so every later sync is a lookup, not a re-create
   duplicate_of_client_id BIGINT UNSIGNED NULL,
   is_active             TINYINT(1) NOT NULL DEFAULT 1,  -- contact fields never hard-deleted; this soft-flags whole record
   is_sample_data        TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real client
@@ -595,6 +596,18 @@ CREATE TABLE order_payment_status (
   balance_firc_received_at        DATE NULL,
   freight_firc_reference          VARCHAR(100) NULL,
   freight_firc_received_at        DATE NULL,
+
+  -- CA / Accounting module (Phase 3) — set once a leg's INR actual has
+  -- been successfully pushed to Zoho Books as a Customer Payment
+  -- (zoho_reference holds that payment's Zoho-side id). NULL means either
+  -- never attempted, or attempted and failed — see zoho_sync_log for
+  -- which, and why.
+  advance_zoho_synced_at          TIMESTAMP NULL,
+  advance_zoho_reference          VARCHAR(100) NULL,
+  balance_zoho_synced_at          TIMESTAMP NULL,
+  balance_zoho_reference          VARCHAR(100) NULL,
+  freight_zoho_synced_at          TIMESTAMP NULL,
+  freight_zoho_reference          VARCHAR(100) NULL,
 
   FOREIGN KEY (order_id) REFERENCES orders(id)
 ) ENGINE=InnoDB;
@@ -980,6 +993,28 @@ CREATE TABLE audit_log (
   INDEX idx_audit_entity (entity_type, entity_id),
   INDEX idx_audit_time (created_at)
   -- No update/delete grants at the application DB-user level for this table.
+) ENGINE=InnoDB;
+
+-- CA / Accounting module (Phase 3) — Zoho Books sync keeps its own
+-- audit/error log, independent of audit_log above, per the module's own
+-- brief ("that sync will maintain his own audit/error logs
+-- independently"). Every sync attempt (manual button or scheduled cron),
+-- success or failure, writes exactly one row here.
+CREATE TABLE zoho_sync_log (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  sync_type             VARCHAR(50) NOT NULL,             -- 'revenue_payment' (Phase 3); other sync types land here as later phases add them
+  entity_type           VARCHAR(50) NULL,                 -- 'order_payment_status'
+  entity_id             BIGINT UNSIGNED NULL,              -- order_id
+  leg                   VARCHAR(20) NULL,                  -- 'advance' | 'balance' | 'freight'
+  status                ENUM('success','error','skipped') NOT NULL,
+  zoho_reference        VARCHAR(100) NULL,                 -- the Zoho-side id created, on success
+  message               TEXT NULL,                         -- human-readable outcome or error detail
+  triggered_by          ENUM('manual','scheduled') NOT NULL,
+  triggered_by_user_id  BIGINT UNSIGNED NULL,               -- set for 'manual', NULL for 'scheduled'
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (triggered_by_user_id) REFERENCES users(id),
+  INDEX idx_zoho_sync_entity (entity_type, entity_id),
+  INDEX idx_zoho_sync_time (created_at)
 ) ENGINE=InnoDB;
 
 -- ================================================================

@@ -27,6 +27,14 @@ final class ClientRepository
         return $stmt->fetch() ?: null;
     }
 
+    /** CA / Accounting module (Phase 3) — caches the Zoho Books contact_id created for this client on first sync. */
+    public static function setZohoContactId(int $id, string $zohoContactId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE clients SET zoho_contact_id = :zoho_contact_id WHERE id = :id'
+        )->execute(['zoho_contact_id' => $zohoContactId, 'id' => $id]);
+    }
+
     /** @return array<int, array<string,mixed>> deactivated clients — never shown in all(), still directly viewable */
     public static function allInactive(): array
     {

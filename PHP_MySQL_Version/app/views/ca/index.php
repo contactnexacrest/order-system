@@ -1,6 +1,6 @@
 <div class="card page-wide">
   <h1>CA / Accounting</h1>
-  <p class="muted">Independent of the order-pipeline system — nothing here affects order stages, and nothing in the order reports feeds this. <a href="/ca/reports">FY / calendar-year revenue reports &rarr;</a></p>
+  <p class="muted">Independent of the order-pipeline system — nothing here affects order stages, and nothing in the order reports feeds this. <a href="/ca/reports">FY / calendar-year revenue reports &rarr;</a> &middot; <a href="/ca/zoho-sync">Zoho Books sync &rarr;</a></p>
 
   <div class="section">
     <h2>INR Settlement Register</h2>
@@ -9,7 +9,7 @@
       <p class="muted">No settlement legs have been cleared yet.</p>
     <?php else: ?>
       <table class="list">
-        <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th></tr>
+        <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th><th>Zoho Books</th></tr>
         <?php foreach ($settlements as $s): ?>
         <tr>
           <td><a href="/orders/<?= (int) $s['order_id'] ?>"><?= htmlspecialchars($s['buyer_inquiry_ref']) ?></a></td>
@@ -44,6 +44,15 @@
               <span class="review-banner bad" style="display:inline-flex; padding:3px 8px;">Pending — flag for follow-up</span>
             <?php else: ?>
               <span class="muted">Not yet recorded</span>
+            <?php endif; ?>
+          </td>
+          <td class="muted small">
+            <?php if ($s['zoho_synced_at'] !== null): ?>
+              Synced <?= htmlspecialchars((string) $s['zoho_synced_at']) ?>
+            <?php elseif ($s['inr_actual'] !== null): ?>
+              Pending
+            <?php else: ?>
+              —
             <?php endif; ?>
           </td>
         </tr>

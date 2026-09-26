@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\Flash;
 use App\Helpers\FinancialYear;
 use App\Helpers\View;
 use App\Repositories\CaRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\UserRepository;
+use App\Repositories\ZohoSyncLogRepository;
+use App\Services\AuthService;
+use App\Services\CaSyncService;
+use App\Services\ZohoBooksService;
 
 /**
  * CA / Accounting module — independent of the order-pipeline system. Every
@@ -68,5 +73,34 @@ final class CaController
             'lutNumber' => CompanySettingsRepository::get('lut_number'),
             'lutValidFy' => CompanySettingsRepository::get('lut_valid_fy'),
         ], 'layout/base');
+    }
+
+    /**
+     * Zoho Books sync status page — config status, the "Sync Now" button,
+     * and the independent zoho_sync_log history. Gated on ca_module_manage
+     * (see public_html/index.php), a step up from ca_module_view, since
+     * this exposes sync error detail and can call an external API.
+     */
+    public function zohoSync(array $params): void
+    {
+        View::render('ca/zoho_sync', [
+            'isEnabled' => ZohoBooksService::isEnabled(),
+            'pendingCount' => count(CaRepository::legsPendingZohoSync()),
+            'log' => ZohoSyncLogRepository::recent(100),
+        ], 'layout/base');
+    }
+
+    public function runZohoSync(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $result = CaSyncService::syncPendingRevenue('manual', (int) $user['id']);
+        if ($result['failed'] > 0) {
+            Flash::set('warning', "Sync finished: {$result['synced']} pushed, {$result['failed']} failed — see the log below for details.");
+        } elseif ($result['synced'] > 0) {
+            Flash::set('success', "Sync finished: {$result['synced']} settlement leg(s) pushed to Zoho Books.");
+        } else {
+            Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
+        }
+        header('Location: /ca/zoho-sync');
     }
 }

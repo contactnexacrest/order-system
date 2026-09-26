@@ -4,6 +4,7 @@ const cron = require('node-cron');
 const checkAlerts = require('./checkAlerts');
 const dispatchDeferredEmails = require('./dispatchDeferredEmails');
 const autoConfirmOcAcknowledgments = require('./autoConfirmOcAcknowledgments');
+const zohoSync = require('./zohoSync');
 const logger = require('../helpers/logger');
 
 /**
@@ -67,7 +68,16 @@ function start() {
     })
   );
 
-  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min).');
+  // Hourly — CA / Accounting module (Phase 3): pushes any settlement leg
+  // with a recorded INR actual but not yet synced to Zoho Books. No-ops
+  // cleanly (one logged "skipped" row) when Zoho Books isn't configured.
+  tasks.push(
+    cron.schedule('0 * * * *', () => {
+      zohoSync.run().catch((e) => logger.error('scheduler:zohoSync', e));
+    })
+  );
+
+  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly).');
   return tasks;
 }
 

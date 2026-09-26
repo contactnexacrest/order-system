@@ -164,10 +164,38 @@ async function setFreightFirc(orderId, reference, receivedAt) {
   );
 }
 
+// ----------------------------------------------------------------
+// CA / Accounting module (Phase 3) — marks a leg as pushed to Zoho
+// Books. Written only by caSyncService, after a successful
+// zohoBooksService.pushRevenuePayment() call.
+// ----------------------------------------------------------------
+
+async function setAdvanceZohoSync(orderId, zohoReference) {
+  await db.execute(
+    'UPDATE order_payment_status SET advance_zoho_synced_at = NOW(), advance_zoho_reference = :ref WHERE order_id = :order_id',
+    { ref: zohoReference, order_id: orderId }
+  );
+}
+
+async function setBalanceZohoSync(orderId, zohoReference) {
+  await db.execute(
+    'UPDATE order_payment_status SET balance_zoho_synced_at = NOW(), balance_zoho_reference = :ref WHERE order_id = :order_id',
+    { ref: zohoReference, order_id: orderId }
+  );
+}
+
+async function setFreightZohoSync(orderId, zohoReference) {
+  await db.execute(
+    'UPDATE order_payment_status SET freight_zoho_synced_at = NOW(), freight_zoho_reference = :ref WHERE order_id = :order_id',
+    { ref: zohoReference, order_id: orderId }
+  );
+}
+
 module.exports = {
   initializeForOrder, find, recordAdvanceReceived, markAdvanceCleared, setBalanceAmount,
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
   setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,
   setFreightInrActual, clearFreightInrActual, clearedSettlements,
   setAssumedExchangeRate, setAdvanceFirc, setBalanceFirc, setFreightFirc,
+  setAdvanceZohoSync, setBalanceZohoSync, setFreightZohoSync,
 };

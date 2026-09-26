@@ -319,7 +319,7 @@ Send to Buyer" section appears per generated document, plus new
 
 ### Bluehost cron setup
 
-Three scheduled jobs, all plain PHP scripts meant to be run via
+Four scheduled jobs, all plain PHP scripts meant to be run via
 cPanel → Cron Jobs (Bluehost's equivalent of a systemd timer — there is no
 persistent worker process on shared hosting, which is exactly why these
 exist as polling scripts rather than a queue consumer):
@@ -328,6 +328,7 @@ exist as polling scripts rather than a queue consumer):
 */10 * * * *  php /home/yourcpaneluser/nexacrest_webapp/app/cron/dispatch_deferred_emails.php >> /home/yourcpaneluser/logs/dispatch_deferred_emails.log 2>&1
 */15 * * * *  php /home/yourcpaneluser/nexacrest_webapp/app/cron/auto_confirm_oc_acknowledgments.php >> /home/yourcpaneluser/logs/auto_confirm_oc_acknowledgments.log 2>&1
 0 6 * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/check_alerts.php >> /home/yourcpaneluser/logs/check_alerts.log 2>&1
+0 * * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/zoho_sync.php >> /home/yourcpaneluser/logs/zoho_sync.log 2>&1
 ```
 
 - `dispatch_deferred_emails.php` — recommended every 5–15 minutes. Sends
@@ -348,8 +349,14 @@ exist as polling scripts rather than a queue consumer):
   creates in-app notifications for Admin/MD (see "Real bugs found" below —
   this has a same-day dedup guard so it doesn't re-notify on every run
   while a condition remains unresolved).
+- `zoho_sync.php` — CA / Accounting module (Phase 3). Recommended hourly.
+  Pushes every settlement leg with an INR actual recorded but not yet
+  synced to Zoho Books as a customer payment; no-ops cleanly (one logged
+  "skipped" row, exit 0) if Zoho Books isn't configured yet. Same
+  `/ca/zoho-sync` page shows this job's log alongside the manual "Sync
+  Now" button's.
 
-All three scripts print a one-line summary to stdout and exit 0 on
+All four scripts print a one-line summary to stdout and exit 0 on
 success — redirect that to a log file (as above) so a Bluehost cron failure notice
 actually tells you something.
 

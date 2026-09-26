@@ -14,6 +14,11 @@ async function find(id) {
   return db.queryOne('SELECT * FROM clients WHERE id = :id', { id });
 }
 
+/** CA / Accounting module (Phase 3) — caches the Zoho Books contact_id created for this client on first sync. */
+async function setZohoContactId(id, zohoContactId) {
+  await db.execute('UPDATE clients SET zoho_contact_id = :zoho_contact_id WHERE id = :id', { zoho_contact_id: zohoContactId, id });
+}
+
 async function allInactive() {
   return db.query('SELECT * FROM clients WHERE is_active = 0 ORDER BY company_legal_name');
 }
@@ -107,4 +112,4 @@ async function lockData(id, reason) {
   );
 }
 
-module.exports = { all, find, allInactive, create, update, setActive, markSample, markTest, lockData };
+module.exports = { all, find, allInactive, create, update, setActive, markSample, markTest, lockData, setZohoContactId };

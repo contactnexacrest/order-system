@@ -187,6 +187,33 @@ final class OrderPaymentStatusRepository
         )->execute(['ref' => $reference, 'received_at' => $receivedAt, 'order_id' => $orderId]);
     }
 
+    // ----------------------------------------------------------------
+    // CA / Accounting module (Phase 3) — marks a leg as pushed to Zoho
+    // Books. Written only by CaSyncService, after a successful
+    // ZohoBooksService::pushRevenuePayment() call.
+    // ----------------------------------------------------------------
+
+    public static function setAdvanceZohoSync(int $orderId, string $zohoReference): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status SET advance_zoho_synced_at = NOW(), advance_zoho_reference = :ref WHERE order_id = :order_id'
+        )->execute(['ref' => $zohoReference, 'order_id' => $orderId]);
+    }
+
+    public static function setBalanceZohoSync(int $orderId, string $zohoReference): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status SET balance_zoho_synced_at = NOW(), balance_zoho_reference = :ref WHERE order_id = :order_id'
+        )->execute(['ref' => $zohoReference, 'order_id' => $orderId]);
+    }
+
+    public static function setFreightZohoSync(int $orderId, string $zohoReference): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_payment_status SET freight_zoho_synced_at = NOW(), freight_zoho_reference = :ref WHERE order_id = :order_id'
+        )->execute(['ref' => $zohoReference, 'order_id' => $orderId]);
+    }
+
     /**
      * Every order with at least one cleared settlement leg, for the CA
      * module's settlement register (CaRepository). Joined here rather than

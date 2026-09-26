@@ -13,9 +13,9 @@ const financialYear = require('../helpers/financialYear');
 // further.
 
 const LEGS = [
-  { leg: 'advance', amountCol: 'advance_amount', clearedCol: 'advance_cleared_at', inrCol: 'advance_inr_actual', inrAtCol: 'advance_inr_actual_recorded_at', inrByCol: 'advance_inr_actual_recorded_by', fircCol: 'advance_firc_reference', fircAtCol: 'advance_firc_received_at' },
-  { leg: 'balance', amountCol: 'balance_amount', clearedCol: 'balance_cleared_at', inrCol: 'balance_inr_actual', inrAtCol: 'balance_inr_actual_recorded_at', inrByCol: 'balance_inr_actual_recorded_by', fircCol: 'balance_firc_reference', fircAtCol: 'balance_firc_received_at' },
-  { leg: 'freight', amountCol: 'freight_amount', clearedCol: 'freight_cleared_at', inrCol: 'freight_inr_actual', inrAtCol: 'freight_inr_actual_recorded_at', inrByCol: 'freight_inr_actual_recorded_by', fircCol: 'freight_firc_reference', fircAtCol: 'freight_firc_received_at' },
+  { leg: 'advance', amountCol: 'advance_amount', clearedCol: 'advance_cleared_at', inrCol: 'advance_inr_actual', inrAtCol: 'advance_inr_actual_recorded_at', inrByCol: 'advance_inr_actual_recorded_by', fircCol: 'advance_firc_reference', fircAtCol: 'advance_firc_received_at', zohoAtCol: 'advance_zoho_synced_at', zohoRefCol: 'advance_zoho_reference' },
+  { leg: 'balance', amountCol: 'balance_amount', clearedCol: 'balance_cleared_at', inrCol: 'balance_inr_actual', inrAtCol: 'balance_inr_actual_recorded_at', inrByCol: 'balance_inr_actual_recorded_by', fircCol: 'balance_firc_reference', fircAtCol: 'balance_firc_received_at', zohoAtCol: 'balance_zoho_synced_at', zohoRefCol: 'balance_zoho_reference' },
+  { leg: 'freight', amountCol: 'freight_amount', clearedCol: 'freight_cleared_at', inrCol: 'freight_inr_actual', inrAtCol: 'freight_inr_actual_recorded_at', inrByCol: 'freight_inr_actual_recorded_by', fircCol: 'freight_firc_reference', fircAtCol: 'freight_firc_received_at', zohoAtCol: 'freight_zoho_synced_at', zohoRefCol: 'freight_zoho_reference' },
 ];
 
 /**
@@ -49,6 +49,7 @@ async function settlementRegister() {
 
       rows.push({
         order_id: ops.order_id,
+        client_id: ops.client_id,
         buyer_inquiry_ref: ops.buyer_inquiry_ref,
         company_legal_name: ops.company_legal_name,
         currency_code: ops.currency_code,
@@ -64,11 +65,23 @@ async function settlementRegister() {
         firc_reference: ops[legDef.fircCol] ?? null,
         firc_received_at: ops[legDef.fircAtCol] ?? null,
         firc_pending: fircPending,
+        zoho_synced_at: ops[legDef.zohoAtCol] ?? null,
+        zoho_reference: ops[legDef.zohoRefCol] ?? null,
       });
     }
   }
   rows.sort((a, b) => String(b.cleared_at).localeCompare(String(a.cleared_at)));
   return rows;
+}
+
+/**
+ * Every leg with an INR actual on record that hasn't been pushed to Zoho
+ * Books yet — what caSyncService.syncPendingRevenue() works through on
+ * each run (manual or scheduled).
+ */
+async function legsPendingZohoSync() {
+  const rows = await settlementRegister();
+  return rows.filter((r) => r.inr_actual !== null && r.zoho_synced_at === null);
 }
 
 /** FY labels (e.g. '2026-27') with at least one cleared leg, newest first. */
@@ -142,4 +155,4 @@ async function revenueReport(mode, period) {
   };
 }
 
-module.exports = { settlementRegister, availableFinancialYears, availableCalendarYears, revenueReport };
+module.exports = { settlementRegister, availableFinancialYears, availableCalendarYears, revenueReport, legsPendingZohoSync };

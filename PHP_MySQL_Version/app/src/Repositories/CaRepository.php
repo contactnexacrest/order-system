@@ -18,9 +18,9 @@ use App\Helpers\FinancialYear;
 final class CaRepository
 {
     private const LEGS = [
-        ['leg' => 'advance', 'amount_col' => 'advance_amount', 'cleared_col' => 'advance_cleared_at', 'inr_col' => 'advance_inr_actual', 'inr_at_col' => 'advance_inr_actual_recorded_at', 'inr_by_col' => 'advance_inr_actual_recorded_by', 'firc_col' => 'advance_firc_reference', 'firc_at_col' => 'advance_firc_received_at'],
-        ['leg' => 'balance', 'amount_col' => 'balance_amount', 'cleared_col' => 'balance_cleared_at', 'inr_col' => 'balance_inr_actual', 'inr_at_col' => 'balance_inr_actual_recorded_at', 'inr_by_col' => 'balance_inr_actual_recorded_by', 'firc_col' => 'balance_firc_reference', 'firc_at_col' => 'balance_firc_received_at'],
-        ['leg' => 'freight', 'amount_col' => 'freight_amount', 'cleared_col' => 'freight_cleared_at', 'inr_col' => 'freight_inr_actual', 'inr_at_col' => 'freight_inr_actual_recorded_at', 'inr_by_col' => 'freight_inr_actual_recorded_by', 'firc_col' => 'freight_firc_reference', 'firc_at_col' => 'freight_firc_received_at'],
+        ['leg' => 'advance', 'amount_col' => 'advance_amount', 'cleared_col' => 'advance_cleared_at', 'inr_col' => 'advance_inr_actual', 'inr_at_col' => 'advance_inr_actual_recorded_at', 'inr_by_col' => 'advance_inr_actual_recorded_by', 'firc_col' => 'advance_firc_reference', 'firc_at_col' => 'advance_firc_received_at', 'zoho_at_col' => 'advance_zoho_synced_at', 'zoho_ref_col' => 'advance_zoho_reference'],
+        ['leg' => 'balance', 'amount_col' => 'balance_amount', 'cleared_col' => 'balance_cleared_at', 'inr_col' => 'balance_inr_actual', 'inr_at_col' => 'balance_inr_actual_recorded_at', 'inr_by_col' => 'balance_inr_actual_recorded_by', 'firc_col' => 'balance_firc_reference', 'firc_at_col' => 'balance_firc_received_at', 'zoho_at_col' => 'balance_zoho_synced_at', 'zoho_ref_col' => 'balance_zoho_reference'],
+        ['leg' => 'freight', 'amount_col' => 'freight_amount', 'cleared_col' => 'freight_cleared_at', 'inr_col' => 'freight_inr_actual', 'inr_at_col' => 'freight_inr_actual_recorded_at', 'inr_by_col' => 'freight_inr_actual_recorded_by', 'firc_col' => 'freight_firc_reference', 'firc_at_col' => 'freight_firc_received_at', 'zoho_at_col' => 'freight_zoho_synced_at', 'zoho_ref_col' => 'freight_zoho_reference'],
     ];
 
     /**
@@ -57,6 +57,7 @@ final class CaRepository
 
                 $rows[] = [
                     'order_id' => (int) $ops['order_id'],
+                    'client_id' => (int) $ops['client_id'],
                     'buyer_inquiry_ref' => $ops['buyer_inquiry_ref'],
                     'company_legal_name' => $ops['company_legal_name'],
                     'currency_code' => $ops['currency_code'],
@@ -72,11 +73,28 @@ final class CaRepository
                     'firc_reference' => $ops[$legDef['firc_col']],
                     'firc_received_at' => $ops[$legDef['firc_at_col']],
                     'firc_pending' => $fircPending,
+                    'zoho_synced_at' => $ops[$legDef['zoho_at_col']],
+                    'zoho_reference' => $ops[$legDef['zoho_ref_col']],
                 ];
             }
         }
         usort($rows, static fn(array $a, array $b): int => strcmp((string) $b['cleared_at'], (string) $a['cleared_at']));
         return $rows;
+    }
+
+    /**
+     * Every leg with an INR actual on record that hasn't been pushed to
+     * Zoho Books yet — what CaSyncService::syncPendingRevenue() works
+     * through on each run (manual or scheduled).
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function legsPendingZohoSync(): array
+    {
+        return array_values(array_filter(
+            self::settlementRegister(),
+            static fn(array $r): bool => $r['inr_actual'] !== null && $r['zoho_synced_at'] === null
+        ));
     }
 
     /** FY labels (e.g. '2026-27') with at least one cleared leg, newest first. @return array<int,string> */

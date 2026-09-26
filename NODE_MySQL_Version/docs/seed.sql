@@ -65,7 +65,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('ca_module_view',            'View CA / Accounting module',   'View the CA/Accounting module (independent of the order-pipeline system) — the INR settlement register and, as later phases land, revenue/expense/reconciliation reports.', 'ca'),
   ('inr_actual_view',           'View INR actual settlement amounts', 'See the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
   ('inr_actual_edit',           'Add/edit INR actual settlement amounts', 'Record or correct the actual INR amount credited to the bank for a cleared advance/balance/freight payment.', 'ca'),
-  ('inr_actual_delete',         'Delete INR actual settlement amounts', 'Remove a recorded INR actual amount (e.g. to correct a mis-entry) — kept separate from edit since this is a destructive correction, not routine data entry.', 'ca');
+  ('inr_actual_delete',         'Delete INR actual settlement amounts', 'Remove a recorded INR actual amount (e.g. to correct a mis-entry) — kept separate from edit since this is a destructive correction, not routine data entry.', 'ca'),
+  ('ca_module_manage',          'Manage CA / Accounting integrations', 'Trigger a Zoho Books sync and view its log — kept separate from ca_module_view since this calls an external API and can expose sync error detail, not just read the register.', 'ca');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -85,7 +86,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Accounts Executive'
-  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit');
+  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
@@ -492,6 +493,23 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('zoho_from_address',   '', 'string',  'zoho', 'The Zoho mailbox address mail is sent from — must be one of the Zoho account''s own verified addresses.', 0),
   ('zoho_accounts_domain', 'accounts.zoho.com', 'string', 'zoho', 'Zoho OAuth token endpoint domain — Zoho is region-specific (accounts.zoho.com / .eu / .in / .com.cn / .com.au, matching whichever data center the Zoho One account lives in).', 0),
   ('zoho_api_domain',      'mail.zoho.com', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0);
+
+-- CA / Accounting module (Phase 3) — Zoho Books sync. A separate OAuth
+-- self-client registration from zoho_client_id/etc. above (Zoho Mail and
+-- Zoho Books are different API scopes, so their refresh tokens are
+-- independent even under the same Zoho One subscription). Off by default
+-- — zoho_books_enabled = '0' until every credential below is filled in;
+-- caSyncService treats "not enabled" as a routine no-op, never a blocker
+-- (see zohoSyncLogRepository/caSyncService docblocks).
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('zoho_books_enabled',            '0', 'boolean', 'zoho_books', 'Master on/off switch for syncing revenue to Zoho Books. Off by default (no credentials configured yet) — when off, Sync Now and the scheduled job both log a single "skipped, not configured" entry and exit cleanly.', 0),
+  ('zoho_books_client_id',          '', 'string',  'zoho_books', 'Zoho Books API Console self-client OAuth Client ID.', 1),
+  ('zoho_books_client_secret',      '', 'string',  'zoho_books', 'Zoho Books API Console self-client OAuth Client Secret.', 1),
+  ('zoho_books_refresh_token',      '', 'string',  'zoho_books', 'Zoho Books OAuth refresh token (ZohoBooks.fullaccess scope) — exchanged for a short-lived access token on each sync.', 1),
+  ('zoho_books_organization_id',    '', 'string',  'zoho_books', 'Zoho Books organization ID — required on every Books API call.', 1),
+  ('zoho_books_deposit_account_id', '', 'string',  'zoho_books', 'The Zoho Books chart-of-accounts account ID that synced customer payments are recorded as deposited into (e.g. your bank account in Zoho Books).', 1),
+  ('zoho_books_accounts_domain',    'accounts.zoho.com', 'string', 'zoho_books', 'Zoho OAuth token endpoint domain — region-specific, matching whichever data center the Zoho One account lives in.', 0),
+  ('zoho_books_api_domain',         'www.zohoapis.com', 'string', 'zoho_books', 'Zoho Books API domain — matches zoho_books_accounts_domain''s region (www.zohoapis.com / .eu / .in / .com.cn / .com.au).', 0);
 
 -- Addition beyond the spec's named key list: the signature/seal on generated
 -- documents are electronic marks, not a scan of a wet-ink signature or a
