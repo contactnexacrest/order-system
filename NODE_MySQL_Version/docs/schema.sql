@@ -56,7 +56,8 @@ CREATE TABLE company_settings (
 -- password_expiry_days, non_usd_price_buffer_pct, revision_start_number,
 -- master_tracking_ref_format, client_number_format, order_ref_format,
 -- dispute_response_days_n, weekly_off_days, show_generated_document_disclaimer,
--- generated_document_disclaimer_text
+-- generated_document_disclaimer_text, wet_signature_required_buyer_po,
+-- wet_signature_required_supplier_po
 
 CREATE TABLE ports (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -2322,4 +2323,8 @@ ALTER TABLE order_supplier_po
 -- signature, Zoho Mail integration) added 2026-09-24.
 -- Section AJ (client reorder requests) added 2026-09-26.
 -- Section AK (supplier PO signing timestamp) added 2026-09-26.
+-- Wet-signature-required flags (wet_signature_required_buyer_po,
+-- wet_signature_required_supplier_po) added 2026-09-26 as company_settings
+-- rows in seed.sql — no ALTER needed, company_settings is already a
+-- key-value table (see Section A).
 -- ================================================================

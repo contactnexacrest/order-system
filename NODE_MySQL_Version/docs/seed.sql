@@ -523,6 +523,27 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('show_generated_document_disclaimer', '1', 'boolean', 'documents', 'Show the "system-generated document" disclaimer under the signature block on any generated document that carries a signature/seal image. Set to 0 to hide it everywhere.', 0),
   ('generated_document_disclaimer_text', 'This is a system-generated document. The signature and company seal shown are NexaCrest''s authorised electronic signature and digital company seal, applied automatically by the order management system under internal document-authorisation controls.', 'string', 'documents', 'Exact wording shown under the signature block when the disclaimer above is enabled. Edit freely — no code change needed.', 0);
 
+-- Wet-signature-required flags. This was discussed early on but left
+-- unbuilt (docs/SOP/README.md "Still pending", task tracker item #106):
+-- recordBuyerPo() (Stage 2) and confirmSupplierSigned() (Stage 5) have
+-- always let staff pass their gate with a button click alone — the
+-- upload-signed-copy endpoint next to each one is a separate, optional
+-- action, never actually required to advance the stage (see the "Real
+-- gap this closes" docblocks on uploadBuyerPoDocument()/
+-- uploadSupplierPoDocument() in orderController). That is the loophole:
+-- a stage can be confirmed "signed" with zero physical evidence ever
+-- attached to the order. These two flags close it — default ON, so the
+-- gate now refuses to pass without at least one uploaded copy already on
+-- file for that PO — while staying Admin-toggleable per document type
+-- for a workflow that genuinely doesn't need the physical copy (e.g. a
+-- trusted repeat counterparty operating purely on emailed confirmations).
+-- Amendments need no equivalent flag: attachSignedCopyAndActivate() is
+-- already the ONLY path to an amendment becoming active, so that gate was
+-- never bypassable in the first place.
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('wet_signature_required_buyer_po', '1', 'boolean', 'workflow', 'When on, Stage 2 (Buyer PO) cannot be confirmed until the buyer''s signed PO copy has been uploaded for this order via "Attach Buyer PO copy". Default on — this is the fix for a real gap: recording just a reference number used to be enough to pass the gate.', 0),
+  ('wet_signature_required_supplier_po', '1', 'boolean', 'workflow', 'When on, Stage 5 (Supplier PO) cannot be confirmed signed until the supplier''s signed acknowledgment copy has been uploaded for the current Supplier PO version. Default on — same class of gap as the Buyer PO flag above.', 0);
+
 -- Protected by default: the 12 is_sensitive fields (identity/banking/
 -- compliance — a wrong edit is real financial/legal damage), plus the 3
 -- document reference-format strings (changing one mid-year breaks

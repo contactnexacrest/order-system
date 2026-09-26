@@ -25,13 +25,19 @@ confuse one for the other:
 
 2. **Confirm Buyer PO Received** — the field staff actually type the
    buyer's own PO reference number into once it's back. **This is the
-   action that passes Stage 2's gate.** It's a plain text field, required,
-   with no connection to the file upload below it.
+   action that passes Stage 2's gate** — but, per the wet-signature-required
+   flag (on by default; see [Admin & Settings](./15-admin-settings.md)),
+   it also requires that at least one scanned copy has already been
+   attached below first. Typing the reference number alone is not enough:
+   submitting this form with no attached copy on file is refused, with a
+   message pointing back to "Attach Buyer PO Copy."
 
 Separately, **Attach Buyer PO Copy** lets staff keep a scanned/uploaded
 copy of the buyer's actual signed PO on file — version history, every
-upload kept, nothing overwritten. This is purely for record-keeping and
-**does not set the reference number or pass the gate on its own.**
+upload kept, nothing overwritten. This is the record of the counterparty's
+actual signature the flag above checks for; it **still does not set the
+reference number by itself** — that's a separate step, deliberately kept
+as two actions rather than folded into one upload form.
 
 > **Common confusion this causes:** if staff attach the buyer's PO copy but
 > never separately type the reference number into "Confirm Buyer PO

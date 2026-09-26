@@ -10,10 +10,12 @@ table-by-table listing lives in [`_inventory_raw.md`](./_inventory_raw.md);
 this document is the plan built on top of it: what to test, in what order,
 and why.
 
-This plan does not cover the CA/Reports content-gap analysis (missing
-report types) or the wet-signature-flag concept — those are open product
-discussions tracked separately (task tracker item #106 for the
-wet-signature flag), not yet in scope for test-writing.
+This plan does not separately re-cover the CA/Reports content-gap analysis
+or the wet-signature-required flag — both have since been closed (new
+reports/CA additions with their own PHPUnit/Jest coverage in
+`ReportGapsTest`/`CaGapsTest` and their Jest equivalents; the flag with its
+own `WetSignatureGuardTest`/`wetSignatureGuard.test.js`), and are exercised
+through those dedicated suites rather than duplicated here.
 
 ## 1. Scope and application shape
 

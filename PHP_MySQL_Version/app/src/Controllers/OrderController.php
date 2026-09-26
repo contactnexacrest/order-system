@@ -49,6 +49,7 @@ use App\Services\PermissionService;
 use App\Services\ReferenceNumberService;
 use App\Services\StageGateService;
 use App\Services\TestModeService;
+use App\Services\WetSignatureGuardService;
 
 final class OrderController
 {
@@ -766,6 +767,11 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        if (WetSignatureGuardService::buyerPoBlocked($orderId)) {
+            Flash::set('error', 'Wet-signature required: upload the buyer\'s signed PO copy ("Attach Buyer PO copy") before confirming this gate.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderRepository::setBuyersPoRef($orderId, $ref);
         StageGateService::passAndUnlockNext($orderId, 2, (int) $user['id']);
         Flash::set('success', "Buyer PO recorded ({$ref}). Stage 3 (PI / Production) unlocked.");
@@ -1051,6 +1057,11 @@ final class OrderController
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         if (!$supplierPo) {
             Flash::set('error', 'Save the Supplier PO terms and generate the document before confirming signature.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if (WetSignatureGuardService::supplierPoBlocked((int) $supplierPo['id'])) {
+            Flash::set('error', 'Wet-signature required: upload the supplier\'s signed acknowledgment copy before confirming this gate.');
             header("Location: /orders/{$orderId}");
             return;
         }

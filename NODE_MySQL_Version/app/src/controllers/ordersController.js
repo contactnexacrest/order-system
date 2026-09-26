@@ -47,6 +47,7 @@ const documentGenerationService = require('../services/documentGenerationService
 const clientPortalService = require('../services/clientPortalService');
 const fileUploadService = require('../services/fileUploadService');
 const testModeService = require('../services/testModeService');
+const wetSignatureGuardService = require('../services/wetSignatureGuardService');
 
 // Port of App\Controllers\OrderController.
 
@@ -756,6 +757,11 @@ async function recordBuyerPo(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  if (await wetSignatureGuardService.buyerPoBlocked(orderId)) {
+    flash.set(req, 'error', 'Wet-signature required: upload the buyer\'s signed PO copy ("Attach Buyer PO copy") before confirming this gate.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderRepository.setBuyersPoRef(orderId, ref);
   await stageGateService.passAndUnlockNext(orderId, 2, user.id);
   flash.set(req, 'success', `Buyer PO recorded (${ref}). Stage 3 (PI / Production) unlocked.`);
@@ -1037,6 +1043,11 @@ async function confirmSupplierSigned(req, res) {
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
   if (!supplierPo) {
     flash.set(req, 'error', 'Save the Supplier PO terms and generate the document before confirming signature.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (await wetSignatureGuardService.supplierPoBlocked(supplierPo.id)) {
+    flash.set(req, 'error', 'Wet-signature required: upload the supplier\'s signed acknowledgment copy before confirming this gate.');
     res.redirect(`/orders/${orderId}`);
     return;
   }

@@ -42,12 +42,17 @@ actions**:
 1. **Confirm Supplier Signed & Returned PO** — the button staff click once
    the supplier's countersigned PO copy actually comes back. **This is the
    action that passes Stage 5's gate** (and triggers the FOB auto-skip
-   check above).
+   check above) — but, per the wet-signature-required flag (on by
+   default; see [Admin & Settings](./15-admin-settings.md)), clicking it
+   is refused unless the acknowledgment copy below has already been
+   attached for this Supplier PO. There's no way to click straight past
+   this button with nothing on file.
 2. **Attach Supplier PO Acknowledgment** — a separate file upload for
    keeping the supplier's actual signed copy on record, with version
-   history. Like the Buyer PO's attachment, this is purely for
-   record-keeping and **does not by itself confirm the signature or pass
-   the gate**.
+   history. This is the record the flag above checks for; like the Buyer
+   PO's attachment, it **still does not by itself confirm the signature or
+   pass the gate** — that's the separate button above, deliberately kept
+   as two actions.
 
 Once confirmed:
 

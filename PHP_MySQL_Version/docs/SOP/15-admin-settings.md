@@ -57,7 +57,11 @@ mistake (or malice).
 - **Company Settings** — legal name, registered/corporate office, GSTIN/IEC,
   bank details, LUT number — the exact fields snapshotted onto every
   generated document (see the note in [Chapter 1](./01-stage1-enquiry-quotation.md)
-  about data integrity).
+  about data integrity). The **Workflow** category here holds the
+  wet-signature-required flags — on by default, one per document type
+  (Buyer PO, Supplier PO) — that gate [Stage 2](./02-stage2-buyer-po.md)
+  and [Stage 5](./05-stage5-supplier-po.md) on a scanned copy actually
+  being on file before their button can pass the gate.
 - **Holiday Calendar** — the dates the Working Days Calculator (used for
   dispute response deadlines, see [Disputes](./11-disputes.md)) excludes.
 - **HS Codes** — the master list product HS codes must come from; an order
