@@ -367,8 +367,21 @@ Infrastructure (QA-2) is live on both stacks:
      was checked against a deliberately removed status clause to confirm
      it actually fails before being confirmed correct against the real
      query.
-8. P3 suites as capacity allows, prioritized by which modules see the
-   most real usage.
+8. ✅ Core CRUD correctness suite (P3) — `CoreCrudTest.php`/
+   `coreCrud.test.js`, one test per module named in Section 6's P3 tier
+   (Clients, HS Codes, Watermarks, Company Holidays, Email Templates,
+   Product Catalog, the Internal Reference Library, Signatory
+   Designations), each exercising create → read → update → delete/toggle
+   against the real repository. Two upsert-style repositories
+   (`WatermarkSettingsRepository::upsertGlobal()` for the real, shared
+   'global' draft watermark row, and `InternalReferenceDocRepository::
+   upsert()` for the real, shared `WALLREF` reference-doc row) are pinned
+   specifically on "a second call updates the existing row rather than
+   inserting a duplicate," and both tests restore the row's original
+   content afterward since these are genuine shared company-wide
+   settings, not disposable per-test fixtures.
+
+This completes every tier QA-4 set out to build (P0 through P3).
 
 ## Appendix
 
