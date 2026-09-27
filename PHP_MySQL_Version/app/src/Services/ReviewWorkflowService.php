@@ -10,6 +10,7 @@ use App\Repositories\DocumentCrossVerificationRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\DocumentReviewRepository;
 use App\Repositories\NotificationRepository;
+use App\Repositories\UserRepository;
 
 /**
  * Spec Section 9 — REVIEW QUEUE / REVIEWER ASSIGNMENT / REVIEW ACTIONS /
@@ -30,10 +31,50 @@ final class ReviewWorkflowService
             throw new \RuntimeException("Document {$documentId} not found");
         }
 
-        foreach (array_unique($reviewerIds) as $reviewerId) {
-            DocumentReviewRepository::assign($documentId, (int) $reviewerId);
+        // QA-5: validate every requested reviewer up front (all-or-nothing)
+        // before inserting any — a partial insert followed by a thrown
+        // exception would leave some reviewers assigned and others not,
+        // for reasons the caller never sees.
+        $existingReviewerIds = array_map(
+            static fn(array $r): int => (int) $r['reviewer_id'],
+            DocumentReviewRepository::forDocument($documentId)
+        );
+        $generatedBy = $document['generated_by'] !== null ? (int) $document['generated_by'] : null;
+
+        $toAssign = [];
+        foreach (array_unique(array_map('intval', $reviewerIds)) as $reviewerId) {
+            if (in_array($reviewerId, $existingReviewerIds, true)) {
+                // Already has a review row on this document (pending,
+                // approved or rejected) — assigning them again would leave
+                // a second 'pending' row nobody is ever prompted to
+                // resolve, permanently stalling finalizeIfFullyApproved()'s
+                // pending-count check (REV-07).
+                continue;
+            }
+            $reviewer = UserRepository::findById($reviewerId);
+            if (!$reviewer) {
+                throw new \RuntimeException("User {$reviewerId} not found.");
+            }
+            if (!$reviewer['is_active']) {
+                // REV-06: an inactive user (e.g. deactivated after leaving)
+                // can no longer log in to ever act on this assignment,
+                // which would otherwise stall the document in review
+                // forever.
+                throw new \RuntimeException("{$reviewer['name']} is not an active user and cannot be assigned as a reviewer.");
+            }
+            if ($generatedBy !== null && $reviewerId === $generatedBy && !MakerCheckerGuard::selfApprovalAllowed($reviewerId)) {
+                // QA-5 maker-checker (REV-05): the document's own generator
+                // cannot review/approve their own work, unless they're a
+                // Super Admin or hold manage_permissions (owner decision).
+                throw new \RuntimeException("This document's own generator cannot be assigned as its reviewer — a different person must review it.");
+            }
+            $toAssign[] = $reviewerId;
+        }
+
+        foreach ($toAssign as $reviewerId) {
+            DocumentReviewRepository::assign($documentId, $reviewerId);
             NotificationRepository::create(
-                (int) $reviewerId,
+                $reviewerId,
                 null,
                 'review_assigned',
                 (int) $document['order_id'],
@@ -41,19 +82,20 @@ final class ReviewWorkflowService
             );
         }
 
-        if ($document['status'] === 'draft') {
-            DocumentRepository::markInReview($documentId);
+        if (!empty($toAssign)) {
+            if ($document['status'] === 'draft') {
+                DocumentRepository::markInReview($documentId);
+            }
+            AuditLogRepository::log(
+                $assignedByUserId,
+                'REVIEWERS_ASSIGNED',
+                'documents',
+                $documentId,
+                'reviewers',
+                null,
+                implode(',', $toAssign)
+            );
         }
-
-        AuditLogRepository::log(
-            $assignedByUserId,
-            'REVIEWERS_ASSIGNED',
-            'documents',
-            $documentId,
-            'reviewers',
-            null,
-            implode(',', $reviewerIds)
-        );
     }
 
     public static function approve(int $documentReviewId, int $reviewerUserId, ?string $comments): void

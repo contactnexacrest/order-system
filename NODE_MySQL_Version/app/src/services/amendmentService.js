@@ -11,6 +11,7 @@ const permissionRepository = require('../repositories/permissionRepository');
 const referenceNumberService = require('./referenceNumberService');
 const documentDataAssembler = require('./documentDataAssembler');
 const documentGenerationService = require('./documentGenerationService');
+const makerCheckerGuard = require('./makerCheckerGuard');
 
 /**
  * Spec Section 8 — PAYMENT TERMS AMENDMENT SYSTEM (SC/AMD). Orchestrates
@@ -100,7 +101,8 @@ async function createRequest(
     amendedBalanceTriggerOption,
     amendedBalanceDays,
     amendedBalanceAmount,
-    effectiveFrom
+    effectiveFrom,
+    requestedByUserId
   );
 
   await auditLogRepository.log(requestedByUserId, 'AMENDMENT_REQUESTED', 'amendments', amendmentId, 'reason', null, reason);
@@ -125,6 +127,17 @@ async function approveByMd(amendmentId, mdUserId) {
   }
   if (amendment.status !== 'pending') {
     throw new Error('Only a pending amendment can be MD-approved.');
+  }
+  // QA-5 maker-checker (AMD-05): whoever filed this amendment request must
+  // not also be the one who MD-approves it, unless they're a Super Admin
+  // or hold manage_permissions (owner decision).
+  if (
+    amendment.created_by !== null
+    && amendment.created_by !== undefined
+    && Number(amendment.created_by) === Number(mdUserId)
+    && !(await makerCheckerGuard.selfApprovalAllowed(mdUserId))
+  ) {
+    throw new Error('You requested this amendment — a different privileged user must MD-approve it.');
   }
   await amendmentRepository.approveByMd(amendmentId, mdUserId);
   await auditLogRepository.log(mdUserId, 'AMENDMENT_MD_APPROVED', 'amendments', amendmentId);

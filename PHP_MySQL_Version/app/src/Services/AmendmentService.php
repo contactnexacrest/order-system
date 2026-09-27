@@ -96,7 +96,8 @@ final class AmendmentService
             $amendedBalanceTriggerOption,
             $amendedBalanceDays,
             $amendedBalanceAmount,
-            $effectiveFrom
+            $effectiveFrom,
+            $requestedByUserId
         );
 
         AuditLogRepository::log($requestedByUserId, 'AMENDMENT_REQUESTED', 'amendments', $amendmentId, 'reason', null, $reason);
@@ -121,6 +122,15 @@ final class AmendmentService
         }
         if ($amendment['status'] !== 'pending') {
             throw new \RuntimeException('Only a pending amendment can be MD-approved.');
+        }
+        // QA-5 maker-checker (AMD-05): whoever filed this amendment request
+        // must not also be the one who MD-approves it, unless they're a
+        // Super Admin or hold manage_permissions (owner decision).
+        if ($amendment['created_by'] !== null
+            && (int) $amendment['created_by'] === $mdUserId
+            && !MakerCheckerGuard::selfApprovalAllowed($mdUserId)
+        ) {
+            throw new \RuntimeException('You requested this amendment — a different privileged user must MD-approve it.');
         }
         AmendmentRepository::approveByMd($amendmentId, $mdUserId);
         AuditLogRepository::log($mdUserId, 'AMENDMENT_MD_APPROVED', 'amendments', $amendmentId);

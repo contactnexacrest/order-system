@@ -846,9 +846,11 @@ CREATE TABLE amendments (
   signed_copy_file_id   BIGINT UNSIGNED NULL,
   document_id           BIGINT UNSIGNED NULL,   -- the generated SC/AMD document record
   status                ENUM('pending','md_approved','signed','active','rejected') NOT NULL DEFAULT 'pending',
+  created_by            BIGINT UNSIGNED NULL,   -- QA-5 maker-checker: the staff user who filed this request — approveByMd() refuses to let this same user MD-approve their own request (unless Super Admin / manage_permissions)
   created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (order_id) REFERENCES orders(id),
-  FOREIGN KEY (document_id) REFERENCES documents(id)
+  FOREIGN KEY (document_id) REFERENCES documents(id),
+  FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
 ALTER TABLE orders

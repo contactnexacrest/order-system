@@ -2,25 +2,25 @@
 
 const db = require('../config/db');
 
-async function create(amendmentReference, orderId, reason, requestedBy, originalTermsSnapshot, amendedAdvancePct, amendedAdvanceAmount, amendedBalanceTerms, amendedBalanceTriggerOption, amendedBalanceDays, amendedBalanceAmount, effectiveFrom) {
+async function create(amendmentReference, orderId, reason, requestedBy, originalTermsSnapshot, amendedAdvancePct, amendedAdvanceAmount, amendedBalanceTerms, amendedBalanceTriggerOption, amendedBalanceDays, amendedBalanceAmount, effectiveFrom, createdByUserId = null) {
   const result = await db.execute(
     `INSERT INTO amendments
         (amendment_reference, order_id, reason, requested_by, original_terms_snapshot,
          amended_advance_pct, amended_advance_amount, amended_balance_terms,
          amended_balance_trigger_option, amended_balance_days, amended_balance_amount,
-         effective_from, status)
+         effective_from, created_by, status)
      VALUES
         (:ref, :order_id, :reason, :requested_by, :snapshot,
          :amended_advance_pct, :amended_advance_amount, :amended_balance_terms,
          :amended_balance_trigger_option, :amended_balance_days, :amended_balance_amount,
-         :effective_from, 'pending')`,
+         :effective_from, :created_by, 'pending')`,
     {
       ref: amendmentReference, order_id: orderId, reason, requested_by: requestedBy,
       snapshot: JSON.stringify(originalTermsSnapshot),
       amended_advance_pct: amendedAdvancePct, amended_advance_amount: amendedAdvanceAmount,
       amended_balance_terms: amendedBalanceTerms, amended_balance_trigger_option: amendedBalanceTriggerOption,
       amended_balance_days: amendedBalanceDays, amended_balance_amount: amendedBalanceAmount,
-      effective_from: effectiveFrom,
+      effective_from: effectiveFrom, created_by: createdByUserId,
     }
   );
   return result.insertId;

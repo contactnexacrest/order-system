@@ -26,7 +26,8 @@ final class AmendmentRepository
         ?string $amendedBalanceTriggerOption,
         ?int $amendedBalanceDays,
         ?float $amendedBalanceAmount,
-        ?string $effectiveFrom
+        ?string $effectiveFrom,
+        ?int $createdByUserId = null
     ): int {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
@@ -34,12 +35,12 @@ final class AmendmentRepository
                 (amendment_reference, order_id, reason, requested_by, original_terms_snapshot,
                  amended_advance_pct, amended_advance_amount, amended_balance_terms,
                  amended_balance_trigger_option, amended_balance_days, amended_balance_amount,
-                 effective_from, status)
+                 effective_from, created_by, status)
              VALUES
                 (:ref, :order_id, :reason, :requested_by, :snapshot,
                  :amended_advance_pct, :amended_advance_amount, :amended_balance_terms,
                  :amended_balance_trigger_option, :amended_balance_days, :amended_balance_amount,
-                 :effective_from, \'pending\')'
+                 :effective_from, :created_by, \'pending\')'
         );
         $stmt->execute([
             'ref'                    => $amendmentReference,
@@ -54,6 +55,7 @@ final class AmendmentRepository
             'amended_balance_days'   => $amendedBalanceDays,
             'amended_balance_amount' => $amendedBalanceAmount,
             'effective_from'         => $effectiveFrom,
+            'created_by'             => $createdByUserId,
         ]);
         return (int) $pdo->lastInsertId();
     }

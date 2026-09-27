@@ -6,7 +6,9 @@ const documentCrossVerificationRepository = require('../repositories/documentCro
 const documentRepository = require('../repositories/documentRepository');
 const documentReviewRepository = require('../repositories/documentReviewRepository');
 const notificationRepository = require('../repositories/notificationRepository');
+const userRepository = require('../repositories/userRepository');
 const documentGenerationService = require('./documentGenerationService');
+const makerCheckerGuard = require('./makerCheckerGuard');
 
 /**
  * Spec Section 9 — REVIEW QUEUE / REVIEWER ASSIGNMENT / REVIEW ACTIONS /
@@ -25,8 +27,43 @@ async function assignReviewers(documentId, reviewerIds, assignedByUserId) {
     throw new Error(`Document ${documentId} not found`);
   }
 
-  const uniqueIds = [...new Set(reviewerIds)];
-  for (const reviewerId of uniqueIds) {
+  // QA-5: validate every requested reviewer up front (all-or-nothing)
+  // before inserting any — a partial insert followed by a thrown error
+  // would leave some reviewers assigned and others not, for reasons the
+  // caller never sees.
+  const existingReviews = await documentReviewRepository.forDocument(documentId);
+  const existingReviewerIds = new Set(existingReviews.map((r) => Number(r.reviewer_id)));
+  const generatedBy = document.generated_by !== null && document.generated_by !== undefined ? Number(document.generated_by) : null;
+
+  const toAssign = [];
+  for (const rawId of new Set(reviewerIds.map(Number))) {
+    if (existingReviewerIds.has(rawId)) {
+      // Already has a review row on this document (pending, approved or
+      // rejected) — assigning them again would leave a second 'pending'
+      // row nobody is ever prompted to resolve, permanently stalling
+      // finalizeIfFullyApproved()'s pending-count check (REV-07).
+      continue;
+    }
+    const reviewer = await userRepository.findById(rawId);
+    if (!reviewer) {
+      throw new Error(`User ${rawId} not found.`);
+    }
+    if (!reviewer.is_active) {
+      // REV-06: an inactive user (e.g. deactivated after leaving) can no
+      // longer log in to ever act on this assignment, which would
+      // otherwise stall the document in review forever.
+      throw new Error(`${reviewer.name} is not an active user and cannot be assigned as a reviewer.`);
+    }
+    if (generatedBy !== null && rawId === generatedBy && !(await makerCheckerGuard.selfApprovalAllowed(rawId))) {
+      // QA-5 maker-checker (REV-05): the document's own generator cannot
+      // review/approve their own work, unless they're a Super Admin or
+      // hold manage_permissions (owner decision).
+      throw new Error("This document's own generator cannot be assigned as its reviewer — a different person must review it.");
+    }
+    toAssign.push(rawId);
+  }
+
+  for (const reviewerId of toAssign) {
     await documentReviewRepository.assign(documentId, reviewerId);
     await notificationRepository.create(
       reviewerId,
@@ -37,11 +74,12 @@ async function assignReviewers(documentId, reviewerIds, assignedByUserId) {
     );
   }
 
-  if (document.status === 'draft') {
-    await documentRepository.markInReview(documentId);
+  if (toAssign.length > 0) {
+    if (document.status === 'draft') {
+      await documentRepository.markInReview(documentId);
+    }
+    await auditLogRepository.log(assignedByUserId, 'REVIEWERS_ASSIGNED', 'documents', documentId, 'reviewers', null, toAssign.join(','));
   }
-
-  await auditLogRepository.log(assignedByUserId, 'REVIEWERS_ASSIGNED', 'documents', documentId, 'reviewers', null, reviewerIds.join(','));
 }
 
 async function approve(documentReviewId, reviewerUserId, comments) {

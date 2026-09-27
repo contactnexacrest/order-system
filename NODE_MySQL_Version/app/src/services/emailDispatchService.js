@@ -14,6 +14,7 @@ const permissionRepository = require('../repositories/permissionRepository');
 const userRepository = require('../repositories/userRepository');
 const mailSenderService = require('./mailSenderService');
 const documentDataAssembler = require('./documentDataAssembler');
+const makerCheckerGuard = require('./makerCheckerGuard');
 const fs = require('fs');
 
 /**
@@ -147,6 +148,17 @@ async function approveSend(emailLogId, approverUserId) {
   const row = await emailLogRepository.find(emailLogId);
   if (!row || row.status !== 'pending_approval') {
     throw new Error('This send is not awaiting approval.');
+  }
+  // QA-5 maker-checker (EML-03): whoever requested this send must not also
+  // be the one who approves it, unless they're a Super Admin or hold
+  // manage_permissions (owner decision).
+  if (
+    row.requested_by !== null
+    && row.requested_by !== undefined
+    && Number(row.requested_by) === Number(approverUserId)
+    && !(await makerCheckerGuard.selfApprovalAllowed(approverUserId))
+  ) {
+    throw new Error('You requested this send — a different privileged user must approve it.');
   }
   await emailLogRepository.approve(emailLogId, approverUserId);
   await auditLogRepository.log(approverUserId, 'EMAIL_SEND_APPROVED', 'email_log', emailLogId);
