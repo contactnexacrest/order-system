@@ -10,10 +10,13 @@ use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CaBankStatementRepository;
 use App\Repositories\CaExpenseRepository;
+use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\CaFyLockRepository;
 use App\Repositories\CaRepository;
 use App\Repositories\CompanySettingsRepository;
+use App\Repositories\LookupRepository;
 use App\Repositories\OrderPaymentStatusRepository;
+use App\Repositories\OrderRepository;
 use App\Repositories\UserRepository;
 use App\Repositories\ZohoSyncLogRepository;
 use App\Services\AuthService;
@@ -161,6 +164,117 @@ final class CaController
         CaExpenseRepository::setTds($id, $isTdsApplicable, $tdsAmount, (int) $user['id']);
         Flash::set('success', 'Expense TDS details updated.');
         header('Location: /ca/expenses');
+    }
+
+    /**
+     * CA / Accounting module (Phase 8) — government export benefit/
+     * incentive claims (RODTEP + whatever else Admin adds to
+     * dropdown_options('export_benefit_scheme')). Unlike ca_expenses this
+     * is money owed TO the company, entered locally since there's no Zoho
+     * Books import for it.
+     */
+    public function exportBenefits(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+
+        View::render('ca/export_benefits', [
+            'benefits' => CaExportBenefitRepository::all(),
+            'schemeOptions' => LookupRepository::dropdownOptions('export_benefit_scheme'),
+            'totalClaimed' => CaExportBenefitRepository::totalClaimed(),
+            'totalReceived' => CaExportBenefitRepository::totalReceived(),
+            'canOverrideFyLock' => CaFyLockGuard::canOverride((int) $user['id'], $roleId),
+        ], 'layout/base');
+    }
+
+    public function recordExportBenefit(array $params): void
+    {
+        $user = AuthService::currentUser();
+
+        $schemeName = trim((string) ($_POST['scheme_name'] ?? ''));
+        $validSchemes = array_column(LookupRepository::dropdownOptions('export_benefit_scheme'), 'option_value');
+        if (!in_array($schemeName, $validSchemes, true)) {
+            Flash::set('error', 'Choose a valid scheme.');
+            header('Location: /ca/export-benefits');
+            return;
+        }
+
+        $claimedAmount = trim((string) ($_POST['claimed_amount'] ?? ''));
+        if ($claimedAmount === '' || !is_numeric($claimedAmount) || (float) $claimedAmount <= 0) {
+            Flash::set('error', 'Enter a valid claimed amount.');
+            header('Location: /ca/export-benefits');
+            return;
+        }
+
+        $claimedAt = trim((string) ($_POST['claimed_at'] ?? ''));
+        if ($claimedAt === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $claimedAt)) {
+            Flash::set('error', 'Enter a valid claim date.');
+            header('Location: /ca/export-benefits');
+            return;
+        }
+
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow($claimedAt, (int) $user['id'], $roleId, 'ca_export_benefits', 0, 'record')) {
+            header('Location: /ca/export-benefits');
+            return;
+        }
+
+        $orderId = null;
+        $orderRef = trim((string) ($_POST['order_reference'] ?? ''));
+        if ($orderRef !== '') {
+            $orderId = OrderRepository::findIdByReference($orderRef);
+            if ($orderId === null) {
+                Flash::set('error', "No order found with reference \"{$orderRef}\" — the claim was not recorded. Leave the field blank if this benefit isn't tied to one order.");
+                header('Location: /ca/export-benefits');
+                return;
+            }
+        }
+
+        $referenceNumber = trim((string) ($_POST['reference_number'] ?? '')) ?: null;
+        $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
+        $currencyCode = trim((string) ($_POST['currency_code'] ?? '')) ?: 'INR';
+
+        $id = CaExportBenefitRepository::record($orderId, $schemeName, $referenceNumber, (float) $claimedAmount, $claimedAt, $currencyCode, $notes, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', $id, null, null, $schemeName);
+        Flash::set('success', "{$schemeName} claim recorded.");
+        header('Location: /ca/export-benefits');
+    }
+
+    public function markExportBenefitReceived(array $params): void
+    {
+        $id = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+
+        $benefit = CaExportBenefitRepository::find($id);
+        if (!$benefit) {
+            http_response_code(404);
+            echo 'Claim not found.';
+            return;
+        }
+
+        $receivedAmount = trim((string) ($_POST['received_amount'] ?? ''));
+        if ($receivedAmount === '' || !is_numeric($receivedAmount) || (float) $receivedAmount < 0) {
+            Flash::set('error', 'Enter a valid received amount.');
+            header('Location: /ca/export-benefits');
+            return;
+        }
+        $receivedAt = trim((string) ($_POST['received_at'] ?? ''));
+        if ($receivedAt === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $receivedAt)) {
+            Flash::set('error', 'Enter a valid received date.');
+            header('Location: /ca/export-benefits');
+            return;
+        }
+
+        if (!CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'ca_export_benefits', $id, 'mark_received')) {
+            header('Location: /ca/export-benefits');
+            return;
+        }
+
+        CaExportBenefitRepository::markReceived($id, (float) $receivedAmount, $receivedAt);
+        AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', $id, 'received_amount', null, $receivedAmount);
+        Flash::set('success', 'Marked as received.');
+        header('Location: /ca/export-benefits');
     }
 
     /**

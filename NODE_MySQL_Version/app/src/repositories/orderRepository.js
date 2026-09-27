@@ -85,6 +85,12 @@ async function find(id) {
   );
 }
 
+/** CA Phase 8 (export benefits) — lets staff link a claim by typing the order reference rather than picking from a long dropdown of every order. */
+async function findIdByReference(orderReference) {
+  const row = await db.queryOne('SELECT id FROM orders WHERE order_reference = :ref', { ref: orderReference });
+  return row ? row.id : null;
+}
+
 /**
  * QA-5 CONC-03: reading "next sequence number for this client" and
  * inserting the order used to be two separate, unlocked statements
@@ -313,7 +319,7 @@ async function setIncludeAnnexureA(orderId, include) {
 }
 
 module.exports = {
-  all, allArchived, archive, unarchive, find, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
+  all, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setDisputeButtonVisible,
 };

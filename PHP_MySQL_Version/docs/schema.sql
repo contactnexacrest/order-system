@@ -1113,6 +1113,37 @@ CREATE TABLE ca_fy_locks (
   INDEX idx_ca_fy_locks_fy (financial_year)
 ) ENGINE=InnoDB;
 
+-- CA / Accounting module (Phase 8) — government export benefit/incentive
+-- claims (RODTEP and any other scheme Admin adds to
+-- dropdown_options('export_benefit_scheme') — Duty Drawback, RoSCTL, etc.).
+-- Unlike ca_expenses (money going out, imported one-way from Zoho Books),
+-- this is money OWED TO the company by the government, entered locally —
+-- there is no Zoho Books equivalent to sync from, since these schemes are
+-- claimed via ICEGATE/DGFT against a shipping bill, not booked as a normal
+-- accounting expense. order_id is nullable: a claim is almost always tied
+-- to one export order/shipping bill, but "other benefits" occasionally
+-- apply at a consignment level spanning normal business records this app
+-- doesn't otherwise track. received_amount is separate from claimed_amount
+-- because DGFT/Customs frequently pays out a different (usually lower)
+-- amount than what was claimed after their own scrutiny.
+CREATE TABLE ca_export_benefits (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id          BIGINT UNSIGNED NULL,
+  scheme_name       VARCHAR(150) NOT NULL,   -- from dropdown_options('export_benefit_scheme'), e.g. 'RODTEP'
+  reference_number  VARCHAR(100) NULL,       -- shipping bill / scroll number the claim is filed against
+  claimed_amount    DECIMAL(14,2) NOT NULL,
+  claimed_at        DATE NOT NULL,
+  received_amount   DECIMAL(14,2) NULL,
+  received_at       DATE NULL,
+  currency_code     VARCHAR(10) NOT NULL DEFAULT 'INR',
+  notes             VARCHAR(500) NULL,
+  recorded_by       BIGINT UNSIGNED NOT NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (recorded_by) REFERENCES users(id),
+  INDEX idx_ca_export_benefits_claimed_at (claimed_at)
+) ENGINE=InnoDB;
+
 -- ================================================================
 -- SECTION K — 2FA BACKUP CODES & SAVED REPORT DEFINITIONS
 -- (Resolved 2026-09-18 — see ARCHITECTURE.md "Open questions", now closed)

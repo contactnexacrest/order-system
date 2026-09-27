@@ -63,6 +63,24 @@ in the same Sync Log. The hourly scheduled job does the same thing
 automatically. See [Zoho Books Sync](./ca-03-zoho-sync.md) for the full
 detail on configuring the connection and reading the log.
 
+## Export-related costs (ECGC insurance, COO fees, CHA charges, Transport, etc.)
+
+These are ordinary expenses like any other — as long as your Accounts
+team books them in Zoho Books (under whatever category name you use
+there, e.g. "ECGC Insurance", "CHA Charges", "Freight/Transport", "COO
+Certification Fees"), the next sync pulls them in here exactly like any
+other expense, with that category name intact for filtering. There is
+nothing special to configure — this system doesn't maintain its own
+separate list of expense categories on purpose (see "What gets imported"
+above), so it never falls out of sync with however your CA actually
+categorizes things in Zoho Books.
+
+This is different from **government export benefits** (RODTEP and similar
+schemes) — see [Government Export Benefits](./ca-07-export-benefits.md).
+Those are money owed *to* the company, not an expense, and Zoho Books has
+no equivalent for them, so they're entered directly in this system
+instead.
+
 ## What this doesn't do yet
 
 - No expense editing or deletion here — corrections happen in Zoho Books;

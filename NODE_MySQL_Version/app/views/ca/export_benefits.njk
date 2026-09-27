@@ -1,0 +1,85 @@
+<div class="card page-wide">
+  <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
+  <h1>Government Export Benefits</h1>
+  <p class="muted">RODTEP and any other export incentive scheme claimed against a shipping bill. Unlike Expenses, this is money owed <strong>to</strong> the company by the government — entered here directly, since there's no Zoho Books import for it.</p>
+
+  <div class="section">
+    <h2>Totals</h2>
+    <p>Claimed: <strong>{{ totalClaimed | money }}</strong> &middot; Received: <strong>{{ totalReceived | money }}</strong> &middot; Outstanding: <strong>{{ (totalClaimed - totalReceived) | money }}</strong></p>
+  </div>
+
+  <div class="section">
+    <h2>Record a Claim</h2>
+    <form method="post" action="/ca/export-benefits" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Scheme<br>
+        <select name="scheme_name" required>
+          <option value="">Select…</option>
+          {% for opt in schemeOptions %}
+            <option value="{{ opt.option_value }}" {{ 'selected' if opt.is_default else '' }}>{{ opt.option_value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Order Reference (optional)<br>
+        <input type="text" name="order_reference" placeholder="e.g. NC/2026/0042">
+      </label>
+      <label>Shipping Bill / Scroll No. (optional)<br>
+        <input type="text" name="reference_number">
+      </label>
+      <label>Claimed Amount<br>
+        <input type="number" step="0.01" min="0.01" name="claimed_amount" required>
+      </label>
+      <label>Currency<br>
+        <input type="text" name="currency_code" value="INR" maxlength="10" style="width:70px;">
+      </label>
+      <label>Claim Date<br>
+        <input type="date" name="claimed_at" required>
+      </label>
+      <label style="flex-basis:100%;">Notes (optional)<br>
+        <input type="text" name="notes" style="width:100%;">
+      </label>
+      <button type="submit" class="btn btn-primary">Record Claim</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Claims</h2>
+    {% if benefits.length == 0 %}
+      <p class="muted">No claims recorded yet.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Claimed</th><th>Scheme</th><th>Order</th><th>Reference</th><th>Claimed Amount</th><th>Received</th><th>Status</th></tr>
+        {% for b in benefits %}
+        <tr>
+          <td>{{ b.claimed_at }}</td>
+          <td>{{ b.scheme_name }}</td>
+          <td>{% if b.order_id %}<a href="/orders/{{ b.order_id }}">{{ b.order_reference }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="muted small">{{ b.reference_number or '—' }}</td>
+          <td>{{ b.claimed_amount | money }} {{ b.currency_code }}</td>
+          <td>
+            {% if b.received_amount != null %}
+              {{ b.received_amount | money }} {{ b.currency_code }}
+              <div class="muted small">{{ b.received_at }}</div>
+            {% else %}
+              {% if b.lockMessage == null or canOverrideFyLock %}
+                {% if b.lockMessage != null %}
+                  <span class="muted small" style="display:block;">&#9888; {{ b.lockMessage }} Saving will log an override.</span>
+                {% endif %}
+                <form method="post" action="/ca/export-benefits/{{ b.id }}/mark-received" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <input type="number" step="0.01" min="0" name="received_amount" placeholder="Amount" required style="width:100px;">
+                  <input type="date" name="received_at" required>
+                  <button type="submit" class="btn-sm">Mark Received</button>
+                </form>
+              {% else %}
+                <span class="muted small">Pending — {{ b.lockMessage }}</span>
+              {% endif %}
+            {% endif %}
+          </td>
+          <td>{% if b.received_amount != null %}<span class="badge good">Received</span>{% else %}<span class="badge">Claimed</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  </div>
+</div>

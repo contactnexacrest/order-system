@@ -96,6 +96,15 @@ final class OrderRepository
         return $stmt->fetch() ?: null;
     }
 
+    /** CA Phase 8 (export benefits) — lets staff link a claim by typing the order reference rather than picking from a long dropdown of every order. */
+    public static function findIdByReference(string $orderReference): ?int
+    {
+        $stmt = Database::connection()->prepare('SELECT id FROM orders WHERE order_reference = :ref');
+        $stmt->execute(['ref' => $orderReference]);
+        $id = $stmt->fetchColumn();
+        return $id !== false ? (int) $id : null;
+    }
+
     /**
      * QA-5 CONC-03: reading "next sequence number for this client" and
      * inserting the order used to be two separate, unlocked statements

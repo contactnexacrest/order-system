@@ -2,8 +2,11 @@
 
 const caRepository = require('../repositories/caRepository');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
+const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const caBankStatementRepository = require('../repositories/caBankStatementRepository');
 const caFyLockRepository = require('../repositories/caFyLockRepository');
+const lookupRepository = require('../repositories/lookupRepository');
+const orderRepository = require('../repositories/orderRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const userRepository = require('../repositories/userRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
@@ -137,6 +140,113 @@ async function setExpenseTds(req, res) {
   await caExpenseRepository.setTds(id, isTdsApplicable, tdsAmount, user.id);
   flash.set(req, 'success', 'Expense TDS details updated.');
   res.redirect('/ca/expenses');
+}
+
+/**
+ * CA / Accounting module (Phase 8) — government export benefit/incentive
+ * claims (RODTEP + whatever else Admin adds to
+ * dropdown_options('export_benefit_scheme')). Unlike ca_expenses this is
+ * money owed TO the company, entered locally since there's no Zoho Books
+ * import for it.
+ */
+async function exportBenefits(req, res) {
+  const benefits = await caExportBenefitRepository.all();
+  for (const b of benefits) {
+    b.lockMessage = b.received_amount === null ? await caFyLockRepository.lockMessageForDate(b.claimed_at) : null;
+  }
+
+  res.renderView('ca/export_benefits', {
+    benefits,
+    schemeOptions: await lookupRepository.dropdownOptions('export_benefit_scheme'),
+    totalClaimed: await caExportBenefitRepository.totalClaimed(),
+    totalReceived: await caExportBenefitRepository.totalReceived(),
+    canOverrideFyLock: caFyLockGuard.canOverride(req),
+  }, 'layout/base');
+}
+
+async function recordExportBenefit(req, res) {
+  const user = req.user;
+
+  const schemeName = String(req.body.scheme_name || '').trim();
+  const validSchemes = (await lookupRepository.dropdownOptions('export_benefit_scheme')).map((row) => row.option_value);
+  if (!validSchemes.includes(schemeName)) {
+    flash.set(req, 'error', 'Choose a valid scheme.');
+    res.redirect('/ca/export-benefits');
+    return;
+  }
+
+  const claimedAmount = String(req.body.claimed_amount || '').trim();
+  if (claimedAmount === '' || Number.isNaN(Number(claimedAmount)) || Number(claimedAmount) <= 0) {
+    flash.set(req, 'error', 'Enter a valid claimed amount.');
+    res.redirect('/ca/export-benefits');
+    return;
+  }
+
+  const claimedAt = String(req.body.claimed_at || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(claimedAt)) {
+    flash.set(req, 'error', 'Enter a valid claim date.');
+    res.redirect('/ca/export-benefits');
+    return;
+  }
+
+  if (!(await caFyLockGuard.allow(req, claimedAt, 'ca_export_benefits', 0, 'record'))) {
+    res.redirect('/ca/export-benefits');
+    return;
+  }
+
+  let orderId = null;
+  const orderRef = String(req.body.order_reference || '').trim();
+  if (orderRef !== '') {
+    orderId = await orderRepository.findIdByReference(orderRef);
+    if (orderId === null) {
+      flash.set(req, 'error', `No order found with reference "${orderRef}" — the claim was not recorded. Leave the field blank if this benefit isn't tied to one order.`);
+      res.redirect('/ca/export-benefits');
+      return;
+    }
+  }
+
+  const referenceNumber = String(req.body.reference_number || '').trim() || null;
+  const notes = String(req.body.notes || '').trim() || null;
+  const currencyCode = String(req.body.currency_code || '').trim() || 'INR';
+
+  const id = await caExportBenefitRepository.record(orderId, schemeName, referenceNumber, parseFloat(claimedAmount), claimedAt, currencyCode, notes, user.id);
+  await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', id, null, null, schemeName);
+  flash.set(req, 'success', `${schemeName} claim recorded.`);
+  res.redirect('/ca/export-benefits');
+}
+
+async function markExportBenefitReceived(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const user = req.user;
+
+  const benefit = await caExportBenefitRepository.find(id);
+  if (!benefit) {
+    res.status(404).send('Claim not found.');
+    return;
+  }
+
+  const receivedAmount = String(req.body.received_amount || '').trim();
+  if (receivedAmount === '' || Number.isNaN(Number(receivedAmount)) || Number(receivedAmount) < 0) {
+    flash.set(req, 'error', 'Enter a valid received amount.');
+    res.redirect('/ca/export-benefits');
+    return;
+  }
+  const receivedAt = String(req.body.received_at || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(receivedAt)) {
+    flash.set(req, 'error', 'Enter a valid received date.');
+    res.redirect('/ca/export-benefits');
+    return;
+  }
+
+  if (!(await caFyLockGuard.allow(req, receivedAt, 'ca_export_benefits', id, 'mark_received'))) {
+    res.redirect('/ca/export-benefits');
+    return;
+  }
+
+  await caExportBenefitRepository.markReceived(id, parseFloat(receivedAmount), receivedAt);
+  await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', id, 'received_amount', null, receivedAmount);
+  flash.set(req, 'success', 'Marked as received.');
+  res.redirect('/ca/export-benefits');
 }
 
 /**
@@ -404,6 +514,7 @@ async function tdsSummary(req, res) {
 
 module.exports = {
   index, reports, zohoSync, runZohoSync, expenses, setExpenseTds, tdsSummary,
+  exportBenefits, recordExportBenefit, markExportBenefitReceived,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,
 };

@@ -406,7 +406,11 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
   ('received_from', 'CHA / Shipping Line', 3, 0, 1),
   ('supplier_type', 'Quarry Owner', 1, 1, 1),
   ('supplier_type', 'Processor', 2, 0, 1),
-  ('supplier_type', 'Trader', 3, 0, 1);
+  ('supplier_type', 'Trader', 3, 0, 1),
+  ('export_benefit_scheme', 'RODTEP', 1, 1, 1),
+  ('export_benefit_scheme', 'Duty Drawback', 2, 0, 1),
+  ('export_benefit_scheme', 'RoSCTL', 3, 0, 1),
+  ('export_benefit_scheme', 'Other', 4, 0, 1);
 
 -- ================================================================
 -- FILE_UPLOAD_CONTEXTS — Phase D wires up the first two of these
