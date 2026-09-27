@@ -68,7 +68,10 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('inr_actual_delete',         'Delete INR actual settlement amounts', 'Remove a recorded INR actual amount (e.g. to correct a mis-entry) — kept separate from edit since this is a destructive correction, not routine data entry.', 'ca'),
   ('ca_module_manage',          'Manage CA / Accounting integrations', 'Trigger a Zoho Books sync and view its log, and lock/unlock a financial year for CA data entry — kept separate from ca_module_view since these are administrative actions with a wider blast radius than routine data entry, not just reading the register.', 'ca'),
   ('ca_fy_lock_override',       'Override a financial year lock', 'Push through a single CA entry even while its financial year is locked — for a genuine backdated correction, never routine use. Every use is logged. Kept separate from ca_module_manage, which can reopen a year outright for everyone.', 'ca'),
-  ('edit_order_post_confirmation', 'Edit an order after confirmation', 'Edit order details or product rows once Order Confirmation has been issued (Stage 4+) — a reason is required and every use is logged. Before Stage 4, manage_orders alone is enough.', 'orders');
+  ('edit_order_post_confirmation', 'Edit an order after confirmation', 'Edit order details or product rows once Order Confirmation has been issued (Stage 4+) — a reason is required and every use is logged. Before Stage 4, manage_orders alone is enough.', 'orders'),
+  ('manage_payments',            'Manage order payments',         'Record and clear an order''s advance/balance payment (Stages 3 and 8) — QA-5 RBAC-03/04: split out of manage_orders so a Logistics-only user can no longer mark a buyer payment as cleared; kept with Accounts, who already owns payment tracking.', 'orders'),
+  ('manage_shipping',            'Manage shipping & freight',      'Record freight terms/payment and packing/BL/shipping actions (Stages 6-7 and 9) — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer record a BL.', 'orders'),
+  ('close_orders',               'Close or mark an order lost',    'Close a fully-despatched order or mark one lost — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer close an order.', 'orders');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -82,19 +85,19 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Export Executive'
-  AND p.permission_key IN ('manage_orders','generate_documents','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders');
+  AND p.permission_key IN ('manage_orders','manage_payments','manage_shipping','close_orders','generate_documents','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Accounts Executive'
-  AND p.permission_key IN ('manage_orders','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override');
+  AND p.permission_key IN ('manage_orders','manage_payments','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Logistics Executive'
-  AND p.permission_key IN ('manage_orders','generate_documents','download_pdf','cross_verify_documents','view_product_catalog','browse_product_catalog','view_archived_orders');
+  AND p.permission_key IN ('manage_orders','manage_shipping','close_orders','generate_documents','download_pdf','cross_verify_documents','view_product_catalog','browse_product_catalog','view_archived_orders');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1

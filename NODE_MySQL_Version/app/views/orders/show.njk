@@ -165,7 +165,7 @@
       <button type="submit" class="btn-sm btn-secondary">Archive Order</button>
     </form>
   {% endif %}
-  {% if order.status == 'active' and permissions.manage_orders %}
+  {% if order.status == 'active' and permissions.close_orders %}
   <form method="post" action="/orders/{{ order.id }}/mark-lost" style="display:inline" onsubmit="return confirmMarkLost(this);">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <input type="hidden" name="reason" class="mark-lost-reason">
@@ -859,7 +859,9 @@
     {% endif %}
 
     {% if stage3 and stage3.status != 'locked' and not advanceCleared %}
-      {% if not payment or payment.advance_remittance_received_at == null %}
+      {% if not permissions.manage_payments %}
+        <p class="muted">Only Accounts can record or clear this payment.</p>
+      {% elif not payment or payment.advance_remittance_received_at == null %}
         <form method="post" action="/orders/{{ order.id }}/payment/advance">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Advance Amount Received *<input type="text" name="advance_amount" required></label>
@@ -1208,7 +1210,9 @@
       {% endif %}
 
       {% if not balanceCleared %}
-        {% if not payment or payment.balance_remittance_received_at == null %}
+        {% if not permissions.manage_payments %}
+          <p class="muted">Only Accounts can record or clear this payment.</p>
+        {% elif not payment or payment.balance_remittance_received_at == null %}
           <form method="post" action="/orders/{{ order.id }}/payment/balance">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Balance Amount Received *<input type="text" name="balance_amount" required value="{{ payment.balance_amount or '' }}"></label>
@@ -1236,7 +1240,9 @@
     {% elif not stage9 or stage9.status == 'locked' %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% else %}
-      {% if not shipping or not shipping.bl_originals_received_at %}
+      {% if not permissions.manage_shipping %}
+        <p class="muted">Only Logistics can record the original BLs.</p>
+      {% elif not shipping or not shipping.bl_originals_received_at %}
         <form method="post" action="/orders/{{ order.id }}/bl-originals-received">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
@@ -1246,7 +1252,7 @@
         <p class="muted small">Original BLs received ({{ shipping.bl_originals_received_count }}).</p>
       {% endif %}
 
-      {% if shipping and shipping.bl_originals_received_at and not shipping.bl_endorsed_at %}
+      {% if permissions.manage_shipping and shipping and shipping.bl_originals_received_at and not shipping.bl_endorsed_at %}
         <form method="post" action="/orders/{{ order.id }}/bl-endorsed">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
@@ -1255,11 +1261,15 @@
         <p class="muted small">Original BLs endorsed.</p>
       {% endif %}
 
+      {% if permissions.close_orders %}
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
         <button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
+      {% else %}
+      <p class="muted">Only Export/Logistics can close this order.</p>
+      {% endif %}
     {% endif %}
   </div>
 </div>

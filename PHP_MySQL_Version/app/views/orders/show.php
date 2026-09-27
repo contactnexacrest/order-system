@@ -11,6 +11,10 @@ $currentUser = AuthService::currentUser();
 $canViewReports = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_reports');
 $canEditLockedData = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'edit_locked_data');
 $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_orders');
+// QA-5 RBAC-03/04: duty-specific split of manage_orders — see docs/seed.sql.
+$canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_payments');
+$canManageShipping = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_shipping');
+$canCloseOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'close_orders');
 $canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
 // Phase 7: a narrow exception to a financial year lock — see CaFyLockGuard.
 $canOverrideFyLock = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'ca_fy_lock_override');
@@ -210,7 +214,7 @@ $orderClosed = $order['status'] === 'complete';
       <button type="submit" class="btn-sm btn-secondary">Archive Order</button>
     </form>
   <?php endif; ?>
-  <?php if ($order['status'] === 'active' && $canManageOrders): ?>
+  <?php if ($order['status'] === 'active' && $canCloseOrders): ?>
   <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-lost" style="display:inline" onsubmit="return confirmMarkLost(this);">
     <?= Csrf::field() ?>
     <input type="hidden" name="reason" class="mark-lost-reason">
@@ -919,7 +923,9 @@ $orderClosed = $order['status'] === 'complete';
     <?php endif; ?>
 
     <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared): ?>
-      <?php if (!$payment || $payment['advance_remittance_received_at'] === null): ?>
+      <?php if (!$canManagePayments): ?>
+        <p class="muted">Only Accounts can record or clear this payment.</p>
+      <?php elseif (!$payment || $payment['advance_remittance_received_at'] === null): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance">
           <?= Csrf::field() ?>
           <label>Advance Amount Received *<input type="text" name="advance_amount" required></label>
@@ -1271,7 +1277,9 @@ $orderClosed = $order['status'] === 'complete';
       <?php endif; ?>
 
       <?php if (!$balanceCleared): ?>
-        <?php if (!$payment || $payment['balance_remittance_received_at'] === null): ?>
+        <?php if (!$canManagePayments): ?>
+          <p class="muted">Only Accounts can record or clear this payment.</p>
+        <?php elseif (!$payment || $payment['balance_remittance_received_at'] === null): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance">
             <?= Csrf::field() ?>
             <label>Balance Amount Received *<input type="text" name="balance_amount" required value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
@@ -1299,7 +1307,9 @@ $orderClosed = $order['status'] === 'complete';
     <?php elseif (!$stage9 || $stage9['status'] === 'locked'): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php else: ?>
-      <?php if (!$shipping || !$shipping['bl_originals_received_at']): ?>
+      <?php if (!$canManageShipping): ?>
+        <p class="muted">Only Logistics can record the original BLs.</p>
+      <?php elseif (!$shipping || !$shipping['bl_originals_received_at']): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-originals-received">
           <?= Csrf::field() ?>
           <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
@@ -1309,7 +1319,7 @@ $orderClosed = $order['status'] === 'complete';
         <p class="muted small">Original BLs received (<?= (int) $shipping['bl_originals_received_count'] ?>).</p>
       <?php endif; ?>
 
-      <?php if ($shipping && $shipping['bl_originals_received_at'] && !$shipping['bl_endorsed_at']): ?>
+      <?php if ($canManageShipping && $shipping && $shipping['bl_originals_received_at'] && !$shipping['bl_endorsed_at']): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsed">
           <?= Csrf::field() ?>
           <button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
@@ -1318,11 +1328,15 @@ $orderClosed = $order['status'] === 'complete';
         <p class="muted small">Original BLs endorsed.</p>
       <?php endif; ?>
 
+      <?php if ($canCloseOrders): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
         <button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
+      <?php else: ?>
+      <p class="muted">Only Export/Logistics can close this order.</p>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 </div>

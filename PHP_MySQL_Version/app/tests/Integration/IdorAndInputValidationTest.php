@@ -85,6 +85,19 @@ final class IdorAndInputValidationTest extends DbTestCase
             // Export Executive handles orders but has no CA access.
             ['Export Executive', 'manage_orders', true],
             ['Export Executive', 'ca_module_view', false],
+            // QA-5 RBAC-03/04 (Owner Decision #3: "Must be role + permission
+            // based"): manage_orders no longer covers payment clearance or
+            // shipping/closure — Logistics must never reach the payment
+            // actions, and Accounts must never reach shipping/closure.
+            ['Logistics Executive', 'manage_payments', false],
+            ['Logistics Executive', 'manage_shipping', true],
+            ['Logistics Executive', 'close_orders', true],
+            ['Accounts Executive', 'manage_payments', true],
+            ['Accounts Executive', 'manage_shipping', false],
+            ['Accounts Executive', 'close_orders', false],
+            ['Export Executive', 'manage_payments', true],
+            ['Export Executive', 'manage_shipping', true],
+            ['Export Executive', 'close_orders', true],
         ];
 
         foreach ($cases as [$roleName, $permissionKey, $expected]) {

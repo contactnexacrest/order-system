@@ -295,9 +295,12 @@ $router->post('/orders/{id}/payment/balance/inr-actual', [$orders, 'recordBalanc
 $router->post('/orders/{id}/payment/balance/inr-actual/delete', [$orders, 'deleteBalanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_delete'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/freight/inr-actual', [$orders, 'recordFreightInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/freight/inr-actual/delete', [$orders, 'deleteFreightInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_delete'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment-reports/{reportId}/reviewed', [$orders, 'markPaymentReportReviewed'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// QA-5 RBAC-03/04: payment record/clear is Accounts' duty, split out of
+// manage_orders so a Logistics-only user can no longer mark a buyer
+// payment as cleared (see docs/seed.sql's manage_payments permission).
+$router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment-reports/{reportId}/reviewed', [$orders, 'markPaymentReportReviewed'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
@@ -323,22 +326,26 @@ $router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionA
 $router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/freight-terms', [$orders, 'saveFreightTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight', [$orders, 'recordFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight/clear', [$orders, 'clearFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// QA-5 RBAC-04: freight/packing/shipping/BL/closure are Logistics' duty,
+// split out of manage_orders so an Accounts-only user can no longer
+// record a BL or close an order (see docs/seed.sql's manage_shipping /
+// close_orders permissions).
+$router->post('/orders/{id}/freight-terms', [$orders, 'saveFreightTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight', [$orders, 'recordFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight/clear', [$orders, 'clearFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/packing', [$orders, 'savePacking'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/shipping', [$orders, 'saveShipping'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/bl-issued', [$orders, 'recordBlIssued'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/packing', [$orders, 'savePacking'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/shipping', [$orders, 'saveShipping'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-issued', [$orders, 'recordBlIssued'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/payment/balance', [$orders, 'recordBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/balance/clear', [$orders, 'clearBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance', [$orders, 'recordBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance/clear', [$orders, 'clearBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/bl-originals-received', [$orders, 'recordBlOriginalsReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/close', [$orders, 'closeOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/mark-lost', [$orders, 'markLost'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-originals-received', [$orders, 'recordBlOriginalsReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/close', [$orders, 'closeOrder'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/mark-lost', [$orders, 'markLost'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/documents/{documentId}/delete', [$documents, 'delete'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
