@@ -878,6 +878,18 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // QA-5 (GATE-05): the stage-unlock check above only proves Stage 2
+        // was passed — it says nothing about whether an advance amount was
+        // ever actually recorded via recordAdvancePayment(). Without this,
+        // clearing a never-recorded (NULL) advance would still unlock
+        // Stage 4 and provision client portal access with zero money
+        // having been received.
+        $existingPayment = OrderPaymentStatusRepository::find($orderId);
+        if (!$existingPayment || $existingPayment['advance_amount'] === null) {
+            Flash::set('error', 'Record the advance remittance before marking it cleared.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['advance_cleared_at'] ?? '')) ?: date('Y-m-d');
 
         $fobTotal = OrderProductRepository::totalFobValue($orderId);
@@ -1346,6 +1358,18 @@ final class OrderController
         $user = AuthService::currentUser();
         if (!StageGateService::isUnlocked($orderId, 8)) {
             Flash::set('error', 'Stage 8 has not been unlocked for this order yet — complete Stage 7 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // QA-5 (GATE-04): being unlocked only proves Stage 7 was passed —
+        // it says nothing about whether a balance amount was ever actually
+        // recorded (normally set automatically by clearAdvancePayment(),
+        // but an admin stage override could reach Stage 8 without it).
+        // Without this, clearing a never-recorded (NULL) balance would
+        // still unlock Stage 9.
+        $existingPayment = OrderPaymentStatusRepository::find($orderId);
+        if (!$existingPayment || $existingPayment['balance_amount'] === null) {
+            Flash::set('error', 'The balance amount has not been recorded for this order yet — it cannot be marked cleared.');
             header("Location: /orders/{$orderId}");
             return;
         }

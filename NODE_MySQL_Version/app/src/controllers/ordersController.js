@@ -866,6 +866,19 @@ async function clearAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // QA-5 (GATE-05/GATE-10): the stage-unlock check above only proves Stage
+  // 2 was passed — it says nothing about whether an advance amount was
+  // ever actually recorded via recordAdvancePayment(), and doesn't catch
+  // a nonexistent order id either (which used to reach order.balance_pct
+  // below and throw a TypeError / 500). Without the amount check, clearing
+  // a never-recorded (NULL) advance would still unlock Stage 4 and
+  // provision client portal access with zero money having been received.
+  const existingPayment = await orderPaymentStatusRepository.find(orderId);
+  if (!existingPayment || existingPayment.advance_amount === null) {
+    flash.set(req, 'error', 'Record the advance remittance before marking it cleared.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const clearedAt = str(req.body.advance_cleared_at) || todayYmd();
 
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
@@ -1331,6 +1344,17 @@ async function clearBalancePayment(req, res) {
   const user = req.user;
   if (!(await stageGateService.isUnlocked(orderId, 8))) {
     flash.set(req, 'error', 'Stage 8 has not been unlocked for this order yet — complete Stage 7 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // QA-5 (GATE-04): being unlocked only proves Stage 7 was passed — it
+  // says nothing about whether a balance amount was ever actually
+  // recorded (normally set automatically by clearAdvancePayment(), but an
+  // admin stage override could reach Stage 8 without it). Without this,
+  // clearing a never-recorded (NULL) balance would still unlock Stage 9.
+  const existingPayment = await orderPaymentStatusRepository.find(orderId);
+  if (!existingPayment || existingPayment.balance_amount === null) {
+    flash.set(req, 'error', 'The balance amount has not been recorded for this order yet — it cannot be marked cleared.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
