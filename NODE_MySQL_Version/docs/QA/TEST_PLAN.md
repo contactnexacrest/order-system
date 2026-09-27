@@ -311,7 +311,33 @@ Infrastructure (QA-2) is live on both stacks:
      `'pending'`, mirroring `approveByMd()`'s guard.
    All three were verified by reverting each fix and confirming its
    regression test failed with the expected diagnostic, then restoring it.
-6. P1 financial-integrity suites.
+6. ✅ Financial data integrity suite (P1) — `FinancialIntegrityTest.php`/
+   `financialIntegrity.test.js`. All four formulas checked here were
+   already correct — these are pinning tests against a hand-computed
+   value, not bug fixes:
+   - Amendment override reconciliation: `AmendmentService::
+     attachSignedCopyAndActivate()` always derives `balance_pct = 100 -
+     advance_pct` rather than trusting a separately-submitted balance
+     percentage, so `advance_pct + balance_pct` sums to exactly 100 for
+     every amendment activation (checked across 0%, 30%, 55.5%, 100%
+     advance).
+   - CA settlement register forex gain/loss (`CaRepository::
+     settlementRegister()`): `expected_inr = foreign_amount *
+     assumed_exchange_rate`, `forex_gain_loss = inr_actual -
+     expected_inr` — checked for both a forex gain and a forex loss
+     against hand-computed values.
+   - Payments report aggregation (`ReportRepository::paymentsReport()`):
+     `outstanding = invoiced - cleared`, per row and per currency —
+     checked as a before/after delta (not an absolute total), since the
+     disposable test DB accumulates USD-currency orders from every other
+     Integration test class run in the same process, which would
+     contaminate an absolute-total assertion but not a delta.
+   - Audit log immutability: a static source-tree scan confirming no PHP/
+     JS file anywhere issues an `UPDATE` or `DELETE FROM` against
+     `audit_log` (the only writer is `AuditLogRepository::log()`'s single
+     `INSERT`). Each pinning test was checked against a deliberately
+     broken formula to confirm it actually fails before being confirmed
+     correct against the real one.
 7. P2/P3 suites as capacity allows, prioritized by which modules see the
    most real usage.
 
