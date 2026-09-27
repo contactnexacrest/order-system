@@ -100,15 +100,24 @@ async function find(id) {
  * so by the time buildFields(sequenceNo) runs, no other caller can ever
  * have been handed the same number.
  *
+ * QA-5 ORD-05: `executor` lets the order INSERT itself join a caller's
+ * transaction (see ordersController.store()) so it rolls back together
+ * with the order_stages/order_payment_status/order_products rows on any
+ * failure. The sequence reservation above stays on the plain pool
+ * (already self-contained/atomic per its own docblock) — a failed order
+ * creation can leave a small gap in sequence numbers, same as an
+ * auto-increment gap on any other rolled-back insert, which is harmless.
+ *
  * @param {number} clientId
  * @param {(sequenceNo: number) => object} buildFields
  * @param {number} createdBy
+ * @param {object} [executor] db-shaped executor (query/queryOne/execute); defaults to the plain pool
  * @returns {Promise<{orderId: number, sequenceNo: number, orderReference: string}>}
  */
-async function createWithNextSequence(clientId, buildFields, createdBy) {
+async function createWithNextSequence(clientId, buildFields, createdBy, executor = db) {
   const sequenceNo = await referenceNumberService.nextOrderSequenceForClient(clientId);
   const fields = { ...buildFields(sequenceNo), client_id: clientId, sequence_no: sequenceNo };
-  const orderId = await insertOrderRow(db, fields, createdBy);
+  const orderId = await insertOrderRow(executor, fields, createdBy);
   return { orderId, sequenceNo, orderReference: fields.order_reference };
 }
 
@@ -223,8 +232,10 @@ async function markSample(id) {
 }
 
 /** Test Mode (docs/schema.sql Section V) — mirrors markSample()'s pattern. */
-async function markTest(id) {
-  await db.execute('UPDATE orders SET is_test_data = 1 WHERE id = :id', { id });
+// QA-5 ORD-05: optional executor lets this join the caller's transaction at
+// order creation (see ordersController.store()).
+async function markTest(id, executor = db) {
+  await executor.execute('UPDATE orders SET is_test_data = 1 WHERE id = :id', { id });
 }
 
 async function setCurrentStage(orderId, stageId) {

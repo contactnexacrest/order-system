@@ -2,11 +2,14 @@
 
 const db = require('../config/db');
 
-async function initializeForOrder(orderId) {
-  const stages = await db.query('SELECT id, stage_number FROM stages_master ORDER BY sequence');
+// QA-5 ORD-05: optional executor lets this join the caller's transaction
+// (order creation — see ordersController.store()), defaulting to the plain
+// pool for every other existing call site.
+async function initializeForOrder(orderId, executor = db) {
+  const stages = await executor.query('SELECT id, stage_number FROM stages_master ORDER BY sequence');
   for (const stage of stages) {
     const isFirst = parseInt(stage.stage_number, 10) === 1;
-    await db.execute(
+    await executor.execute(
       'INSERT INTO order_stages (order_id, stage_id, status, unlocked_at) VALUES (:order_id, :stage_id, :status, :unlocked_at)',
       {
         order_id: orderId,

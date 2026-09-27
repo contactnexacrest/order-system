@@ -6,12 +6,15 @@ async function forOrder(orderId) {
   return db.query('SELECT * FROM order_products WHERE order_id = :order_id AND is_active = 1 ORDER BY line_no', { order_id: orderId });
 }
 
-async function add(orderId, lineNo, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode = '6802.93') {
+// QA-5 ORD-05: optional executor lets this join the caller's transaction
+// (order creation — see ordersController.store()), defaulting to the plain
+// pool for every other existing call site.
+async function add(orderId, lineNo, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode = '6802.93', executor = db) {
   const fobValue = (quantity !== null && unitPrice !== null && !quantityIsTbc)
     ? String(parseFloat(quantity) * parseFloat(unitPrice))
     : null;
 
-  const result = await db.execute(
+  const result = await executor.execute(
     `INSERT INTO order_products
         (order_id, line_no, description, finish, dimensions, quantity, quantity_is_tbc, unit, unit_price, fob_value, hs_code)
      VALUES

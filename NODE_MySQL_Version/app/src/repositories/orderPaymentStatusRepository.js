@@ -2,8 +2,11 @@
 
 const db = require('../config/db');
 
-async function initializeForOrder(orderId) {
-  await db.execute('INSERT INTO order_payment_status (order_id) VALUES (:order_id)', { order_id: orderId });
+// QA-5 ORD-05: optional executor lets this join the caller's transaction
+// (order creation — see ordersController.store()), defaulting to the plain
+// pool for every other existing call site.
+async function initializeForOrder(orderId, executor = db) {
+  await executor.execute('INSERT INTO order_payment_status (order_id) VALUES (:order_id)', { order_id: orderId });
 }
 
 async function find(orderId) {

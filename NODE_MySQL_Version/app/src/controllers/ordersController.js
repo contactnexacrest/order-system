@@ -2,8 +2,10 @@
 
 const fs = require('fs');
 const JSZip = require('jszip');
+const db = require('../config/db');
 const { parseDbDateTime } = require('../helpers/dbDateTime');
 const flash = require('../helpers/flash');
+const orderLineValidator = require('../helpers/orderLineValidator');
 const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const amendmentRepository = require('../repositories/amendmentRepository');
@@ -197,6 +199,16 @@ async function store(req, res) {
     res.redirect('/orders/create');
     return;
   }
+  // QA-5 ORD-04: the create-order dropdown only ever lists active clients
+  // (clientRepository.all()), but find() here has no is_active filter — a
+  // direct/forged POST, or a client deactivated in the moment between page
+  // load and submit, otherwise sailed straight through to a new order for
+  // a client the business has already cut off.
+  if (!client.is_active) {
+    flash.set(req, 'error', 'This client is not active — reactivate them before creating a new order.');
+    res.redirect('/orders/create');
+    return;
+  }
 
   const incotermId = parseInt(body.incoterm_id || 0, 10);
   const currencyId = parseInt(body.currency_id || 0, 10);
@@ -232,6 +244,35 @@ async function store(req, res) {
     }
   }
 
+  // QA-5 ORD-05/ORD-06: quantity/unit price used to be passed straight
+  // through as raw strings all the way to a DECIMAL column bind — a
+  // non-numeric value crashed with an unhandled
+  // ER_TRUNCATED_WRONG_VALUE_FOR_FIELD deep in orderProductRepository.add(),
+  // by which point the order/stage/payment-status rows were already
+  // committed, and a negative quantity was never rejected at all. Checked
+  // here, same "before anything is written" placement as the HS-code check
+  // above.
+  {
+    const quantitiesInput = [].concat(body.product_quantity || []);
+    const unitPricesInput = [].concat(body.product_unit_price || []);
+    const quantityTbcInput = body.product_quantity_tbc || {};
+    for (let i = 0; i < descriptions.length; i++) {
+      if (str(descriptions[i]) === '') continue;
+      const quantityError = orderLineValidator.checkQuantity(quantitiesInput[i], !!quantityTbcInput[i]);
+      if (quantityError) {
+        flash.set(req, 'error', `Product line ${i + 1}: ${quantityError}`);
+        res.redirect(`/orders/create?client_id=${clientId}`);
+        return;
+      }
+      const priceError = orderLineValidator.checkUnitPrice(unitPricesInput[i]);
+      if (priceError) {
+        flash.set(req, 'error', `Product line ${i + 1}: ${priceError}`);
+        res.redirect(`/orders/create?client_id=${clientId}`);
+        return;
+      }
+    }
+  }
+
   const portOfDischargeId = body.port_of_discharge_id ? parseInt(body.port_of_discharge_id, 10) : null;
   const portOfDischargeText = str(body.port_of_discharge_text);
 
@@ -239,80 +280,96 @@ async function store(req, res) {
   const testModeEnabled = await testModeService.isEnabled();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
 
-  // QA-5 CONC-03: sequence-number reservation and the order INSERT now
-  // happen atomically inside createWithNextSequence() (a single
-  // transaction holding a row lock for this client) — see its docblock in
-  // orderRepository.js. order_reference embeds the sequence number, so it
-  // can only be built once buildFields(sequenceNo) is called with the
-  // safely-reserved value.
-  const { orderId, orderReference } = await orderRepository.createWithNextSequence(
-    clientId,
-    (sequenceNo) => ({
-      order_reference: testModeService.applyReferencePrefix(
-        orderRefFormat
-          .replace(/\{YYYY\}/g, String(new Date().getFullYear()))
-          .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0')) + `-${clientId}`, // client suffix keeps this globally unique even though the format string isn't scoped per-client
-        testModeEnabled
-      ),
-      buyer_inquiry_ref: client.client_unique_number,
-      payment_preset_id: paymentPresetId,
-      incoterm_id: incotermId,
-      port_of_loading_id: body.port_of_loading_id ? parseInt(body.port_of_loading_id, 10) : null,
-      port_of_discharge_id: portOfDischargeId,
-      port_of_discharge_text: portOfDischargeId ? null : portOfDischargeText || null,
-      currency_id: currencyId,
-      coo_type: str(body.coo_type) || client.coo_type || 'TBC',
-      include_annexure_a: !!body.include_annexure_a,
-      special_requirements: str(body.special_requirements) || null,
-      container_type: str(body.container_type) || null,
-      estimated_total_cbm: str(body.estimated_total_cbm),
-      estimated_gross_weight_kg: str(body.estimated_gross_weight_kg),
-      estimated_net_weight_kg: str(body.estimated_net_weight_kg),
-      estimated_package_count: str(body.estimated_package_count) || null,
-      estimated_package_type: str(body.estimated_package_type) || null,
-      est_lead_time_text: str(body.est_lead_time_text) || null,
-      indicative_freight_low: str(body.indicative_freight_low),
-      indicative_freight_high: str(body.indicative_freight_high),
-      indicative_insurance_amount: str(body.indicative_insurance_amount),
-      buyers_po_ref: 'NIL',
-      quotation_date: todayYmd(),
-      quotation_valid_until: addDaysYmd(todayYmd(), quotationValidityDays),
-    }),
-    user.id
-  );
-  if (testModeEnabled) {
-    await orderRepository.markTest(orderId);
-  }
-
-  await orderStageRepository.initializeForOrder(orderId);
-  await orderPaymentStatusRepository.initializeForOrder(orderId);
-
-  const dimensions = [].concat(body.product_dimensions || []);
-  const finishes = [].concat(body.product_finish || []);
-  const quantities = [].concat(body.product_quantity || []);
-  const quantityTbcFlags = body.product_quantity_tbc || {};
-  const units = [].concat(body.product_unit || []);
-  const unitPrices = [].concat(body.product_unit_price || []);
-  const hsCodes = [].concat(body.product_hs_code || []);
-
-  let lineNo = 1;
-  for (let i = 0; i < descriptions.length; i++) {
-    const description = str(descriptions[i]);
-    if (description === '') continue; // blank row — skip rather than insert an empty product
-    const quantityIsTbc = !!(Array.isArray(quantityTbcFlags) ? quantityTbcFlags[i] : quantityTbcFlags[i]);
-    await orderProductRepository.add(
-      orderId,
-      lineNo++,
-      description,
-      str(dimensions[i]) || null,
-      str(finishes[i]) || null,
-      str(quantities[i]) || null,
-      quantityIsTbc,
-      str(units[i]) || null,
-      str(unitPrices[i]) || null,
-      str(hsCodes[i])
+  // QA-5 ORD-05: the order row, its stage/payment-status rows, and every
+  // product line used to be inserted as separate, unwrapped statements —
+  // any failure partway through (the crash this defect was originally
+  // reported for, or any other insert error) left a real, visible
+  // "half-created" order behind with no products or stages. The input
+  // validation above now rules out the specific known trigger, but this
+  // transaction is what actually guarantees the "no half-created order"
+  // property in general: any failure anywhere in this block rolls back the
+  // order row itself along with everything else.
+  const { orderId, orderReference } = await db.transaction(async (trx) => {
+    // QA-5 CONC-03: sequence-number reservation and the order INSERT now
+    // happen atomically inside createWithNextSequence() (a single
+    // transaction holding a row lock for this client) — see its docblock in
+    // orderRepository.js. order_reference embeds the sequence number, so it
+    // can only be built once buildFields(sequenceNo) is called with the
+    // safely-reserved value.
+    const result = await orderRepository.createWithNextSequence(
+      clientId,
+      (sequenceNo) => ({
+        order_reference: testModeService.applyReferencePrefix(
+          orderRefFormat
+            .replace(/\{YYYY\}/g, String(new Date().getFullYear()))
+            .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0')) + `-${clientId}`, // client suffix keeps this globally unique even though the format string isn't scoped per-client
+          testModeEnabled
+        ),
+        buyer_inquiry_ref: client.client_unique_number,
+        payment_preset_id: paymentPresetId,
+        incoterm_id: incotermId,
+        port_of_loading_id: body.port_of_loading_id ? parseInt(body.port_of_loading_id, 10) : null,
+        port_of_discharge_id: portOfDischargeId,
+        port_of_discharge_text: portOfDischargeId ? null : portOfDischargeText || null,
+        currency_id: currencyId,
+        coo_type: str(body.coo_type) || client.coo_type || 'TBC',
+        include_annexure_a: !!body.include_annexure_a,
+        special_requirements: str(body.special_requirements) || null,
+        container_type: str(body.container_type) || null,
+        estimated_total_cbm: str(body.estimated_total_cbm),
+        estimated_gross_weight_kg: str(body.estimated_gross_weight_kg),
+        estimated_net_weight_kg: str(body.estimated_net_weight_kg),
+        estimated_package_count: str(body.estimated_package_count) || null,
+        estimated_package_type: str(body.estimated_package_type) || null,
+        est_lead_time_text: str(body.est_lead_time_text) || null,
+        indicative_freight_low: str(body.indicative_freight_low),
+        indicative_freight_high: str(body.indicative_freight_high),
+        indicative_insurance_amount: str(body.indicative_insurance_amount),
+        buyers_po_ref: 'NIL',
+        quotation_date: todayYmd(),
+        quotation_valid_until: addDaysYmd(todayYmd(), quotationValidityDays),
+      }),
+      user.id,
+      trx
     );
-  }
+    const { orderId } = result;
+    if (testModeEnabled) {
+      await orderRepository.markTest(orderId, trx);
+    }
+
+    await orderStageRepository.initializeForOrder(orderId, trx);
+    await orderPaymentStatusRepository.initializeForOrder(orderId, trx);
+
+    const dimensions = [].concat(body.product_dimensions || []);
+    const finishes = [].concat(body.product_finish || []);
+    const quantities = [].concat(body.product_quantity || []);
+    const quantityTbcFlags = body.product_quantity_tbc || {};
+    const units = [].concat(body.product_unit || []);
+    const unitPrices = [].concat(body.product_unit_price || []);
+    const hsCodes = [].concat(body.product_hs_code || []);
+
+    let lineNo = 1;
+    for (let i = 0; i < descriptions.length; i++) {
+      const description = str(descriptions[i]);
+      if (description === '') continue; // blank row — skip rather than insert an empty product
+      const quantityIsTbc = !!(Array.isArray(quantityTbcFlags) ? quantityTbcFlags[i] : quantityTbcFlags[i]);
+      await orderProductRepository.add(
+        orderId,
+        lineNo++,
+        description,
+        str(dimensions[i]) || null,
+        str(finishes[i]) || null,
+        str(quantities[i]) || null,
+        quantityIsTbc,
+        str(units[i]) || null,
+        str(unitPrices[i]) || null,
+        str(hsCodes[i]),
+        trx
+      );
+    }
+
+    return result;
+  });
 
   flash.set(req, 'success', `Order ${orderReference} created for ${client.company_legal_name}.`);
   res.redirect(`/orders/${orderId}`);
