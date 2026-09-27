@@ -680,6 +680,20 @@ app.use((req, res) => {
   res.status(404).send('404 Not Found');
 });
 
+// QA-5 UP-03 (PHP names this defect, but Node has its own version of the
+// same "oversized upload gives a confusing error" class: multer's own
+// middleware throws a MulterError before any route handler runs, which
+// otherwise fell straight through to the generic 500 handler below with no
+// indication of what actually went wrong — a staff member trying to upload
+// a large amendment/dispute document just sees "something went wrong").
+app.use((err, req, res, next) => {
+  if (err && err.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).send('<h1>413 — File too large</h1><p>The file you tried to upload is too large for this server to accept. Please use a smaller file and try again.</p>');
+    return;
+  }
+  next(err);
+});
+
 // --- Error handler (never leak stack traces outside APP_ENV=local, same rule as bootstrap.php's display_errors) ---
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   logger.error('UNHANDLED ERROR', err, { method: req.method, url: req.originalUrl, user: req.user ? req.user.id : null });
