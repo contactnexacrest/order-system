@@ -80,6 +80,11 @@ final class AmendmentController
     {
         $amendmentId = (int) $params['amendmentId'];
         $amendment = AmendmentRepository::find($amendmentId);
+        if (!$amendment) {
+            http_response_code(404);
+            echo 'Amendment not found.';
+            return;
+        }
 
         try {
             AmendmentService::approveByMd($amendmentId, (int) AuthService::currentUser()['id']);
@@ -88,13 +93,18 @@ final class AmendmentController
             Flash::set('error', $e->getMessage());
         }
 
-        header('Location: /orders/' . ($amendment['order_id'] ?? '') . '/amendments');
+        header('Location: /orders/' . $amendment['order_id'] . '/amendments');
     }
 
     public function reject(array $params): void
     {
         $amendmentId = (int) $params['amendmentId'];
         $amendment = AmendmentRepository::find($amendmentId);
+        if (!$amendment) {
+            http_response_code(404);
+            echo 'Amendment not found.';
+            return;
+        }
 
         try {
             \App\Services\AmendmentService::rejectAmendment($amendmentId, (int) AuthService::currentUser()['id']);
@@ -103,13 +113,18 @@ final class AmendmentController
             Flash::set('error', $e->getMessage());
         }
 
-        header('Location: /orders/' . ($amendment['order_id'] ?? '') . '/amendments');
+        header('Location: /orders/' . $amendment['order_id'] . '/amendments');
     }
 
     public function generateDocument(array $params): void
     {
         $amendmentId = (int) $params['amendmentId'];
         $amendment = AmendmentRepository::find($amendmentId);
+        if (!$amendment) {
+            http_response_code(404);
+            echo 'Amendment not found.';
+            return;
+        }
 
         try {
             AmendmentService::generateDocument($amendmentId, (int) AuthService::currentUser()['id']);
@@ -118,7 +133,7 @@ final class AmendmentController
             Flash::set('error', $e->getMessage());
         }
 
-        header('Location: /orders/' . ($amendment['order_id'] ?? '') . '/amendments');
+        header('Location: /orders/' . $amendment['order_id'] . '/amendments');
     }
 
     public function uploadSignedCopy(array $params): void

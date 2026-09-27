@@ -72,6 +72,10 @@ async function create(req, res) {
 async function mdApprove(req, res) {
   const amendmentId = parseInt(req.params.amendmentId, 10);
   const amendment = await amendmentRepository.find(amendmentId);
+  if (!amendment) {
+    res.status(404).send('Amendment not found.');
+    return;
+  }
 
   try {
     await amendmentService.approveByMd(amendmentId, req.user.id);
@@ -80,12 +84,16 @@ async function mdApprove(req, res) {
     flash.set(req, 'error', e.message);
   }
 
-  res.redirect(`/orders/${(amendment && amendment.order_id) || ''}/amendments`);
+  res.redirect(`/orders/${amendment.order_id}/amendments`);
 }
 
 async function reject(req, res) {
   const amendmentId = parseInt(req.params.amendmentId, 10);
   const amendment = await amendmentRepository.find(amendmentId);
+  if (!amendment) {
+    res.status(404).send('Amendment not found.');
+    return;
+  }
 
   try {
     await amendmentService.rejectAmendment(amendmentId, req.user.id);
@@ -94,12 +102,16 @@ async function reject(req, res) {
     flash.set(req, 'error', e.message);
   }
 
-  res.redirect(`/orders/${(amendment && amendment.order_id) || ''}/amendments`);
+  res.redirect(`/orders/${amendment.order_id}/amendments`);
 }
 
 async function generateDocument(req, res) {
   const amendmentId = parseInt(req.params.amendmentId, 10);
   const amendment = await amendmentRepository.find(amendmentId);
+  if (!amendment) {
+    res.status(404).send('Amendment not found.');
+    return;
+  }
 
   try {
     await amendmentService.generateDocument(amendmentId, req.user.id);
@@ -108,7 +120,7 @@ async function generateDocument(req, res) {
     flash.set(req, 'error', e.message);
   }
 
-  res.redirect(`/orders/${(amendment && amendment.order_id) || ''}/amendments`);
+  res.redirect(`/orders/${amendment.order_id}/amendments`);
 }
 
 async function uploadSignedCopy(req, res) {
