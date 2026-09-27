@@ -154,17 +154,44 @@ const sessionKnex = knex({
 });
 
 app.set('trust proxy', 1);
-// QA-5 UP-02: an uploaded file (dispute/amendment/BL/PO evidence, chat
-// attachments, client-portal payment screenshots) is served back with a
-// Content-Type read from whatever the browser declared at upload time, not
-// sniffed server-side. Without this header, a file uploaded as
-// "invoice.pdf" that's actually HTML/JS can be MIME-sniffed by the browser
-// and rendered/executed instead of downloaded — stored XSS via file
-// upload. Set unconditionally here, before every other middleware
-// (including express.static), rather than in each of the dozen download
-// actions individually.
+// QA-5 UP-02/AUTH-14: sitewide response headers, set unconditionally here —
+// before every other middleware (including express.static) — rather than
+// duplicated in every controller.
+//
+// - X-Content-Type-Options: nosniff (UP-02) — an uploaded file
+//   (dispute/amendment/BL/PO evidence, chat attachments, client-portal
+//   payment screenshots) is served back with a Content-Type read from
+//   whatever the browser declared at upload time, not sniffed
+//   server-side. Without this, a file uploaded as "invoice.pdf" that's
+//   actually HTML/JS can be MIME-sniffed by the browser and
+//   rendered/executed instead of downloaded — stored XSS via upload.
+// - X-Frame-Options: DENY (AUTH-14) — nothing in this app is meant to be
+//   framed by another site. Without it, a disgruntled insider (or an
+//   outside attacker) can iframe a real authenticated page — e.g. an
+//   order's approve/close action — under invisible bait on another page
+//   and trick a logged-in staff member's click into landing on the real
+//   button underneath (clickjacking).
+// - Referrer-Policy: strict-origin-when-cross-origin (AUTH-14) — the
+//   default browser policy leaks the full request URL (path + query
+//   string) to any third-party resource a page loads, including a
+//   quotation/PI intake link's bearer token or a password-reset token if
+//   a page ever included an external image/link. This trims what's sent
+//   cross-origin to just the origin.
+// - Strict-Transport-Security (AUTH-14), production only — tells the
+//   browser to only ever reach this host over HTTPS, even if a
+//   bookmark/typed URL or an attacker-controlled link points it at plain
+//   http://, closing the window for a man-in-the-middle to downgrade the
+//   connection and read/tamper with a session cookie in transit. Gated on
+//   !env.isLocal() because it would otherwise break local http://
+//   development (a browser that's cached the header will refuse to load
+//   http://localhost at all until it expires).
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (!env.isLocal()) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
   next();
 });
 app.use(express.urlencoded({ extended: true }));
