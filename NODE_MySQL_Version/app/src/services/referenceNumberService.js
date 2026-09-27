@@ -64,6 +64,32 @@ async function nextOrderSequenceForClient(clientId) {
   return parseInt(result.insertId, 10);
 }
 
+/**
+ * QA-5 CONC-04: documents.revision_number had the exact same bug — a plain
+ * `existing ? existing.revision_number + 1 : 0` read with no lock at all,
+ * and then (in documentGenerationService, not here) an INSERT that didn't
+ * land until AFTER the PDF/DOCX were fully rendered — a much longer race
+ * window than CONC-03's, since PDF rendering is not fast. There's no
+ * UNIQUE constraint on (order_id, document_type_id, revision_number)
+ * either, so two concurrent regenerations of the same document didn't
+ * even 500 — they silently left two documents rows sharing one revision
+ * number. Reserving the number atomically up front, before any rendering
+ * starts, closes the race without holding a lock across that slow work;
+ * see nextOrderSequenceForClient() above for why an UPSERT rather than a
+ * `SELECT ... FOR UPDATE`. revision_number starts at 0 (not 1), hence
+ * COALESCE(...,-1) + 1 rather than COALESCE(...,0) + 1.
+ */
+async function nextDocumentRevisionNumber(orderId, documentTypeId) {
+  const result = await db.execute(
+    `INSERT INTO reference_sequences (scope_key, last_seq)
+     SELECT :key, COALESCE(MAX(d.revision_number), -1) + 1 FROM documents d
+     WHERE d.order_id = :order_id AND d.document_type_id = :document_type_id
+     ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)`,
+    { key: `document_revision:${orderId}:${documentTypeId}`, order_id: orderId, document_type_id: documentTypeId }
+  );
+  return parseInt(result.insertId, 10);
+}
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
@@ -124,4 +150,4 @@ async function generateAmendmentRef() {
   return render(row.ref_format, seq, now);
 }
 
-module.exports = { generateClientUniqueNumber, generateDocumentRef, generateAmendmentRef, nextOrderSequenceForClient };
+module.exports = { generateClientUniqueNumber, generateDocumentRef, generateAmendmentRef, nextOrderSequenceForClient, nextDocumentRevisionNumber };

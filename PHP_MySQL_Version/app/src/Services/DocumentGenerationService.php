@@ -94,7 +94,13 @@ final class DocumentGenerationService
         $data = DocumentDataAssembler::assemble($orderId);
 
         $existing = DocumentRepository::findLatestForOrderAndType($orderId, (int) $docType['id']);
-        $revisionNumber = $existing ? ((int) $existing['revision_number']) + 1 : 0;
+        // QA-5 CONC-04: reserved atomically, up front — see
+        // ReferenceNumberService::nextDocumentRevisionNumber()'s docblock
+        // for why a plain `$existing['revision_number'] + 1` read (with the
+        // actual INSERT not landing until after PDF/DOCX rendering
+        // finished) let two concurrent regenerations of the same document
+        // silently share one revision number.
+        $revisionNumber = ReferenceNumberService::nextDocumentRevisionNumber($orderId, (int) $docType['id']);
 
         // Client-facing revision (docs/schema.sql Section AH) — how many
         // documents of this (order, type) the client has actually already

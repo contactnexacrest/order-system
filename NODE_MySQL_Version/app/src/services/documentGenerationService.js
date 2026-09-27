@@ -166,7 +166,13 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   const data = await documentDataAssembler.assemble(orderId);
 
   const existing = await documentRepository.findLatestForOrderAndType(orderId, docType.id);
-  const revisionNumber = existing ? parseInt(existing.revision_number, 10) + 1 : 0;
+  // QA-5 CONC-04: reserved atomically, up front — see
+  // referenceNumberService.nextDocumentRevisionNumber()'s docblock for why
+  // a plain `existing.revision_number + 1` read (with the actual INSERT
+  // not landing until after PDF/DOCX rendering finished) let two
+  // concurrent regenerations of the same document silently share one
+  // revision number.
+  const revisionNumber = await require('./referenceNumberService').nextDocumentRevisionNumber(orderId, docType.id);
 
   // Client-facing revision (docs/schema.sql Section AH) — how many
   // documents of this (order, type) the client has actually already been
