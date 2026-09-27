@@ -133,7 +133,14 @@ final class AuthService
         if ($userId) {
             AuditLogRepository::log($userId, 'LOGOUT', 'users', $userId);
         }
-        $_SESSION = [];
+        // QA-5 CP-13: this used to be `$_SESSION = [];` — wiping the ENTIRE
+        // session, not just the staff login. A staff member with the client
+        // portal open in the same browser (or vice versa — see
+        // ClientPortalService::logout(), already scoped correctly) got
+        // silently logged out of that other, unrelated surface too, just by
+        // logging out of this one. Scoped to only this service's own key,
+        // matching ClientPortalService::logout()'s existing pattern.
+        unset($_SESSION[self::SESSION_USER_ID]);
         session_regenerate_id(true);
     }
 

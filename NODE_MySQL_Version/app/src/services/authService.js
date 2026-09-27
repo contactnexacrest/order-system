@@ -2,6 +2,7 @@
 
 const { parseDbDateTime } = require('../helpers/dbDateTime');
 const passwordHash = require('../helpers/passwordHash');
+const { regeneratePreserving } = require('../helpers/sessionRegenerate');
 const userRepository = require('../repositories/userRepository');
 const loginAttemptRepository = require('../repositories/loginAttemptRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -15,6 +16,12 @@ const twoFactorService = require('./twoFactorService');
 // (company_settings, category 'security'), same as the original.
 
 const SESSION_USER_ID = '_auth_user_id';
+
+// QA-5 CP-13: mirrors clientPortalService.js's own SESSION_CLIENT_ID. Kept
+// as a literal rather than required from clientPortalService.js to avoid a
+// circular require (that file needs this file's SESSION_USER_ID the same
+// way) — see sessionRegenerate.js for why this needs preserving at all.
+const CLIENT_PORTAL_SESSION_KEY = '_client_portal_client_id';
 
 // AUTH-04/AUTH-05: a fixed dummy hash so passwordHash.verify() always runs
 // real bcrypt work, even for an email that doesn't exist — otherwise the
@@ -102,14 +109,11 @@ async function completeTwoFactor(req, submittedCode) {
   return { status: 'ok', force_password_change: !!(user && user.force_password_change) };
 }
 
-function establishSession(req, userId) {
-  return new Promise((resolve, reject) => {
-    req.session.regenerate((err) => {
-      if (err) return reject(err);
-      req.session[SESSION_USER_ID] = userId;
-      userRepository.updateLastLogin(userId).then(resolve, reject);
-    });
+async function establishSession(req, userId) {
+  await regeneratePreserving(req, [CLIENT_PORTAL_SESSION_KEY], () => {
+    req.session[SESSION_USER_ID] = userId;
   });
+  await userRepository.updateLastLogin(userId);
 }
 
 function currentUserId(req) {
@@ -126,12 +130,7 @@ async function logout(req) {
   if (userId) {
     await auditLogRepository.log(userId, 'LOGOUT', 'users', userId);
   }
-  return new Promise((resolve, reject) => {
-    req.session.regenerate((err) => {
-      if (err) return reject(err);
-      resolve();
-    });
-  });
+  await regeneratePreserving(req, [CLIENT_PORTAL_SESSION_KEY]);
 }
 
 async function changePassword(userId, newPassword) {

@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const env = require('../config/env');
 const { parseDbDateTime } = require('../helpers/dbDateTime');
 const passwordHash = require('../helpers/passwordHash');
+const { regeneratePreserving } = require('../helpers/sessionRegenerate');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const clientLoginRepository = require('../repositories/clientLoginRepository');
 const clientPasswordResetTokenRepository = require('../repositories/clientPasswordResetTokenRepository');
@@ -28,6 +29,12 @@ const emailService = require('./emailService');
  */
 
 const SESSION_CLIENT_ID = '_client_portal_client_id';
+
+// QA-5 CP-13: mirrors authService.js's own SESSION_USER_ID. Kept as a
+// literal rather than required from authService.js to avoid a circular
+// require (that file needs this file's SESSION_CLIENT_ID the same way) —
+// see sessionRegenerate.js for why this needs preserving at all.
+const STAFF_SESSION_KEY = '_auth_user_id';
 
 // CP-07: a fixed dummy hash so passwordHash.verify() always runs real
 // bcrypt work, even for an email with no client_logins row — otherwise the
@@ -113,17 +120,8 @@ async function attemptLogin(req, email, password) {
   }
 
   await clientLoginRepository.resetFailedLogins(login.client_id);
-  await new Promise((resolve, reject) => {
-    req.session.regenerate((err) => {
-      if (err) return reject(err);
-      // Must be set inside the callback, not after the awaited promise
-      // resolves — regenerate() replaces req.session's contents, so a
-      // write outside this callback risks landing on a stale reference
-      // depending on the session store. Matches authService.js's
-      // establishSession() convention.
-      req.session[SESSION_CLIENT_ID] = login.client_id;
-      resolve();
-    });
+  await regeneratePreserving(req, [STAFF_SESSION_KEY], () => {
+    req.session[SESSION_CLIENT_ID] = login.client_id;
   });
   await clientLoginRepository.updateLastLogin(login.client_id);
   await auditLogRepository.log(null, 'CLIENT_LOGIN_SUCCESS', 'clients', login.client_id);
@@ -145,12 +143,7 @@ async function logout(req) {
   if (clientId) {
     await auditLogRepository.log(null, 'CLIENT_LOGOUT', 'clients', clientId);
   }
-  await new Promise((resolve, reject) => {
-    req.session.regenerate((err) => {
-      if (err) return reject(err);
-      resolve();
-    });
-  });
+  await regeneratePreserving(req, [STAFF_SESSION_KEY]);
 }
 
 async function changePassword(clientId, newPassword) {
