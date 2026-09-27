@@ -187,6 +187,13 @@ final class ReviewWorkflowService
         if ($pending === 0 && $rejected === 0 && $approved >= max(1, $minRequired)) {
             DocumentGenerationService::finalizeApproval($documentId);
             AuditLogRepository::log(null, 'DOCUMENT_APPROVED', 'documents', $documentId, 'status', $document['status'], 'approved');
+
+            // GATE-01: the QT's approval — not its mere draft generation —
+            // is Stage 1's real gate (Owner Decision #1: "No stage passes
+            // until its document is approved").
+            if ($document['document_type_code'] === 'QT') {
+                StageGateService::passAndUnlockNext((int) $document['order_id'], 1, null);
+            }
         }
     }
 }

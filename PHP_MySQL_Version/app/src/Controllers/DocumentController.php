@@ -13,7 +13,6 @@ use App\Services\AuthService;
 use App\Services\DocumentGenerationService;
 use App\Services\PermissionService;
 use App\Services\StageGateBlockedException;
-use App\Services\StageGateService;
 
 final class DocumentController
 {
@@ -87,12 +86,11 @@ final class DocumentController
             );
         }
 
-        // QT generation is Stage 1's gate — passing it here (rather than
-        // inside DocumentGenerationService) keeps stage progression, a
-        // workflow/orchestration concern, out of the pure rendering service.
-        if ($type === 'QT') {
-            StageGateService::passAndUnlockNext($orderId, 1, (int) $user['id']);
-        }
+        // GATE-01: Stage 1 passes only once the QT is actually *approved*
+        // (see ReviewWorkflowService::finalizeIfFullyApproved()), not on mere
+        // draft generation — Owner Decision #1: "No stage passes until its
+        // document is approved." Generating the QT here just creates the
+        // draft; it still has to go through review before anything unlocks.
 
         Flash::set('success', "{$type} generated: {$result['document_reference']} Rev.{$result['revision_number']}.");
 

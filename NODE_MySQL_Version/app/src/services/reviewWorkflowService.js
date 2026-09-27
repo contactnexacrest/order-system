@@ -9,6 +9,7 @@ const notificationRepository = require('../repositories/notificationRepository')
 const userRepository = require('../repositories/userRepository');
 const documentGenerationService = require('./documentGenerationService');
 const makerCheckerGuard = require('./makerCheckerGuard');
+const stageGateService = require('./stageGateService');
 
 /**
  * Spec Section 9 — REVIEW QUEUE / REVIEWER ASSIGNMENT / REVIEW ACTIONS /
@@ -168,6 +169,13 @@ async function finalizeIfFullyApproved(documentId) {
   if (pending === 0 && rejected === 0 && approved >= Math.max(1, minRequired)) {
     await documentGenerationService.finalizeApproval(documentId);
     await auditLogRepository.log(null, 'DOCUMENT_APPROVED', 'documents', documentId, 'status', document.status, 'approved');
+
+    // GATE-01: the QT's approval — not its mere draft generation — is
+    // Stage 1's real gate (Owner Decision #1: "No stage passes until its
+    // document is approved").
+    if (document.document_type_code === 'QT') {
+      await stageGateService.passAndUnlockNext(document.order_id, 1, null);
+    }
   }
 }
 
