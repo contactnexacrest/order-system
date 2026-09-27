@@ -138,7 +138,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <span class="sidebar-user-avatar"><?= htmlspecialchars(mb_strtoupper(mb_substr($current['name'], 0, 1))) ?></span>
         <span class="sidebar-user-name"><?= htmlspecialchars($current['name']) ?></span>
       </a>
-      <a href="/logout" class="sidebar-logout">Log out</a>
+      <form method="post" action="/logout" class="sidebar-logout-form"><?= \App\Helpers\Csrf::field() ?><button type="submit" class="sidebar-logout">Log out</button></form>
     <?php endif; ?>
   </div>
 </header>

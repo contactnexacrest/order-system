@@ -269,7 +269,12 @@ app.get('/login', asyncHandler(authController.showLogin));
 app.post('/login', verifyCsrf, asyncHandler(authController.login));
 app.get('/2fa', asyncHandler(authController.show2fa));
 app.post('/2fa', verifyCsrf, asyncHandler(authController.verify2fa));
-app.get('/logout', asyncHandler(authController.logout));
+// QA-5 AUTH-15: was a bare GET with no CSRF check — a plain
+// <img src="…/logout"> on any page the victim's browser loaded would
+// silently end their session (logout CSRF), usable to repeatedly force out
+// a coworker mid-approval as harassment. Now POST + verifyCsrf, like every
+// other state-changing action.
+app.post('/logout', verifyCsrf, asyncHandler(authController.logout));
 app.get('/forgot-password', asyncHandler(authController.showForgotPassword));
 app.post('/forgot-password', verifyCsrf, asyncHandler(authController.forgotPassword));
 app.get('/reset-password/:token', asyncHandler(authController.showResetPassword));
@@ -296,7 +301,7 @@ app.post('/pi-details/:token', verifyCsrf, asyncHandler(piIntakeController.submi
 // advance-cleared gate (clientPortalService.provisionIfNeeded).
 app.get('/client/login', asyncHandler(clientPortalController.showLogin));
 app.post('/client/login', verifyCsrf, asyncHandler(clientPortalController.login));
-app.get('/client/logout', asyncHandler(clientPortalController.logout));
+app.post('/client/logout', verifyCsrf, asyncHandler(clientPortalController.logout));
 app.get('/client/set-password/:token', asyncHandler(clientPortalController.showSetPassword));
 app.post('/client/set-password/:token', verifyCsrf, asyncHandler(clientPortalController.setPassword));
 

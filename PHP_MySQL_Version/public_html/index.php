@@ -100,7 +100,12 @@ $router->get('/login', [$auth, 'showLogin']);
 $router->post('/login', [$auth, 'login'], [CsrfCheck::verify()]);
 $router->get('/2fa', [$auth, 'show2fa']);
 $router->post('/2fa', [$auth, 'verify2fa'], [CsrfCheck::verify()]);
-$router->get('/logout', [$auth, 'logout']);
+// QA-5 AUTH-15: was a bare GET with no CSRF check — a plain
+// <img src="…/logout"> on any page the victim's browser loaded would
+// silently end their session (logout CSRF), usable to repeatedly force out
+// a coworker mid-approval as harassment. Now POST + CsrfCheck, like every
+// other state-changing action.
+$router->post('/logout', [$auth, 'logout'], [CsrfCheck::verify()]);
 $router->get('/forgot-password', [$auth, 'showForgotPassword']);
 $router->post('/forgot-password', [$auth, 'forgotPassword'], [CsrfCheck::verify()]);
 $router->get('/reset-password/{token}', [$auth, 'showResetPassword']);
@@ -127,7 +132,7 @@ $router->post('/pi-details/{token}', [$piIntake, 'submit'], [CsrfCheck::verify()
 // advance-cleared gate (ClientPortalService::provisionIfNeeded).
 $router->get('/client/login', [$clientPortal, 'showLogin']);
 $router->post('/client/login', [$clientPortal, 'login'], [CsrfCheck::verify()]);
-$router->get('/client/logout', [$clientPortal, 'logout']);
+$router->post('/client/logout', [$clientPortal, 'logout'], [CsrfCheck::verify()]);
 $router->get('/client/set-password/{token}', [$clientPortal, 'showSetPassword']);
 $router->post('/client/set-password/{token}', [$clientPortal, 'setPassword'], [CsrfCheck::verify()]);
 

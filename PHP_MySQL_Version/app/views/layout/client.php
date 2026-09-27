@@ -18,7 +18,7 @@
   <nav class="topbar-nav">
     <a href="/client">My Orders</a>
     <a href="/client/account">My Account</a>
-    <a href="/client/logout" style="margin-left:auto">Log out</a>
+    <form method="post" action="/client/logout" style="margin-left:auto"><?= \App\Helpers\Csrf::field() ?><button type="submit" class="topbar-nav-logout">Log out</button></form>
   </nav>
 </header>
 <main class="page">

@@ -95,7 +95,7 @@
         <span class="sidebar-user-avatar">{{ currentUser.name[0] | upper }}</span>
         <span class="sidebar-user-name">{{ currentUser.name }}</span>
       </a>
-      <a href="/logout" class="sidebar-logout">Log out</a>
+      <form method="post" action="/logout" class="sidebar-logout-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="sidebar-logout">Log out</button></form>
     {% endif %}
   </div>
 </header>
