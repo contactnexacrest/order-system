@@ -12,6 +12,7 @@ use App\Controllers\AuditLogController;
 use App\Controllers\AuthController;
 use App\Controllers\CaController;
 use App\Controllers\ClientController;
+use App\Controllers\DataExportController;
 use App\Controllers\ClientIntakeController;
 use App\Controllers\ClientIntakeReviewController;
 use App\Controllers\ClientPortalController;
@@ -92,6 +93,7 @@ $adminOverrides = new AdminOverrideController();
 $fieldProtection = new FieldProtectionController();
 $users = new UserController();
 $sampleData = new SampleDataController();
+$dataExport = new DataExportController();
 $products = new ProductController();
 $testMode = new TestModeController();
 
@@ -442,6 +444,10 @@ $router->get('/admin/field-protection', [$fieldProtection, 'index'], [SessionAut
 $router->post('/admin/field-protection/request', [$fieldProtection, 'createRequest'], [SessionAuth::required(), PermissionCheck::requires('manage_field_protection'), CsrfCheck::verify()]);
 $router->post('/admin/field-protection/{requestId}/approve', [$fieldProtection, 'approve'], [SessionAuth::required(), PermissionCheck::requires('manage_field_protection'), CsrfCheck::verify()]);
 $router->post('/admin/field-protection/{requestId}/reject', [$fieldProtection, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_field_protection'), CsrfCheck::verify()]);
+
+$router->get('/admin/data-export', [$dataExport, 'index'], [SessionAuth::required(), PermissionCheck::requires('data_export_run')]);
+$router->get('/admin/data-export/schema', [$dataExport, 'downloadSchema'], [SessionAuth::required(), PermissionCheck::requires('data_export_run')]);
+$router->get('/admin/data-export/data', [$dataExport, 'downloadData'], [SessionAuth::required(), PermissionCheck::requires('data_export_run')]);
 $router->post('/clients/{id}/override-unique-number', [$clients, 'overrideUniqueNumber'], [SessionAuth::required(), PermissionCheck::requires('edit_locked_data'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/override-status-lock', [$orders, 'overrideStatusLock'], [SessionAuth::required(), PermissionCheck::requires('edit_locked_data'), CsrfCheck::verify()]);
 $router->post('/amendments/{amendmentId}/override-reference', [$amendments, 'overrideReference'], [SessionAuth::required(), PermissionCheck::requires('edit_locked_data'), CsrfCheck::verify()]);

@@ -34,6 +34,7 @@ implementation detail.
 - [Admin & Settings](./15-admin-settings.md) — roles/permissions, users, signatories, watermarks, HS codes, company settings, email templates.
 - [Test Mode](./16-test-mode.md) — a sandboxed way to rehearse the system without touching real data or sending real email.
 - [Editing, Duplicating & Reordering](./17-order-edit-duplication.md) — changing an order after it's created, cloning a product line or a whole order, and a client's self-service repeat order.
+- [Data Export / Migration](./18-data-export-migration.md) — downloading a structure snapshot and a full data export of the live database, to migrate every historical record into a fresh reinstall without loss.
 
 ## The running examples
 

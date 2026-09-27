@@ -63,6 +63,7 @@ const reportController = require('./controllers/reportController');
 const userController = require('./controllers/userController');
 const adminOverrideController = require('./controllers/adminOverrideController');
 const fieldProtectionController = require('./controllers/fieldProtectionController');
+const dataExportController = require('./controllers/dataExportController');
 const sampleDataController = require('./controllers/sampleDataController');
 const signatoryController = require('./controllers/signatoryController');
 const superAdminController = require('./controllers/superAdminController');
@@ -649,6 +650,10 @@ app.get('/admin/field-protection', requireAuth, requirePermission('manage_field_
 app.post('/admin/field-protection/request', requireAuth, requirePermission('manage_field_protection'), verifyCsrf, asyncHandler(fieldProtectionController.createRequest));
 app.post('/admin/field-protection/:requestId/approve', requireAuth, requirePermission('manage_field_protection'), verifyCsrf, asyncHandler(fieldProtectionController.approve));
 app.post('/admin/field-protection/:requestId/reject', requireAuth, requirePermission('manage_field_protection'), verifyCsrf, asyncHandler(fieldProtectionController.reject));
+
+app.get('/admin/data-export', requireAuth, requirePermission('data_export_run'), asyncHandler(dataExportController.index));
+app.get('/admin/data-export/schema', requireAuth, requirePermission('data_export_run'), asyncHandler(dataExportController.downloadSchema));
+app.get('/admin/data-export/data', requireAuth, requirePermission('data_export_run'), asyncHandler(dataExportController.downloadData));
 
 app.get('/users', requireAuth, requirePermission('manage_users'), asyncHandler(userController.index));
 app.post('/users/create', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.create));

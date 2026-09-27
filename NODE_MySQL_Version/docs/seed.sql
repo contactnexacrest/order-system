@@ -71,7 +71,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('edit_order_post_confirmation', 'Edit an order after confirmation', 'Edit order details or product rows once Order Confirmation has been issued (Stage 4+) — a reason is required and every use is logged. Before Stage 4, manage_orders alone is enough.', 'orders'),
   ('manage_payments',            'Manage order payments',         'Record and clear an order''s advance/balance payment (Stages 3 and 8) — QA-5 RBAC-03/04: split out of manage_orders so a Logistics-only user can no longer mark a buyer payment as cleared; kept with Accounts, who already owns payment tracking.', 'orders'),
   ('manage_shipping',            'Manage shipping & freight',      'Record freight terms/payment and packing/BL/shipping actions (Stages 6-7 and 9) — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer record a BL.', 'orders'),
-  ('close_orders',               'Close or mark an order lost',    'Close a fully-despatched order or mark one lost — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer close an order.', 'orders');
+  ('close_orders',               'Close or mark an order lost',    'Close a fully-despatched order or mark one lost — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer close an order.', 'orders'),
+  ('data_export_run',            'Export database structure/data', 'Download a full structure-only and data-only dump of the live database, to migrate all historical records into a fresh reinstall. Kept separate from manage_company_settings since it can expose every record, including staff password hashes.', 'admin');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)

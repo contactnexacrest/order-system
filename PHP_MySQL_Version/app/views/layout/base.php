@@ -28,11 +28,12 @@ $canSampleData = $can('manage_sample_data');
 $canViewProducts = $can('view_product_catalog');
 $canViewArchivedOrders = $can('view_archived_orders');
 $canCaModule = $can('ca_module_view');
+$canDataExport = $can('data_export_run');
 
 $opsGroupVisible = $canOrders || $canViewArchivedOrders;
 $insightsGroupVisible = $canReports || $canAudit || $canApproveEmail;
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
-    || $canUsers || $canFieldProtection || $canOverrides || $canSampleData;
+    || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport;
 
 // Sidebar redesign (2026-09-23, "cover all" UI pass) — highlights the
 // current section so a fresher can see at a glance where they are, and
@@ -120,6 +121,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canFieldProtection): ?><a href="/admin/field-protection" class="<?= $isActive('/admin/field-protection') ? 'active' : '' ?>">Field Protection</a><?php endif; ?>
           <?php if ($canOverrides): ?><a href="/admin/overrides" class="<?= $isActive('/admin/overrides') ? 'active' : '' ?>">Admin Overrides</a><?php endif; ?>
           <?php if ($canSampleData): ?><a href="/sample-data" class="<?= $isActive('/sample-data') ? 'active' : '' ?>">Sample Data</a><?php endif; ?>
+          <?php if ($canDataExport): ?><a href="/admin/data-export" class="<?= $isActive('/admin/data-export') ? 'active' : '' ?>">Data Export / Migration</a><?php endif; ?>
         </div>
       </details>
     <?php endif; ?>
