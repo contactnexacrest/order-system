@@ -34,33 +34,16 @@ function fromHeader() {
 }
 
 /**
- * Test Mode (docs/schema.sql Section V) redirect — the single chokepoint
- * both send functions below funnel through, so nothing that calls either
- * of them has to know about Test Mode. `isSecurityEmail` is the one
- * exception carved out by design: staff's own 2FA codes and password-reset
- * links must keep going to the real address they belong to, or Test Mode
- * would lock staff out of their own accounts. Every other call site
- * (order/document notices, buyer communications, reminder alerts, client
- * portal access emails) defaults to redirectable.
- */
-async function resolveRecipient(toEmail, isSecurityEmail, subject) {
-  if (isSecurityEmail) return toEmail;
-  const settings = await testModeService.getSettings();
-  if (!settings || parseInt(settings.is_enabled, 10) !== 1) return toEmail;
-  if (!settings.test_email) {
-    console.error(`[TEST MODE — no test_email configured, sending to real address] To: ${toEmail} | Subject: ${subject}`);
-    return toEmail;
-  }
-  console.log(`[TEST MODE — email redirected] Original To: ${toEmail} -> Test: ${settings.test_email} | Subject: ${subject}`);
-  return settings.test_email;
-}
-
-/**
  * @param {{isSecurityEmail?: boolean}} [opts] — set true for staff 2FA/password-reset emails, which Test Mode never redirects.
  * @returns {Promise<boolean>} true if actually handed to a transport, false if only logged (dev fallback)
  */
 async function sendPlainText(toEmail, subject, body, opts = {}) {
-  const to = await resolveRecipient(toEmail, !!opts.isSecurityEmail, subject);
+  const to = await testModeService.resolveEmailRecipient(toEmail, !!opts.isSecurityEmail, subject);
+  if (to === null) {
+    // QA-5 TM-07: Test Mode is on and no test_email is configured — never
+    // fall back to sending this to the real address.
+    return false;
+  }
   const t = transport();
   if (!t) {
     console.error(`[EMAIL NOT SENT — no SMTP configured] To: ${to} | Subject: ${subject} | Body: ${body}`);
@@ -95,7 +78,25 @@ async function sendWithAttachment(toEmail, subject, body, attachmentPath, attach
  * @returns {Promise<boolean>}
  */
 async function sendWithAttachments(toEmail, subject, body, attachments, opts = {}) {
-  const to = await resolveRecipient(toEmail, !!opts.isSecurityEmail, subject);
+  const to = await testModeService.resolveEmailRecipient(toEmail, !!opts.isSecurityEmail, subject);
+  if (to === null) {
+    // QA-5 TM-07: see sendPlainText() above.
+    return false;
+  }
+  return deliverWithAttachments(to, subject, body, attachments);
+}
+
+/**
+ * QA-5 TM-08: mailSenderService is the one caller that needs to resolve the
+ * Test Mode recipient itself, BEFORE choosing Zoho vs. this SMTP fallback —
+ * Zoho's own send() call has to see the resolved (possibly redirected)
+ * address too, so the gate can't live only inside sendWithAttachments()
+ * above. This is that already-resolved delivery path; `to` here is never
+ * re-checked against Test Mode.
+ * @param {Array<{path: string, name: string}>} attachments
+ * @returns {Promise<boolean>}
+ */
+async function deliverWithAttachments(to, subject, body, attachments) {
   const t = transport();
   if (!t) {
     const names = attachments.map((a) => a.name).join(', ');
@@ -117,4 +118,4 @@ async function sendWithAttachments(toEmail, subject, body, attachments, opts = {
   }
 }
 
-module.exports = { sendPlainText, sendWithAttachment, sendWithAttachments };
+module.exports = { sendPlainText, sendWithAttachment, sendWithAttachments, deliverWithAttachments };

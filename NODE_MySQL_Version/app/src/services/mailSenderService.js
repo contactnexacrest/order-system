@@ -1,6 +1,7 @@
 'use strict';
 
 const emailService = require('./emailService');
+const testModeService = require('./testModeService');
 const zohoMailService = require('./zohoMailService');
 
 /**
@@ -19,17 +20,30 @@ const zohoMailService = require('./zohoMailService');
  * @returns {Promise<boolean>} true if actually handed to a transport, false if only logged (dev fallback)
  */
 async function send(to, subject, body, attachments = [], opts = {}) {
+  // QA-5 TM-08: resolved ONCE, here, before either transport is chosen.
+  // Test Mode's redirect used to live only inside emailService's own send
+  // functions — the SMTP fallback path — so turning Zoho on gave every
+  // outbound email a way around Test Mode entirely, straight to the real
+  // buyer's inbox. Both transports below now see the same, already-
+  // resolved address.
+  const resolved = await testModeService.resolveEmailRecipient(to, !!opts.isSecurityEmail, subject);
+  if (resolved === null) {
+    // QA-5 TM-07: Test Mode is on and no test_email is configured — never
+    // fall back to sending this to the real address, via Zoho or SMTP.
+    return false;
+  }
+
   if (!opts.isSecurityEmail && (await zohoMailService.isEnabled())) {
     try {
-      const sent = await zohoMailService.send(to, subject, body, attachments);
+      const sent = await zohoMailService.send(resolved, subject, body, attachments);
       if (sent) return true;
-      console.error('[ZOHO MAIL — send returned false, falling back to SMTP] To:', to);
+      console.error('[ZOHO MAIL — send returned false, falling back to SMTP] To:', resolved);
     } catch (e) {
       console.error('[ZOHO MAIL — exception, falling back to SMTP]', e.message);
     }
   }
 
-  return emailService.sendWithAttachments(to, subject, body, attachments, opts);
+  return emailService.deliverWithAttachments(resolved, subject, body, attachments);
 }
 
 module.exports = { send };

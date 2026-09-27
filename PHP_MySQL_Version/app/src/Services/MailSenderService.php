@@ -23,17 +23,31 @@ final class MailSenderService
      */
     public static function send(string $to, string $subject, string $body, array $attachments = [], bool $isSecurityEmail = false): bool
     {
+        // QA-5 TM-08: resolved ONCE, here, before either transport is
+        // chosen. Test Mode's redirect used to live only inside
+        // EmailService's own send methods — the SMTP fallback path — so
+        // turning Zoho on gave every outbound email a way around Test Mode
+        // entirely, straight to the real buyer's inbox. Both transports
+        // below now see the same, already-resolved address.
+        $resolved = TestModeService::resolveEmailRecipient($to, $isSecurityEmail, $subject);
+        if ($resolved === null) {
+            // QA-5 TM-07: Test Mode is on and no test_email is configured —
+            // never fall back to sending this to the real address, via
+            // Zoho or SMTP.
+            return false;
+        }
+
         if (!$isSecurityEmail && ZohoMailService::isEnabled()) {
             try {
-                if (ZohoMailService::send($to, $subject, $body, $attachments)) {
+                if (ZohoMailService::send($resolved, $subject, $body, $attachments)) {
                     return true;
                 }
-                error_log('[ZOHO MAIL — send returned false, falling back to SMTP] To: ' . $to);
+                error_log('[ZOHO MAIL — send returned false, falling back to SMTP] To: ' . $resolved);
             } catch (\Throwable $e) {
                 error_log('[ZOHO MAIL — exception, falling back to SMTP] ' . $e->getMessage());
             }
         }
 
-        return EmailService::sendWithAttachments($to, $subject, $body, $attachments, $isSecurityEmail);
+        return EmailService::deliverWithAttachments($resolved, $subject, $body, $attachments);
     }
 }

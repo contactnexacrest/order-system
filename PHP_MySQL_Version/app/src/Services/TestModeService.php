@@ -48,6 +48,37 @@ final class TestModeService
         TestModeRepository::setTestEmail($email);
     }
 
+    /**
+     * QA-5 TM-07/TM-08: the single Test Mode email gate — every outbound
+     * transport (Zoho Mail, SMTP) must call this before doing anything
+     * else, so no choice of transport can bypass it. $isSecurityEmail is
+     * the one carve-out by design: staff's own 2FA codes and
+     * password-reset links must keep going to the real address they
+     * belong to, or Test Mode would lock staff out of their own accounts.
+     *
+     * Returns null when Test Mode is on and no test_email is configured —
+     * the caller must treat that as "do not send this email at all", never
+     * fall back to the real address (TM-07). docs/schema.sql Section V's
+     * guarantee is "no real buyer is ever emailed while Test Mode is on",
+     * not "unless nobody happened to configure a test address yet".
+     */
+    public static function resolveEmailRecipient(string $toEmail, bool $isSecurityEmail, string $subject): ?string
+    {
+        if ($isSecurityEmail) {
+            return $toEmail;
+        }
+        $settings = self::getSettings();
+        if (!$settings || (int) $settings['is_enabled'] !== 1) {
+            return $toEmail;
+        }
+        if (empty($settings['test_email'])) {
+            error_log("[TEST MODE — no test_email configured, BLOCKING send that would otherwise reach the real address] To: {$toEmail} | Subject: {$subject}");
+            return null;
+        }
+        error_log("[TEST MODE — email redirected] Original To: {$toEmail} -> Test: {$settings['test_email']} | Subject: {$subject}");
+        return (string) $settings['test_email'];
+    }
+
     public static function testDataCounts(): array
     {
         return TestModeRepository::testDataCounts();

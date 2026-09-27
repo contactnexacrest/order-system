@@ -41,6 +41,32 @@ async function setTestEmail(email) {
   await testModeRepository.setTestEmail(email);
 }
 
+/**
+ * QA-5 TM-07/TM-08: the single Test Mode email gate — every outbound
+ * transport (Zoho Mail, SMTP) must call this before doing anything else,
+ * so no choice of transport can bypass it. `isSecurityEmail` is the one
+ * carve-out by design: staff's own 2FA codes and password-reset links must
+ * keep going to the real address they belong to, or Test Mode would lock
+ * staff out of their own accounts.
+ *
+ * Returns null when Test Mode is on and no test_email is configured — the
+ * caller must treat that as "do not send this email at all", never fall
+ * back to the real address (TM-07). docs/schema.sql Section V's guarantee
+ * is "no real buyer is ever emailed while Test Mode is on", not "unless
+ * nobody happened to configure a test address yet".
+ */
+async function resolveEmailRecipient(toEmail, isSecurityEmail, subject) {
+  if (isSecurityEmail) return toEmail;
+  const settings = await getSettings();
+  if (!settings || parseInt(settings.is_enabled, 10) !== 1) return toEmail;
+  if (!settings.test_email) {
+    console.error(`[TEST MODE — no test_email configured, BLOCKING send that would otherwise reach the real address] To: ${toEmail} | Subject: ${subject}`);
+    return null;
+  }
+  console.log(`[TEST MODE — email redirected] Original To: ${toEmail} -> Test: ${settings.test_email} | Subject: ${subject}`);
+  return settings.test_email;
+}
+
 async function testDataCounts() {
   return testModeRepository.testDataCounts();
 }
@@ -70,6 +96,7 @@ module.exports = {
   enable,
   disable,
   setTestEmail,
+  resolveEmailRecipient,
   testDataCounts,
   hasTestData,
   deleteAllTestData,
