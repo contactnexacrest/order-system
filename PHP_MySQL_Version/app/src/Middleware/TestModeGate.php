@@ -24,6 +24,15 @@ final class TestModeGate
      * (must stay operable to turn Test Mode off) or /products (Product
      * Catalog — decided to stay editable: it's operational reference data
      * staff consult day to day, not site configuration).
+     *
+     * QA-5 TM-06 (Owner Decision #4: "All decision-making screens frozen;
+     * only operational screens available"): /hs-codes, /email-templates,
+     * /admin/roles, and /admin/permission-definitions were missing from
+     * this list entirely — HS codes, buyer-facing email wording, and the
+     * roles/permissions that decide who can do what could all still be
+     * created or edited while Test Mode was supposedly frozen. All four are
+     * decision-making configuration in the same sense as /settings or
+     * /signatories, not day-to-day operational data like /products.
      */
     private const FROZEN_PREFIXES = [
         '/settings',
@@ -35,7 +44,11 @@ final class TestModeGate
         '/admin/permissions',
         '/admin/overrides',
         '/admin/field-protection',
+        '/admin/roles',
+        '/admin/permission-definitions',
         '/users',
+        '/hs-codes',
+        '/email-templates',
     ];
 
     /**
