@@ -154,6 +154,19 @@ const sessionKnex = knex({
 });
 
 app.set('trust proxy', 1);
+// QA-5 UP-02: an uploaded file (dispute/amendment/BL/PO evidence, chat
+// attachments, client-portal payment screenshots) is served back with a
+// Content-Type read from whatever the browser declared at upload time, not
+// sniffed server-side. Without this header, a file uploaded as
+// "invoice.pdf" that's actually HTML/JS can be MIME-sniffed by the browser
+// and rendered/executed instead of downloaded — stored XSS via file
+// upload. Set unconditionally here, before every other middleware
+// (including express.static), rather than in each of the dozen download
+// actions individually.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));

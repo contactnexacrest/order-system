@@ -13,6 +13,22 @@ namespace App\Helpers;
  */
 final class Router
 {
+    /**
+     * QA-5 UP-02: an uploaded file (dispute/amendment/BL/PO evidence, chat
+     * attachments, client-portal payment screenshots) is served back with a
+     * Content-Type read from whatever the browser declared at upload time,
+     * not sniffed server-side. Without this header, a file uploaded as
+     * "invoice.pdf" that's actually HTML/JS can be MIME-sniffed by the
+     * browser and rendered/executed instead of downloaded — stored XSS via
+     * file upload. Sent unconditionally from dispatch(), the single
+     * chokepoint every response passes through, rather than in each of the
+     * dozen download actions individually. Kept as a named constant (rather
+     * than inlined in the header() call) so its value is directly assertable
+     * from a test — header()'s own effect isn't observable under the CLI
+     * SAPI PHPUnit runs under.
+     */
+    public const SECURITY_HEADERS = ['X-Content-Type-Options: nosniff'];
+
     /** @var array<int, array{method:string, pattern:string, paramNames:array<int,string>, regex:string, handler:callable, middleware:array<int,callable>}> */
     private array $routes = [];
 
@@ -47,6 +63,10 @@ final class Router
 
     public function dispatch(string $method, string $uri): void
     {
+        foreach (self::SECURITY_HEADERS as $h) {
+            header($h);
+        }
+
         $path = parse_url($uri, PHP_URL_PATH) ?? '/';
         $path = rtrim($path, '/');
         if ($path === '') {
