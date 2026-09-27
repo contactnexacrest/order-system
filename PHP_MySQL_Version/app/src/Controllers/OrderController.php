@@ -230,45 +230,53 @@ final class OrderController
         $portOfDischargeId = !empty($_POST['port_of_discharge_id']) ? (int) $_POST['port_of_discharge_id'] : null;
         $portOfDischargeText = trim((string) ($_POST['port_of_discharge_text'] ?? ''));
 
-        $sequenceNo = OrderRepository::nextSequenceForClient($clientId);
         $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/OC/{YYYY}/{NNN}';
         $testModeEnabled = TestModeService::isEnabled();
-        $orderReference = TestModeService::applyReferencePrefix(
-            strtr($orderRefFormat, [
-                '{YYYY}' => date('Y'),
-                '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
-            ]) . '-' . $clientId, // client suffix keeps this globally unique even though the format string isn't scoped per-client
-            $testModeEnabled
-        );
 
-        $orderId = OrderRepository::create([
-            'order_reference'       => $orderReference,
-            'client_id'             => $clientId,
-            'sequence_no'           => $sequenceNo,
-            'buyer_inquiry_ref'     => $client['client_unique_number'],
-            'payment_preset_id'     => $paymentPresetId,
-            'incoterm_id'           => $incotermId,
-            'port_of_loading_id'    => !empty($_POST['port_of_loading_id']) ? (int) $_POST['port_of_loading_id'] : null,
-            'port_of_discharge_id'  => $portOfDischargeId,
-            'port_of_discharge_text' => $portOfDischargeId ? null : ($portOfDischargeText ?: null),
-            'currency_id'           => $currencyId,
-            'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: $client['coo_type'] ?? 'TBC',
-            'include_annexure_a'    => !empty($_POST['include_annexure_a']),
-            'special_requirements'  => trim((string) ($_POST['special_requirements'] ?? '')) ?: null,
-            'container_type'        => trim((string) ($_POST['container_type'] ?? '')) ?: null,
-            'estimated_total_cbm'   => trim((string) ($_POST['estimated_total_cbm'] ?? '')),
-            'estimated_gross_weight_kg' => trim((string) ($_POST['estimated_gross_weight_kg'] ?? '')),
-            'estimated_net_weight_kg'   => trim((string) ($_POST['estimated_net_weight_kg'] ?? '')),
-            'estimated_package_count'   => trim((string) ($_POST['estimated_package_count'] ?? '')) ?: null,
-            'estimated_package_type'    => trim((string) ($_POST['estimated_package_type'] ?? '')) ?: null,
-            'est_lead_time_text'    => trim((string) ($_POST['est_lead_time_text'] ?? '')) ?: null,
-            'indicative_freight_low'  => trim((string) ($_POST['indicative_freight_low'] ?? '')),
-            'indicative_freight_high' => trim((string) ($_POST['indicative_freight_high'] ?? '')),
-            'indicative_insurance_amount' => trim((string) ($_POST['indicative_insurance_amount'] ?? '')),
-            'buyers_po_ref'         => 'NIL',
-            'quotation_date'        => date('Y-m-d'),
-            'quotation_valid_until' => date('Y-m-d', strtotime('+' . ((int) (CompanySettingsRepository::get('quotation_validity_days') ?? 30)) . ' days')),
-        ], (int) $user['id']);
+        // QA-5 CONC-03: sequence-number reservation and the order INSERT
+        // now happen atomically inside createWithNextSequence() — see its
+        // docblock in OrderRepository.php. order_reference embeds the
+        // sequence number, so it can only be built once the closure runs
+        // with the safely-reserved value.
+        $result = OrderRepository::createWithNextSequence($clientId, function (int $sequenceNo) use (
+            $orderRefFormat, $testModeEnabled, $clientId, $client, $paymentPresetId, $incotermId,
+            $portOfDischargeId, $portOfDischargeText, $currencyId
+        ): array {
+            return [
+                'order_reference'       => TestModeService::applyReferencePrefix(
+                    strtr($orderRefFormat, [
+                        '{YYYY}' => date('Y'),
+                        '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
+                    ]) . '-' . $clientId, // client suffix keeps this globally unique even though the format string isn't scoped per-client
+                    $testModeEnabled
+                ),
+                'buyer_inquiry_ref'     => $client['client_unique_number'],
+                'payment_preset_id'     => $paymentPresetId,
+                'incoterm_id'           => $incotermId,
+                'port_of_loading_id'    => !empty($_POST['port_of_loading_id']) ? (int) $_POST['port_of_loading_id'] : null,
+                'port_of_discharge_id'  => $portOfDischargeId,
+                'port_of_discharge_text' => $portOfDischargeId ? null : ($portOfDischargeText ?: null),
+                'currency_id'           => $currencyId,
+                'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: $client['coo_type'] ?? 'TBC',
+                'include_annexure_a'    => !empty($_POST['include_annexure_a']),
+                'special_requirements'  => trim((string) ($_POST['special_requirements'] ?? '')) ?: null,
+                'container_type'        => trim((string) ($_POST['container_type'] ?? '')) ?: null,
+                'estimated_total_cbm'   => trim((string) ($_POST['estimated_total_cbm'] ?? '')),
+                'estimated_gross_weight_kg' => trim((string) ($_POST['estimated_gross_weight_kg'] ?? '')),
+                'estimated_net_weight_kg'   => trim((string) ($_POST['estimated_net_weight_kg'] ?? '')),
+                'estimated_package_count'   => trim((string) ($_POST['estimated_package_count'] ?? '')) ?: null,
+                'estimated_package_type'    => trim((string) ($_POST['estimated_package_type'] ?? '')) ?: null,
+                'est_lead_time_text'    => trim((string) ($_POST['est_lead_time_text'] ?? '')) ?: null,
+                'indicative_freight_low'  => trim((string) ($_POST['indicative_freight_low'] ?? '')),
+                'indicative_freight_high' => trim((string) ($_POST['indicative_freight_high'] ?? '')),
+                'indicative_insurance_amount' => trim((string) ($_POST['indicative_insurance_amount'] ?? '')),
+                'buyers_po_ref'         => 'NIL',
+                'quotation_date'        => date('Y-m-d'),
+                'quotation_valid_until' => date('Y-m-d', strtotime('+' . ((int) (CompanySettingsRepository::get('quotation_validity_days') ?? 30)) . ' days')),
+            ];
+        }, (int) $user['id']);
+        $orderId = $result['orderId'];
+        $orderReference = $result['orderReference'];
         if ($testModeEnabled) {
             OrderRepository::markTest($orderId);
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\ReferenceNumberService;
 
 final class OrderRepository
 {
@@ -95,16 +96,34 @@ final class OrderRepository
         return $stmt->fetch() ?: null;
     }
 
-    public static function nextSequenceForClient(int $clientId): int
+    /**
+     * QA-5 CONC-03: reading "next sequence number for this client" and
+     * inserting the order used to be two separate, unlocked statements
+     * (nextSequenceForClient() then create()) — two concurrent
+     * order-creation requests for the same client (a double-submit, or two
+     * staff members working the same client at once) could both read the
+     * same MAX(sequence_no), both build the identical order_reference from
+     * it, and the second INSERT would then 500 on order_reference's UNIQUE
+     * constraint. ReferenceNumberService::nextOrderSequenceForClient()
+     * reserves the number atomically (a single UPSERT on
+     * reference_sequences' unique scope_key index — see its docblock for
+     * why that's used instead of a `SELECT ... FOR UPDATE`, which
+     * deadlocks under real concurrent load), so by the time
+     * $buildFields($sequenceNo) runs, no other caller can ever have been
+     * handed the same number.
+     *
+     * @param callable(int):array<string,mixed> $buildFields
+     * @return array{orderId:int, sequenceNo:int, orderReference:string}
+     */
+    public static function createWithNextSequence(int $clientId, callable $buildFields, int $createdBy): array
     {
-        $stmt = Database::connection()->prepare(
-            'SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM orders WHERE client_id = :client_id'
-        );
-        $stmt->execute(['client_id' => $clientId]);
-        return (int) $stmt->fetch()['next_seq'];
+        $sequenceNo = ReferenceNumberService::nextOrderSequenceForClient($clientId);
+        $fields = $buildFields($sequenceNo) + ['client_id' => $clientId, 'sequence_no' => $sequenceNo];
+        $orderId = self::insertRow($fields, $createdBy);
+        return ['orderId' => $orderId, 'sequenceNo' => $sequenceNo, 'orderReference' => $fields['order_reference']];
     }
 
-    public static function create(array $data, int $createdBy): int
+    private static function insertRow(array $data, int $createdBy): int
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(

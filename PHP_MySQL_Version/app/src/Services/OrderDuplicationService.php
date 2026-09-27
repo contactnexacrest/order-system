@@ -37,45 +37,47 @@ final class OrderDuplicationService
         }
         $client = ClientRepository::find((int) $source['client_id']);
 
-        $sequenceNo = OrderRepository::nextSequenceForClient((int) $source['client_id']);
         $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/OC/{YYYY}/{NNN}';
         $testModeEnabled = TestModeService::isEnabled();
-        $orderReference = TestModeService::applyReferencePrefix(
-            strtr($orderRefFormat, [
-                '{YYYY}' => date('Y'),
-                '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
-            ]) . '-' . $source['client_id'],
-            $testModeEnabled
-        );
 
-        $newOrderId = OrderRepository::create([
-            'order_reference'       => $orderReference,
-            'client_id'             => $source['client_id'],
-            'sequence_no'           => $sequenceNo,
-            'buyer_inquiry_ref'     => $client['client_unique_number'] ?? $source['buyer_inquiry_ref'],
-            'payment_preset_id'     => $source['payment_preset_id'],
-            'incoterm_id'           => $source['incoterm_id'],
-            'port_of_loading_id'    => $source['port_of_loading_id'],
-            'port_of_discharge_id'  => $source['port_of_discharge_id'],
-            'port_of_discharge_text' => $source['port_of_discharge_id'] ? null : $source['port_of_discharge_text'],
-            'currency_id'           => $source['currency_id'],
-            'coo_type'              => $source['coo_type'] ?? 'TBC',
-            'include_annexure_a'    => (bool) $source['include_annexure_a'],
-            'special_requirements'  => $source['special_requirements'],
-            'container_type'        => $source['container_type'],
-            'estimated_total_cbm'   => $source['estimated_total_cbm'],
-            'estimated_gross_weight_kg' => $source['estimated_gross_weight_kg'],
-            'estimated_net_weight_kg'   => $source['estimated_net_weight_kg'],
-            'estimated_package_count'   => $source['estimated_package_count'],
-            'estimated_package_type'    => $source['estimated_package_type'],
-            'est_lead_time_text'    => $source['est_lead_time_text'],
-            'indicative_freight_low'  => $source['indicative_freight_low'],
-            'indicative_freight_high' => $source['indicative_freight_high'],
-            'indicative_insurance_amount' => $source['indicative_insurance_amount'],
-            'buyers_po_ref'         => 'NIL', // the buyer's own ref is specific to each order — staff records the new one
-            'quotation_date'        => date('Y-m-d'),
-            'quotation_valid_until' => date('Y-m-d', strtotime('+' . ((int) (CompanySettingsRepository::get('quotation_validity_days') ?? 30)) . ' days')),
-        ], $createdBy);
+        // QA-5 CONC-03: see OrderRepository::createWithNextSequence()'s docblock.
+        $result = OrderRepository::createWithNextSequence((int) $source['client_id'], function (int $sequenceNo) use (
+            $orderRefFormat, $testModeEnabled, $source, $client
+        ): array {
+            return [
+                'order_reference'       => TestModeService::applyReferencePrefix(
+                    strtr($orderRefFormat, [
+                        '{YYYY}' => date('Y'),
+                        '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
+                    ]) . '-' . $source['client_id'],
+                    $testModeEnabled
+                ),
+                'buyer_inquiry_ref'     => $client['client_unique_number'] ?? $source['buyer_inquiry_ref'],
+                'payment_preset_id'     => $source['payment_preset_id'],
+                'incoterm_id'           => $source['incoterm_id'],
+                'port_of_loading_id'    => $source['port_of_loading_id'],
+                'port_of_discharge_id'  => $source['port_of_discharge_id'],
+                'port_of_discharge_text' => $source['port_of_discharge_id'] ? null : $source['port_of_discharge_text'],
+                'currency_id'           => $source['currency_id'],
+                'coo_type'              => $source['coo_type'] ?? 'TBC',
+                'include_annexure_a'    => (bool) $source['include_annexure_a'],
+                'special_requirements'  => $source['special_requirements'],
+                'container_type'        => $source['container_type'],
+                'estimated_total_cbm'   => $source['estimated_total_cbm'],
+                'estimated_gross_weight_kg' => $source['estimated_gross_weight_kg'],
+                'estimated_net_weight_kg'   => $source['estimated_net_weight_kg'],
+                'estimated_package_count'   => $source['estimated_package_count'],
+                'estimated_package_type'    => $source['estimated_package_type'],
+                'est_lead_time_text'    => $source['est_lead_time_text'],
+                'indicative_freight_low'  => $source['indicative_freight_low'],
+                'indicative_freight_high' => $source['indicative_freight_high'],
+                'indicative_insurance_amount' => $source['indicative_insurance_amount'],
+                'buyers_po_ref'         => 'NIL', // the buyer's own ref is specific to each order — staff records the new one
+                'quotation_date'        => date('Y-m-d'),
+                'quotation_valid_until' => date('Y-m-d', strtotime('+' . ((int) (CompanySettingsRepository::get('quotation_validity_days') ?? 30)) . ' days')),
+            ];
+        }, $createdBy);
+        $newOrderId = $result['orderId'];
         if ($testModeEnabled) {
             OrderRepository::markTest($newOrderId);
         }

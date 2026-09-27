@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const referenceNumberService = require('../services/referenceNumberService');
 
 /**
  * Also carries incoterm_code, current_stage_number, currency_code, and
@@ -84,16 +85,35 @@ async function find(id) {
   );
 }
 
-async function nextSequenceForClient(clientId) {
-  const row = await db.queryOne(
-    'SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM orders WHERE client_id = :client_id',
-    { client_id: clientId }
-  );
-  return parseInt(row.next_seq, 10);
+/**
+ * QA-5 CONC-03: reading "next sequence number for this client" and
+ * inserting the order used to be two separate, unlocked statements
+ * (nextSequenceForClient() then create()) — two concurrent order-creation
+ * requests for the same client (a double-submit, or two staff members
+ * working the same client at once) could both read the same
+ * MAX(sequence_no), both build the identical order_reference from it, and
+ * the second INSERT would then 500 on order_reference's UNIQUE constraint.
+ * referenceNumberService.nextOrderSequenceForClient() reserves the number
+ * atomically (a single UPSERT on reference_sequences' unique scope_key
+ * index — see its docblock for why that's used instead of a
+ * `SELECT ... FOR UPDATE`, which deadlocks under real concurrent load),
+ * so by the time buildFields(sequenceNo) runs, no other caller can ever
+ * have been handed the same number.
+ *
+ * @param {number} clientId
+ * @param {(sequenceNo: number) => object} buildFields
+ * @param {number} createdBy
+ * @returns {Promise<{orderId: number, sequenceNo: number, orderReference: string}>}
+ */
+async function createWithNextSequence(clientId, buildFields, createdBy) {
+  const sequenceNo = await referenceNumberService.nextOrderSequenceForClient(clientId);
+  const fields = { ...buildFields(sequenceNo), client_id: clientId, sequence_no: sequenceNo };
+  const orderId = await insertOrderRow(db, fields, createdBy);
+  return { orderId, sequenceNo, orderReference: fields.order_reference };
 }
 
-async function create(data, createdBy) {
-  const result = await db.execute(
+async function insertOrderRow(executor, data, createdBy) {
+  const result = await executor.execute(
     `INSERT INTO orders
         (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
          port_of_loading_id, port_of_discharge_id, port_of_discharge_text, currency_id, coo_type,
@@ -282,7 +302,7 @@ async function setIncludeAnnexureA(orderId, include) {
 }
 
 module.exports = {
-  all, allArchived, archive, unarchive, find, nextSequenceForClient, create, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
+  all, allArchived, archive, unarchive, find, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setDisputeButtonVisible,
 };

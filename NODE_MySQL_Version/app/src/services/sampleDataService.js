@@ -355,25 +355,22 @@ async function createSampleClient(companyName, billingAddress, userId, email = n
  */
 async function createSampleOrderShell(clientId, incoterm, currency, loadingPort, preset, userId, portOfDischargeText = null, includeAnnexureA = false) {
   const client = await clientRepository.find(clientId);
-  const sequenceNo = await orderRepository.nextSequenceForClient(clientId);
   const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/OC/{YYYY}/{NNN}';
   const now = new Date();
-  const orderReference =
-    orderRefFormat
-      .replace(/\{YYYY\}/g, String(now.getFullYear()))
-      .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0'))
-    + '-' + clientId;
-
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
   const quotationDate = formatDate(now);
   const validUntil = new Date(now);
   validUntil.setDate(validUntil.getDate() + quotationValidityDays);
 
-  const orderId = await orderRepository.create(
-    {
-      order_reference: orderReference,
-      client_id: clientId,
-      sequence_no: sequenceNo,
+  // QA-5 CONC-03: see orderRepository.createWithNextSequence()'s docblock.
+  const { orderId } = await orderRepository.createWithNextSequence(
+    clientId,
+    (sequenceNo) => ({
+      order_reference:
+        orderRefFormat
+          .replace(/\{YYYY\}/g, String(now.getFullYear()))
+          .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0'))
+        + '-' + clientId,
       buyer_inquiry_ref: client.client_unique_number,
       payment_preset_id: parseInt(preset.id, 10),
       incoterm_id: parseInt(incoterm.id, 10),
@@ -391,7 +388,7 @@ async function createSampleOrderShell(clientId, incoterm, currency, loadingPort,
       quotation_date: quotationDate,
       quotation_valid_until: formatDate(validUntil),
       include_annexure_a: includeAnnexureA,
-    },
+    }),
     userId
   );
   await orderRepository.markSample(orderId);

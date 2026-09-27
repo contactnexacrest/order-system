@@ -235,23 +235,25 @@ async function store(req, res) {
   const portOfDischargeId = body.port_of_discharge_id ? parseInt(body.port_of_discharge_id, 10) : null;
   const portOfDischargeText = str(body.port_of_discharge_text);
 
-  const sequenceNo = await orderRepository.nextSequenceForClient(clientId);
   const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/OC/{YYYY}/{NNN}';
   const testModeEnabled = await testModeService.isEnabled();
-  const orderReference = testModeService.applyReferencePrefix(
-    orderRefFormat
-      .replace(/\{YYYY\}/g, String(new Date().getFullYear()))
-      .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0')) + `-${clientId}`, // client suffix keeps this globally unique even though the format string isn't scoped per-client
-    testModeEnabled
-  );
-
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
 
-  const orderId = await orderRepository.create(
-    {
-      order_reference: orderReference,
-      client_id: clientId,
-      sequence_no: sequenceNo,
+  // QA-5 CONC-03: sequence-number reservation and the order INSERT now
+  // happen atomically inside createWithNextSequence() (a single
+  // transaction holding a row lock for this client) — see its docblock in
+  // orderRepository.js. order_reference embeds the sequence number, so it
+  // can only be built once buildFields(sequenceNo) is called with the
+  // safely-reserved value.
+  const { orderId, orderReference } = await orderRepository.createWithNextSequence(
+    clientId,
+    (sequenceNo) => ({
+      order_reference: testModeService.applyReferencePrefix(
+        orderRefFormat
+          .replace(/\{YYYY\}/g, String(new Date().getFullYear()))
+          .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0')) + `-${clientId}`, // client suffix keeps this globally unique even though the format string isn't scoped per-client
+        testModeEnabled
+      ),
       buyer_inquiry_ref: client.client_unique_number,
       payment_preset_id: paymentPresetId,
       incoterm_id: incotermId,
@@ -275,7 +277,7 @@ async function store(req, res) {
       buyers_po_ref: 'NIL',
       quotation_date: todayYmd(),
       quotation_valid_until: addDaysYmd(todayYmd(), quotationValidityDays),
-    },
+    }),
     user.id
   );
   if (testModeEnabled) {

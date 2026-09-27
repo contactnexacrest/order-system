@@ -373,35 +373,38 @@ final class SampleDataService
         bool $includeAnnexureA = false
     ): int {
         $client = ClientRepository::find($clientId);
-        $sequenceNo = OrderRepository::nextSequenceForClient($clientId);
         $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/OC/{YYYY}/{NNN}';
-        $orderReference = strtr($orderRefFormat, [
-            '{YYYY}' => date('Y'),
-            '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
-        ]) . '-' . $clientId;
 
-        $orderId = OrderRepository::create([
-            'order_reference'       => $orderReference,
-            'client_id'             => $clientId,
-            'sequence_no'           => $sequenceNo,
-            'buyer_inquiry_ref'     => $client['client_unique_number'],
-            'payment_preset_id'     => (int) $preset['id'],
-            'incoterm_id'           => (int) $incoterm['id'],
-            'port_of_loading_id'    => $loadingPort ? (int) $loadingPort['id'] : null,
-            'port_of_discharge_text' => $portOfDischargeText,
-            'currency_id'           => (int) $currency['id'],
-            'coo_type'              => $client['coo_type'] ?? 'TBC',
-            'estimated_total_cbm'         => null,
-            'estimated_gross_weight_kg'   => null,
-            'estimated_net_weight_kg'     => null,
-            'indicative_freight_low'      => null,
-            'indicative_freight_high'     => null,
-            'indicative_insurance_amount' => null,
-            'buyers_po_ref'         => 'NIL',
-            'quotation_date'        => date('Y-m-d'),
-            'quotation_valid_until' => date('Y-m-d', strtotime('+' . ((int) (CompanySettingsRepository::get('quotation_validity_days') ?? 30)) . ' days')),
-            'include_annexure_a'    => $includeAnnexureA,
-        ], $userId);
+        // QA-5 CONC-03: see OrderRepository::createWithNextSequence()'s docblock.
+        $result = OrderRepository::createWithNextSequence($clientId, function (int $sequenceNo) use (
+            $orderRefFormat, $clientId, $client, $preset, $incoterm, $loadingPort, $portOfDischargeText,
+            $currency, $includeAnnexureA
+        ): array {
+            return [
+                'order_reference'       => strtr($orderRefFormat, [
+                    '{YYYY}' => date('Y'),
+                    '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
+                ]) . '-' . $clientId,
+                'buyer_inquiry_ref'     => $client['client_unique_number'],
+                'payment_preset_id'     => (int) $preset['id'],
+                'incoterm_id'           => (int) $incoterm['id'],
+                'port_of_loading_id'    => $loadingPort ? (int) $loadingPort['id'] : null,
+                'port_of_discharge_text' => $portOfDischargeText,
+                'currency_id'           => (int) $currency['id'],
+                'coo_type'              => $client['coo_type'] ?? 'TBC',
+                'estimated_total_cbm'         => null,
+                'estimated_gross_weight_kg'   => null,
+                'estimated_net_weight_kg'     => null,
+                'indicative_freight_low'      => null,
+                'indicative_freight_high'     => null,
+                'indicative_insurance_amount' => null,
+                'buyers_po_ref'         => 'NIL',
+                'quotation_date'        => date('Y-m-d'),
+                'quotation_valid_until' => date('Y-m-d', strtotime('+' . ((int) (CompanySettingsRepository::get('quotation_validity_days') ?? 30)) . ' days')),
+                'include_annexure_a'    => $includeAnnexureA,
+            ];
+        }, $userId);
+        $orderId = $result['orderId'];
         OrderRepository::markSample($orderId);
 
         OrderStageRepository::initializeForOrder($orderId);
