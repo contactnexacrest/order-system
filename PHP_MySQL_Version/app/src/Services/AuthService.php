@@ -19,16 +19,44 @@ final class AuthService
 {
     private const SESSION_USER_ID = '_auth_user_id';
 
+    // AUTH-04/AUTH-05: a fixed dummy hash so password_verify() always runs
+    // real bcrypt work, even for an email that doesn't exist — otherwise
+    // the timing difference alone could tell an attacker an account exists.
+    private const DUMMY_PASSWORD_HASH = '$2y$12$XkZEWJ9OTUrQ7pC.e9pnpO1LA.XHdoTUKJahoxDBHKjd8rQTbId22';
+
     public static function attemptLogin(string $email, string $password): array
     {
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         $user = UserRepository::findByEmail($email);
 
-        if (!$user) {
-            LoginAttemptRepository::record(null, $email, $ip, false);
+        // AUTH-04/AUTH-05: the password is checked BEFORE anything about
+        // account state (exists / disabled / locked) is revealed — an
+        // attacker submitting any password for a guessed email must see the
+        // exact same 'invalid_credentials' response whether that account
+        // doesn't exist, is perfectly normal, is disabled, or is currently
+        // locked out. Only once the real password is confirmed correct does
+        // the legitimate account holder get told why they still can't log in.
+        $passwordCorrect = password_verify($password, $user['password_hash'] ?? self::DUMMY_PASSWORD_HASH) && $user !== null;
+
+        if (!$passwordCorrect) {
+            if ($user) {
+                UserRepository::incrementFailedLogins((int) $user['id']);
+
+                $maxAttempts = (int) (CompanySettingsRepository::get('failed_login_lockout_count') ?? '5');
+                $lockoutMinutes = (int) (CompanySettingsRepository::get('lockout_duration_minutes') ?? '15');
+                $recentFailures = LoginAttemptRepository::recentFailedCount((int) $user['id'], $lockoutMinutes);
+
+                if ($recentFailures >= $maxAttempts) {
+                    $until = date('Y-m-d H:i:s', time() + ($lockoutMinutes * 60));
+                    UserRepository::lockUntil((int) $user['id'], $until);
+                    AuditLogRepository::log((int) $user['id'], 'ACCOUNT_LOCKED', 'users', (int) $user['id'], null, null, null, "{$recentFailures} failed attempts within {$lockoutMinutes} minutes");
+                }
+            }
+            LoginAttemptRepository::record($user['id'] ?? null, $email, $ip, false);
             return ['status' => 'invalid_credentials'];
         }
 
+        // Password confirmed correct — safe to reveal real account state now.
         if (!$user['is_active']) {
             LoginAttemptRepository::record((int) $user['id'], $email, $ip, false);
             return ['status' => 'account_disabled'];
@@ -39,25 +67,7 @@ final class AuthService
             return ['status' => 'locked_out', 'locked_until' => $user['locked_until']];
         }
 
-        if (!password_verify($password, $user['password_hash'])) {
-            UserRepository::incrementFailedLogins((int) $user['id']);
-            LoginAttemptRepository::record((int) $user['id'], $email, $ip, false);
-
-            $maxAttempts = (int) (CompanySettingsRepository::get('failed_login_lockout_count') ?? '5');
-            $lockoutMinutes = (int) (CompanySettingsRepository::get('lockout_duration_minutes') ?? '15');
-            $recentFailures = LoginAttemptRepository::recentFailedCount((int) $user['id'], $lockoutMinutes);
-
-            if ($recentFailures >= $maxAttempts) {
-                $until = date('Y-m-d H:i:s', time() + ($lockoutMinutes * 60));
-                UserRepository::lockUntil((int) $user['id'], $until);
-                AuditLogRepository::log((int) $user['id'], 'ACCOUNT_LOCKED', 'users', (int) $user['id'], null, null, null, "{$recentFailures} failed attempts within {$lockoutMinutes} minutes");
-                return ['status' => 'locked_out', 'locked_until' => $until];
-            }
-
-            return ['status' => 'invalid_credentials'];
-        }
-
-        // Password correct.
+        // Password correct, active, not locked.
         UserRepository::resetFailedLogins((int) $user['id']);
         LoginAttemptRepository::record((int) $user['id'], $email, $ip, true);
 

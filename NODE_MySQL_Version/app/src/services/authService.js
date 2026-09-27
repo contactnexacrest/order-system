@@ -15,15 +15,45 @@ const twoFactorService = require('./twoFactorService');
 
 const SESSION_USER_ID = '_auth_user_id';
 
+// AUTH-04/AUTH-05: a fixed dummy hash so passwordHash.verify() always runs
+// real bcrypt work, even for an email that doesn't exist — otherwise the
+// timing difference alone could tell an attacker an account exists.
+const DUMMY_PASSWORD_HASH = '$2y$12$XkZEWJ9OTUrQ7pC.e9pnpO1LA.XHdoTUKJahoxDBHKjd8rQTbId22';
+
 async function attemptLogin(req, email, password) {
   const ip = req.ip || 'unknown';
   const user = await userRepository.findByEmail(email);
 
-  if (!user) {
-    await loginAttemptRepository.record(null, email, ip, false);
+  // AUTH-04/AUTH-05: the password is checked BEFORE anything about account
+  // state (exists / disabled / locked) is revealed — an attacker submitting
+  // any password for a guessed email must see the exact same
+  // 'invalid_credentials' response whether that account doesn't exist, is
+  // perfectly normal, is disabled, or is currently locked out. Only once
+  // the real password is confirmed correct does the legitimate account
+  // holder get told why they still can't log in.
+  const verified = await passwordHash.verify(password, user ? user.password_hash : DUMMY_PASSWORD_HASH);
+  const passwordCorrect = user !== null && verified;
+
+  if (!passwordCorrect) {
+    if (user) {
+      await userRepository.incrementFailedLogins(user.id);
+
+      const maxAttempts = parseInt((await companySettingsRepository.get('failed_login_lockout_count')) ?? '5', 10);
+      const lockoutMinutes = parseInt((await companySettingsRepository.get('lockout_duration_minutes')) ?? '15', 10);
+      const recentFailures = await loginAttemptRepository.recentFailedCount(user.id, lockoutMinutes);
+
+      if (recentFailures >= maxAttempts) {
+        const until = new Date(Date.now() + lockoutMinutes * 60000);
+        const untilStr = until.toISOString().slice(0, 19).replace('T', ' ');
+        await userRepository.lockUntil(user.id, untilStr);
+        await auditLogRepository.log(user.id, 'ACCOUNT_LOCKED', 'users', user.id, null, null, null, `${recentFailures} failed attempts within ${lockoutMinutes} minutes`, ip);
+      }
+    }
+    await loginAttemptRepository.record(user ? user.id : null, email, ip, false);
     return { status: 'invalid_credentials' };
   }
 
+  // Password confirmed correct — safe to reveal real account state now.
   if (!user.is_active) {
     await loginAttemptRepository.record(user.id, email, ip, false);
     return { status: 'account_disabled' };
@@ -34,27 +64,7 @@ async function attemptLogin(req, email, password) {
     return { status: 'locked_out', locked_until: user.locked_until };
   }
 
-  const passwordOk = await passwordHash.verify(password, user.password_hash);
-  if (!passwordOk) {
-    await userRepository.incrementFailedLogins(user.id);
-    await loginAttemptRepository.record(user.id, email, ip, false);
-
-    const maxAttempts = parseInt((await companySettingsRepository.get('failed_login_lockout_count')) ?? '5', 10);
-    const lockoutMinutes = parseInt((await companySettingsRepository.get('lockout_duration_minutes')) ?? '15', 10);
-    const recentFailures = await loginAttemptRepository.recentFailedCount(user.id, lockoutMinutes);
-
-    if (recentFailures >= maxAttempts) {
-      const until = new Date(Date.now() + lockoutMinutes * 60000);
-      const untilStr = until.toISOString().slice(0, 19).replace('T', ' ');
-      await userRepository.lockUntil(user.id, untilStr);
-      await auditLogRepository.log(user.id, 'ACCOUNT_LOCKED', 'users', user.id, null, null, null, `${recentFailures} failed attempts within ${lockoutMinutes} minutes`, ip);
-      return { status: 'locked_out', locked_until: untilStr };
-    }
-
-    return { status: 'invalid_credentials' };
-  }
-
-  // Password correct.
+  // Password correct, active, not locked.
   await userRepository.resetFailedLogins(user.id);
   await loginAttemptRepository.record(user.id, email, ip, true);
 

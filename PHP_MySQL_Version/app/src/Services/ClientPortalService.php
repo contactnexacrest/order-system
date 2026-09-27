@@ -24,6 +24,11 @@ final class ClientPortalService
 {
     private const SESSION_CLIENT_ID = '_client_portal_client_id';
 
+    // CP-07: a fixed dummy hash so password_verify() always runs real
+    // bcrypt work, even for an email with no client_logins row — otherwise
+    // the timing difference alone could tell an attacker an account exists.
+    private const DUMMY_PASSWORD_HASH = '$2y$12$XkZEWJ9OTUrQ7pC.e9pnpO1LA.XHdoTUKJahoxDBHKjd8rQTbId22';
+
     /**
      * Called from OrderController::clearAdvancePayment().
      * @return string 'provisioned' | 'already_provisioned' | 'no_email_on_file'
@@ -78,25 +83,30 @@ final class ClientPortalService
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         $login = ClientLoginRepository::findByEmail($email);
 
-        if (!$login) {
+        // CP-07: the password is checked BEFORE anything about account
+        // state (exists / disabled / locked) is revealed — see
+        // AuthService::attemptLogin()'s identical staff-side fix.
+        $passwordCorrect = password_verify($password, $login['password_hash'] ?? self::DUMMY_PASSWORD_HASH) && $login !== null;
+
+        if (!$passwordCorrect) {
+            if ($login) {
+                ClientLoginRepository::incrementFailedLogins((int) $login['client_id']);
+                if ((int) $login['failed_login_count'] + 1 >= 5) {
+                    $until = date('Y-m-d H:i:s', time() + (15 * 60));
+                    ClientLoginRepository::lockUntil((int) $login['client_id'], $until);
+                }
+            }
             LoginAttemptRepository::record(null, $email, $ip, false);
             return ['status' => 'invalid_credentials'];
         }
+
+        // Password confirmed correct — safe to reveal real account state now.
         if (!$login['client_is_active'] || !$login['is_active']) {
             LoginAttemptRepository::record(null, $email, $ip, false);
             return ['status' => 'account_disabled'];
         }
         if ($login['locked_until'] && strtotime($login['locked_until']) > time()) {
             return ['status' => 'locked_out', 'locked_until' => $login['locked_until']];
-        }
-        if (!password_verify($password, $login['password_hash'])) {
-            ClientLoginRepository::incrementFailedLogins((int) $login['client_id']);
-            if ((int) $login['failed_login_count'] + 1 >= 5) {
-                $until = date('Y-m-d H:i:s', time() + (15 * 60));
-                ClientLoginRepository::lockUntil((int) $login['client_id'], $until);
-                return ['status' => 'locked_out', 'locked_until' => $until];
-            }
-            return ['status' => 'invalid_credentials'];
         }
 
         ClientLoginRepository::resetFailedLogins((int) $login['client_id']);

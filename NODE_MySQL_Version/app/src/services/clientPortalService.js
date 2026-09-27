@@ -28,6 +28,11 @@ const emailService = require('./emailService');
 
 const SESSION_CLIENT_ID = '_client_portal_client_id';
 
+// CP-07: a fixed dummy hash so passwordHash.verify() always runs real
+// bcrypt work, even for an email with no client_logins row — otherwise the
+// timing difference alone could tell an attacker an account exists.
+const DUMMY_PASSWORD_HASH = '$2y$12$XkZEWJ9OTUrQ7pC.e9pnpO1LA.XHdoTUKJahoxDBHKjd8rQTbId22';
+
 /**
  * Called from ordersController.clearAdvancePayment().
  * @returns {Promise<string>} 'provisioned' | 'already_provisioned' | 'no_email_on_file'
@@ -79,25 +84,31 @@ async function attemptLogin(req, email, password) {
   const ip = req.ip || 'unknown';
   const login = await clientLoginRepository.findByEmail(email);
 
-  if (!login) {
+  // CP-07: the password is checked BEFORE anything about account state
+  // (exists / disabled / locked) is revealed — see authService.js's
+  // identical staff-side fix.
+  const verified = await passwordHash.verify(password, login ? login.password_hash : DUMMY_PASSWORD_HASH);
+  const passwordCorrect = login !== null && verified;
+
+  if (!passwordCorrect) {
+    if (login) {
+      await clientLoginRepository.incrementFailedLogins(login.client_id);
+      if (parseInt(login.failed_login_count, 10) + 1 >= 5) {
+        const until = new Date(Date.now() + 15 * 60000).toISOString().slice(0, 19).replace('T', ' ');
+        await clientLoginRepository.lockUntil(login.client_id, until);
+      }
+    }
     await loginAttemptRepository.record(null, email, ip, false);
     return { status: 'invalid_credentials' };
   }
+
+  // Password confirmed correct — safe to reveal real account state now.
   if (!login.client_is_active || !login.is_active) {
     await loginAttemptRepository.record(null, email, ip, false);
     return { status: 'account_disabled' };
   }
   if (login.locked_until && new Date(login.locked_until).getTime() > Date.now()) {
     return { status: 'locked_out', locked_until: login.locked_until };
-  }
-  if (!(await passwordHash.verify(password, login.password_hash))) {
-    await clientLoginRepository.incrementFailedLogins(login.client_id);
-    if (parseInt(login.failed_login_count, 10) + 1 >= 5) {
-      const until = new Date(Date.now() + 15 * 60000).toISOString().slice(0, 19).replace('T', ' ');
-      await clientLoginRepository.lockUntil(login.client_id, until);
-      return { status: 'locked_out', locked_until: until };
-    }
-    return { status: 'invalid_credentials' };
   }
 
   await clientLoginRepository.resetFailedLogins(login.client_id);
