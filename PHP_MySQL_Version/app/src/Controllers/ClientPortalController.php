@@ -360,7 +360,14 @@ final class ClientPortalController
             return;
         }
 
-        OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'client_portal', null, null);
+        if (!OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'client_portal', null, null)) {
+            // QA-5 EML-06: lost the race to another acknowledgment path
+            // (staff-recorded, or the 48h auto-confirm cron) between this
+            // action's own pre-check above and this write.
+            Flash::set('success', 'This order has already been acknowledged and is moving to production.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
         \App\Services\StageGateService::passAndUnlockNext($orderId, 4, null);
         Flash::set('success', 'Thank you — your acknowledgement has been recorded and your order is moving to production.');
         header("Location: /client/orders/{$orderId}");

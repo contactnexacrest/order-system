@@ -1016,7 +1016,14 @@ async function recordOcAcknowledgment(req, res) {
   }
 
   const user = req.user;
-  await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'staff_recorded_email', note, user.id);
+  if (!(await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'staff_recorded_email', note, user.id))) {
+    // QA-5 EML-06: lost the race to another acknowledgment path (client
+    // portal, or the 48h auto-confirm job) between this action's own
+    // pre-check above and this write.
+    flash.set(req, 'error', 'This order was already acknowledged by another path a moment ago.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await stageGateService.passAndUnlockNext(orderId, 4, user.id);
   await auditLogRepository.log(user.id, 'OC_ACKNOWLEDGED_VIA_EMAIL', 'orders', orderId, null, null, null, note);
   flash.set(req, 'success', 'Buyer acknowledgement recorded. Stage 5 (Supplier PO) unlocked.');

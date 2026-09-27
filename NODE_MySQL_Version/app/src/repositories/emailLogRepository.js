@@ -92,6 +92,25 @@ async function dueForSend() {
   return db.query("SELECT * FROM email_log WHERE status = 'approved' AND (scheduled_at IS NULL OR scheduled_at <= NOW())");
 }
 
+/**
+ * QA-5 EML-06: the dispatch job can overlap itself (a slow run still going
+ * when the next scheduler tick fires, or an in-process scheduler racing an
+ * OS cron entry pointed at the same script) and both runs' dueForSend()
+ * would see the same 'approved' row — whichever thread reads first, both
+ * would then send it. Claiming the row atomically first (UPDATE ... WHERE
+ * status = 'approved', checked via affectedRows) means only one of the two
+ * racing UPDATEs can ever win; the loser sees 0 rows affected and skips
+ * the send.
+ *
+ * @returns {Promise<boolean>} true if THIS call won the claim (row was
+ *   'approved' and is now 'sending'); false if another run already
+ *   claimed it first.
+ */
+async function claimForSend(id) {
+  const result = await db.execute("UPDATE email_log SET status = 'sending' WHERE id = :id AND status = 'approved'", { id });
+  return result.affectedRows > 0;
+}
+
 async function markSent(id) {
   await db.execute("UPDATE email_log SET status = 'sent', sent_at = NOW() WHERE id = :id", { id });
 }
@@ -125,6 +144,7 @@ module.exports = {
   reject,
   cancel,
   dueForSend,
+  claimForSend,
   markSent,
   markFailed,
 };

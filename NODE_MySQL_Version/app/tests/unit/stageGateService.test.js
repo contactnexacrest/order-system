@@ -8,6 +8,11 @@ const orderRepository = require('../../src/repositories/orderRepository');
 const stageGateService = require('../../src/services/stageGateService');
 
 describe('stageGateService.isUnlocked', () => {
+  beforeEach(() => {
+    // Default: a normal active order, so existing stage-status assertions
+    // below aren't all forced false by the QA-5 GATE-06 order-status guard.
+    orderRepository.find.mockResolvedValue({ status: 'active' });
+  });
   afterEach(() => jest.clearAllMocks());
 
   it('returns true when the stage is in_progress', async () => {
@@ -29,10 +34,38 @@ describe('stageGateService.isUnlocked', () => {
     orderStageRepository.findByOrderAndStageNumber.mockResolvedValue(null);
     await expect(stageGateService.isUnlocked(1, 99)).resolves.toBe(false);
   });
+
+  // QA-5 GATE-06: a lost/completed order must refuse every gate action,
+  // even one whose stage row still reads 'in_progress' (markLost()/
+  // markComplete() never touch order_stages, only orders.status/is_locked).
+  it.each(['lost', 'complete'])('returns false once the order status is %s, even though its stage is still in_progress', async (status) => {
+    orderRepository.find.mockResolvedValue({ status });
+    orderStageRepository.findByOrderAndStageNumber.mockResolvedValue({ id: 9, status: 'in_progress' });
+    await expect(stageGateService.isUnlocked(1, 5)).resolves.toBe(false);
+  });
+
+  it('returns false when the order itself cannot be found', async () => {
+    orderRepository.find.mockResolvedValue(null);
+    orderStageRepository.findByOrderAndStageNumber.mockResolvedValue({ id: 9, status: 'in_progress' });
+    await expect(stageGateService.isUnlocked(1, 5)).resolves.toBe(false);
+  });
 });
 
 describe('stageGateService.passAndUnlockNext', () => {
+  beforeEach(() => {
+    orderRepository.find.mockResolvedValue({ status: 'active' });
+  });
   afterEach(() => jest.clearAllMocks());
+
+  // QA-5 GATE-06: same order-status guard as isUnlocked(), added directly
+  // to this method too (defense-in-depth — see the method's own comment).
+  it.each(['lost', 'complete'])('refuses to pass any stage once the order status is %s, and mutates nothing', async (status) => {
+    orderRepository.find.mockResolvedValue({ status });
+    orderStageRepository.findByOrderAndStageNumber.mockResolvedValue({ id: 9, status: 'in_progress' });
+
+    await expect(stageGateService.passAndUnlockNext(1, 5, 42)).resolves.toBe(false);
+    expect(orderStageRepository.passGate).not.toHaveBeenCalled();
+  });
 
   it('regression (QA-1): refuses to pass a stage that is still locked, and mutates nothing', async () => {
     // This is the exact shape of the original vulnerability: a controller
@@ -124,6 +157,7 @@ describe('stageGateService — sequential walk through all 9 stages', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    orderRepository.find.mockResolvedValue({ status: 'active' });
   });
 
   it('succeeds stage by stage while every stage ahead stays refused', async () => {

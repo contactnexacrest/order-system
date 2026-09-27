@@ -169,4 +169,36 @@ final class StageGateServiceTest extends DbTestCase
         self::assertSame('in_progress', $cifStages[6], 'CIF order must NOT auto-skip Stage 6');
         self::assertSame('locked', $cifStages[7], 'Stage 7 must stay locked until Stage 6 genuinely passes on a CIF order');
     }
+
+    /**
+     * QA-5 GATE-06: a lost order's current stage is never itself flipped
+     * away from 'in_progress' by markLost() — only orders.status/is_locked
+     * change. Before this fix, isUnlocked()/passAndUnlockNext() only
+     * looked at the stage row, so a lost (or completed) order could still
+     * have its still-"in_progress"-looking current stage force-passed.
+     */
+    public function testIsUnlockedIsFalseOnceOrderIsMarkedLostEvenThoughItsStageStillReadsInProgress(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+
+        self::assertTrue(StageGateService::isUnlocked($orderId, 1), 'sanity: Stage 1 is unlocked before the order is lost');
+
+        \App\Repositories\OrderRepository::markLost($orderId, 'Buyer went silent — QA-5 GATE-06 test', 1);
+        self::assertSame('in_progress', $this->stageStatuses($orderId)[1], 'markLost() must not itself touch the stage row');
+
+        self::assertFalse(StageGateService::isUnlocked($orderId, 1), 'a lost order must refuse every gate action, even on its own current stage');
+        self::assertFalse(StageGateService::passAndUnlockNext($orderId, 1, null));
+    }
+
+    public function testIsUnlockedIsFalseOnceOrderIsComplete(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        StageGateService::passAndUnlockNext($orderId, 1, null);
+
+        \App\Repositories\OrderRepository::markComplete($orderId);
+
+        self::assertFalse(StageGateService::isUnlocked($orderId, 2), 'a completed order must refuse further gate actions');
+    }
 }

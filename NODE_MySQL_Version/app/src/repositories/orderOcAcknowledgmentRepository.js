@@ -26,13 +26,30 @@ async function find(orderId) {
   return db.queryOne('SELECT * FROM order_oc_acknowledgments WHERE order_id = :order_id', { order_id: orderId });
 }
 
+/**
+ * QA-5 EML-06 (same overlapping-cron-run defect class, folded in while
+ * fixing the email dispatcher): the three callers of this function
+ * (staff-recorded, client-portal, and the 48h auto-confirm job) each used
+ * to pre-check `acknowledged_at IS NULL` and then write unconditionally —
+ * a classic check-then-act race if two of those paths land at the same
+ * moment (e.g. the buyer clicks "acknowledge" in the portal in the same
+ * instant the 48h job fires). Restricting the UPDATE itself to
+ * `acknowledged_at IS NULL` makes the write the atomic claim, so only the
+ * first caller's write actually lands.
+ *
+ * @returns {Promise<boolean>} true if THIS call recorded the
+ *   acknowledgment; false if another path already had (the caller must
+ *   skip its own follow-up side effects — stage-gate pass, audit log,
+ *   notification — in that case).
+ */
 async function markAcknowledged(orderId, via, note, recordedBy) {
-  await db.execute(
+  const result = await db.execute(
     `UPDATE order_oc_acknowledgments
      SET acknowledged_at = NOW(), acknowledged_via = :via, acknowledged_note = :note, recorded_by = :recorded_by
-     WHERE order_id = :order_id`,
+     WHERE order_id = :order_id AND acknowledged_at IS NULL`,
     { order_id: orderId, via, note, recorded_by: recordedBy }
   );
+  return result.affectedRows > 0;
 }
 
 /** Unacknowledged rows past due — for the 48h auto-confirm cron. */

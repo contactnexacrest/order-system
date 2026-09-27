@@ -29,7 +29,14 @@ $confirmedCount = 0;
 
 foreach ($due as $row) {
     $orderId = (int) $row['order_id'];
-    OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'auto_48h', null, null);
+    // QA-5 EML-06: markAcknowledged()'s own WHERE now makes this the
+    // atomic claim — an overlapping run of this same script, or the buyer
+    // acknowledging in the portal at the same moment this loop reaches
+    // their order, can only have one of them win. The loser skips the
+    // stage pass and audit log entirely rather than double-recording it.
+    if (!OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'auto_48h', null, null)) {
+        continue;
+    }
     StageGateService::passAndUnlockNext($orderId, 4, null);
     AuditLogRepository::log(null, 'OC_AUTO_CONFIRMED', 'orders', $orderId, null, null, null, 'Buyer did not respond within 48 hours of the Order Confirmation being emailed — auto-confirmed.');
     $confirmedCount++;

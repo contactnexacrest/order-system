@@ -399,7 +399,14 @@ async function acknowledgeOc(req, res) {
     return;
   }
 
-  await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'client_portal', null, null);
+  if (!(await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'client_portal', null, null))) {
+    // QA-5 EML-06: lost the race to another acknowledgment path
+    // (staff-recorded, or the 48h auto-confirm job) between this action's
+    // own pre-check above and this write.
+    flash.set(req, 'success', 'This order has already been acknowledged and is moving to production.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
   await stageGateService.passAndUnlockNext(orderId, 4, null);
   flash.set(req, 'success', 'Thank you — your acknowledgement has been recorded and your order is moving to production.');
   res.redirect(`/client/orders/${orderId}`);

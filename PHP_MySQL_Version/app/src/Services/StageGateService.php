@@ -39,6 +39,15 @@ final class StageGateService
      */
     public static function passAndUnlockNext(int $orderId, int $stageNumber, ?int $userId): bool
     {
+        // QA-5 GATE-06 defense-in-depth: every controller action already
+        // checks isUnlocked() before reaching this call, but this method's
+        // own doc comment says callers "MUST" rely on its return value —
+        // make that true unconditionally rather than trusting every future
+        // caller to pre-check order.status itself.
+        $order = OrderRepository::find($orderId);
+        if ($order === null || $order['status'] !== 'active') {
+            return false;
+        }
         $current = OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
         if (!$current) {
             return false; // stage doesn't exist for this order
@@ -91,9 +100,21 @@ final class StageGateService
      * (e.g. confirming BL issued on an order that never cleared its
      * advance payment) is refused before anything is recorded, not just
      * before the stage-gate row itself is updated.
+     *
+     * QA-5 GATE-06: this used to check ONLY the target stage's own status,
+     * so an order already marked 'complete' or 'lost' (is_locked=1 per
+     * Business Rule #17) could still have a gate action forced through if
+     * its current stage still happened to read 'in_progress' — e.g. a
+     * lost order's last-reached stage was never itself flipped away from
+     * in_progress by markLost(). A closed-for-business order must refuse
+     * every gate action, not just out-of-order ones.
      */
     public static function isUnlocked(int $orderId, int $stageNumber): bool
     {
+        $order = OrderRepository::find($orderId);
+        if ($order === null || $order['status'] !== 'active') {
+            return false;
+        }
         $stage = OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
         return $stage !== null && $stage['status'] === 'in_progress';
     }

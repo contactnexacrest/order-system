@@ -27,7 +27,14 @@ async function run() {
 
   for (const row of due) {
     const orderId = row.order_id;
-    await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'auto_48h', null, null);
+    // QA-5 EML-06: markAcknowledged()'s own WHERE now makes this the
+    // atomic claim — an overlapping run of this same job, or the buyer
+    // acknowledging in the portal at the same moment this loop reaches
+    // their order, can only have one of them win. The loser skips the
+    // stage pass and audit log entirely rather than double-recording it.
+    if (!(await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'auto_48h', null, null))) {
+      continue;
+    }
     await stageGateService.passAndUnlockNext(orderId, 4, null);
     await auditLogRepository.log(null, 'OC_AUTO_CONFIRMED', 'orders', orderId, null, null, null, 'Buyer did not respond within 48 hours of the Order Confirmation being emailed — auto-confirmed.');
     confirmedCount++;

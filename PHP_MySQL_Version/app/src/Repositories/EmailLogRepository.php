@@ -131,6 +131,28 @@ final class EmailLogRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * QA-5 EML-06: dispatch_deferred_emails.php can overlap itself (a slow
+     * run still going when cPanel's next tick fires, or an in-process
+     * scheduler racing an OS cron entry pointed at the same script) and
+     * both runs' SELECT dueForSend() would see the same 'approved' row —
+     * whichever thread reads first, both would then send it. Claiming the
+     * row atomically first (UPDATE ... WHERE status = 'approved', checked
+     * via affected-row count) means only one of the two racing UPDATEs can
+     * ever win; the loser sees 0 rows affected and skips the send.
+     *
+     * @return bool true if THIS call won the claim (row was 'approved' and
+     *   is now 'sending'); false if another run already claimed it first.
+     */
+    public static function claimForSend(int $id): bool
+    {
+        $stmt = Database::connection()->prepare(
+            "UPDATE email_log SET status = 'sending' WHERE id = :id AND status = 'approved'"
+        );
+        $stmt->execute(['id' => $id]);
+        return $stmt->rowCount() > 0;
+    }
+
     public static function markSent(int $id): void
     {
         Database::connection()->prepare(

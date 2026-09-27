@@ -227,6 +227,10 @@ describe('Amendment / document-review / email-approval gates (QA-4 P0.4)', () =>
     const { fileId } = await createTestFileOnDisk(orderId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
     const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+    // QA-5 EML-06: dispatch() now also requires email_log itself to be
+    // 'approved' (the atomic send-claim) — a real cron-dispatched row is
+    // always approved first, so this scenario needs it too.
+    await emailLogRepository.approve(emailLogId, 1);
 
     // A new reviewer is assigned to the already-approved document and
     // rejects it — reviewWorkflowService.reject() unconditionally reverts
@@ -260,6 +264,10 @@ describe('Amendment / document-review / email-approval gates (QA-4 P0.4)', () =>
     const { fileId } = await createTestFileOnDisk(orderId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
     const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+    // QA-5 EML-06: dispatch() now also requires email_log itself to be
+    // 'approved' (the atomic send-claim) — a real cron-dispatched row is
+    // always approved first, so this scenario needs it too.
+    await emailLogRepository.approve(emailLogId, 1);
 
     const sendSpy = jest.spyOn(mailSenderService, 'send').mockResolvedValue(false);
     await emailDispatchService.dispatch(await emailLogRepository.find(emailLogId));

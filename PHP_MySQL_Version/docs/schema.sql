@@ -937,7 +937,7 @@ CREATE TABLE email_log (
   body_snapshot     TEXT NOT NULL,
   scheduled_at      TIMESTAMP NULL,
   sent_at           TIMESTAMP NULL,
-  status            ENUM('pending_approval','approved','rejected','sent','failed','cancelled') NOT NULL DEFAULT 'pending_approval',
+  status            ENUM('pending_approval','approved','sending','rejected','sent','failed','cancelled') NOT NULL DEFAULT 'pending_approval',  -- 'sending' (QA-5 EML-06): transient atomic-claim state so two overlapping dispatch runs can't both send the same row
   requested_by      BIGINT UNSIGNED NULL,
   approved_by       BIGINT UNSIGNED NULL,
   approved_at       TIMESTAMP NULL,

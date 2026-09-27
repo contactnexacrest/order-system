@@ -1046,7 +1046,14 @@ final class OrderController
         }
 
         $user = AuthService::currentUser();
-        OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'staff_recorded_email', $note, (int) $user['id']);
+        if (!OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'staff_recorded_email', $note, (int) $user['id'])) {
+            // QA-5 EML-06: lost the race to another acknowledgment path
+            // (client portal, or the 48h auto-confirm cron) between this
+            // action's own pre-check above and this write.
+            Flash::set('error', 'This order was already acknowledged by another path a moment ago.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         StageGateService::passAndUnlockNext($orderId, 4, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'OC_ACKNOWLEDGED_VIA_EMAIL', 'orders', $orderId, null, null, null, $note);
         Flash::set('success', 'Buyer acknowledgement recorded. Stage 5 (Supplier PO) unlocked.');

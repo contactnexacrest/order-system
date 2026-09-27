@@ -188,6 +188,15 @@ final class EmailDispatchService
      */
     public static function dispatch(array $emailLogRow): bool
     {
+        // QA-5 EML-06: atomically claim this row before doing anything
+        // else, so an overlapping dispatch run (or a duplicate manual
+        // trigger) can never send the same approved email twice. A lost
+        // race is not a failure — it just means another run already has
+        // it — so it returns false without touching email_log again (a
+        // markFailed() here would clobber the winner's later markSent()).
+        if (!EmailLogRepository::claimForSend((int) $emailLogRow['id'])) {
+            return false;
+        }
         if ($emailLogRow['document_id'] === null) {
             EmailLogRepository::markFailed((int) $emailLogRow['id']);
             return false;

@@ -234,6 +234,15 @@ async function cancelSend(emailLogId, userId, reason, isApprover) {
  * Returns true on send success.
  */
 async function dispatch(emailLogRow) {
+  // QA-5 EML-06: atomically claim this row before doing anything else, so
+  // an overlapping dispatch run (or a duplicate manual trigger) can never
+  // send the same approved email twice. A lost race is not a failure — it
+  // just means another run already has it — so it returns false without
+  // touching email_log again (a markFailed() here would clobber the
+  // winner's later markSent()).
+  if (!(await emailLogRepository.claimForSend(emailLogRow.id))) {
+    return false;
+  }
   if (emailLogRow.document_id === null || emailLogRow.document_id === undefined) {
     await emailLogRepository.markFailed(emailLogRow.id);
     return false;

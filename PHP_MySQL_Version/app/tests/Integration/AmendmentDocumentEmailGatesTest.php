@@ -184,6 +184,10 @@ final class AmendmentDocumentEmailGatesTest extends DbTestCase
 
         $documentId = $this->createTestDocument($orderId, 'QT', 'approved', $fileId);
         $emailLogId = EmailLogRepository::create($orderId, $documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+        // QA-5 EML-06: dispatch() now also requires email_log itself to be
+        // 'approved' (the atomic send-claim) — a real cron-dispatched row
+        // is always approved first, so this scenario needs it too.
+        EmailLogRepository::approve($emailLogId, 1);
 
         // A new reviewer is assigned to the already-approved document and
         // rejects it — ReviewWorkflowService::reject() unconditionally
@@ -224,6 +228,10 @@ final class AmendmentDocumentEmailGatesTest extends DbTestCase
 
         $documentId = $this->createTestDocument($orderId, 'QT', 'approved', $fileId);
         $emailLogId = EmailLogRepository::create($orderId, $documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+        // QA-5 EML-06: dispatch() now also requires email_log itself to be
+        // 'approved' (the atomic send-claim) — a real cron-dispatched row
+        // is always approved first, so this scenario needs it too.
+        EmailLogRepository::approve($emailLogId, 1);
 
         $logFile = tempnam(sys_get_temp_dir(), 'phpunit_error_log_');
         $previous = ini_set('error_log', $logFile);
