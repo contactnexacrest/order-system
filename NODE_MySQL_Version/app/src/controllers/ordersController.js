@@ -80,7 +80,13 @@ function str(v, fallback = '') {
  */
 async function index(req, res) {
   const all = await orderRepository.all();
-  const statusFilter = String(req.query.status || '').trim();
+  // Default to the Active tab, not All — most orders in the system at
+  // any time are still in play, and staff opening this screen want to
+  // see what's actually moving, not a completed/lost order buried in the
+  // same list. "All" is now its own explicit choice (?status=all),
+  // distinct from no query param at all, so a deliberate click on "All"
+  // is remembered for that pageview exactly like every other tab.
+  const statusFilter = String(req.query.status || '').trim() || 'active';
 
   const counts = { all: all.length, active: 0, overdue: 0, complete: 0, lost: 0 };
   for (const o of all) {
@@ -93,6 +99,8 @@ async function index(req, res) {
     orders = all.filter((o) => !!o.is_overdue);
   } else if (['active', 'complete', 'lost'].includes(statusFilter)) {
     orders = all.filter((o) => o.status === statusFilter);
+  } else if (statusFilter !== 'all') {
+    orders = all.filter((o) => o.status === 'active');
   }
 
   // Precomputed here (not in the template) since Nunjucks has no min/max
@@ -105,7 +113,7 @@ async function index(req, res) {
 
   res.renderView('orders/index', {
     orders,
-    statusFilter: statusFilter || 'all',
+    statusFilter,
     counts,
   }, 'layout/base');
 }

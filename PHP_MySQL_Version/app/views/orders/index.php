@@ -20,7 +20,7 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
 
   <div class="filter-chip-row">
     <?php foreach ($statusLabels as $key => $label): ?>
-      <a class="filter-chip<?= $statusFilter === $key ? ' active' : '' ?>" href="/orders<?= $key === 'all' ? '' : '?status=' . $key ?>"><?= $label ?> (<?= (int) $counts[$key] ?>)</a>
+      <a class="filter-chip<?= $statusFilter === $key ? ' active' : '' ?>" href="/orders?status=<?= $key ?>"><?= $label ?> (<?= (int) $counts[$key] ?>)</a>
     <?php endforeach; ?>
   </div>
 

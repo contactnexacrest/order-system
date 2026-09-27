@@ -65,7 +65,14 @@ final class OrderController
     public function index(array $params): void
     {
         $all = OrderRepository::all();
-        $statusFilter = trim((string) ($_GET['status'] ?? ''));
+        // Default to the Active tab, not All — most orders in the system
+        // at any time are still in play, and staff opening this screen
+        // want to see what's actually moving, not a completed/lost order
+        // buried in the same list. "All" is now its own explicit choice
+        // (?status=all), distinct from no query param at all, so a
+        // deliberate click on "All" is remembered for that pageview
+        // exactly like every other tab.
+        $statusFilter = trim((string) ($_GET['status'] ?? '')) ?: 'active';
 
         $counts = [
             'all' => count($all),
@@ -84,14 +91,15 @@ final class OrderController
         }
 
         $orders = match ($statusFilter) {
+            'all' => $all,
             'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
             'active', 'complete', 'lost' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
-            default => $all,
+            default => array_values(array_filter($all, static fn($o) => $o['status'] === 'active')),
         };
 
         View::render('orders/index', [
             'orders' => $orders,
-            'statusFilter' => $statusFilter ?: 'all',
+            'statusFilter' => $statusFilter,
             'counts' => $counts,
         ], 'layout/base');
     }

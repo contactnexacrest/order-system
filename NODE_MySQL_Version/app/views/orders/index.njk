@@ -13,7 +13,7 @@
 
   <div class="filter-chip-row">
     {% for key, label in statusLabels %}
-      <a class="filter-chip{{ ' active' if statusFilter == key else '' }}" href="/orders{{ '' if key == 'all' else '?status=' + key }}">{{ label }} ({{ counts[key] }})</a>
+      <a class="filter-chip{{ ' active' if statusFilter == key else '' }}" href="/orders?status={{ key }}">{{ label }} ({{ counts[key] }})</a>
     {% endfor %}
   </div>
 
