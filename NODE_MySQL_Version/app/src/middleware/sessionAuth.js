@@ -37,50 +37,60 @@ function required() {
     req.session[LAST_ACTIVITY_KEY] = Date.now();
 
     const user = await userRepository.findById(userId);
-    if (user) {
-      let mustChange = parseInt(user.force_password_change, 10) === 1;
 
-      if (!mustChange && user.password_changed_at !== null) {
-        const expiryDays = parseInt((await companySettingsRepository.get('password_expiry_days')) ?? '0', 10);
-        if (expiryDays > 0) {
-          const ageDays = (Date.now() - new Date(user.password_changed_at).getTime()) / 86400000;
-          if (ageDays > expiryDays) {
-            await userRepository.flagPasswordExpired(user.id);
-            await auditLogRepository.log(
-              user.id, 'PASSWORD_EXPIRED_FORCED_CHANGE', 'users', user.id, null, null, null,
-              `Password last changed ${Math.round(ageDays)} days ago, exceeding the ${expiryDays}-day policy.`
-            );
-            mustChange = true;
-          }
-        }
-      }
-
-      if (mustChange) {
-        const requestPath = req.path.replace(/\/+$/, '');
-        if (requestPath !== '/force-password-change') {
-          res.redirect('/force-password-change');
-          return;
-        }
-      }
-
-      req.user = user;
-      req.permissions = await permissionService.load(user.id, user.role_id !== null ? user.role_id : null);
-
-      // A Super Admin (permanent flag or an active delegation) is
-      // unrestricted everywhere: every permission key resolves true, with
-      // no per-key configuration needed. Every currently-registered
-      // permission key is set true here (rather than a Proxy) so both
-      // permissionCheck middleware's plain-object lookups and every view
-      // template's `permissions.xxx` access see the same real object.
-      req.isSuperAdmin = await superAdminService.isEffective(user.id);
-      if (req.isSuperAdmin) {
-        for (const key of await permissionRepository.allKeys()) {
-          req.permissions[key] = true;
-        }
-      }
-
-      req.unreadCount = await notificationRepository.unreadCountForUser(user.id);
+    // AUTH-10: a user deactivated mid-session (staff let go, a wrongdoer
+    // suspended) must lose access on their very next request, not just be
+    // blocked from a future login — is_active is only ever checked at
+    // login time otherwise, so an already logged-in session would keep
+    // working indefinitely.
+    if (!user || !user.is_active) {
+      await authService.logout(req);
+      res.redirect('/login');
+      return;
     }
+
+    let mustChange = parseInt(user.force_password_change, 10) === 1;
+
+    if (!mustChange && user.password_changed_at !== null) {
+      const expiryDays = parseInt((await companySettingsRepository.get('password_expiry_days')) ?? '0', 10);
+      if (expiryDays > 0) {
+        const ageDays = (Date.now() - new Date(user.password_changed_at).getTime()) / 86400000;
+        if (ageDays > expiryDays) {
+          await userRepository.flagPasswordExpired(user.id);
+          await auditLogRepository.log(
+            user.id, 'PASSWORD_EXPIRED_FORCED_CHANGE', 'users', user.id, null, null, null,
+            `Password last changed ${Math.round(ageDays)} days ago, exceeding the ${expiryDays}-day policy.`
+          );
+          mustChange = true;
+        }
+      }
+    }
+
+    if (mustChange) {
+      const requestPath = req.path.replace(/\/+$/, '');
+      if (requestPath !== '/force-password-change') {
+        res.redirect('/force-password-change');
+        return;
+      }
+    }
+
+    req.user = user;
+    req.permissions = await permissionService.load(user.id, user.role_id !== null ? user.role_id : null);
+
+    // A Super Admin (permanent flag or an active delegation) is
+    // unrestricted everywhere: every permission key resolves true, with
+    // no per-key configuration needed. Every currently-registered
+    // permission key is set true here (rather than a Proxy) so both
+    // permissionCheck middleware's plain-object lookups and every view
+    // template's `permissions.xxx` access see the same real object.
+    req.isSuperAdmin = await superAdminService.isEffective(user.id);
+    if (req.isSuperAdmin) {
+      for (const key of await permissionRepository.allKeys()) {
+        req.permissions[key] = true;
+      }
+    }
+
+    req.unreadCount = await notificationRepository.unreadCountForUser(user.id);
 
     next();
   };

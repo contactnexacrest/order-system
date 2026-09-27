@@ -24,6 +24,17 @@ use App\Tests\Support\DbTestCase;
  */
 final class StageOneGateTest extends DbTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Other integration test classes (e.g. AmendmentDocumentEmailGatesTest,
+        // MakerCheckerGuardTest) mutate the single shared QT document_types
+        // row's min_reviewers_default and don't always restore it — reset it
+        // here so this class's single-reviewer-approval assertions don't
+        // depend on test execution order.
+        Database::connection()->exec("UPDATE document_types SET min_reviewers_default = 1 WHERE code = 'QT'");
+    }
+
     private function setMinReviewers(int $documentId, int $count): void
     {
         $pdo = Database::connection();

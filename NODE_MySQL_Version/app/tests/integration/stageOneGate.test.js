@@ -25,6 +25,15 @@ describe('Stage 1 gate — QT approval, not generation (QA-5 GATE-01)', () => {
     await db.pool.end();
   });
 
+  // Other integration test files (e.g. amendmentDocumentEmailGates,
+  // makerCheckerGuard) mutate the single shared QT document_types row's
+  // min_reviewers_default and don't always restore it — reset it here so
+  // this file's single-reviewer-approval assertions don't depend on test
+  // execution order.
+  beforeEach(async () => {
+    await db.execute("UPDATE document_types SET min_reviewers_default = 1 WHERE code = 'QT'");
+  });
+
   async function createTestDocument(orderId, typeCode = 'QT', status = 'draft', pdfFileId = null) {
     const type = await db.queryOne('SELECT id FROM document_types WHERE code = :code', { code: typeCode });
     const result = await db.execute(

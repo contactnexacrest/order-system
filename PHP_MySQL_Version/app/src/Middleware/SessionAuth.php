@@ -39,43 +39,52 @@ final class SessionAuth
             $_SESSION[self::LAST_ACTIVITY_KEY] = time();
 
             $user = AuthService::currentUser();
-            if ($user) {
-                $mustChange = (int) $user['force_password_change'] === 1;
 
-                // password_expiry_days (company_settings, category
-                // 'security') — a stored setting the spec flagged as "not
-                // yet enforced." password_changed_at is only NULL for an
-                // account that has never completed its first (forced)
-                // password change, which the force_password_change branch
-                // above already gates — so a NULL here means "not yet
-                // applicable," not "never expires."
-                if (!$mustChange && $user['password_changed_at'] !== null) {
-                    $expiryDays = (int) (CompanySettingsRepository::get('password_expiry_days') ?? '0');
-                    if ($expiryDays > 0) {
-                        $ageDays = (time() - strtotime($user['password_changed_at'])) / 86400;
-                        if ($ageDays > $expiryDays) {
-                            UserRepository::flagPasswordExpired((int) $user['id']);
-                            AuditLogRepository::log(
-                                (int) $user['id'],
-                                'PASSWORD_EXPIRED_FORCED_CHANGE',
-                                'users',
-                                (int) $user['id'],
-                                null,
-                                null,
-                                null,
-                                "Password last changed " . round($ageDays) . " days ago, exceeding the {$expiryDays}-day policy."
-                            );
-                            $mustChange = true;
-                        }
+            // AUTH-10: a user deactivated mid-session (staff let go, a
+            // wrongdoer suspended) must lose access on their very next
+            // request, not just be blocked from a future login — is_active
+            // is only ever checked at login time otherwise, so an already
+            // logged-in session would keep working indefinitely.
+            if (!$user || !$user['is_active']) {
+                AuthService::logout();
+                header('Location: /login');
+                return false;
+            }
+
+            $mustChange = (int) $user['force_password_change'] === 1;
+
+            // password_expiry_days (company_settings, category 'security')
+            // — a stored setting the spec flagged as "not yet enforced."
+            // password_changed_at is only NULL for an account that has
+            // never completed its first (forced) password change, which the
+            // force_password_change branch above already gates — so a NULL
+            // here means "not yet applicable," not "never expires."
+            if (!$mustChange && $user['password_changed_at'] !== null) {
+                $expiryDays = (int) (CompanySettingsRepository::get('password_expiry_days') ?? '0');
+                if ($expiryDays > 0) {
+                    $ageDays = (time() - strtotime($user['password_changed_at'])) / 86400;
+                    if ($ageDays > $expiryDays) {
+                        UserRepository::flagPasswordExpired((int) $user['id']);
+                        AuditLogRepository::log(
+                            (int) $user['id'],
+                            'PASSWORD_EXPIRED_FORCED_CHANGE',
+                            'users',
+                            (int) $user['id'],
+                            null,
+                            null,
+                            null,
+                            "Password last changed " . round($ageDays) . " days ago, exceeding the {$expiryDays}-day policy."
+                        );
+                        $mustChange = true;
                     }
                 }
+            }
 
-                if ($mustChange) {
-                    $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-                    if (rtrim($requestPath, '/') !== '/force-password-change') {
-                        header('Location: /force-password-change');
-                        return false;
-                    }
+            if ($mustChange) {
+                $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+                if (rtrim($requestPath, '/') !== '/force-password-change') {
+                    header('Location: /force-password-change');
+                    return false;
                 }
             }
 
