@@ -2,6 +2,7 @@
 
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
+const settingValueValidator = require('../helpers/settingValueValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const zohoMailService = require('../services/zohoMailService');
@@ -54,6 +55,23 @@ async function update(req, res) {
   const reasonError = reasonValidator.check(reason);
   if (reasonError) {
     flash.set(req, 'error', reasonError);
+    res.redirect('/settings');
+    return;
+  }
+
+  // QA-5 SET-02: company_settings.value_type was defined in the schema but
+  // never actually enforced — any string could be saved into a 'number'
+  // setting like session_timeout_minutes, parsing to NaN or a negative
+  // threshold everywhere it's later read. Same fail-closed contract as the
+  // protected-field check below: one bad value fails the whole submission.
+  const valueErrors = Object.entries(toApply)
+    .map(([key, change]) => {
+      const error = settingValueValidator.check(byKey[key].value_type, change.new);
+      return error ? `${key} ${error}` : null;
+    })
+    .filter(Boolean);
+  if (valueErrors.length > 0) {
+    flash.set(req, 'error', `Invalid value(s) — nothing was saved: ${valueErrors.join('; ')}`);
     res.redirect('/settings');
     return;
   }

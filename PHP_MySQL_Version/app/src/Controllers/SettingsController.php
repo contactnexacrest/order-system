@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
+use App\Helpers\SettingValueValidator;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
@@ -66,6 +67,25 @@ final class SettingsController
 
         if ($error = ReasonValidator::check($reason)) {
             Flash::set('error', $error);
+            header('Location: /settings');
+            return;
+        }
+
+        // QA-5 SET-02: company_settings.value_type was defined in the
+        // schema but never actually enforced — any string could be saved
+        // into a 'number' setting like session_timeout_minutes, parsing to
+        // garbage everywhere it's later read. Same fail-closed contract as
+        // the protected-field check below: one bad value fails the whole
+        // submission.
+        $valueErrors = [];
+        foreach ($toApply as $key => $change) {
+            $error = SettingValueValidator::check($byKey[$key]['value_type'], $change['new']);
+            if ($error !== null) {
+                $valueErrors[] = "{$key} {$error}";
+            }
+        }
+        if (!empty($valueErrors)) {
+            Flash::set('error', 'Invalid value(s) — nothing was saved: ' . implode('; ', $valueErrors));
             header('Location: /settings');
             return;
         }
