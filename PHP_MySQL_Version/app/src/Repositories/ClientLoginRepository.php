@@ -30,11 +30,30 @@ final class ClientLoginRepository
             'SELECT cl.*, c.email AS client_email, c.company_legal_name, c.client_unique_number, c.is_active AS client_is_active
              FROM client_logins cl
              JOIN clients c ON c.id = cl.client_id
-             WHERE c.email = :email
-             LIMIT 1'
+             WHERE c.email = :email'
         );
         $stmt->execute(['email' => $email]);
-        return $stmt->fetch() ?: null;
+        $rows = $stmt->fetchAll();
+
+        // CP-08: clients.email has no uniqueness constraint — two different
+        // client records (a data-entry mistake, or a deliberate edit) can
+        // end up sharing the same address. Picking one of several matches
+        // here (the old query's LIMIT 1) would silently resolve "log in
+        // with this email" to an arbitrary one of them, letting whichever
+        // client wins the tie be reached under a shared identifier. Refuse
+        // the login entirely instead — this surfaces as an ordinary
+        // "invalid credentials" to whoever's trying, and staff must resolve
+        // the duplicate (a distinct email, or a genuine merge via
+        // clients.duplicate_of_client_id) before either account can log in
+        // again.
+        if (count($rows) !== 1) {
+            if (count($rows) > 1) {
+                error_log("[CLIENT PORTAL] Ambiguous login email '{$email}' matches " . count($rows) . ' client_logins rows — refusing login until the duplicate is resolved.');
+            }
+            return null;
+        }
+
+        return $rows[0];
     }
 
     public static function findById(int $id): ?array
