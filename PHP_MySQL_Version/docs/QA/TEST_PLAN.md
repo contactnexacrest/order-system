@@ -338,7 +338,36 @@ Infrastructure (QA-2) is live on both stacks:
      `INSERT`). Each pinning test was checked against a deliberately
      broken formula to confirm it actually fails before being confirmed
      correct against the real one.
-7. P2/P3 suites as capacity allows, prioritized by which modules see the
+7. ✅ CSRF/IDOR/input-validation suite (P2) — `IdorAndInputValidationTest.php`/
+   `idorAndInputValidation.test.js`:
+   - CSRF: a static scan confirming every one of the 177 `$router->post()`
+     registrations in `public_html/index.php` (and their `app.post()`
+     mirrors in `server.js`) includes `CsrfCheck::verify()`/`verifyCsrf`
+     in its middleware list — spot-checking every POST route individually
+     would be redundant, since CSRF is enforced by this one shared
+     middleware, not per-route logic.
+   - Staff-side IDOR: a role/permission matrix cross-checking Section 2's
+     documented grants directly against `PermissionService::can()` (the
+     same check every route's `PermissionCheck::requires()` middleware
+     calls) — confirms a Logistics Executive holding `manage_orders`
+     cannot reach any CA/finance permission, an Accounts Executive can, a
+     Viewer/Auditor cannot reach any order-mutating permission, and the CA
+     role itself (explicitly "no order-management access at all" per its
+     own seed.sql description) cannot reach `manage_orders` or
+     `inr_actual_edit` despite owning the CA module's view permissions.
+   - Public unauthenticated endpoints: token security for both intake
+     links (`ClientIntakeRepository`/`clientIntakeRepository.js` and
+     `PiIntakeRepository`/`piIntakeRepository.js`). Both already compare a
+     SHA-256 hash of a 256-bit random token (never the raw value) and
+     additionally gate on submission status — pinned against a guessed
+     token, an expired token, and (the one that would be easy to
+     regress) the genuine token reused after the submission has moved
+     past its editable state (converted/rejected for client intake;
+     pending_review/applied for PI intake). Each status-gate assertion
+     was checked against a deliberately removed status clause to confirm
+     it actually fails before being confirmed correct against the real
+     query.
+8. P3 suites as capacity allows, prioritized by which modules see the
    most real usage.
 
 ## Appendix
