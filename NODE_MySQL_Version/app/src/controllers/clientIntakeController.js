@@ -26,7 +26,7 @@ const RATE_LIMIT_WINDOW_MINUTES = 15;
  */
 
 function show(req, res) {
-  res.renderView('client_intake/form', {}, 'layout/bare');
+  res.renderView('client_intake/form', { wrapClass: 'intake-wrap' }, 'layout/bare');
 }
 
 async function submit(req, res) {
@@ -54,7 +54,7 @@ async function showEdit(req, res) {
     res.renderView('client_intake/link_expired', {}, 'layout/bare');
     return;
   }
-  res.renderView('client_intake/edit_form', { submission, token: req.params.token }, 'layout/bare');
+  res.renderView('client_intake/edit_form', { submission, token: req.params.token, wrapClass: 'intake-wrap' }, 'layout/bare');
 }
 
 async function updateSubmission(req, res) {

@@ -21,7 +21,7 @@ async function show(req, res) {
     res.renderView('pi_intake/link_expired', {}, 'layout/bare');
     return;
   }
-  res.renderView('pi_intake/form', { submission, token: req.params.token }, 'layout/bare');
+  res.renderView('pi_intake/form', { submission, token: req.params.token, wrapClass: 'intake-wrap' }, 'layout/bare');
 }
 
 async function submit(req, res) {

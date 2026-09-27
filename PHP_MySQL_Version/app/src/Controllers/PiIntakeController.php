@@ -27,7 +27,7 @@ final class PiIntakeController
             View::render('pi_intake/link_expired', [], 'layout/bare');
             return;
         }
-        View::render('pi_intake/form', ['submission' => $submission, 'token' => $params['token']], 'layout/bare');
+        View::render('pi_intake/form', ['submission' => $submission, 'token' => $params['token'], 'wrapClass' => 'intake-wrap'], 'layout/bare');
     }
 
     public function submit(array $params): void

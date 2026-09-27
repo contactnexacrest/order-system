@@ -1,55 +1,64 @@
 <div class="card">
   <h1>Quotation Details Form</h1>
-  <p class="muted">We need these details to prepare your Quotation — no product information required here. Complete and submit; we'll review and send your Quotation within 24 hours. Fields marked * are required.</p>
+  <p class="muted">Just your company and shipping details — no product information needed here. We'll review and send your Quotation within 24 hours.</p>
+  <div class="intake-summary">
+    <span>&#128203; 2 short sections</span>
+    <span>&#9201;&#65039; About 2 minutes</span>
+    <span>&#9989; Fields marked * are required</span>
+  </div>
 
   <form method="post" action="/quotation-details/submit">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
-    <fieldset>
-      <legend>Your Details</legend>
-      <label>Company Legal Name *
-        <input type="text" name="company_legal_name" placeholder="e.g., Test Company Ltd" required>
-      </label>
-      <label>Billing Address *
-        <textarea name="billing_address" placeholder="e.g., 123 Example Street, Test City, Country" required></textarea>
-      </label>
-      <label>VAT / EORI / Tax Reg. No. *
-        <input type="text" name="vat_eori_tax_no" placeholder="UK: EORI No. | France: SIRET + TVA No. | Norway: Org. No. + MVA" required>
-      </label>
-      <label>Contact Person *
-        <input type="text" name="contact_person" placeholder="e.g., John Doe" required>
-      </label>
-      <label>Email *
-        <input type="email" name="email" placeholder="e.g., name@example.com" required>
-      </label>
-      <label>Phone
-        <input type="text" name="phone" placeholder="e.g., +1 555 123 4567">
-      </label>
-      <label>Country of Destination *
-        <input type="text" name="country_of_destination" placeholder="e.g., Hungary / United Kingdom / France / Norway" required>
-      </label>
-      <label>Port of Discharge
-        <input type="text" name="port_of_discharge_text" placeholder="e.g., Tilbury UK / Port of Koper Slovenia — leave blank if unsure, we will advise">
-      </label>
-      <label>Certificate of Origin Type
-        <input type="text" name="coo_type" placeholder="GSP Form A (preferential) / Non-preferential — confirm with your customs broker if unsure">
-      </label>
+    <fieldset class="intake-step">
+      <legend><span class="intake-step-num">1</span> Your Details</legend>
+      <div class="field-grid">
+        <label class="full">Company Legal Name *
+          <input type="text" name="company_legal_name" placeholder="e.g., Test Company Ltd" required>
+        </label>
+        <label class="full">Billing Address *
+          <textarea name="billing_address" placeholder="e.g., 123 Example Street, Test City, Country" required></textarea>
+        </label>
+        <label>Contact Person *
+          <input type="text" name="contact_person" placeholder="e.g., John Doe" required>
+        </label>
+        <label>Email *
+          <input type="email" name="email" placeholder="e.g., name@example.com" required>
+        </label>
+        <label>Phone
+          <input type="text" name="phone" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>VAT / EORI / Tax Reg. No. *
+          <input type="text" name="vat_eori_tax_no" placeholder="UK: EORI No. | Others: Tax Reg. No." required>
+        </label>
+        <label>Country of Destination *
+          <input type="text" name="country_of_destination" placeholder="e.g., Hungary / UK / France" required>
+        </label>
+        <label>Port of Discharge
+          <input type="text" name="port_of_discharge_text" placeholder="Optional — we'll advise">
+        </label>
+        <label class="full">Certificate of Origin Type
+          <input type="text" name="coo_type" placeholder="GSP Form A (preferential) / Non-preferential — confirm with your customs broker if unsure">
+        </label>
+      </div>
     </fieldset>
 
-    <fieldset>
-      <legend>Shipping Preference</legend>
-      <label>Incoterm *
-        <input type="text" name="incoterm_preference" placeholder="FOB Chennai, India / CFR [port] / CIF [port] — if unsure, write FOB" required>
-      </label>
-      <label>Container Type
-        <input type="text" name="container_type_text" placeholder="e.g., 1 × 20ft FCL / 1 × 40ft FCL — leave blank, we will advise based on your order">
-      </label>
-      <label>Your Own Reference Number
-        <input type="text" name="buyer_own_reference" placeholder="Your internal reference number, if any — write NIL if none">
-      </label>
-      <label>Anything else we should know?
-        <textarea name="notes" placeholder="Product details, quantities, timeline, etc."></textarea>
-      </label>
+    <fieldset class="intake-step">
+      <legend><span class="intake-step-num">2</span> Shipping Preference</legend>
+      <div class="field-grid">
+        <label>Incoterm *
+          <input type="text" name="incoterm_preference" placeholder="FOB / CFR / CIF — if unsure, write FOB" required>
+        </label>
+        <label>Container Type
+          <input type="text" name="container_type_text" placeholder="e.g., 1 × 20ft FCL (optional)">
+        </label>
+        <label class="full">Your Own Reference Number
+          <input type="text" name="buyer_own_reference" placeholder="Your internal reference number, if any — write NIL if none">
+        </label>
+        <label class="full">Anything else we should know?
+          <textarea name="notes" placeholder="Product details, quantities, timeline, etc."></textarea>
+        </label>
+      </div>
     </fieldset>
 
     <button type="submit">Submit Request</button>

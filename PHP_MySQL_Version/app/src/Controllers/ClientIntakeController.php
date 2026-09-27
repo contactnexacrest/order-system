@@ -22,7 +22,7 @@ final class ClientIntakeController
 {
     public function show(array $params): void
     {
-        View::render('client_intake/form', [], 'layout/bare');
+        View::render('client_intake/form', ['wrapClass' => 'intake-wrap'], 'layout/bare');
     }
 
     // QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order
@@ -62,7 +62,7 @@ final class ClientIntakeController
             View::render('client_intake/link_expired', [], 'layout/bare');
             return;
         }
-        View::render('client_intake/edit_form', ['submission' => $submission, 'token' => $params['token']], 'layout/bare');
+        View::render('client_intake/edit_form', ['submission' => $submission, 'token' => $params['token'], 'wrapClass' => 'intake-wrap'], 'layout/bare');
     }
 
     public function updateSubmission(array $params): void

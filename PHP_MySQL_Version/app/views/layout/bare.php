@@ -10,7 +10,7 @@
 <script src="/assets/js/app.js" defer></script>
 </head>
 <body class="bare">
-<div class="bare-wrap">
+<div class="bare-wrap<?= isset($wrapClass) ? ' ' . htmlspecialchars($wrapClass) : '' ?>">
   <div class="bare-brand">
     <span class="bare-brand-mark" aria-hidden="true"><img src="/assets/img/logo.jpg" alt=""></span>
     NexaCrest <span>International</span>
