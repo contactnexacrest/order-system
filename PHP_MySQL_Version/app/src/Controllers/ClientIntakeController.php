@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Config\Env;
 use App\Helpers\Flash;
+use App\Helpers\RateLimiter;
 use App\Helpers\View;
 use App\Repositories\ClientIntakeRepository;
 use App\Services\EmailService;
@@ -24,8 +25,24 @@ final class ClientIntakeController
         View::render('client_intake/form', [], 'layout/bare');
     }
 
+    // QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order
+    // token the way PI-intake does — a scripted flood from a single IP is
+    // otherwise unlimited. 5 submissions per 15 minutes is generous for a
+    // genuine prospect (who submits once) while making a burst-flood of
+    // the review queue impractical.
+    private const RATE_LIMIT_BUCKET = 'quotation_intake_submit';
+    private const RATE_LIMIT_MAX_REQUESTS = 5;
+    private const RATE_LIMIT_WINDOW_MINUTES = 15;
+
     public function submit(array $params): void
     {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        if (RateLimiter::tooManyRequests(self::RATE_LIMIT_BUCKET, $ip, self::RATE_LIMIT_MAX_REQUESTS, self::RATE_LIMIT_WINDOW_MINUTES)) {
+            Flash::set('error', 'Too many submissions from this connection. Please wait a few minutes and try again.');
+            header('Location: /quotation-details');
+            return;
+        }
+
         $data = self::extractAndValidate();
         if ($data === null) {
             header('Location: /quotation-details');

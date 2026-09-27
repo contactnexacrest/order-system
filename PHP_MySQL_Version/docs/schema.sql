@@ -328,6 +328,22 @@ CREATE TABLE login_attempts (
   INDEX idx_la_time (attempted_at)
 ) ENGINE=InnoDB;
 
+-- QA-5 INT-05: generic sitewide rate-limit ledger, one row per hit. Not
+-- login_attempts-specific — bucket_key names the thing being limited (e.g.
+-- 'quotation_intake_submit') so this same table backs any public,
+-- unauthenticated endpoint that later needs the same throttling, without a
+-- new table per endpoint. A row is inserted on every attempt (accepted or
+-- rejected) and RateLimiter counts rows in the trailing window itself
+-- rather than maintaining a running counter column, so there's nothing to
+-- reset or get out of sync — old rows simply age out of the window.
+CREATE TABLE rate_limit_hits (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  bucket_key   VARCHAR(100) NOT NULL,
+  ip_address   VARCHAR(45) NOT NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_rlh_bucket_ip_time (bucket_key, ip_address, created_at)
+) ENGINE=InnoDB;
+
 -- ================================================================
 -- SECTION C — ASSETS & FILES (Spec Section 3, 12)
 -- ================================================================

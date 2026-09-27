@@ -4,7 +4,17 @@ const crypto = require('crypto');
 const flash = require('../helpers/flash');
 const env = require('../config/env');
 const emailService = require('../services/emailService');
+const rateLimiter = require('../helpers/rateLimiter');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
+
+// QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order token
+// the way PI-intake does — a scripted flood from a single IP is otherwise
+// unlimited. 5 submissions per 15 minutes is generous for a genuine
+// prospect (who submits once) while making a burst-flood of the review
+// queue impractical.
+const RATE_LIMIT_BUCKET = 'quotation_intake_submit';
+const RATE_LIMIT_MAX_REQUESTS = 5;
+const RATE_LIMIT_WINDOW_MINUTES = 15;
 
 /**
  * Port of App\Controllers\ClientIntakeController. Public, unauthenticated
@@ -20,6 +30,12 @@ function show(req, res) {
 }
 
 async function submit(req, res) {
+  if (await rateLimiter.tooManyRequests(RATE_LIMIT_BUCKET, req.ip || '', RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MINUTES)) {
+    flash.set(req, 'error', 'Too many submissions from this connection. Please wait a few minutes and try again.');
+    res.redirect('/quotation-details');
+    return;
+  }
+
   const data = extractAndValidate(req);
   if (!data) {
     res.redirect('/quotation-details');
