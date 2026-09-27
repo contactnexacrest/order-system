@@ -1,5 +1,15 @@
 'use strict';
 
+// QA-5 DEF-04: must be set before Jest spawns its worker process(es) — by
+// the time a worker's own require() chain reaches config/env.js (which
+// also sets this, for the real server), that worker's V8 isolate has
+// already resolved and cached its default ICU timezone from whatever was
+// in its environment at process start, and a later in-process
+// process.env.TZ mutation does not invalidate that cache. Setting it here,
+// before jest-worker forks anything, means every worker inherits
+// TZ=Asia/Kolkata in its environment from birth.
+process.env.TZ = 'Asia/Kolkata';
+
 module.exports = {
   testEnvironment: 'node',
   rootDir: __dirname,

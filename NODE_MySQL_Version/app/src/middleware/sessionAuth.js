@@ -1,6 +1,7 @@
 'use strict';
 
 const authService = require('../services/authService');
+const { parseDbDateTime } = require('../helpers/dbDateTime');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const userRepository = require('../repositories/userRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -54,7 +55,7 @@ function required() {
     if (!mustChange && user.password_changed_at !== null) {
       const expiryDays = parseInt((await companySettingsRepository.get('password_expiry_days')) ?? '0', 10);
       if (expiryDays > 0) {
-        const ageDays = (Date.now() - new Date(user.password_changed_at).getTime()) / 86400000;
+        const ageDays = (Date.now() - parseDbDateTime(user.password_changed_at).getTime()) / 86400000;
         if (ageDays > expiryDays) {
           await userRepository.flagPasswordExpired(user.id);
           await auditLogRepository.log(

@@ -5,8 +5,8 @@
   "type": "commonjs",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node src/server.js",
+    "start": "TZ=Asia/Kolkata node src/server.js",
+    "dev": "TZ=Asia/Kolkata node src/server.js",
     "test": "jest --runInBand"
   },
   "dependencies": {

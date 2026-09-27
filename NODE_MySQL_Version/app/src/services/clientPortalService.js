@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 
 const env = require('../config/env');
+const { parseDbDateTime } = require('../helpers/dbDateTime');
 const passwordHash = require('../helpers/passwordHash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const clientLoginRepository = require('../repositories/clientLoginRepository');
@@ -107,7 +108,7 @@ async function attemptLogin(req, email, password) {
     await loginAttemptRepository.record(null, email, ip, false);
     return { status: 'account_disabled' };
   }
-  if (login.locked_until && new Date(login.locked_until).getTime() > Date.now()) {
+  if (login.locked_until && parseDbDateTime(login.locked_until).getTime() > Date.now()) {
     return { status: 'locked_out', locked_until: login.locked_until };
   }
 

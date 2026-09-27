@@ -4,6 +4,7 @@ const db = require('../../src/config/db');
 const passwordHash = require('../../src/helpers/passwordHash');
 const userRepository = require('../../src/repositories/userRepository');
 const clientRepository = require('../../src/repositories/clientRepository');
+const clientLoginRepository = require('../../src/repositories/clientLoginRepository');
 const authService = require('../../src/services/authService');
 const clientPortalService = require('../../src/services/clientPortalService');
 const { createTestClient } = require('../support/fixtures');
@@ -114,5 +115,20 @@ describe('Account enumeration guard (QA-5 AUTH-04/AUTH-05/CP-07)', () => {
     const result = await clientPortalService.attemptLogin(fakeReq(), email, KNOWN_PASSWORD);
 
     expect(result.status).toBe('account_disabled');
+  });
+
+  // QA-5 DEF-04 follow-on: locked_until is written as `new Date(...).toISOString()`
+  // (a UTC wall-clock string) and, before this fix, was read back with a bare
+  // `new Date(login.locked_until)` — which parses a naive "Y-m-d H:i:s" string
+  // as LOCAL time. Once the process runs in IST (DEF-04) instead of UTC, that
+  // misparse made every still-locked client portal account look already
+  // unlocked, 5 hours 30 minutes early. Pins the correct behavior in place.
+  it('a correct password on a locked client portal login still reveals locked_out', async () => {
+    const { id, email } = await createTestClientWithKnownPortalPassword();
+    await clientLoginRepository.lockUntil(id, new Date(Date.now() + 900000).toISOString().slice(0, 19).replace('T', ' '));
+
+    const result = await clientPortalService.attemptLogin(fakeReq(), email, KNOWN_PASSWORD);
+
+    expect(result.status).toBe('locked_out');
   });
 });

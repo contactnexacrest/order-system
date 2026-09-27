@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const JSZip = require('jszip');
+const { parseDbDateTime } = require('../helpers/dbDateTime');
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
@@ -598,7 +599,7 @@ async function show(req, res) {
   if (
     piIntake
     && ['awaiting_client', 'rejected'].includes(piIntake.status)
-    && new Date(piIntake.access_token_expires_at).getTime() > Date.now()
+    && parseDbDateTime(piIntake.access_token_expires_at).getTime() > Date.now()
   ) {
     piFormFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/pi-details/${piIntake.access_token_plain}`;
   }

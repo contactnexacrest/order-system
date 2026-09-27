@@ -1,5 +1,6 @@
 'use strict';
 
+const { parseDbDateTime } = require('../helpers/dbDateTime');
 const passwordHash = require('../helpers/passwordHash');
 const userRepository = require('../repositories/userRepository');
 const loginAttemptRepository = require('../repositories/loginAttemptRepository');
@@ -59,7 +60,7 @@ async function attemptLogin(req, email, password) {
     return { status: 'account_disabled' };
   }
 
-  if (user.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
+  if (user.locked_until && parseDbDateTime(user.locked_until).getTime() > Date.now()) {
     await loginAttemptRepository.record(user.id, email, ip, false);
     return { status: 'locked_out', locked_until: user.locked_until };
   }
