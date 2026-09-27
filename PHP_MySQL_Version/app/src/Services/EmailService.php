@@ -61,6 +61,10 @@ final class EmailService
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
             try {
                 $mail->isSMTP();
+                // QA-5 EML-07: PHPMailer defaults to iso-8859-1, which
+                // garbles any non-ASCII character (accented buyer names,
+                // currency symbols, etc.) in both the subject and body.
+                $mail->CharSet = \PHPMailer\PHPMailer\PHPMailer::CHARSET_UTF8;
                 $mail->Host       = $smtpHost;
                 $mail->SMTPAuth   = true;
                 $mail->Username   = Env::get('SMTP_USERNAME');
@@ -120,6 +124,8 @@ final class EmailService
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
             try {
                 $mail->isSMTP();
+                // QA-5 EML-07: see sendPlainText() above.
+                $mail->CharSet = \PHPMailer\PHPMailer\PHPMailer::CHARSET_UTF8;
                 $mail->Host       = $smtpHost;
                 $mail->SMTPAuth   = true;
                 $mail->Username   = Env::get('SMTP_USERNAME');

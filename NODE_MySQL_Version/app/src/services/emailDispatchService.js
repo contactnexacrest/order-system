@@ -11,6 +11,7 @@ const notificationRepository = require('../repositories/notificationRepository')
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderRepository = require('../repositories/orderRepository');
 const permissionRepository = require('../repositories/permissionRepository');
+const signatoryRepository = require('../repositories/signatoryRepository');
 const userRepository = require('../repositories/userRepository');
 const mailSenderService = require('./mailSenderService');
 const documentDataAssembler = require('./documentDataAssembler');
@@ -41,9 +42,23 @@ async function tokensFor(order, document, sender) {
   const piDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
   const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
 
+  // QA-5 EML-08: {sender_title} used to always resolve to the company-wide
+  // md_title setting ("Founder & Managing Director") regardless of who
+  // actually sent the email — a Logistics or Accounts user's approved send
+  // would go out signed with the MD's own title. Use the real sender's own
+  // designation when they have one; md_title is now only the fallback for
+  // a sender with none set (or no specific sender at all).
+  let senderTitle = (await companySettingsRepository.get('md_title')) || '';
+  if (sender && sender.designation_id) {
+    const designation = await signatoryRepository.findDesignation(sender.designation_id);
+    if (designation) {
+      senderTitle = designation.title;
+    }
+  }
+
   let signature = (sender && sender.email_signature ? String(sender.email_signature).trim() : '');
   if (signature === '') {
-    signature = `${(sender && sender.name) || (await companySettingsRepository.get('md_name')) || ''}\n${(await companySettingsRepository.get('md_title')) || ''}`;
+    signature = `${(sender && sender.name) || (await companySettingsRepository.get('md_name')) || ''}\n${senderTitle}`;
   }
 
   return {
@@ -62,7 +77,7 @@ async function tokensFor(order, document, sender) {
     '{company_email}': (await companySettingsRepository.get('email')) || '',
     '{company_phone}': (await companySettingsRepository.get('phone')) || '',
     '{sender_name}': (sender && sender.name) || (await companySettingsRepository.get('md_name')) || '',
-    '{sender_title}': (await companySettingsRepository.get('md_title')) || '',
+    '{sender_title}': senderTitle,
     '{sender_signature}': signature,
   };
 }

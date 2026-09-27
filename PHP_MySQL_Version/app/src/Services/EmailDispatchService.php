@@ -14,6 +14,7 @@ use App\Repositories\FileStoreRepository;
 use App\Repositories\NotificationRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\PermissionRepository;
+use App\Repositories\SignatoryRepository;
 use App\Repositories\UserRepository;
 
 /**
@@ -256,10 +257,25 @@ final class EmailDispatchService
         $piDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
         $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
 
+        // QA-5 EML-08: {sender_title} used to always resolve to the
+        // company-wide md_title setting ("Founder & Managing Director")
+        // regardless of who actually sent the email — a Logistics or
+        // Accounts user's approved send would go out signed with the MD's
+        // own title. Use the real sender's own designation when they have
+        // one; md_title is now only the fallback for a sender with none set
+        // (or no specific sender at all).
+        $senderTitle = (string) CompanySettingsRepository::get('md_title');
+        if ($sender && $sender['designation_id']) {
+            $designation = SignatoryRepository::findDesignation((int) $sender['designation_id']);
+            if ($designation) {
+                $senderTitle = $designation['title'];
+            }
+        }
+
         $signature = trim((string) ($sender['email_signature'] ?? ''));
         if ($signature === '') {
             $signature = ($sender['name'] ?? (string) CompanySettingsRepository::get('md_name'))
-                . "\n" . (string) CompanySettingsRepository::get('md_title');
+                . "\n" . $senderTitle;
         }
 
         return [
@@ -278,7 +294,7 @@ final class EmailDispatchService
             '{company_email}'        => (string) CompanySettingsRepository::get('email'),
             '{company_phone}'        => (string) CompanySettingsRepository::get('phone'),
             '{sender_name}'          => $sender['name'] ?? (string) CompanySettingsRepository::get('md_name'),
-            '{sender_title}'         => (string) CompanySettingsRepository::get('md_title'),
+            '{sender_title}'         => $senderTitle,
             '{sender_signature}'     => $signature,
         ];
     }
