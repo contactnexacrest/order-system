@@ -2343,6 +2343,37 @@ ALTER TABLE order_supplier_po
   ADD COLUMN signed_at TIMESTAMP NULL;
 
 -- ================================================================
+-- SECTION AL — HS CODE BULK IMPORT + PRODUCT GUIDE (added 2026-09-27)
+-- ================================================================
+-- The HS Code Master List (Section AB) only ever supported adding one
+-- code at a time — genuinely painful when onboarding a real customs
+-- reference sheet with a dozen-plus codes at once. usage_note lets a
+-- code carry its own short "when to use this one" guidance (mirrors the
+-- Product Guide sheet a real HS-code reference workbook ships with,
+-- condensed to per-code text); hs_code_product_examples digitizes that
+-- same sheet's product-name -> code mapping wholesale, since it's keyed
+-- by product name rather than by code (and a single product row can
+-- legitimately point at more than one candidate code, e.g. "flat blank
+-- vs. pre-shaped blank" — deliberately left as free text rather than a
+-- second foreign key, since resolving it to one exact code needs a human
+-- to look at the actual SKU). Both are read-only reference material for
+-- whoever is about to pick an HS code for a new product line — most
+-- useful for a fresher who has never had to classify one before.
+ALTER TABLE hs_codes
+  ADD COLUMN usage_note VARCHAR(500) NULL;
+
+CREATE TABLE hs_code_product_examples (
+  id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  product_description VARCHAR(255) NOT NULL,
+  code_reference      VARCHAR(50) NOT NULL,   -- usually one code; occasionally "code1 / code2" when it genuinely depends on the SKU
+  note                VARCHAR(500) NULL,
+  sort_order          INT NOT NULL DEFAULT 0,
+  created_by          BIGINT UNSIGNED NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2376,4 +2407,5 @@ ALTER TABLE order_supplier_po
 -- wet_signature_required_supplier_po) added 2026-09-26 as company_settings
 -- rows in seed.sql — no ALTER needed, company_settings is already a
 -- key-value table (see Section A).
+-- Section AL (HS code bulk import + product guide) added 2026-09-27.
 -- ================================================================

@@ -65,7 +65,14 @@ mistake (or malice).
 - **Holiday Calendar** — the dates the Working Days Calculator (used for
   dispute response deadlines, see [Disputes](./11-disputes.md)) excludes.
 - **HS Codes** — the master list product HS codes must come from; an order
-  can never use a code that isn't on this list.
+  can never use a code that isn't on this list. A real customs reference
+  sheet can be onboarded in one pass via Bulk Import (paste straight from
+  Excel — Tab-separated, or comma-separated for hand-typed lines) rather
+  than adding codes one at a time, and each code can carry its own short
+  usage note. The Product Guide underneath it is a separate, read-only
+  "which code do I actually use for this product" reference (also bulk
+  importable) — most useful for a fresher who has never had to classify a
+  product before.
 - **Email Templates** — subject/body/footer for every system email, with
   template-key placeholders merged in at send time (see
   [Document Review & Approval](./13-document-review-approval.md)).

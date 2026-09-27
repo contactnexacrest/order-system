@@ -157,6 +157,9 @@ $router->post('/hs-codes', [$hsCodes, 'create'], [SessionAuth::required(), Permi
 $router->post('/hs-codes/{id}/update', [$hsCodes, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
 $router->post('/hs-codes/{id}/toggle', [$hsCodes, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
 $router->post('/hs-codes/{id}/delete', [$hsCodes, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
+$router->post('/hs-codes/bulk-import', [$hsCodes, 'bulkImport'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
+$router->post('/hs-codes/product-guide', [$hsCodes, 'importProductGuide'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
+$router->post('/hs-codes/product-guide/{id}/delete', [$hsCodes, 'deleteProductGuideEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
 
 // docs/schema.sql Section AI — email template CRUD (add/edit, never delete).
 $router->get('/email-templates', [$emailTemplates, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates')]);

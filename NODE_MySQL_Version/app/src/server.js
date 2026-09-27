@@ -363,6 +363,9 @@ app.post('/hs-codes', requireAuth, requirePermission('manage_hs_codes'), verifyC
 app.post('/hs-codes/:id/update', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.update));
 app.post('/hs-codes/:id/toggle', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.toggleActive));
 app.post('/hs-codes/:id/delete', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.remove));
+app.post('/hs-codes/bulk-import', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.bulkImport));
+app.post('/hs-codes/product-guide', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.importProductGuide));
+app.post('/hs-codes/product-guide/:id/delete', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.deleteProductGuideEntry));
 
 app.get('/watermarks', requireAuth, requirePermission('manage_company_settings'), asyncHandler(watermarkController.index));
 app.post('/watermarks/:which', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(watermarkController.update));

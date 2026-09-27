@@ -1153,6 +1153,53 @@ INSERT INTO hs_codes (code, description, is_active, created_by)
 SELECT '680293', 'Worked monumental or building stone (granite, etc.) and articles thereof', 1, u.id
 FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
+-- ================================================================
+-- HS CODE BULK IMPORT + PRODUCT GUIDE (Section AL) — the business's own
+-- granite/marble HS Code Quick Reference (CAPEXIL registration
+-- RCMC/CAPEXIL/03217/2026-2027), imported wholesale via the new
+-- /hs-codes bulk-import action rather than typed in one at a time.
+-- usage_note is only filled in where the Product Guide sheet gives an
+-- unambiguous signal for that exact code — left NULL rather than guessed
+-- everywhere else.
+-- ================================================================
+INSERT INTO hs_codes (code, description, usage_note, is_active, created_by)
+SELECT v.code, v.description, v.usage_note, 1, u.id
+FROM (
+  SELECT '25161100' AS code, 'Granite - crude / roughly trimmed' AS description, 'Roughly trimmed only, not squared on all sides - a block that has been squared belongs in 25161200 instead.' AS usage_note
+  UNION ALL SELECT '25161200', 'Granite - cut into blocks or slabs', 'Squared/cut raw blocks or slabs (still unpolished) - e.g. a cut-to-size pillar block, all sides cut/squared.'
+  UNION ALL SELECT '25162000', 'Sandstone - raw', NULL
+  UNION ALL SELECT '25169010', 'Other monumental stone - Pakur stone', NULL
+  UNION ALL SELECT '25169020', 'Other monumental stone - boulders', NULL
+  UNION ALL SELECT '25169090', 'Other monumental stone - other', NULL
+  UNION ALL SELECT '68010000', 'Setts, curbstones, flagstones (natural stone)', NULL
+  UNION ALL SELECT '68022310', 'Granite blocks or tiles, polished', 'Polished, flat, custom-to-size - custom-to-size slabs, gangsaw-size slabs, granite tiles, or a flat (unshaped) monument blank.'
+  UNION ALL SELECT '68022390', 'Granite - other worked', 'Polished but irregular/random-sized slabs.'
+  UNION ALL SELECT '68022900', 'Other worked stone (non-granite/marble)', NULL
+  UNION ALL SELECT '68029100', 'Marble, travertine, alabaster - worked', NULL
+  UNION ALL SELECT '68029300', 'Granite - worked (finished / monuments)', 'Pre-shaped/profiled monument blanks, complete ready-to-install monument sets, finished/engraved tombstones, and carved 3D articles (e.g. a vase).'
+  UNION ALL SELECT '68029900', 'Other worked stone', NULL
+) v
+CROSS JOIN users u
+WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com'
+  AND NOT EXISTS (SELECT 1 FROM hs_codes existing WHERE existing.code = v.code);
+
+INSERT INTO hs_code_product_examples (product_description, code_reference, note, sort_order, created_by)
+SELECT v.product_description, v.code_reference, v.note, v.sort_order, u.id
+FROM (
+  SELECT 1 AS sort_order, 'Custom-to-size slabs (polished)' AS product_description, '68022310' AS code_reference, NULL AS note
+  UNION ALL SELECT 2, 'Random slabs (polished, irregular)', '68022390', NULL
+  UNION ALL SELECT 3, 'Gangsaw size slabs (polished)', '68022310', NULL
+  UNION ALL SELECT 4, 'Monument slabs / blanks', '68022310 / 68029300', 'Flat blank -> .2310; pre-shaped/profiled blank -> .9300 - check per SKU'
+  UNION ALL SELECT 5, 'Complete ready-to-install monument set', '68029300', NULL
+  UNION ALL SELECT 6, 'Cut-to-size raw block (e.g. pillar, unpolished)', '25161200', 'Squared but unworked -> stays in Ch.25'
+  UNION ALL SELECT 7, 'Complete raw block, all sides cut/squared', '25161200', 'Roughly trimmed only (not squared) -> 25161100'
+  UNION ALL SELECT 8, 'Granite tiles (polished)', '68022310', NULL
+  UNION ALL SELECT 9, 'Ready-to-install tombstone (finished/engraved)', '68029300', NULL
+  UNION ALL SELECT 10, 'Granite vase', '68029300', 'Carved 3D article'
+) v
+CROSS JOIN users u
+WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ================================================================

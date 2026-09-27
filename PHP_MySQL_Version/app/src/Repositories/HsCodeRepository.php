@@ -44,10 +44,61 @@ final class HsCodeRepository
         return (int) Database::connection()->lastInsertId();
     }
 
-    public static function updateDescription(int $id, string $description): void
+    public static function updateDescription(int $id, string $description, ?string $usageNote = null): void
     {
-        Database::connection()->prepare('UPDATE hs_codes SET description = :description WHERE id = :id')
-            ->execute(['description' => $description, 'id' => $id]);
+        Database::connection()->prepare('UPDATE hs_codes SET description = :description, usage_note = :usage_note WHERE id = :id')
+            ->execute(['description' => $description, 'usage_note' => $usageNote, 'id' => $id]);
+    }
+
+    /**
+     * Point 4 — importing a real customs reference sheet one code at a
+     * time was the actual gap; this takes a whole pasted block (Excel's
+     * own tab-separated copy/paste format, or comma-separated when typed
+     * by hand) and imports every valid line in one pass.
+     *
+     * @return array{inserted:string[], skipped:string[]}
+     */
+    public static function bulkImport(string $rawText, int $createdBy): array
+    {
+        $inserted = [];
+        $skipped = [];
+
+        foreach (preg_split('/\r\n|\r|\n/', $rawText) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            $parts = preg_split('/\t/', $line, 2);
+            if (count($parts) < 2) {
+                $parts = preg_split('/,/', $line, 2);
+            }
+            if (count($parts) < 2) {
+                $skipped[] = "\"{$line}\" — separate the code and description with a Tab or a comma.";
+                continue;
+            }
+
+            $code = trim($parts[0]);
+            $description = trim($parts[1]);
+
+            if (!preg_match('/^\d{6}$|^\d{8}$/', $code)) {
+                $skipped[] = "\"{$code}\" — must be exactly 6 or 8 digits, no dots or other characters.";
+                continue;
+            }
+            if ($description === '') {
+                $skipped[] = "{$code} — description is blank.";
+                continue;
+            }
+            if (self::findByCode($code)) {
+                $skipped[] = "{$code} — already exists.";
+                continue;
+            }
+
+            self::create($code, $description, $createdBy);
+            $inserted[] = $code;
+        }
+
+        return ['inserted' => $inserted, 'skipped' => $skipped];
     }
 
     public static function toggleActive(int $id): void

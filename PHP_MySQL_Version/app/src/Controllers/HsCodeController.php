@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\HsCodeProductGuideRepository;
 use App\Repositories\HsCodeRepository;
 use App\Services\AuthService;
 
@@ -23,7 +24,10 @@ final class HsCodeController
 {
     public function index(array $params): void
     {
-        View::render('hs_codes/index', ['codes' => HsCodeRepository::all()], 'layout/base');
+        View::render('hs_codes/index', [
+            'codes' => HsCodeRepository::all(),
+            'productGuide' => HsCodeProductGuideRepository::all(),
+        ], 'layout/base');
     }
 
     public function create(array $params): void
@@ -58,6 +62,7 @@ final class HsCodeController
     {
         $id = (int) ($params['id'] ?? 0);
         $description = trim((string) ($_POST['description'] ?? ''));
+        $usageNote = trim((string) ($_POST['usage_note'] ?? '')) ?: null;
         if ($description === '') {
             Flash::set('error', 'A description is required.');
             header('Location: /hs-codes');
@@ -77,9 +82,75 @@ final class HsCodeController
         }
 
         $user = AuthService::currentUser();
-        HsCodeRepository::updateDescription($id, $description);
+        HsCodeRepository::updateDescription($id, $description, $usageNote);
         AuditLogRepository::log((int) $user['id'], 'HS_CODE_UPDATED', 'hs_codes', $id, 'description', $row['description'], $description);
-        Flash::set('success', 'Description updated.');
+        Flash::set('success', 'HS code updated.');
+        header('Location: /hs-codes');
+    }
+
+    /**
+     * Point 4 — bulk import from a pasted block (Excel's own tab-separated
+     * copy/paste format works directly; comma-separated also accepted for
+     * hand-typed lines).
+     */
+    public function bulkImport(array $params): void
+    {
+        $raw = (string) ($_POST['bulk_codes'] ?? '');
+        if (trim($raw) === '') {
+            Flash::set('error', 'Paste at least one line (Code, Description) to import.');
+            header('Location: /hs-codes');
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $result = HsCodeRepository::bulkImport($raw, (int) $user['id']);
+
+        if (!empty($result['inserted'])) {
+            AuditLogRepository::log((int) $user['id'], 'HS_CODE_BULK_IMPORTED', 'hs_codes', null, null, null, implode(', ', $result['inserted']));
+        }
+
+        $message = count($result['inserted']) . ' HS code(s) added.';
+        if (!empty($result['skipped'])) {
+            Flash::set('error', $message . ' Skipped: ' . implode(' | ', $result['skipped']));
+        } else {
+            Flash::set('success', $message);
+        }
+        header('Location: /hs-codes');
+    }
+
+    /** Point 4 — bulk import for the Product Guide reference (Product, Code, optional Note). */
+    public function importProductGuide(array $params): void
+    {
+        $raw = (string) ($_POST['bulk_guide'] ?? '');
+        if (trim($raw) === '') {
+            Flash::set('error', 'Paste at least one line (Product, Code, Note) to import.');
+            header('Location: /hs-codes');
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $result = HsCodeProductGuideRepository::bulkImport($raw, (int) $user['id']);
+
+        if ($result['inserted'] > 0) {
+            AuditLogRepository::log((int) $user['id'], 'HS_CODE_GUIDE_IMPORTED', 'hs_code_product_examples', null, null, null, (string) $result['inserted']);
+        }
+
+        $message = $result['inserted'] . ' product guide row(s) added.';
+        if (!empty($result['skipped'])) {
+            Flash::set('error', $message . ' Skipped: ' . implode(' | ', $result['skipped']));
+        } else {
+            Flash::set('success', $message);
+        }
+        header('Location: /hs-codes');
+    }
+
+    public function deleteProductGuideEntry(array $params): void
+    {
+        $id = (int) ($params['id'] ?? 0);
+        $user = AuthService::currentUser();
+        HsCodeProductGuideRepository::delete($id);
+        AuditLogRepository::log((int) $user['id'], 'HS_CODE_GUIDE_DELETED', 'hs_code_product_examples', $id, null, null, null);
+        Flash::set('success', 'Product guide entry removed.');
         header('Location: /hs-codes');
     }
 
