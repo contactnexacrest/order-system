@@ -37,8 +37,15 @@ const FROZEN_PREFIXES = [
 // paths diverge from "/client" at the very next character ('s', '-').
 const CLIENT_FACING_PREFIXES = ['/quotation-details', '/pi-details', '/client'];
 
+// QA-5 TM-03/TM-05/PAR-02: matched case-sensitively before, so
+// /CLIENT/login or /SETTINGS/update didn't match these lowercase prefixes
+// and sailed through — server.js's case-sensitive-routing setting is the
+// primary fix (a wrong-case path now 404s before any handler runs at
+// all), but this gate has no business depending on that setting to stay
+// safe, so it normalizes case itself too.
 function matchesPrefix(path, prefixes) {
-  return prefixes.some((p) => path === p || path.startsWith(`${p}/`));
+  const lower = path.toLowerCase();
+  return prefixes.some((p) => lower === p || lower.startsWith(`${p}/`));
 }
 
 function blockAdminWritesInTestMode() {

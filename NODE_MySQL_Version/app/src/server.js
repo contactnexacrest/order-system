@@ -78,6 +78,17 @@ const superAdminOnly = require('./middleware/superAdminOnly');
 const clientAuth = require('./middleware/clientAuth');
 
 const app = express();
+// QA-5 TM-03/TM-05/PAR-02: Express matches routes case-insensitively by
+// default (unlike the PHP stack's hand-rolled Router, which does a plain
+// case-sensitive preg_match and 404s on any other case) — so
+// /CLIENT/login or /SETTINGS/update reached the exact same handler as
+// /client/login or /settings/update, while testModeGate's own path-prefix
+// checks below (an exact-case startsWith) did not recognize the
+// differently-cased request and let it straight through, bypassing both
+// the client-facing block and the admin-settings freeze. This restores
+// parity with PHP's router: a wrong-case path now 404s instead of quietly
+// matching.
+app.set('case sensitive routing', true);
 const viewsDir = path.join(__dirname, '..', 'views');
 
 // --- View engine (Nunjucks) ---------------------------------------------
