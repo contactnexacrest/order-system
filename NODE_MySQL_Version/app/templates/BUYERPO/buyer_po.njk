@@ -15,7 +15,7 @@
 {% endblock %}
 
 {% block banner %}
-<div class="banner banner-amber">&#9201;&nbsp; <span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.quotation_valid_until or 'TBC' }}</span> &nbsp;&nbsp;<span class="note">This Purchase Order must be signed and returned before the Quotation validity expires.</span></div>
+<div class="banner banner-amber">&#9201;&nbsp; <span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.quotation_valid_until or 'To Be Confirmed' }}</span> &nbsp;&nbsp;<span class="note">This Purchase Order must be signed and returned before the Quotation validity expires.</span></div>
 {% endblock %}
 
 {% block body %}
@@ -26,11 +26,11 @@
   <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
   <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
   <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Reg. *</td><td class="v">{{ buyer.vat_eori_tax_no or 'TBC' }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person or 'TBC' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. *</td><td class="v">{{ buyer.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Phone *</td><td class="v">{{ buyer.phone or '—' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email or 'TBC' }}</td></tr>
-  <tr><td class="k">Country of Destination *</td><td class="v">{{ buyer.country_of_destination or 'TBC' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Country of Destination *</td><td class="v">{{ buyer.country_of_destination or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
 </table>
 
@@ -43,9 +43,9 @@
   <tr><td class="k">Against Quotation No. *</td><td class="v">{{ order.quotation_ref or '—' }} <span class="placeholder-italic" style="font-size:8.5pt;">(fixed)</span></td></tr>
   <tr><td class="k">Quotation Date *</td><td class="v">{{ order.quotation_date or '—' }} <span class="placeholder-italic" style="font-size:8.5pt;">(fixed)</span></td></tr>
   <tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }}</td></tr>
-  <tr><td class="k">Quantity *</td><td class="v">{{ products[0].quantity if products.length else 'TBC' }}</td></tr>
-  <tr><td class="k">Unit *</td><td class="v">{{ products[0].unit if products.length else 'TBC' }}</td></tr>
-  <tr><td class="k">Unit Price ({{ order.currency_code }}) *</td><td class="v">{{ products[0].unit_price if products.length else 'TBC' }}</td></tr>
+  <tr><td class="k">Quantity *</td><td class="v">{{ products[0].quantity if products.length else 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Unit *</td><td class="v">{{ products[0].unit if products.length else 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Unit Price ({{ order.currency_code }}) *</td><td class="v">{{ products[0].unit_price if products.length else 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Total FOB Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.fob_value }}</td></tr>
   <tr><td class="k">Incoterm</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading</td><td class="v">{{ order.port_of_loading }}</td></tr>

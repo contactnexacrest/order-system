@@ -390,7 +390,17 @@ final class DocumentGenerationService
     /** @param array<string,mixed>|null $asset */
     private static function assetDataUri(?array $asset): ?string
     {
-        if (!$asset || !is_file($asset['server_path'])) {
+        if (!$asset) {
+            return null;
+        }
+        if (!is_file($asset['server_path'])) {
+            // Point 8 fix — this used to fail silently: mode 'both' would
+            // quietly render only the text layer with no error anywhere,
+            // looking exactly like the image branch was never coded. Now
+            // it's at least visible in the logs, and WatermarkController
+            // additionally refuses to save 'image'/'both' with no on-disk
+            // file in the first place (see its own comment).
+            error_log("[WATERMARK] Asset id {$asset['id']} references missing file: {$asset['server_path']}");
             return null;
         }
         return 'data:' . ($asset['mime_type'] ?: 'image/png') . ';base64,' . base64_encode((string) file_get_contents($asset['server_path']));

@@ -55,14 +55,14 @@ async function createRequest(
   const balancePct = parseFloat(order.balance_pct);
   const advanceAmount = Math.round((fobValue * advancePct) / 100 * 100) / 100;
   const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
-  const portOfDischarge = order.port_of_discharge_name || order.port_of_discharge_text || 'TBC';
+  const portOfDischarge = order.port_of_discharge_name || order.port_of_discharge_text || 'To Be Confirmed';
 
   const qtDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'QT');
   const piDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
   const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
   const products = await orderProductRepository.forOrder(orderId);
   const productSummary = products
-    .map((p) => `${p.description} — ${p.quantity_is_tbc ? 'TBC' : p.quantity} ${p.unit || ''}`)
+    .map((p) => `${p.description} — ${p.quantity_is_tbc ? 'To Be Confirmed' : p.quantity} ${p.unit || ''}`)
     .join('; ');
 
   const snapshot = {

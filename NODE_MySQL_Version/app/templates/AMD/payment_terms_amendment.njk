@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block banner %}
-<div class="banner banner-amber">&#9201;&nbsp; <span class="label">EFFECTIVE DATE OF AMENDMENT *</span> &nbsp; <span class="value">{{ amendment.effective_from or 'TBC — date from which amended terms apply' }}</span> &nbsp;&nbsp;<span class="note">This amendment is not valid unless signed by authorised representatives of both parties.</span></div>
+<div class="banner banner-amber">&#9201;&nbsp; <span class="label">EFFECTIVE DATE OF AMENDMENT *</span> &nbsp; <span class="value">{{ amendment.effective_from or 'To Be Confirmed — date from which amended terms apply' }}</span> &nbsp;&nbsp;<span class="note">This amendment is not valid unless signed by authorised representatives of both parties.</span></div>
 {% endblock %}
 
 {% block section1 %}
@@ -32,11 +32,11 @@
 <table class="kv" style="margin-top:6pt;">
   <tr><td class="k" style="background:#FFFDE7;">The Importer *</td><td class="v" style="background:#FFFDE7;"><strong>{{ buyer.company_legal_name }}</strong></td></tr>
   <tr><td class="k" style="background:#FFFDE7;">Registered Address *</td><td class="v" style="background:#FFFDE7;">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">VAT / EORI / Tax Reg. No. *</td><td class="v" style="background:#FFFDE7;">{{ buyer.vat_eori_tax_no or 'TBC' }}</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">Contact Person *</td><td class="v" style="background:#FFFDE7;">{{ buyer.contact_person or 'TBC' }}</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">Designation / Title *</td><td class="v" style="background:#FFFDE7;">TBC</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">VAT / EORI / Tax Reg. No. *</td><td class="v" style="background:#FFFDE7;">{{ buyer.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Contact Person *</td><td class="v" style="background:#FFFDE7;">{{ buyer.contact_person or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Designation / Title *</td><td class="v" style="background:#FFFDE7;">To Be Confirmed</td></tr>
   <tr><td class="k" style="background:#FFFDE7;">Phone *</td><td class="v" style="background:#FFFDE7;">{{ buyer.phone or '—' }}</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">Email *</td><td class="v" style="background:#FFFDE7;">{{ buyer.email or 'TBC' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Email *</td><td class="v" style="background:#FFFDE7;">{{ buyer.email or 'To Be Confirmed' }}</td></tr>
 </table>
 {% endblock %}
 
@@ -76,7 +76,7 @@
   <tr><td class="k">Amended Advance Amount *</td><td class="v">{{ (amendment.original.currency ~ ' ' ~ amendment.amended.advance_amount) if amendment.amended.advance_amount else 'Unchanged from Section 3 above' }}</td></tr>
   <tr><td class="k">Amended Balance Payment *</td><td class="v">{{ amendment.amended.balance_terms or 'Unchanged from Section 3 above' }}</td></tr>
   <tr><td class="k">Amended Balance Amount *</td><td class="v">{{ (amendment.original.currency ~ ' ' ~ amendment.amended.balance_amount) if amendment.amended.balance_amount else 'Unchanged from Section 3 above' }}</td></tr>
-  <tr><td class="k">Effective From *</td><td class="v">{{ amendment.effective_from or 'TBC' }}</td></tr>
+  <tr><td class="k">Effective From *</td><td class="v">{{ amendment.effective_from or 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">5. REASON FOR AMENDMENT</div>
@@ -100,7 +100,7 @@
 <table class="kv acceptance-table">
   <tr><td class="k">The Importer — Company Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
   <tr><td class="k">Registered Address</td><td class="v">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Reg. No.</td><td class="v">{{ buyer.vat_eori_tax_no or 'TBC' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. No.</td><td class="v">{{ buyer.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Authorised Signatory Name *</td><td class="v">&nbsp;</td></tr>
   <tr><td class="k">Designation *</td><td class="v">&nbsp;</td></tr>
   <tr><td class="k">Date of Signing *</td><td class="v">&nbsp;</td></tr>

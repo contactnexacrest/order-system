@@ -46,7 +46,7 @@ async function assemble(orderId) {
   const balanceAmount = round2(fobValue - advanceAmount);
 
   const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
-  const portOfDischarge = order.port_of_discharge_name ?? order.port_of_discharge_text ?? 'TBC';
+  const portOfDischarge = order.port_of_discharge_name ?? order.port_of_discharge_text ?? 'To Be Confirmed';
 
   // Cross-document references: PI cites the QT ref, OC cites the PI
   // ref. Looked up from documents already generated for this order —
@@ -84,11 +84,11 @@ async function assemble(orderId) {
       is_fob: isFob,
       port_of_loading: order.port_of_loading_name ?? 'Chennai, India',
       port_of_discharge: portOfDischarge,
-      container_type: order.container_type ?? 'TBC',
-      est_lead_time_text: order.est_lead_time_text ?? 'TBC',
-      est_shipment_date_text: order.est_shipment_date_text ?? 'TBC',
+      container_type: order.container_type ?? 'To Be Confirmed',
+      est_lead_time_text: order.est_lead_time_text ?? 'To Be Confirmed',
+      est_shipment_date_text: order.est_shipment_date_text ?? 'To Be Confirmed',
       production_status_text: order.production_status_text ?? 'Not yet commenced',
-      coo_type: order.coo_type ?? 'TBC',
+      coo_type: order.coo_type ?? 'To Be Confirmed',
       include_annexure_a: !!order.include_annexure_a,
       currency_code: order.currency_code,
       buyers_po_ref: order.buyers_po_ref ?? 'NIL',
@@ -133,10 +133,10 @@ async function assemble(orderId) {
       dimensions: p.dimensions,
       finish: p.finish,
       hs_code: p.hs_code,
-      quantity: p.quantity_is_tbc ? 'TBC' : formatNumber(p.quantity),
+      quantity: p.quantity_is_tbc ? 'To Be Confirmed' : formatNumber(p.quantity),
       unit: p.unit,
-      unit_price: p.unit_price !== null ? formatMoney(p.unit_price) : 'TBC',
-      amount: p.fob_value !== null ? formatMoney(p.fob_value) : 'TBC',
+      unit_price: p.unit_price !== null ? formatMoney(p.unit_price) : 'To Be Confirmed',
+      amount: p.fob_value !== null ? formatMoney(p.fob_value) : 'To Be Confirmed',
     })),
     financial: {
       fob_value: formatMoney(fobValue),
@@ -221,7 +221,7 @@ async function annexureProductsBlock(orderId) {
 /**
  * Phase C blocks: Supplier PO, Freight, Packing/Crates, Shipping/BL,
  * and Production tracking. Each is simply null/empty until that stage
- * of the order has actually happened — templates render 'TBC'/'—' for
+ * of the order has actually happened — templates render 'To Be Confirmed'/'—' for
  * a null block via Nunjucks' default filter, exactly like the Phase B
  * fields do for an order that hasn't reached that stage yet.
  */
@@ -244,7 +244,7 @@ async function supplierPoBlock(orderId) {
     surface_finish: row.surface_finish,
     dimensions: row.dimensions,
     dimensional_tolerance: row.dimensional_tolerance,
-    quantity: row.quantity !== null ? formatNumber(row.quantity) : 'TBC',
+    quantity: row.quantity !== null ? formatNumber(row.quantity) : 'To Be Confirmed',
     unit: row.unit,
     colour_reference: row.colour_reference || 'NIL',
     special_requirements: row.special_requirements || 'NIL',
@@ -296,7 +296,7 @@ async function packingBlock(orderId) {
     return null;
   }
   return {
-    actual_quantity_packed: row.actual_quantity_packed !== null ? formatNumber(row.actual_quantity_packed) : 'TBC',
+    actual_quantity_packed: row.actual_quantity_packed !== null ? formatNumber(row.actual_quantity_packed) : 'To Be Confirmed',
     crate_count: row.crate_count,
     total_net_weight_kg: row.total_net_weight_kg,
     total_gross_weight_kg: row.total_gross_weight_kg,
@@ -312,8 +312,8 @@ async function packingBlock(orderId) {
 // "10.00" pcs / "1600.00" kg / "9.2500" m³ in the crate breakdown instead
 // of the trimmed "10" / "1600" / "9.25" the rest of the same document
 // uses. Trims trailing zeros the same way, but returns null (not
-// formatNumber()'s 'TBC') for a genuinely empty cell — the template's own
-// `|| '—'` fallback already handles that, and 'TBC' would be a behavior
+// formatNumber()'s 'To Be Confirmed') for a genuinely empty cell — the template's own
+// `|| '—'` fallback already handles that, and 'To Be Confirmed' would be a behavior
 // change for a document type whose crate rows come from a form where
 // these are all required.
 function trimCrateNumber(value) {
@@ -614,7 +614,7 @@ function assetDataUri(asset) {
 
 function formatMoney(value) {
   if (value === null || value === undefined || value === '') {
-    return 'TBC';
+    return 'To Be Confirmed';
   }
   return Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -638,7 +638,7 @@ function balanceTriggerSentence(option, days) {
 
 function formatNumber(value) {
   if (value === null || value === undefined || value === '') {
-    return 'TBC';
+    return 'To Be Confirmed';
   }
   return Number(value).toLocaleString('en-US', { maximumFractionDigits: 3 });
 }

@@ -70,7 +70,7 @@ final class OrderProductRepository
             'unit'            => $unit,
             'unit_price'      => $unitPrice ?: null,
             'fob_value'       => $fobValue,
-            'hs_code'         => $hsCode ?: '6802.93',
+            'hs_code'         => $hsCode ?: '680293',
             'id'              => $id,
         ]);
     }
@@ -118,7 +118,7 @@ final class OrderProductRepository
         bool $quantityIsTbc,
         ?string $unit,
         ?string $unitPrice,
-        string $hsCode = '6802.93'
+        string $hsCode = '680293'
     ): int {
         $fobValue = ($quantity !== null && $unitPrice !== null && !$quantityIsTbc)
             ? (string) (((float) $quantity) * ((float) $unitPrice))
@@ -142,7 +142,7 @@ final class OrderProductRepository
             'unit'            => $unit,
             'unit_price'      => $unitPrice ?: null,
             'fob_value'       => $fobValue,
-            'hs_code'         => $hsCode ?: '6802.93',
+            'hs_code'         => $hsCode ?: '680293',
         ]);
         return (int) $pdo->lastInsertId();
     }

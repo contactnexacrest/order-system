@@ -21,13 +21,13 @@
     <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Company Legal Name *</strong><br>{{ buyer.company_legal_name }}</p>
     <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Consignee Name *</strong><br>{{ buyer.consignee_name }}</p>
     <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Consignee Address *</strong><br>{{ buyer.consignee_address }}</p>
-    <p style="margin:0;"><strong style="color:#17233A;">VAT / EORI / Tax Reg. No. *</strong><br>{{ buyer.vat_eori_tax_no ?: 'TBC' }}</p>
+    <p style="margin:0;"><strong style="color:#17233A;">VAT / EORI / Tax Reg. No. *</strong><br>{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</p>
   </td>
   <td class="v" style="width:50%; vertical-align:top; background:#F1F5F9;">
     <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Incoterm *</strong><br>{{ order.incoterm_label }}</p>
     <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Port of Loading *</strong><br>{{ order.port_of_loading }}</p>
     <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Port of Discharge *</strong><br>{{ order.port_of_discharge }}</p>
-    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Country of Final Destination *</strong><br>{{ buyer.country_of_destination ?: 'TBC' }}</p>
+    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Country of Final Destination *</strong><br>{{ buyer.country_of_destination ?: 'To Be Confirmed' }}</p>
     <p style="margin:0;"><strong style="color:#17233A;">Notify Party</strong><br>{{ buyer.notify_party ?: 'Same as consignee' }}</p>
   </td>
 </tr></table>
@@ -43,11 +43,11 @@
   <tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }}</td></tr>
   <tr><td class="k">HS Code *</td><td class="v">{{ hsCodeList|join(', ') }}</td></tr>
   <tr><td class="k">Country of Origin *</td><td class="v">India</td></tr>
-  <tr><td class="k">Total Quantity *</td><td class="v">{{ packing.actual_quantity_packed ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Total No. of Crates *</td><td class="v">{{ packing.crate_count ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Total Net Weight *</td><td class="v">{{ packing.total_net_weight_kg ? packing.total_net_weight_kg ~ ' kg' : 'TBC' }}</td></tr>
-  <tr><td class="k">Total Gross Weight *</td><td class="v">{{ packing.total_gross_weight_kg ? packing.total_gross_weight_kg ~ ' kg' : 'TBC' }}</td></tr>
-  <tr><td class="k">Total CBM *</td><td class="v">{{ packing.total_cbm ? packing.total_cbm ~ ' m³' : 'TBC' }}</td></tr>
+  <tr><td class="k">Total Quantity *</td><td class="v">{{ packing.actual_quantity_packed ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Total No. of Crates *</td><td class="v">{{ packing.crate_count ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Total Net Weight *</td><td class="v">{{ packing.total_net_weight_kg ? packing.total_net_weight_kg ~ ' kg' : 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Total Gross Weight *</td><td class="v">{{ packing.total_gross_weight_kg ? packing.total_gross_weight_kg ~ ' kg' : 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Total CBM *</td><td class="v">{{ packing.total_cbm ? packing.total_cbm ~ ' m³' : 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">4. CRATE-LEVEL BREAKDOWN &nbsp;(from factory packing data)</div>

@@ -12,7 +12,7 @@
 {% endblock %}
 
 {% block banner %}
-<div class="banner banner-amber">&#9201;&nbsp; <span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.pi_valid_until ?: 'TBC' }}</span> &nbsp;&nbsp;<span class="note">Payment must be received before this date for prices and terms to remain valid.</span></div>
+<div class="banner banner-amber">&#9201;&nbsp; <span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.pi_valid_until ?: 'To Be Confirmed' }}</span> &nbsp;&nbsp;<span class="note">Payment must be received before this date for prices and terms to remain valid.</span></div>
 <div class="banner banner-green"><span class="label">GST DECLARATION:</span> <span class="value">Supply meant for export under Letter of Undertaking (LUT) without payment of Integrated Tax (IGST).</span> <span class="label">LUT Order No.: {{ company.lut_number }}</span> <span class="value">&nbsp;·&nbsp; Valid for {{ company.lut_valid_fy }} &nbsp;·&nbsp; GSTIN: {{ company.gstin }}</span></div>
 {% endblock %}
 
@@ -24,12 +24,12 @@
   <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
   <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
   <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination ?: 'TBC' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Certificate of Origin Type</td><td class="v">{{ order.coo_type }}</td></tr>
   <tr><td class="k">Buyer's PO / Ref No.</td><td class="v">{{ order.buyers_po_ref }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Phone</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
   <tr><td class="k">Notify Party</td><td class="v">{{ buyer.notify_party ?: 'SAME as buyer' }}</td></tr>
 </table>
@@ -52,8 +52,8 @@
     <td></td>
     <td colspan="5">
       <span class="line-no" style="color:{{ lineColor }};">{{ loop.index }}.</span>
-      <span class="spec-label">Dimensions:</span> {{ p.dimensions ?: 'TBC' }}
-      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Finish:</span> {{ p.finish ?: 'TBC' }}
+      <span class="spec-label">Dimensions:</span> {{ p.dimensions ?: 'To Be Confirmed' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Finish:</span> {{ p.finish ?: 'To Be Confirmed' }}
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">HS Code:</span> {{ p.hs_code }}
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Country of Origin:</span> India
     </td>
@@ -84,9 +84,9 @@
 <p class="weight-caption">Weight &amp; Volume <span class="note">(Estimated — actuals confirmed on Packing List after production and packing)</span></p>
 <table class="weight">
   <tr><th>Parameter</th><th>Estimated Value *</th><th>Unit</th></tr>
-  <tr><td>Total CBM (m&sup3;)</td><td>{{ order.estimated_total_cbm ?: 'TBC' }}</td><td>m&sup3;</td></tr>
-  <tr><td>Gross Weight (incl. packing)</td><td>{{ order.estimated_gross_weight_kg ?: 'TBC' }}</td><td>kg</td></tr>
-  <tr><td>Net Weight (stone only)</td><td>{{ order.estimated_net_weight_kg ?: 'TBC' }}</td><td>kg</td></tr>
+  <tr><td>Total CBM (m&sup3;)</td><td>{{ order.estimated_total_cbm ?: 'To Be Confirmed' }}</td><td>m&sup3;</td></tr>
+  <tr><td>Gross Weight (incl. packing)</td><td>{{ order.estimated_gross_weight_kg ?: 'To Be Confirmed' }}</td><td>kg</td></tr>
+  <tr><td>Net Weight (stone only)</td><td>{{ order.estimated_net_weight_kg ?: 'To Be Confirmed' }}</td><td>kg</td></tr>
   <tr><td>No. of Packages / Crates</td><td>{{ order.estimated_package_count }}</td><td>Crates</td></tr>
   <tr><td>Package Type</td><td>{{ order.estimated_package_type }}</td><td>—</td></tr>
 </table>

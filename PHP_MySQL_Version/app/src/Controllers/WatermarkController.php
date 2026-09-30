@@ -67,6 +67,18 @@ final class WatermarkController
                 header('Location: /watermarks');
                 return;
             }
+            // Point 8 fix — a DB row being "active" didn't guarantee the
+            // file behind it still existed on disk; that gap is exactly
+            // how mode 'both' used to save successfully and then silently
+            // render text-only on every generated PDF forever after, with
+            // nothing telling anyone why. Catch it here instead, at the
+            // moment it's still fixable (re-upload), not at PDF-generation
+            // time where it's invisible.
+            if (!is_file($watermarkAsset['server_path'])) {
+                Flash::set('error', 'The active watermark image is on file in the database but its file is missing from storage — please re-upload it from Company Assets before selecting Image or Both.');
+                header('Location: /watermarks');
+                return;
+            }
             $data['image_asset_id'] = (int) $watermarkAsset['id'];
         } else {
             $data['image_asset_id'] = null;

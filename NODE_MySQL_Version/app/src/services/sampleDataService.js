@@ -98,8 +98,8 @@ const env = require('../config/env');
  *       Annexure A, since this is a quantity/packaging distinction, not a
  *       technical drawing one.
  *   - Client F (Granite Quarry Direct Traders) — Order F1: a single raw,
- *     unprocessed block line item (HS code 2516.11, not the finished-goods
- *     default 6802.93) — NO Annexure A, since a raw block has no finish or
+ *     unprocessed block line item (HS code 25161100, not the finished-goods
+ *     default 680293) — NO Annexure A, since a raw block has no finish or
  *     technical spec to document.
  */
 
@@ -305,10 +305,10 @@ async function load(userId) {
     userId
   );
   const orderF1Id = await createSampleOrderCustomLines(clientFId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
-    // 2516.11, not the finished-goods default 6802.93 — a raw/crude-trimmed
+    // 25161100, not the finished-goods default 680293 — a raw/crude-trimmed
     // block is a materially different tariff classification (seed.sql's own
     // note: "Different product = verify HS Code before issuing").
-    { description: 'Raw Granite Block — Absolute Black (unprocessed)', dimensions: 'approx. 300 x 150 x 150 cm (irregular, as-quarried)', finish: 'Natural / Unfinished (Raw Block)', quantity: '4', unit: 'blocks', unit_price: '95000.00', hs_code: '2516.11' },
+    { description: 'Raw Granite Block — Absolute Black (unprocessed)', dimensions: 'approx. 300 x 150 x 150 cm (irregular, as-quarried)', finish: 'Natural / Unfinished (Raw Block)', quantity: '4', unit: 'blocks', unit_price: '95000.00', hs_code: '25161100' },
   ]);
   await advanceSampleOrderPastQuotation(orderF1Id, userId, false);
 
@@ -331,7 +331,7 @@ async function createSampleClient(companyName, billingAddress, userId, email = n
       email,
       phone: null,
       country_of_destination: 'Test Country',
-      coo_type: 'TBC',
+      coo_type: 'To Be Confirmed',
       notify_party: null,
     },
     userId,
@@ -377,7 +377,7 @@ async function createSampleOrderShell(clientId, incoterm, currency, loadingPort,
       port_of_loading_id: loadingPort ? parseInt(loadingPort.id, 10) : null,
       port_of_discharge_text: portOfDischargeText,
       currency_id: parseInt(currency.id, 10),
-      coo_type: client.coo_type ?? 'TBC',
+      coo_type: client.coo_type ?? 'To Be Confirmed',
       estimated_total_cbm: null,
       estimated_gross_weight_kg: null,
       estimated_net_weight_kg: null,
@@ -399,7 +399,7 @@ async function createSampleOrderShell(clientId, incoterm, currency, loadingPort,
   return orderId;
 }
 
-/** @param {Array<[string,string,string]>} productLines [description, dimensions, finish] — fixed quantity '10' pcs @ 250.00, HS 6802.93. */
+/** @param {Array<[string,string,string]>} productLines [description, dimensions, finish] — fixed quantity '10' pcs @ 250.00, HS 680293. */
 async function createSampleOrder(clientId, incoterm, currency, loadingPort, preset, userId, productLines, portOfDischargeText = null) {
   const orderId = await createSampleOrderShell(clientId, incoterm, currency, loadingPort, preset, userId, portOfDischargeText);
 
@@ -415,7 +415,7 @@ async function createSampleOrder(clientId, incoterm, currency, loadingPort, pres
       false,
       'pcs',
       '250.00',
-      '6802.93'
+      '680293'
     );
   }
 
@@ -444,7 +444,7 @@ async function createSampleOrderCustomLines(clientId, incoterm, currency, loadin
       false,
       line.unit,
       line.unit_price,
-      line.hs_code || '6802.93'
+      line.hs_code || '680293'
     );
   }
 
@@ -711,7 +711,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
     net_weight_kg: '700.00',
     gross_weight_kg: '760.00',
     cbm: '4.100',
-    hs_code: product.hs_code || '6802.93',
+    hs_code: product.hs_code || '680293',
   }));
   await orderCrateRepository.replaceForOrder(orderId, crates);
   await documentGenerationService.generate(orderId, 'PL', userId);
@@ -814,7 +814,7 @@ async function advanceSampleOrderToStage9(orderId, supplierId, userId) {
     net_weight_kg: '1600.00',
     gross_weight_kg: '1725.00',
     cbm: '9.250',
-    hs_code: product.hs_code || '6802.93',
+    hs_code: product.hs_code || '680293',
   }));
   await orderCrateRepository.replaceForOrder(orderId, crates);
   await documentGenerationService.generate(orderId, 'PL', userId);

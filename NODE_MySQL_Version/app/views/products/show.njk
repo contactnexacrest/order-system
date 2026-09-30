@@ -77,7 +77,7 @@
             {% if s.contact_email %}<br><small class="muted">{{ s.contact_email }}</small>{% endif %}
           </td>
           <td>{{ s.fob_source | capitalize }}</td>
-          <td>{{ 'TBC' if s.effective_fob == null else (s.effective_fob | money) }}</td>
+          <td>{{ 'To Be Confirmed' if s.effective_fob == null else (s.effective_fob | money) }}</td>
           <td>{{ '&#9733;' | safe if s.is_primary else '' }}</td>
           <td>
             {% if canManage %}

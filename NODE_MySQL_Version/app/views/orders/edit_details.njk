@@ -39,7 +39,7 @@
       </label>
       <label>Certificate of Origin Type
         <select name="coo_type">
-          <option value="">— TBC —</option>
+          <option value="">— To Be Confirmed —</option>
           {% for o in cooTypes %}
             <option value="{{ o.option_value }}" {{ 'selected' if o.option_value == order.coo_type }}>{{ o.option_value }}</option>
           {% endfor %}
@@ -73,7 +73,7 @@
       </label>
       <label>Container Type
         <select name="container_type">
-          <option value="">— TBC —</option>
+          <option value="">— To Be Confirmed —</option>
           {% for o in containerTypes %}
             <option value="{{ o.option_value }}" {{ 'selected' if o.option_value == order.container_type }}>{{ o.option_value }}</option>
           {% endfor %}
@@ -101,7 +101,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Special Requirements</legend>
+      <legend>Special Requirements/Instructions</legend>
       <textarea name="special_requirements" rows="2">{{ order.special_requirements or '' }}</textarea>
     </fieldset>
 

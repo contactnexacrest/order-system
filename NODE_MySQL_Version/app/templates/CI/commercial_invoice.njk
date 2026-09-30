@@ -23,11 +23,11 @@
   <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
   <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
   <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no or 'TBC' }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person or 'TBC' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email or 'TBC' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Notify Party</td><td class="v">{{ buyer.notify_party or 'SAME as consignee' }}</td></tr>
-  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination or 'TBC' }}</td></tr>
+  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination or 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">3. SHIPPING DETAILS</div>
@@ -35,11 +35,11 @@
   <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
-  <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no or 'TBC' }}</td></tr>
-  <tr><td class="k">Bill of Lading No. *</td><td class="v">{{ shipping.bl_number or 'TBC' }}</td></tr>
-  <tr><td class="k">Bill of Lading Date *</td><td class="v">{{ shipping.bl_date or 'TBC — must match this invoice date' }}</td></tr>
-  <tr><td class="k">Vessel / Voyage *</td><td class="v">{{ shipping.vessel_name or 'TBC' }}{{ (' / ' ~ shipping.voyage_number) if shipping.voyage_number else '' }}</td></tr>
-  <tr><td class="k">No. of Packages *</td><td class="v">{{ (packing.crate_count ~ ' Wooden Crates') if packing.crate_count else 'TBC' }} — must match Packing List</td></tr>
+  <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Bill of Lading No. *</td><td class="v">{{ shipping.bl_number or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Bill of Lading Date *</td><td class="v">{{ shipping.bl_date or 'To Be Confirmed — must match this invoice date' }}</td></tr>
+  <tr><td class="k">Vessel / Voyage *</td><td class="v">{{ shipping.vessel_name or 'To Be Confirmed' }}{{ (' / ' ~ shipping.voyage_number) if shipping.voyage_number else '' }}</td></tr>
+  <tr><td class="k">No. of Packages *</td><td class="v">{{ (packing.crate_count ~ ' Wooden Crates') if packing.crate_count else 'To Be Confirmed' }} — must match Packing List</td></tr>
 </table>
 
 <div class="section-title">4. PRODUCT / ORDER DETAILS</div>
@@ -61,8 +61,8 @@
     <td></td>
     <td colspan="5">
       <span class="line-no" style="color:{{ lineColor }};">{{ loop.index }}.</span>
-      <span class="spec-label">Dimensions:</span> {{ p.dimensions or 'TBC' }}
-      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Finish:</span> {{ p.finish or 'TBC' }}
+      <span class="spec-label">Dimensions:</span> {{ p.dimensions or 'To Be Confirmed' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Finish:</span> {{ p.finish or 'To Be Confirmed' }}
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">HS Code:</span> {{ p.hs_code }}
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Country of Origin:</span> India
     </td>
@@ -77,7 +77,7 @@
    the actual first/last crate_no from the same crates the Packing List
    itself lists, which is correct regardless of whatever numbering scheme
    was actually typed into the packing form. #}
-<p style="font-size:9pt; color:#5B6573; margin:2pt 0 0;">PL Reference: {{ order.pl_ref or 'TBC' }}
+<p style="font-size:9pt; color:#5B6573; margin:2pt 0 0;">PL Reference: {{ order.pl_ref or 'To Be Confirmed' }}
 {%- if crates and crates.length > 0 -%}
   {%- if crates.length > 1 %} — Crates {{ (crates|first).crate_no }} to {{ (crates|last).crate_no }}{% else %} — Crate {{ (crates|first).crate_no }}{% endif -%}
 {%- endif -%}.</p>
@@ -96,7 +96,7 @@
     <td class="k">Freight &amp; Insurance</td>
     <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB order <strong style="color:#C0392B;">*</strong>{% else %}Paid via FDN <strong style="color:#C0392B;">*</strong>{% endif %}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">
-      {% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}Paid separately via Freight Debit Note No. {{ order.fdn_ref or 'TBC' }} dated {{ order.fdn_date or 'TBC' }}. Not included in CI value.{% endif %}
+      {% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}Paid separately via Freight Debit Note No. {{ order.fdn_ref or 'To Be Confirmed' }} dated {{ order.fdn_date or 'To Be Confirmed' }}. Not included in CI value.{% endif %}
     </td>
   </tr>
   <tr>
@@ -108,12 +108,12 @@
   <tr>
     <td class="k">&#10003;&nbsp; {{ financial.advance_pct }}% Advance — {{ 'RECEIVED' if payment_status.advance_cleared_at else 'PENDING' }}</td>
     <td class="v" style="text-align:right;">{{ order.currency_code }} {{ payment_status.advance_amount or financial.advance_amount }} <strong style="color:#C0392B;">*</strong></td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Received: {{ payment_status.advance_cleared_at or 'TBC' }}<br>Against: PI No. {{ order.pi_ref or 'TBC' }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Received: {{ payment_status.advance_cleared_at or 'To Be Confirmed' }}<br>Against: PI No. {{ order.pi_ref or 'To Be Confirmed' }}</td>
   </tr>
   <tr>
     <td class="k">&#10003;&nbsp; Freight &amp; Insurance — {% if order.is_fob %}NIL (FOB){% else %}{{ 'PAID VIA FDN' if payment_status.freight_cleared_at else 'PENDING' }}{% endif %}</td>
-    <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB{% else %}{{ order.currency_code }} {{ payment_status.freight_amount or 'TBC' }} <strong style="color:#C0392B;">*</strong>{% endif %}</td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}CFR/CIF: Against FDN No. {{ order.fdn_ref or 'TBC' }} dated {{ order.fdn_date or 'TBC' }}{% endif %}</td>
+    <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB{% else %}{{ order.currency_code }} {{ payment_status.freight_amount or 'To Be Confirmed' }} <strong style="color:#C0392B;">*</strong>{% endif %}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}CFR/CIF: Against FDN No. {{ order.fdn_ref or 'To Be Confirmed' }} dated {{ order.fdn_date or 'To Be Confirmed' }}{% endif %}</td>
   </tr>
   <tr>
     <td class="k" style="font-weight:bold;">SUBTOTAL ALREADY PAID</td>

@@ -49,7 +49,7 @@ final class DocumentDataAssembler
         $balanceAmount = round($fobValue - $advanceAmount, 2);
 
         $isFob = strtoupper($order['incoterm_code']) === 'FOB';
-        $portOfDischarge = $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'TBC';
+        $portOfDischarge = $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed';
 
         // Cross-document references: PI cites the QT ref, OC cites the PI
         // ref. Looked up from documents already generated for this order —
@@ -87,11 +87,11 @@ final class DocumentDataAssembler
                 'is_fob'               => $isFob,
                 'port_of_loading'      => $order['port_of_loading_name'] ?? 'Chennai, India',
                 'port_of_discharge'    => $portOfDischarge,
-                'container_type'       => $order['container_type'] ?? 'TBC',
-                'est_lead_time_text'   => $order['est_lead_time_text'] ?? 'TBC',
-                'est_shipment_date_text' => $order['est_shipment_date_text'] ?? 'TBC',
+                'container_type'       => $order['container_type'] ?? 'To Be Confirmed',
+                'est_lead_time_text'   => $order['est_lead_time_text'] ?? 'To Be Confirmed',
+                'est_shipment_date_text' => $order['est_shipment_date_text'] ?? 'To Be Confirmed',
                 'production_status_text' => $order['production_status_text'] ?? 'Not yet commenced',
-                'coo_type'             => $order['coo_type'] ?? 'TBC',
+                'coo_type'             => $order['coo_type'] ?? 'To Be Confirmed',
                 'include_annexure_a'   => (bool) ($order['include_annexure_a'] ?? false),
                 'currency_code'        => $order['currency_code'],
                 'buyers_po_ref'        => $order['buyers_po_ref'] ?? 'NIL',
@@ -137,10 +137,10 @@ final class DocumentDataAssembler
                     'dimensions'     => $p['dimensions'],
                     'finish'         => $p['finish'],
                     'hs_code'        => $p['hs_code'],
-                    'quantity'       => $p['quantity_is_tbc'] ? 'TBC' : self::formatNumber($p['quantity']),
+                    'quantity'       => $p['quantity_is_tbc'] ? 'To Be Confirmed' : self::formatNumber($p['quantity']),
                     'unit'           => $p['unit'],
-                    'unit_price'     => $p['unit_price'] !== null ? self::formatMoney($p['unit_price']) : 'TBC',
-                    'amount'         => $p['fob_value'] !== null ? self::formatMoney($p['fob_value']) : 'TBC',
+                    'unit_price'     => $p['unit_price'] !== null ? self::formatMoney($p['unit_price']) : 'To Be Confirmed',
+                    'amount'         => $p['fob_value'] !== null ? self::formatMoney($p['fob_value']) : 'To Be Confirmed',
                 ];
             }, $products),
             'financial' => [
@@ -228,7 +228,7 @@ final class DocumentDataAssembler
     /**
      * Phase C blocks: Supplier PO, Freight, Packing/Crates, Shipping/BL,
      * and Production tracking. Each is simply null/empty until that stage
-     * of the order has actually happened — templates render 'TBC'/'—' for
+     * of the order has actually happened — templates render 'To Be Confirmed'/'—' for
      * a null block via Twig's null-safe access, exactly like the Phase B
      * fields do for an order that hasn't reached that stage yet.
      */
@@ -252,7 +252,7 @@ final class DocumentDataAssembler
             'surface_finish'        => $row['surface_finish'],
             'dimensions'            => $row['dimensions'],
             'dimensional_tolerance' => $row['dimensional_tolerance'],
-            'quantity'              => $row['quantity'] !== null ? self::formatNumber($row['quantity']) : 'TBC',
+            'quantity'              => $row['quantity'] !== null ? self::formatNumber($row['quantity']) : 'To Be Confirmed',
             'unit'                  => $row['unit'],
             'colour_reference'      => $row['colour_reference'] ?: 'NIL',
             'special_requirements'  => $row['special_requirements'] ?: 'NIL',
@@ -306,7 +306,7 @@ final class DocumentDataAssembler
             return null;
         }
         return [
-            'actual_quantity_packed'  => $row['actual_quantity_packed'] !== null ? self::formatNumber($row['actual_quantity_packed']) : 'TBC',
+            'actual_quantity_packed'  => $row['actual_quantity_packed'] !== null ? self::formatNumber($row['actual_quantity_packed']) : 'To Be Confirmed',
             'crate_count'             => $row['crate_count'],
             'total_net_weight_kg'     => $row['total_net_weight_kg'],
             'total_gross_weight_kg'   => $row['total_gross_weight_kg'],
@@ -325,9 +325,9 @@ final class DocumentDataAssembler
         // generated showed "10.00" pcs / "1600.00" kg / "9.2500" m³ in the
         // crate breakdown instead of the trimmed "10" / "1600" / "9.25" the
         // rest of the same document uses. Trims trailing zeros the same
-        // way, but returns null (not formatNumber()'s 'TBC') for a genuinely
+        // way, but returns null (not formatNumber()'s 'To Be Confirmed') for a genuinely
         // empty cell — the template's own `?: '—'` fallback already handles
-        // that, and 'TBC' would be a behavior change for a document type
+        // that, and 'To Be Confirmed' would be a behavior change for a document type
         // whose crate rows come from a form where these are all required.
         $trim = static fn(?string $v): ?string => $v === null || $v === ''
             ? null
@@ -639,7 +639,7 @@ final class DocumentDataAssembler
     public static function formatMoney(string|int|float|null $value): string
     {
         if ($value === null || $value === '') {
-            return 'TBC';
+            return 'To Be Confirmed';
         }
         return number_format((float) $value, 2);
     }
@@ -665,7 +665,7 @@ final class DocumentDataAssembler
     private static function formatNumber(string|int|float|null $value): string
     {
         if ($value === null || $value === '') {
-            return 'TBC';
+            return 'To Be Confirmed';
         }
         $float = (float) $value;
         return rtrim(rtrim(number_format($float, 3), '0'), '.');

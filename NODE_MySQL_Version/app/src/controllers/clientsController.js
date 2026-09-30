@@ -52,7 +52,7 @@ async function store(req, res) {
       email: String(req.body.email || '').trim() || null,
       phone: String(req.body.phone || '').trim() || null,
       country_of_destination: String(req.body.country_of_destination || '').trim() || null,
-      coo_type: String(req.body.coo_type || '').trim() || 'TBC',
+      coo_type: String(req.body.coo_type || '').trim() || 'To Be Confirmed',
       notify_party: String(req.body.notify_party || '').trim() || null,
     },
     user.id,

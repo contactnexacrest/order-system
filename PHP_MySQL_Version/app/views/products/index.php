@@ -34,7 +34,7 @@
           <td><?= View::e($p['hs_code']) ?></td>
           <td><?= View::e($p['origin'] ?? '—') ?></td>
           <?php if ($canViewPricing): ?>
-            <td><?= $p['headline_fob'] === null ? 'TBC' : number_format((float) $p['headline_fob'], 2) ?></td>
+            <td><?= $p['headline_fob'] === null ? 'To Be Confirmed' : number_format((float) $p['headline_fob'], 2) ?></td>
           <?php endif; ?>
           <td><span class="badge <?= $p['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $p['is_active'] ? 'Active' : 'Inactive' ?></span></td>
           <td><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>">View</a></td>

@@ -471,7 +471,17 @@ async function watermarkFromRow(row) {
 }
 
 function assetDataUri(asset) {
-  if (!asset || !fs.existsSync(asset.server_path)) return null;
+  if (!asset) return null;
+  if (!fs.existsSync(asset.server_path)) {
+    // Point 8 fix — this used to fail silently: mode 'both' would quietly
+    // render only the text layer with no error anywhere, looking exactly
+    // like the image branch was never coded. Now it's at least visible in
+    // the logs, and watermarkController additionally refuses to save
+    // 'image'/'both' with no on-disk file in the first place (see its own
+    // comment).
+    console.error(`[WATERMARK] Asset id ${asset.id} references missing file: ${asset.server_path}`);
+    return null;
+  }
   const buf = fs.readFileSync(asset.server_path);
   return `data:${asset.mime_type || 'image/png'};base64,${buf.toString('base64')}`;
 }
@@ -1012,4 +1022,9 @@ module.exports = {
   downstreamDocumentsAtRisk,
   templatesEnvironment,
   StageGateBlockedError,
+  // Exported for tests only (Point 8 watermark fix) — Node has no
+  // PHP-style reflection to reach a private method, so this is the
+  // idiomatic equivalent for exercising the mode/show_image logic
+  // directly instead of only through a full generate() pipeline.
+  watermarkFromRow,
 };

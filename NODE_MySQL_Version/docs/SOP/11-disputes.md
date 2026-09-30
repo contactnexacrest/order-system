@@ -10,6 +10,30 @@ comments in [Client Portal](./12-client-portal.md).
 Like Amendments, this isn't part of the 9-stage pipeline: a dispute can be
 raised at any point on any order and never blocks or unlocks a stage gate.
 
+## Who can do what
+
+Two separate permissions gate this module — they used to be folded into
+the general `manage_orders` permission, which meant anyone who could
+touch an order at all could also manage its disputes and flip the
+client-facing dispute button. That's now split:
+
+- **Manage disputes** (`manage_disputes`) — view the dispute log, raise a
+  dispute, change its status, attach evidence, and enable/disable the
+  client's "Raise a Dispute" button. Privileged by default: only Admin,
+  Managing Director, Executive Director, and Super Admin hold it out of
+  the box. Grant it to another role from **Roles & Permissions** if that
+  business needs it more broadly.
+- **Respond to disputes** (`respond_to_disputes`) — post a reply in a
+  dispute's own reply thread (see below). Granted to Export Executive by
+  default, since day-to-day sales staff are usually the ones who actually
+  answer a dispute, without needing the broader ability to enable the
+  button or change a dispute's status.
+
+Holding either permission is enough to open a given order's Disputes
+screen at all; what's shown on it (the Log Dispute form, Status/Attach
+Document controls) depends on which of the two permissions you actually
+have.
+
 ## The system does this automatically
 
 - **The response-due date is calculated automatically** the moment a
@@ -41,6 +65,25 @@ Once resolved:
 A dedicated **global Disputes log** (separate from any one order) lists
 every dispute across all orders, filterable by status — useful for seeing
 what's still open company-wide rather than checking order by order.
+
+### Replying to a dispute
+
+Each logged dispute has its own **Replies** thread, directly underneath
+its status/evidence controls. Anyone holding **Respond to disputes**
+(Export Executive by default — see "Who can do what" above) can write a
+reply; it's timestamped and shows who posted it. This is deliberately a
+separate thread from the order-wide progress chat described in
+[Client Portal](./12-client-portal.md) — a dispute reply is scoped to
+that one dispute, doesn't email the client automatically, and stays
+visible for as long as the dispute record exists, so the full back-
+and-forth on a specific complaint is easy to find later without wading
+through unrelated order updates.
+
+Because the reply thread lives on the dispute, and the dispute itself
+is reached from the order's own Disputes screen, a dispute's entire
+history — notice, status changes, evidence, and every reply — is always
+part of that order's record, not a separate system you have to
+remember to check.
 
 ### Letting the client raise their own disputes
 

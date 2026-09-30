@@ -283,6 +283,9 @@ const requireAuth = asyncHandler(sessionAuth.required());
 function requirePermission(key) {
   return asyncHandler(permissionCheck.requires(key));
 }
+function requirePermissionAny(keys) {
+  return asyncHandler(permissionCheck.requiresAny(keys));
+}
 const verifyCsrf = csrfCheck.verify();
 
 // =========================================================================
@@ -509,7 +512,7 @@ app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_p
 app.post('/orders/:id/payment-reports/:reportId/reviewed', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(ordersController.markPaymentReportReviewed));
 app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
-app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
+app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 
 // docs/schema.sql Section AI — order progress chat.
 app.post('/orders/:id/comments', requireAuth, requirePermission('manage_orders'), uploadMedia.array('attachments'), verifyCsrf, asyncHandler(orderCommentController.post));
@@ -613,11 +616,16 @@ app.post('/amendments/:amendmentId/generate-document', requireAuth, requirePermi
 app.post('/amendments/:amendmentId/signed-copy', requireAuth, requirePermission('manage_orders'), uploadLarge.single('signed_copy'), verifyCsrf, asyncHandler(amendmentController.uploadSignedCopy));
 app.post('/amendments/:amendmentId/override-reference', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(amendmentController.overrideReference));
 
-app.get('/disputes', requireAuth, requirePermission('manage_orders'), asyncHandler(disputeController.index));
-app.get('/orders/:id/disputes', requireAuth, requirePermission('manage_orders'), asyncHandler(disputeController.forOrder));
-app.post('/orders/:id/disputes', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(disputeController.create));
-app.post('/disputes/:disputeId/status', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(disputeController.updateStatus));
-app.post('/disputes/:disputeId/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(disputeController.uploadDocument));
+// manage_disputes replaces manage_orders here (docs/schema.sql Section AO)
+// — view/raise/status/evidence/enable are privileged-only by default;
+// respond_to_disputes is the separate, more broadly grantable permission
+// for posting a reply.
+app.get('/disputes', requireAuth, requirePermission('manage_disputes'), asyncHandler(disputeController.index));
+app.get('/orders/:id/disputes', requireAuth, requirePermissionAny(['manage_disputes', 'respond_to_disputes']), asyncHandler(disputeController.forOrder));
+app.post('/orders/:id/disputes', requireAuth, requirePermission('manage_disputes'), verifyCsrf, asyncHandler(disputeController.create));
+app.post('/disputes/:disputeId/status', requireAuth, requirePermission('manage_disputes'), verifyCsrf, asyncHandler(disputeController.updateStatus));
+app.post('/disputes/:disputeId/documents', requireAuth, requirePermission('manage_disputes'), uploadLarge.single('document'), verifyCsrf, asyncHandler(disputeController.uploadDocument));
+app.post('/disputes/:disputeId/replies', requireAuth, requirePermission('respond_to_disputes'), verifyCsrf, asyncHandler(disputeController.postReply));
 
 app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.index));
 app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));

@@ -4,6 +4,7 @@
   <h1>Disputes — <?= htmlspecialchars($order['order_reference']) ?></h1>
   <p class="muted"><?= htmlspecialchars($order['company_legal_name']) ?></p>
 
+  <?php if ($canManage): ?>
   <div class="section">
     <h2>Raise a Dispute</h2>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/disputes">
@@ -22,6 +23,7 @@
       <button type="submit" class="btn-sm">Log Dispute</button>
     </form>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Dispute Log</h2>
@@ -36,6 +38,7 @@
         <p><?= nl2br(htmlspecialchars($d['description'])) ?></p>
         <?php if ($d['resolution_notes']): ?><p><strong>Resolution:</strong> <?= nl2br(htmlspecialchars($d['resolution_notes'])) ?></p><?php endif; ?>
 
+        <?php if ($canManage): ?>
         <form method="post" action="/disputes/<?= (int) $d['id'] ?>/status">
           <?= Csrf::field() ?>
           <label>Status
@@ -55,6 +58,28 @@
           <input type="text" name="received_from" placeholder="Received from (optional)">
           <button type="submit" class="btn-sm">Attach Document</button>
         </form>
+        <?php endif; ?>
+
+        <div class="section-nested" style="margin-top:0.75rem">
+          <h3>Replies</h3>
+          <?php foreach (($replies[(int) $d['id']] ?? []) as $r): ?>
+            <div class="reply-item" style="border-top:1px solid var(--line, #EFE6D2);padding:0.5rem 0">
+              <p class="muted small"><?= htmlspecialchars($r['author_name']) ?> — <?= htmlspecialchars($r['created_at']) ?></p>
+              <p><?= nl2br(htmlspecialchars($r['body'])) ?></p>
+            </div>
+          <?php endforeach; ?>
+          <?php if (empty($replies[(int) $d['id']] ?? [])): ?>
+            <p class="muted small">No replies yet.</p>
+          <?php endif; ?>
+
+          <?php if ($canRespond): ?>
+          <form method="post" action="/disputes/<?= (int) $d['id'] ?>/replies">
+            <?= Csrf::field() ?>
+            <label>Reply<textarea name="body" required rows="2" style="width:100%"></textarea></label>
+            <button type="submit" class="btn-sm">Post Reply</button>
+          </form>
+          <?php endif; ?>
+        </div>
       </details>
     <?php endforeach; ?>
     <?php if (empty($disputes)): ?>

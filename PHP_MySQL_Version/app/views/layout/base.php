@@ -29,8 +29,10 @@ $canViewProducts = $can('view_product_catalog');
 $canViewArchivedOrders = $can('view_archived_orders');
 $canCaModule = $can('ca_module_view');
 $canDataExport = $can('data_export_run');
+// docs/schema.sql Section AO — no longer folded into manage_orders.
+$canDisputes = $can('manage_disputes') || $can('respond_to_disputes');
 
-$opsGroupVisible = $canOrders || $canViewArchivedOrders;
+$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes;
 $insightsGroupVisible = $canReports || $canAudit || $canApproveEmail;
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
     || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport;
@@ -91,7 +93,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review</a>
           <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review</a>
           <a href="/reorder-requests" class="<?= $isActive('/reorder-requests') ? 'active' : '' ?>">Reorder Requests</a>
-          <a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a>
+          <?php if ($canDisputes): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
         </div>
       </details>
     <?php endif; ?>

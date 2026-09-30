@@ -78,7 +78,7 @@
             <?php if ($s['contact_email']): ?><br><small class="muted"><?= View::e($s['contact_email']) ?></small><?php endif; ?>
           </td>
           <td><?= View::e(ucfirst($s['fob_source'])) ?></td>
-          <td><?= $s['effective_fob'] === null ? 'TBC' : number_format((float) $s['effective_fob'], 2) ?></td>
+          <td><?= $s['effective_fob'] === null ? 'To Be Confirmed' : number_format((float) $s['effective_fob'], 2) ?></td>
           <td><?= $s['is_primary'] ? '&#9733;' : '' ?></td>
           <td>
             <?php if ($canManage): ?>

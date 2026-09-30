@@ -57,7 +57,7 @@ final class ClientController
             'email'                 => trim((string) ($_POST['email'] ?? '')) ?: null,
             'phone'                 => trim((string) ($_POST['phone'] ?? '')) ?: null,
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
-            'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: 'TBC',
+            'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: 'To Be Confirmed',
             'notify_party'          => trim((string) ($_POST['notify_party'] ?? '')) ?: null,
         ], (int) $user['id'], $clientUniqueNumber);
         if (TestModeService::isEnabled()) {

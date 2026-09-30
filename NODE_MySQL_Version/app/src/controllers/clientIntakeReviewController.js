@@ -47,7 +47,7 @@ async function accept(req, res) {
       email: submission.email,
       phone: submission.phone,
       country_of_destination: submission.country_of_destination,
-      coo_type: submission.coo_type || 'TBC',
+      coo_type: submission.coo_type || 'To Be Confirmed',
       notify_party: null,
     },
     user.id,

@@ -49,14 +49,14 @@ final class AmendmentService
         $balancePct = (float) $order['balance_pct'];
         $advanceAmount = round($fobValue * $advancePct / 100, 2);
         $isFob = strtoupper((string) $order['incoterm_code']) === 'FOB';
-        $portOfDischarge = $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'TBC';
+        $portOfDischarge = $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed';
 
         $qtDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'QT');
         $piDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
         $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
         $products = OrderProductRepository::forOrder($orderId);
         $productSummary = implode('; ', array_map(
-            static fn(array $p): string => $p['description'] . ' — ' . ($p['quantity_is_tbc'] ? 'TBC' : $p['quantity']) . ' ' . ($p['unit'] ?? ''),
+            static fn(array $p): string => $p['description'] . ' — ' . ($p['quantity_is_tbc'] ? 'To Be Confirmed' : $p['quantity']) . ' ' . ($p['unit'] ?? ''),
             $products
         ));
 

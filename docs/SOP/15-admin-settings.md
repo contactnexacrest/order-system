@@ -61,19 +61,32 @@ mistake (or malice).
 - **Holiday Calendar** — the dates the Working Days Calculator (used for
   dispute response deadlines, see [Disputes](./11-disputes.md)) excludes.
 - **HS Codes** — the master list product HS codes must come from; an order
-  can never use a code that isn't on this list. A real customs reference
-  sheet can be onboarded in one pass via Bulk Import (paste straight from
-  Excel — Tab-separated, or comma-separated for hand-typed lines) rather
-  than adding codes one at a time, and each code can carry its own short
-  usage note. The Product Guide underneath it is a separate, read-only
-  "which code do I actually use for this product" reference (also bulk
-  importable) — most useful for a fresher who has never had to classify a
-  product before.
+  can never use a code that isn't on this list. Every code is **6 or 8
+  plain digits, never dotted** (e.g. `68022310`, not `6802.23`) — this is
+  enforced on both manual add and bulk import, so a customs reference that
+  still uses the dotted convention needs its dots stripped before typing
+  or pasting it in. A real customs reference sheet can be onboarded in one
+  pass via Bulk Import (paste straight from Excel — Tab-separated, or
+  comma-separated for hand-typed lines) rather than adding codes one at a
+  time, and each code can carry its own short usage note. The Product
+  Guide underneath it is a separate, read-only "which code do I actually
+  use for this product" reference (also bulk importable) — most useful
+  for a fresher who has never had to classify a product before.
 - **Email Templates** — subject/body/footer for every system email, with
   template-key placeholders merged in at send time (see
   [Document Review & Approval](./13-document-review-approval.md)).
 - **Watermarks** — the draft vs. final watermark text/styling swapped
-  automatically when a document is approved.
+  automatically when a document is approved. Each of the two (draft/final)
+  independently supports Text only, Image only, or Text and image
+  together — "Both" really does render both layers, they're independent
+  overlays, not either/or. The watermark image itself comes from Company
+  Assets (upload it there first). If the active watermark image's file
+  ever goes missing from server storage (moved, deleted, or not carried
+  over by a deploy), the Watermarks screen shows a clear warning instead
+  of a silently incomplete PDF, and saving Image/Both mode is refused
+  until a fresh image is re-uploaded — this replaced an earlier gap where
+  such a save could succeed and every subsequent PDF would quietly show
+  the text watermark only, with nothing indicating why.
 - **Assets** — logo, company seal, and signature images used across every
   document template.
 - **Signatories** — which users are eligible to sign which document types,

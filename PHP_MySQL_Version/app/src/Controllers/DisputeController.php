@@ -9,12 +9,14 @@ use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DisputeDocumentRepository;
+use App\Repositories\DisputeReplyRepository;
 use App\Repositories\DisputeRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
 use App\Services\FileUploadService;
+use App\Services\PermissionService;
 use App\Services\WorkingDaysCalculator;
 
 /** Spec Section 16 — Dispute Management. */
@@ -41,12 +43,51 @@ final class DisputeController
             return;
         }
 
+        $disputes = DisputeRepository::forOrder($orderId);
+        $replies = [];
+        foreach ($disputes as $d) {
+            $replies[(int) $d['id']] = DisputeReplyRepository::forDispute((int) $d['id']);
+        }
+
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $canManage = PermissionService::can((int) $user['id'], $roleId, 'manage_disputes');
+        $canRespond = PermissionService::can((int) $user['id'], $roleId, 'respond_to_disputes');
+
         View::render('disputes/order', [
             'order'         => $order,
-            'disputes'      => DisputeRepository::forOrder($orderId),
+            'disputes'      => $disputes,
+            'replies'       => $replies,
+            'canManage'     => $canManage,
+            'canRespond'    => $canRespond,
             'users'         => UserRepository::listActive(),
             'statusOptions' => LookupRepository::dropdownOptions('dispute_status'),
         ], 'layout/base');
+    }
+
+    public function postReply(array $params): void
+    {
+        $disputeId = (int) $params['disputeId'];
+        $dispute = DisputeRepository::find($disputeId);
+        if (!$dispute) {
+            http_response_code(404);
+            echo 'Dispute not found.';
+            return;
+        }
+
+        $body = trim((string) ($_POST['body'] ?? ''));
+        if ($body === '') {
+            Flash::set('error', 'Write a reply before posting.');
+            header("Location: /orders/{$dispute['order_id']}/disputes");
+            return;
+        }
+
+        $userId = (int) AuthService::currentUser()['id'];
+        DisputeReplyRepository::create($disputeId, $userId, $body);
+        AuditLogRepository::log($userId, 'DISPUTE_REPLY_POSTED', 'disputes', $disputeId);
+
+        Flash::set('success', 'Reply posted.');
+        header("Location: /orders/{$dispute['order_id']}/disputes");
     }
 
     public function create(array $params): void

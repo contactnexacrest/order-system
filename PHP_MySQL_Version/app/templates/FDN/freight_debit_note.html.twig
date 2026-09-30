@@ -26,8 +26,8 @@
 <table class="kv">
   <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
   <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">3. ORDER REFERENCE</div>
@@ -41,8 +41,8 @@
   <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}. Freight recovery applies as agreed under the referenced Proforma Invoice.</td></tr>
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
-  <tr><td class="k">Shipping Line</td><td class="v">{{ freight.freight_forwarder_name ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Cargo Status *</td><td class="v">{{ packing.packing_date ? 'Packed and ready for shipment as of ' ~ packing.packing_date : 'TBC' }}</td></tr>
+  <tr><td class="k">Shipping Line</td><td class="v">{{ freight.freight_forwarder_name ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Cargo Status *</td><td class="v">{{ packing.packing_date ? 'Packed and ready for shipment as of ' ~ packing.packing_date : 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">4. FREIGHT &amp; CHARGES</div>
@@ -51,7 +51,7 @@
   <tr>
     <td>Ocean Freight</td>
     <td class="placeholder-italic">{{ order.container_type }}</td>
-    <td class="num">{{ freight.confirmed_freight_rate ?: 'TBC' }}</td>
+    <td class="num">{{ freight.confirmed_freight_rate ?: 'To Be Confirmed' }}</td>
     <td class="placeholder-italic" style="font-size:8.5pt;">Confirmed rate — {{ order.port_of_loading }} to {{ order.port_of_discharge }}</td>
   </tr>
   <tr style="background:#F1F5F9;">
@@ -63,7 +63,7 @@
   <tr>
     <td>Insurance</td>
     <td></td>
-    <td class="num">{% if order.incoterm_code == 'CIF' %}{{ freight.insurance_amount ?: 'TBC' }}{% else %}NIL{% endif %}</td>
+    <td class="num">{% if order.incoterm_code == 'CIF' %}{{ freight.insurance_amount ?: 'To Be Confirmed' }}{% else %}NIL{% endif %}</td>
     <td class="placeholder-italic" style="font-size:8.5pt;">CIF only — if FOB/CFR enter NIL</td>
   </tr>
   <tr style="background:#F1F5F9;">
@@ -74,12 +74,12 @@
   </tr>
 </table>
 <table class="totals">
-  <tr class="highlight"><td class="k">TOTAL AMOUNT DUE ({{ order.currency_code }}) * &nbsp;<span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(incl. GST if applicable)</span></td><td class="v" style="font-style:italic;">{{ freight.total_freight_and_insurance ?: 'TBC' }}</td></tr>
+  <tr class="highlight"><td class="k">TOTAL AMOUNT DUE ({{ order.currency_code }}) * &nbsp;<span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(incl. GST if applicable)</span></td><td class="v" style="font-style:italic;">{{ freight.total_freight_and_insurance ?: 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">5. PAYMENT INSTRUCTIONS</div>
 <div class="banner banner-red" style="text-align:left; font-size:9.5pt; font-weight:normal;">
-  <p style="margin:0 0 4pt;"><strong>Payment Due:</strong> <span style="color:#5A1414;">Within 3 working days of this Debit Note date — by <em>{{ freight.payment_due_date ?: 'TBC' }}</em></span> <strong style="color:#C0392B;">*</strong></p>
+  <p style="margin:0 0 4pt;"><strong>Payment Due:</strong> <span style="color:#5A1414;">Within 3 working days of this Debit Note date — by <em>{{ freight.payment_due_date ?: 'To Be Confirmed' }}</em></span> <strong style="color:#C0392B;">*</strong></p>
   <p style="margin:0 0 4pt;"><strong>Payment Method:</strong> <span style="color:#5A1414;">T/T (Telegraphic Transfer) to the NexaCrest bank account below</span></p>
   <p style="margin:0 0 4pt;"><strong>Reference:</strong> <span style="color:#5A1414;">Quote Debit Note No. <em>{{ meta.document_reference }}</em> and PI No. <em>{{ order.pi_ref ?: '—' }}</em> in the remittance</span></p>
   <p style="margin:0;"><strong>&#9888; Critical:</strong> <span style="color:#5A1414;">Share bank remittance copy as per Section 1 contact details above immediately after payment. Shipment booking will be confirmed only upon verification of freight receipt.</span></p>

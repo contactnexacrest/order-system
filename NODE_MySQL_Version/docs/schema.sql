@@ -2416,6 +2416,37 @@ ALTER TABLE orders
   ADD COLUMN ca_internal_doc_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER active_amendment_id;
 
 -- ================================================================
+-- SECTION AO — DISPUTE REPLIES + GRANULAR DISPUTE PERMISSIONS
+-- (added 2026-09-30)
+-- ================================================================
+-- Every Dispute action (view log, raise, change status, attach evidence)
+-- plus the client-facing "enable dispute button" toggle on orders used to
+-- share the single generic manage_orders permission. Two new permissions
+-- replace that: manage_disputes (view/manage/enable — Admin/MD/ED and any
+-- explicitly-granted privileged role only, NOT auto-inherited from
+-- manage_orders) and respond_to_disputes (post a reply — grantable to
+-- day-to-day sales roles independently of manage_disputes). See
+-- docs/seed.sql for the grants.
+--
+-- dispute_replies is a flat, append-only reply thread scoped to one
+-- dispute (FK dispute_id, not order_id) — deliberately NOT the same table
+-- as order_comments (Section AI): that table's client-auto-email and
+-- email_sent bookkeeping are order-progress-chat-specific side effects a
+-- dispute reply must not inherit. A dispute's replies are reached from
+-- the order's own Disputes screen, so the order's full history already
+-- includes its disputes and their replies.
+-- ================================================================
+CREATE TABLE dispute_replies (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  dispute_id        BIGINT UNSIGNED NOT NULL,
+  author_user_id    BIGINT UNSIGNED NOT NULL,
+  body              TEXT NOT NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (dispute_id) REFERENCES disputes(id),
+  FOREIGN KEY (author_user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2452,4 +2483,5 @@ ALTER TABLE orders
 -- Section AL (HS code bulk import + product guide) added 2026-09-27.
 -- Section AM (expense-to-order linking) added 2026-09-27.
 -- Section AN (internal-only CA financial annexure) added 2026-09-30.
+-- Section AO (dispute replies + granular dispute permissions) added 2026-09-30.
 -- ================================================================

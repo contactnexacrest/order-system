@@ -318,7 +318,7 @@ $router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'],
 $router->post('/orders/{id}/payment-reports/{reportId}/reviewed', [$orders, 'markPaymentReportReviewed'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), CsrfCheck::verify()]);
 
 // docs/schema.sql Section AI — order progress chat.
 $router->post('/orders/{id}/comments', [$orderComments, 'post'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
@@ -400,12 +400,16 @@ $router->post('/amendments/{amendmentId}/reject', [$amendments, 'reject'], [Sess
 $router->post('/amendments/{amendmentId}/generate-document', [$amendments, 'generateDocument'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->post('/amendments/{amendmentId}/signed-copy', [$amendments, 'uploadSignedCopy'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
-// Dispute management (Section 16).
-$router->get('/disputes', [$disputes, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
-$router->get('/orders/{id}/disputes', [$disputes, 'forOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
-$router->post('/orders/{id}/disputes', [$disputes, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/disputes/{disputeId}/status', [$disputes, 'updateStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/disputes/{disputeId}/documents', [$disputes, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// Dispute management (Section 16). manage_disputes replaces manage_orders
+// here (docs/schema.sql Section AO) — view/raise/status/evidence/enable
+// are privileged-only by default; respond_to_disputes (below) is the
+// separate, more broadly grantable permission for posting a reply.
+$router->get('/disputes', [$disputes, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes')]);
+$router->get('/orders/{id}/disputes', [$disputes, 'forOrder'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_disputes', 'respond_to_disputes'])]);
+$router->post('/orders/{id}/disputes', [$disputes, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), CsrfCheck::verify()]);
+$router->post('/disputes/{disputeId}/status', [$disputes, 'updateStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), CsrfCheck::verify()]);
+$router->post('/disputes/{disputeId}/documents', [$disputes, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), CsrfCheck::verify()]);
+$router->post('/disputes/{disputeId}/replies', [$disputes, 'postReply'], [SessionAuth::required(), PermissionCheck::requires('respond_to_disputes'), CsrfCheck::verify()]);
 
 // Audit log viewer (Section 14/17) — read-only, no delete route exists anywhere.
 $router->get('/audit-log', [$auditLog, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);

@@ -93,7 +93,7 @@
       {% for p in products %}
       <tr>
         <td>{{ p.description }}</td>
-        <td>{{ 'TBC' if p.quantity_is_tbc else (p.quantity | qty) }}</td>
+        <td>{{ 'To Be Confirmed' if p.quantity_is_tbc else (p.quantity | qty) }}</td>
         <td>{{ p.unit or '—' }}</td>
         <td>{{ (p.unit_price | money) if p.unit_price != null else '—' }}</td>
         <td>{{ (p.fob_value | money) if p.fob_value != null else '—' }}</td>

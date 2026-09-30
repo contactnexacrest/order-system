@@ -98,7 +98,7 @@
       <?php foreach ($products as $p): ?>
       <tr>
         <td><?= htmlspecialchars($p['description']) ?></td>
-        <td><?= $p['quantity_is_tbc'] ? 'TBC' : rtrim(rtrim(number_format((float) $p['quantity'], 3), '0'), '.') ?></td>
+        <td><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : rtrim(rtrim(number_format((float) $p['quantity'], 3), '0'), '.') ?></td>
         <td><?= htmlspecialchars($p['unit'] ?? '—') ?></td>
         <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : '—' ?></td>
         <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : '—' ?></td>

@@ -32,8 +32,8 @@
 <table class="kv kv-solid">
   <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
   <tr><td class="k">Full Address *</td><td class="v">{{ buyer.consignee_address or buyer.billing_address }}</td></tr>
-  <tr><td class="k">Country *</td><td class="v">{{ buyer.country_of_destination or 'TBC' }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Ref *</td><td class="v">{{ buyer.vat_eori_tax_no or 'TBC' }}</td></tr>
+  <tr><td class="k">Country *</td><td class="v">{{ buyer.country_of_destination or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Ref *</td><td class="v">{{ buyer.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">3. NOTIFY PARTY</div>
@@ -46,10 +46,10 @@
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
   <tr><td class="k">Place of Delivery</td><td class="v">Same as Port of Discharge unless buyer has an inland delivery arrangement</td></tr>
-  <tr><td class="k">Vessel Name *</td><td class="v">{{ shipping.vessel_name or 'TBC — to be confirmed by shipping line at time of booking' }}</td></tr>
-  <tr><td class="k">Voyage Number *</td><td class="v">{{ shipping.voyage_number or 'TBC' }}</td></tr>
-  <tr><td class="k">ETD (Est. Departure) *</td><td class="v">{{ shipping.etd or 'TBC' }}</td></tr>
-  <tr><td class="k">ETA (Est. Arrival) *</td><td class="v">{{ shipping.eta or 'TBC' }}</td></tr>
+  <tr><td class="k">Vessel Name *</td><td class="v">{{ shipping.vessel_name or 'To Be Confirmed — to be confirmed by shipping line at time of booking' }}</td></tr>
+  <tr><td class="k">Voyage Number *</td><td class="v">{{ shipping.voyage_number or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">ETD (Est. Departure) *</td><td class="v">{{ shipping.etd or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">ETA (Est. Arrival) *</td><td class="v">{{ shipping.eta or 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">5. CONTAINER &amp; CARGO DETAILS</div>
@@ -60,12 +60,12 @@
     <span class="box{{ ' checked' if ('40ft' in order.container_type and 'High Cube' not in order.container_type) else '' }}"><span class="cbx">{{ ('&#10003;' if ('40ft' in order.container_type and 'High Cube' not in order.container_type) else '')|safe }}</span>40ft Standard</span> &nbsp;
     <span class="box{{ ' checked' if 'High Cube' in order.container_type else '' }}"><span class="cbx">{{ ('&#10003;' if 'High Cube' in order.container_type else '')|safe }}</span>40ft High Cube</span>
   </td></tr>
-  <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no or 'TBC — to be confirmed by shipping line after stuffing' }}</td></tr>
-  <tr><td class="k">Seal No. *</td><td class="v">{{ shipping.seal_no or 'TBC — to be confirmed after stuffing' }}</td></tr>
-  <tr><td class="k">No. of Packages *</td><td class="v">{{ (packing.crate_count ~ ' Wooden Crates') if packing.crate_count else 'TBC' }} — must match Packing List exactly</td></tr>
-  <tr><td class="k">Gross Weight *</td><td class="v">{{ (packing.total_gross_weight_kg ~ ' kg') if packing.total_gross_weight_kg else 'TBC' }}</td></tr>
-  <tr><td class="k">Net Weight *</td><td class="v">{{ (packing.total_net_weight_kg ~ ' kg') if packing.total_net_weight_kg else 'TBC' }}</td></tr>
-  <tr><td class="k">Total CBM *</td><td class="v">{{ (packing.total_cbm ~ ' m³') if packing.total_cbm else 'TBC' }}</td></tr>
+  <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no or 'To Be Confirmed — to be confirmed by shipping line after stuffing' }}</td></tr>
+  <tr><td class="k">Seal No. *</td><td class="v">{{ shipping.seal_no or 'To Be Confirmed — to be confirmed after stuffing' }}</td></tr>
+  <tr><td class="k">No. of Packages *</td><td class="v">{{ (packing.crate_count ~ ' Wooden Crates') if packing.crate_count else 'To Be Confirmed' }} — must match Packing List exactly</td></tr>
+  <tr><td class="k">Gross Weight *</td><td class="v">{{ (packing.total_gross_weight_kg ~ ' kg') if packing.total_gross_weight_kg else 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Net Weight *</td><td class="v">{{ (packing.total_net_weight_kg ~ ' kg') if packing.total_net_weight_kg else 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Total CBM *</td><td class="v">{{ (packing.total_cbm ~ ' m³') if packing.total_cbm else 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">6. CARGO DESCRIPTION &nbsp;(appears on BL exactly as written)</div>
@@ -88,7 +88,7 @@
     <span class="box{{ '' if order.is_fob else ' checked' }}"><span class="cbx">{{ ('' if order.is_fob else '&#10003;')|safe }}</span>Freight Prepaid (seller pays freight — CFR/CIF)</span> &nbsp;&nbsp;
     <span class="box{{ ' checked' if order.is_fob else '' }}"><span class="cbx">{{ ('&#10003;' if order.is_fob else '')|safe }}</span>Freight Collect (buyer pays freight — FOB)</span>
   </td></tr>
-  <tr><td class="k">Freight Amount</td><td class="v">{{ 'N/A — Freight Collect' if order.is_fob else ((freight.confirmed_freight_rate or 'TBC') ~ ' ' ~ order.currency_code) }}</td></tr>
+  <tr><td class="k">Freight Amount</td><td class="v">{{ 'N/A — Freight Collect' if order.is_fob else ((freight.confirmed_freight_rate or 'To Be Confirmed') ~ ' ' ~ order.currency_code) }}</td></tr>
 </table>
 
 <div class="banner banner-red">

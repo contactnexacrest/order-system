@@ -121,9 +121,9 @@ function buildProductRows(products) {
         ? [
             [`${n}. `, { bold: true, color: lineColor }],
             ['Dimensions: ', { bold: true, color: C.NAVY }],
-            [`${p.dimensions || 'TBC'}   ·   `, {}],
+            [`${p.dimensions || 'To Be Confirmed'}   ·   `, {}],
             ['Finish: ', { bold: true, color: C.NAVY }],
-            [`${p.finish || 'TBC'}   ·   `, {}],
+            [`${p.finish || 'To Be Confirmed'}   ·   `, {}],
             ['HS Code: ', { bold: true, color: C.NAVY }],
             [`${p.hs_code || ''}   ·   `, {}],
             ['Country of Origin: ', { bold: true, color: C.NAVY }],
@@ -142,11 +142,11 @@ function buildProductRows(products) {
 function weightTable(order) {
   const out = [C.plain('Weight & Volume (Estimated — actuals confirmed on Packing List after production)', { bold: true, size: 21, color: C.NAVY })];
   const rows = [
-    ['Total CBM (m³)', g(order, 'estimated_total_cbm', 'TBC'), 'm³'],
-    ['Gross Weight (incl. packing)', g(order, 'estimated_gross_weight_kg', 'TBC'), 'kg'],
-    ['Net Weight (stone only)', g(order, 'estimated_net_weight_kg', 'TBC'), 'kg'],
-    ['No. of Packages / Crates', g(order, 'estimated_package_count', 'TBC'), 'Crates'],
-    ['Package Type', g(order, 'estimated_package_type', 'TBC'), '—'],
+    ['Total CBM (m³)', g(order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
+    ['Gross Weight (incl. packing)', g(order, 'estimated_gross_weight_kg', 'To Be Confirmed'), 'kg'],
+    ['Net Weight (stone only)', g(order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
+    ['No. of Packages / Crates', g(order, 'estimated_package_count', 'To Be Confirmed'), 'Crates'],
+    ['Package Type', g(order, 'estimated_package_type', 'To Be Confirmed'), '—'],
   ];
   out.push(...C.checklistTable(['Parameter', 'Estimated Value *', 'Unit'], [50, 35, 15], rows.map((r) => ({ cells: r.map(String) }))));
   return out;
@@ -202,7 +202,7 @@ function renderQt(context) {
       C.rich([
         ['⏱  ', { size: 19 }],
         ['VALID UNTIL * ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
-        [` ${g(order, 'quotation_valid_until', 'TBC')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
+        [` ${g(order, 'quotation_valid_until', 'To Be Confirmed')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
         ['Prices and terms are not valid after this date.', { italics: true, size: 17, color: C.AMBER_NOTE }],
       ]),
     ])
@@ -217,11 +217,11 @@ function renderQt(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'TBC') },
-      { label: 'Country of Destination *', value: g(buyer, 'country_of_destination', 'TBC') },
+      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
+      { label: 'Country of Destination *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
       { label: 'Certificate of Origin Type', value: g(order, 'coo_type') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'TBC') },
-      { label: 'Email *', value: g(buyer, 'email', 'TBC') },
+      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
+      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
       { label: 'Phone', value: g(buyer, 'phone', '—') },
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
     ])
@@ -272,8 +272,11 @@ function renderQt(context) {
   );
 
   if (order.special_requirements) {
-    children.push(...C.sectionTitle('SPECIAL REQUIREMENTS'));
-    children.push(...C.kvTable([{ full: true, value: String(order.special_requirements) }]));
+    // Point 7 — amber title bar + tinted box instead of the ordinary navy
+    // section title, so this stands out from routine sections rather than
+    // blending in.
+    children.push(...C.sectionTitle('SPECIAL REQUIREMENTS / INSTRUCTIONS', C.AMBER_BORDER));
+    children.push(...C.colorBox(C.AMBER_BG2, C.AMBER_BORDER, [C.plain(String(order.special_requirements), { size: 19, color: C.AMBER_TEXT2 })]));
   }
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 7, context.terms_section_title || 'TERMS & CONDITIONS'));
@@ -310,7 +313,7 @@ function renderPi(context) {
       C.rich([
         ['⏱  ', { size: 19 }],
         ['VALID UNTIL * ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
-        [` ${g(order, 'pi_valid_until', 'TBC')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
+        [` ${g(order, 'pi_valid_until', 'To Be Confirmed')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
         ['Payment must be received before this date for prices and terms to remain valid.', { italics: true, size: 17, color: C.AMBER_NOTE }],
       ]),
     ])
@@ -335,12 +338,12 @@ function renderPi(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'TBC') },
-      { label: 'Country of Final Destination *', value: g(buyer, 'country_of_destination', 'TBC') },
+      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
+      { label: 'Country of Final Destination *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
       { label: 'Certificate of Origin Type', value: g(order, 'coo_type') },
       { label: "Buyer's PO / Ref No.", value: g(order, 'buyers_po_ref') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'TBC') },
-      { label: 'Email *', value: g(buyer, 'email', 'TBC') },
+      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
+      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
       { label: 'Phone', value: g(buyer, 'phone', '—') },
       { label: 'Notify Party', value: g(buyer, 'notify_party', 'SAME as buyer') },
     ])
@@ -457,9 +460,9 @@ function renderOc(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'TBC') },
+      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
       { label: 'Phone *', value: g(buyer, 'phone', '—') },
-      { label: 'Email *', value: g(buyer, 'email', 'TBC') },
+      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
     ])
   );
 
@@ -482,7 +485,7 @@ function renderOc(context) {
   children.push(...C.sectionTitle('4. PAYMENT STATUS'));
   const paymentRows = [
     { label: `${g(financial, 'advance_pct')}% Advance (USD) *`, value: g(payment, 'advance_amount') !== '—' ? g(payment, 'advance_amount') : g(financial, 'advance_amount') },
-    { label: 'Advance T/T Received On *', value: g(payment, 'advance_remittance_received_at', 'TBC') },
+    { label: 'Advance T/T Received On *', value: g(payment, 'advance_remittance_received_at', 'To Be Confirmed') },
     { label: 'Balance Due (USD) *', value: `${g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount')}  —  ${g(financial, 'balance_terms_text')}` },
     { label: 'Currency', value: 'USD (always)' },
   ];
@@ -687,7 +690,7 @@ function renderBuyerPo(context) {
     ...C.colorBox(C.AMBER_BG, C.AMBER_BORDER, [
       C.rich([
         ['⏱  VALID UNTIL * ', { bold: true, color: C.AMBER_LABEL }],
-        [` ${g(order, 'quotation_valid_until', 'TBC')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
+        [` ${g(order, 'quotation_valid_until', 'To Be Confirmed')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
         ['This Purchase Order must be signed and returned before the Quotation validity expires.', { italics: true, size: 17, color: C.AMBER_NOTE }],
       ]),
     ])
@@ -702,11 +705,11 @@ function renderBuyerPo(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. *', value: g(buyer, 'vat_eori_tax_no', 'TBC') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'TBC') },
+      { label: 'VAT / EORI / Tax Reg. *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
+      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
       { label: 'Phone *', value: g(buyer, 'phone', '—') },
-      { label: 'Email *', value: g(buyer, 'email', 'TBC') },
-      { label: 'Country of Destination *', value: g(buyer, 'country_of_destination', 'TBC') },
+      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
+      { label: 'Country of Destination *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
     ])
   );
@@ -719,9 +722,9 @@ function renderBuyerPo(context) {
       { label: 'Against Quotation No. *', value: `${g(order, 'quotation_ref', '—')} (fixed)` },
       { label: 'Quotation Date *', value: `${g(order, 'quotation_date', '—')} (fixed)` },
       { label: 'Product Description *', value: productList },
-      { label: 'Quantity *', value: first.quantity ?? 'TBC' },
-      { label: 'Unit *', value: first.unit || 'TBC' },
-      { label: `Unit Price (${currency}) *`, value: first.unit_price ?? 'TBC' },
+      { label: 'Quantity *', value: first.quantity ?? 'To Be Confirmed' },
+      { label: 'Unit *', value: first.unit || 'To Be Confirmed' },
+      { label: `Unit Price (${currency}) *`, value: first.unit_price ?? 'To Be Confirmed' },
       { label: `Total FOB Value (${currency}) *`, value: g(financial, 'fob_value') },
       { label: 'Incoterm', value: g(order, 'incoterm_label') },
       { label: 'Port of Loading', value: g(order, 'port_of_loading') },
@@ -827,11 +830,11 @@ function renderSupPo(context) {
     ...C.kvTable([
       { label: 'Supplier Legal Name *', value: g(sp, 'supplier_legal_name') },
       { label: 'Address *', value: g(sp, 'supplier_address') },
-      { label: 'GSTIN *', value: g(sp, 'supplier_gstin', 'TBC') },
+      { label: 'GSTIN *', value: g(sp, 'supplier_gstin', 'To Be Confirmed') },
       { label: 'PAN', value: g(sp, 'supplier_pan', '—') },
-      { label: 'Contact Person *', value: g(sp, 'supplier_contact_person', 'TBC') },
-      { label: 'Phone *', value: g(sp, 'supplier_phone', 'TBC') },
-      { label: 'Supplier Type *', value: g(sp, 'supplier_type', 'TBC') },
+      { label: 'Contact Person *', value: g(sp, 'supplier_contact_person', 'To Be Confirmed') },
+      { label: 'Phone *', value: g(sp, 'supplier_phone', 'To Be Confirmed') },
+      { label: 'Supplier Type *', value: g(sp, 'supplier_type', 'To Be Confirmed') },
     ])
   );
 
@@ -846,17 +849,23 @@ function renderSupPo(context) {
   );
   children.push(
     ...C.kvTable([
-      { label: 'Material / Stone Type *', value: g(sp, 'material_stone_type', 'TBC') },
+      { label: 'Material / Stone Type *', value: g(sp, 'material_stone_type', 'To Be Confirmed') },
       { label: 'Grade *', value: `${g(sp, 'grade')} only — no mixed grades, no seconds` },
-      { label: 'Surface Finish *', value: g(sp, 'surface_finish', 'TBC') },
-      { label: 'Dimensions *', value: g(sp, 'dimensions', 'TBC') },
+      { label: 'Surface Finish *', value: g(sp, 'surface_finish', 'To Be Confirmed') },
+      { label: 'Dimensions *', value: g(sp, 'dimensions', 'To Be Confirmed') },
       { label: 'Dimensional Tolerance', value: g(sp, 'dimensional_tolerance', '±2 mm on L and W · ±0.5 mm on thickness') },
       { label: 'Quantity *', value: g(sp, 'quantity') },
-      { label: 'Unit *', value: g(sp, 'unit', 'TBC') },
+      { label: 'Unit *', value: g(sp, 'unit', 'To Be Confirmed') },
       { label: 'Colour Reference', value: g(sp, 'colour_reference') },
-      { label: 'Special Requirements', value: g(sp, 'special_requirements') },
     ])
   );
+
+  if (sp.special_requirements) {
+    // Point 7 — its own amber-highlighted callout instead of just another
+    // row in the specifications table, so it stands out.
+    children.push(...C.sectionTitle('SPECIAL REQUIREMENTS / INSTRUCTIONS', C.AMBER_BORDER));
+    children.push(...C.colorBox(C.AMBER_BG2, C.AMBER_BORDER, [C.plain(String(sp.special_requirements), { size: 19, color: C.AMBER_TEXT2 })]));
+  }
 
   children.push(...C.sectionTitle('4. COMMERCIAL TERMS', green));
   const commercialRows = [
@@ -873,8 +882,8 @@ function renderSupPo(context) {
   children.push(...C.sectionTitle('5. DELIVERY TERMS', green));
   children.push(
     ...C.kvTable([
-      { label: 'Delivery Location *', value: g(sp, 'delivery_location', 'TBC') },
-      { label: 'Required Delivery Date *', value: g(sp, 'required_delivery_date', 'TBC') },
+      { label: 'Delivery Location *', value: g(sp, 'delivery_location', 'To Be Confirmed') },
+      { label: 'Required Delivery Date *', value: g(sp, 'required_delivery_date', 'To Be Confirmed') },
       { label: 'Delivery Confirmation', value: 'Supplier must confirm delivery readiness in writing (WhatsApp acceptable) at least 7 days before the required delivery date.' },
       {
         label: 'Time is of the Essence',
@@ -974,8 +983,8 @@ function renderFdn(context) {
     ...C.kvTable([
       { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'TBC') },
-      { label: 'Email *', value: g(buyer, 'email', 'TBC') },
+      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
+      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
     ])
   );
 
@@ -988,26 +997,26 @@ function renderFdn(context) {
       { label: 'Incoterm *', value: `${g(order, 'incoterm_label')}. Freight recovery applies as agreed under the referenced Proforma Invoice.` },
       { label: 'Port of Loading *', value: g(order, 'port_of_loading') },
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
-      { label: 'Shipping Line', value: g(freight, 'freight_forwarder_name', 'TBC') },
-      { label: 'Cargo Status *', value: g(context, 'packing.packing_date') !== '—' ? `Packed and ready for shipment as of ${g(context, 'packing.packing_date')}` : 'TBC' },
+      { label: 'Shipping Line', value: g(freight, 'freight_forwarder_name', 'To Be Confirmed') },
+      { label: 'Cargo Status *', value: g(context, 'packing.packing_date') !== '—' ? `Packed and ready for shipment as of ${g(context, 'packing.packing_date')}` : 'To Be Confirmed' },
     ])
   );
 
   children.push(...C.sectionTitle('4. FREIGHT & CHARGES'));
   children.push(
     ...C.productsTable(['Description *', 'Container Type *', `Amount (${currency}) *`, 'Remarks'], [22, 18, 20, 40], [
-      { cells: ['Ocean Freight', g(order, 'container_type'), g(freight, 'confirmed_freight_rate', 'TBC'), `Confirmed rate — ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}`], align: [null, null, 'right', null] },
+      { cells: ['Ocean Freight', g(order, 'container_type'), g(freight, 'confirmed_freight_rate', 'To Be Confirmed'), `Confirmed rate — ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}`], align: [null, null, 'right', null] },
       { cells: ['Origin Charges (if any)', '', 'NIL', `THC, documentation charges at ${g(order, 'port_of_loading')} — if applicable`], align: [null, null, 'right', null] },
-      { cells: ['Insurance', '', g(order, 'incoterm_code') === 'CIF' ? g(freight, 'insurance_amount', 'TBC') : 'NIL', 'CIF only — if FOB/CFR enter NIL'], align: [null, null, 'right', null] },
+      { cells: ['Insurance', '', g(order, 'incoterm_code') === 'CIF' ? g(freight, 'insurance_amount', 'To Be Confirmed') : 'NIL', 'CIF only — if FOB/CFR enter NIL'], align: [null, null, 'right', null] },
       { cells: ['GST / IGST (if applicable)', '', g(freight, 'gst_treatment') === 'IGST_18' ? '18% IGST' : 'NIL', 'As advised by CA — NIL if pure cost reimbursement'], align: [null, null, 'right', null] },
     ])
   );
-  children.push(...C.totalsTable([{ label: `TOTAL AMOUNT DUE (${currency}) *  (incl. GST if applicable)`, value: g(freight, 'total_freight_and_insurance', 'TBC'), highlight: true }]));
+  children.push(...C.totalsTable([{ label: `TOTAL AMOUNT DUE (${currency}) *  (incl. GST if applicable)`, value: g(freight, 'total_freight_and_insurance', 'To Be Confirmed'), highlight: true }]));
 
   children.push(...C.sectionTitle('5. PAYMENT INSTRUCTIONS'));
   children.push(
     ...C.colorBox(C.RED_BG, C.RED_BORDER, [
-      C.rich([['Payment Due: ', { bold: true }], [`Within 3 working days of this Debit Note date — by ${g(freight, 'payment_due_date', 'TBC')}`, { color: C.RED_SUB }]]),
+      C.rich([['Payment Due: ', { bold: true }], [`Within 3 working days of this Debit Note date — by ${g(freight, 'payment_due_date', 'To Be Confirmed')}`, { color: C.RED_SUB }]]),
       C.rich([['Payment Method: ', { bold: true }], ['T/T (Telegraphic Transfer) to the NexaCrest bank account below', { color: C.RED_SUB }]]),
       C.rich([['Reference: ', { bold: true }], [`Quote Debit Note No. ${g(meta, 'document_reference')} and PI No. ${g(order, 'pi_ref', '—')} in the remittance`, { color: C.RED_SUB }]]),
       C.rich([
@@ -1063,12 +1072,12 @@ function renderPl(context) {
     ['Consignee Name *', 'consignee_name'],
     ['Consignee Address *', 'consignee_address'],
     ['VAT / EORI / Tax Reg. No. *', 'vat_eori_tax_no'],
-  ].map(([label, key]) => C.rich([[`${label}\n`, { bold: true, color: C.NAVY }], [String(g(buyer, key, 'TBC')), {}]]));
+  ].map(([label, key]) => C.rich([[`${label}\n`, { bold: true, color: C.NAVY }], [String(g(buyer, key, 'To Be Confirmed')), {}]]));
   const rightPara = [
     ['Incoterm *', g(order, 'incoterm_label')],
     ['Port of Loading *', g(order, 'port_of_loading')],
     ['Port of Discharge *', g(order, 'port_of_discharge')],
-    ['Country of Final Destination *', g(buyer, 'country_of_destination', 'TBC')],
+    ['Country of Final Destination *', g(buyer, 'country_of_destination', 'To Be Confirmed')],
     ['Notify Party', g(buyer, 'notify_party', 'Same as consignee')],
   ].map(([label, val]) => C.rich([[`${label}\n`, { bold: true, color: C.NAVY }], [String(val), {}]]));
   children.push(
@@ -1095,11 +1104,11 @@ function renderPl(context) {
       { label: 'Product Description *', value: productList },
       { label: 'HS Code *', value: hsCodeList },
       { label: 'Country of Origin *', value: 'India' },
-      { label: 'Total Quantity *', value: g(packing, 'actual_quantity_packed', 'TBC') },
-      { label: 'Total No. of Crates *', value: g(packing, 'crate_count', 'TBC') },
-      { label: 'Total Net Weight *', value: g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'TBC' },
-      { label: 'Total Gross Weight *', value: g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'TBC' },
-      { label: 'Total CBM *', value: g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'TBC' },
+      { label: 'Total Quantity *', value: g(packing, 'actual_quantity_packed', 'To Be Confirmed') },
+      { label: 'Total No. of Crates *', value: g(packing, 'crate_count', 'To Be Confirmed') },
+      { label: 'Total Net Weight *', value: g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'To Be Confirmed' },
+      { label: 'Total Gross Weight *', value: g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'To Be Confirmed' },
+      { label: 'Total CBM *', value: g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'To Be Confirmed' },
     ])
   );
 
@@ -1213,8 +1222,8 @@ function renderBli(context) {
       [
         { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
         { label: 'Full Address *', value: g(buyer, 'consignee_address') !== '—' ? g(buyer, 'consignee_address') : g(buyer, 'billing_address') },
-        { label: 'Country *', value: g(buyer, 'country_of_destination', 'TBC') },
-        { label: 'VAT / EORI / Tax Ref *', value: g(buyer, 'vat_eori_tax_no', 'TBC') },
+        { label: 'Country *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
+        { label: 'VAT / EORI / Tax Ref *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
       ],
       true
     )
@@ -1231,9 +1240,9 @@ function renderBli(context) {
         { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
         { label: 'Place of Delivery', value: 'Same as Port of Discharge unless buyer has an inland delivery arrangement' },
         { label: 'Vessel Name *', value: g(shipping, 'vessel_name', 'TBC — to be confirmed by shipping line at time of booking') },
-        { label: 'Voyage Number *', value: g(shipping, 'voyage_number', 'TBC') },
-        { label: 'ETD (Est. Departure) *', value: g(shipping, 'etd', 'TBC') },
-        { label: 'ETA (Est. Arrival) *', value: g(shipping, 'eta', 'TBC') },
+        { label: 'Voyage Number *', value: g(shipping, 'voyage_number', 'To Be Confirmed') },
+        { label: 'ETD (Est. Departure) *', value: g(shipping, 'etd', 'To Be Confirmed') },
+        { label: 'ETA (Est. Arrival) *', value: g(shipping, 'eta', 'To Be Confirmed') },
       ],
       true
     )
@@ -1251,10 +1260,10 @@ function renderBli(context) {
         },
         { label: 'Container No. *', value: g(shipping, 'container_no', 'TBC — to be confirmed by shipping line after stuffing') },
         { label: 'Seal No. *', value: g(shipping, 'seal_no', 'TBC — to be confirmed after stuffing') },
-        { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'TBC'} — must match Packing List exactly` },
-        { label: 'Gross Weight *', value: g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'TBC' },
-        { label: 'Net Weight *', value: g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'TBC' },
-        { label: 'Total CBM *', value: g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'TBC' },
+        { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'To Be Confirmed'} — must match Packing List exactly` },
+        { label: 'Gross Weight *', value: g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'To Be Confirmed' },
+        { label: 'Net Weight *', value: g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'To Be Confirmed' },
+        { label: 'Total CBM *', value: g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'To Be Confirmed' },
       ],
       true
     )
@@ -1288,7 +1297,7 @@ function renderBli(context) {
           label: 'Freight Terms *',
           value: `${checkbox(!isFob, 'Freight Prepaid (seller pays freight — CFR/CIF)')}    ${checkbox(isFob, 'Freight Collect (buyer pays freight — FOB)')}`,
         },
-        { label: 'Freight Amount', value: isFob ? 'N/A — Freight Collect' : `${g(freight, 'confirmed_freight_rate', 'TBC')} ${currency}` },
+        { label: 'Freight Amount', value: isFob ? 'N/A — Freight Collect' : `${g(freight, 'confirmed_freight_rate', 'To Be Confirmed')} ${currency}` },
       ],
       true
     )
@@ -1393,11 +1402,11 @@ function renderCi(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'TBC') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'TBC') },
-      { label: 'Email *', value: g(buyer, 'email', 'TBC') },
+      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
+      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
+      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
       { label: 'Notify Party', value: g(buyer, 'notify_party', 'SAME as consignee') },
-      { label: 'Country of Final Destination *', value: g(buyer, 'country_of_destination', 'TBC') },
+      { label: 'Country of Final Destination *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
     ])
   );
 
@@ -1407,18 +1416,18 @@ function renderCi(context) {
       { label: 'Incoterm *', value: g(order, 'incoterm_label') },
       { label: 'Port of Loading *', value: g(order, 'port_of_loading') },
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
-      { label: 'Container No. *', value: g(shipping, 'container_no', 'TBC') },
-      { label: 'Bill of Lading No. *', value: g(shipping, 'bl_number', 'TBC') },
+      { label: 'Container No. *', value: g(shipping, 'container_no', 'To Be Confirmed') },
+      { label: 'Bill of Lading No. *', value: g(shipping, 'bl_number', 'To Be Confirmed') },
       { label: 'Bill of Lading Date *', value: g(shipping, 'bl_date', 'TBC — must match this invoice date') },
-      { label: 'Vessel / Voyage *', value: `${g(shipping, 'vessel_name', 'TBC')}${g(shipping, 'voyage_number') !== '—' ? ` / ${g(shipping, 'voyage_number')}` : ''}` },
-      { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'TBC'} — must match Packing List` },
+      { label: 'Vessel / Voyage *', value: `${g(shipping, 'vessel_name', 'To Be Confirmed')}${g(shipping, 'voyage_number') !== '—' ? ` / ${g(shipping, 'voyage_number')}` : ''}` },
+      { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'To Be Confirmed'} — must match Packing List` },
     ])
   );
 
   children.push(...C.sectionTitle('4. PRODUCT / ORDER DETAILS'));
   children.push(C.plain('Quantities and values below reflect ACTUAL shipment — must match Packing List. Must not exceed PI quantities.', { italics: true, size: 17, color: C.MUTED }));
   children.push(...C.productsTable(productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(products)));
-  let plRefLine = `PL Reference: ${g(order, 'pl_ref', 'TBC')}`;
+  let plRefLine = `PL Reference: ${g(order, 'pl_ref', 'To Be Confirmed')}`;
   if (crates.length) {
     plRefLine += crates.length > 1 ? ` — Crates ${crates[0].crate_no || ''} to ${crates[crates.length - 1].crate_no || ''}` : ` — Crate ${crates[0].crate_no || ''}`;
   }
@@ -1432,7 +1441,7 @@ function renderCi(context) {
   );
 
   const isFob = !!order.is_fob;
-  const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Freight Debit Note No. ${g(order, 'fdn_ref', 'TBC')} dated ${g(order, 'fdn_date', 'TBC')}. Not included in CI value.`;
+  const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Freight Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}. Not included in CI value.`;
   const sectionARows = [
     ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')} *`, 'Sum of all product lines above — basis for all payments'],
     ['Freight & Insurance', `${isFob ? 'NIL — FOB order' : 'Paid via FDN'} *`, freightRemark],
@@ -1443,15 +1452,15 @@ function renderCi(context) {
   const advanceAmt = g(payment, 'advance_amount') !== '—' ? g(payment, 'advance_amount') : g(financial, 'advance_amount');
   const balanceAmt = g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount');
   const freightStatus = isFob ? 'NIL (FOB)' : g(payment, 'freight_cleared_at') !== '—' ? 'PAID VIA FDN' : 'PENDING';
-  const freightAmtCell = isFob ? 'NIL — FOB' : `${currency} ${g(payment, 'freight_amount', 'TBC')} *`;
-  const freightRemark2 = isFob ? 'FOB: buyer arranges — write NIL' : `CFR/CIF: Against FDN No. ${g(order, 'fdn_ref', 'TBC')} dated ${g(order, 'fdn_date', 'TBC')}`;
+  const freightAmtCell = isFob ? 'NIL — FOB' : `${currency} ${g(payment, 'freight_amount', 'To Be Confirmed')} *`;
+  const freightRemark2 = isFob ? 'FOB: buyer arranges — write NIL' : `CFR/CIF: Against FDN No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}`;
   const freightAmtVal = g(payment, 'freight_amount', null);
-  const subtotalPaid = `${currency} ${advanceAmt}${!isFob && freightAmtVal !== '—' && freightAmtVal !== 'TBC' ? ` + ${g(payment, 'freight_amount')} (freight)` : ''}`;
+  const subtotalPaid = `${currency} ${advanceAmt}${!isFob && freightAmtVal !== '—' && freightAmtVal !== 'To Be Confirmed' ? ` + ${g(payment, 'freight_amount')} (freight)` : ''}`;
   const sectionBRows = [
     [
       `✓  ${g(financial, 'advance_pct')}% Advance — ${g(payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'}`,
       `${currency} ${advanceAmt} *`,
-      `Received: ${g(payment, 'advance_cleared_at', 'TBC')}\nAgainst: PI No. ${g(order, 'pi_ref', 'TBC')}`,
+      `Received: ${g(payment, 'advance_cleared_at', 'To Be Confirmed')}\nAgainst: PI No. ${g(order, 'pi_ref', 'To Be Confirmed')}`,
     ],
     [`✓  Freight & Insurance — ${freightStatus}`, freightAmtCell, freightRemark2],
     ['SUBTOTAL ALREADY PAID', subtotalPaid, `${g(financial, 'advance_pct')}% Advance${!isFob ? ' + FDN (if applicable)' : ''}`],
@@ -1574,21 +1583,21 @@ function renderCooprep(context) {
     ['Exporter — IEC *', g(company, 'iec_pan'), hardcoded],
     ['Consignee — Legal Name *', g(buyer, 'company_legal_name'), 'Commercial Invoice Section 2'],
     ['Consignee — Address *', g(buyer, 'consignee_address') !== '—' ? g(buyer, 'consignee_address') : g(buyer, 'billing_address'), 'Commercial Invoice Section 2'],
-    ['Consignee — Country *', g(buyer, 'country_of_destination', 'TBC'), 'Commercial Invoice Section 2'],
-    ['Vessel Name & Voyage No. *', `${g(shipping, 'vessel_name', 'TBC')}${g(shipping, 'voyage_number') !== '—' ? ` / V.${g(shipping, 'voyage_number')}` : ''}`, 'Bill of Lading'],
+    ['Consignee — Country *', g(buyer, 'country_of_destination', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
+    ['Vessel Name & Voyage No. *', `${g(shipping, 'vessel_name', 'To Be Confirmed')}${g(shipping, 'voyage_number') !== '—' ? ` / V.${g(shipping, 'voyage_number')}` : ''}`, 'Bill of Lading'],
     ['Port of Loading *', g(order, 'port_of_loading'), hardcoded],
     ['Port of Discharge *', g(order, 'port_of_discharge'), 'Bill of Lading / Commercial Invoice Section 3'],
-    ['Bill of Lading No. *', g(shipping, 'bl_number', 'TBC'), 'Bill of Lading'],
+    ['Bill of Lading No. *', g(shipping, 'bl_number', 'To Be Confirmed'), 'Bill of Lading'],
     ['Bill of Lading Date *', g(shipping, 'bl_date', 'TBC — same as CI date'), 'Bill of Lading / Commercial Invoice'],
     ['Product Description *', productList, 'Commercial Invoice Section 4'],
     ['HS Code *', hsCodeList, 'Hardcoded — verify against CI'],
     ['Country of Origin *', 'India', hardcoded],
-    ['No. of Packages *', g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'TBC', 'Packing List Section 3 / BL'],
-    ['Gross Weight *', g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'TBC', 'Packing List Section 3'],
-    ['Net Weight *', g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'TBC', 'Packing List Section 3'],
-    ['Total CBM *', g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'TBC', 'Packing List Section 3'],
+    ['No. of Packages *', g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'To Be Confirmed', 'Packing List Section 3 / BL'],
+    ['Gross Weight *', g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'To Be Confirmed', 'Packing List Section 3'],
+    ['Net Weight *', g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'To Be Confirmed', 'Packing List Section 3'],
+    ['Total CBM *', g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'To Be Confirmed', 'Packing List Section 3'],
     ['FOB Value *', `${g(order, 'currency_code')} ${g(financial, 'fob_value')}`, 'Commercial Invoice Section 4'],
-    ['Invoice No. & Date *', `${g(order, 'ci_ref', 'TBC')} — ${g(order, 'ci_date', 'TBC')}`, 'Commercial Invoice meta bar'],
+    ['Invoice No. & Date *', `${g(order, 'ci_ref', 'To Be Confirmed')} — ${g(order, 'ci_date', 'To Be Confirmed')}`, 'Commercial Invoice meta bar'],
     ['Competent Authority Signature', 'Signed and stamped by CAPEXIL authorised officer — not by NexaCrest', 'CAPEXIL issues — not your responsibility'],
   ];
   children.push(

@@ -4,9 +4,15 @@
   <p class="muted">Every generated PDF carries one of these two watermarks — <strong>Draft</strong> until a document is fully reviewer-approved, then <strong>Final</strong>. Each can show text only, an image only, or both at the same time — they're independent overlay layers, not either/or.</p>
 
   <div class="section">
+    <?php if ($watermarkImageAsset && !is_file($watermarkImageAsset['server_path'])): ?>
+    <p class="muted small" style="color:var(--danger,#A5402B)">
+      Watermark image on file: <strong>missing</strong> — the database has an active watermark image record, but its file is no longer on the server. Image/Both mode cannot be saved until you <a href="/company-assets">re-upload a watermark image from Company Assets</a>.
+    </p>
+    <?php else: ?>
     <p class="muted small">
       Watermark image on file: <?= $watermarkImageAsset ? '<strong>yes</strong> — <a href="/company-assets">replace it from Company Assets</a>' : '<strong>none yet</strong> — <a href="/company-assets">upload one from Company Assets</a> before picking Image or Both below.' ?>
     </p>
+    <?php endif; ?>
   </div>
 
   <?php foreach (['draft' => $draft, 'final' => $final] as $which => $w): ?>

@@ -21,7 +21,7 @@
             <label>Dimensions<input type="text" name="dimensions[<?= $i ?>]" value="<?= htmlspecialchars($l['dimensions'] ?? '') ?>"></label>
             <label>Finish<input type="text" name="finish[<?= $i ?>]" value="<?= htmlspecialchars($l['finish'] ?? '') ?>"></label>
             <label>Qty<input type="text" name="quantity[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['quantity'] ?? '')) ?>"></label>
-            <label><input type="checkbox" name="quantity_is_tbc[<?= $i ?>]" value="1" style="display:inline-block;width:auto;" <?= $l['quantity_is_tbc'] ? 'checked' : '' ?>> Qty TBC</label>
+            <label><input type="checkbox" name="quantity_is_tbc[<?= $i ?>]" value="1" style="display:inline-block;width:auto;" <?= $l['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
             <label>Unit<input type="text" name="unit[<?= $i ?>]" value="<?= htmlspecialchars($l['unit'] ?? '') ?>"></label>
             <label>Unit Price *<input type="text" name="unit_price[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['unit_price'] ?? '')) ?>"></label>
             <label>HS Code *<input type="text" name="hs_code[<?= $i ?>]" value="<?= htmlspecialchars($l['hs_code'] ?? '') ?>" list="hs_code_list" required></label>

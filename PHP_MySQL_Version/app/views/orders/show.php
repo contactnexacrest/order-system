@@ -16,6 +16,8 @@ $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUs
 $canManageShipping = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_shipping');
 $canCloseOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'close_orders');
 $canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
+// docs/schema.sql Section AO — split out of manage_orders so enabling the client-facing dispute button is privileged-only by default.
+$canManageDisputes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_disputes');
 // Phase 7: a narrow exception to a financial year lock — see CaFyLockGuard.
 $canOverrideFyLock = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'ca_fy_lock_override');
 // Order-Edit feature — product-row edits/duplication once Order Confirmation is reached — see OrderEditGuard.
@@ -246,11 +248,15 @@ $orderClosed = $order['status'] === 'complete';
     <?php endforeach; ?>
   </div>
 
+  <div class="order-layout" id="order-layout">
+    <nav class="order-sidebar" id="order-sidebar" aria-label="Order sections"></nav>
+    <div class="order-panels" id="order-panels">
+
   <div class="section">
     <h2>Order Details</h2>
     <div class="kv-grid">
       <div><span class="k">FOB Value</span><span class="v"><?= htmlspecialchars($order['currency_code']) ?> <?= number_format((float) $fobTotal, 2) ?></span></div>
-      <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'TBC') ?></span></div>
+      <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed') ?></span></div>
       <div><span class="k">Container Type</span><span class="v"><?= htmlspecialchars($order['container_type'] ?? '—') ?></span></div>
       <div><span class="k">Payment Preset</span><span class="v"><?= htmlspecialchars($order['preset_name']) ?></span></div>
       <div><span class="k">Buyer's PO Ref</span><span class="v">
@@ -262,7 +268,7 @@ $orderClosed = $order['status'] === 'complete';
           NIL
         <?php endif; ?>
       </span></div>
-      <div><span class="k">Special Requirements</span><span class="v"><?= htmlspecialchars($order['special_requirements'] ?? '—') ?></span></div>
+      <div><span class="k">Special Requirements/Instructions</span><span class="v"><?= htmlspecialchars($order['special_requirements'] ?? '—') ?></span></div>
     </div>
   </div>
 
@@ -275,10 +281,10 @@ $orderClosed = $order['status'] === 'complete';
         <tr>
           <td><?= $i + 1 ?></td>
           <td><?= htmlspecialchars($p['description']) ?><?php if ($p['dimensions'] || $p['finish']): ?><br><span class="muted small"><?= htmlspecialchars($p['dimensions'] ?? '') ?> <?= htmlspecialchars($p['finish'] ?? '') ?></span><?php endif; ?></td>
-          <td><?= $p['quantity_is_tbc'] ? 'TBC' : htmlspecialchars((string) $p['quantity']) ?></td>
+          <td><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars((string) $p['quantity']) ?></td>
           <td><?= htmlspecialchars($p['unit'] ?? '') ?></td>
-          <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : 'TBC' ?></td>
-          <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : 'TBC' ?></td>
+          <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : 'To Be Confirmed' ?></td>
+          <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : 'To Be Confirmed' ?></td>
         </tr>
         <?php endforeach; ?>
       </table>
@@ -297,7 +303,7 @@ $orderClosed = $order['status'] === 'complete';
             <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
             <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
             <label>Qty<input type="text" name="quantity" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
-            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty TBC</label>
+            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
             <label>Unit<input type="text" name="unit" value="<?= htmlspecialchars($p['unit'] ?? '') ?>"></label>
             <label>Unit Price<input type="text" name="unit_price" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
             <label>HS Code<input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" required></label>
@@ -328,7 +334,7 @@ $orderClosed = $order['status'] === 'complete';
           <label>Dimensions<input type="text" name="dimensions"></label>
           <label>Finish<input type="text" name="finish"></label>
           <label>Qty<input type="text" name="quantity"></label>
-          <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty TBC</label>
+          <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
           <label>Unit<input type="text" name="unit"></label>
           <label>Unit Price<input type="text" name="unit_price"></label>
           <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
@@ -801,7 +807,7 @@ $orderClosed = $order['status'] === 'complete';
 
   <div class="section">
     <h2>Amendments &amp; Disputes</h2>
-    <?php if ($canManageOrders): ?>
+    <?php if ($canManageDisputes): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/dispute-visibility" style="margin-bottom:10px">
       <?= Csrf::field() ?>
       <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
@@ -1055,7 +1061,7 @@ $orderClosed = $order['status'] === 'complete';
     <h2>Production &amp; Estimated Shipment</h2>
     <div class="kv-grid">
       <div><span class="k">Production Status</span><span class="v"><?= htmlspecialchars($order['production_status_text'] ?? 'Not yet commenced') ?></span></div>
-      <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'TBC') ?></span></div>
+      <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
     </div>
     <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/production-status">
@@ -1152,7 +1158,7 @@ $orderClosed = $order['status'] === 'complete';
           <label>Quantity<input type="text" name="quantity"></label>
           <label>Unit<input type="text" name="unit"></label>
           <label>Colour Reference<input type="text" name="colour_reference"></label>
-          <label>Special Requirements<input type="text" name="special_requirements"></label>
+          <label>Special Requirements/Instructions<input type="text" name="special_requirements"></label>
           <label>Unit Price (INR)<input type="text" name="unit_price_inr"></label>
           <label>Basic Value (INR)<input type="text" name="basic_value_inr"></label>
           <label>GST Rate (%)<input type="text" name="gst_rate_pct"></label>
@@ -1404,4 +1410,67 @@ $orderClosed = $order['status'] === 'complete';
       <?php endif; ?>
     <?php endif; ?>
   </div>
+
+    </div>
+  </div>
+  <script>
+  (function () {
+    var layout = document.getElementById('order-layout');
+    var panelsContainer = document.getElementById('order-panels');
+    var sidebar = document.getElementById('order-sidebar');
+    if (!layout || !panelsContainer || !sidebar) { return; }
+    var panels = Array.prototype.filter.call(panelsContainer.children, function (el) {
+      return el.classList.contains('section');
+    });
+    if (!panels.length) { return; }
+
+    function slugify(text) {
+      var s = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      return s || 'section';
+    }
+    var usedIds = {};
+    panels.forEach(function (panel, idx) {
+      if (panel.id) {
+        usedIds[panel.id] = true;
+        return;
+      }
+      var heading = panel.querySelector('h2');
+      var label = heading ? heading.textContent.trim() : ('Section ' + (idx + 1));
+      var base = 'panel-' + slugify(label);
+      var id = base, n = 2;
+      while (usedIds[id]) { id = base + '-' + n; n++; }
+      usedIds[id] = true;
+      panel.id = id;
+    });
+
+    panels.forEach(function (panel) {
+      var heading = panel.querySelector('h2');
+      var label = heading ? heading.textContent.trim() : panel.id;
+      var link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'order-sidebar-link';
+      link.textContent = label;
+      link.dataset.target = panel.id;
+      link.addEventListener('click', function () { activate(panel.id, true); });
+      sidebar.appendChild(link);
+    });
+
+    function activate(id, updateHash) {
+      panels.forEach(function (p) { p.classList.toggle('active-panel', p.id === id); });
+      Array.prototype.forEach.call(sidebar.children, function (link) {
+        link.classList.toggle('active', link.dataset.target === id);
+      });
+      if (updateHash && window.history && window.history.pushState) {
+        window.history.pushState(null, '', '#' + id);
+      }
+    }
+
+    var initialId = (window.location.hash || '').replace('#', '');
+    var initialPanel = null;
+    panels.forEach(function (p) { if (p.id === initialId) { initialPanel = p; } });
+    activate(initialPanel ? initialPanel.id : panels[0].id, false);
+
+    layout.classList.add('js-enabled');
+  })();
+  </script>
 </div>

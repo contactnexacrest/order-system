@@ -80,6 +80,15 @@ whatever's actually different. From Stage 4 on, duplicating (like editing
 or removing a line, or adding a new one) needs the override permission
 and a reason, exactly like the Edit Order Details form above.
 
+The same **Duplicate** button is also on the **New Order** creation
+screen itself, on every product row, from the very first line — it
+doesn't only appear after the order is saved. It works the same way
+there: clones that row's values into a brand-new row in the same form,
+instantly, with nothing saved yet. This is different from "+ Add product
+line" right below it, which adds a blank row — use Duplicate when the new
+line is mostly the same as one already typed (a second size, a colour
+variant) and Add for a genuinely new product.
+
 ## Duplicating a whole order
 
 **Duplicate Order**, on the order page, is for a genuine repeat order —

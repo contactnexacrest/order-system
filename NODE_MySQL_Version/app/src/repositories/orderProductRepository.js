@@ -9,7 +9,7 @@ async function forOrder(orderId) {
 // QA-5 ORD-05: optional executor lets this join the caller's transaction
 // (order creation — see ordersController.store()), defaulting to the plain
 // pool for every other existing call site.
-async function add(orderId, lineNo, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode = '6802.93', executor = db) {
+async function add(orderId, lineNo, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode = '680293', executor = db) {
   const fobValue = (quantity !== null && unitPrice !== null && !quantityIsTbc)
     ? String(parseFloat(quantity) * parseFloat(unitPrice))
     : null;
@@ -22,7 +22,7 @@ async function add(orderId, lineNo, description, dimensions, finish, quantity, q
     {
       order_id: orderId, line_no: lineNo, description, finish, dimensions,
       quantity: quantity || null, quantity_is_tbc: quantityIsTbc ? 1 : 0, unit,
-      unit_price: unitPrice || null, fob_value: fobValue, hs_code: hsCode || '6802.93',
+      unit_price: unitPrice || null, fob_value: fobValue, hs_code: hsCode || '680293',
     }
   );
   return result.insertId;
@@ -56,7 +56,7 @@ async function update(id, description, dimensions, finish, quantity, quantityIsT
     {
       description, finish, dimensions,
       quantity: quantity || null, quantity_is_tbc: quantityIsTbc ? 1 : 0, unit,
-      unit_price: unitPrice || null, fob_value: fobValue, hs_code: hsCode || '6802.93',
+      unit_price: unitPrice || null, fob_value: fobValue, hs_code: hsCode || '680293',
       id,
     }
   );

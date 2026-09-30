@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const flash = require('../helpers/flash');
 const assetRepository = require('../repositories/assetRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -17,6 +18,7 @@ const watermarkSettingsRepository = require('../repositories/watermarkSettingsRe
  */
 
 async function index(req, res) {
+  const watermarkImageAsset = await assetRepository.findActiveByType('watermark');
   res.renderView(
     'watermarks/index',
     {
@@ -24,7 +26,8 @@ async function index(req, res) {
         draft: await watermarkSettingsRepository.findGlobal(true),
         final: await watermarkSettingsRepository.findGlobal(false),
       },
-      watermarkImageAsset: await assetRepository.findActiveByType('watermark'),
+      watermarkImageAsset,
+      watermarkImageMissing: !!(watermarkImageAsset && !fs.existsSync(watermarkImageAsset.server_path)),
     },
     'layout/base'
   );
@@ -61,6 +64,18 @@ async function update(req, res) {
     const watermarkAsset = await assetRepository.findActiveByType('watermark');
     if (!watermarkAsset) {
       flash.set(req, 'error', 'No watermark image is on file yet — upload one from Company Assets first, then come back and pick Image or Both here.');
+      res.redirect('/watermarks');
+      return;
+    }
+    // Point 8 fix — a DB row being "active" didn't guarantee the file
+    // behind it still existed on disk; that gap is exactly how mode
+    // 'both' used to save successfully and then silently render
+    // text-only on every generated PDF forever after, with nothing
+    // telling anyone why. Catch it here instead, at the moment it's
+    // still fixable (re-upload), not at PDF-generation time where it's
+    // invisible.
+    if (!fs.existsSync(watermarkAsset.server_path)) {
+      flash.set(req, 'error', 'The active watermark image is on file in the database but its file is missing from storage — please re-upload it from Company Assets before selecting Image or Both.');
       res.redirect('/watermarks');
       return;
     }

@@ -20,7 +20,7 @@
             <label>Dimensions<input type="text" name="product_dimensions[{{ loop.index0 }}]" value="{{ p.dimensions or '' }}"></label>
             <label>Finish<input type="text" name="product_finish[{{ loop.index0 }}]" value="{{ p.finish or '' }}"></label>
             <label>Qty<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}"></label>
-            <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty TBC</label>
+            <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
             <label>Unit<input type="text" name="product_unit[{{ loop.index0 }}]" value="{{ p.unit or '' }}" placeholder="SQM/PCS"></label>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
           </div>
@@ -31,7 +31,7 @@
             <label>Dimensions<input type="text" name="product_dimensions[0]"></label>
             <label>Finish<input type="text" name="product_finish[0]"></label>
             <label>Qty<input type="text" name="product_quantity[0]"></label>
-            <label><input type="checkbox" name="product_quantity_tbc[0]" value="1" style="display:inline-block;width:auto;"> Qty TBC</label>
+            <label><input type="checkbox" name="product_quantity_tbc[0]" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit<input type="text" name="product_unit[0]" placeholder="SQM/PCS"></label>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
           </div>

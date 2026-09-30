@@ -57,7 +57,7 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
       port_of_discharge_id: source.port_of_discharge_id,
       port_of_discharge_text: source.port_of_discharge_id ? null : source.port_of_discharge_text,
       currency_id: source.currency_id,
-      coo_type: source.coo_type || 'TBC',
+      coo_type: source.coo_type || 'To Be Confirmed',
       include_annexure_a: !!source.include_annexure_a,
       special_requirements: source.special_requirements,
       container_type: source.container_type,

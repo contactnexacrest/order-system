@@ -98,6 +98,52 @@ several stages ahead of a document that's still sitting in "draft" or
 "in review" — that's normal, not a bug, though it's worth keeping an eye on
 so nothing old goes out to a buyer unreviewed.
 
+## Conventions used across every screen
+
+**"To Be Confirmed" is always spelled out, never abbreviated.** Any field
+that genuinely isn't known yet — a quantity, a container type, a
+certificate of origin type, a shipment date — shows the full words "To Be
+Confirmed" on screen and on every generated PDF/DOCX, not the abbreviation
+"TBC". This applies everywhere the system falls back to a placeholder for
+missing data, so a fresher (or a buyer reading a document) never has to
+guess what an unfamiliar three-letter code means.
+
+**"Special Requirements/Instructions" gets its own highlighted section on
+every document that carries it** (the Quotation and Supplier Purchase
+Order), not just another row in a table — an amber title bar and a tinted
+box, the same visual treatment used for other must-not-miss notices like
+the Quotation's "VALID UNTIL" banner. The field itself (renamed from just
+"Special Requirements" wherever it's shown, on-screen and in the order
+and Supplier PO forms) is optional and free text, but when something is
+written there, it's meant to be noticed, not buried.
+
+**An order's detail page is one page, navigated through a sidebar, not one
+long scroll.** Every order's own page (`/orders/{id}`) always shows the
+order's title, action buttons, and 9-stage tracker at the top — those never
+move. Below that, a sidebar on the left lists every section of the order
+(Order Details, Products, Documents, each numbered stage, and so on); click
+one to bring up just that section in the pane on the right, instead of
+scrolling past everything else to find it. This is purely a navigation
+aid — nothing about what a section does, what permission it needs, or what
+button does what has changed; a section still works exactly as this SOP
+describes it, it's just reached by clicking its name in the sidebar rather
+than scrolling to it. On a narrow screen (phone width) the sidebar becomes
+a row of tabs above the content instead of a column beside it. If the
+sidebar's script fails to load for any reason, every section simply
+appears one after another on the page, exactly as it did before this
+navigation was added — nothing is ever hidden behind JavaScript that isn't
+there as a backup.
+
+**A creation or edit form groups related fields two to a row, not one.**
+The New Order form (and other detail-entry screens like it) pairs related
+fields side by side — Incoterm next to Port of Loading, Total volume next
+to package count, and so on — instead of stacking every single field on
+its own line. A field that needs the full row to itself (a free-text note,
+an explanatory line) still gets one. Where a figure could be read two ways
+(e.g. a weight that could mean the product alone or the product plus its
+packing), the field's label carries a small tag spelling out exactly which
+one it is, so nobody has to guess or check twice at the Packing List stage.
+
 ## Roles in this system
 
 Six roles exist today (Admin → Settings → Roles & Permissions): **Admin**,

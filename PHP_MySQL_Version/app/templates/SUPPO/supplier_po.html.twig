@@ -27,26 +27,30 @@
 <table class="kv">
   <tr><td class="k">Supplier Legal Name *</td><td class="v">{{ supplier_po.supplier_legal_name }}</td></tr>
   <tr><td class="k">Address *</td><td class="v">{{ supplier_po.supplier_address }}</td></tr>
-  <tr><td class="k">GSTIN *</td><td class="v">{{ supplier_po.supplier_gstin ?: 'TBC' }}</td></tr>
+  <tr><td class="k">GSTIN *</td><td class="v">{{ supplier_po.supplier_gstin ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">PAN</td><td class="v">{{ supplier_po.supplier_pan ?: '—' }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ supplier_po.supplier_contact_person ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Phone *</td><td class="v">{{ supplier_po.supplier_phone ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Supplier Type *</td><td class="v">{{ supplier_po.supplier_type ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ supplier_po.supplier_contact_person ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Phone *</td><td class="v">{{ supplier_po.supplier_phone ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Supplier Type *</td><td class="v">{{ supplier_po.supplier_type ?: 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">3. MATERIAL SPECIFICATIONS &nbsp;(All fields mandatory — no exceptions)</div>
 <div class="banner banner-red" style="text-align:left; font-size:9pt;">&#9888;&nbsp; <strong>All specifications below are binding.</strong> <span style="font-weight:normal; color:#5A1414;">Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.</span></div>
 <table class="kv">
-  <tr><td class="k">Material / Stone Type *</td><td class="v">{{ supplier_po.material_stone_type ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Material / Stone Type *</td><td class="v">{{ supplier_po.material_stone_type ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Grade *</td><td class="v">{{ supplier_po.grade }} only — no mixed grades, no seconds</td></tr>
-  <tr><td class="k">Surface Finish *</td><td class="v">{{ supplier_po.surface_finish ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Dimensions *</td><td class="v">{{ supplier_po.dimensions ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Surface Finish *</td><td class="v">{{ supplier_po.surface_finish ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Dimensions *</td><td class="v">{{ supplier_po.dimensions ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Dimensional Tolerance</td><td class="v">{{ supplier_po.dimensional_tolerance ?: '±2 mm on L and W · ±0.5 mm on thickness' }}</td></tr>
   <tr><td class="k">Quantity *</td><td class="v">{{ supplier_po.quantity }}</td></tr>
-  <tr><td class="k">Unit *</td><td class="v">{{ supplier_po.unit ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Unit *</td><td class="v">{{ supplier_po.unit ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Colour Reference</td><td class="v">{{ supplier_po.colour_reference }}</td></tr>
-  <tr><td class="k">Special Requirements</td><td class="v">{{ supplier_po.special_requirements }}</td></tr>
 </table>
+
+{% if supplier_po.special_requirements %}
+<div class="section-title-highlight">SPECIAL REQUIREMENTS / INSTRUCTIONS</div>
+<div class="box-highlight-amber">{{ supplier_po.special_requirements }}</div>
+{% endif %}
 
 <div class="section-title">4. COMMERCIAL TERMS</div>
 <table class="kv" style="table-layout:fixed;">
@@ -90,8 +94,8 @@
 
 <div class="section-title">5. DELIVERY TERMS</div>
 <table class="kv">
-  <tr><td class="k">Delivery Location *</td><td class="v">{{ supplier_po.delivery_location ?: 'TBC' }}</td></tr>
-  <tr><td class="k">Required Delivery Date *</td><td class="v">{{ supplier_po.required_delivery_date ?: 'TBC' }}</td></tr>
+  <tr><td class="k">Delivery Location *</td><td class="v">{{ supplier_po.delivery_location ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Required Delivery Date *</td><td class="v">{{ supplier_po.required_delivery_date ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Delivery Confirmation</td><td class="v">Supplier must confirm delivery readiness in writing (WhatsApp acceptable) at least 7 days before the required delivery date.</td></tr>
   <tr><td class="k">Time is of the Essence</td><td class="v">Delivery by the agreed date is of the essence of this Purchase Order. Failure to deliver by the agreed date may result in cancellation of this PO and / or recovery of losses incurred by NexaCrest as a result of the delay, including but not limited to demurrage, vessel rebooking charges and buyer penalties.</td></tr>
   <tr><td class="k">Packing *</td><td class="v">{{ supplier_po.packing_requirement }}</td></tr>

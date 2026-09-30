@@ -204,6 +204,7 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .product-row{display:grid;grid-template-columns:2fr 1fr 1fr 0.8fr 0.8fr 0.9fr 0.8fr auto;gap:0.5rem;align-items:end;margin-bottom:0.6rem;}
 .product-row label{margin-bottom:0.2rem;font-size:0.72rem;}
 .product-row input{margin-top:0;}
+.product-row-actions{display:flex;gap:0.35rem;}
 .remove-row{background:var(--danger);padding:0.5rem 0.7rem;}
 .remove-row:hover{background:#7e3221;}
 .stage-track{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.65rem;margin-bottom:1.25rem;}
@@ -245,6 +246,28 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .kv-grid div span.v{font-weight:700;}
 .doc-pill{display:inline-block;padding:0.15rem 0.6rem;border-radius:999px;font-size:0.7rem;font-weight:600;background:var(--navy-soft);color:var(--navy);margin-left:0.4rem;}
 
+/* --- Order detail page: Concept C sidebar + single-panel layout.
+   Sidebar and panel-switching are JS-built progressive enhancement: the
+   ".js-enabled" class is only added once the script below successfully
+   builds the nav, so with JS disabled/failed every section still renders,
+   one after another, exactly as before this redesign. --- */
+.order-layout{display:flex;gap:1.75rem;align-items:flex-start;}
+.order-sidebar{flex:0 0 220px;position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow-y:auto;border-right:1px solid var(--line);padding-right:0.9rem;display:none;}
+.order-layout.js-enabled .order-sidebar{display:block;}
+.order-sidebar-link{display:block;width:100%;text-align:left;background:none;border:none;border-left:3px solid transparent;padding:0.5rem 0.7rem;margin-bottom:2px;border-radius:0 8px 8px 0;font-size:0.82rem;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+.order-sidebar-link:hover{background:var(--navy-soft);color:var(--navy);}
+.order-sidebar-link.active{background:var(--navy-soft);color:var(--navy);border-left-color:var(--gold);}
+.order-panels{flex:1;min-width:0;}
+.order-layout.js-enabled .order-panels > .section{display:none;}
+.order-layout.js-enabled .order-panels > .section.active-panel{display:block;}
+@media (max-width:900px){
+  .order-sidebar{position:static;max-height:none;border-right:none;border-bottom:1px solid var(--line);padding-right:0;padding-bottom:0.6rem;flex-wrap:wrap;gap:4px;}
+  .order-layout.js-enabled .order-sidebar{display:flex;}
+  .order-layout{flex-direction:column;}
+  .order-sidebar-link{width:auto;border-left:none;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;}
+  .order-sidebar-link.active{border-left-color:transparent;border-bottom-color:var(--gold);}
+}
+
 /* --- Phase E: dashboard / reports --- */
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:1rem;}
 .stat-tile{border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:12px;padding:1rem 1.1rem;background:#fff;}
@@ -284,6 +307,7 @@ a.entity-card:hover{text-decoration:none;}
 .tag{font-size:0.66rem;font-weight:700;padding:0.2rem 0.55rem;border-radius:6px;white-space:nowrap;}
 .tag-gold{color:var(--gold-strong);background:var(--gold-soft);}
 .tag-navy{color:var(--navy);background:var(--navy-soft);}
+.tag-hint{font-size:0.66rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:6px;white-space:nowrap;color:var(--ink-soft);background:var(--bg);border:1px solid var(--line);margin-left:0.35rem;}
 .mini-stage-track{display:flex;gap:3px;margin-bottom:0.4rem;}
 .mini-stage-seg{flex:1;height:5px;border-radius:3px;background:var(--line);}
 .mini-stage-seg.filled{background:var(--gold);}

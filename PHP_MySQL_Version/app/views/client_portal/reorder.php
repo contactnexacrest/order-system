@@ -21,7 +21,7 @@
           <label>Dimensions<input type="text" name="product_dimensions[<?= $idx ?>]" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
           <label>Finish<input type="text" name="product_finish[<?= $idx ?>]" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
           <label>Qty<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
-          <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty TBC</label>
+          <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
           <label>Unit<input type="text" name="product_unit[<?= $idx ?>]" value="<?= htmlspecialchars($p['unit'] ?? '') ?>" placeholder="SQM/PCS"></label>
           <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
         </div>

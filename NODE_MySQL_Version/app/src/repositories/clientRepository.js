@@ -44,7 +44,7 @@ async function create(data, createdBy, clientUniqueNumber) {
       email: data.email ?? null,
       phone: data.phone ?? null,
       country_of_destination: data.country_of_destination ?? null,
-      coo_type: data.coo_type ?? 'TBC',
+      coo_type: data.coo_type ?? 'To Be Confirmed',
       notify_party: data.notify_party ?? null,
       created_by: createdBy,
     }

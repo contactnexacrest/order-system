@@ -93,7 +93,7 @@ final class DocumentRepository
      * 'QT' or 'PI') for an order, purely to expose its document_reference
      * for cross-referencing on a later-stage document (PI shows the QT ref,
      * OC shows the PI ref). Returns null if that document hasn't been
-     * generated yet — callers render 'TBC'/'—' rather than fail.
+     * generated yet — callers render 'To Be Confirmed'/'—' rather than fail.
      */
     public static function findLatestForOrderAndTypeCode(int $orderId, string $documentTypeCode): ?array
     {

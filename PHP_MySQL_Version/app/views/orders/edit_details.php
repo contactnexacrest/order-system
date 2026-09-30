@@ -40,7 +40,7 @@
       </label>
       <label>Certificate of Origin Type
         <select name="coo_type">
-          <option value="">— TBC —</option>
+          <option value="">— To Be Confirmed —</option>
           <?php foreach ($cooTypes as $o): ?>
             <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['option_value'] === $order['coo_type'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
           <?php endforeach; ?>
@@ -74,7 +74,7 @@
       </label>
       <label>Container Type
         <select name="container_type">
-          <option value="">— TBC —</option>
+          <option value="">— To Be Confirmed —</option>
           <?php foreach ($containerTypes as $o): ?>
             <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['option_value'] === $order['container_type'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
           <?php endforeach; ?>
@@ -102,7 +102,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Special Requirements</legend>
+      <legend>Special Requirements/Instructions</legend>
       <textarea name="special_requirements" rows="2"><?= htmlspecialchars($order['special_requirements'] ?? '') ?></textarea>
     </fieldset>
 

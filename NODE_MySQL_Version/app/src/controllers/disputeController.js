@@ -4,6 +4,7 @@ const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const disputeDocumentRepository = require('../repositories/disputeDocumentRepository');
+const disputeReplyRepository = require('../repositories/disputeReplyRepository');
 const disputeRepository = require('../repositories/disputeRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderRepository = require('../repositories/orderRepository');
@@ -45,16 +46,49 @@ async function forOrder(req, res) {
     return;
   }
 
+  const disputes = await disputeRepository.forOrder(orderId);
+  const replies = {};
+  for (const d of disputes) {
+    replies[d.id] = await disputeReplyRepository.forDispute(d.id);
+  }
+
+  const permissions = req.permissions || {};
+
   res.renderView(
     'disputes/order',
     {
       order,
-      disputes: await disputeRepository.forOrder(orderId),
+      disputes,
+      replies,
+      canManage: !!permissions.manage_disputes,
+      canRespond: !!permissions.respond_to_disputes,
       users: await userRepository.listActive(),
       statusOptions: await lookupRepository.dropdownOptions('dispute_status'),
     },
     'layout/base'
   );
+}
+
+async function postReply(req, res) {
+  const disputeId = parseInt(req.params.disputeId, 10);
+  const dispute = await disputeRepository.find(disputeId);
+  if (!dispute) {
+    res.status(404).send('Dispute not found.');
+    return;
+  }
+
+  const body = String(req.body.body || '').trim();
+  if (body === '') {
+    flash.set(req, 'error', 'Write a reply before posting.');
+    res.redirect(`/orders/${dispute.order_id}/disputes`);
+    return;
+  }
+
+  await disputeReplyRepository.create(disputeId, req.user.id, body);
+  await auditLogRepository.log(req.user.id, 'DISPUTE_REPLY_POSTED', 'disputes', disputeId);
+
+  flash.set(req, 'success', 'Reply posted.');
+  res.redirect(`/orders/${dispute.order_id}/disputes`);
 }
 
 async function create(req, res) {
@@ -149,4 +183,4 @@ async function uploadDocument(req, res) {
   res.redirect(`/orders/${dispute.order_id}/disputes`);
 }
 
-module.exports = { index, forOrder, create, updateStatus, uploadDocument };
+module.exports = { index, forOrder, create, updateStatus, uploadDocument, postReply };
