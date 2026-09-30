@@ -551,8 +551,65 @@ async function conversion(req, res) {
   );
 }
 
+/** @returns {[string,string]|null} [dateFrom, dateTo] for a named preset, calendar-based (not fiscal year) */
+function presetRange(preset) {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth(); // 0-based
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const lastDayOfMonth = (year, month) => new Date(Date.UTC(year, month + 1, 0));
+  const firstDayOfMonth = (year, month) => new Date(Date.UTC(year, month, 1));
+
+  switch (preset) {
+    case 'this_month':
+      return [fmt(firstDayOfMonth(y, m)), fmt(lastDayOfMonth(y, m))];
+    case 'last_month':
+      return [fmt(firstDayOfMonth(y, m - 1)), fmt(lastDayOfMonth(y, m - 1))];
+    case 'this_quarter':
+    case 'last_quarter': {
+      let quarterStartMonth = Math.floor(m / 3) * 3;
+      if (preset === 'last_quarter') quarterStartMonth -= 3;
+      return [fmt(firstDayOfMonth(y, quarterStartMonth)), fmt(lastDayOfMonth(y, quarterStartMonth + 2))];
+    }
+    case 'this_half_year':
+    case 'last_half_year': {
+      let halfStartMonth = m <= 5 ? 0 : 6;
+      if (preset === 'last_half_year') halfStartMonth -= 6;
+      return [fmt(firstDayOfMonth(y, halfStartMonth)), fmt(lastDayOfMonth(y, halfStartMonth + 5))];
+    }
+    case 'this_year':
+      return [`${y}-01-01`, `${y}-12-31`];
+    case 'last_year':
+      return [`${y - 1}-01-01`, `${y - 1}-12-31`];
+    default:
+      return null;
+  }
+}
+
+/**
+ * Sales Performance report — quotations/PIs sent, win/loss counts and
+ * rate, FOB value won, and every lost order's own reason, for any
+ * period, with an automatic comparison against the immediately
+ * preceding period of equal length. A `preset` query param fills in
+ * date_from/date_to for the common cases without a separate UI per
+ * period — the underlying report is always just a date range.
+ */
+async function performance(req, res) {
+  const preset = str(req.query.preset);
+  const preRange = preset !== '' ? presetRange(preset) : null;
+
+  const dateFrom = preRange ? preRange[0] : (str(req.query.date_from) || null);
+  const dateTo = preRange ? preRange[1] : (str(req.query.date_to) || null);
+
+  res.renderView(
+    'reports/performance',
+    { report: await reportRepository.salesPerformanceReport(dateFrom, dateTo), filters: { dateFrom, dateTo, preset } },
+    'layout/base'
+  );
+}
+
 module.exports = {
   index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
   payments, disputes, amendments, trends, staff, ageing, freightCost, products, suppliers, conversion,
-  profitability,
+  profitability, performance, presetRange,
 };

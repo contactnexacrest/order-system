@@ -1,0 +1,54 @@
+<div class="card page-wide">
+  <h1>Logistics Partners — CHA &amp; Transportation</h1>
+  <p class="muted">The directory of Customs House Agent and transportation contacts staff use when placing or coordinating shipments. The same company sometimes provides both services — a partner is tagged CHA, Transportation, or both rather than entered twice.</p>
+
+  <div class="section">
+    <form method="get" action="/logistics-partners" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <label style="display:inline-block;width:auto;">Filter
+        <select name="service_type" onchange="this.form.submit()">
+          <option value="">All partners</option>
+          {% for key, label in serviceTypes %}
+            <option value="{{ key }}" {% if filterServiceType == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% if filterServiceType != '' %}<a href="/logistics-partners" class="btn-sm btn-secondary">Clear filter</a>{% endif %}
+      <a href="/logistics-partners/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Partner</a>
+    </form>
+
+    <table class="list">
+      <tr><th>Partner</th><th>Service</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr>
+      {% if partners.length == 0 %}
+      <tr><td colspan="8" class="muted">No logistics partners yet — add the first one above.</td></tr>
+      {% endif %}
+      {% for p in partners %}
+      <tr>
+        <td>{{ p.partner_name }}{% if p.email %}<br><small class="muted">{{ p.email }}</small>{% endif %}</td>
+        <td>{{ serviceTypes[p.service_type] or p.service_type }}</td>
+        <td>{% if p.city or p.state %}{{ p.city or '' }}{% if p.city and p.state %}, {% endif %}{{ p.state or '' }}{% else %}—{% endif %}</td>
+        <td>
+          {{ p.phone or '—' }}
+          {% if p.whatsapp_number %}<br><small class="muted">WhatsApp: {{ p.whatsapp_number }}</small>{% endif %}
+        </td>
+        <td>
+          {{ p.contact_person_name or '—' }}
+          {% if p.contact_person_phone %}<br><small class="muted">{{ p.contact_person_phone }}</small>{% endif %}
+        </td>
+        <td>{{ p.gstin or '—' }}</td>
+        <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
+        <td>
+          <a href="/logistics-partners/{{ p.id }}/edit" class="btn-sm btn-secondary">Edit</a>
+          <form method="post" action="/logistics-partners/{{ p.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if p.is_active else 'Reactivate' }} {{ p.partner_name }}?');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm {{ 'btn-danger' if p.is_active else 'btn-success' }}">{{ 'Deactivate' if p.is_active else 'Reactivate' }}</button>
+          </form>
+          <form method="post" action="/logistics-partners/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete {{ p.partner_name }} from the directory? This cannot be undone.');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

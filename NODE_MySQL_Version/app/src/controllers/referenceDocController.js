@@ -230,8 +230,17 @@ async function customDownload(req, res) {
   // eslint-disable-next-line no-control-regex
   safeDownloadName = safeDownloadName.replace(/[\x00-\x1F\x7F"]/g, '');
 
+  // A raw non-ASCII byte (e.g. an em dash — Quarry SOP — Block Selection)
+  // in a bare filename="..." isn't valid Latin-1 header content — Node's
+  // http module throws ("Invalid character in header content") rather
+  // than send it, which took the whole download down. The RFC 6266
+  // filename* parameter carries the real UTF-8 name percent-encoded, with
+  // an ASCII fallback in filename= for any client that ignores it.
+  // eslint-disable-next-line no-control-regex
+  const asciiDownloadName = safeDownloadName.replace(/[^\x20-\x7E]/g, '_');
+
   res.setHeader('Content-Type', doc.file_mime_type || 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${safeDownloadName}"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiDownloadName}"; filename*=UTF-8''${encodeURIComponent(safeDownloadName)}`);
   fs.createReadStream(doc.file_path).pipe(res);
 }
 

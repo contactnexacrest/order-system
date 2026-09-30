@@ -47,6 +47,7 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <div class="btn-row">
       <a class="btn-sm" href="/reports/trends">Open Trends</a>
       <a class="btn-sm" href="/reports/conversion">Open Conversion Rate Report</a>
+      <a class="btn-sm" href="/reports/performance">Open Sales Performance Report</a>
     </div>
   </div>
 

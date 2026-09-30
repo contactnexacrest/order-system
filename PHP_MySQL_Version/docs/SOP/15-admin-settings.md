@@ -87,6 +87,27 @@ mistake (or malice).
   until a fresh image is re-uploaded — this replaced an earlier gap where
   such a save could succeed and every subsequent PDF would quietly show
   the text watermark only, with nothing indicating why.
+- **Logistics Partners** — the CHA (Customs House Agent) and transportation
+  contact directory, gated by its own `manage_logistics_partners`
+  permission (same tier as HS Codes: Admin/MD/ED and Super Admin by
+  default). Each partner carries a **Service Type** — CHA only,
+  Transportation only, or **CHA + Transportation** — since the same
+  company sometimes handles both and sometimes only one; a "both" partner
+  shows up whichever way staff filter the list. Alongside name/address/
+  city/state, every entry can carry a WhatsApp number and phone for both
+  the company and a named contact person, plus GSTIN and PAN for the
+  paperwork side. This directory is standalone for now — a quick
+  "who do we call for this" lookup — not yet wired into a specific order
+  or Order Cost Entry.
+- **Reference Library** (`/reference-docs`) — any authenticated staff
+  member can view and download every entry here; adding, deleting, or
+  re-uploading a file requires `manage_company_settings`, the same gate
+  as Company Settings itself. Alongside the system's own fixed reference
+  documents (SOPs, the Stage Gate Reference, the Cross-Verification
+  Checklist), this is where documents a client might ask to see to verify
+  the business live — the Factory SOP, Quarry SOP, Factory Processing
+  Agreement template, and Quarry Block Supply Agreement template are the
+  first four seeded here, each downloadable straight from the list.
 - **Assets** — logo, company seal, and signature images used across every
   document template.
 - **Signatories** — which users are eligible to sign which document types,

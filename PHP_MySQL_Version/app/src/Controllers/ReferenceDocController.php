@@ -257,11 +257,26 @@ final class ReferenceDocController
             return;
         }
 
-        $safeDownloadName = str_replace(['/', '\\'], '-', (string) ($doc['file_original_name'] ?? 'file'));
-        $safeDownloadName = preg_replace('/[\x00-\x1F\x7F"]/', '', $safeDownloadName);
-
         header('Content-Type: ' . ($doc['file_mime_type'] ?: 'application/octet-stream'));
-        header('Content-Disposition: attachment; filename="' . $safeDownloadName . '"');
+        header('Content-Disposition: ' . self::contentDispositionHeaderValue((string) ($doc['file_original_name'] ?? 'file')));
         readfile($doc['file_path']);
+    }
+
+    /**
+     * A raw non-ASCII byte (e.g. an em dash — Quarry SOP — Block
+     * Selection) in a bare filename="..." is outside what an HTTP header
+     * value may legally contain; browsers vary in how they recover, from
+     * mojibake to (on stricter servers/runtimes) an outright error. The
+     * RFC 6266 filename* parameter carries the real UTF-8 name
+     * percent-encoded, with an ASCII-only fallback kept in filename= for
+     * any client that ignores it.
+     */
+    public static function contentDispositionHeaderValue(string $originalName): string
+    {
+        $safeDownloadName = str_replace(['/', '\\'], '-', $originalName);
+        $safeDownloadName = preg_replace('/[\x00-\x1F\x7F"]/', '', $safeDownloadName);
+        $asciiDownloadName = preg_replace('/[^\x20-\x7E]/', '_', $safeDownloadName);
+
+        return 'attachment; filename="' . $asciiDownloadName . '"; filename*=UTF-8\'\'' . rawurlencode($safeDownloadName);
     }
 }

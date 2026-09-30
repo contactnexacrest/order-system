@@ -1252,6 +1252,167 @@ async function conversionRateReport(dateFrom, dateTo) {
   };
 }
 
+// ================================================================
+// SALES PERFORMANCE REPORT — "how are we doing, and compared to what."
+// Reuses funnelActivity()'s own counts (never a second, divergent
+// definition of sent/won/lost) and adds: a win rate, the FOB value of
+// orders that reached PI in the period (by currency — never summed
+// across currencies), the individual lost orders with their own reason
+// text (lost_reason is free text, so this lists each one rather than
+// inventing a category scheme nobody asked for), and, when both
+// dateFrom and dateTo are given, the same metrics for the immediately
+// preceding period of equal length, with a % change per metric.
+// ================================================================
+
+async function ordersCreatedCount(dateFrom, dateTo) {
+  const clauses = ['is_test_data = :is_test_data'];
+  const params = { is_test_data: await isTestModeFlag() };
+  if (dateFrom) {
+    clauses.push('DATE(created_at) >= :date_from');
+    params.date_from = dateFrom;
+  }
+  if (dateTo) {
+    clauses.push('DATE(created_at) <= :date_to');
+    params.date_to = dateTo;
+  }
+  const row = await db.queryOne(`SELECT COUNT(*) AS n FROM orders WHERE ${clauses.join(' AND ')}`, params);
+  return Number(row?.n ?? 0);
+}
+
+/** @returns {Promise<Object<string, number>>} currency code => total FOB value of orders that reached PI (pi_date) in the period */
+async function fobWonByCurrency(dateFrom, dateTo) {
+  const clauses = [
+    `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`,
+    'o.is_test_data = :is_test_data',
+  ];
+  const params = { is_test_data: await isTestModeFlag() };
+  if (dateFrom) {
+    clauses.push('o.pi_date >= :date_from');
+    params.date_from = dateFrom;
+  }
+  if (dateTo) {
+    clauses.push('o.pi_date <= :date_to');
+    params.date_to = dateTo;
+  }
+  const rows = await db.query(
+    `SELECT cur.code AS cc, (SELECT COALESCE(SUM(fob_value), 0) FROM order_products WHERE order_id = o.id AND is_active = 1) AS total_fob_value
+       FROM orders o
+       JOIN currencies cur ON cur.id = o.currency_id
+      WHERE ${clauses.join(' AND ')}`,
+    params
+  );
+  const byCurrency = {};
+  for (const row of rows) {
+    byCurrency[row.cc] = (byCurrency[row.cc] ?? 0) + Number(row.total_fob_value);
+  }
+  return byCurrency;
+}
+
+/** @returns {Promise<Array<Object>>} every order marked lost in the period, newest first, with its own reason text */
+async function lostOrdersDetail(dateFrom, dateTo) {
+  const reachedClause = `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`;
+  const clauses = [`o.status = 'lost'`, 'o.is_test_data = :is_test_data'];
+  const params = { is_test_data: await isTestModeFlag() };
+  if (dateFrom) {
+    clauses.push('DATE(o.lost_at) >= :date_from');
+    params.date_from = dateFrom;
+  }
+  if (dateTo) {
+    clauses.push('DATE(o.lost_at) <= :date_to');
+    params.date_to = dateTo;
+  }
+  const rows = await db.query(
+    `SELECT o.id, o.order_reference, c.company_legal_name, o.lost_at, o.lost_reason,
+            ${reachedClause} AS reached_pi
+       FROM orders o
+       JOIN clients c ON c.id = o.client_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY o.lost_at DESC`,
+    params
+  );
+  return rows.map((r) => ({ ...r, reached_pi: !!r.reached_pi }));
+}
+
+async function performancePeriod(dateFrom, dateTo) {
+  const funnel = await funnelActivity(dateFrom, dateTo);
+  const quotationsSent = funnel.quotationsSent;
+  const won = funnel.quotationsWon;
+  const lostBeforePi = funnel.quotationsLost;
+  const lostAfterPi = funnel.piLost;
+
+  const [ordersCreated, fobByCurrency] = await Promise.all([
+    ordersCreatedCount(dateFrom, dateTo),
+    fobWonByCurrency(dateFrom, dateTo),
+  ]);
+
+  return {
+    orders_created: ordersCreated,
+    quotations_sent: quotationsSent,
+    pi_sent: funnel.piSent,
+    won,
+    lost_before_pi: lostBeforePi,
+    lost_after_pi: lostAfterPi,
+    lost_total: lostBeforePi + lostAfterPi,
+    win_rate_pct: quotationsSent > 0 ? round2((100 * won) / quotationsSent) : null,
+    fob_won_by_currency: fobByCurrency,
+  };
+}
+
+/**
+ * @returns {[string,string]|null} [prevFrom, prevTo], the same number of
+ *   days immediately before dateFrom — null when either bound is missing,
+ *   since "previous period" is only meaningful for a fully bounded range.
+ */
+function previousPeriodRange(dateFrom, dateTo) {
+  if (!dateFrom || !dateTo) {
+    return null;
+  }
+  const from = new Date(`${dateFrom}T00:00:00Z`);
+  const to = new Date(`${dateTo}T00:00:00Z`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+    return null;
+  }
+  const days = Math.round((to - from) / 86400000) + 1;
+  const prevTo = new Date(from.getTime() - 86400000);
+  const prevFrom = new Date(prevTo.getTime() - (days - 1) * 86400000);
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  return [fmt(prevFrom), fmt(prevTo)];
+}
+
+/** @returns {number|null} percentage change from previous to current — null when previous is 0 (undefined/"new") or either is missing */
+function pctChange(current, previous) {
+  if (current === null || current === undefined || previous === null || previous === undefined || previous === 0) {
+    return null;
+  }
+  return round2((100 * (current - previous)) / previous);
+}
+
+async function salesPerformanceReport(dateFrom, dateTo) {
+  const current = await performancePeriod(dateFrom, dateTo);
+
+  let previous = null;
+  const previousRange = previousPeriodRange(dateFrom, dateTo);
+  if (previousRange !== null) {
+    previous = await performancePeriod(previousRange[0], previousRange[1]);
+  }
+
+  let comparison = null;
+  if (previous !== null) {
+    comparison = {};
+    for (const key of ['orders_created', 'quotations_sent', 'pi_sent', 'won', 'lost_total', 'win_rate_pct']) {
+      comparison[key] = pctChange(current[key], previous[key]);
+    }
+  }
+
+  return {
+    current,
+    previous,
+    previous_range: previousRange,
+    comparison,
+    lost_orders: await lostOrdersDetail(dateFrom, dateTo),
+  };
+}
+
 /**
  * Order Profitability Sheet, rolled up (docs/schema.sql Section AP) — "for
  * every export order... per order/per month/per quarter/per six
@@ -1344,4 +1505,5 @@ module.exports = {
   supplierPerformanceReport,
   conversionRateReport,
   orderProfitabilityReport,
+  salesPerformanceReport,
 };

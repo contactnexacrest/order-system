@@ -1,0 +1,33 @@
+<div class="card page-wide">
+  <p class="muted small"><a href="/logistics-partners">&larr; Back to Logistics Partners</a></p>
+  <h1>Edit Logistics Partner — {{ partner.partner_name }}</h1>
+  <form method="post" action="/logistics-partners/{{ partner.id }}/update">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="kv-grid">
+      <label>Partner / Company Name * <input type="text" name="partner_name" value="{{ partner.partner_name }}" required></label>
+      <label>Service Type *
+        <select name="service_type" required>
+          {% for key, label in serviceTypes %}
+            <option value="{{ key }}" {% if partner.service_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Address <input type="text" name="address" value="{{ partner.address or '' }}"></label>
+      <label>City <input type="text" name="city" value="{{ partner.city or '' }}"></label>
+      <label>State <input type="text" name="state" value="{{ partner.state or '' }}"></label>
+      <label>Phone <input type="text" name="phone" value="{{ partner.phone or '' }}"></label>
+      <label>WhatsApp Number <input type="text" name="whatsapp_number" value="{{ partner.whatsapp_number or '' }}"></label>
+      <label>Email <input type="email" name="email" value="{{ partner.email or '' }}"></label>
+      <label>Contact Person — Name <input type="text" name="contact_person_name" value="{{ partner.contact_person_name or '' }}"></label>
+      <label>Contact Person — Phone <input type="text" name="contact_person_phone" value="{{ partner.contact_person_phone or '' }}"></label>
+      <label>Contact Person — WhatsApp <input type="text" name="contact_person_whatsapp" value="{{ partner.contact_person_whatsapp or '' }}"></label>
+      <label>GSTIN <input type="text" name="gstin" value="{{ partner.gstin or '' }}"></label>
+      <label>PAN <input type="text" name="pan" value="{{ partner.pan or '' }}"></label>
+    </div>
+    <label>Notes <textarea name="notes" rows="3">{{ partner.notes or '' }}</textarea></label>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm btn-success">Save Changes</button>
+      <a href="/logistics-partners" class="btn-sm btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>

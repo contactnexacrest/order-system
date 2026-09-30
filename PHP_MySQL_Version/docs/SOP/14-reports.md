@@ -32,28 +32,30 @@ Everything starts from the **Reports** hub:
 
   ![Payments Report — summary by currency, backed by the exact order detail below it](./images/reports_payments.png)
 
-- **Debtors / Receivables Ageing Report** — every outstanding (not yet
-  cleared) advance, balance, or freight leg, bucketed by how overdue it is:
-  Current, 1-30, 31-60, 61-90, 90+ days. Advance and freight are counted
-  overdue from the order's own creation date (due promptly once invoiced);
-  balance uses its own computed due date when the payment preset sets one.
 - **Dispute Report** / **Amendment Report** — status and aging breakdowns
   across every order, not just one at a time.
 - **Trends** — orders created, quotations/PI sent, lost, and FOB value,
   month over month for the last 12 months.
-- **Conversion Rate Report** — the same underlying activity as Operations
-  Queues' funnel section, shown as the percentages a sales lead actually
-  wants at a glance (Quotation &rarr; PI, PI &rarr; Confirmed Order) rather
-  than raw counts.
-- **Freight Cost Report** — confirmed freight/insurance terms and invoiced
-  freight, rolled up by forwarder.
-- **Product / HS-Code Sales Report** — which products/HS codes actually
-  drive FOB value, ranked highest first.
-- **Supplier Performance Report** — per supplier: PO count, average days
-  from PO creation to signature, and on-time delivery rate (packing date
-  vs. the PO's required delivery date — the closest available proxy for
-  "material received on time," since the system has no separate
-  goods-receipt timestamp).
+- **Sales Performance Report** — the KPI/growth view: for any period (a
+  preset — This/Last Month, This/Last Quarter, This/Last Half-Year,
+  This/Last Year — or a custom date range), how many orders were created,
+  quotations and PIs sent, how many were **won** and how many **lost**,
+  the win rate, and the FOB value won by currency (currencies are never
+  summed together). "Won" means **reached the PI stage** — the same
+  sent/won/lost counts every other funnel-based report in this module
+  already uses, never a second, divergent definition. A lost order is
+  split into **lost before PI** vs. **lost after PI** (losing a live PI is
+  a different problem than losing a quotation), and every individual lost
+  order is listed with its own reason exactly as recorded — this report
+  never invents a fixed category scheme for why an order was lost, since
+  the reason is free text a staff member typed at the time. When both
+  Date From and Date To are set, the report automatically compares against
+  the **immediately preceding period of equal length** (e.g. This Month
+  vs. Last Month, or a custom 15-day range vs. the 15 days before it) and
+  shows a ▲/▼ percentage change per metric — a metric with nothing in the
+  previous period shows "—" rather than a fake infinite percentage. This
+  is the report to open when asking "how are we actually doing, and is it
+  getting better or worse."
 - **Staff Productivity** — documents generated and audit-log activity per
   user (requires the separate `view_staff_reports` permission — this one
   isn't available to every role by default, unlike the others).

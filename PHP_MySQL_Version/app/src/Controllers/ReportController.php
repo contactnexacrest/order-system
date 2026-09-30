@@ -541,4 +541,64 @@ final class ReportController
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
         ], 'layout/base');
     }
+
+    /**
+     * Sales Performance report — quotations/PIs sent, win/loss counts and
+     * rate, FOB value won, and every lost order's own reason, for any
+     * period, with an automatic comparison against the immediately
+     * preceding period of equal length. A `preset` query param (see
+     * presetRange()) fills in date_from/date_to for the common cases
+     * ("This Month", "Last Quarter", ...) without a separate UI per
+     * period — the underlying report is always just a date range.
+     */
+    public function performance(array $params): void
+    {
+        $preset = trim((string) ($_GET['preset'] ?? ''));
+        $presetRange = $preset !== '' ? self::presetRange($preset) : null;
+
+        $dateFrom = $presetRange[0] ?? (trim((string) ($_GET['date_from'] ?? '')) ?: null);
+        $dateTo = $presetRange[1] ?? (trim((string) ($_GET['date_to'] ?? '')) ?: null);
+
+        View::render('reports/performance', [
+            'report' => ReportRepository::salesPerformanceReport($dateFrom, $dateTo),
+            'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'preset' => $preset],
+        ], 'layout/base');
+    }
+
+    /** @return array{0:string,1:string}|null [dateFrom, dateTo] for a named preset, calendar-based (not fiscal year) */
+    private static function presetRange(string $preset): ?array
+    {
+        $today = new \DateTimeImmutable('today');
+        switch ($preset) {
+            case 'this_month':
+                return [$today->modify('first day of this month')->format('Y-m-d'), $today->modify('last day of this month')->format('Y-m-d')];
+            case 'last_month':
+                return [$today->modify('first day of last month')->format('Y-m-d'), $today->modify('last day of last month')->format('Y-m-d')];
+            case 'this_quarter':
+            case 'last_quarter':
+                $quarterStartMonth = (int) (ceil(((int) $today->format('n')) / 3) - 1) * 3 + 1;
+                $start = $today->modify('first day of this month')->setDate((int) $today->format('Y'), $quarterStartMonth, 1);
+                if ($preset === 'last_quarter') {
+                    $start = $start->modify('-3 months');
+                }
+                $end = $start->modify('+2 months')->modify('last day of this month');
+                return [$start->format('Y-m-d'), $end->format('Y-m-d')];
+            case 'this_half_year':
+            case 'last_half_year':
+                $halfStartMonth = ((int) $today->format('n')) <= 6 ? 1 : 7;
+                $start = $today->setDate((int) $today->format('Y'), $halfStartMonth, 1);
+                if ($preset === 'last_half_year') {
+                    $start = $start->modify('-6 months');
+                }
+                $end = $start->modify('+5 months')->modify('last day of this month');
+                return [$start->format('Y-m-d'), $end->format('Y-m-d')];
+            case 'this_year':
+                return [$today->format('Y') . '-01-01', $today->format('Y') . '-12-31'];
+            case 'last_year':
+                $lastYear = ((int) $today->format('Y')) - 1;
+                return [$lastYear . '-01-01', $lastYear . '-12-31'];
+            default:
+                return null;
+        }
+    }
 }

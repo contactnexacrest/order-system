@@ -2507,6 +2507,45 @@ CREATE TABLE order_cost_entries (
 -- ================================================================
 
 -- ================================================================
+-- SECTION AQ — LOGISTICS PARTNERS DIRECTORY (CHA / TRANSPORTATION)
+-- (added 2026-10-01)
+-- ================================================================
+-- A CHA (Customs House Agent) and a transporter are sometimes the same
+-- company and sometimes two separate ones — service_type records which
+-- service(s) a given partner actually provides, rather than forcing a
+-- combined provider to be entered twice as two unrelated rows. Standalone
+-- master data, like suppliers/hs_codes: not yet linked to a specific
+-- order or cost entry (deliberately, per the initial scope — see
+-- docs/SOP), and so carries neither is_test_data nor is_sample_data,
+-- matching those two tables' own precedent.
+CREATE TABLE logistics_partners (
+  id                       BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  partner_name             VARCHAR(255) NOT NULL,
+  service_type             ENUM('cha','transportation','both') NOT NULL,
+  address                  VARCHAR(500) NULL,
+  city                     VARCHAR(120) NULL,
+  state                    VARCHAR(120) NULL,
+  phone                    VARCHAR(30) NULL,
+  whatsapp_number          VARCHAR(30) NULL,
+  email                    VARCHAR(255) NULL,
+  contact_person_name      VARCHAR(150) NULL,
+  contact_person_phone     VARCHAR(30) NULL,
+  contact_person_whatsapp  VARCHAR(30) NULL,
+  gstin                    VARCHAR(20) NULL,
+  pan                      VARCHAR(20) NULL,
+  notes                    VARCHAR(1000) NULL,
+  is_active                TINYINT(1) NOT NULL DEFAULT 1,
+  created_by               BIGINT UNSIGNED NULL,
+  created_at               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- manage_logistics_partners permission itself is seeded in seed.sql
+-- (permissions + role_permissions), same as every other permission.
+-- ================================================================
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2545,4 +2584,5 @@ CREATE TABLE order_cost_entries (
 -- Section AN (internal-only CA financial annexure) added 2026-09-30.
 -- Section AO (dispute replies + granular dispute permissions) added 2026-09-30.
 -- Section AP (reorder-to-supplier linking + order profitability) added 2026-09-30.
+-- Section AQ (logistics partners directory) added 2026-10-01.
 -- ================================================================

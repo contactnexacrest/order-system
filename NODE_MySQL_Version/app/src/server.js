@@ -72,6 +72,7 @@ const permissionAdminController = require('./controllers/permissionAdminControll
 const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
+const logisticsPartnerController = require('./controllers/logisticsPartnerController');
 const watermarkController = require('./controllers/watermarkController');
 const orderCommentController = require('./controllers/orderCommentController');
 const emailTemplateController = require('./controllers/emailTemplateController');
@@ -370,6 +371,13 @@ app.post('/hs-codes/:id/delete', requireAuth, requirePermission('manage_hs_codes
 app.post('/hs-codes/bulk-import', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.bulkImport));
 app.post('/hs-codes/product-guide', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.importProductGuide));
 app.post('/hs-codes/product-guide/:id/delete', requireAuth, requirePermission('manage_hs_codes'), verifyCsrf, asyncHandler(hsCodeController.deleteProductGuideEntry));
+app.get('/logistics-partners', requireAuth, requirePermission('manage_logistics_partners'), asyncHandler(logisticsPartnerController.index));
+app.get('/logistics-partners/create', requireAuth, requirePermission('manage_logistics_partners'), asyncHandler(logisticsPartnerController.createForm));
+app.post('/logistics-partners', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.create));
+app.get('/logistics-partners/:id/edit', requireAuth, requirePermission('manage_logistics_partners'), asyncHandler(logisticsPartnerController.editForm));
+app.post('/logistics-partners/:id/update', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.update));
+app.post('/logistics-partners/:id/toggle', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.toggleActive));
+app.post('/logistics-partners/:id/delete', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.remove));
 
 app.get('/watermarks', requireAuth, requirePermission('manage_company_settings'), asyncHandler(watermarkController.index));
 app.post('/watermarks/:which', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(watermarkController.update));
@@ -655,6 +663,7 @@ app.get('/reports/freight-cost', requireAuth, requirePermission('view_reports'),
 app.get('/reports/products', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.products));
 app.get('/reports/suppliers', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.suppliers));
 app.get('/reports/conversion', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.conversion));
+app.get('/reports/performance', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.performance));
 app.get('/reports/order-profitability', requireAuth, requirePermission('manage_order_financials'), asyncHandler(reportController.profitability));
 app.post('/reports/save', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.saveDefinition));
 app.get('/reports/saved/:reportId/run', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.runDefinition));

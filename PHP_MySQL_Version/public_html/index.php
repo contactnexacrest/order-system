@@ -27,6 +27,7 @@ use App\Controllers\EmailDispatchController;
 use App\Controllers\FieldProtectionController;
 use App\Controllers\HolidayController;
 use App\Controllers\HsCodeController;
+use App\Controllers\LogisticsPartnerController;
 use App\Controllers\WatermarkController;
 use App\Controllers\ReferenceDocController;
 use App\Controllers\SopController;
@@ -83,6 +84,7 @@ $amendments = new AmendmentController();
 $disputes = new DisputeController();
 $holidays = new HolidayController();
 $hsCodes = new HsCodeController();
+$logisticsPartners = new LogisticsPartnerController();
 $watermarks = new WatermarkController();
 $referenceDocs = new ReferenceDocController();
 $sop = new SopController();
@@ -162,6 +164,14 @@ $router->post('/hs-codes/{id}/delete', [$hsCodes, 'delete'], [SessionAuth::requi
 $router->post('/hs-codes/bulk-import', [$hsCodes, 'bulkImport'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
 $router->post('/hs-codes/product-guide', [$hsCodes, 'importProductGuide'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
 $router->post('/hs-codes/product-guide/{id}/delete', [$hsCodes, 'deleteProductGuideEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_hs_codes'), CsrfCheck::verify()]);
+
+$router->get('/logistics-partners', [$logisticsPartners, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners')]);
+$router->get('/logistics-partners/create', [$logisticsPartners, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners')]);
+$router->post('/logistics-partners', [$logisticsPartners, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+$router->get('/logistics-partners/{id}/edit', [$logisticsPartners, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners')]);
+$router->post('/logistics-partners/{id}/update', [$logisticsPartners, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+$router->post('/logistics-partners/{id}/toggle', [$logisticsPartners, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+$router->post('/logistics-partners/{id}/delete', [$logisticsPartners, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 
 // docs/schema.sql Section AI — email template CRUD (add/edit, never delete).
 $router->get('/email-templates', [$emailTemplates, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates')]);
@@ -444,6 +454,7 @@ $router->get('/reports/products', [$reports, 'products'], [SessionAuth::required
 $router->get('/reports/suppliers', [$reports, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/order-profitability', [$reports, 'profitability'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials')]);
 $router->get('/reports/conversion', [$reports, 'conversion'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/performance', [$reports, 'performance'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->post('/reports/save', [$reports, 'saveDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
 $router->get('/reports/saved/{reportId}/run', [$reports, 'runDefinition'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->post('/reports/saved/{reportId}/update', [$reports, 'updateDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);

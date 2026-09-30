@@ -1412,4 +1412,179 @@ final class ReportRepository
             'overall_quotation_to_confirmed_pct' => $quotationsSent > 0 ? round(100 * ($piSent - $piLost) / $quotationsSent, 1) : null,
         ];
     }
+
+    // ================================================================
+    // SALES PERFORMANCE REPORT — "how are we doing, and compared to what."
+    // Reuses funnelActivity()'s own counts (never a second, divergent
+    // definition of sent/won/lost) and adds: a win rate, the FOB value of
+    // orders that reached PI in the period (by currency — never summed
+    // across currencies), the individual lost orders with their own
+    // reason text (lost_reason is free text, so this lists each one
+    // rather than inventing a category scheme nobody asked for), and,
+    // when both dateFrom and dateTo are given, the same metrics for the
+    // immediately preceding period of equal length, with a % change per
+    // metric — the actual "how did we do compared to last time" ask.
+    // ================================================================
+
+    /** @return array<string,mixed> */
+    public static function salesPerformanceReport(?string $dateFrom, ?string $dateTo): array
+    {
+        $current = self::performancePeriod($dateFrom, $dateTo);
+
+        $previous = null;
+        $previousRange = self::previousPeriodRange($dateFrom, $dateTo);
+        if ($previousRange !== null) {
+            $previous = self::performancePeriod($previousRange[0], $previousRange[1]);
+        }
+
+        $comparison = null;
+        if ($previous !== null) {
+            $comparison = [];
+            foreach (['orders_created', 'quotations_sent', 'pi_sent', 'won', 'lost_total', 'win_rate_pct'] as $key) {
+                $comparison[$key] = self::pctChange($current[$key], $previous[$key]);
+            }
+        }
+
+        return [
+            'current' => $current,
+            'previous' => $previous,
+            'previous_range' => $previousRange,
+            'comparison' => $comparison,
+            'lost_orders' => self::lostOrdersDetail($dateFrom, $dateTo),
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private static function performancePeriod(?string $dateFrom, ?string $dateTo): array
+    {
+        $funnel = self::funnelActivity($dateFrom, $dateTo);
+        $quotationsSent = (int) $funnel['quotationsSent'];
+        $won = (int) $funnel['quotationsWon'];
+        $lostBeforePi = (int) $funnel['quotationsLost'];
+        $lostAfterPi = (int) $funnel['piLost'];
+
+        return [
+            'orders_created' => self::ordersCreatedCount($dateFrom, $dateTo),
+            'quotations_sent' => $quotationsSent,
+            'pi_sent' => (int) $funnel['piSent'],
+            'won' => $won,
+            'lost_before_pi' => $lostBeforePi,
+            'lost_after_pi' => $lostAfterPi,
+            'lost_total' => $lostBeforePi + $lostAfterPi,
+            'win_rate_pct' => $quotationsSent > 0 ? round(100 * $won / $quotationsSent, 1) : null,
+            'fob_won_by_currency' => self::fobWonByCurrency($dateFrom, $dateTo),
+        ];
+    }
+
+    private static function ordersCreatedCount(?string $dateFrom, ?string $dateTo): int
+    {
+        $clauses = ['is_test_data = :is_test_data'];
+        $params = ['is_test_data' => self::isTestModeFlag()];
+        if ($dateFrom) {
+            $clauses[] = 'DATE(created_at) >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $clauses[] = 'DATE(created_at) <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+        $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM orders WHERE ' . implode(' AND ', $clauses));
+        $stmt->execute($params);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /** @return array<string,float> currency code => total FOB value of orders that reached PI (pi_date) in the period */
+    private static function fobWonByCurrency(?string $dateFrom, ?string $dateTo): array
+    {
+        $clauses = [
+            "EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)",
+            'o.is_test_data = :is_test_data',
+        ];
+        $params = ['is_test_data' => self::isTestModeFlag()];
+        if ($dateFrom) {
+            $clauses[] = 'o.pi_date >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $clauses[] = 'o.pi_date <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+        $stmt = Database::connection()->prepare(
+            'SELECT cur.code AS cc, (SELECT COALESCE(SUM(fob_value), 0) FROM order_products WHERE order_id = o.id AND is_active = 1) AS total_fob_value
+               FROM orders o
+               JOIN currencies cur ON cur.id = o.currency_id
+              WHERE ' . implode(' AND ', $clauses)
+        );
+        $stmt->execute($params);
+        $byCurrency = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $byCurrency[$row['cc']] = ($byCurrency[$row['cc']] ?? 0.0) + (float) $row['total_fob_value'];
+        }
+        return $byCurrency;
+    }
+
+    /** @return array<int, array<string,mixed>> every order marked lost in the period, newest first, with its own reason text */
+    private static function lostOrdersDetail(?string $dateFrom, ?string $dateTo): array
+    {
+        $reachedClause = "EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)";
+        $clauses = ["o.status = 'lost'", 'o.is_test_data = :is_test_data'];
+        $params = ['is_test_data' => self::isTestModeFlag()];
+        if ($dateFrom) {
+            $clauses[] = 'DATE(o.lost_at) >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $clauses[] = 'DATE(o.lost_at) <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+        $stmt = Database::connection()->prepare(
+            "SELECT o.id, o.order_reference, c.company_legal_name, o.lost_at, o.lost_reason,
+                    {$reachedClause} AS reached_pi
+               FROM orders o
+               JOIN clients c ON c.id = o.client_id
+              WHERE " . implode(' AND ', $clauses) . '
+              ORDER BY o.lost_at DESC'
+        );
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$r) {
+            $r['reached_pi'] = (bool) $r['reached_pi'];
+        }
+        return $rows;
+    }
+
+    /**
+     * @return array{0:string,1:string}|null [prevFrom, prevTo], the same
+     *   number of days immediately before $dateFrom — null when either
+     *   bound is missing, since "previous period" is only meaningful for
+     *   a fully bounded range.
+     */
+    private static function previousPeriodRange(?string $dateFrom, ?string $dateTo): ?array
+    {
+        if (!$dateFrom || !$dateTo) {
+            return null;
+        }
+        try {
+            $from = new \DateTimeImmutable($dateFrom);
+            $to = new \DateTimeImmutable($dateTo);
+        } catch (\Exception $e) {
+            return null;
+        }
+        if ($from > $to) {
+            return null;
+        }
+        $days = $from->diff($to)->days + 1;
+        $prevTo = $from->modify('-1 day');
+        $prevFrom = $prevTo->modify('-' . ($days - 1) . ' days');
+        return [$prevFrom->format('Y-m-d'), $prevTo->format('Y-m-d')];
+    }
+
+    /** @return float|null percentage change from $previous to $current — null when $previous is 0 (undefined/"new") or either is non-numeric */
+    private static function pctChange(?float $current, ?float $previous): ?float
+    {
+        if ($current === null || $previous === null || $previous == 0.0) {
+            return null;
+        }
+        return round(100 * ($current - $previous) / $previous, 1);
+    }
 }
