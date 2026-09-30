@@ -41,6 +41,15 @@ upload kept, nothing overwritten. This is purely for record-keeping and
 > in that situation, precisely so this half-done state is visible rather
 > than looking like nothing happened at all.
 
+> **Wet-signature gate:** by default (**Admin & Settings → the
+> `wet_signature_required_buyer_po` toggle**, on unless an Admin has
+> turned it off), typing the reference number alone is **not** enough —
+> "Confirm Buyer PO Received" is refused until at least one file is also
+> on record under "Attach Buyer PO Copy." This closes the loophole where
+> a stage could be confirmed "signed" with zero physical evidence ever
+> attached to the order. Turn the toggle off only for a workflow that
+> genuinely doesn't need the physical copy.
+
 Once confirmed, the order updates immediately:
 
 ![Stage 2 after confirming](./images/s2_after_confirm.png)

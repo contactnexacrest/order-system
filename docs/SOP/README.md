@@ -48,8 +48,3 @@ from each real action:
   [Chapter 6](./06-stage6-freight.md), since the main example skips that
   stage entirely, and reused for the Amendments and Disputes chapters.
 
-## Still pending
-
-A wet-signature-required flag concept was discussed but not yet built into
-the system — see the project's own task tracker, not this manual, for that
-item's status.

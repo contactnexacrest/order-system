@@ -49,6 +49,15 @@ actions**:
    record-keeping and **does not by itself confirm the signature or pass
    the gate**.
 
+> **Wet-signature gate:** by default (**Admin & Settings → the
+> `wet_signature_required_supplier_po` toggle**, on unless an Admin has
+> turned it off), clicking "Confirm Supplier Signed & Returned PO" is
+> **not** enough on its own either — it's refused until at least one file
+> is also on record under "Attach Supplier PO Acknowledgment." Same
+> loophole this closes as on the Buyer PO side: a stage confirmed "signed"
+> with zero physical evidence ever attached. Turn the toggle off only for
+> a workflow that genuinely doesn't need the physical copy.
+
 Once confirmed:
 
 ![Stage 5 section — supplier signature confirmed](./images/s5_signed_confirmed.png)
