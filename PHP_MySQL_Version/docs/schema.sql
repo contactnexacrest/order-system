@@ -2453,25 +2453,26 @@ CREATE TABLE dispute_replies (
 -- (added 2026-09-30)
 -- ================================================================
 -- Repeat-order linkage: duplicated_from_order_id records which order a
--- repeat order was created from, whether via staff's direct "Duplicate
--- Order" or an approved client reorder request (both go through
+-- repeat order was created from, whether via a staff Duplicate Order
+-- action or an approved client reorder request (both go through
 -- OrderDuplicationService::duplicate()). order_reorder_requests already
--- had its own source_order_id/new_order_id pair for that one path — this
--- column is the general-purpose version, set for every duplication path,
--- so the order page itself can show "duplicated from Order X" without
--- caring which path created it.
+-- had its own source_order_id/new_order_id pair for that one path, but
+-- this column is the general-purpose version, set for every duplication
+-- path, so the order page itself can show a duplicated-from-Order-X note
+-- without caring which path created it.
 --
 -- OrderDuplicationService::duplicate() also now carries the source
--- order's Supplier PO (if any) forward onto the new order as a fresh
--- order_supplier_po row with status='draft' — same supplier and pricing,
+-- order Supplier PO (if any) forward onto the new order as a fresh
+-- order_supplier_po row with status draft: same supplier and pricing,
 -- a brand-new supplier_po_reference, nothing sent anywhere. This is the
--- ONLY path that ever inserts a 'draft'-status row (the normal Stage 5
--- flow in OrderController::saveSupplierPo() always inserts 'issued'), so
--- status='draft' plus a non-null duplicated_from_order_id on the order
+-- only path that ever inserts a draft-status row (the normal Stage 5
+-- flow in OrderController::saveSupplierPo() always inserts issued), so
+-- status draft plus a non-null duplicated_from_order_id on the order
 -- itself is sufficient to identify a carried-over draft on the order
--- page — no separate link column needed on order_supplier_po itself.
+-- page, with no separate link column needed on order_supplier_po itself.
 ALTER TABLE orders
-  ADD COLUMN duplicated_from_order_id BIGINT UNSIGNED NULL AFTER ca_internal_doc_enabled,
+  ADD COLUMN duplicated_from_order_id BIGINT UNSIGNED NULL AFTER ca_internal_doc_enabled;
+ALTER TABLE orders
   ADD FOREIGN KEY (duplicated_from_order_id) REFERENCES orders(id);
 
 -- Order Profitability Sheet: manually-recorded cost lines not already
