@@ -660,6 +660,7 @@ final class OrderController
         // the order page shows every financial detail tied to it at a
         // glance, not just in the separate CA module list screens.
         $canViewCaLinks = PermissionService::can((int) $actor['id'], $actorRoleId, 'ca_module_view');
+        $canManageCaInternalDoc = PermissionService::can((int) $actor['id'], $actorRoleId, 'ca_internal_doc_manage');
 
         $stages = OrderStageRepository::forOrder($orderId);
         $stageByNumber = [];
@@ -727,6 +728,8 @@ final class OrderController
             'canViewCaLinks' => $canViewCaLinks,
             'linkedExportBenefits' => $canViewCaLinks ? CaExportBenefitRepository::forOrder($orderId) : [],
             'linkedCaExpenses' => $canViewCaLinks ? CaExpenseRepository::forOrder($orderId) : [],
+            'canManageCaInternalDoc' => $canManageCaInternalDoc,
+            'caInternalDoc' => $canViewCaLinks ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN') : null,
         ], 'layout/base');
     }
 
@@ -774,8 +777,12 @@ final class OrderController
      * evidence, buyer PO copy, supplier PO acknowledgment, ...) had to be
      * downloaded one at a time. file_store.order_id is already set for
      * both origins (insertGenerated() and insertReceived()), so
-     * FileStoreRepository::forOrder() alone is everything the dossier
-     * needs — no separate joins through documents/dispute_documents/etc.
+     * FileStoreRepository::forOrderExcludingInternalCaDocs() (forOrder()
+     * minus the internal-only CA Financial Annexure, see that method's
+     * docblock — this route is gated only on manage_orders, far broader
+     * than the ca_module_view that document's data needs everywhere
+     * else) is everything the dossier needs — no separate joins through
+     * documents/dispute_documents/etc.
      * Built as a temp file (not in-memory) since ZipArchive needs a real
      * seekable file handle to write to, then streamed and deleted —
      * never left behind in storage/ for a stray/orphaned ZIP to
@@ -791,7 +798,7 @@ final class OrderController
             return;
         }
 
-        $files = FileStoreRepository::forOrder($orderId);
+        $files = FileStoreRepository::forOrderExcludingInternalCaDocs($orderId);
         if (empty($files)) {
             Flash::set('error', 'No files are on record for this order yet.');
             header("Location: /orders/{$orderId}");

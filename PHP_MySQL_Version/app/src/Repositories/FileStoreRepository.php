@@ -112,4 +112,34 @@ final class FileStoreRepository
         $stmt->execute(['order_id' => $orderId]);
         return $stmt->fetchAll();
     }
+
+    /**
+     * Point 2 follow-up — same as forOrder(), but excludes the internal-
+     * only CA Financial Annexure (CAFIN). Used by the general-purpose
+     * staff dossier ZIP (OrderController::downloadDossier()), which is
+     * gated only on the broad manage_orders permission most staff hold —
+     * bundling CAFIN into it would let anyone with that permission pull
+     * sensitive financial data in bulk, bypassing the ca_module_view gate
+     * DocumentController::download() enforces for it everywhere else.
+     * Staff who actually hold that permission still get it directly from
+     * the order page/CA module, one click away — this only keeps it out
+     * of the unrelated bulk export.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function forOrderExcludingInternalCaDocs(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT fs.* FROM file_store fs
+             WHERE fs.order_id = :order_id AND fs.is_active = 1
+               AND NOT EXISTS (
+                   SELECT 1 FROM documents d
+                   JOIN document_types dt ON dt.id = d.document_type_id
+                   WHERE dt.code = 'CAFIN' AND (d.pdf_file_id = fs.id OR d.docx_file_id = fs.id)
+               )
+             ORDER BY fs.file_origin, fs.uploaded_at"
+        );
+        $stmt->execute(['order_id' => $orderId]);
+        return $stmt->fetchAll();
+    }
 }

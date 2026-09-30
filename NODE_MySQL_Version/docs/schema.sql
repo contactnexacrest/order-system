@@ -2393,6 +2393,29 @@ ALTER TABLE ca_expenses
   ADD FOREIGN KEY (order_id) REFERENCES orders(id);
 
 -- ================================================================
+-- SECTION AN — INTERNAL-ONLY CA FINANCIAL ANNEXURE (added 2026-09-30)
+-- ================================================================
+-- Government export benefits (RODTEP etc.) and expenses (ECGC insurance,
+-- inspection fees, CHA, transport, ...) linked to an order (Section AM
+-- and CA Phase 8) must NEVER reach a client-facing document — but staff
+-- sometimes need them collected into one printable internal record for a
+-- specific order. This is a hard, structural separation, not a checkbox
+-- on an existing buyer document:
+--   - ca_internal_doc_enabled defaults OFF for every order and can only
+--     be flipped by someone holding the new ca_internal_doc_manage
+--     permission (caController.toggleInternalDoc()).
+--   - The resulting document is its own document_types row (CAFIN,
+--     category='internal') — the exact same mechanism this schema
+--     already uses to keep SUPPO/BLI/COOPREP/AMD/checklists out of
+--     documentRepository.customerFacingForOrder() (category =
+--     'customer_facing' filter), so it is excluded from the client
+--     portal by construction, not by a setting that could be
+--     misconfigured. See documentGenerationService.
+--     generateCaInternalAnnexure().
+ALTER TABLE orders
+  ADD COLUMN ca_internal_doc_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER active_amendment_id;
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2428,4 +2451,5 @@ ALTER TABLE ca_expenses
 -- key-value table (see Section A).
 -- Section AL (HS code bulk import + product guide) added 2026-09-27.
 -- Section AM (expense-to-order linking) added 2026-09-27.
+-- Section AN (internal-only CA financial annexure) added 2026-09-30.
 -- ================================================================

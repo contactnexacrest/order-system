@@ -8,6 +8,8 @@ const nunjucks = require('nunjucks');
 const env = require('../config/env');
 const db = require('../config/db');
 const amendmentRepository = require('../repositories/amendmentRepository');
+const caExpenseRepository = require('../repositories/caExpenseRepository');
+const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
@@ -15,6 +17,7 @@ const orderRepository = require('../repositories/orderRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const termsClauseRepository = require('../repositories/termsClauseRepository');
+const userRepository = require('../repositories/userRepository');
 const documentDataAssembler = require('./documentDataAssembler');
 const { renderPdfFromHtml } = require('./pdfRenderService');
 const docxDocumentBuilder = require('./docx/docxDocumentBuilder');
@@ -68,6 +71,25 @@ function templatesEnvironment() {
       return parts.slice(0, limit - 1).concat(parts.slice(limit - 1).join(delimiter));
     }
     return parts;
+  });
+  // Twig's |format() (sprintf) — only used by CAFIN/ca_financial_annexure.njk
+  // so far, and only with the two directives that template needs: %.Nf
+  // (fixed-decimal money) and %0Nd (zero-padded revision number).
+  njkEnv.addFilter('format', (fmt, ...args) => {
+    let i = 0;
+    return String(fmt).replace(/%(0?)(\d*)(?:\.(\d+))?([df])/g, (match, zeroFlag, width, precision, type) => {
+      const val = args[i++];
+      if (type === 'f') {
+        const p = precision !== undefined ? parseInt(precision, 10) : 6;
+        return Number(val).toFixed(p);
+      }
+      let s = String(Math.trunc(Number(val)));
+      const w = width ? parseInt(width, 10) : 0;
+      if (zeroFlag && s.length < w) {
+        s = '0'.repeat(w - s.length) + s;
+      }
+      return s;
+    });
   });
   return njkEnv;
 }
@@ -699,6 +721,134 @@ async function generateAmendment(amendmentId, generatedByUserId) {
   return { document_id: documentId, pdf_file_id: pdfFileId };
 }
 
+/**
+ * Point 2 follow-up (2026-09-30) — the internal-only "CA Financial
+ * Annexure": every RODTEP/export-benefit claim and every expense (ECGC
+ * insurance, inspection, CHA, transport, ...) linked to one order,
+ * collected into one printable record for staff/CA use.
+ *
+ * This is a HARD, structural separation from every client-facing
+ * document type, not a checkbox on an existing one:
+ *   - Its own document_types row (CAFIN, category='internal') — the
+ *     exact mechanism this app already uses to keep SUPPO/BLI/COOPREP/
+ *     AMD/checklists out of documentRepository.customerFacingForOrder()
+ *     (that query filters on category = 'customer_facing'), so this can
+ *     never appear in the client portal's document list, whatever
+ *     caController does.
+ *   - Its own Nunjucks template (CAFIN/ca_financial_annexure.njk) that
+ *     is NOT rendered through any shared buyer-document layout — no
+ *     shared header/footer/signature-block markup with any buyer
+ *     document, so it can never be visually mistaken for one even if it
+ *     somehow ended up in the wrong hands. Carries a bright red
+ *     "INTERNAL ONLY" banner top and bottom instead.
+ *   - Stored under the order's own "internal-ca" path segment, not
+ *     alongside stage-based generated documents.
+ *   - file_store.internal_only = true (same flag content-parity DOCX
+ *     renders already use) and excluded from the general dossier ZIP
+ *     (ordersController.downloadDossier()) so a staff member holding
+ *     only the broad manage_orders permission can't pull it in bulk —
+ *     documentController.download() separately requires ca_module_view
+ *     specifically for this one document type before serving it.
+ *
+ * Refused unless orders.ca_internal_doc_enabled is set (checked here
+ * too, not just in the controller, as defense in depth) — see
+ * orderRepository.setCaInternalDocEnabled(). No stage-gate or locked-
+ * order check: unlike buyer documents, this one is often only generated
+ * well after an order has closed (RODTEP can take months to actually be
+ * credited), so it must remain generatable regardless of the order's own
+ * lifecycle state.
+ */
+async function generateCaInternalAnnexure(orderId, generatedByUserId) {
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    throw new Error(`Order ${orderId} not found`);
+  }
+  if (!order.ca_internal_doc_enabled) {
+    throw new Error(`Internal CA financial annexure is not enabled for order ${orderId}.`);
+  }
+
+  const docTypeId = await documentTypeIdFor('CAFIN');
+  if (!docTypeId) {
+    throw new Error('CAFIN document type is not seeded.');
+  }
+
+  // mysql2 returns DECIMAL columns as strings, and JS's `+` concatenates
+  // rather than adds when either operand is a string — the template's
+  // running-total {% set total = total + row.amount %} would silently
+  // produce garbage (or a NaN once >1 row is summed) without this
+  // explicit Number() coercion up front.
+  const benefits = (await caExportBenefitRepository.forOrder(orderId)).map((b) => ({
+    ...b,
+    claimed_amount: Number(b.claimed_amount),
+    received_amount: b.received_amount !== null && b.received_amount !== undefined ? Number(b.received_amount) : null,
+  }));
+  const expenses = (await caExpenseRepository.forOrder(orderId)).map((e) => ({
+    ...e,
+    amount: Number(e.amount),
+    tds_amount: e.tds_amount !== null && e.tds_amount !== undefined ? Number(e.tds_amount) : null,
+  }));
+
+  const referenceNumberService = require('./referenceNumberService');
+  const revisionNumber = await referenceNumberService.nextDocumentRevisionNumber(orderId, docTypeId);
+  const existing = await documentRepository.findLatestForOrderAndType(orderId, docTypeId);
+  const documentReference = existing ? existing.document_reference : await referenceNumberService.generateDocumentRef(docTypeId);
+
+  const generatedByUser = await userRepository.findById(generatedByUserId);
+
+  const context = {
+    company: await documentDataAssembler.companyBlock(),
+    order: {
+      order_reference: order.order_reference,
+      company_legal_name: order.company_legal_name,
+    },
+    meta: {
+      document_reference: documentReference,
+      revision_number: revisionNumber,
+      generated_date: formatNowWithTime(),
+      generated_by_name: (generatedByUser && generatedByUser.name) || 'Unknown',
+    },
+    benefits,
+    expenses,
+  };
+
+  const twig = templatesEnvironment();
+  const html = twig.render('CAFIN/ca_financial_annexure.njk', context);
+  const pdfBytes = await renderPdfFromHtml(html);
+
+  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const clientNumber = sanitizePathSegment(order.client_unique_number);
+  const orderRef = sanitizePathSegment(order.order_reference);
+  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, 'internal-ca', 'generated');
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  const filenameSafeReference = documentReference.replace(/\//g, '-');
+  const uuidName = uuidFilename('pdf');
+  const pdfPath = path.join(targetDir, uuidName);
+  fs.writeFileSync(pdfPath, pdfBytes);
+
+  const pdfFileId = await fileStoreRepository.insertGenerated(
+    null,
+    orderId,
+    null,
+    pdfPath,
+    uuidName,
+    `CAFIN ${filenameSafeReference} (INTERNAL ONLY - not for client).pdf`,
+    pdfBytes.length,
+    'application/pdf',
+    generatedByUserId,
+    true // internal_only — never emailed/sent to buyer, never in the client portal
+  );
+
+  const documentId = await documentRepository.create(orderId, docTypeId, documentReference, revisionNumber, pdfFileId, null, generatedByUserId);
+
+  return {
+    document_id: documentId,
+    document_reference: documentReference,
+    revision_number: revisionNumber,
+    pdf_file_id: pdfFileId,
+  };
+}
+
 function templateFileFor(code) {
   const map = {
     QT: 'QT/quotation.njk',
@@ -846,10 +996,18 @@ function formatNow() {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+function formatNowWithTime() {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${formatNow()} ${hh}:${mm}`;
+}
+
 module.exports = {
   generate,
   finalizeApproval,
   generateAmendment,
+  generateCaInternalAnnexure,
   documentTypeIdFor,
   downstreamDocumentsAtRisk,
   templatesEnvironment,

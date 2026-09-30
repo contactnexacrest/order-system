@@ -212,6 +212,91 @@ final class CaController
     }
 
     /**
+     * Point 2 follow-up — the one switch that controls whether this
+     * order's linked government export benefits/expenses can ever be
+     * assembled into a document at all, even an internal-only one. Off
+     * by default for every order; gated on ca_internal_doc_manage (NOT
+     * ca_module_view/inr_actual_edit) — Admin/MD/ED and Super Admin only,
+     * unless explicitly granted to someone else via Roles & Permissions.
+     * The document itself, once generated, can never reach a client —
+     * see DocumentGenerationService::generateCaInternalAnnexure()'s
+     * docblock for the structural (not just permission-based) reason why.
+     */
+    public function toggleInternalDoc(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header('Location: /orders');
+            return;
+        }
+
+        $enabled = !empty($_POST['enabled']);
+        OrderRepository::setCaInternalDocEnabled($orderId, $enabled);
+
+        AuditLogRepository::log(
+            (int) $user['id'],
+            $enabled ? 'CA_INTERNAL_DOC_ENABLED' : 'CA_INTERNAL_DOC_DISABLED',
+            'orders',
+            $orderId,
+            'ca_internal_doc_enabled',
+            (string) (int) !empty($order['ca_internal_doc_enabled']),
+            (string) (int) $enabled
+        );
+
+        Flash::set('success', $enabled
+            ? 'Internal CA financial annexure enabled for this order — it can now be generated below.'
+            : 'Internal CA financial annexure disabled for this order.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Generates (or regenerates) the internal-only CA Financial Annexure
+     * for one order — refused unless toggleInternalDoc() has already
+     * turned it on for this specific order, so generation is never
+     * possible from a stale form left open after someone else disabled
+     * it. Same permission as the toggle; viewing/downloading the result
+     * afterwards only needs ca_module_view (see DocumentController::
+     * download()'s CAFIN-specific check) since it shows nothing beyond
+     * what that permission already exposes on this order's own page.
+     */
+    public function generateInternalDoc(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header('Location: /orders');
+            return;
+        }
+        if (empty($order['ca_internal_doc_enabled'])) {
+            Flash::set('error', 'The internal CA financial annexure is not enabled for this order yet — enable it first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $result = \App\Services\DocumentGenerationService::generateCaInternalAnnexure($orderId, (int) $user['id']);
+
+        AuditLogRepository::log(
+            (int) $user['id'],
+            'CA_INTERNAL_DOC_GENERATED',
+            'orders',
+            $orderId,
+            'document_reference',
+            null,
+            $result['document_reference']
+        );
+
+        Flash::set('success', "Internal CA financial annexure generated: {$result['document_reference']}.");
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
      * CA / Accounting module (Phase 8) — government export benefit/
      * incentive claims (RODTEP + whatever else Admin adds to
      * dropdown_options('export_benefit_scheme')). Unlike ca_expenses this

@@ -106,6 +106,20 @@ final class OrderRepository
     }
 
     /**
+     * Point 2 follow-up (2026-09-30) — the one switch controlling whether
+     * this order's linked government export benefits / expenses can ever
+     * be assembled into a printable (internal-only) document at all.
+     * Defaults to 0 for every order; only flipped via CaController::
+     * toggleInternalDoc(), gated on the ca_internal_doc_manage permission.
+     */
+    public static function setCaInternalDocEnabled(int $orderId, bool $enabled): void
+    {
+        Database::connection()->prepare(
+            'UPDATE orders SET ca_internal_doc_enabled = :enabled WHERE id = :id'
+        )->execute(['enabled' => $enabled ? 1 : 0, 'id' => $orderId]);
+    }
+
+    /**
      * QA-5 CONC-03: reading "next sequence number for this client" and
      * inserting the order used to be two separate, unlocked statements
      * (nextSequenceForClient() then create()) — two concurrent

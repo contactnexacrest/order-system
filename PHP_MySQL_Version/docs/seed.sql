@@ -72,7 +72,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('manage_payments',            'Manage order payments',         'Record and clear an order''s advance/balance payment (Stages 3 and 8) — QA-5 RBAC-03/04: split out of manage_orders so a Logistics-only user can no longer mark a buyer payment as cleared; kept with Accounts, who already owns payment tracking.', 'orders'),
   ('manage_shipping',            'Manage shipping & freight',      'Record freight terms/payment and packing/BL/shipping actions (Stages 6-7 and 9) — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer record a BL.', 'orders'),
   ('close_orders',               'Close or mark an order lost',    'Close a fully-despatched order or mark one lost — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer close an order.', 'orders'),
-  ('data_export_run',            'Export database structure/data', 'Download a full structure-only and data-only dump of the live database, to migrate all historical records into a fresh reinstall. Kept separate from manage_company_settings since it can expose every record, including staff password hashes.', 'admin');
+  ('data_export_run',            'Export database structure/data', 'Download a full structure-only and data-only dump of the live database, to migrate all historical records into a fresh reinstall. Kept separate from manage_company_settings since it can expose every record, including staff password hashes.', 'admin'),
+  ('ca_internal_doc_manage',      'Manage internal CA financial annexure', 'Toggle the internal-only CA Financial Annexure (govt export benefits + expenses) for an order and generate it. Not auto-granted to Accounts Executive/CA roles — only Admin/MD/ED and Super Admin get it by default.', 'ca');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -202,7 +203,8 @@ INSERT INTO document_types (code, name, category, ref_format, never_shown_to_buy
   ('SOP_A_SALES', 'SOP — Sales Process, Tier A (Standard — New Buyer)', 'internal', NULL,               1, 1, 1, 1),
   ('SOP_B_SALES', 'SOP — Sales Process, Tier B (Established Buyer — Post-BL)', 'internal', NULL,        1, 1, 1, 1),
   ('STAGEGATE', 'Stage Gate Reference',                 'internal',       NULL,                        1, 0, 1, 1),
-  ('WALLREF',   'Wall Reference',                       'internal',       NULL,                        1, 0, 1, 1);
+  ('WALLREF',   'Wall Reference',                       'internal',       NULL,                        1, 0, 1, 1),
+  ('CAFIN',     'CA Financial Annexure — Government Benefits & Expenses (Internal Only)', 'internal', 'SC/CAFIN/{YYYY}/{DDMM}{NNN}', 1, 1, 0, 1);
 
 -- ================================================================
 -- TC_CLAUSES / TC_CLAUSE_DOCUMENTS — real Terms & Conditions text

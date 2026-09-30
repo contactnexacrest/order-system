@@ -724,6 +724,8 @@ async function show(req, res) {
       canViewCaLinks: !!req.permissions.ca_module_view,
       linkedExportBenefits: req.permissions.ca_module_view ? await caExportBenefitRepository.forOrder(orderId) : [],
       linkedCaExpenses: req.permissions.ca_module_view ? await caExpenseRepository.forOrder(orderId) : [],
+      canManageCaInternalDoc: !!req.permissions.ca_internal_doc_manage,
+      caInternalDoc: req.permissions.ca_module_view ? await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CAFIN') : null,
     },
     'layout/base'
   );
@@ -770,8 +772,12 @@ async function generatePiFormLink(req, res) {
  * document and every received/uploaded file (dispute evidence, buyer PO
  * copy, supplier PO acknowledgment, ...) had to be downloaded one at a
  * time. file_store.order_id is already set for both origins
- * (insertGenerated() and insertReceived()), so fileStoreRepository.forOrder()
- * alone is everything the dossier needs — no separate joins through
+ * (insertGenerated() and insertReceived()), so
+ * fileStoreRepository.forOrderExcludingInternalCaDocs() (forOrder() minus
+ * the internal-only CA Financial Annexure, see that method's docblock —
+ * this route is gated only on manage_orders, far broader than the
+ * ca_module_view that document's data needs everywhere else) is
+ * everything the dossier needs — no separate joins through
  * documents/dispute_documents/orderBuyerPoDocuments/etc.
  */
 async function downloadDossier(req, res) {
@@ -782,7 +788,7 @@ async function downloadDossier(req, res) {
     return;
   }
 
-  const files = await fileStoreRepository.forOrder(orderId);
+  const files = await fileStoreRepository.forOrderExcludingInternalCaDocs(orderId);
   if (files.length === 0) {
     flash.set(req, 'error', 'No files are on record for this order yet.');
     res.redirect(`/orders/${orderId}`);

@@ -122,6 +122,26 @@ final class DocumentController
             return;
         }
 
+        // Point 2 follow-up: the internal-only CA Financial Annexure
+        // (government export benefits/expenses) is one of many document
+        // types this generic route serves, gated at the route level only
+        // on the broad download_pdf permission that most staff hold.
+        // That's fine for every other type here (BLI/COOPREP/SUPPO/AMD
+        // are internal too, but not sensitive financial data) — CAFIN
+        // specifically needs the same ca_module_view gate its data
+        // already carries everywhere else it's shown, so a staff member
+        // without any CA permission can't fetch it just by knowing/
+        // guessing its document id.
+        if ($document['document_type_code'] === 'CAFIN') {
+            $user = AuthService::currentUser();
+            $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+            if (!PermissionService::can((int) $user['id'], $roleId, 'ca_module_view')) {
+                http_response_code(403);
+                echo 'You do not have permission to view this document.';
+                return;
+            }
+        }
+
         $fileId = $format === 'docx' ? $document['docx_file_id'] : $document['pdf_file_id'];
         if (!$fileId) {
             http_response_code(404);

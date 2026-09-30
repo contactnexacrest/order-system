@@ -1022,6 +1022,32 @@ $orderClosed = $order['status'] === 'complete';
         <?php endforeach; ?>
       </table>
     <?php endif; ?>
+
+    <h3 style="font-size:0.95em; margin-top:12px;">Internal-Only Financial Annexure</h3>
+    <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
+    <?php if ($canManageCaInternalDoc): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/toggle" style="margin-bottom:6px;">
+        <?= Csrf::field() ?>
+        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
+          <input type="checkbox" name="enabled" value="1" <?= !empty($order['ca_internal_doc_enabled']) ? 'checked' : '' ?> onchange="this.form.submit()">
+          Enable internal financial annexure for this order
+        </label>
+      </form>
+      <?php if (!empty($order['ca_internal_doc_enabled'])): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/generate" style="display:inline;">
+          <?= Csrf::field() ?>
+          <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
+        </form>
+      <?php endif; ?>
+    <?php else: ?>
+      <p class="muted small">Internal financial annexure is currently <strong><?= !empty($order['ca_internal_doc_enabled']) ? 'enabled' : 'disabled' ?></strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
+    <?php endif; ?>
+    <?php if ($caInternalDoc): ?>
+      <p class="small" style="margin-top:6px;">
+        Latest: <a href="/documents/<?= (int) $caInternalDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($caInternalDoc['document_reference']) ?></a>
+        (generated <?= htmlspecialchars((string) $caInternalDoc['generated_at']) ?>) — <span class="badge">INTERNAL ONLY — never shown to client</span>
+      </p>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 

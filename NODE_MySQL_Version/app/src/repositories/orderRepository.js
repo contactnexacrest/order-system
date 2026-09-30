@@ -92,6 +92,20 @@ async function findIdByReference(orderReference) {
 }
 
 /**
+ * Point 2 follow-up (2026-09-30) — the one switch controlling whether
+ * this order's linked government export benefits / expenses can ever be
+ * assembled into a printable (internal-only) document at all. Defaults
+ * to 0 for every order; only flipped via caController.toggleInternalDoc(),
+ * gated on the ca_internal_doc_manage permission.
+ */
+async function setCaInternalDocEnabled(orderId, enabled) {
+  await db.execute('UPDATE orders SET ca_internal_doc_enabled = :enabled WHERE id = :id', {
+    enabled: enabled ? 1 : 0,
+    id: orderId,
+  });
+}
+
+/**
  * QA-5 CONC-03: reading "next sequence number for this client" and
  * inserting the order used to be two separate, unlocked statements
  * (nextSequenceForClient() then create()) — two concurrent order-creation
@@ -321,5 +335,5 @@ async function setIncludeAnnexureA(orderId, include) {
 module.exports = {
   all, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
-  setIncludeAnnexureA, setDisputeButtonVisible,
+  setIncludeAnnexureA, setDisputeButtonVisible, setCaInternalDocEnabled,
 };

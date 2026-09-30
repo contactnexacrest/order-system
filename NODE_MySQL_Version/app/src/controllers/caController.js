@@ -187,6 +187,86 @@ async function linkExpenseToOrder(req, res) {
 }
 
 /**
+ * Point 2 follow-up — the one switch that controls whether this order's
+ * linked government export benefits/expenses can ever be assembled into
+ * a document at all, even an internal-only one. Off by default for every
+ * order; gated on ca_internal_doc_manage (NOT ca_module_view/
+ * inr_actual_edit) — Admin/MD/ED and Super Admin only, unless explicitly
+ * granted to someone else via Roles & Permissions. The document itself,
+ * once generated, can never reach a client — see
+ * documentGenerationService.generateCaInternalAnnexure()'s docblock for
+ * the structural (not just permission-based) reason why.
+ */
+async function toggleInternalDoc(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect('/orders');
+    return;
+  }
+
+  const enabled = !!req.body.enabled;
+  await orderRepository.setCaInternalDocEnabled(orderId, enabled);
+
+  await auditLogRepository.log(
+    user.id,
+    enabled ? 'CA_INTERNAL_DOC_ENABLED' : 'CA_INTERNAL_DOC_DISABLED',
+    'orders',
+    orderId,
+    'ca_internal_doc_enabled',
+    String(Number(!!order.ca_internal_doc_enabled)),
+    String(Number(enabled))
+  );
+
+  flash.set(
+    req,
+    'success',
+    enabled
+      ? 'Internal CA financial annexure enabled for this order — it can now be generated below.'
+      : 'Internal CA financial annexure disabled for this order.'
+  );
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Generates (or regenerates) the internal-only CA Financial Annexure for
+ * one order — refused unless toggleInternalDoc() has already turned it
+ * on for this specific order, so generation is never possible from a
+ * stale form left open after someone else disabled it. Same permission
+ * as the toggle; viewing/downloading the result afterwards only needs
+ * ca_module_view (see documentController.download()'s CAFIN-specific
+ * check) since it shows nothing beyond what that permission already
+ * exposes on this order's own page.
+ */
+async function generateInternalDoc(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect('/orders');
+    return;
+  }
+  if (!order.ca_internal_doc_enabled) {
+    flash.set(req, 'error', 'The internal CA financial annexure is not enabled for this order yet — enable it first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const documentGenerationService = require('../services/documentGenerationService');
+  const result = await documentGenerationService.generateCaInternalAnnexure(orderId, user.id);
+
+  await auditLogRepository.log(user.id, 'CA_INTERNAL_DOC_GENERATED', 'orders', orderId, 'document_reference', null, result.document_reference);
+
+  flash.set(req, 'success', `Internal CA financial annexure generated: ${result.document_reference}.`);
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
  * CA / Accounting module (Phase 8) — government export benefit/incentive
  * claims (RODTEP + whatever else Admin adds to
  * dropdown_options('export_benefit_scheme')). Unlike ca_expenses this is
@@ -561,4 +641,5 @@ module.exports = {
   exportBenefits, recordExportBenefit, markExportBenefitReceived,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,
+  toggleInternalDoc, generateInternalDoc,
 };

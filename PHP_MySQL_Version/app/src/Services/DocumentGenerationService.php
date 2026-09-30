@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Config\Database;
 use App\Config\Env;
 use App\Repositories\AmendmentRepository;
+use App\Repositories\CaExpenseRepository;
+use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
@@ -658,6 +660,130 @@ final class DocumentGenerationService
         AmendmentRepository::attachDocument($amendmentId, $documentId);
 
         return ['document_id' => $documentId, 'pdf_file_id' => $pdfFileId];
+    }
+
+    /**
+     * Point 2 follow-up (2026-09-30) — the internal-only "CA Financial
+     * Annexure": every RODTEP/export-benefit claim and every expense
+     * (ECGC insurance, inspection, CHA, transport, ...) linked to one
+     * order, collected into one printable record for staff/CA use.
+     *
+     * This is a HARD, structural separation from every client-facing
+     * document type, not a checkbox on an existing one:
+     *   - Its own document_types row (CAFIN, category='internal') — the
+     *     exact mechanism this app already uses to keep SUPPO/BLI/
+     *     COOPREP/AMD/checklists out of DocumentRepository::
+     *     customerFacingForOrder() (that query filters on
+     *     category = 'customer_facing'), so this can never appear in the
+     *     client portal's document list, whatever CaController does.
+     *   - Its own Twig template (CAFIN/ca_financial_annexure.html.twig)
+     *     that does NOT extend _layout.html.twig — deliberately no
+     *     shared header/footer/signature-block markup with any buyer
+     *     document, so it can never be visually mistaken for one even if
+     *     it somehow ended up in the wrong hands. Carries a bright red
+     *     "INTERNAL ONLY" banner top and bottom instead.
+     *   - Stored under the order's own "internal-ca" path segment, not
+     *     alongside stage-based generated documents.
+     *   - file_store.internal_only = true (same flag content-parity
+     *     DOCX renders already use) and excluded from the general
+     *     dossier ZIP (OrderController::downloadDossier()) so a staff
+     *     member holding only the broad manage_orders permission can't
+     *     pull it in bulk — DocumentController::download() separately
+     *     requires ca_module_view specifically for this one document
+     *     type before serving it.
+     *
+     * Refused unless orders.ca_internal_doc_enabled is set (checked here
+     * too, not just in the controller, as defense in depth) — see
+     * OrderRepository::setCaInternalDocEnabled(). No stage-gate or
+     * locked-order check: unlike buyer documents, this one is often only
+     * generated well after an order has closed (RODTEP can take months
+     * to actually be credited), so it must remain generatable regardless
+     * of the order's own lifecycle state.
+     */
+    public static function generateCaInternalAnnexure(int $orderId, int $generatedByUserId): array
+    {
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            throw new \RuntimeException("Order {$orderId} not found");
+        }
+        if (empty($order['ca_internal_doc_enabled'])) {
+            throw new \RuntimeException("Internal CA financial annexure is not enabled for order {$orderId}.");
+        }
+
+        $docTypeId = self::documentTypeIdFor('CAFIN');
+        if (!$docTypeId) {
+            throw new \RuntimeException('CAFIN document type is not seeded.');
+        }
+
+        $benefits = CaExportBenefitRepository::forOrder($orderId);
+        $expenses = CaExpenseRepository::forOrder($orderId);
+
+        $revisionNumber = ReferenceNumberService::nextDocumentRevisionNumber($orderId, $docTypeId);
+        $existing = DocumentRepository::findLatestForOrderAndType($orderId, $docTypeId);
+        $documentReference = $existing['document_reference'] ?? ReferenceNumberService::generateDocumentRef($docTypeId);
+
+        $context = [
+            'company' => DocumentDataAssembler::companyBlock(),
+            'order' => [
+                'order_reference' => $order['order_reference'],
+                'company_legal_name' => $order['company_legal_name'],
+            ],
+            'meta' => [
+                'document_reference' => $documentReference,
+                'revision_number'    => $revisionNumber,
+                'generated_date'     => (new \DateTimeImmutable())->format('d F Y H:i'),
+                'generated_by_name'  => \App\Repositories\UserRepository::findById($generatedByUserId)['name'] ?? 'Unknown',
+            ],
+            'benefits' => $benefits,
+            'expenses' => $expenses,
+        ];
+
+        $twig = self::twigEnvironment();
+        $html = $twig->render('CAFIN/ca_financial_annexure.html.twig', $context);
+        $pdfBytes = self::renderPdf($html);
+
+        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
+        $orderRef = self::sanitizePathSegment($order['order_reference']);
+        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/internal-ca/generated";
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+
+        $filenameSafeReference = str_replace('/', '-', $documentReference);
+        $uuidName = self::uuidFilename('pdf');
+        $pdfPath = "{$targetDir}/{$uuidName}";
+        file_put_contents($pdfPath, $pdfBytes);
+
+        $pdfFileId = FileStoreRepository::insertGenerated(
+            null,
+            $orderId,
+            null,
+            $pdfPath,
+            $uuidName,
+            "CAFIN {$filenameSafeReference} (INTERNAL ONLY - not for client).pdf",
+            strlen($pdfBytes),
+            'application/pdf',
+            $generatedByUserId,
+            true // internal_only — never emailed/sent to buyer, never in the client portal
+        );
+
+        $documentId = DocumentRepository::create(
+            $orderId,
+            $docTypeId,
+            $documentReference,
+            $revisionNumber,
+            $pdfFileId,
+            null,
+            $generatedByUserId
+        );
+
+        return [
+            'document_id'        => $documentId,
+            'document_reference' => $documentReference,
+            'revision_number'    => $revisionNumber,
+            'pdf_file_id'        => $pdfFileId,
+        ];
     }
 
     private static function twigEnvironment(): TwigEnvironment

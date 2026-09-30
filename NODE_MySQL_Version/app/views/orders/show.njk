@@ -958,6 +958,32 @@
         {% endfor %}
       </table>
     {% endif %}
+
+    <h3 style="font-size:0.95em; margin-top:12px;">Internal-Only Financial Annexure</h3>
+    <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
+    {% if canManageCaInternalDoc %}
+      <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/toggle" style="margin-bottom:6px;">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
+          <input type="checkbox" name="enabled" value="1" {% if order.ca_internal_doc_enabled %}checked{% endif %} onchange="this.form.submit()">
+          Enable internal financial annexure for this order
+        </label>
+      </form>
+      {% if order.ca_internal_doc_enabled %}
+        <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/generate" style="display:inline;">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="muted small">Internal financial annexure is currently <strong>{% if order.ca_internal_doc_enabled %}enabled{% else %}disabled{% endif %}</strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
+    {% endif %}
+    {% if caInternalDoc %}
+      <p class="small" style="margin-top:6px;">
+        Latest: <a href="/documents/{{ caInternalDoc.id }}/download?format=pdf">{{ caInternalDoc.document_reference }}</a>
+        (generated {{ caInternalDoc.generated_at }}) — <span class="badge">INTERNAL ONLY — never shown to client</span>
+      </p>
+    {% endif %}
   </div>
   {% endif %}
 

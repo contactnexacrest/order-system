@@ -481,6 +481,8 @@ app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), asyncH
 app.get('/ca/tds-summary', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.tdsSummary));
 app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
 app.post('/ca/expenses/:id/link-order', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.linkExpenseToOrder));
+app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('ca_internal_doc_manage'), verifyCsrf, asyncHandler(caController.toggleInternalDoc));
+app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), verifyCsrf, asyncHandler(caController.generateInternalDoc));
 app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));
 app.post('/ca/bank-statement/upload', requireAuth, requirePermission('inr_actual_edit'), upload.single('statement'), verifyCsrf, asyncHandler(caController.uploadBankStatement));
 app.post('/ca/bank-statement/:id/match-revenue', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.matchBankLineToRevenue));

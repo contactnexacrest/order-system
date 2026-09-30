@@ -50,17 +50,21 @@ order-management access, or vice versa.
 | `inr_actual_view` | See the actual INR amount recorded against a cleared advance/balance/freight payment. |
 | `inr_actual_edit` | Record or correct the INR actual amount for a cleared payment. |
 | `inr_actual_delete` | Remove a recorded INR actual amount (a destructive correction — kept separate from edit). |
+| `ca_internal_doc_manage` | Turn on, and generate, the internal-only CA Financial Annexure for a specific order (see below) — deliberately **not** granted to the Accounts Executive or CA roles by default, unlike every other CA permission. |
 
 A new role, **CA / Chartered Accountant**, is seeded with `ca_module_view`
 and `inr_actual_view` only — a view-only role for an external or in-house
 Chartered Accountant, with no order-management access at all. The
 **Accounts Executive** role is granted `ca_module_view`,
-`inr_actual_view`, and `inr_actual_edit` (not delete). **Admin, Managing
-Director,** and **Executive Director** get every permission automatically,
-same as everywhere else in the system. As with any permission, these can
-be granted individually to any other user (e.g. a Director who isn't
-normally in Accounts) via **Admin → Settings → Roles & Permissions** or a
-per-user override — see [Admin & Settings](./15-admin-settings.md).
+`inr_actual_view`, and `inr_actual_edit` (not delete) — but, deliberately,
+**not** `ca_internal_doc_manage`. **Admin, Managing Director,** and
+**Executive Director** get every permission automatically, same as
+everywhere else in the system, so in practice `ca_internal_doc_manage`
+starts out held only by them (and Super Admin) — anyone else needs an
+explicit grant. As with any permission, these can be granted individually
+to any other user (e.g. a Director who isn't normally in Accounts) via
+**Admin → Settings → Roles & Permissions** or a per-user override — see
+[Admin & Settings](./15-admin-settings.md).
 
 ## Recording an INR actual amount
 
@@ -101,6 +105,57 @@ read-only; recording a claim, marking one received, or linking/unlinking
 an expense is still done from the CA module itself — see
 [Government Export Benefits](./ca-07-export-benefits.md) and
 [Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to).
+
+## The internal-only CA Financial Annexure — and why it can never reach a client
+
+Government export benefits and expenses are genuine business figures, but
+they must **never** appear on a document a client/buyer ever sees — not
+by accident, and not even if someone deliberately tries to make it
+happen. Rather than add a checkbox to an existing buyer document (a risk
+that a future change, a bug, or a mis-click could quietly undo), this is
+built as three separate, structural guarantees:
+
+1. **Off by default, and behind its own permission.** At the bottom of
+   the same Government Export Benefits & Expenses (CA) box, someone
+   holding `ca_internal_doc_manage` sees a checkbox — *"Enable internal
+   financial annexure for this order"* — unchecked by default for every
+   order. Only once it's checked does a **Generate Internal Financial
+   Annexure (PDF)** button appear. Anyone else (including a CA-role user
+   with `ca_module_view`) sees a plain read-only line stating whether
+   it's currently enabled, with no way to change it.
+2. **A different document type entirely.** The generated PDF (document
+   type code `CAFIN`) is not a variant of any buyer-facing document — it
+   is its own internal-only document type, using the exact same
+   mechanism this system already relies on to keep the Supplier PO, BL
+   Instruction Sheet, and Payment Terms Amendment out of the client
+   portal: `document_types.category = 'internal'`. The client portal's
+   document list only ever queries `category = 'customer_facing'`, so
+   CAFIN is excluded by construction — not by a setting that could be
+   turned off, and not dependent on the document's approval status.
+   Visually it's deliberately plain and different too: a heavy red
+   "INTERNAL USE ONLY — NOT FOR CLIENT / BUYER" banner top and bottom, no
+   shared header/logo/signature-block styling with any buyer document, so
+   it could never be mistaken for one even printed on paper.
+3. **Viewing it needs `ca_module_view`, specifically — even on the
+   generic download link.** Once generated, anyone with `ca_module_view`
+   can open it from the same box (it shows the latest one generated,
+   with its reference and date) — the same permission that already lets
+   them see this data on-screen, so this adds no new exposure. But the
+   system's one generic "download any document" link is normally gated
+   only by the much broader "Download PDF" permission most staff hold —
+   for this one document type specifically, that link additionally
+   refuses anyone who doesn't hold `ca_module_view`, so a staff member
+   without any CA access can't fetch it just by knowing or guessing its
+   document ID. It's also deliberately left out of the "download
+   everything for this order" dossier ZIP staff use for handovers/
+   archiving, for the same reason — that ZIP only requires the broad
+   "manage orders" permission.
+
+Staff and admins can always open both what a client actually receives
+(any of the ordinary generated documents) and this internal one side by
+side, to check exactly what each contains — nothing here blocks staff
+access, it only makes sure the two document sets can never cross paths on
+the client's side.
 
 ## The INR Settlement Register
 
