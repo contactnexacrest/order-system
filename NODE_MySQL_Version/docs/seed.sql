@@ -1206,11 +1206,27 @@ FROM (
 CROSS JOIN users u
 WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
+-- Client-verification reference documents (Factory/Quarry SOPs and
+-- agreement templates) for the internal Reference Library (Section Y,
+-- reference_library_documents). The actual files ship in git under
+-- storage/assets/reference_library/ alongside the other committed assets
+-- (logos, seals, signatures) so a fresh clone/deploy always has them —
+-- unlike storage/internal/reference_library/, which is gitignored runtime
+-- state for staff-uploaded custom entries, not these four fixed originals.
+INSERT INTO reference_library_documents (title, file_path, file_original_name, file_mime_type) VALUES
+  ('Quarry SOP – Block Selection & Reservation', '__STORAGE_BASE_PATH__/assets/reference_library/quarry_sop_block_selection_and_reservation.pdf', 'Quarry SOP – Block Selection & Reservation.pdf', 'application/pdf'),
+  ('Factory SOP – Processing, QC & Packing', '__STORAGE_BASE_PATH__/assets/reference_library/factory_sop_processing_qc_and_packing.pdf', 'Factory SOP – Processing, QC & Packing.pdf', 'application/pdf'),
+  ('Factory Processing Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/factory_processing_agreement_template.docx', 'Factory Processing Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+  ('Quarry Block Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/quarry_block_supply_agreement_template.docx', 'Quarry Block Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ================================================================
 -- POST-IMPORT STEP (manual, not part of this SQL file):
--- Replace the literal string __STORAGE_BASE_PATH__ in the assets table
--- with your actual STORAGE_BASE_PATH (the same value as in .env), e.g.:
+-- Replace the literal string __STORAGE_BASE_PATH__ with your actual
+-- STORAGE_BASE_PATH (the same value as in .env) in every table that uses
+-- this placeholder, e.g.:
 --   UPDATE assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
+--   UPDATE user_signature_assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
+--   UPDATE reference_library_documents SET file_path = REPLACE(file_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
 -- ================================================================
