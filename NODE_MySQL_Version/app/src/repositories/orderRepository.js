@@ -150,7 +150,7 @@ async function insertOrderRow(executor, data, createdBy) {
          estimated_gross_weight_kg, estimated_net_weight_kg, estimated_package_count,
          estimated_package_type, est_lead_time_text, indicative_freight_low, indicative_freight_high,
          indicative_insurance_amount, buyers_po_ref, quotation_date, quotation_valid_until,
-         status, created_by)
+         status, created_by, duplicated_from_order_id)
      VALUES
         (:order_reference, :client_id, :sequence_no, :buyer_inquiry_ref, :payment_preset_id, :incoterm_id,
          :port_of_loading_id, :port_of_discharge_id, :port_of_discharge_text, :currency_id, :coo_type,
@@ -158,7 +158,7 @@ async function insertOrderRow(executor, data, createdBy) {
          :estimated_gross_weight_kg, :estimated_net_weight_kg, :estimated_package_count,
          :estimated_package_type, :est_lead_time_text, :indicative_freight_low, :indicative_freight_high,
          :indicative_insurance_amount, :buyers_po_ref, :quotation_date, :quotation_valid_until,
-         'active', :created_by)`,
+         'active', :created_by, :duplicated_from_order_id)`,
     {
       order_reference: data.order_reference,
       client_id: data.client_id,
@@ -187,9 +187,18 @@ async function insertOrderRow(executor, data, createdBy) {
       quotation_date: data.quotation_date,
       quotation_valid_until: data.quotation_valid_until,
       created_by: createdBy,
+      duplicated_from_order_id: data.duplicated_from_order_id ?? null,
     }
   );
   return result.insertId;
+}
+
+/** Repeat orders created from this one (staff "Duplicate Order" or an approved client reorder), newest first. */
+async function findOrdersDuplicatedFrom(sourceOrderId) {
+  return db.query(
+    'SELECT id, order_reference, created_at FROM orders WHERE duplicated_from_order_id = :id ORDER BY created_at DESC',
+    { id: sourceOrderId }
+  );
 }
 
 /**
@@ -335,5 +344,5 @@ async function setIncludeAnnexureA(orderId, include) {
 module.exports = {
   all, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
-  setIncludeAnnexureA, setDisputeButtonVisible, setCaInternalDocEnabled,
+  setIncludeAnnexureA, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
 };

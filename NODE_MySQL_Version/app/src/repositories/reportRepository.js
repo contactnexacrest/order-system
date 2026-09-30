@@ -6,6 +6,7 @@ const documentRepository = require('./documentRepository');
 const amendmentRepository = require('./amendmentRepository');
 const disputeRepository = require('./disputeRepository');
 const testModeService = require('../services/testModeService');
+const orderProfitabilityService = require('../services/orderProfitabilityService');
 
 /**
  * Test Mode (docs/schema.sql Section V) — reports must never mix test and
@@ -1251,6 +1252,78 @@ async function conversionRateReport(dateFrom, dateTo) {
   };
 }
 
+/**
+ * Order Profitability Sheet, rolled up (docs/schema.sql Section AP) — "for
+ * every export order... per order/per month/per quarter/per six
+ * months/per financial year". A single date-range filter (matching every
+ * other report's date_from/date_to convention) IS the
+ * month/quarter/half-year/FY view: pick April-March for an FY, any three
+ * months for a quarter, and so on — no separate UI per period, same
+ * pattern as every other report in this module.
+ *
+ * Deliberately a small loop over orderProfitabilityService rather than one
+ * large SQL rollup — that service is the single source of truth for how a
+ * profitability figure is computed (see its own docblock for the
+ * revenue/cost assumptions), and this report must never compute those
+ * figures a second, divergent way. Fine at this report's realistic scale
+ * (an export business's order volume), not meant for a dataset large
+ * enough to need real aggregation.
+ */
+async function orderProfitabilityReport(dateFrom, dateTo) {
+  const isTestMode = await isTestModeFlag();
+  const where = ['o.is_test_data = :is_test_data'];
+  const params = { is_test_data: isTestMode };
+  if (dateFrom) {
+    where.push('DATE(o.created_at) >= :date_from');
+    params.date_from = dateFrom;
+  }
+  if (dateTo) {
+    where.push('DATE(o.created_at) <= :date_to');
+    params.date_to = dateTo;
+  }
+
+  const orders = await db.query(
+    `SELECT o.id, o.order_reference, o.created_at, c.company_legal_name
+     FROM orders o
+     JOIN clients c ON c.id = o.client_id
+     WHERE ${where.join(' AND ')}
+     ORDER BY o.created_at DESC`,
+    params
+  );
+
+  const rows = [];
+  let totalRevenue = 0;
+  let totalCost = 0;
+  let totalProfit = 0;
+  for (const o of orders) {
+    const p = await orderProfitabilityService.computeForOrder(o.id);
+    rows.push({
+      order_id: o.id,
+      order_reference: o.order_reference,
+      company_legal_name: o.company_legal_name,
+      created_at: o.created_at,
+      revenue_inr: p.revenue_inr,
+      revenue_is_estimated: p.revenue_is_estimated,
+      total_cost_inr: p.total_cost_inr,
+      profit_inr: p.profit_inr,
+      margin_pct: p.margin_pct,
+    });
+    totalRevenue += p.revenue_inr;
+    totalCost += p.total_cost_inr;
+    totalProfit += p.profit_inr;
+  }
+
+  return {
+    rows,
+    totals: {
+      revenue_inr: totalRevenue,
+      total_cost_inr: totalCost,
+      profit_inr: totalProfit,
+      margin_pct: totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100 * 100) / 100 : null,
+    },
+  };
+}
+
 module.exports = {
   perClient,
   perOrder,
@@ -1270,4 +1343,5 @@ module.exports = {
   productSalesReport,
   supplierPerformanceReport,
   conversionRateReport,
+  orderProfitabilityReport,
 };

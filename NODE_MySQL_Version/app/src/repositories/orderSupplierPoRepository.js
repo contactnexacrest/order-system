@@ -2,7 +2,7 @@
 
 const db = require('../config/db');
 
-async function create(orderId, supplierId, supplierPoReference, data) {
+async function create(orderId, supplierId, supplierPoReference, data, status = 'issued') {
   const result = await db.execute(
     `INSERT INTO order_supplier_po
         (order_id, supplier_id, supplier_po_reference, material_stone_type, grade, surface_finish,
@@ -15,9 +15,9 @@ async function create(orderId, supplierId, supplierPoReference, data) {
          :dimensions, :tolerance, :quantity, :unit, :colour, :special,
          :unit_price, :basic_value, :gst_rate, :gst_amount, :total_payable,
          :advance_pct, :advance_amount, :balance_amount,
-         :delivery_location, :required_delivery_date, :packing_requirement, 'issued')`,
+         :delivery_location, :required_delivery_date, :packing_requirement, :status)`,
     {
-      order_id: orderId, supplier_id: supplierId, ref: supplierPoReference,
+      order_id: orderId, supplier_id: supplierId, ref: supplierPoReference, status,
       material: data.material_stone_type ?? null,
       grade: data.grade ?? 'Grade A',
       finish: data.surface_finish ?? null,

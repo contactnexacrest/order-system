@@ -13,9 +13,11 @@ const caExportBenefitRepository = require('../repositories/caExportBenefitReposi
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
+const orderProfitabilityService = require('./orderProfitabilityService');
 const termsClauseRepository = require('../repositories/termsClauseRepository');
 const userRepository = require('../repositories/userRepository');
 const documentDataAssembler = require('./documentDataAssembler');
@@ -185,7 +187,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     await orderRepository.setPiDates(orderId, fmt(today), fmt(validUntil));
   }
 
-  const data = await documentDataAssembler.assemble(orderId);
+  const data = await documentDataAssembler.assemble(orderId, documentTypeCode);
 
   const existing = await documentRepository.findLatestForOrderAndType(orderId, docType.id);
   // QA-5 CONC-04: reserved atomically, up front — see
@@ -525,7 +527,7 @@ async function finalizeApproval(documentId) {
   const order = await orderRepository.find(orderId);
   const documentTypeCode = document.document_type_code;
 
-  const data = await documentDataAssembler.assemble(orderId);
+  const data = await documentDataAssembler.assemble(orderId, documentTypeCode);
   const terms = await resolveTerms(documentTypeCode, data);
 
   const context = {
@@ -797,6 +799,16 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
     amount: Number(e.amount),
     tds_amount: e.tds_amount !== null && e.tds_amount !== undefined ? Number(e.tds_amount) : null,
   }));
+  // Added alongside the Order Profitability Sheet (docs/schema.sql Section
+  // AP) — supplier pricing is exactly the kind of data this document
+  // exists for (internal-only, never client-facing) and was previously
+  // missing from it entirely.
+  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  const costEntries = (await orderCostEntryRepository.forOrder(orderId)).map((c) => ({
+    ...c,
+    amount_inr: Number(c.amount_inr),
+  }));
+  const profitability = await orderProfitabilityService.computeForOrder(orderId);
 
   const referenceNumberService = require('./referenceNumberService');
   const revisionNumber = await referenceNumberService.nextDocumentRevisionNumber(orderId, docTypeId);
@@ -819,6 +831,9 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
     },
     benefits,
     expenses,
+    supplier_po: supplierPo,
+    cost_entries: costEntries,
+    profitability,
   };
 
   const twig = templatesEnvironment();

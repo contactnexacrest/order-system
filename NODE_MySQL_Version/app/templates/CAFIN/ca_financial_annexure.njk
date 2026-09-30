@@ -47,7 +47,7 @@
 </div>
 
 <div class="meta-title">CA FINANCIAL ANNEXURE</div>
-<div class="meta-sub">Government Export Benefits &amp; Expenses — {{ order.order_reference }} ({{ order.company_legal_name }})</div>
+<div class="meta-sub">Government Export Benefits, Expenses, Supplier Cost &amp; Profitability — {{ order.order_reference }} ({{ order.company_legal_name }})</div>
 
 <table class="meta"><tr>
   <td><span class="label">Document Reference</span><span class="value">{{ meta.document_reference }}</span></td>
@@ -103,10 +103,63 @@
 </table>
 {% endif %}
 
+<div class="section-title">SUPPLIER COST</div>
+{% if not supplier_po %}
+  <div class="empty-note">No Supplier PO exists for this order.</div>
+{% else %}
+<table class="data">
+  <tr><th>Supplier</th><th>Material</th><th>Basic Value (INR)</th><th>GST (INR)</th><th>Total Payable (INR)</th><th>Status</th></tr>
+  <tr>
+    <td>{{ supplier_po.supplier_legal_name }}</td>
+    <td>{{ supplier_po.material_stone_type or '—' }}</td>
+    <td>{{ supplier_po.basic_value_inr or '—' }}</td>
+    <td>{{ supplier_po.gst_amount_inr or '—' }}</td>
+    <td>{{ supplier_po.total_payable_inr or '—' }}</td>
+    <td>{{ supplier_po.status }}</td>
+  </tr>
+</table>
+{% endif %}
+
+<div class="section-title">OTHER ORDER COSTS</div>
+{% if cost_entries.length === 0 %}
+  <div class="empty-note">No other costs recorded for this order.</div>
+{% else %}
+<table class="data">
+  <tr><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Date</th><th>Recorded By</th></tr>
+  {% set otherTotal = 0 %}
+  {% for c in cost_entries %}
+  <tr>
+    <td>{{ c.category }}</td>
+    <td>{{ c.description or '—' }}</td>
+    <td>{{ '%.2f'|format(c.amount_inr) }}</td>
+    <td>{{ c.incurred_at or '—' }}</td>
+    <td>{{ c.recorded_by_name }}</td>
+  </tr>
+  {% set otherTotal = otherTotal + c.amount_inr %}
+  {% endfor %}
+  <tr class="totals"><td colspan="2">TOTAL</td><td>{{ '%.2f'|format(otherTotal) }}</td><td colspan="2"></td></tr>
+</table>
+{% endif %}
+
+<div class="section-title">ORDER PROFITABILITY SUMMARY</div>
+<table class="data">
+  <tr><th>Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</th><th>Supplier Cost</th><th>Ocean Freight</th><th>Insurance</th><th>Other Costs</th><th>Total Cost</th><th>Profit</th><th>Margin %</th></tr>
+  <tr>
+    <td>{{ '%.2f'|format(profitability.revenue_inr) }}</td>
+    <td>{{ '%.2f'|format(profitability.supplier_cost_inr) }}</td>
+    <td>{{ '%.2f'|format(profitability.freight_cost_inr) }}</td>
+    <td>{{ '%.2f'|format(profitability.insurance_cost_inr) }}</td>
+    <td>{{ '%.2f'|format(profitability.other_costs_inr) }}</td>
+    <td>{{ '%.2f'|format(profitability.total_cost_inr) }}</td>
+    <td>{{ '%.2f'|format(profitability.profit_inr) }}</td>
+    <td>{% if profitability.margin_pct !== null %}{{ '%.2f'|format(profitability.margin_pct) }}%{% else %}—{% endif %}</td>
+  </tr>
+</table>
+
 <div class="footer-note">
   This document is generated for {{ company.legal_name }}'s internal accounting/CA use only. It contains
-  government export-benefit and expense data that must never be shared with, forwarded to, printed for, or
-  otherwise made accessible to the client/buyer of this order under any circumstances.
+  government export-benefit, expense, supplier-cost, and profitability data that must never be shared with,
+  forwarded to, printed for, or otherwise made accessible to the client/buyer of this order under any circumstances.
 </div>
 
 <div class="internal-banner" style="margin-top:14pt;">

@@ -156,7 +156,7 @@ final class CaOrderLinkingTest extends DbTestCase
         $controller->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringContainsString('Government Export Benefits &amp; Expenses (CA)', $output);
+        self::assertStringContainsString('Order Financials', $output);
         self::assertStringContainsString('RODTEP', $output);
         self::assertStringContainsString('ECGC insurance', $output);
     }

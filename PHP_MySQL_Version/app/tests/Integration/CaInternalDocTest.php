@@ -277,9 +277,44 @@ final class CaInternalDocTest extends DbTestCase
         self::assertStringContainsString('Enable internal financial annexure for this order', $output);
     }
 
-    public function testOrderShowPageHidesToggleFromANonPrivilegedCaViewer(): void
+    /**
+     * docs/schema.sql Section AP tightened this further: the whole Order
+     * Financials panel (not just the CAFIN toggle inside it) now requires
+     * manage_order_financials, which Accounts Executive does NOT get by
+     * default (unlike the broader ca_module_view it does hold) — so this
+     * viewer sees none of the panel at all, CAFIN sub-section included.
+     */
+    public function testOrderShowPageHidesTheWholePanelFromANonPrivilegedCaViewer(): void
     {
         $userId = $this->createTestUser('Accounts Executive');
+        $orderId = $this->createTestOrder($this->createTestClient());
+
+        $_SESSION['_auth_user_id'] = $userId;
+        $controller = new \App\Controllers\OrderController();
+        ob_start();
+        $controller->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertStringNotContainsString('Internal-Only Financial Annexure', $output);
+        self::assertStringNotContainsString('Enable internal financial annexure for this order', $output);
+        self::assertStringNotContainsString('Order Financials', $output);
+    }
+
+    /**
+     * Within the panel itself, the finer-grained distinction the original
+     * version of this test protected still holds: someone who can see the
+     * panel (granted manage_order_financials) but wasn't separately
+     * granted ca_internal_doc_manage sees the CAFIN sub-section read-only,
+     * not the toggle/generate controls.
+     */
+    public function testOrderShowPageHidesToggleFromAViewerWithoutCaInternalDocManage(): void
+    {
+        $userId = $this->createTestUser('Accounts Executive');
+        $pdo = Database::connection();
+        $permissionId = (int) $pdo->query("SELECT id FROM permissions WHERE permission_key = 'manage_order_financials'")->fetchColumn();
+        $pdo->prepare('INSERT INTO user_permissions (user_id, permission_id, is_enabled) VALUES (:user_id, :permission_id, 1)')
+            ->execute(['user_id' => $userId, 'permission_id' => $permissionId]);
+        \App\Services\PermissionService::resetCache();
         $orderId = $this->createTestOrder($this->createTestClient());
 
         $_SESSION['_auth_user_id'] = $userId;

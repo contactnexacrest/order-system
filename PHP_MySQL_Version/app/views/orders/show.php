@@ -193,6 +193,14 @@ $orderClosed = $order['status'] === 'complete';
     <?php if ($canViewReports): ?>&nbsp;·&nbsp; <a href="/reports/order/<?= (int) $order['id'] ?>">Full Report</a><?php endif; ?>
     <?php if ($canManageOrders): ?>&nbsp;·&nbsp; <a href="/orders/<?= (int) $order['id'] ?>/edit">Edit Order Details</a><?php endif; ?>
   </p>
+  <?php if ($duplicatedFromOrder): ?>
+    <p class="notice notice-info">This order was created as a repeat order from <a href="/orders/<?= (int) $duplicatedFromOrder['id'] ?>"><?= htmlspecialchars($duplicatedFromOrder['order_reference']) ?></a>.<?php if ($supplierPo && $supplierPo['status'] === 'draft'): ?> Its Supplier PO terms were carried over below as a draft — review and confirm once Stage 5 is reached.<?php endif; ?></p>
+  <?php endif; ?>
+  <?php if (!empty($duplicatedIntoOrders)): ?>
+    <p class="notice notice-info">Repeat order<?= count($duplicatedIntoOrders) === 1 ? '' : 's' ?> placed from this order:
+      <?php foreach ($duplicatedIntoOrders as $i => $d): ?><?= $i > 0 ? ', ' : '' ?><a href="/orders/<?= (int) $d['id'] ?>"><?= htmlspecialchars($d['order_reference']) ?></a><?php endforeach; ?>.
+    </p>
+  <?php endif; ?>
   <?php if ($canManageOrders): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/duplicate" style="display:inline" onsubmit="return confirm('Create a new order copying this one\'s client, commercial terms, and product lines? Nothing about this order changes.');">
       <?= Csrf::field() ?>
@@ -992,30 +1000,66 @@ $orderClosed = $order['status'] === 'complete';
     <?php endif; ?>
   </div>
 
-  <?php if ($canViewCaLinks): ?>
-  <div class="section">
-    <h2>Government Export Benefits &amp; Expenses (CA)</h2>
-    <p class="muted small">Financial detail linked to this order from the CA / Accounting module — manage claims and expense links from there. <a href="/ca/export-benefits">Export Benefits &rarr;</a> &middot; <a href="/ca/expenses">Expenses &rarr;</a></p>
-    <?php if (empty($linkedExportBenefits) && empty($linkedCaExpenses)): ?>
-      <p class="muted">Nothing linked to this order yet. Record a claim or link an expense from the CA module above, referencing <?= htmlspecialchars($order['order_reference']) ?>.</p>
-    <?php endif; ?>
-    <?php if (!empty($linkedExportBenefits)): ?>
-      <h3 style="font-size:0.95em;">Export Benefits Claimed</h3>
+  <?php if ($canManageOrderFinancials): ?>
+  <div class="section" id="order-financials">
+    <h2>Order Financials — Government Benefits, Costs &amp; Profitability</h2>
+    <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
+
+    <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
+    <?php if (empty($linkedExportBenefits)): ?>
+      <p class="muted">Nothing claimed against this order yet.</p>
+    <?php else: ?>
       <table class="list">
-        <tr><th>Claimed</th><th>Scheme</th><th>Claimed Amount</th><th>Received</th><th>Status</th></tr>
+        <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
         <?php foreach ($linkedExportBenefits as $b): ?>
         <tr>
           <td><?= htmlspecialchars((string) $b['claimed_at']) ?></td>
           <td><?= htmlspecialchars($b['scheme_name']) ?></td>
+          <td><?= htmlspecialchars($b['reference_number'] ?? '—') ?></td>
           <td><?= number_format((float) $b['claimed_amount'], 2) ?> <?= htmlspecialchars($b['currency_code']) ?></td>
           <td><?= $b['received_amount'] !== null ? number_format((float) $b['received_amount'], 2) . ' ' . htmlspecialchars($b['currency_code']) : '<span class="muted">—</span>' ?></td>
           <td><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed</span>' ?></td>
+          <td>
+            <?php if ($b['received_amount'] === null): ?>
+              <details>
+                <summary class="small">Mark received</summary>
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/received">
+                  <?= Csrf::field() ?>
+                  <label>Received Amount *<input type="text" name="received_amount" required></label>
+                  <label>Received On *<input type="date" name="received_at" value="<?= date('Y-m-d') ?>" required></label>
+                  <button type="submit" class="btn-sm">Save</button>
+                </form>
+              </details>
+            <?php endif; ?>
+          </td>
         </tr>
         <?php endforeach; ?>
       </table>
     <?php endif; ?>
-    <?php if (!empty($linkedCaExpenses)): ?>
-      <h3 style="font-size:0.95em; margin-top:12px;">Expenses for This Order</h3>
+    <details>
+      <summary>Record a new claim for this order</summary>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits">
+        <?= Csrf::field() ?>
+        <label>Scheme *
+          <select name="scheme_name" required>
+            <?php foreach ($exportBenefitSchemes as $opt): ?>
+              <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
+        <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+        <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
+        <label>Currency<input type="text" name="currency_code" value="INR"></label>
+        <label>Notes<input type="text" name="notes"></label>
+        <button type="submit" class="btn-sm">Record Claim</button>
+      </form>
+    </details>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Expenses Imported from Zoho Books</h3>
+    <?php if (empty($linkedCaExpenses)): ?>
+      <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
+    <?php else: ?>
       <table class="list">
         <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
         <?php foreach ($linkedCaExpenses as $e): ?>
@@ -1029,7 +1073,66 @@ $orderClosed = $order['status'] === 'complete';
       </table>
     <?php endif; ?>
 
-    <h3 style="font-size:0.95em; margin-top:12px;">Internal-Only Financial Annexure</h3>
+    <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
+    <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
+    <?php if (empty($orderCostEntries)): ?>
+      <p class="muted">No other costs recorded for this order yet.</p>
+    <?php else: ?>
+      <table class="list">
+        <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
+        <?php foreach ($orderCostEntries as $c): ?>
+        <tr>
+          <td><?= htmlspecialchars((string) ($c['incurred_at'] ?? '—')) ?></td>
+          <td><?= htmlspecialchars($costEntryCategories[$c['category']] ?? $c['category']) ?></td>
+          <td><?= htmlspecialchars($c['description'] ?? '—') ?></td>
+          <td><?= number_format((float) $c['amount_inr'], 2) ?></td>
+          <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
+          <td>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries/<?= (int) $c['id'] ?>/delete" onsubmit="return confirm('Remove this cost entry?');">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm btn-danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
+    <details>
+      <summary>Record a cost for this order</summary>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries">
+        <?= Csrf::field() ?>
+        <label>Category *
+          <select name="category" required>
+            <?php foreach ($costEntryCategories as $key => $label): ?>
+              <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
+        <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
+        <label>Description<input type="text" name="description"></label>
+        <button type="submit" class="btn-sm">Record Cost</button>
+      </form>
+    </details>
+
+    <?php if ($profitability): ?>
+      <h3 style="font-size:0.95em; margin-top:14px;">Profitability Summary</h3>
+      <div class="kv-grid">
+        <div><span class="k">Revenue (INR)<?= $profitability['revenue_is_estimated'] ? ' — estimated' : '' ?></span><span class="v"><?= number_format($profitability['revenue_inr'], 2) ?></span></div>
+        <div><span class="k">Supplier Cost (INR)</span><span class="v"><?= number_format($profitability['supplier_cost_inr'], 2) ?></span></div>
+        <div><span class="k">Ocean Freight (INR)</span><span class="v"><?= number_format($profitability['freight_cost_inr'], 2) ?></span></div>
+        <div><span class="k">Insurance (INR)</span><span class="v"><?= number_format($profitability['insurance_cost_inr'], 2) ?></span></div>
+        <div><span class="k">Other Costs (INR)</span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
+        <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
+        <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
+        <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
+      </div>
+      <?php if ($profitability['revenue_is_estimated']): ?>
+        <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
+      <?php endif; ?>
+    <?php endif; ?>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Internal-Only Financial Annexure</h3>
     <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
     <?php if ($canManageCaInternalDoc): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/toggle" style="margin-bottom:6px;">
@@ -1107,7 +1210,16 @@ $orderClosed = $order['status'] === 'complete';
   <div class="section">
     <h2>Stage 5 — Supplier Purchase Order (Material Procurement)</h2>
     <?php if (!$stage5 || $stage5['status'] === 'locked'): ?>
-      <p class="muted">Confirm buyer acknowledgement first to unlock this gate.</p>
+      <?php if ($supplierPo): ?>
+        <div class="kv-grid">
+          <div><span class="k">Supplier</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_legal_name']) ?></span></div>
+          <div><span class="k">Supplier PO Ref</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_po_reference']) ?></span></div>
+          <div><span class="k">Material</span><span class="v"><?= htmlspecialchars($supplierPo['material_stone_type'] ?? '—') ?></span></div>
+          <div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div>
+          <div><span class="k">Status</span><span class="v"><?= htmlspecialchars($supplierPo['status']) ?></span></div>
+        </div>
+      <?php endif; ?>
+      <p class="muted">Confirm buyer acknowledgement first to unlock this gate<?= $supplierPo ? ' before you can edit or progress this Supplier PO' : '' ?>.</p>
     <?php else: ?>
       <?php if ($supplierPo): ?>
         <div class="kv-grid">

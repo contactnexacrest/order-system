@@ -1,0 +1,44 @@
+<div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
+  <h1>Order Profitability Report</h1>
+  <p class="muted">Revenue, total cost, profit, and margin % per order — filtered by order creation date. Pick a date range to view any period (a month, a quarter, six months, a financial year) with a totals row for that range. See each order's own page for the full cost breakdown behind these figures.</p>
+
+  <form method="get" action="/reports/order-profitability" class="section">
+    <div class="kv-grid">
+      <label>Created From<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
+      <label>Created To<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm">Run</button>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/order-profitability?date_from={{ filters.dateFrom or '' }}&date_to={{ filters.dateTo or '' }}&format=csv">Export CSV</a>
+    </div>
+  </form>
+
+  <div class="section">
+    <h2>Totals for This Period</h2>
+    <div class="kv-grid">
+      <div><span class="k">Total Revenue (INR)</span><span class="v">{{ totals.revenue_inr | money }}</span></div>
+      <div><span class="k">Total Cost (INR)</span><span class="v">{{ totals.total_cost_inr | money }}</span></div>
+      <div><span class="k">Total Profit (INR)</span><span class="v">{{ totals.profit_inr | money }}</span></div>
+      <div><span class="k">Overall Margin %</span><span class="v">{% if totals.margin_pct != null %}{{ totals.margin_pct | money }}%{% else %}—{% endif %}</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <table class="list">
+      <tr><th>Order</th><th>Client</th><th>Created</th><th>Revenue (INR)</th><th>Total Cost (INR)</th><th>Profit (INR)</th><th>Margin %</th></tr>
+      {% for r in rows %}
+      <tr>
+        <td><a href="/orders/{{ r.order_id }}">{{ r.order_reference }}</a></td>
+        <td>{{ r.company_legal_name }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>{{ r.revenue_inr | money }}{% if r.revenue_is_estimated %} <span class="muted small">(est.)</span>{% endif %}</td>
+        <td>{{ r.total_cost_inr | money }}</td>
+        <td>{{ r.profit_inr | money }}</td>
+        <td>{% if r.margin_pct != null %}{{ r.margin_pct | money }}%{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% if rows.length == 0 %}<tr><td colspan="7" class="muted">No orders in this period.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>

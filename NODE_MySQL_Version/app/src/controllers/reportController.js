@@ -30,6 +30,7 @@ async function index(req, res) {
       searchQuery: query,
       searchResults: query !== '' ? await reportRepository.searchOrders(query) : [],
       canViewStaffReports: !!(req.permissions && req.permissions.view_staff_reports),
+      canManageOrderFinancials: !!(req.permissions && req.permissions.manage_order_financials),
     },
     'layout/base'
   );
@@ -510,6 +511,35 @@ async function suppliers(req, res) {
   res.renderView('reports/suppliers', { rows: await reportRepository.supplierPerformanceReport() }, 'layout/base');
 }
 
+/**
+ * Order Profitability Sheet, rolled up across orders — gated on
+ * manage_order_financials (not the general view_reports), same reasoning
+ * as the order-page panel this mirrors: it surfaces per-order margin data.
+ */
+async function profitability(req, res) {
+  const dateFrom = str(req.query.date_from) || null;
+  const dateTo = str(req.query.date_to) || null;
+
+  const data = await reportRepository.orderProfitabilityReport(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const rows = data.rows.map((r) => ({
+      'Order Ref': r.order_reference,
+      Client: r.company_legal_name,
+      Created: r.created_at,
+      'Revenue (INR)': r.revenue_inr,
+      Estimated: r.revenue_is_estimated ? 'Yes' : 'No',
+      'Total Cost (INR)': r.total_cost_inr,
+      'Profit (INR)': r.profit_inr,
+      'Margin %': r.margin_pct,
+    }));
+    csv.stream(res, 'order_profitability_report.csv', ['Order Ref', 'Client', 'Created', 'Revenue (INR)', 'Estimated', 'Total Cost (INR)', 'Profit (INR)', 'Margin %'], rows);
+    return;
+  }
+
+  res.renderView('reports/profitability', { rows: data.rows, totals: data.totals, filters: { dateFrom, dateTo } }, 'layout/base');
+}
+
 /** Conversion-rate report — closes a real gap: the funnel showed raw counts, never the actual conversion percentage. */
 async function conversion(req, res) {
   const dateFrom = str(req.query.date_from) || null;
@@ -524,4 +554,5 @@ async function conversion(req, res) {
 module.exports = {
   index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
   payments, disputes, amendments, trends, staff, ageing, freightCost, products, suppliers, conversion,
+  profitability,
 };

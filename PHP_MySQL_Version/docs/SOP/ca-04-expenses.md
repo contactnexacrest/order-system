@@ -94,11 +94,14 @@ is always a manual, local-only step, exactly like the TDS annotation
 above — it's never pushed back to Zoho Books.
 
 Once linked, the expense shows up on that order's own detail page too,
-under **Government Export Benefits & Expenses (CA)**, alongside any
+under **Order Financials — Government Benefits, Costs & Profitability**
+(gated on `manage_order_financials`, not the broader `ca_module_view` —
+see [Order Financials](./ca-08-order-financials.md)), alongside any
 RODTEP/export-benefit claim linked to the same order (see
-[Government Export Benefits](./ca-07-export-benefits.md)) — so opening
-one order shows every financial detail tied to it at a glance, not just
-the separate CA-module list screens.
+[Government Export Benefits](./ca-07-export-benefits.md)), any Order Cost
+Entry, and the order's own Profitability Sheet — so opening one order
+shows every financial detail tied to it at a glance, not just the
+separate CA-module list screens.
 
 ## What this doesn't do yet
 

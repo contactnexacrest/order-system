@@ -11,6 +11,7 @@ use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderStageRepository;
+use App\Repositories\OrderSupplierPoRepository;
 
 /**
  * Creates a brand-new order from an existing one — a "repeat order",
@@ -22,6 +23,15 @@ use App\Repositories\OrderStageRepository;
  * documents, payment status, FIRC/INR-actual data, disputes, comments, or
  * stage progress — all of that starts fresh, exactly like any order
  * created through the normal /orders/create form.
+ *
+ * One exception, added 2026-09-30: if the source order has a Supplier PO,
+ * its supplier and pricing terms are carried forward onto the new order
+ * as a fresh order_supplier_po row with status='draft' (see
+ * carrySupplierPoForward() below) — a repeat client order almost always
+ * means a repeat order to the same supplier too, and staff shouldn't have
+ * to re-type terms that haven't changed. It's a draft, not an issued PO:
+ * nothing is sent to the supplier, and staff review/adjust it through the
+ * normal Stage 5 flow once this new order reaches that stage.
  */
 final class OrderDuplicationService
 {
@@ -75,6 +85,7 @@ final class OrderDuplicationService
                 'buyers_po_ref'         => 'NIL', // the buyer's own ref is specific to each order — staff records the new one
                 'quotation_date'        => date('Y-m-d'),
                 'quotation_valid_until' => date('Y-m-d', strtotime('+' . ((int) (CompanySettingsRepository::get('quotation_validity_days') ?? 30)) . ' days')),
+                'duplicated_from_order_id' => (int) $source['id'],
             ];
         }, $createdBy);
         $newOrderId = $result['orderId'];
@@ -109,6 +120,69 @@ final class OrderDuplicationService
 
         AuditLogRepository::log($createdBy, 'ORDER_DUPLICATED', 'orders', $newOrderId, 'source_order_id', null, (string) $sourceOrderId);
 
+        self::carrySupplierPoForward($sourceOrderId, $newOrderId, $createdBy);
+
         return $newOrderId;
+    }
+
+    /**
+     * See class docblock. Silently does nothing if the source order never
+     * had a Supplier PO — that's the common case for an order duplicated
+     * before it ever reached Stage 5, and is not an error.
+     */
+    private static function carrySupplierPoForward(int $sourceOrderId, int $newOrderId, int $createdBy): void
+    {
+        $sourceSupplierPo = OrderSupplierPoRepository::findLatestForOrder($sourceOrderId);
+        if ($sourceSupplierPo === null) {
+            return;
+        }
+
+        $docTypeId = \App\Services\DocumentGenerationService::documentTypeIdFor('SUPPO');
+        $newReference = $docTypeId ? \App\Services\ReferenceNumberService::generateDocumentRef($docTypeId) : null;
+        if ($newReference === null) {
+            return;
+        }
+
+        $newSupplierPoId = OrderSupplierPoRepository::create(
+            $newOrderId,
+            (int) $sourceSupplierPo['supplier_id'],
+            $newReference,
+            [
+                'material_stone_type'   => $sourceSupplierPo['material_stone_type'],
+                'grade'                 => $sourceSupplierPo['grade'],
+                'surface_finish'        => $sourceSupplierPo['surface_finish'],
+                'dimensions'            => $sourceSupplierPo['dimensions'],
+                'dimensional_tolerance' => $sourceSupplierPo['dimensional_tolerance'],
+                'quantity'              => $sourceSupplierPo['quantity'],
+                'unit'                  => $sourceSupplierPo['unit'],
+                'colour_reference'      => $sourceSupplierPo['colour_reference'],
+                'special_requirements'  => $sourceSupplierPo['special_requirements'],
+                'unit_price_inr'        => $sourceSupplierPo['unit_price_inr'],
+                'basic_value_inr'       => $sourceSupplierPo['basic_value_inr'],
+                'gst_rate_pct'          => $sourceSupplierPo['gst_rate_pct'],
+                'gst_amount_inr'        => $sourceSupplierPo['gst_amount_inr'],
+                'total_payable_inr'     => $sourceSupplierPo['total_payable_inr'],
+                'advance_pct'           => $sourceSupplierPo['advance_pct'],
+                'advance_amount_inr'    => $sourceSupplierPo['advance_amount_inr'],
+                'balance_amount_inr'    => $sourceSupplierPo['balance_amount_inr'],
+                'delivery_location'     => $sourceSupplierPo['delivery_location'],
+                // Deliberately NOT carried over: required_delivery_date and
+                // delivery_confirmation_due_date are specific to the source
+                // shipment's own timeline — staff set fresh dates for this order.
+                'required_delivery_date' => null,
+                'packing_requirement'   => $sourceSupplierPo['packing_requirement'],
+            ],
+            'draft'
+        );
+
+        AuditLogRepository::log(
+            $createdBy,
+            'SUPPLIER_PO_CARRIED_FORWARD',
+            'order_supplier_po',
+            $newSupplierPoId,
+            'source_supplier_po_id',
+            null,
+            (string) $sourceSupplierPo['id']
+        );
     }
 }

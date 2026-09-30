@@ -33,6 +33,7 @@ final class ReportController
             'searchQuery' => $query,
             'searchResults' => $query !== '' ? ReportRepository::searchOrders($query) : [],
             'canViewStaffReports' => PermissionService::can((int) $user['id'], $roleId, 'view_staff_reports'),
+            'canManageOrderFinancials' => PermissionService::can((int) $user['id'], $roleId, 'manage_order_financials'),
         ], 'layout/base');
     }
 
@@ -482,6 +483,40 @@ final class ReportController
     {
         View::render('reports/suppliers', [
             'rows' => ReportRepository::supplierPerformanceReport(),
+        ], 'layout/base');
+    }
+
+    /**
+     * Order Profitability Sheet, rolled up across orders — gated on
+     * manage_order_financials (not the general view_reports), same
+     * reasoning as the order-page panel this mirrors: it surfaces
+     * per-order margin data.
+     */
+    public function profitability(array $params): void
+    {
+        $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
+        $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
+
+        $data = ReportRepository::orderProfitabilityReport($dateFrom, $dateTo);
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            $rows = array_map(static fn(array $r): array => [
+                'Order Ref' => $r['order_reference'],
+                'Client' => $r['company_legal_name'],
+                'Created' => $r['created_at'],
+                'Revenue (INR)' => $r['revenue_inr'],
+                'Estimated' => $r['revenue_is_estimated'] ? 'Yes' : 'No',
+                'Total Cost (INR)' => $r['total_cost_inr'],
+                'Profit (INR)' => $r['profit_inr'],
+                'Margin %' => $r['margin_pct'],
+            ], $data['rows']);
+            Csv::stream('order_profitability_report.csv', ['Order Ref', 'Client', 'Created', 'Revenue (INR)', 'Estimated', 'Total Cost (INR)', 'Profit (INR)', 'Margin %'], $rows);
+        }
+
+        View::render('reports/profitability', [
+            'rows' => $data['rows'],
+            'totals' => $data['totals'],
+            'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
         ], 'layout/base');
     }
 

@@ -2447,6 +2447,66 @@ CREATE TABLE dispute_replies (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION AP — REORDER-TO-SUPPLIER LINKING + ORDER PROFITABILITY
+-- (added 2026-09-30)
+-- ================================================================
+-- Repeat-order linkage: duplicated_from_order_id records which order a
+-- repeat order was created from, whether via staff's direct "Duplicate
+-- Order" or an approved client reorder request (both go through
+-- orderDuplicationService.duplicate()). order_reorder_requests already
+-- had its own source_order_id/new_order_id pair for that one path — this
+-- column is the general-purpose version, set for every duplication path,
+-- so the order page itself can show "duplicated from Order X" without
+-- caring which path created it.
+--
+-- orderDuplicationService.duplicate() also now carries the source
+-- order's Supplier PO (if any) forward onto the new order as a fresh
+-- order_supplier_po row with status='draft' — same supplier and pricing,
+-- a brand-new supplier_po_reference, nothing sent anywhere. This is the
+-- ONLY path that ever inserts a 'draft'-status row (the normal Stage 5
+-- flow in ordersController.saveSupplierPo() always inserts 'issued'), so
+-- status='draft' plus a non-null duplicated_from_order_id on the order
+-- itself is sufficient to identify a carried-over draft on the order
+-- page — no separate link column needed on order_supplier_po itself.
+ALTER TABLE orders
+  ADD COLUMN duplicated_from_order_id BIGINT UNSIGNED NULL AFTER ca_internal_doc_enabled,
+  ADD FOREIGN KEY (duplicated_from_order_id) REFERENCES orders(id);
+
+-- Order Profitability Sheet: manually-recorded cost lines not already
+-- captured elsewhere in the schema (supplier cost lives in
+-- order_supplier_po.total_payable_inr, ocean freight/insurance in
+-- order_freight — orderProfitabilityService pulls those automatically,
+-- nothing is double-entered here). Everything below is assumed INR, same
+-- convention as order_supplier_po, since these are domestic costs NexaCrest
+-- itself pays (CHA, port handling, bank charges, etc.) — see
+-- orderProfitabilityService's own comment for the full assumption list.
+-- ecgc_insurance and due_diligence cover the two extra "government
+-- benefits/expenses" categories asked for beyond the existing RODTEP/Duty
+-- Drawback/RoSCTL benefit schemes in ca_export_benefits (those two are
+-- expenses NexaCrest pays out, not benefits it claims back, so they
+-- belong here rather than in that claim-tracking table).
+CREATE TABLE order_cost_entries (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL,
+  category      ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
+                      'documentation','port_charges','bank_charges','commission',
+                      'packing_crates','other') NOT NULL,
+  description   VARCHAR(255) NULL,
+  amount_inr    DECIMAL(14,2) NOT NULL,
+  incurred_at   DATE NULL,
+  recorded_by   BIGINT UNSIGNED NOT NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (recorded_by) REFERENCES users(id),
+  INDEX idx_order_cost_entries_order (order_id)
+) ENGINE=InnoDB;
+
+-- manage_order_financials permission itself is seeded in seed.sql
+-- (permissions + role_permissions), same as every other permission — see
+-- that file's own comment for the default-grant reasoning.
+-- ================================================================
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2484,4 +2544,5 @@ CREATE TABLE dispute_replies (
 -- Section AM (expense-to-order linking) added 2026-09-27.
 -- Section AN (internal-only CA financial annexure) added 2026-09-30.
 -- Section AO (dispute replies + granular dispute permissions) added 2026-09-30.
+-- Section AP (reorder-to-supplier linking + order profitability) added 2026-09-30.
 -- ================================================================

@@ -28,6 +28,7 @@ const documentRepository = require('../repositories/documentRepository');
 const documentReviewRepository = require('../repositories/documentReviewRepository');
 const emailLogRepository = require('../repositories/emailLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
+const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderCrateRepository = require('../repositories/orderCrateRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPackingRepository = require('../repositories/orderPackingRepository');
@@ -49,6 +50,7 @@ const emailService = require('../services/emailService');
 const referenceNumberService = require('../services/referenceNumberService');
 const stageGateService = require('../services/stageGateService');
 const documentGenerationService = require('../services/documentGenerationService');
+const orderProfitabilityService = require('../services/orderProfitabilityService');
 const clientPortalService = require('../services/clientPortalService');
 const fileUploadService = require('../services/fileUploadService');
 const testModeService = require('../services/testModeService');
@@ -648,6 +650,12 @@ async function show(req, res) {
   }
 
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+
+  const duplicatedFromOrder = order.duplicated_from_order_id
+    ? await orderRepository.find(order.duplicated_from_order_id)
+    : null;
+  const duplicatedIntoOrders = await orderRepository.findOrdersDuplicatedFrom(orderId);
+
   const activeUsers = await userRepository.listActive();
   const usersById = {};
   for (const u of activeUsers) usersById[u.id] = u.name;
@@ -726,6 +734,18 @@ async function show(req, res) {
       linkedCaExpenses: req.permissions.ca_module_view ? await caExpenseRepository.forOrder(orderId) : [],
       canManageCaInternalDoc: !!req.permissions.ca_internal_doc_manage,
       caInternalDoc: req.permissions.ca_module_view ? await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CAFIN') : null,
+      // Reorder-to-supplier linking + Order Profitability Sheet (docs/schema.sql
+      // Section AP) — gated on the new, deliberately stricter
+      // manage_order_financials permission rather than ca_module_view, per
+      // the user's own ask that this specific section stay
+      // Super-Admin-plus-explicitly-granted-roles only.
+      canManageOrderFinancials: !!req.permissions.manage_order_financials,
+      orderCostEntries: req.permissions.manage_order_financials ? await orderCostEntryRepository.forOrder(orderId) : [],
+      costEntryCategories: orderCostEntryRepository.CATEGORIES,
+      profitability: req.permissions.manage_order_financials ? await orderProfitabilityService.computeForOrder(orderId) : null,
+      exportBenefitSchemes: await lookupRepository.dropdownOptions('export_benefit_scheme'),
+      duplicatedFromOrder,
+      duplicatedIntoOrders,
     },
     'layout/base'
   );

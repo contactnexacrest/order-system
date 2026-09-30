@@ -93,7 +93,7 @@ final class DocumentGenerationService
             );
         }
 
-        $data = DocumentDataAssembler::assemble($orderId);
+        $data = DocumentDataAssembler::assemble($orderId, $documentTypeCode);
 
         $existing = DocumentRepository::findLatestForOrderAndType($orderId, (int) $docType['id']);
         // QA-5 CONC-04: reserved atomically, up front — see
@@ -450,7 +450,7 @@ final class DocumentGenerationService
         $order = OrderRepository::find($orderId);
         $documentTypeCode = $document['document_type_code'];
 
-        $data = DocumentDataAssembler::assemble($orderId);
+        $data = DocumentDataAssembler::assemble($orderId, $documentTypeCode);
         $terms = self::resolveTerms($documentTypeCode, $data);
 
         $context = array_merge($data, [
@@ -727,6 +727,13 @@ final class DocumentGenerationService
 
         $benefits = CaExportBenefitRepository::forOrder($orderId);
         $expenses = CaExpenseRepository::forOrder($orderId);
+        // Added alongside the Order Profitability Sheet (docs/schema.sql
+        // Section AP) — supplier pricing is exactly the kind of data this
+        // document exists for (internal-only, never client-facing) and was
+        // previously missing from it entirely.
+        $supplierPo = \App\Repositories\OrderSupplierPoRepository::findLatestForOrder($orderId);
+        $costEntries = \App\Repositories\OrderCostEntryRepository::forOrder($orderId);
+        $profitability = \App\Services\OrderProfitabilityService::computeForOrder($orderId);
 
         $revisionNumber = ReferenceNumberService::nextDocumentRevisionNumber($orderId, $docTypeId);
         $existing = DocumentRepository::findLatestForOrderAndType($orderId, $docTypeId);
@@ -746,6 +753,9 @@ final class DocumentGenerationService
             ],
             'benefits' => $benefits,
             'expenses' => $expenses,
+            'supplier_po' => $supplierPo,
+            'cost_entries' => $costEntries,
+            'profitability' => $profitability,
         ];
 
         $twig = self::twigEnvironment();

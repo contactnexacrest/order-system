@@ -41,6 +41,7 @@ const holidayController = require('./controllers/holidayController');
 const referenceDocController = require('./controllers/referenceDocController');
 const sopController = require('./controllers/sopController');
 const caController = require('./controllers/caController');
+const orderFinancialsController = require('./controllers/orderFinancialsController');
 const assetController = require('./controllers/assetController');
 const clientsController = require('./controllers/clientsController');
 const clientIntakeController = require('./controllers/clientIntakeController');
@@ -486,6 +487,10 @@ app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit
 app.post('/ca/expenses/:id/link-order', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.linkExpenseToOrder));
 app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('ca_internal_doc_manage'), verifyCsrf, asyncHandler(caController.toggleInternalDoc));
 app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), verifyCsrf, asyncHandler(caController.generateInternalDoc));
+app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
+app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
+app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));
+app.post('/orders/:id/cost-entries/:entryId/delete', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(orderFinancialsController.deleteCostEntry));
 app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));
 app.post('/ca/bank-statement/upload', requireAuth, requirePermission('inr_actual_edit'), upload.single('statement'), verifyCsrf, asyncHandler(caController.uploadBankStatement));
 app.post('/ca/bank-statement/:id/match-revenue', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.matchBankLineToRevenue));
@@ -650,6 +655,7 @@ app.get('/reports/freight-cost', requireAuth, requirePermission('view_reports'),
 app.get('/reports/products', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.products));
 app.get('/reports/suppliers', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.suppliers));
 app.get('/reports/conversion', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.conversion));
+app.get('/reports/order-profitability', requireAuth, requirePermission('manage_order_financials'), asyncHandler(reportController.profitability));
 app.post('/reports/save', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.saveDefinition));
 app.get('/reports/saved/:reportId/run', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.runDefinition));
 app.post('/reports/saved/:reportId/update', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.updateDefinition));

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\OrderProfitabilityService;
 use App\Services\TestModeService;
 
 /**
@@ -1190,6 +1191,80 @@ final class ReportRepository
         ksort($byForwarder);
 
         return ['rows' => $rows, 'by_forwarder' => $byForwarder];
+    }
+
+    /**
+     * Order Profitability Sheet, rolled up (docs/schema.sql Section AP) —
+     * "for every export order... per order/per month/per quarter/per six
+     * months/per financial year". A single date-range filter (matching
+     * every other report's date_from/date_to convention) IS the
+     * month/quarter/half-year/FY view: pick April-March for an FY, any
+     * three months for a quarter, and so on — no separate UI per period,
+     * same pattern as every other report in this module.
+     *
+     * Deliberately a small in-PHP loop over OrderProfitabilityService
+     * rather than one large SQL rollup — that service is the single
+     * source of truth for how a profitability figure is computed (see its
+     * own docblock for the revenue/cost assumptions), and this report
+     * must never compute those figures a second, divergent way. Fine at
+     * this report's realistic scale (an export business's order volume),
+     * not meant for a dataset large enough to need real aggregation.
+     */
+    public static function orderProfitabilityReport(?string $dateFrom, ?string $dateTo): array
+    {
+        $isTestMode = self::isTestModeFlag();
+        $where = ['o.is_test_data = :is_test_data'];
+        $params = ['is_test_data' => $isTestMode];
+        if ($dateFrom) {
+            $where[] = 'DATE(o.created_at) >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $where[] = 'DATE(o.created_at) <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+
+        $sql = 'SELECT o.id, o.order_reference, o.created_at, c.company_legal_name
+                FROM orders o
+                JOIN clients c ON c.id = o.client_id
+                WHERE ' . implode(' AND ', $where) . '
+                ORDER BY o.created_at DESC';
+
+        $stmt = Database::connection()->prepare($sql);
+        $stmt->execute($params);
+        $orders = $stmt->fetchAll();
+
+        $rows = [];
+        $totalRevenue = 0.0;
+        $totalCost = 0.0;
+        $totalProfit = 0.0;
+        foreach ($orders as $o) {
+            $p = OrderProfitabilityService::computeForOrder((int) $o['id']);
+            $rows[] = [
+                'order_id'        => (int) $o['id'],
+                'order_reference' => $o['order_reference'],
+                'company_legal_name' => $o['company_legal_name'],
+                'created_at'      => $o['created_at'],
+                'revenue_inr'     => $p['revenue_inr'],
+                'revenue_is_estimated' => $p['revenue_is_estimated'],
+                'total_cost_inr'  => $p['total_cost_inr'],
+                'profit_inr'      => $p['profit_inr'],
+                'margin_pct'      => $p['margin_pct'],
+            ];
+            $totalRevenue += $p['revenue_inr'];
+            $totalCost += $p['total_cost_inr'];
+            $totalProfit += $p['profit_inr'];
+        }
+
+        return [
+            'rows' => $rows,
+            'totals' => [
+                'revenue_inr' => $totalRevenue,
+                'total_cost_inr' => $totalCost,
+                'profit_inr' => $totalProfit,
+                'margin_pct' => $totalRevenue > 0 ? round($totalProfit / $totalRevenue * 100, 2) : null,
+            ],
+        ];
     }
 
     // ================================================================

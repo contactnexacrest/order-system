@@ -28,7 +28,19 @@ const { addWorkingDays } = require('./workingDaysCalculator');
  * nothing outside of DB seed data." Templates only ever see variables from
  * here, never a DB call of their own.
  */
-async function assemble(orderId) {
+// Document types allowed to see supplier pricing (what NexaCrest pays its
+// supplier) in the context this function builds. Added 2026-09-30 after a
+// review found supplierPoBlock() was unconditionally included in every
+// document's context — buyer-facing templates (QT/PI/OC/BUYERPO/CI/PL/BLI/
+// AMD) never happened to reference it, so nothing ever leaked, but that
+// was "safe by accident," not by construction. documentTypeCode is
+// optional (defaults to including the block, the old behavior) only so
+// any caller that genuinely needs the full assembly without knowing its
+// own document type still works — every real call site in this codebase
+// passes its type explicitly.
+const SUPPLIER_COST_VISIBLE_TO = ['SUPPO'];
+
+async function assemble(orderId, documentTypeCode = null) {
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
@@ -167,7 +179,9 @@ async function assemble(orderId) {
           balance_due_date: formatDate(payment.balance_due_date),
         }
       : null,
-    supplier_po: await supplierPoBlock(orderId),
+    supplier_po: (documentTypeCode === null || SUPPLIER_COST_VISIBLE_TO.includes(documentTypeCode))
+      ? await supplierPoBlock(orderId)
+      : null,
     freight: await freightBlock(orderId),
     packing: await packingBlock(orderId),
     crates: await cratesBlock(orderId),

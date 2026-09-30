@@ -19,6 +19,14 @@ so it's entered directly here instead of through a sync.
 
 ## Recording a claim
 
+A claim can be recorded from either of two places, both writing to the
+same table: the CA module's own screen below, or directly from the
+**Order Financials** box on the order's own page (see
+[Order Financials](./ca-08-order-financials.md)) if you already have that
+order open and hold `manage_order_financials` — useful when you're
+already looking at the order and don't want to go hunting for its
+reference number. This chapter covers the CA-module screen.
+
 **CA / Accounting → Government Export Benefits → Record a Claim.** Choose
 the scheme (RODTEP is the default; Admin can add more schemes under
 Settings → Dropdown Options → `export_benefit_scheme`), optionally the
@@ -39,11 +47,16 @@ system keeps both on record rather than assuming they always match.
 A claim tied to an order (via the order-reference field when recording
 it) shows up in two places: the order reference is a clickable link right
 here in the Claims table, and the claim also appears on that order's own
-detail page under **Government Export Benefits & Expenses (CA)** —
-alongside any expense (see [Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to))
-linked to the same order. This is the same permission gate
-(`ca_module_view`) as the rest of this module, so it only appears to
-someone who could already see this page.
+detail page under **Order Financials — Government Benefits, Costs &
+Profitability** — alongside any expense (see
+[Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to)),
+Order Cost Entry, and the order's own Profitability Sheet — see
+[Order Financials](./ca-08-order-financials.md). That box is gated on the
+stricter `manage_order_financials` permission (Admin/MD/ED and Super
+Admin by default) — **not** `ca_module_view` — so a CA-role or Accounts
+Executive user who can see and record claims from this screen may not see
+that same claim on the order's own page unless also granted
+`manage_order_financials`.
 
 ## Totals
 

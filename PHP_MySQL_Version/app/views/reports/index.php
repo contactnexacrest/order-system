@@ -68,6 +68,14 @@ $__uid = $__u ? (int) $__u['id'] : 0;
   </div>
   <?php endif; ?>
 
+  <?php if ($canManageOrderFinancials): ?>
+  <div class="section">
+    <h2>Order Profitability</h2>
+    <p class="muted">Revenue vs. every direct cost, per order, for any date range — month, quarter, half-year, or financial year. Visible only to Super Admin and roles specifically granted "Manage order financials".</p>
+    <a class="btn-sm" href="/reports/order-profitability">Open Order Profitability Report</a>
+  </div>
+  <?php endif; ?>
+
   <div class="section">
     <h2>Find an Order</h2>
     <p class="muted">Search by order reference or client company name to jump straight to that order's Full Report.</p>

@@ -8,7 +8,7 @@ use App\Config\Database;
 
 final class OrderSupplierPoRepository
 {
-    public static function create(int $orderId, int $supplierId, string $supplierPoReference, array $data): int
+    public static function create(int $orderId, int $supplierId, string $supplierPoReference, array $data, string $status = 'issued'): int
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
@@ -23,12 +23,13 @@ final class OrderSupplierPoRepository
                  :dimensions, :tolerance, :quantity, :unit, :colour, :special,
                  :unit_price, :basic_value, :gst_rate, :gst_amount, :total_payable,
                  :advance_pct, :advance_amount, :balance_amount,
-                 :delivery_location, :required_delivery_date, :packing_requirement, \'issued\')'
+                 :delivery_location, :required_delivery_date, :packing_requirement, :status)'
         );
         $stmt->execute([
             'order_id'    => $orderId,
             'supplier_id' => $supplierId,
             'ref'         => $supplierPoReference,
+            'status'      => $status,
             'material'    => $data['material_stone_type'] ?? null,
             'grade'       => $data['grade'] ?? 'Grade A',
             'finish'      => $data['surface_finish'] ?? null,

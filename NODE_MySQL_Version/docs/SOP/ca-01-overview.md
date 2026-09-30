@@ -51,6 +51,7 @@ order-management access, or vice versa.
 | `inr_actual_edit` | Record or correct the INR actual amount for a cleared payment. |
 | `inr_actual_delete` | Remove a recorded INR actual amount (a destructive correction — kept separate from edit). |
 | `ca_internal_doc_manage` | Turn on, and generate, the internal-only CA Financial Annexure for a specific order (see below) — deliberately **not** granted to the Accounts Executive or CA roles by default, unlike every other CA permission. |
+| `manage_order_financials` | View/add/edit an order's government export benefit claims, other order costs, and its Order Profitability Sheet, all from the order's own page (see [Order Financials](./ca-08-order-financials.md)) — deliberately **stricter** than `ca_module_view`/`inr_actual_edit`: not auto-granted to Accounts Executive or CA, Admin/MD/ED and Super Admin only by default. |
 
 A new role, **CA / Chartered Accountant**, is seeded with `ca_module_view`
 and `inr_actual_view` only — a view-only role for an external or in-house
@@ -94,29 +95,34 @@ Every record and delete action here is written to the system's audit log
 (**Insights → Audit Log**, if you hold that permission), same as any other
 sensitive field in the system.
 
-## Government export benefits & linked expenses (also on the order's own page)
+## Order Financials (also on the order's own page)
 
-Just below the Payment Status section, anyone with `ca_module_view` also
-sees a **Government Export Benefits & Expenses (CA)** box — any RODTEP/
-export-benefit claim or expense (ECGC insurance, third-party inspection,
-CHA, transport, ...) linked to this specific order, so opening one order
-shows every CA financial detail tied to it at a glance. This box is
-read-only; recording a claim, marking one received, or linking/unlinking
-an expense is still done from the CA module itself — see
+Just below the Payment Status section, anyone holding the stricter
+`manage_order_financials` permission (see the permission table above —
+**not** `ca_module_view`) sees an **Order Financials — Government
+Benefits, Costs & Profitability** box: every government export-benefit
+claim and expense linked to this specific order, its Order Cost Entries,
+and its Order Profitability Sheet, all in one place so opening one order
+shows every financial detail tied to it at a glance. Unlike Phase 1's
+read-only box, this one lets a claim be recorded and marked received, and
+a cost entered or removed, directly from the order page — see
+[Order Financials](./ca-08-order-financials.md) for the full chapter, and
 [Government Export Benefits](./ca-07-export-benefits.md) and
-[Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to).
+[Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to)
+for the CA-module screens the same data also appears on.
 
 ## The internal-only CA Financial Annexure — and why it can never reach a client
 
-Government export benefits and expenses are genuine business figures, but
-they must **never** appear on a document a client/buyer ever sees — not
-by accident, and not even if someone deliberately tries to make it
-happen. Rather than add a checkbox to an existing buyer document (a risk
-that a future change, a bug, or a mis-click could quietly undo), this is
-built as three separate, structural guarantees:
+Government export benefits, expenses, supplier cost, and profitability
+figures are genuine business figures, but they must **never** appear on a
+document a client/buyer ever sees — not by accident, and not even if
+someone deliberately tries to make it happen. Rather than add a checkbox
+to an existing buyer document (a risk that a future change, a bug, or a
+mis-click could quietly undo), this is built as three separate,
+structural guarantees:
 
 1. **Off by default, and behind its own permission.** At the bottom of
-   the same Government Export Benefits & Expenses (CA) box, someone
+   the same Order Financials box, someone
    holding `ca_internal_doc_manage` sees a checkbox — *"Enable internal
    financial annexure for this order"* — unchecked by default for every
    order. Only once it's checked does a **Generate Internal Financial
@@ -150,6 +156,20 @@ built as three separate, structural guarantees:
    everything for this order" dossier ZIP staff use for handovers/
    archiving, for the same reason — that ZIP only requires the broad
    "manage orders" permission.
+4. **Supplier cost is invisible to the template-assembly step itself for
+   every other document type** (added alongside Order Financials) — not
+   just kept off the client portal's document list. Every generated
+   document's content (QT, PI, OC, CAFIN, all of them) is built by one
+   shared internal step that assembles everything the template *could*
+   reference; before this, that step always included the order's
+   Supplier PO figures in what it built, and only happened to be safe
+   because no buyer-facing template referenced them. Now that step is
+   told which document type it's building for, and only ever includes
+   Supplier PO figures — and, with them, the Order Cost Entries and
+   Profitability Sheet baked into CAFIN — when building `CAFIN` itself.
+   A future template change to a buyer-facing document type literally
+   cannot pull in supplier cost data, since it's never assembled in the
+   first place for anything but `CAFIN`.
 
 Staff and admins can always open both what a client actually receives
 (any of the ordinary generated documents) and this internal one side by

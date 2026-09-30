@@ -7,6 +7,8 @@ const orderPaymentStatusRepository = require('../repositories/orderPaymentStatus
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
+const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
+const referenceNumberService = require('./referenceNumberService');
 const testModeService = require('../services/testModeService');
 
 /**
@@ -20,6 +22,15 @@ const testModeService = require('../services/testModeService');
  * status, FIRC/INR-actual data, disputes, comments, or stage progress —
  * all of that starts fresh, exactly like any order created through the
  * normal /orders/create form.
+ *
+ * One exception, added 2026-09-30: if the source order has a Supplier PO,
+ * its supplier and pricing terms are carried forward onto the new order
+ * as a fresh order_supplier_po row with status='draft' (see
+ * carrySupplierPoForward() below) — a repeat client order almost always
+ * means a repeat order to the same supplier too, and staff shouldn't have
+ * to re-type terms that haven't changed. It's a draft, not an issued PO:
+ * nothing is sent to the supplier, and staff review/adjust it through the
+ * normal Stage 5 flow once this new order reaches that stage.
  *
  * @param {number} sourceOrderId
  * @param {number} createdBy
@@ -73,6 +84,7 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
       buyers_po_ref: 'NIL', // the buyer's own ref is specific to each order — staff records the new one
       quotation_date: todayYmd,
       quotation_valid_until: validUntilYmd,
+      duplicated_from_order_id: source.id,
     }),
     createdBy
   );
@@ -107,7 +119,70 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
 
   await auditLogRepository.log(createdBy, 'ORDER_DUPLICATED', 'orders', newOrderId, 'source_order_id', null, String(sourceOrderId));
 
+  await carrySupplierPoForward(sourceOrderId, newOrderId, createdBy);
+
   return newOrderId;
+}
+
+/**
+ * See module docblock. Silently does nothing if the source order never
+ * had a Supplier PO — that's the common case for an order duplicated
+ * before it ever reached Stage 5, and is not an error.
+ */
+async function carrySupplierPoForward(sourceOrderId, newOrderId, createdBy) {
+  const sourceSupplierPo = await orderSupplierPoRepository.findLatestForOrder(sourceOrderId);
+  if (!sourceSupplierPo) {
+    return;
+  }
+
+  const documentGenerationService = require('./documentGenerationService');
+  const docTypeId = await documentGenerationService.documentTypeIdFor('SUPPO');
+  const newReference = docTypeId ? await referenceNumberService.generateDocumentRef(docTypeId) : null;
+  if (!newReference) {
+    return;
+  }
+
+  const newSupplierPoId = await orderSupplierPoRepository.create(
+    newOrderId,
+    sourceSupplierPo.supplier_id,
+    newReference,
+    {
+      material_stone_type: sourceSupplierPo.material_stone_type,
+      grade: sourceSupplierPo.grade,
+      surface_finish: sourceSupplierPo.surface_finish,
+      dimensions: sourceSupplierPo.dimensions,
+      dimensional_tolerance: sourceSupplierPo.dimensional_tolerance,
+      quantity: sourceSupplierPo.quantity,
+      unit: sourceSupplierPo.unit,
+      colour_reference: sourceSupplierPo.colour_reference,
+      special_requirements: sourceSupplierPo.special_requirements,
+      unit_price_inr: sourceSupplierPo.unit_price_inr,
+      basic_value_inr: sourceSupplierPo.basic_value_inr,
+      gst_rate_pct: sourceSupplierPo.gst_rate_pct,
+      gst_amount_inr: sourceSupplierPo.gst_amount_inr,
+      total_payable_inr: sourceSupplierPo.total_payable_inr,
+      advance_pct: sourceSupplierPo.advance_pct,
+      advance_amount_inr: sourceSupplierPo.advance_amount_inr,
+      balance_amount_inr: sourceSupplierPo.balance_amount_inr,
+      delivery_location: sourceSupplierPo.delivery_location,
+      // Deliberately NOT carried over: required_delivery_date and
+      // delivery_confirmation_due_date are specific to the source
+      // shipment's own timeline — staff set fresh dates for this order.
+      required_delivery_date: null,
+      packing_requirement: sourceSupplierPo.packing_requirement,
+    },
+    'draft'
+  );
+
+  await auditLogRepository.log(
+    createdBy,
+    'SUPPLIER_PO_CARRIED_FORWARD',
+    'order_supplier_po',
+    newSupplierPoId,
+    'source_supplier_po_id',
+    null,
+    String(sourceSupplierPo.id)
+  );
 }
 
 module.exports = { duplicate };

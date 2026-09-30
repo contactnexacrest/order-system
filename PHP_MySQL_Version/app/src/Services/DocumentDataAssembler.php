@@ -30,7 +30,21 @@ use App\Repositories\OrderSupplierPoRepository;
  */
 final class DocumentDataAssembler
 {
-    public static function assemble(int $orderId): array
+    /**
+     * Document types allowed to see supplier pricing (what NexaCrest pays
+     * its supplier) in the context this method builds. Added 2026-09-30
+     * after a review found supplierPoBlock() was unconditionally included
+     * in every document's context — buyer-facing templates (QT/PI/OC/
+     * BUYERPO/CI/PL/BLI/AMD) never happened to reference it, so nothing
+     * ever leaked, but that was "safe by accident," not by construction.
+     * $documentTypeCode is optional (defaults to including the block, the
+     * old behavior) only so any caller that genuinely needs the full
+     * assembly without knowing its own document type still works — every
+     * real call site in this codebase passes its type explicitly.
+     */
+    private const SUPPLIER_COST_VISIBLE_TO = ['SUPPO'];
+
+    public static function assemble(int $orderId, ?string $documentTypeCode = null): array
     {
         $order = OrderRepository::find($orderId);
         if (!$order) {
@@ -169,7 +183,9 @@ final class DocumentDataAssembler
                 'balance_cleared_at'              => self::formatDate($payment['balance_cleared_at']),
                 'balance_due_date'                => self::formatDate($payment['balance_due_date']),
             ] : null,
-            'supplier_po' => self::supplierPoBlock($orderId),
+            'supplier_po' => ($documentTypeCode === null || in_array($documentTypeCode, self::SUPPLIER_COST_VISIBLE_TO, true))
+                ? self::supplierPoBlock($orderId)
+                : null,
             'freight'     => self::freightBlock($orderId),
             'packing'     => self::packingBlock($orderId),
             'crates'      => self::cratesBlock($orderId),

@@ -27,6 +27,7 @@ use App\Repositories\HsCodeRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCommentRepository;
+use App\Repositories\OrderCostEntryRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPackingRepository;
@@ -49,6 +50,7 @@ use App\Services\EmailService;
 use App\Services\FileUploadService;
 use App\Services\OrderDuplicationService;
 use App\Services\OrderEditGuard;
+use App\Services\OrderProfitabilityService;
 use App\Services\PermissionService;
 use App\Services\ReferenceNumberService;
 use App\Services\StageGateService;
@@ -662,6 +664,13 @@ final class OrderController
         $canViewCaLinks = PermissionService::can((int) $actor['id'], $actorRoleId, 'ca_module_view');
         $canManageCaInternalDoc = PermissionService::can((int) $actor['id'], $actorRoleId, 'ca_internal_doc_manage');
 
+        // Reorder-to-supplier linking + Order Profitability Sheet (docs/schema.sql
+        // Section AP) — gated on the new, deliberately stricter
+        // manage_order_financials permission rather than ca_module_view,
+        // per the user's own ask that this specific section stay
+        // Super-Admin-plus-explicitly-granted-roles only.
+        $canManageOrderFinancials = PermissionService::can((int) $actor['id'], $actorRoleId, 'manage_order_financials');
+
         $stages = OrderStageRepository::forOrder($orderId);
         $stageByNumber = [];
         foreach ($stages as $s) {
@@ -692,6 +701,11 @@ final class OrderController
         }
 
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
+
+        $duplicatedFromOrder = !empty($order['duplicated_from_order_id'])
+            ? OrderRepository::find((int) $order['duplicated_from_order_id'])
+            : null;
+        $duplicatedIntoOrders = OrderRepository::findOrdersDuplicatedFrom($orderId);
 
         View::render('orders/show', [
             'order'    => $order,
@@ -730,6 +744,13 @@ final class OrderController
             'linkedCaExpenses' => $canViewCaLinks ? CaExpenseRepository::forOrder($orderId) : [],
             'canManageCaInternalDoc' => $canManageCaInternalDoc,
             'caInternalDoc' => $canViewCaLinks ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN') : null,
+            'canManageOrderFinancials' => $canManageOrderFinancials,
+            'orderCostEntries' => $canManageOrderFinancials ? OrderCostEntryRepository::forOrder($orderId) : [],
+            'costEntryCategories' => OrderCostEntryRepository::CATEGORIES,
+            'profitability' => $canManageOrderFinancials ? OrderProfitabilityService::computeForOrder($orderId) : null,
+            'exportBenefitSchemes' => LookupRepository::dropdownOptions('export_benefit_scheme'),
+            'duplicatedFromOrder' => $duplicatedFromOrder,
+            'duplicatedIntoOrders' => $duplicatedIntoOrders,
         ], 'layout/base');
     }
 

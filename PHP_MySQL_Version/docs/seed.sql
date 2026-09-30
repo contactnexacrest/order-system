@@ -75,7 +75,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('data_export_run',            'Export database structure/data', 'Download a full structure-only and data-only dump of the live database, to migrate all historical records into a fresh reinstall. Kept separate from manage_company_settings since it can expose every record, including staff password hashes.', 'admin'),
   ('ca_internal_doc_manage',      'Manage internal CA financial annexure', 'Toggle the internal-only CA Financial Annexure (govt export benefits + expenses) for an order and generate it. Not auto-granted to Accounts Executive/CA roles — only Admin/MD/ED and Super Admin get it by default.', 'ca'),
   ('manage_disputes',             'Manage disputes',                'View/raise/update a dispute''s status, attach evidence, and enable/disable the client-facing dispute button. Not auto-inherited from manage_orders — only Admin/MD/ED and Super Admin get it by default.', 'orders'),
-  ('respond_to_disputes',         'Respond to disputes',            'Post a reply in a dispute''s reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button.', 'orders');
+  ('respond_to_disputes',         'Respond to disputes',            'Post a reply in a dispute''s reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button.', 'orders'),
+  ('manage_order_financials',     'Manage order financials',        'View/add/edit an order''s export benefit claims, other costs, and its profitability summary. Stricter than ca_module_view/inr_actual_edit: not auto-granted to Accounts/CA, only Admin/MD/ED and Super Admin by default.', 'ca');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
