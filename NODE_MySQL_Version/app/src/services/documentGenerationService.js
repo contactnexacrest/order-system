@@ -913,7 +913,7 @@ function titleFor(code) {
     ANNEXA: 'ANNEXURE A — PRODUCT TECHNICAL SPECIFICATIONS',
     PI: 'PROFORMA INVOICE',
     OC: 'ORDER CONFIRMATION',
-    BUYERPO: 'PURCHASE ORDER — ORDER ACCEPTANCE',
+    BUYERPO: 'PURCHASE ORDER',
     SUPPO: 'PURCHASE ORDER — MATERIAL PROCUREMENT',
     FDN: 'FREIGHT DEBIT NOTE',
     PL: 'PACKING LIST',
@@ -1042,4 +1042,13 @@ module.exports = {
   // idiomatic equivalent for exercising the mode/show_image logic
   // directly instead of only through a full generate() pipeline.
   watermarkFromRow,
+  // Exported for tests only — Puppeteer is stubbed out under Jest, so
+  // Node tests can't exercise generate()'s real PDF path the way PHP's
+  // PHPUnit tests do (dompdf runs cheaply in-process there). Rendering
+  // the Nunjucks template directly with titleFor/section1TitleFor/
+  // templateFileFor is the equivalent way to verify actual document
+  // output without a real browser.
+  titleFor,
+  section1TitleFor,
+  templateFileFor,
 };

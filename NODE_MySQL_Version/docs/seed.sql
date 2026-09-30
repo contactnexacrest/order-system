@@ -383,11 +383,11 @@ INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Balance Payment Release Condition' AND dt.code = 'SUPPO';
 
-INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (60, 'Time Is of the Essence', 'Delivery by the agreed date is of the essence of this Purchase Order. Failure to deliver by the agreed date may result in cancellation of this PO and/or recovery of losses incurred by NexaCrest as a result of the delay, including but not limited to demurrage, vessel rebooking charges and buyer penalties.', 'active', 1);
-INSERT INTO tc_clause_documents (clause_id, document_type_id)
-SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
-WHERE c.clause_title = 'Time Is of the Essence' AND dt.code = 'SUPPO';
+-- NOTE: no "Time Is of the Essence" clause row here (removed 2026-09-30,
+-- against the real Supplier PO reference template) — that exact wording is
+-- already a static row in Section 5 (Delivery Terms) of the Supplier PO
+-- document; a clause row of the same text under Section 6 (Quality &
+-- Inspection) duplicated it on every generated PDF/DOCX.
 
 -- Every T&C clause is currently mandatory — none may be omitted (standing
 -- instruction, 2026-09-19). All rows ship is_protected = 1; unprotecting

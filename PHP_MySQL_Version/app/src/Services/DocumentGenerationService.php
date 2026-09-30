@@ -921,7 +921,7 @@ final class DocumentGenerationService
             'ANNEXA' => 'ANNEXURE A — PRODUCT TECHNICAL SPECIFICATIONS',
             'PI' => 'PROFORMA INVOICE',
             'OC' => 'ORDER CONFIRMATION',
-            'BUYERPO' => 'PURCHASE ORDER — ORDER ACCEPTANCE',
+            'BUYERPO' => 'PURCHASE ORDER',
             'SUPPO' => 'PURCHASE ORDER — MATERIAL PROCUREMENT',
             'FDN' => 'FREIGHT DEBIT NOTE',
             'PL' => 'PACKING LIST',
