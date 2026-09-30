@@ -34,6 +34,17 @@ separate field from the claimed amount, since DGFT/Customs frequently
 pays a different (usually lower) figure after their own review — the
 system keeps both on record rather than assuming they always match.
 
+## Where a linked claim shows up
+
+A claim tied to an order (via the order-reference field when recording
+it) shows up in two places: the order reference is a clickable link right
+here in the Claims table, and the claim also appears on that order's own
+detail page under **Government Export Benefits & Expenses (CA)** —
+alongside any expense (see [Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to))
+linked to the same order. This is the same permission gate
+(`ca_module_view`) as the rest of this module, so it only appears to
+someone who could already see this page.
+
 ## Totals
 
 The page shows claimed, received, and outstanding totals across every

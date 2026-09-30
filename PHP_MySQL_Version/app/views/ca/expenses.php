@@ -10,7 +10,7 @@
       <p class="muted">No expenses imported yet — run a Zoho Books sync once it's configured.</p>
     <?php else: ?>
       <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Description</th><th>Amount</th><th>TDS</th></tr>
+        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Description</th><th>Amount</th><th>Order</th><th>TDS</th></tr>
         <?php foreach ($expenses as $e): ?>
         <tr>
           <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
@@ -18,6 +18,25 @@
           <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
           <td class="muted small"><?= htmlspecialchars((string) ($e['description'] ?? '')) ?></td>
           <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
+          <td>
+            <?php if ($e['order_id'] !== null): ?>
+              <a href="/orders/<?= (int) $e['order_id'] ?>"><?= htmlspecialchars($e['order_reference']) ?></a>
+              <?php if ($canEditTds): ?>
+                <form method="post" action="/ca/expenses/<?= (int) $e['id'] ?>/link-order" style="display:inline" onsubmit="return confirm('Unlink this expense from its order?');">
+                  <?= \App\Helpers\Csrf::field() ?>
+                  <button type="submit" class="btn-sm btn-danger" title="Unlink">&times;</button>
+                </form>
+              <?php endif; ?>
+            <?php elseif ($canEditTds): ?>
+              <form method="post" action="/ca/expenses/<?= (int) $e['id'] ?>/link-order" style="display:flex;gap:4px;">
+                <?= \App\Helpers\Csrf::field() ?>
+                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;">
+                <button type="submit" class="btn-sm">Link</button>
+              </form>
+            <?php else: ?>
+              <span class="muted">—</span>
+            <?php endif; ?>
+          </td>
           <td>
             <?php $expenseLockMessage = \App\Repositories\CaFyLockRepository::lockMessageForDate($e['expense_date']); ?>
             <?php if ($canEditTds && ($expenseLockMessage === null || $canOverrideFyLock)): ?>

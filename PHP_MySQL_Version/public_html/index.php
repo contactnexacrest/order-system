@@ -286,6 +286,7 @@ $router->post('/ca/zoho-sync/run', [$ca, 'runZohoSync'], [SessionAuth::required(
 $router->get('/ca/expenses', [$ca, 'expenses'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->get('/ca/tds-summary', [$ca, 'tdsSummary'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/expenses/{id}/tds', [$ca, 'setExpenseTds'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/ca/expenses/{id}/link-order', [$ca, 'linkExpenseToOrder'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->get('/ca/bank-statement', [$ca, 'bankStatement'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/bank-statement/upload', [$ca, 'uploadBankStatement'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/bank-statement/{id}/match-revenue', [$ca, 'matchBankLineToRevenue'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);

@@ -12,6 +12,8 @@ use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AmendmentRepository;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\CaExpenseRepository;
+use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
@@ -652,6 +654,13 @@ final class OrderController
         $canEditInrActual = PermissionService::can((int) $actor['id'], $actorRoleId, 'inr_actual_edit');
         $canDeleteInrActual = PermissionService::can((int) $actor['id'], $actorRoleId, 'inr_actual_delete');
 
+        // Point 2 follow-up — a RODTEP/export-benefit claim or an expense
+        // (ECGC insurance, third-party inspection, ...) can be linked to
+        // the specific order it relates to; this surfaces both here so
+        // the order page shows every financial detail tied to it at a
+        // glance, not just in the separate CA module list screens.
+        $canViewCaLinks = PermissionService::can((int) $actor['id'], $actorRoleId, 'ca_module_view');
+
         $stages = OrderStageRepository::forOrder($orderId);
         $stageByNumber = [];
         foreach ($stages as $s) {
@@ -715,6 +724,9 @@ final class OrderController
             'canViewInrActual' => $canViewInrActual,
             'canEditInrActual' => $canEditInrActual,
             'canDeleteInrActual' => $canDeleteInrActual,
+            'canViewCaLinks' => $canViewCaLinks,
+            'linkedExportBenefits' => $canViewCaLinks ? CaExportBenefitRepository::forOrder($orderId) : [],
+            'linkedCaExpenses' => $canViewCaLinks ? CaExpenseRepository::forOrder($orderId) : [],
         ], 'layout/base');
     }
 

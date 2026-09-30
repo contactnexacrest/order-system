@@ -167,6 +167,51 @@ final class CaController
     }
 
     /**
+     * Point 2 follow-up — links (or, given a blank reference, unlinks) an
+     * imported expense to the specific order it was actually incurred
+     * for (e.g. ECGC insurance or a third-party inspection fee paid for
+     * one shipment). Zoho Books has no concept of this app's order IDs,
+     * so this is always a manual, local-only step — never pushed back to
+     * Zoho, exactly like recordExportBenefit()'s order-reference lookup.
+     */
+    public function linkExpenseToOrder(array $params): void
+    {
+        $id = (int) $params['id'];
+        $user = AuthService::currentUser();
+
+        $expense = CaExpenseRepository::find($id);
+        if (!$expense) {
+            Flash::set('error', 'Expense not found.');
+            header('Location: /ca/expenses');
+            return;
+        }
+
+        $orderRef = trim((string) ($_POST['order_reference'] ?? ''));
+        $orderId = null;
+        if ($orderRef !== '') {
+            $orderId = OrderRepository::findIdByReference($orderRef);
+            if ($orderId === null) {
+                Flash::set('error', "No order found with reference \"{$orderRef}\" — the expense was not linked. Leave the field blank to unlink.");
+                header('Location: /ca/expenses');
+                return;
+            }
+        }
+
+        CaExpenseRepository::linkToOrder($id, $orderId);
+        AuditLogRepository::log(
+            (int) $user['id'],
+            $orderId !== null ? 'CA_EXPENSE_LINKED_TO_ORDER' : 'CA_EXPENSE_UNLINKED_FROM_ORDER',
+            'ca_expenses',
+            $id,
+            'order_id',
+            $expense['order_id'] !== null ? (string) $expense['order_id'] : null,
+            $orderId !== null ? (string) $orderId : null
+        );
+        Flash::set('success', $orderId !== null ? "Expense linked to {$orderRef}." : 'Expense unlinked from its order.');
+        header('Location: /ca/expenses');
+    }
+
+    /**
      * CA / Accounting module (Phase 8) — government export benefit/
      * incentive claims (RODTEP + whatever else Admin adds to
      * dropdown_options('export_benefit_scheme')). Unlike ca_expenses this

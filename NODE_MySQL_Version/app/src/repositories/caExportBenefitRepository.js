@@ -45,6 +45,17 @@ async function all() {
   );
 }
 
+/**
+ * Benefits linked to one specific order — shown on that order's own
+ * detail page (e.g. a RODTEP claim earned by this shipment) alongside
+ * any linked expenses.
+ *
+ * @returns newest first
+ */
+async function forOrder(orderId) {
+  return db.query('SELECT * FROM ca_export_benefits WHERE order_id = :order_id ORDER BY claimed_at DESC, id DESC', { order_id: orderId });
+}
+
 async function markReceived(id, receivedAmount, receivedAt) {
   await db.execute(
     'UPDATE ca_export_benefits SET received_amount = :amount, received_at = :received_at WHERE id = :id',
@@ -68,4 +79,4 @@ async function availableFinancialYears() {
   return financialYear.labelsPresentIn(rows.map((r) => r.claimed_at));
 }
 
-module.exports = { record, find, all, markReceived, totalClaimed, totalReceived, availableFinancialYears };
+module.exports = { record, find, all, forOrder, markReceived, totalClaimed, totalReceived, availableFinancialYears };

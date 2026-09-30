@@ -143,6 +143,50 @@ async function setExpenseTds(req, res) {
 }
 
 /**
+ * Point 2 follow-up — links (or, given a blank reference, unlinks) an
+ * imported expense to the specific order it was actually incurred for
+ * (e.g. ECGC insurance or a third-party inspection fee paid for one
+ * shipment). Zoho Books has no concept of this app's order IDs, so this
+ * is always a manual, local-only step — never pushed back to Zoho,
+ * exactly like recordExportBenefit()'s order-reference lookup.
+ */
+async function linkExpenseToOrder(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const user = req.user;
+
+  const expense = await caExpenseRepository.find(id);
+  if (!expense) {
+    flash.set(req, 'error', 'Expense not found.');
+    res.redirect('/ca/expenses');
+    return;
+  }
+
+  const orderRef = String(req.body.order_reference || '').trim();
+  let orderId = null;
+  if (orderRef !== '') {
+    orderId = await orderRepository.findIdByReference(orderRef);
+    if (orderId === null) {
+      flash.set(req, 'error', `No order found with reference "${orderRef}" — the expense was not linked. Leave the field blank to unlink.`);
+      res.redirect('/ca/expenses');
+      return;
+    }
+  }
+
+  await caExpenseRepository.linkToOrder(id, orderId);
+  await auditLogRepository.log(
+    user.id,
+    orderId !== null ? 'CA_EXPENSE_LINKED_TO_ORDER' : 'CA_EXPENSE_UNLINKED_FROM_ORDER',
+    'ca_expenses',
+    id,
+    'order_id',
+    expense.order_id !== null ? String(expense.order_id) : null,
+    orderId !== null ? String(orderId) : null
+  );
+  flash.set(req, 'success', orderId !== null ? `Expense linked to ${orderRef}.` : 'Expense unlinked from its order.');
+  res.redirect('/ca/expenses');
+}
+
+/**
  * CA / Accounting module (Phase 8) — government export benefit/incentive
  * claims (RODTEP + whatever else Admin adds to
  * dropdown_options('export_benefit_scheme')). Unlike ca_expenses this is
@@ -513,7 +557,7 @@ async function tdsSummary(req, res) {
 }
 
 module.exports = {
-  index, reports, zohoSync, runZohoSync, expenses, setExpenseTds, tdsSummary,
+  index, reports, zohoSync, runZohoSync, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
   exportBenefits, recordExportBenefit, markExportBenefitReceived,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,

@@ -90,6 +90,18 @@ Every record and delete action here is written to the system's audit log
 (**Insights → Audit Log**, if you hold that permission), same as any other
 sensitive field in the system.
 
+## Government export benefits & linked expenses (also on the order's own page)
+
+Just below the Payment Status section, anyone with `ca_module_view` also
+sees a **Government Export Benefits & Expenses (CA)** box — any RODTEP/
+export-benefit claim or expense (ECGC insurance, third-party inspection,
+CHA, transport, ...) linked to this specific order, so opening one order
+shows every CA financial detail tied to it at a glance. This box is
+read-only; recording a claim, marking one received, or linking/unlinking
+an expense is still done from the CA module itself — see
+[Government Export Benefits](./ca-07-export-benefits.md) and
+[Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to).
+
 ## The INR Settlement Register
 
 **CA / Accounting** in the sidebar (visible only with `ca_module_view`)

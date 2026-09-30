@@ -11,6 +11,8 @@ const adminOverrideRepository = require('../repositories/adminOverrideRepository
 const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caFyLockRepository = require('../repositories/caFyLockRepository');
+const caExpenseRepository = require('../repositories/caExpenseRepository');
+const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
 const orderDuplicationService = require('../services/orderDuplicationService');
 const orderEditGuard = require('../services/orderEditGuard');
@@ -714,6 +716,14 @@ async function show(req, res) {
       canOverrideFyLock: caFyLockGuard.canOverride(req),
       caLockMessages,
       usersById,
+      // Point 2 follow-up — a RODTEP/export-benefit claim or an expense
+      // (ECGC insurance, third-party inspection, ...) can be linked to
+      // the specific order it relates to; this surfaces both here so the
+      // order page shows every financial detail tied to it at a glance,
+      // not just in the separate CA module list screens.
+      canViewCaLinks: !!req.permissions.ca_module_view,
+      linkedExportBenefits: req.permissions.ca_module_view ? await caExportBenefitRepository.forOrder(orderId) : [],
+      linkedCaExpenses: req.permissions.ca_module_view ? await caExpenseRepository.forOrder(orderId) : [],
     },
     'layout/base'
   );

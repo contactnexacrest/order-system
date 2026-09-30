@@ -986,6 +986,45 @@ $orderClosed = $order['status'] === 'complete';
     <?php endif; ?>
   </div>
 
+  <?php if ($canViewCaLinks): ?>
+  <div class="section">
+    <h2>Government Export Benefits &amp; Expenses (CA)</h2>
+    <p class="muted small">Financial detail linked to this order from the CA / Accounting module — manage claims and expense links from there. <a href="/ca/export-benefits">Export Benefits &rarr;</a> &middot; <a href="/ca/expenses">Expenses &rarr;</a></p>
+    <?php if (empty($linkedExportBenefits) && empty($linkedCaExpenses)): ?>
+      <p class="muted">Nothing linked to this order yet. Record a claim or link an expense from the CA module above, referencing <?= htmlspecialchars($order['order_reference']) ?>.</p>
+    <?php endif; ?>
+    <?php if (!empty($linkedExportBenefits)): ?>
+      <h3 style="font-size:0.95em;">Export Benefits Claimed</h3>
+      <table class="list">
+        <tr><th>Claimed</th><th>Scheme</th><th>Claimed Amount</th><th>Received</th><th>Status</th></tr>
+        <?php foreach ($linkedExportBenefits as $b): ?>
+        <tr>
+          <td><?= htmlspecialchars((string) $b['claimed_at']) ?></td>
+          <td><?= htmlspecialchars($b['scheme_name']) ?></td>
+          <td><?= number_format((float) $b['claimed_amount'], 2) ?> <?= htmlspecialchars($b['currency_code']) ?></td>
+          <td><?= $b['received_amount'] !== null ? number_format((float) $b['received_amount'], 2) . ' ' . htmlspecialchars($b['currency_code']) : '<span class="muted">—</span>' ?></td>
+          <td><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed</span>' ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
+    <?php if (!empty($linkedCaExpenses)): ?>
+      <h3 style="font-size:0.95em; margin-top:12px;">Expenses for This Order</h3>
+      <table class="list">
+        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
+        <?php foreach ($linkedCaExpenses as $e): ?>
+        <tr>
+          <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
+          <td><?= htmlspecialchars($e['category']) ?></td>
+          <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
+          <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
   <div class="section">
     <h2>Production &amp; Estimated Shipment</h2>
     <div class="kv-grid">

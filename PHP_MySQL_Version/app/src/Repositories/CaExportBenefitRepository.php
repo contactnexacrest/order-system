@@ -68,6 +68,22 @@ final class CaExportBenefitRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * Benefits linked to one specific order — shown on that order's own
+     * detail page (e.g. a RODTEP claim earned by this shipment) alongside
+     * any linked expenses.
+     *
+     * @return array<int, array<string,mixed>> newest first
+     */
+    public static function forOrder(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM ca_export_benefits WHERE order_id = :order_id ORDER BY claimed_at DESC, id DESC'
+        );
+        $stmt->execute(['order_id' => $orderId]);
+        return $stmt->fetchAll();
+    }
+
     public static function markReceived(int $id, float $receivedAmount, string $receivedAt): void
     {
         Database::connection()->prepare(

@@ -27,13 +27,39 @@ async function insert(zohoExpenseId, category, description, vendorName, amount, 
   return result.insertId;
 }
 
-/** @returns newest first */
+/** @returns newest first, with the linked order's reference joined in for display */
 async function all() {
-  return db.query('SELECT * FROM ca_expenses ORDER BY expense_date DESC, id DESC');
+  return db.query(
+    `SELECT ce.*, o.order_reference
+     FROM ca_expenses ce
+     LEFT JOIN orders o ON o.id = ce.order_id
+     ORDER BY ce.expense_date DESC, ce.id DESC`
+  );
 }
 
 async function find(id) {
   return db.queryOne('SELECT * FROM ca_expenses WHERE id = :id', { id });
+}
+
+/**
+ * Expenses linked to one specific order — shown on that order's own
+ * detail page (e.g. ECGC insurance or a third-party inspection fee paid
+ * for this shipment) alongside any linked export benefits.
+ *
+ * @returns newest first
+ */
+async function forOrder(orderId) {
+  return db.query('SELECT * FROM ca_expenses WHERE order_id = :order_id ORDER BY expense_date DESC, id DESC', { order_id: orderId });
+}
+
+/**
+ * Point 2 follow-up — Zoho Books has no concept of this app's order IDs,
+ * so an imported expense can only ever be linked to the order it was
+ * actually incurred for as a manual, local-only step (never pushed back
+ * to Zoho). Passing null unlinks it, to correct a mis-link.
+ */
+async function linkToOrder(id, orderId) {
+  await db.execute('UPDATE ca_expenses SET order_id = :order_id WHERE id = :id', { order_id: orderId, id });
 }
 
 /** All-time total of every imported expense — used by the reconciliation summary. */
@@ -99,4 +125,4 @@ async function tdsSummary() {
   return rows;
 }
 
-module.exports = { existsByZohoId, insert, all, find, setTds, totalAll, availableFinancialYears, tdsSummary };
+module.exports = { existsByZohoId, insert, all, find, forOrder, linkToOrder, setTds, totalAll, availableFinancialYears, tdsSummary };

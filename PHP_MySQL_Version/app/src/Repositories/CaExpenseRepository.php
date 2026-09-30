@@ -48,11 +48,45 @@ final class CaExpenseRepository
         return (int) $pdo->lastInsertId();
     }
 
-    /** @return array<int, array<string,mixed>> newest first */
+    /** @return array<int, array<string,mixed>> newest first, with the linked order's reference joined in for display */
     public static function all(): array
     {
-        $stmt = Database::connection()->query('SELECT * FROM ca_expenses ORDER BY expense_date DESC, id DESC');
+        $stmt = Database::connection()->query(
+            'SELECT ce.*, o.order_reference
+             FROM ca_expenses ce
+             LEFT JOIN orders o ON o.id = ce.order_id
+             ORDER BY ce.expense_date DESC, ce.id DESC'
+        );
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Expenses linked to one specific order — shown on that order's own
+     * detail page (e.g. ECGC insurance or a third-party inspection fee
+     * paid for this shipment) alongside any linked export benefits.
+     *
+     * @return array<int, array<string,mixed>> newest first
+     */
+    public static function forOrder(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM ca_expenses WHERE order_id = :order_id ORDER BY expense_date DESC, id DESC'
+        );
+        $stmt->execute(['order_id' => $orderId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Point 2 follow-up — Zoho Books has no concept of this app's order
+     * IDs, so an imported expense can only ever be linked to the order it
+     * was actually incurred for as a manual, local-only step (never
+     * pushed back to Zoho). Passing null unlinks it, to correct a
+     * mis-link.
+     */
+    public static function linkToOrder(int $id, ?int $orderId): void
+    {
+        Database::connection()->prepare('UPDATE ca_expenses SET order_id = :order_id WHERE id = :id')
+            ->execute(['order_id' => $orderId, 'id' => $id]);
     }
 
     /** All-time total of every imported expense — used by the reconciliation summary. */

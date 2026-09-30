@@ -44,6 +44,16 @@ and reporting, and it never writes anything back to Zoho Books. If your
 Zoho Books setup already tracks TDS in its own way, treat this as a
 convenience for cross-checking, not a replacement.
 
+## TDS Payable Summary
+
+**CA / Accounting → TDS Payable Summary** rolls up every TDS-applicable
+expense (the local annotation above) by month and by financial-year
+quarter (Q1 Apr-Jun, Q2 Jul-Sep, Q3 Oct-Dec, Q4 Jan-Mar) — total expense
+amount and total TDS amount in each bucket, so a CA can see at a glance
+what's due for a given quarter's TDS return without re-filtering the
+Expenses list by hand. Expenses never marked TDS-applicable are excluded
+entirely, exactly as they are everywhere else in this module.
+
 ## How to run an import
 
 Exactly the same way revenue gets synced — **CA / Accounting → Zoho Books
@@ -52,6 +62,43 @@ revenue, then imports any new expenses, and logs each outcome separately
 in the same Sync Log. The hourly scheduled job does the same thing
 automatically. See [Zoho Books Sync](./ca-03-zoho-sync.md) for the full
 detail on configuring the connection and reading the log.
+
+## Export-related costs (ECGC insurance, COO fees, CHA charges, Transport, etc.)
+
+These are ordinary expenses like any other — as long as your Accounts
+team books them in Zoho Books (under whatever category name you use
+there, e.g. "ECGC Insurance", "CHA Charges", "Freight/Transport", "COO
+Certification Fees"), the next sync pulls them in here exactly like any
+other expense, with that category name intact for filtering. There is
+nothing special to configure — this system doesn't maintain its own
+separate list of expense categories on purpose (see "What gets imported"
+above), so it never falls out of sync with however your CA actually
+categorizes things in Zoho Books.
+
+This is different from **government export benefits** (RODTEP and similar
+schemes) — see [Government Export Benefits](./ca-07-export-benefits.md).
+Those are money owed *to* the company, not an expense, and Zoho Books has
+no equivalent for them, so they're entered directly in this system
+instead.
+
+## Linking an expense to the order it belongs to
+
+An expense like ECGC insurance or a third-party inspection fee is
+genuinely tied to one shipment, not the business in general — the
+Expenses list lets anyone with the "Add/edit INR actual" permission link
+an imported expense to the order it was actually incurred for, by typing
+that order's reference number next to the row (an "&times;" button
+appears next to a linked expense to undo the link, e.g. to correct a
+mis-entry). Zoho Books has no concept of this system's order IDs, so this
+is always a manual, local-only step, exactly like the TDS annotation
+above — it's never pushed back to Zoho Books.
+
+Once linked, the expense shows up on that order's own detail page too,
+under **Government Export Benefits & Expenses (CA)**, alongside any
+RODTEP/export-benefit claim linked to the same order (see
+[Government Export Benefits](./ca-07-export-benefits.md)) — so opening
+one order shows every financial detail tied to it at a glance, not just
+the separate CA-module list screens.
 
 ## What this doesn't do yet
 

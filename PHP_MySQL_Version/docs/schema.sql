@@ -2376,6 +2376,25 @@ CREATE TABLE hs_code_product_examples (
 ) ENGINE=InnoDB;
 
 -- ================================================================
+-- SECTION AM — EXPENSE-TO-ORDER LINKING (added 2026-09-27)
+-- ================================================================
+-- ca_export_benefits (Section within CA Phase 8) already had a nullable
+-- order_id — a claim can be tied to the specific order that earned it.
+-- ca_expenses had no such column at all: every expense (ECGC insurance,
+-- CHA, third-party inspection, transport, ...) was a one-way Zoho Books
+-- import with no way to say "this expense belongs to order X", even
+-- though a real expense like a per-shipment inspection fee obviously
+-- does. Since Zoho Books itself has no concept of this app's order IDs,
+-- linking has to be a manual, local-only step (CaController::
+-- linkExpenseToOrder(), by order reference) — never pushed back to Zoho.
+-- Mirrors ca_export_benefits.order_id exactly: nullable, FK to orders,
+-- unlinking (setting it back to NULL) is always allowed to correct a
+-- mis-link.
+ALTER TABLE ca_expenses
+  ADD COLUMN order_id BIGINT UNSIGNED NULL AFTER id,
+  ADD FOREIGN KEY (order_id) REFERENCES orders(id);
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2410,4 +2429,5 @@ CREATE TABLE hs_code_product_examples (
 -- rows in seed.sql — no ALTER needed, company_settings is already a
 -- key-value table (see Section A).
 -- Section AL (HS code bulk import + product guide) added 2026-09-27.
+-- Section AM (expense-to-order linking) added 2026-09-27.
 -- ================================================================

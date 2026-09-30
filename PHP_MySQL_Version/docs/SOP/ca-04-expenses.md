@@ -81,6 +81,25 @@ Those are money owed *to* the company, not an expense, and Zoho Books has
 no equivalent for them, so they're entered directly in this system
 instead.
 
+## Linking an expense to the order it belongs to
+
+An expense like ECGC insurance or a third-party inspection fee is
+genuinely tied to one shipment, not the business in general — the
+Expenses list lets anyone with the "Add/edit INR actual" permission link
+an imported expense to the order it was actually incurred for, by typing
+that order's reference number next to the row (an "&times;" button
+appears next to a linked expense to undo the link, e.g. to correct a
+mis-entry). Zoho Books has no concept of this system's order IDs, so this
+is always a manual, local-only step, exactly like the TDS annotation
+above — it's never pushed back to Zoho Books.
+
+Once linked, the expense shows up on that order's own detail page too,
+under **Government Export Benefits & Expenses (CA)**, alongside any
+RODTEP/export-benefit claim linked to the same order (see
+[Government Export Benefits](./ca-07-export-benefits.md)) — so opening
+one order shows every financial detail tied to it at a glance, not just
+the separate CA-module list screens.
+
 ## What this doesn't do yet
 
 - No expense editing or deletion here — corrections happen in Zoho Books;
