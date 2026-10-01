@@ -33,6 +33,18 @@ documents — consignee name and address, notify party, port of discharge,
 confirmed Incoterm, container type, payment-terms confirmation, and Country
 of Origin type — fields the Quotation stage never asked for.
 
+The "Your Details" section (company name, billing address, consignee,
+VAT/EORI/tax no., contact person, email, phone) and the Incoterm/port of
+discharge/container type fields in Shipping Details arrive **pre-filled**
+from the client record and the order itself — the buyer already gave this
+information at the Quotation stage, so they only need to review it and
+correct anything that's changed, not retype it from scratch. Only the
+genuinely new fields (payment-terms confirmation, acceptance-of-quotation
+reference, buyer PO/reference no., changes from quotation, special document
+requirements) start blank. If the buyer edits a pre-filled value and the
+submission is later rejected, their own corrected answer is what reappears
+on the form when they come back — never the original client-record default.
+
 ![PI-Stage Intake section, link generated, awaiting the client](./images/s3_pi_intake_section.png)
 
 This step is **entirely optional and never blocks anything** — staff can

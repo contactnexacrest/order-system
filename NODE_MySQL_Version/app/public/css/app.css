@@ -100,7 +100,7 @@ a.js-slow-download.is-loading{pointer-events:none;opacity:0.7;}
    field grid lets short fields sit side by side, and numbered section
    badges break the form into small, countable steps instead of one
    continuous scroll. --- */
-.intake-wrap{max-width:720px;margin:0 auto;padding:2.5rem 1.25rem 2rem;}
+.intake-wrap{max-width:828px;margin:0 auto;padding:2.5rem 1.25rem 2rem;}
 .intake-summary{display:flex;flex-wrap:wrap;gap:0.6rem 1.5rem;margin:0.9rem 0 1.4rem;padding:0.75rem 1rem;background:var(--navy-soft);border-radius:10px;font-size:0.82rem;color:var(--navy);}
 .intake-summary span{display:flex;align-items:center;gap:0.4rem;font-weight:600;}
 fieldset.intake-step{padding-top:1.25rem;}
@@ -110,7 +110,7 @@ fieldset.intake-step{padding-top:1.25rem;}
 .field-grid label.full{grid-column:1 / -1;}
 .field-grid label{margin-bottom:0.9rem;}
 .intake-note{background:var(--gold-soft);border:1px solid var(--gold);border-radius:10px;padding:0.75rem 1rem;font-size:0.82rem;color:var(--gold-strong);margin-bottom:1.25rem;}
-@media (max-width:640px){.field-grid{grid-template-columns:1fr;} .intake-wrap{max-width:480px;padding:1.75rem 1rem 1.5rem;}}
+@media (max-width:640px){.field-grid{grid-template-columns:1fr;} .intake-wrap{max-width:552px;padding:1.75rem 1rem 1.5rem;}}
 .bare-brand{display:flex;align-items:center;justify-content:center;gap:10px;font-size:1.2rem;font-weight:700;letter-spacing:-0.01em;color:var(--navy);margin-bottom:1.25rem;}
 .bare-brand span{color:var(--ink-soft);font-weight:500;}
 .bare-brand-mark{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--line);flex:0 0 auto;overflow:hidden;}

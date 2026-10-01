@@ -49,15 +49,63 @@ final class PiIntakeRepository
     {
         $hash = hash('sha256', $rawToken);
         $stmt = Database::connection()->prepare(
-            "SELECT pis.*, o.order_reference, c.company_legal_name AS client_company_legal_name
+            "SELECT pis.*, o.order_reference, c.company_legal_name AS client_company_legal_name,
+                    c.billing_address AS client_billing_address,
+                    c.consignee_name AS client_consignee_name,
+                    c.consignee_address AS client_consignee_address,
+                    c.vat_eori_tax_no AS client_vat_eori_tax_no,
+                    c.contact_person AS client_contact_person,
+                    c.email AS client_email,
+                    c.phone AS client_phone,
+                    c.notify_party AS client_notify_party,
+                    c.country_of_destination AS client_country_of_destination,
+                    c.coo_type AS client_coo_type,
+                    COALESCE(p.name, o.port_of_discharge_text) AS order_port_of_discharge,
+                    i.code AS order_incoterm_code,
+                    o.container_type AS order_container_type
              FROM pi_intake_submissions pis
              JOIN orders o ON o.id = pis.order_id
              JOIN clients c ON c.id = o.client_id
+             LEFT JOIN ports p ON p.id = o.port_of_discharge_id
+             LEFT JOIN incoterms i ON i.id = o.incoterm_id
              WHERE pis.access_token_hash = :hash AND pis.access_token_expires_at > NOW()
                AND pis.status IN ('awaiting_client', 'rejected')"
         );
         $stmt->execute(['hash' => $hash]);
-        return $stmt->fetch() ?: null;
+        $row = $stmt->fetch() ?: null;
+        if ($row === null) {
+            return null;
+        }
+
+        // Prefill: a client who already provided these exact contact
+        // details at the Quotation-stage form shouldn't have to retype
+        // them here. Only fills in fields the client hasn't already
+        // answered themselves — on a rejected-and-resubmitted link, the
+        // client's own prior answer always wins over the client/order
+        // default, since they may have deliberately corrected it.
+        $prefillMap = [
+            'company_legal_name'     => 'client_company_legal_name',
+            'billing_address'        => 'client_billing_address',
+            'consignee_name'         => 'client_consignee_name',
+            'consignee_address'      => 'client_consignee_address',
+            'vat_eori_tax_no'        => 'client_vat_eori_tax_no',
+            'contact_person'         => 'client_contact_person',
+            'email'                  => 'client_email',
+            'phone'                  => 'client_phone',
+            'notify_party'           => 'client_notify_party',
+            'country_of_destination' => 'client_country_of_destination',
+            'coo_type'               => 'client_coo_type',
+            'port_of_discharge_text' => 'order_port_of_discharge',
+            'incoterm_confirmed'     => 'order_incoterm_code',
+            'container_type_text'    => 'order_container_type',
+        ];
+        foreach ($prefillMap as $field => $defaultKey) {
+            if (($row[$field] ?? '') === '' || $row[$field] === null) {
+                $row[$field] = $row[$defaultKey] ?? '';
+            }
+        }
+
+        return $row;
     }
 
     public static function latestForOrder(int $orderId): ?array
