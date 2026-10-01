@@ -122,7 +122,15 @@ fieldset.intake-step{padding-top:1.25rem;}
 .topbar-nav a{color:#fff;text-decoration:none;opacity:0.85;}
 .topbar-nav a:hover{opacity:1;text-decoration:underline;}
 
-label{display:block;margin-bottom:1rem;font-size:0.9rem;color:var(--ink-soft);font-weight:500;}
+/* Point 4 (2026-10-01): a label ("Company Legal Name") and its input's
+   placeholder hint ("e.g. Acme Exports Pvt Ltd") previously used the exact
+   same muted tone and weight, so a form read as a wall of identical grey
+   text at first glance — nothing marked which line was the actual field
+   name. Labels are now bold and full-ink; placeholders stay the lighter
+   muted tone but are also italicised, so the two are distinguishable by
+   weight, color, AND style, not just one subtle cue. */
+label{display:block;margin-bottom:1rem;font-size:0.9rem;color:var(--ink);font-weight:700;}
+input::placeholder,textarea::placeholder{color:var(--ink-soft);font-weight:400;font-style:italic;opacity:1;}
 input[type=text],input[type=email],input[type=password],input[type=file],
 input[type=date],input[type=number],input[type=datetime-local],input[type=tel],input[type=url]{
   display:block;width:100%;padding:0.6rem 0.75rem;margin-top:0.35rem;border:1px solid var(--line);border-radius:10px;font-size:1rem;color:var(--ink);background:#fff;font-family:inherit;
