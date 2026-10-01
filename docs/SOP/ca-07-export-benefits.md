@@ -58,6 +58,26 @@ Executive user who can see and record claims from this screen may not see
 that same claim on the order's own page unless also granted
 `manage_order_financials`.
 
+## Gated on the order being complete (the order-page view only)
+
+The **order-page-embedded** "Record a new claim" action and the claims
+table on an order's own **Order Financials** panel are hidden, and the
+record action itself refused server-side, until that specific order is
+both **complete** (`orders.status = 'complete'`, i.e. Stage 9 closed) and
+its **CI/balance remittance has actually been received**
+(`order_payment_status.balance_remittance_received_at` is set). Until
+then the panel shows "Not applicable until the order is complete and the
+CI (balance) remittance has been received" instead of a claims table —
+the exporter's own reasoning being that a benefit scheme is meaningless
+to even look at on an order that hasn't actually shipped and been paid
+for yet. This gate applies only to the order-embedded view/action
+described above — the general `/ca/export-benefits` screen covered
+earlier in this chapter (CA/Accounts' own working screen across every
+order) is unaffected and keeps recording/showing claims regardless of
+any individual order's status, since that screen is where a claim often
+legitimately gets filed and tracked before the order itself is formally
+closed out in the system.
+
 ## Totals
 
 The page shows claimed, received, and outstanding totals across every

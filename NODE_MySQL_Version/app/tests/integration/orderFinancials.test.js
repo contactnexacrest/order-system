@@ -223,6 +223,11 @@ describe('Order Financials (Section AP)', () => {
   it('addExportBenefit records against the order and markExportBenefitReceived updates it', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
+    // Government export benefits only apply once the order is complete and
+    // the CI (balance) remittance has been received.
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.recordBalanceReceived(orderId, 9000.0, '2026-06-01');
+    await orderRepository.markComplete(orderId);
 
     const addReq = fakeReq({
       params: { id: String(orderId) },
@@ -245,6 +250,38 @@ describe('Order Financials (Section AP)', () => {
 
     const updated = await caExportBenefitRepository.find(benefitId);
     expect(parseFloat(updated.received_amount)).toBeCloseTo(9000, 2);
+  });
+
+  /**
+   * "As the order is incomplete, then beneficiaries scheme won't be
+   * applicable, so showing is of no use" — addExportBenefit() must refuse
+   * to record a claim until the order is complete AND the CI (balance)
+   * remittance has been received, not just hide the option in the UI.
+   */
+  it('refuses addExportBenefit before the order is complete and remittance received', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+
+    const attempt = () => orderFinancialsController.addExportBenefit(fakeReq({
+      params: { id: String(orderId) },
+      body: { scheme_name: 'RODTEP', claimed_amount: '9000', claimed_at: '2026-06-01' },
+      user: { id: userId },
+    }), fakeRes());
+
+    // Neither condition met yet — a brand-new order.
+    await attempt();
+    expect(await caExportBenefitRepository.forOrder(orderId)).toHaveLength(0);
+
+    // Remittance received, but the order itself is not yet 'complete'.
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.recordBalanceReceived(orderId, 9000.0, '2026-06-01');
+    await attempt();
+    expect(await caExportBenefitRepository.forOrder(orderId)).toHaveLength(0);
+
+    // Now both conditions hold — the claim must go through.
+    await orderRepository.markComplete(orderId);
+    await attempt();
+    expect(await caExportBenefitRepository.forOrder(orderId)).toHaveLength(1);
   });
 
   // ---------------------------------------------------------------

@@ -9,6 +9,8 @@ use App\Controllers\OrderController;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CaExpenseRepository;
 use App\Repositories\CaExportBenefitRepository;
+use App\Repositories\OrderPaymentStatusRepository;
+use App\Repositories\OrderRepository;
 use App\Config\Database;
 use App\Tests\Support\DbTestCase;
 
@@ -145,6 +147,11 @@ final class CaOrderLinkingTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $order = \App\Repositories\OrderRepository::find($orderId);
+        // Government export benefits only display once the order is
+        // complete and the CI (balance) remittance has been received.
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::recordBalanceReceived($orderId, 9000.0, '2026-06-01');
+        OrderRepository::markComplete($orderId);
 
         CaExportBenefitRepository::record($orderId, 'RODTEP', 'SB-SHOW-1', 9000, '2026-06-01', 'INR', null, $userId);
         $expenseId = CaExpenseRepository::insert('ZOHO-SHOW-1', 'ECGC insurance', null, 'ECGC', 4500.0, 'INR', '2026-06-01');
@@ -173,5 +180,23 @@ final class CaOrderLinkingTest extends DbTestCase
         $output = ob_get_clean();
 
         self::assertStringContainsString('Nothing linked to this order yet', $output);
+    }
+
+    public function testOrderShowPageHidesExportBenefitsUntilOrderCompleteAndRemittanceReceived(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        // Claimed via the repository directly (bypassing the controller
+        // gate) to isolate what's under test here: the view's own gate.
+        CaExportBenefitRepository::record($orderId, 'RODTEP', 'SB-HIDDEN-1', 9000, '2026-06-01', 'INR', null, $userId);
+
+        $_SESSION['_auth_user_id'] = $userId;
+        $controller = new OrderController();
+        ob_start();
+        $controller->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertStringContainsString('Not applicable until the order is complete', $output);
+        self::assertStringNotContainsString('RODTEP', $output);
     }
 }

@@ -223,6 +223,11 @@ final class OrderFinancialsTest extends DbTestCase
     {
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
+        // Government export benefits only apply once the order is complete
+        // and the CI (balance) remittance has been received.
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::recordBalanceReceived($orderId, 9000.0, '2026-06-01');
+        OrderRepository::markComplete($orderId);
 
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = ['scheme_name' => 'RODTEP', 'claimed_amount' => '9000', 'claimed_at' => '2026-06-01'];
@@ -243,6 +248,42 @@ final class OrderFinancialsTest extends DbTestCase
 
         $updated = CaExportBenefitRepository::find($benefitId);
         self::assertSame('9000.00', $updated['received_amount']);
+    }
+
+    /**
+     * "As the order is incomplete, then beneficiaries scheme won't be
+     * applicable, so showing is of no use" — addExportBenefit() must refuse
+     * to record a claim until the order is complete AND the CI (balance)
+     * remittance has been received, not just hide the option in the UI.
+     */
+    public function testAddExportBenefitIsRefusedBeforeOrderIsCompleteAndRemittanceReceived(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $_SESSION['_auth_user_id'] = $userId;
+        $controller = new OrderFinancialsController();
+
+        // Neither condition met yet — a brand-new order.
+        $_POST = ['scheme_name' => 'RODTEP', 'claimed_amount' => '9000', 'claimed_at' => '2026-06-01'];
+        ob_start();
+        $controller->addExportBenefit(['id' => (string) $orderId]);
+        ob_get_clean();
+        self::assertSame([], CaExportBenefitRepository::forOrder($orderId));
+
+        // Remittance received, but the order itself is not yet 'complete'.
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::recordBalanceReceived($orderId, 9000.0, '2026-06-01');
+        ob_start();
+        $controller->addExportBenefit(['id' => (string) $orderId]);
+        ob_get_clean();
+        self::assertSame([], CaExportBenefitRepository::forOrder($orderId), 'order must be complete, not just remittance-received');
+
+        // Now both conditions hold — the claim must go through.
+        OrderRepository::markComplete($orderId);
+        ob_start();
+        $controller->addExportBenefit(['id' => (string) $orderId]);
+        ob_get_clean();
+        self::assertCount(1, CaExportBenefitRepository::forOrder($orderId));
     }
 
     // ---------------------------------------------------------------

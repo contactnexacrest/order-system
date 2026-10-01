@@ -5,6 +5,7 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderRepository = require('../repositories/orderRepository');
+const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
 
 /**
@@ -21,8 +22,15 @@ const caFyLockGuard = require('../services/caFyLockGuard');
 
 async function addExportBenefit(req, res) {
   const orderId = parseInt(req.params.id, 10);
-  if (!(await orderRepository.find(orderId))) {
+  const order = await orderRepository.find(orderId);
+  if (!order) {
     res.status(404).send('Order not found.');
+    return;
+  }
+  const payment = await orderPaymentStatusRepository.find(orderId);
+  if (order.status !== 'complete' || !payment || !payment.balance_remittance_received_at) {
+    flash.set(req, 'error', 'Government export benefits only apply once the order is complete and the CI (balance) remittance has been received.');
+    res.redirect(`/orders/${orderId}`);
     return;
   }
   const user = req.user;

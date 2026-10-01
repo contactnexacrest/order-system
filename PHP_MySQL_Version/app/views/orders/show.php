@@ -1262,6 +1262,10 @@ $orderClosed = $order['status'] === 'complete';
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
 
     <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
+    <?php $govtBenefitsApplicable = $order['status'] === 'complete' && !empty($payment['balance_remittance_received_at']); ?>
+    <?php if (!$govtBenefitsApplicable): ?>
+      <p class="muted">Not applicable until the order is complete and the CI (balance) remittance has been received — government benefit schemes only come into play once the full proceeds have actually landed.</p>
+    <?php else: ?>
     <?php if (empty($linkedExportBenefits)): ?>
       <p class="muted">Nothing claimed against this order yet.</p>
     <?php else: ?>
@@ -1311,6 +1315,7 @@ $orderClosed = $order['status'] === 'complete';
         <button type="submit" class="btn-sm">Record Claim</button>
       </form>
     </details>
+    <?php endif; ?>
 
     <h3 style="font-size:0.95em; margin-top:14px;">Expenses Imported from Zoho Books</h3>
     <?php if (empty($linkedCaExpenses)): ?>

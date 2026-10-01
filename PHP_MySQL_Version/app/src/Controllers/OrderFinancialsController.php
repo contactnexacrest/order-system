@@ -27,9 +27,16 @@ final class OrderFinancialsController
     public function addExportBenefit(array $params): void
     {
         $orderId = (int) $params['id'];
-        if (!OrderRepository::find($orderId)) {
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
             http_response_code(404);
             echo 'Order not found.';
+            return;
+        }
+        $payment = \App\Repositories\OrderPaymentStatusRepository::find($orderId);
+        if ($order['status'] !== 'complete' || empty($payment['balance_remittance_received_at'])) {
+            Flash::set('error', 'Government export benefits only apply once the order is complete and the CI (balance) remittance has been received.');
+            header("Location: /orders/{$orderId}");
             return;
         }
         $user = AuthService::currentUser();
