@@ -27,6 +27,7 @@ use App\Repositories\HsCodeRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCommentRepository;
+use App\Repositories\OrderComplianceTaskRepository;
 use App\Repositories\OrderCostEntryRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
@@ -731,6 +732,7 @@ final class OrderController
             'production' => OrderProductionRepository::find($orderId),
             'supplierTypes' => LookupRepository::dropdownOptions('supplier_type'),
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
+            'complianceTasks' => OrderComplianceTaskRepository::forOrder($orderId),
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
             'piIntake' => PiIntakeRepository::latestForOrder($orderId),
             'clientPaymentReports' => ClientPaymentReportRepository::forOrder($orderId),
@@ -1760,6 +1762,44 @@ final class OrderController
         OrderRepository::markComplete($orderId);
         Flash::set('success', "Order closed — complete document set couriered to buyer (tracking: {$trackingNumber}).");
         header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Compliance/pre-closure task checklist (docs/schema.sql Section AR) —
+     * "the person who has permission to close the order must able to see
+     * this otherwise no meaning for this." Gated on close_orders, same as
+     * the view itself; re-checked here (not just route-level/UI-level) per
+     * the existing defense-in-depth convention (see WetSignatureGuardService).
+     */
+    public function updateComplianceTask(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'close_orders')) {
+            Flash::set('error', 'You do not have permission to update the compliance checklist.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $taskTypeId = (int) ($_POST['task_type_id'] ?? 0);
+        $status = trim((string) ($_POST['status'] ?? ''));
+        if ($taskTypeId <= 0 || !array_key_exists($status, OrderComplianceTaskRepository::STATUSES)) {
+            Flash::set('error', 'Select a valid compliance task and status.');
+            header("Location: /orders/{$orderId}#compliance-checklist");
+            return;
+        }
+
+        $skipReason = trim((string) ($_POST['skip_reason'] ?? ''));
+        if ($status === 'skipped' && $skipReason === '') {
+            Flash::set('error', 'A reason is required to mark a compliance task as not applicable/skipped.');
+            header("Location: /orders/{$orderId}#compliance-checklist");
+            return;
+        }
+
+        OrderComplianceTaskRepository::setStatus($orderId, $taskTypeId, $status, $status === 'skipped' ? $skipReason : null, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', $orderId, 'compliance_task:' . $taskTypeId, null, $status, $status === 'skipped' ? $skipReason : null);
+        Flash::set('success', 'Compliance checklist updated.');
+        header("Location: /orders/{$orderId}#compliance-checklist");
     }
 
     /**

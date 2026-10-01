@@ -1461,6 +1461,41 @@ $orderClosed = $order['status'] === 'complete';
     <?php endif; ?>
   </div>
 
+  <?php if ($canCloseOrders): ?>
+  <div class="section" id="compliance-checklist">
+    <h2>Compliance Checklist</h2>
+    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <a href="/compliance-task-types">Compliance Task Types</a> (Admin-only).</p>
+    <?php if (empty($complianceTasks)): ?>
+    <p class="muted small">No compliance task types have been configured yet.</p>
+    <?php else: ?>
+    <table class="list">
+      <tr><th>Task</th><th>Status &amp; Details</th></tr>
+      <?php foreach ($complianceTasks as $ct): ?>
+      <tr>
+        <td><?= htmlspecialchars($ct['task_type_name']) ?></td>
+        <td>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/compliance-tasks" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="task_type_id" value="<?= (int) $ct['task_type_id'] ?>">
+            <select name="status">
+              <?php foreach (\App\Repositories\OrderComplianceTaskRepository::STATUSES as $key => $label): ?>
+              <option value="<?= htmlspecialchars($key) ?>" <?= $ct['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <input type="text" name="skip_reason" value="<?= htmlspecialchars($ct['skip_reason'] ?? '') ?>" placeholder="Reason — required if Skipped" style="flex:1;min-width:180px;">
+            <button type="submit" class="btn-sm">Save</button>
+            <?php if ($ct['resolved_at']): ?>
+            <span class="muted small"><?= htmlspecialchars($ct['resolved_at']) ?><?php if ($ct['resolved_by_name']): ?> by <?= htmlspecialchars($ct['resolved_by_name']) ?><?php endif; ?></span>
+            <?php endif; ?>
+          </form>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
   <div class="section" id="amendments">
     <h2>Amendments</h2>
     <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>

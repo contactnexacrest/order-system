@@ -77,7 +77,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('manage_disputes',             'Manage disputes',                'View/raise/update a dispute''s status, attach evidence, and enable/disable the client-facing dispute button. Not auto-inherited from manage_orders — only Admin/MD/ED and Super Admin get it by default.', 'orders'),
   ('respond_to_disputes',         'Respond to disputes',            'Post a reply in a dispute''s reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button.', 'orders'),
   ('manage_order_financials',     'Manage order financials',        'View/add/edit an order''s export benefit claims, other costs, and its profitability summary. Stricter than ca_module_view/inr_actual_edit: not auto-granted to Accounts/CA, only Admin/MD/ED and Super Admin by default.', 'ca'),
-  ('manage_logistics_partners',   'Manage logistics partners',      'Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. Same tier as manage_hs_codes: Admin/MD/ED and Super Admin only by default.', 'catalog');
+  ('manage_logistics_partners',   'Manage logistics partners',      'Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. Same tier as manage_hs_codes: Admin/MD/ED and Super Admin only by default.', 'catalog'),
+  ('manage_compliance_task_types', 'Manage compliance task types',   'Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). Does not grant the order-page checklist itself - that uses close_orders. Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -1218,6 +1219,17 @@ INSERT INTO reference_library_documents (title, file_path, file_original_name, f
   ('Factory SOP – Processing, QC & Packing', '__STORAGE_BASE_PATH__/assets/reference_library/factory_sop_processing_qc_and_packing.pdf', 'Factory SOP – Processing, QC & Packing.pdf', 'application/pdf'),
   ('Factory Processing Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/factory_processing_agreement_template.docx', 'Factory Processing Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
   ('Quarry Block Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/quarry_block_supply_agreement_template.docx', 'Quarry Block Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+-- ================================================================
+-- COMPLIANCE TASK TYPES — the defaults the checklist on every order ships
+-- with; Admin can add more later from the Compliance Task Types screen.
+-- ================================================================
+INSERT INTO compliance_task_types (name) VALUES
+  ('ECGC Cover'),
+  ('Pre-Shipment Inspection'),
+  ('Fumigation Certificate'),
+  ('Phytosanitary Certificate'),
+  ('Due Diligence');
 
 SET FOREIGN_KEY_CHECKS = 1;
 

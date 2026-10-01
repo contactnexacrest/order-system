@@ -45,6 +45,32 @@ Stage 9's gate and marks the order complete.**
 
 ![Stage 9 section — order closed](./images/s9_closed.png)
 
+## Compliance Checklist
+
+A separate "Compliance Checklist" panel sits on every order's own page
+(visible regardless of which stage the order is currently in) tracking
+pre-closure compliance tasks — ECGC Cover, Pre-Shipment Inspection,
+Fumigation Certificate, Phytosanitary Certificate, Due Diligence by
+default; Admin can add more from
+[Compliance Task Types](./15-admin-settings.md). Each task's status is one
+of **Not Started** (the default — no row exists yet until staff first
+touch it), **Pending Approval**, **Approved**, or **Skipped (Not
+Applicable)** — skipping requires a reason, since "not applicable to this
+order" still needs to be recorded, not just silently left blank.
+
+Visibility of the whole panel, and every status change on it, is gated on
+the same `close_orders` permission that gates the **Close Order** button
+above — "the person who has permission to close the order must able to see
+this otherwise no meaning for this." There is no separate permission for
+the checklist itself. Every status change is recorded in the order's own
+[Audit Log](./13-document-review-approval.md) under
+`COMPLIANCE_TASK_STATUS_UPDATED`.
+
+The checklist does not itself gate **Close Order** — closing still only
+requires Stage 9's own gate (BL originals/endorsement) and the courier
+tracking number. The checklist is a tracking aid for the same person who
+has the authority to close the order, not an additional hard-coded lock.
+
 ## What the client does (or doesn't)
 
 Nothing inside the system. The buyer receives the physical courier package

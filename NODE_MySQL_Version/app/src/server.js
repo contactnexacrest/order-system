@@ -73,6 +73,7 @@ const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const logisticsPartnerController = require('./controllers/logisticsPartnerController');
+const complianceTaskTypeController = require('./controllers/complianceTaskTypeController');
 const watermarkController = require('./controllers/watermarkController');
 const orderCommentController = require('./controllers/orderCommentController');
 const emailTemplateController = require('./controllers/emailTemplateController');
@@ -379,6 +380,14 @@ app.post('/logistics-partners/:id/update', requireAuth, requirePermission('manag
 app.post('/logistics-partners/:id/toggle', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.toggleActive));
 app.post('/logistics-partners/:id/delete', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.remove));
 
+app.get('/compliance-task-types', requireAuth, requirePermission('manage_compliance_task_types'), asyncHandler(complianceTaskTypeController.index));
+app.get('/compliance-task-types/create', requireAuth, requirePermission('manage_compliance_task_types'), asyncHandler(complianceTaskTypeController.createForm));
+app.post('/compliance-task-types', requireAuth, requirePermission('manage_compliance_task_types'), verifyCsrf, asyncHandler(complianceTaskTypeController.create));
+app.get('/compliance-task-types/:id/edit', requireAuth, requirePermission('manage_compliance_task_types'), asyncHandler(complianceTaskTypeController.editForm));
+app.post('/compliance-task-types/:id/update', requireAuth, requirePermission('manage_compliance_task_types'), verifyCsrf, asyncHandler(complianceTaskTypeController.update));
+app.post('/compliance-task-types/:id/toggle', requireAuth, requirePermission('manage_compliance_task_types'), verifyCsrf, asyncHandler(complianceTaskTypeController.toggleActive));
+app.post('/compliance-task-types/:id/delete', requireAuth, requirePermission('manage_compliance_task_types'), verifyCsrf, asyncHandler(complianceTaskTypeController.remove));
+
 app.get('/watermarks', requireAuth, requirePermission('manage_company_settings'), asyncHandler(watermarkController.index));
 app.post('/watermarks/:which', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(watermarkController.update));
 app.get('/reference-docs', requireAuth, asyncHandler(referenceDocController.index));
@@ -564,6 +573,7 @@ app.post('/orders/:id/bl-originals-received', requireAuth, requirePermission('ma
 app.post('/orders/:id/bl-endorsed', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordBlEndorsed));
 app.post('/orders/:id/close', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.closeOrder));
 app.post('/orders/:id/mark-lost', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.markLost));
+app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.updateComplianceTask));
 
 app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));
 app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.deleteDraft));

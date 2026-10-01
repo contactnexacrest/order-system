@@ -15,6 +15,7 @@ $canOrders = $can('manage_orders');
 $canSettings = $can('manage_company_settings');
 $canManageHsCodes = $can('manage_hs_codes');
 $canManageLogisticsPartners = $can('manage_logistics_partners');
+$canManageComplianceTaskTypes = $can('manage_compliance_task_types');
 $canManageEmailTemplates = $can('manage_email_templates');
 $canAssets = $can('manage_assets');
 $canSignatories = $can('manage_signatories');
@@ -117,6 +118,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>
           <?php if ($canManageHsCodes): ?><a href="/hs-codes" class="<?= $isActive('/hs-codes') ? 'active' : '' ?>">HS Codes</a><?php endif; ?>
           <?php if ($canManageLogisticsPartners): ?><a href="/logistics-partners" class="<?= $isActive('/logistics-partners') ? 'active' : '' ?>">Logistics Partners</a><?php endif; ?>
+          <?php if ($canManageComplianceTaskTypes): ?><a href="/compliance-task-types" class="<?= $isActive('/compliance-task-types') ? 'active' : '' ?>">Compliance Task Types</a><?php endif; ?>
           <?php if ($canManageEmailTemplates): ?><a href="/email-templates" class="<?= $isActive('/email-templates') ? 'active' : '' ?>">Email Templates</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/watermarks" class="<?= $isActive('/watermarks') ? 'active' : '' ?>">Watermarks</a><?php endif; ?>
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>

@@ -70,6 +70,7 @@
           {% if permissions.manage_company_settings %}<a href="/holidays" class="{{ 'active' if (currentPath | startswith('/holidays')) else '' }}">Holiday Calendar</a>{% endif %}
           {% if permissions.manage_hs_codes %}<a href="/hs-codes" class="{{ 'active' if (currentPath | startswith('/hs-codes')) else '' }}">HS Codes</a>{% endif %}
           {% if permissions.manage_logistics_partners %}<a href="/logistics-partners" class="{{ 'active' if (currentPath | startswith('/logistics-partners')) else '' }}">Logistics Partners</a>{% endif %}
+          {% if permissions.manage_compliance_task_types %}<a href="/compliance-task-types" class="{{ 'active' if (currentPath | startswith('/compliance-task-types')) else '' }}">Compliance Task Types</a>{% endif %}
           {% if permissions.manage_email_templates %}<a href="/email-templates" class="{{ 'active' if (currentPath | startswith('/email-templates')) else '' }}">Email Templates</a>{% endif %}
           {% if permissions.manage_company_settings %}<a href="/watermarks" class="{{ 'active' if (currentPath | startswith('/watermarks')) else '' }}">Watermarks</a>{% endif %}
           {% if permissions.manage_assets %}<a href="/company-assets" class="{{ 'active' if (currentPath | startswith('/company-assets')) else '' }}">Assets</a>{% endif %}

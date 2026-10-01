@@ -1,0 +1,32 @@
+<div class="card page-wide">
+  <h1>Compliance Task Types</h1>
+  <p class="muted">The checklist of compliance/pre-closure tasks (ECGC Cover, Pre-Shipment Inspection, etc.) that appears on every order's own page. Add, rename, or deactivate task names here — deactivating removes a task from every order's checklist going forward without touching any status already recorded against it. The checklist itself, on an order's own page, is visible to whoever has the close_orders permission — not this screen.</p>
+
+  <div class="section">
+    <p><a href="/compliance-task-types/create" class="btn-sm btn-accent">Add Task Type</a></p>
+
+    <table class="list">
+      <tr><th>Task Name</th><th>Status</th><th>Actions</th></tr>
+      {% if taskTypes.length == 0 %}
+      <tr><td colspan="3" class="muted">No compliance task types yet — add the first one above.</td></tr>
+      {% endif %}
+      {% for t in taskTypes %}
+      <tr>
+        <td>{{ t.name }}</td>
+        <td><span class="badge {{ 'badge-active' if t.is_active else 'badge-inactive' }}">{{ 'Active' if t.is_active else 'Inactive' }}</span></td>
+        <td class="action-buttons">
+          <a href="/compliance-task-types/{{ t.id }}/edit" class="btn-sm btn-secondary">Edit</a>
+          <form method="post" action="/compliance-task-types/{{ t.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if t.is_active else 'Reactivate' }} &quot;{{ t.name }}&quot;?');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm {{ 'btn-danger' if t.is_active else 'btn-success' }}">{{ 'Deactivate' if t.is_active else 'Reactivate' }}</button>
+          </form>
+          <form method="post" action="/compliance-task-types/{{ t.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete &quot;{{ t.name }}&quot;? This only works if no order has ever recorded a status against it — otherwise deactivate it instead.');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

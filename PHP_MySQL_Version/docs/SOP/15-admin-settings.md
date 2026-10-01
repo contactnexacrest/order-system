@@ -99,6 +99,21 @@ mistake (or malice).
   paperwork side. This directory is standalone for now — a quick
   "who do we call for this" lookup — not yet wired into a specific order
   or Order Cost Entry.
+- **Compliance Task Types** (`/compliance-task-types`) — the admin-editable
+  list of names (ECGC Cover, Pre-Shipment Inspection, Fumigation
+  Certificate, Phytosanitary Certificate, Due Diligence by default) that
+  appears as a checklist on every order's own page — see
+  [Stage 9 — Document Despatch & Closure](./09-stage9-despatch-closure.md)
+  for the checklist itself. Gated by `manage_compliance_task_types`, same
+  tier as HS Codes/Logistics Partners (Admin/MD/ED and Super Admin by
+  default). This screen only edits the list of names; it does not itself
+  grant access to the checklist on an order's page — that uses the
+  existing `close_orders` permission, "the person who has permission to
+  close the order must able to see this otherwise no meaning for this."
+  Deactivating a type removes it from every order's checklist going
+  forward without touching any status already recorded against it;
+  deleting one outright only works if no order has ever recorded a status
+  against it, otherwise the screen asks you to deactivate instead.
 - **Reference Library** (`/reference-docs`) — any authenticated staff
   member can view and download every entry here; adding, deleting, or
   re-uploading a file requires `manage_company_settings`, the same gate

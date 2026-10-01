@@ -27,6 +27,7 @@ use App\Controllers\EmailDispatchController;
 use App\Controllers\FieldProtectionController;
 use App\Controllers\HolidayController;
 use App\Controllers\HsCodeController;
+use App\Controllers\ComplianceTaskTypeController;
 use App\Controllers\LogisticsPartnerController;
 use App\Controllers\WatermarkController;
 use App\Controllers\ReferenceDocController;
@@ -85,6 +86,7 @@ $disputes = new DisputeController();
 $holidays = new HolidayController();
 $hsCodes = new HsCodeController();
 $logisticsPartners = new LogisticsPartnerController();
+$complianceTaskTypes = new ComplianceTaskTypeController();
 $watermarks = new WatermarkController();
 $referenceDocs = new ReferenceDocController();
 $sop = new SopController();
@@ -172,6 +174,14 @@ $router->get('/logistics-partners/{id}/edit', [$logisticsPartners, 'editForm'], 
 $router->post('/logistics-partners/{id}/update', [$logisticsPartners, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/toggle', [$logisticsPartners, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/delete', [$logisticsPartners, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+
+$router->get('/compliance-task-types', [$complianceTaskTypes, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types')]);
+$router->get('/compliance-task-types/create', [$complianceTaskTypes, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types')]);
+$router->post('/compliance-task-types', [$complianceTaskTypes, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types'), CsrfCheck::verify()]);
+$router->get('/compliance-task-types/{id}/edit', [$complianceTaskTypes, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types')]);
+$router->post('/compliance-task-types/{id}/update', [$complianceTaskTypes, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types'), CsrfCheck::verify()]);
+$router->post('/compliance-task-types/{id}/toggle', [$complianceTaskTypes, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types'), CsrfCheck::verify()]);
+$router->post('/compliance-task-types/{id}/delete', [$complianceTaskTypes, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types'), CsrfCheck::verify()]);
 
 // docs/schema.sql Section AI — email template CRUD (add/edit, never delete).
 $router->get('/email-templates', [$emailTemplates, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates')]);
@@ -378,6 +388,7 @@ $router->post('/orders/{id}/bl-originals-received', [$orders, 'recordBlOriginals
 $router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/close', [$orders, 'closeOrder'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/mark-lost', [$orders, 'markLost'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/documents/{documentId}/delete', [$documents, 'delete'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);

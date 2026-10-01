@@ -18,6 +18,7 @@ const orderDuplicationService = require('../services/orderDuplicationService');
 const orderEditGuard = require('../services/orderEditGuard');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
+const orderComplianceTaskRepository = require('../repositories/orderComplianceTaskRepository');
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const hsCodeRepository = require('../repositories/hsCodeRepository');
@@ -712,6 +713,8 @@ async function show(req, res) {
       production: await orderProductionRepository.find(orderId),
       supplierTypes: await lookupRepository.dropdownOptions('supplier_type'),
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
+      complianceTasks: await orderComplianceTaskRepository.forOrder(orderId),
+      complianceStatuses: orderComplianceTaskRepository.STATUSES,
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
       piIntake,
       piFormFullLink,
@@ -1713,6 +1716,43 @@ async function closeOrder(req, res) {
 }
 
 /**
+ * Compliance/pre-closure task checklist (docs/schema.sql Section AR) —
+ * "the person who has permission to close the order must able to see this
+ * otherwise no meaning for this." Gated on close_orders, same as the view
+ * itself; re-checked here (not just route-level/UI-level) per the existing
+ * defense-in-depth convention (see wetSignatureGuardService).
+ */
+async function updateComplianceTask(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  if (!req.permissions || !req.permissions.close_orders) {
+    flash.set(req, 'error', 'You do not have permission to update the compliance checklist.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const taskTypeId = parseInt(req.body.task_type_id, 10) || 0;
+  const status = str(req.body.status);
+  if (taskTypeId <= 0 || !Object.prototype.hasOwnProperty.call(orderComplianceTaskRepository.STATUSES, status)) {
+    flash.set(req, 'error', 'Select a valid compliance task and status.');
+    res.redirect(`/orders/${orderId}#compliance-checklist`);
+    return;
+  }
+
+  const skipReason = str(req.body.skip_reason);
+  if (status === 'skipped' && skipReason === '') {
+    flash.set(req, 'error', 'A reason is required to mark a compliance task as not applicable/skipped.');
+    res.redirect(`/orders/${orderId}#compliance-checklist`);
+    return;
+  }
+
+  await orderComplianceTaskRepository.setStatus(orderId, taskTypeId, status, status === 'skipped' ? skipReason : null, user.id);
+  await auditLogRepository.log(user.id, 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', orderId, `compliance_task:${taskTypeId}`, null, status, status === 'skipped' ? skipReason : null);
+  flash.set(req, 'success', 'Compliance checklist updated.');
+  res.redirect(`/orders/${orderId}#compliance-checklist`);
+}
+
+/**
  * Spec Section 13 — "Stage/lock/order status flags" is explicitly named as
  * an Admin-editable field, distinct from the normal stage-gate progression
  * (stageGateService) which is the non-override path every order takes.
@@ -1806,7 +1846,7 @@ module.exports = {
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, recordBlIssued, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
-  closeOrder, overrideStatusLock, markLost,
+  closeOrder, overrideStatusLock, markLost, updateComplianceTask,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,
   recordAssumedExchangeRate, recordAdvanceFirc, recordBalanceFirc, recordFreightFirc,

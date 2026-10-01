@@ -1392,6 +1392,41 @@
     {% endif %}
   </div>
 
+  {% if permissions.close_orders %}
+  <div class="section" id="compliance-checklist">
+    <h2>Compliance Checklist</h2>
+    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <a href="/compliance-task-types">Compliance Task Types</a> (Admin-only).</p>
+    {% if not complianceTasks or complianceTasks.length == 0 %}
+    <p class="muted small">No compliance task types have been configured yet.</p>
+    {% else %}
+    <table class="list">
+      <tr><th>Task</th><th>Status &amp; Details</th></tr>
+      {% for ct in complianceTasks %}
+      <tr>
+        <td>{{ ct.task_type_name }}</td>
+        <td>
+          <form method="post" action="/orders/{{ order.id }}/compliance-tasks" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="task_type_id" value="{{ ct.task_type_id }}">
+            <select name="status">
+              {% for key, label in complianceStatuses %}
+              <option value="{{ key }}" {% if ct.status == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <input type="text" name="skip_reason" value="{{ ct.skip_reason or '' }}" placeholder="Reason — required if Skipped" style="flex:1;min-width:180px;">
+            <button type="submit" class="btn-sm">Save</button>
+            {% if ct.resolved_at %}
+            <span class="muted small">{{ ct.resolved_at }}{% if ct.resolved_by_name %} by {{ ct.resolved_by_name }}{% endif %}</span>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="section" id="amendments">
     <h2>Amendments</h2>
     <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>

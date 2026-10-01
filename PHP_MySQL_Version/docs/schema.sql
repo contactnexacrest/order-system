@@ -2549,6 +2549,55 @@ CREATE TABLE logistics_partners (
 -- ================================================================
 
 -- ================================================================
+-- SECTION AR — COMPLIANCE / PRE-CLOSURE TASK CHECKLIST
+-- (added 2026-10-01)
+-- ================================================================
+-- A small, admin-managed checklist of compliance/pre-closure tasks per
+-- order (ECGC cover, pre-shipment inspection, fumigation/phytosanitary
+-- certification, buyer due diligence, etc.) — "the person who has
+-- permission to close the order must able to see this otherwise no
+-- meaning for this." compliance_task_types is the admin-editable list of
+-- task names (seeded with five defaults in seed.sql, more addable later);
+-- order_compliance_tasks is the per-order status against each type. A
+-- missing row for a given order+task_type pair means not_started — rows
+-- are only written the first time staff actually touch that task on that
+-- order, so a brand-new order needs zero rows. Visibility of the whole
+-- checklist (and every write action on it) is gated on the existing
+-- close_orders permission plus Super Admin — no new permission needed for
+-- that; manage_compliance_task_types (seeded in seed.sql) gates only the
+-- separate admin screen that edits the task-type list itself.
+CREATE TABLE compliance_task_types (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name              VARCHAR(150) NOT NULL,
+  is_active         TINYINT(1) NOT NULL DEFAULT 1,
+  created_by        BIGINT UNSIGNED NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_compliance_tasks (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id          BIGINT UNSIGNED NOT NULL,
+  task_type_id      BIGINT UNSIGNED NOT NULL,
+  status            ENUM('not_started','pending_approval','approved','skipped') NOT NULL DEFAULT 'not_started',
+  skip_reason       VARCHAR(500) NULL,
+  resolved_at       TIMESTAMP NULL,
+  resolved_by       BIGINT UNSIGNED NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_order_task (order_id, task_type_id),
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (task_type_id) REFERENCES compliance_task_types(id),
+  FOREIGN KEY (resolved_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- manage_compliance_task_types permission itself is seeded in seed.sql
+-- (permissions + role_permissions), same as every other permission. The
+-- five default task_type rows are also seeded there.
+-- ================================================================
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2588,4 +2637,5 @@ CREATE TABLE logistics_partners (
 -- Section AO (dispute replies + granular dispute permissions) added 2026-09-30.
 -- Section AP (reorder-to-supplier linking + order profitability) added 2026-09-30.
 -- Section AQ (logistics partners directory) added 2026-10-01.
+-- Section AR (compliance/pre-closure task checklist) added 2026-10-01.
 -- ================================================================
