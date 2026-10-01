@@ -76,9 +76,10 @@
   <div class="section">
     <h2>Payments</h2>
     <table class="list">
-      <tr><th>Advance</th><th>Advance Cleared</th><th>Balance</th><th>Balance Cleared</th><th>Freight</th><th>Freight Cleared</th></tr>
+      <tr><th>Currency</th><th>Advance</th><th>Advance Cleared</th><th>Balance</th><th>Balance Cleared</th><th>Freight</th><th>Freight Cleared</th></tr>
       <?php foreach ($payments as $p): ?>
       <tr>
+        <td><?= htmlspecialchars($p['currency_code']) ?></td>
         <td><?= $p['advance_amount'] !== null ? number_format((float) $p['advance_amount'], 2) : '—' ?></td>
         <td><?= htmlspecialchars($p['advance_cleared_at'] ?? '—') ?></td>
         <td><?= $p['balance_amount'] !== null ? number_format((float) $p['balance_amount'], 2) : '—' ?></td>
@@ -87,14 +88,14 @@
         <td><?= htmlspecialchars($p['freight_cleared_at'] ?? '—') ?></td>
       </tr>
       <?php endforeach; ?>
-      <?php if (empty($payments)): ?><tr><td colspan="6" class="muted">No payment records yet.</td></tr><?php endif; ?>
+      <?php if (empty($payments)): ?><tr><td colspan="7" class="muted">No payment records yet.</td></tr><?php endif; ?>
     </table>
   </div>
 
   <div class="section">
     <h2>Products (all orders)</h2>
     <table class="list">
-      <tr><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>FOB Value</th></tr>
+      <tr><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>FOB Value</th><th>Currency</th></tr>
       <?php foreach ($products as $p): ?>
       <tr>
         <td><?= htmlspecialchars($p['description']) ?></td>
@@ -102,9 +103,10 @@
         <td><?= htmlspecialchars($p['unit'] ?? '—') ?></td>
         <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : '—' ?></td>
         <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : '—' ?></td>
+        <td><?= htmlspecialchars($p['currency_code']) ?></td>
       </tr>
       <?php endforeach; ?>
-      <?php if (empty($products)): ?><tr><td colspan="5" class="muted">No product lines yet.</td></tr><?php endif; ?>
+      <?php if (empty($products)): ?><tr><td colspan="6" class="muted">No product lines yet.</td></tr><?php endif; ?>
     </table>
   </div>
 </div>

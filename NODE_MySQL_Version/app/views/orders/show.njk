@@ -790,10 +790,10 @@
     <h2>Payment Status</h2>
     {% if payment %}
     <div class="kv-grid">
-      <div><span class="k">Advance Amount</span><span class="v">{{ (payment.advance_amount | money) if payment.advance_amount != null else '—' }}</span></div>
+      <div><span class="k">Advance Amount</span><span class="v">{{ (payment.advance_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.advance_amount != null else '—' }}</span></div>
       <div><span class="k">Advance T/T Received</span><span class="v">{{ payment.advance_remittance_received_at or '—' }}</span></div>
       <div><span class="k">Advance Cleared</span><span class="v">{{ payment.advance_cleared_at or '—' }}</span></div>
-      <div><span class="k">Balance Amount</span><span class="v">{{ (payment.balance_amount | money) if payment.balance_amount != null else '—' }}</span></div>
+      <div><span class="k">Balance Amount</span><span class="v">{{ (payment.balance_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.balance_amount != null else '—' }}</span></div>
       <div><span class="k">Balance Due</span><span class="v">{{ payment.balance_due_date or 'event-triggered' }}</span></div>
     </div>
     {% endif %}
@@ -831,7 +831,7 @@
         <tr>
           <td>{{ r.payment_type | capitalize }}</td>
           <td>{{ r.transaction_ref }}</td>
-          <td>{{ (r.amount | money) if r.amount != null else '—' }}</td>
+          <td>{{ (r.amount | money) ~ ' ' ~ (order.currency_code or '') if r.amount != null else '—' }}</td>
           <td>{{ r.payment_date or '—' }}</td>
           <td>{{ r.payer_bank_details or '—' }}</td>
           <td>
@@ -1045,8 +1045,8 @@
         </form>
       {% else %}
         <div class="kv-grid">
-          <div><span class="k">Confirmed Rate</span><span class="v">{{ freight.confirmed_freight_rate or '—' }}</span></div>
-          <div><span class="k">Insurance</span><span class="v">{{ freight.insurance_amount or 'NIL' }}</span></div>
+          <div><span class="k">Confirmed Rate</span><span class="v">{{ (freight.confirmed_freight_rate ~ ' ' ~ (order.currency_code or '')) if freight.confirmed_freight_rate != null else '—' }}</span></div>
+          <div><span class="k">Insurance</span><span class="v">{{ (freight.insurance_amount ~ ' ' ~ (order.currency_code or '')) if freight.insurance_amount != null else 'NIL' }}</span></div>
           <div><span class="k">Forwarder</span><span class="v">{{ freight.freight_forwarder_name or '—' }}</span></div>
         </div>
         {% if not freightCleared %}

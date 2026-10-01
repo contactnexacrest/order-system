@@ -136,7 +136,7 @@
         <tr>
           <td>{{ r.payment_type | capitalize }}</td>
           <td>{{ r.transaction_ref }}</td>
-          <td>{{ (r.amount | money) if r.amount != null else '—' }}</td>
+          <td>{{ (r.amount | money) ~ ' ' ~ (order.currency_code or '') if r.amount != null else '—' }}</td>
           <td>{{ r.payment_date or '—' }}</td>
           <td>{{ 'Reviewed by our team' if r.status == 'reviewed' else 'Received — pending review' }}</td>
           <td>

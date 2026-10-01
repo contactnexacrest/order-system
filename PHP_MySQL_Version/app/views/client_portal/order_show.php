@@ -145,7 +145,7 @@
         <tr>
           <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
           <td><?= htmlspecialchars($r['transaction_ref']) ?></td>
-          <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) : '—' ?></td>
+          <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></td>
           <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
           <td><?= $r['status'] === 'reviewed' ? 'Reviewed by our team' : 'Received — pending review' ?></td>
           <td>

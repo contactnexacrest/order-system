@@ -856,10 +856,10 @@ $orderClosed = $order['status'] === 'complete';
     <h2>Payment Status</h2>
     <?php if ($payment): ?>
     <div class="kv-grid">
-      <div><span class="k">Advance Amount</span><span class="v"><?= $payment['advance_amount'] !== null ? number_format((float) $payment['advance_amount'], 2) : '—' ?></span></div>
+      <div><span class="k">Advance Amount</span><span class="v"><?= $payment['advance_amount'] !== null ? number_format((float) $payment['advance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
       <div><span class="k">Advance T/T Received</span><span class="v"><?= htmlspecialchars($payment['advance_remittance_received_at'] ?? '—') ?></span></div>
       <div><span class="k">Advance Cleared</span><span class="v"><?= htmlspecialchars($payment['advance_cleared_at'] ?? '—') ?></span></div>
-      <div><span class="k">Balance Amount</span><span class="v"><?= $payment['balance_amount'] !== null ? number_format((float) $payment['balance_amount'], 2) : '—' ?></span></div>
+      <div><span class="k">Balance Amount</span><span class="v"><?= $payment['balance_amount'] !== null ? number_format((float) $payment['balance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
       <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($payment['balance_due_date'] ?? 'event-triggered') ?></span></div>
     </div>
     <?php endif; ?>
@@ -897,7 +897,7 @@ $orderClosed = $order['status'] === 'complete';
         <tr>
           <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
           <td><?= htmlspecialchars($r['transaction_ref']) ?></td>
-          <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) : '—' ?></td>
+          <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></td>
           <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
           <td><?= htmlspecialchars($r['payer_bank_details'] ?? '—') ?></td>
           <td>
@@ -1111,8 +1111,8 @@ $orderClosed = $order['status'] === 'complete';
         </form>
       <?php else: ?>
         <div class="kv-grid">
-          <div><span class="k">Confirmed Rate</span><span class="v"><?= htmlspecialchars($freight['confirmed_freight_rate'] ?? '—') ?></span></div>
-          <div><span class="k">Insurance</span><span class="v"><?= htmlspecialchars($freight['insurance_amount'] ?? 'NIL') ?></span></div>
+          <div><span class="k">Confirmed Rate</span><span class="v"><?= $freight['confirmed_freight_rate'] !== null ? htmlspecialchars($freight['confirmed_freight_rate']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
+          <div><span class="k">Insurance</span><span class="v"><?= $freight['insurance_amount'] !== null ? htmlspecialchars($freight['insurance_amount']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : 'NIL' ?></span></div>
           <div><span class="k">Forwarder</span><span class="v"><?= htmlspecialchars($freight['freight_forwarder_name'] ?? '—') ?></span></div>
         </div>
         <?php if (!$freightCleared): ?>

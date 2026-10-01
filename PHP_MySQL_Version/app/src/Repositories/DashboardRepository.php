@@ -79,10 +79,11 @@ final class DashboardRepository
     {
         $stmt = Database::connection()->query(
             "SELECT o.id AS order_id, o.order_reference, c.company_legal_name,
-                    ops.balance_due_date, ops.balance_amount
+                    ops.balance_due_date, ops.balance_amount, cur.code AS currency_code
              FROM order_payment_status ops
              JOIN orders o ON o.id = ops.order_id
              JOIN clients c ON c.id = o.client_id
+             LEFT JOIN currencies cur ON cur.id = o.currency_id
              WHERE ops.balance_due_date IS NOT NULL
                AND ops.balance_cleared_at IS NULL
                AND ops.balance_due_date < CURDATE()

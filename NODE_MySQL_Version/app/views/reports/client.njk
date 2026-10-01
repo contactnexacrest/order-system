@@ -71,9 +71,10 @@
   <div class="section">
     <h2>Payments</h2>
     <table class="list">
-      <tr><th>Advance</th><th>Advance Cleared</th><th>Balance</th><th>Balance Cleared</th><th>Freight</th><th>Freight Cleared</th></tr>
+      <tr><th>Currency</th><th>Advance</th><th>Advance Cleared</th><th>Balance</th><th>Balance Cleared</th><th>Freight</th><th>Freight Cleared</th></tr>
       {% for p in payments %}
       <tr>
+        <td>{{ p.currency_code }}</td>
         <td>{{ (p.advance_amount | money) if p.advance_amount != null else '—' }}</td>
         <td>{{ p.advance_cleared_at or '—' }}</td>
         <td>{{ (p.balance_amount | money) if p.balance_amount != null else '—' }}</td>
@@ -82,14 +83,14 @@
         <td>{{ p.freight_cleared_at or '—' }}</td>
       </tr>
       {% endfor %}
-      {% if not payments or payments.length == 0 %}<tr><td colspan="6" class="muted">No payment records yet.</td></tr>{% endif %}
+      {% if not payments or payments.length == 0 %}<tr><td colspan="7" class="muted">No payment records yet.</td></tr>{% endif %}
     </table>
   </div>
 
   <div class="section">
     <h2>Products (all orders)</h2>
     <table class="list">
-      <tr><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>FOB Value</th></tr>
+      <tr><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>FOB Value</th><th>Currency</th></tr>
       {% for p in products %}
       <tr>
         <td>{{ p.description }}</td>
@@ -97,9 +98,10 @@
         <td>{{ p.unit or '—' }}</td>
         <td>{{ (p.unit_price | money) if p.unit_price != null else '—' }}</td>
         <td>{{ (p.fob_value | money) if p.fob_value != null else '—' }}</td>
+        <td>{{ p.currency_code }}</td>
       </tr>
       {% endfor %}
-      {% if not products or products.length == 0 %}<tr><td colspan="5" class="muted">No product lines yet.</td></tr>{% endif %}
+      {% if not products or products.length == 0 %}<tr><td colspan="6" class="muted">No product lines yet.</td></tr>{% endif %}
     </table>
   </div>
 </div>

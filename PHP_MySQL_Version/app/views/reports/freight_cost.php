@@ -37,12 +37,13 @@
   <div class="section">
     <h2>Orders</h2>
     <table class="list">
-      <tr><th>Order Ref</th><th>Client</th><th>Incoterm</th><th>Forwarder</th><th>Confirmed Rate</th><th>Insurance</th><th>Invoiced</th><th>Cleared</th></tr>
+      <tr><th>Order Ref</th><th>Client</th><th>Incoterm</th><th>Currency</th><th>Forwarder</th><th>Confirmed Rate</th><th>Insurance</th><th>Invoiced</th><th>Cleared</th></tr>
       <?php foreach ($rows as $r): ?>
       <tr>
         <td><a href="/orders/<?= (int) $r['id'] ?>"><?= htmlspecialchars($r['order_reference']) ?></a></td>
         <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
         <td><?= htmlspecialchars($r['incoterm_code']) ?></td>
+        <td><?= htmlspecialchars($r['currency_code']) ?></td>
         <td><?= htmlspecialchars($r['freight_forwarder_name'] ?? '—') ?></td>
         <td><?= $r['confirmed_freight_rate'] !== null ? number_format((float) $r['confirmed_freight_rate'], 2) : '—' ?></td>
         <td><?= $r['insurance_amount'] !== null ? number_format((float) $r['insurance_amount'], 2) : '—' ?></td>
@@ -50,7 +51,7 @@
         <td><?= $r['payment_cleared_at'] ? 'Yes' : 'No' ?></td>
       </tr>
       <?php endforeach; ?>
-      <?php if (empty($rows)): ?><tr><td colspan="8" class="muted">No orders with freight terms recorded match these filters.</td></tr><?php endif; ?>
+      <?php if (empty($rows)): ?><tr><td colspan="9" class="muted">No orders with freight terms recorded match these filters.</td></tr><?php endif; ?>
     </table>
   </div>
 </div>

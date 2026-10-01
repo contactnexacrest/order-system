@@ -87,7 +87,7 @@
           <td><?= htmlspecialchars($r['order_reference']) ?></td>
           <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
           <td><?= htmlspecialchars($r['balance_due_date']) ?></td>
-          <td><?= $r['balance_amount'] !== null ? number_format((float) $r['balance_amount'], 2) : '—' ?></td>
+          <td><?= $r['balance_amount'] !== null ? number_format((float) $r['balance_amount'], 2) . ' ' . htmlspecialchars($r['currency_code'] ?? '') : '—' ?></td>
           <td><a href="/orders/<?= (int) $r['order_id'] ?>">View</a></td>
         </tr>
         <?php endforeach; ?>
