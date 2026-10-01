@@ -95,6 +95,22 @@ async function approve(documentReviewId, reviewerUserId, comments) {
     throw new Error('This review has already been actioned.');
   }
 
+  const document = await documentRepository.find(review.document_id);
+  if (document && document.order_id !== null) {
+    // A newer revision of this (order, type) may have been generated while
+    // this review sat pending (e.g. a reviewer was slow and the creator
+    // regenerated to fix something reported out-of-band) — approving a
+    // stale revision at this point would immediately get superseded again
+    // by finalizeIfFullyApproved() below the moment the real latest
+    // revision is later approved, which is confusing at best. Block it
+    // outright: only the current latest revision of a document may ever
+    // be approved.
+    const latest = await documentRepository.findLatestForOrderAndType(document.order_id, document.document_type_id);
+    if (latest && latest.id !== document.id) {
+      throw new Error('A newer revision of this document has since been generated — this one can no longer be approved. Review the latest revision instead.');
+    }
+  }
+
   await documentReviewRepository.approve(documentReviewId, comments);
   await auditLogRepository.log(reviewerUserId, 'DOCUMENT_REVIEW_APPROVED', 'documents', review.document_id, null, null, null, comments);
 
@@ -169,6 +185,14 @@ async function finalizeIfFullyApproved(documentId) {
   if (pending === 0 && rejected === 0 && approved >= Math.max(1, minRequired)) {
     await documentGenerationService.finalizeApproval(documentId);
     await auditLogRepository.log(null, 'DOCUMENT_APPROVED', 'documents', documentId, 'status', document.status, 'approved');
+
+    // Point 1 (2026-10-01): this revision is now THE valid copy of this
+    // (order, type) — any other revision still sitting as 'approved'/'sent'
+    // from an earlier pass through review is now stale and must be
+    // invalidated, both in status and visibly on the PDF itself, or
+    // staff/buyers could keep relying on an old copy with no way to tell
+    // it apart from the current one.
+    await documentGenerationService.supersedeOtherApprovedRevisions(documentId);
 
     // GATE-01: the QT's approval — not its mere draft generation — is
     // Stage 1's real gate (Owner Decision #1: "No stage passes until its

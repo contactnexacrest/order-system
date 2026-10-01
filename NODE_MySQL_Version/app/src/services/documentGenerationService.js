@@ -211,7 +211,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     (await preAssignedReferenceFor(documentTypeCode, orderId)) ||
     (await require('./referenceNumberService').generateDocumentRef(docType.id));
 
-  const watermark = await draftWatermark();
+  const watermark = withRevisionStamp(await draftWatermark(), clientRevisionNumber, docType.category);
   const terms = await resolveTerms(documentTypeCode, data);
   const signatory = await documentDataAssembler.signatoryBlock(docType.id, signatoryOverrideUserId);
 
@@ -541,7 +541,7 @@ async function finalizeApproval(documentId) {
       client_revision_label: `Rev.${String(document.client_revision_number).padStart(2, '0')}`,
       generated_date: documentDataAssembler.formatDate(document.generated_at),
     },
-    watermark: await finalWatermark(),
+    watermark: withRevisionStamp(await finalWatermark(), document.client_revision_number, document.document_type_category),
     doc_title: titleFor(documentTypeCode),
     section1_title: section1TitleFor(documentTypeCode),
     terms,
@@ -593,6 +593,157 @@ async function finalizeApproval(documentId) {
   );
 
   await documentRepository.markApproved(documentId, finalPdfFileId);
+}
+
+/**
+ * The buyer's own copy must be unmistakable about which revision they're
+ * looking at — not just in the on-page revision labels but stamped into
+ * the watermark itself, since the watermark is the one thing visible on
+ * every page of a printed or forwarded copy. Only applied from the second
+ * client-facing issue onward (client_revision_number 0 is the first-ever
+ * send — nothing to distinguish it from) and only for customer_facing
+ * document types (BLI/COOPREP/SUPPO etc. are never buyer-facing, so a
+ * revision count on them would mean nothing to whoever's reading one).
+ */
+function withRevisionStamp(watermark, clientRevisionNumber, documentTypeCategory) {
+  if (!watermark.enabled || !watermark.show_text || !clientRevisionNumber || clientRevisionNumber < 1 || documentTypeCategory !== 'customer_facing') {
+    return watermark;
+  }
+  return {
+    ...watermark,
+    text: `${String(watermark.text ?? '').trim()} — REVISION ${String(clientRevisionNumber).padStart(2, '0')}`,
+  };
+}
+
+/**
+ * Hardcoded rather than read from watermark_settings — there's no admin
+ * need to customize how an INVALID stamp looks, and keeping it out of the
+ * DB means it can never accidentally be reconfigured into something less
+ * obvious. Deliberately impossible to miss: bright red, large, steep
+ * angle — the opposite design intent of the DRAFT/final watermarks, which
+ * are meant to be visible but unobtrusive.
+ */
+function invalidWatermark() {
+  return {
+    enabled: true,
+    mode: 'text',
+    show_text: true,
+    show_image: false,
+    text: 'INVALID DOCUMENT — SUPERSEDED',
+    color: '#C0152F',
+    opacity: 0.35,
+    angle: 35,
+    font_size: 54,
+    image_data_uri: null,
+    image_opacity: 0,
+    image_position: 'center',
+  };
+}
+
+/**
+ * A newer revision of this (order, type) has just been fully approved —
+ * this older, previously-approved/sent revision is no longer the valid
+ * copy. Re-renders it from its own stored snapshot (exact same pattern as
+ * finalizeApproval() above: same document_reference, same revision_number,
+ * signatory/company read from the row's own snapshot, never live data)
+ * with the INVALID DOCUMENT watermark instead of the final one, writes
+ * the result as a new file_store row (the previously-approved PDF is left
+ * alone on disk/DB, per the soft-delete-only convention), and repoints
+ * pdf_file_id to it so anyone who opens/downloads this document from here
+ * on sees the invalidated copy, never the old clean one.
+ */
+async function markSuperseded(documentId) {
+  const document = await documentRepository.find(documentId);
+  if (!document || document.order_id === null) {
+    return;
+  }
+
+  const orderId = document.order_id;
+  const order = await orderRepository.find(orderId);
+  const documentTypeCode = document.document_type_code;
+
+  const data = await documentDataAssembler.assemble(orderId, documentTypeCode);
+  const terms = await resolveTerms(documentTypeCode, data);
+
+  const context = {
+    fonts: fontsBlock(),
+    ...data,
+    meta: {
+      document_reference: document.document_reference,
+      revision_number: document.revision_number,
+      revision_label: `Rev.${String(document.revision_number).padStart(2, '0')}`,
+      client_revision_number: document.client_revision_number,
+      client_revision_label: `Rev.${String(document.client_revision_number).padStart(2, '0')}`,
+      generated_date: documentDataAssembler.formatDate(document.generated_at),
+    },
+    watermark: invalidWatermark(),
+    doc_title: titleFor(documentTypeCode),
+    section1_title: section1TitleFor(documentTypeCode),
+    terms,
+    terms_section_number: termsSectionNumberFor(documentTypeCode),
+    terms_section_title: termsSectionTitleFor(documentTypeCode),
+    signatory: await documentDataAssembler.signatoryFromSnapshot(document),
+    company: await documentDataAssembler.companyFromSnapshot(document),
+  };
+
+  const twig = templatesEnvironment();
+  const html = twig.render(templateFileFor(documentTypeCode), context);
+  const pdfBytes = await renderPdfFromHtml(html);
+
+  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const clientNumber = sanitizePathSegment(order.client_unique_number);
+  const orderRef = sanitizePathSegment(order.order_reference);
+  const stageSlug = sanitizePathSegment(order.current_stage_slug || 'stage');
+  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, stageSlug, 'generated');
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  const filenameSafeReference = document.document_reference !== null ? document.document_reference.replace(/\//g, '-') : documentTypeCode;
+  const supersededUuidName = uuidFilename('pdf');
+  const supersededPath = path.join(targetDir, supersededUuidName);
+  fs.writeFileSync(supersededPath, pdfBytes);
+
+  const supersededPdfFileId = await fileStoreRepository.insertGenerated(
+    null,
+    orderId,
+    null,
+    supersededPath,
+    supersededUuidName,
+    `${documentTypeCode} ${filenameSafeReference} Rev.${document.client_revision_number} (SUPERSEDED).pdf`,
+    pdfBytes.length,
+    'application/pdf',
+    null,
+    false
+  );
+
+  await documentRepository.markSuperseded(documentId, supersededPdfFileId);
+  await require('../repositories/auditLogRepository').log(null, 'DOCUMENT_SUPERSEDED', 'documents', documentId, 'status', document.status, 'superseded');
+}
+
+/**
+ * Called right after a document is fully approved (finalizeApproval()
+ * above) — every OTHER document of the same (order, type) that's still
+ * sitting as 'approved' or 'sent' is now stale: only the revision that
+ * was just approved may legitimately be sent to or relied on by the buyer
+ * going forward. Finds every sibling revision via
+ * documentRepository.allForOrderAndType() and invalidates each one still
+ * in 'approved'/'sent' status (a 'draft'/'in_review'/already-'superseded'
+ * sibling is left alone — nothing to invalidate).
+ */
+async function supersedeOtherApprovedRevisions(documentId) {
+  const document = await documentRepository.find(documentId);
+  if (!document || document.order_id === null) {
+    return;
+  }
+
+  const siblings = await documentRepository.allForOrderAndType(document.order_id, document.document_type_id);
+  for (const sibling of siblings) {
+    if (sibling.id === documentId) {
+      continue;
+    }
+    if (sibling.status === 'approved' || sibling.status === 'sent') {
+      await markSuperseded(sibling.id);
+    }
+  }
 }
 
 /**
@@ -1031,6 +1182,8 @@ function formatNowWithTime() {
 module.exports = {
   generate,
   finalizeApproval,
+  markSuperseded,
+  supersedeOtherApprovedRevisions,
   generateAmendment,
   generateCaInternalAnnexure,
   documentTypeIdFor,

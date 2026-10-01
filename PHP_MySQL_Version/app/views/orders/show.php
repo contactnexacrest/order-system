@@ -490,7 +490,13 @@ foreach ($stages as $s) {
         <td><?= htmlspecialchars($d['document_reference'] ?? '—') ?></td>
         <td><?= (int) $d['revision_number'] ?><?php if ($d['client_revision_number'] !== null): ?> <span class="muted small">(client: <?= (int) $d['client_revision_number'] ?>)</span><?php endif; ?></td>
         <td><?= htmlspecialchars($d['generated_at']) ?></td>
-        <td><?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?></td>
+        <td>
+          <?php if ($d['status'] === 'superseded'): ?>
+          <span class="badge badge-danger" title="A newer revision of this document was approved — this copy is no longer valid and is watermarked INVALID DOCUMENT.">INVALID — SUPERSEDED</span>
+          <?php else: ?>
+          <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?>
+          <?php endif; ?>
+        </td>
         <td>
           <?php if ($d['pdf_file_id']): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf">PDF</a><?php endif; ?>
           <?php if ($d['docx_file_id']): ?> · <a href="/documents/<?= (int) $d['id'] ?>/download?format=docx">DOCX (internal)</a><?php endif; ?>
@@ -657,7 +663,13 @@ foreach ($stages as $s) {
       // a generating team member can never lose track of an unreviewed
       // document: it stays visibly flagged until a reviewer is assigned,
       // then shows exactly who has it and what they decided.
-      if (empty($reviews)) {
+      if ($d['status'] === 'superseded') {
+          // Point 1 (2026-10-01): a newer revision of this (order, type)
+          // was approved after this one — this copy is now invalid
+          // regardless of what its old reviews say, and must never be
+          // offered a "Send to Buyer" action below.
+          $reviewState = 'superseded';
+      } elseif (empty($reviews)) {
           $reviewState = 'not_sent';
       } elseif ($anyRejected && $d['status'] === 'draft') {
           $reviewState = 'rejected';
@@ -678,7 +690,8 @@ foreach ($stages as $s) {
       <details>
         <summary>
           <?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?> Rev.<?= (int) $d['revision_number'] ?> — <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?>
-          <?php if ($reviewState === 'not_sent'): ?><span class="review-pill warn">⚠ Not sent for review</span>
+          <?php if ($reviewState === 'superseded'): ?><span class="review-pill bad">⚠ INVALID — superseded by a newer revision</span>
+          <?php elseif ($reviewState === 'not_sent'): ?><span class="review-pill warn">⚠ Not sent for review</span>
           <?php elseif ($reviewState === 'under_review'): ?><span class="review-pill info">Under review</span>
           <?php elseif ($reviewState === 'rejected'): ?><span class="review-pill bad">Rejected — back to draft</span>
           <?php elseif ($reviewState === 'approved'): ?><span class="review-pill good">✓ Approved</span>
@@ -724,7 +737,9 @@ foreach ($stages as $s) {
             <div class="review-step-num <?= $reviewState === 'approved' ? 'is-done' : ($reviewState === 'rejected' ? 'is-bad' : ($reviewState === 'not_sent' ? 'is-warn' : '')) ?>">2</div>
             <div class="review-step-body">
               <h3>Approval Status</h3>
-              <?php if ($reviewState === 'not_sent'): ?>
+              <?php if ($reviewState === 'superseded'): ?>
+                <div class="review-banner bad">✕ <span><strong>INVALID — superseded.</strong> A newer revision of this document was approved after this one, so this copy no longer counts as valid and has been re-watermarked INVALID DOCUMENT — SUPERSEDED. It can no longer be sent to the buyer; use the latest revision instead.</span></div>
+              <?php elseif ($reviewState === 'not_sent'): ?>
                 <div class="review-banner warn">⚠ <span><strong>Not yet sent for review.</strong> This document cannot be finalized or sent to the buyer until at least one reviewer is assigned above. Assign one now, before moving on to your next task.</span></div>
               <?php elseif ($reviewState === 'under_review'): ?>
                 <div class="review-banner info">◔ <span><strong>Under review<?php $pendingNames = array_map(fn($r) => $r['reviewer_name'], array_filter($reviews, fn($r) => $r['status'] === 'pending')); if ($pendingNames): ?> — with <?= htmlspecialchars(implode(', ', $pendingNames)) ?><?php endif; ?>.</strong> If this sits too long, follow up with them directly.</span></div>
@@ -827,6 +842,8 @@ foreach ($stages as $s) {
                 <?php endif; ?>
               <?php elseif ($d['status'] === 'sent'): ?>
                 <p class="muted">Already sent to buyer.</p>
+              <?php elseif ($d['status'] === 'superseded'): ?>
+                <p class="muted small">This revision is INVALID — superseded. It can no longer be sent; see the latest revision instead.</p>
               <?php else: ?>
                 <p class="muted small">Waiting on approval above before this document can be sent.</p>
               <?php endif; ?>

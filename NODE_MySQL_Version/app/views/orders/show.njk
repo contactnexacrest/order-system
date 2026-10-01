@@ -423,7 +423,13 @@
         <td>{{ d.document_reference or '—' }}</td>
         <td>{{ d.revision_number }}{% if d.client_revision_number != null %} <span class="muted small">(client: {{ d.client_revision_number }})</span>{% endif %}</td>
         <td>{{ d.generated_at }}</td>
-        <td>{{ d.status | replace('_', ' ') }}</td>
+        <td>
+          {% if d.status == 'superseded' %}
+          <span class="badge badge-danger" title="A newer revision of this document was approved — this copy is no longer valid and is watermarked INVALID DOCUMENT.">INVALID — SUPERSEDED</span>
+          {% else %}
+          {{ d.status | replace('_', ' ') }}
+          {% endif %}
+        </td>
         <td>
           {% if d.pdf_file_id %}<a href="/documents/{{ d.id }}/download?format=pdf">PDF</a>{% endif %}
           {% if d.docx_file_id %} &middot; <a href="/documents/{{ d.id }}/download?format=docx">DOCX (internal)</a>{% endif %}
@@ -582,7 +588,13 @@
         {% if r.reviewer_id == currentUser.id and r.status == 'pending' %}{% set myPendingReview = r %}{% endif %}
         {% if r.status == 'rejected' %}{% set anyRejected = true %}{% endif %}
       {% endfor %}
-      {% if not reviews or reviews.length == 0 %}
+      {% if d.status == 'superseded' %}
+        {# Point 1 (2026-10-01): a newer revision of this (order, type) was
+           approved after this one — this copy is now invalid regardless of
+           what its old reviews say, and must never be offered a "Send to
+           Buyer" action below. #}
+        {% set reviewState = 'superseded' %}
+      {% elif not reviews or reviews.length == 0 %}
         {% set reviewState = 'not_sent' %}
       {% elif anyRejected and d.status == 'draft' %}
         {% set reviewState = 'rejected' %}
@@ -600,7 +612,8 @@
       <details>
         <summary>
           {{ d.document_type_code }} {{ d.document_reference or '—' }} Rev.{{ d.revision_number }} — {{ d.status | replace('_', ' ') }}
-          {% if reviewState == 'not_sent' %}<span class="review-pill warn">⚠ Not sent for review</span>
+          {% if reviewState == 'superseded' %}<span class="review-pill bad">⚠ INVALID — superseded by a newer revision</span>
+          {% elif reviewState == 'not_sent' %}<span class="review-pill warn">⚠ Not sent for review</span>
           {% elif reviewState == 'under_review' %}<span class="review-pill info">Under review</span>
           {% elif reviewState == 'rejected' %}<span class="review-pill bad">Rejected — back to draft</span>
           {% elif reviewState == 'approved' %}<span class="review-pill good">✓ Approved</span>
@@ -646,7 +659,9 @@
             <div class="review-step-num {{ 'is-done' if reviewState == 'approved' else ('is-bad' if reviewState == 'rejected' else ('is-warn' if reviewState == 'not_sent' else '')) }}">2</div>
             <div class="review-step-body">
               <h3>Approval Status</h3>
-              {% if reviewState == 'not_sent' %}
+              {% if reviewState == 'superseded' %}
+                <div class="review-banner bad">✕ <span><strong>INVALID — superseded.</strong> A newer revision of this document was approved after this one, so this copy no longer counts as valid and has been re-watermarked INVALID DOCUMENT — SUPERSEDED. It can no longer be sent to the buyer; use the latest revision instead.</span></div>
+              {% elif reviewState == 'not_sent' %}
                 <div class="review-banner warn">⚠ <span><strong>Not yet sent for review.</strong> This document cannot be finalized or sent to the buyer until at least one reviewer is assigned above. Assign one now, before moving on to your next task.</span></div>
               {% elif reviewState == 'under_review' %}
                 {% set pendingNames = [] %}
@@ -748,6 +763,8 @@
                 {% endif %}
               {% elif d.status == 'sent' %}
                 <p class="muted">Already sent to buyer.</p>
+              {% elif d.status == 'superseded' %}
+                <p class="muted small">This revision is INVALID — superseded. It can no longer be sent; see the latest revision instead.</p>
               {% else %}
                 <p class="muted small">Waiting on approval above before this document can be sent.</p>
               {% endif %}

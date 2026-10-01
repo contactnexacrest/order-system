@@ -111,6 +111,22 @@ final class ReviewWorkflowService
             throw new \RuntimeException('This review has already been actioned.');
         }
 
+        $document = DocumentRepository::find((int) $review['document_id']);
+        if ($document && $document['order_id'] !== null) {
+            // A newer revision of this (order, type) may have been generated
+            // while this review sat pending (e.g. a reviewer was slow and the
+            // creator regenerated to fix something reported out-of-band) —
+            // approving a stale revision at this point would immediately get
+            // superseded again by finalizeIfFullyApproved() below the moment
+            // the real latest revision is later approved, which is confusing
+            // at best. Block it outright: only the current latest revision
+            // of a document may ever be approved.
+            $latest = DocumentRepository::findLatestForOrderAndType((int) $document['order_id'], (int) $document['document_type_id']);
+            if ($latest && (int) $latest['id'] !== (int) $document['id']) {
+                throw new \RuntimeException('A newer revision of this document has since been generated — this one can no longer be approved. Review the latest revision instead.');
+            }
+        }
+
         DocumentReviewRepository::approve($documentReviewId, $comments);
         AuditLogRepository::log($reviewerUserId, 'DOCUMENT_REVIEW_APPROVED', 'documents', (int) $review['document_id'], null, null, null, $comments);
 
@@ -187,6 +203,14 @@ final class ReviewWorkflowService
         if ($pending === 0 && $rejected === 0 && $approved >= max(1, $minRequired)) {
             DocumentGenerationService::finalizeApproval($documentId);
             AuditLogRepository::log(null, 'DOCUMENT_APPROVED', 'documents', $documentId, 'status', $document['status'], 'approved');
+
+            // Point 1 (2026-10-01): this revision is now THE valid copy of
+            // this (order, type) — any other revision still sitting as
+            // 'approved'/'sent' from an earlier pass through review is now
+            // stale and must be invalidated, both in status and visibly on
+            // the PDF itself, or staff/buyers could keep relying on an old
+            // copy with no way to tell it apart from the current one.
+            DocumentGenerationService::supersedeOtherApprovedRevisions($documentId);
 
             // GATE-01: the QT's approval — not its mere draft generation —
             // is Stage 1's real gate (Owner Decision #1: "No stage passes

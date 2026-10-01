@@ -89,6 +89,25 @@ final class DocumentRepository
     }
 
     /**
+     * Every document ever generated for this (order, type), any status,
+     * newest revision first — used to find prior approved/sent revisions
+     * that need superseding once a newer one is approved (see
+     * DocumentGenerationService::supersedeOtherApprovedRevisions()).
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function allForOrderAndType(int $orderId, int $documentTypeId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM documents
+             WHERE order_id = :order_id AND document_type_id = :document_type_id
+             ORDER BY revision_number DESC'
+        );
+        $stmt->execute(['order_id' => $orderId, 'document_type_id' => $documentTypeId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
      * Looks up the latest generated document of a given type (by code, e.g.
      * 'QT' or 'PI') for an order, purely to expose its document_reference
      * for cross-referencing on a later-stage document (PI shows the QT ref,
@@ -120,6 +139,20 @@ final class DocumentRepository
         Database::connection()->prepare(
             "UPDATE documents SET status = 'approved', pdf_file_id = :pdf_file_id WHERE id = :id"
         )->execute(['pdf_file_id' => $finalPdfFileId, 'id' => $id]);
+    }
+
+    /**
+     * A newer revision of this (order, type) has just been fully approved —
+     * this older revision is no longer valid. Re-rendered by
+     * DocumentGenerationService::markSuperseded() with an INVALID DOCUMENT
+     * watermark before this is called, exactly like markApproved() repoints
+     * pdf_file_id to that new rendering rather than touching the old file.
+     */
+    public static function markSuperseded(int $id, int $pdfFileId): void
+    {
+        Database::connection()->prepare(
+            "UPDATE documents SET status = 'superseded', pdf_file_id = :pdf_file_id WHERE id = :id"
+        )->execute(['pdf_file_id' => $pdfFileId, 'id' => $id]);
     }
 
     public static function markInReview(int $id): void

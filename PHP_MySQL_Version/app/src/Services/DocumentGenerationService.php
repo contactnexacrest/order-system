@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Config\Database;
 use App\Config\Env;
 use App\Repositories\AmendmentRepository;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\CaExpenseRepository;
 use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\CompanySettingsRepository;
@@ -116,7 +117,7 @@ final class DocumentGenerationService
             ?? self::preAssignedReferenceFor($documentTypeCode, $orderId)
             ?? ReferenceNumberService::generateDocumentRef((int) $docType['id']);
 
-        $watermark = self::draftWatermark();
+        $watermark = self::withRevisionStamp(self::draftWatermark(), $clientRevisionNumber, $docType['category'] ?? null);
         $terms = self::resolveTerms($documentTypeCode, $data);
         $signatory = DocumentDataAssembler::signatoryBlock((int) $docType['id'], $signatoryOverrideUserId);
 
@@ -462,7 +463,7 @@ final class DocumentGenerationService
                 'client_revision_label'  => 'Rev.' . str_pad((string) $document['client_revision_number'], 2, '0', STR_PAD_LEFT),
                 'generated_date'     => (new \DateTimeImmutable($document['generated_at']))->format('d F Y'),
             ],
-            'watermark' => self::finalWatermark(),
+            'watermark' => self::withRevisionStamp(self::finalWatermark(), (int) $document['client_revision_number'], $document['document_type_category'] ?? null),
             'doc_title' => self::titleFor($documentTypeCode),
             'section1_title' => self::section1TitleFor($documentTypeCode),
             'terms' => $terms,
@@ -519,6 +520,163 @@ final class DocumentGenerationService
         );
 
         DocumentRepository::markApproved($documentId, $finalPdfFileId);
+    }
+
+    /**
+     * The buyer's own copy must be unmistakable about which revision
+     * they're looking at — not just in the on-page revision labels but
+     * stamped into the watermark itself, since the watermark is the one
+     * thing visible on every page of a printed or forwarded copy. Only
+     * applied from the second client-facing issue onward
+     * (client_revision_number 0 is the first-ever send — nothing to
+     * distinguish it from) and only for customer_facing document types
+     * (BLI/COOPREP/SUPPO etc. are never buyer-facing, so a revision count
+     * on them would mean nothing to whoever's reading one).
+     */
+    private static function withRevisionStamp(array $watermark, int $clientRevisionNumber, ?string $documentTypeCategory): array
+    {
+        if (empty($watermark['enabled']) || empty($watermark['show_text']) || $clientRevisionNumber < 1 || $documentTypeCategory !== 'customer_facing') {
+            return $watermark;
+        }
+        $watermark['text'] = trim((string) $watermark['text']) . ' — REVISION ' . str_pad((string) $clientRevisionNumber, 2, '0', STR_PAD_LEFT);
+        return $watermark;
+    }
+
+    /**
+     * Hardcoded rather than read from watermark_settings — there's no
+     * admin need to customize how an INVALID stamp looks, and keeping it
+     * out of the DB means it can never accidentally be reconfigured into
+     * something less obvious. Deliberately impossible to miss: bright red,
+     * large, steep angle — the opposite design intent of the DRAFT/final
+     * watermarks, which are meant to be visible but unobtrusive.
+     */
+    private static function invalidWatermark(): array
+    {
+        return [
+            'enabled'        => true,
+            'mode'           => 'text',
+            'show_text'      => true,
+            'show_image'     => false,
+            'text'           => 'INVALID DOCUMENT — SUPERSEDED',
+            'color'          => '#C0152F',
+            'opacity'        => 0.35,
+            'angle'          => 35,
+            'font_size'      => 54,
+            'image_data_uri' => null,
+            'image_opacity'  => 0,
+            'image_position' => 'center',
+        ];
+    }
+
+    /**
+     * A newer revision of this (order, type) has just been fully approved
+     * — this older, previously-approved/sent revision is no longer the
+     * valid copy. Re-renders it from its own stored snapshot (exact same
+     * pattern as finalizeApproval() above: same document_reference, same
+     * revision_number, signatory/company read from the row's own
+     * snapshot, never live data) with the INVALID DOCUMENT watermark
+     * instead of the final one, writes the result as a new file_store row
+     * (the previously-approved PDF is left alone on disk/DB, per the
+     * soft-delete-only convention), and repoints pdf_file_id to it so
+     * anyone who opens/downloads this document from here on sees the
+     * invalidated copy, never the old clean one.
+     */
+    public static function markSuperseded(int $documentId): void
+    {
+        $document = DocumentRepository::find($documentId);
+        if (!$document || $document['order_id'] === null) {
+            return;
+        }
+
+        $orderId = (int) $document['order_id'];
+        $order = OrderRepository::find($orderId);
+        $documentTypeCode = $document['document_type_code'];
+
+        $data = DocumentDataAssembler::assemble($orderId, $documentTypeCode);
+        $terms = self::resolveTerms($documentTypeCode, $data);
+
+        $context = array_merge($data, [
+            'meta' => [
+                'document_reference' => $document['document_reference'],
+                'revision_number'    => (int) $document['revision_number'],
+                'revision_label'     => 'Rev.' . str_pad((string) $document['revision_number'], 2, '0', STR_PAD_LEFT),
+                'client_revision_number' => (int) $document['client_revision_number'],
+                'client_revision_label'  => 'Rev.' . str_pad((string) $document['client_revision_number'], 2, '0', STR_PAD_LEFT),
+                'generated_date'     => (new \DateTimeImmutable($document['generated_at']))->format('d F Y'),
+            ],
+            'watermark' => self::invalidWatermark(),
+            'doc_title' => self::titleFor($documentTypeCode),
+            'section1_title' => self::section1TitleFor($documentTypeCode),
+            'terms' => $terms,
+            'terms_section_number' => self::termsSectionNumberFor($documentTypeCode),
+            'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
+            'signatory' => DocumentDataAssembler::signatoryFromSnapshot($document),
+            'company' => DocumentDataAssembler::companyFromSnapshot($document),
+        ]);
+
+        $twig = self::twigEnvironment();
+        $html = $twig->render(self::templateFileFor($documentTypeCode), $context);
+        $pdfBytes = self::renderPdf($html);
+
+        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
+        $orderRef = self::sanitizePathSegment($order['order_reference']);
+        $stageSlug = self::sanitizePathSegment($order['current_stage_slug'] ?? 'stage');
+        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/{$stageSlug}/generated";
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+
+        $filenameSafeReference = $document['document_reference'] !== null
+            ? str_replace('/', '-', $document['document_reference'])
+            : $documentTypeCode;
+        $supersededUuidName = self::uuidFilename('pdf');
+        $supersededPath = "{$targetDir}/{$supersededUuidName}";
+        file_put_contents($supersededPath, $pdfBytes);
+
+        $supersededPdfFileId = FileStoreRepository::insertGenerated(
+            null,
+            $orderId,
+            null,
+            $supersededPath,
+            $supersededUuidName,
+            "{$documentTypeCode} {$filenameSafeReference} Rev.{$document['client_revision_number']} (SUPERSEDED).pdf",
+            strlen($pdfBytes),
+            'application/pdf',
+            null,
+            false
+        );
+
+        DocumentRepository::markSuperseded($documentId, $supersededPdfFileId);
+        AuditLogRepository::log(null, 'DOCUMENT_SUPERSEDED', 'documents', $documentId, 'status', $document['status'], 'superseded');
+    }
+
+    /**
+     * Called right after a document is fully approved (finalizeApproval()
+     * above) — every OTHER document of the same (order, type) that's
+     * still sitting as 'approved' or 'sent' is now stale: only the
+     * revision that was just approved may legitimately be sent to or
+     * relied on by the buyer going forward. Finds every sibling revision
+     * via DocumentRepository::allForOrderAndType() and invalidates each
+     * one still in 'approved'/'sent' status (a 'draft'/'in_review'/
+     * already-'superseded' sibling is left alone — nothing to invalidate).
+     */
+    public static function supersedeOtherApprovedRevisions(int $documentId): void
+    {
+        $document = DocumentRepository::find($documentId);
+        if (!$document || $document['order_id'] === null) {
+            return;
+        }
+
+        $siblings = DocumentRepository::allForOrderAndType((int) $document['order_id'], (int) $document['document_type_id']);
+        foreach ($siblings as $sibling) {
+            if ((int) $sibling['id'] === $documentId) {
+                continue;
+            }
+            if (in_array($sibling['status'], ['approved', 'sent'], true)) {
+                self::markSuperseded((int) $sibling['id']);
+            }
+        }
     }
 
     /**
