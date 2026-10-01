@@ -134,6 +134,22 @@ appears one after another on the page, exactly as it did before this
 navigation was added — nothing is ever hidden behind JavaScript that isn't
 there as a backup.
 
+**"Order Details" is the order's own at-a-glance summary, not just its
+commercial terms.** The first section in the sidebar now opens with a quick
+row of counts before the FOB value/Port of Discharge/Container Type/etc.
+fields it always had: **Current Stage**, **Products** (line count),
+**Payment Legs** (how many of advance/freight/balance are cleared, with a
+jump link to [Payment Snapshot](#payment-snapshot-and-payment-ledger)),
+**Compliance Checklist** (resolved count, shown only to whoever holds
+`close_orders` — same gate as the checklist itself, see
+[Stage 9](./09-stage9-despatch-closure.md)), **Documents Generated**, plus
+Client, Buyer Inquiry Ref, Incoterm/Port of Loading and Quotation Date,
+which previously only appeared in the small subtitle line under the order
+reference. The idea is that opening an order answers "where does this
+stand?" without scrolling or clicking into every other section first;
+every number here is a read-only reflection of data recorded elsewhere on
+the same page, never something edited from this panel.
+
 **A creation or edit form groups related fields two to a row, not one.**
 The New Order form (and other detail-entry screens like it) pairs related
 fields side by side — Incoterm next to Port of Loading, Total volume next

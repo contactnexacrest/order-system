@@ -186,6 +186,55 @@ $freightCleared = $stage6 && $stage6['status'] === 'gate_passed';
 $blIssued = $stage7 && $stage7['status'] === 'gate_passed';
 $balanceCleared = $stage8 && $stage8['status'] === 'gate_passed';
 $orderClosed = $order['status'] === 'complete';
+
+// Payment Snapshot + Payment Ledger data, computed here (rather than down
+// where they're displayed) so the Order Details at-a-glance summary below
+// can also reference the same $paymentLegs without a second pass. Amounts
+// are gated per $canViewPaymentAmounts (see above) — everyone who can view
+// the order sees the STATUS of each leg; only manage_payments/close_orders
+// (Super Admin already covered transitively) see the actual figures.
+$paymentLegs = [
+    ['label' => 'Advance', 'amount' => $payment['advance_amount'] ?? null, 'received_at' => $payment['advance_remittance_received_at'] ?? null, 'cleared_at' => $payment['advance_cleared_at'] ?? null],
+    ['label' => 'Freight', 'amount' => $payment['freight_amount'] ?? null, 'received_at' => $payment['freight_remittance_received_at'] ?? null, 'cleared_at' => $payment['freight_cleared_at'] ?? null],
+    ['label' => 'Balance', 'amount' => $payment['balance_amount'] ?? null, 'received_at' => $payment['balance_remittance_received_at'] ?? null, 'cleared_at' => $payment['balance_cleared_at'] ?? null],
+];
+$ledgerEvents = [];
+foreach ($paymentLegs as $leg) {
+    if ($leg['received_at'] !== null) {
+        $ledgerEvents[] = ['date' => $leg['received_at'], 'event' => "{$leg['label']} Remittance Received", 'amount' => $leg['amount'], 'source' => 'Staff-recorded'];
+    }
+    if ($leg['cleared_at'] !== null) {
+        $ledgerEvents[] = ['date' => $leg['cleared_at'], 'event' => "{$leg['label']} Cleared", 'amount' => $leg['amount'], 'source' => 'Staff-recorded'];
+    }
+}
+foreach ($clientPaymentReports as $r) {
+    $ledgerEvents[] = [
+        'date' => $r['payment_date'] ?? $r['reported_at'],
+        'event' => ucfirst($r['payment_type']) . ' Payment Reported by Client',
+        'amount' => $r['amount'],
+        'source' => $r['status'] === 'reviewed' ? 'Client-reported (reviewed)' : 'Client-reported (new)',
+    ];
+}
+usort($ledgerEvents, static fn(array $a, array $b): int => strcmp((string) $a['date'], (string) $b['date']));
+$paymentLegsResolved = count(array_filter($paymentLegs, static fn(array $l): bool => $l['cleared_at'] !== null));
+$paymentLegsApplicable = count(array_filter($paymentLegs, static fn(array $l): bool => $l['amount'] !== null || $l['received_at'] !== null));
+
+// Order Details at-a-glance summary (redesign) — quick counts reused from
+// data already loaded for other sections, so no extra queries.
+$complianceSummary = ['total' => 0, 'approved' => 0];
+foreach ($complianceTasks as $ct) {
+    $complianceSummary['total']++;
+    if ($ct['status'] === 'approved' || $ct['status'] === 'skipped') {
+        $complianceSummary['approved']++;
+    }
+}
+$currentStage = null;
+foreach ($stages as $s) {
+    if ($s['status'] !== 'gate_passed' && $s['status'] !== 'skipped') {
+        $currentStage = $s;
+        break;
+    }
+}
 ?>
 <div class="card page-wide">
   <p class="muted small"><a href="/orders">&larr; Back to Orders</a></p>
@@ -269,7 +318,19 @@ $orderClosed = $order['status'] === 'complete';
 
   <div class="section">
     <h2>Order Details</h2>
+    <p class="muted small">At a glance — everything else on this page in one place, so you don't have to scroll through every section just to see where this order stands.</p>
     <div class="kv-grid">
+      <div><span class="k">Current Stage</span><span class="v"><?= $currentStage ? 'Stage ' . (int) $currentStage['stage_number'] . ' — ' . htmlspecialchars($currentStage['stage_name']) : ($orderClosed ? 'Complete — all 9 stages resolved' : '—') ?></span></div>
+      <div><span class="k">Products</span><span class="v"><?= count($products) ?> line<?= count($products) === 1 ? '' : 's' ?></span></div>
+      <div><span class="k">Payment Legs</span><span class="v"><?= $paymentLegsResolved ?> of <?= $paymentLegsApplicable ?> cleared<?= $paymentLegsApplicable === 0 ? ' (nothing recorded yet)' : '' ?> — <a href="#payment-snapshot">see Payment Snapshot</a></span></div>
+      <?php if ($canCloseOrders): ?>
+      <div><span class="k">Compliance Checklist</span><span class="v"><?= $complianceSummary['total'] === 0 ? 'No task types configured' : $complianceSummary['approved'] . ' of ' . $complianceSummary['total'] . ' resolved' ?> — <a href="#compliance-checklist">see checklist</a></span></div>
+      <?php endif; ?>
+      <div><span class="k">Documents Generated</span><span class="v"><?= count($documents) ?></span></div>
+      <div><span class="k">Client</span><span class="v"><?= htmlspecialchars($order['company_legal_name']) ?></span></div>
+      <div><span class="k">Buyer Inquiry Ref</span><span class="v"><?= htmlspecialchars($order['buyer_inquiry_ref']) ?></span></div>
+      <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v"><?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '—') ?></span></div>
+      <div><span class="k">Quotation Date</span><span class="v"><?= htmlspecialchars($order['quotation_date'] ?? '—') ?></span></div>
       <div><span class="k">FOB Value</span><span class="v"><?= htmlspecialchars($order['currency_code']) ?> <?= number_format((float) $fobTotal, 2) ?></span></div>
       <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed') ?></span></div>
       <div><span class="k">Container Type</span><span class="v"><?= htmlspecialchars($order['container_type'] ?? '—') ?></span></div>
@@ -857,41 +918,6 @@ $orderClosed = $order['status'] === 'complete';
     </form>
     <?php endif; ?>
   </div>
-
-  <?php
-    // Payment Snapshot + Payment Ledger (new) — a quick-glance summary plus a
-    // single consolidated, read-only history of every payment-related event
-    // on this order (advance/freight/balance remittance+clearance, and every
-    // client-self-reported payment), instead of having to piece it together
-    // from the Payment Status kv-grid and the Client-Reported Payments table
-    // separately. Amounts are gated per $canViewPaymentAmounts (see above) —
-    // everyone who can view the order sees the STATUS of each leg; only
-    // manage_payments/close_orders (Super Admin already covered transitively)
-    // see the actual figures.
-    $paymentLegs = [
-        ['label' => 'Advance', 'amount' => $payment['advance_amount'] ?? null, 'received_at' => $payment['advance_remittance_received_at'] ?? null, 'cleared_at' => $payment['advance_cleared_at'] ?? null],
-        ['label' => 'Freight', 'amount' => $payment['freight_amount'] ?? null, 'received_at' => $payment['freight_remittance_received_at'] ?? null, 'cleared_at' => $payment['freight_cleared_at'] ?? null],
-        ['label' => 'Balance', 'amount' => $payment['balance_amount'] ?? null, 'received_at' => $payment['balance_remittance_received_at'] ?? null, 'cleared_at' => $payment['balance_cleared_at'] ?? null],
-    ];
-    $ledgerEvents = [];
-    foreach ($paymentLegs as $leg) {
-        if ($leg['received_at'] !== null) {
-            $ledgerEvents[] = ['date' => $leg['received_at'], 'event' => "{$leg['label']} Remittance Received", 'amount' => $leg['amount'], 'source' => 'Staff-recorded'];
-        }
-        if ($leg['cleared_at'] !== null) {
-            $ledgerEvents[] = ['date' => $leg['cleared_at'], 'event' => "{$leg['label']} Cleared", 'amount' => $leg['amount'], 'source' => 'Staff-recorded'];
-        }
-    }
-    foreach ($clientPaymentReports as $r) {
-        $ledgerEvents[] = [
-            'date' => $r['payment_date'] ?? $r['reported_at'],
-            'event' => ucfirst($r['payment_type']) . ' Payment Reported by Client',
-            'amount' => $r['amount'],
-            'source' => $r['status'] === 'reviewed' ? 'Client-reported (reviewed)' : 'Client-reported (new)',
-        ];
-    }
-    usort($ledgerEvents, static fn(array $a, array $b): int => strcmp((string) $a['date'], (string) $b['date']));
-  ?>
 
   <div class="section">
     <h2>Payment Snapshot</h2>

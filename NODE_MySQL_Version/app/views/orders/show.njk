@@ -130,6 +130,47 @@
 {% set balanceCleared = stage8 and stage8.status == 'gate_passed' %}
 {% set orderClosed = order.status == 'complete' %}
 
+{# Payment Snapshot + Payment Ledger data, computed here (rather than down
+   where they're displayed) so the Order Details at-a-glance summary below
+   can also reference the same paymentLegs without a second pass. Amounts
+   are gated per canViewPaymentAmounts (set further down, mirrored here) —
+   everyone who can view the order sees the STATUS of each leg; only
+   manage_payments/close_orders (Super Admin already covered transitively)
+   see the actual figures. #}
+{% set canViewPaymentAmounts = permissions.manage_payments or permissions.close_orders %}
+{% set paymentLegs = [
+  { label: 'Advance', amount: payment.advance_amount if payment else null, received_at: payment.advance_remittance_received_at if payment else null, cleared_at: payment.advance_cleared_at if payment else null },
+  { label: 'Freight', amount: payment.freight_amount if payment else null, received_at: payment.freight_remittance_received_at if payment else null, cleared_at: payment.freight_cleared_at if payment else null },
+  { label: 'Balance', amount: payment.balance_amount if payment else null, received_at: payment.balance_remittance_received_at if payment else null, cleared_at: payment.balance_cleared_at if payment else null }
+] %}
+{% set ledgerEvents = [] %}
+{% for leg in paymentLegs %}
+  {% if leg.received_at %}{% set ledgerEvents = (ledgerEvents.push({ date: leg.received_at, event: leg.label ~ ' Remittance Received', amount: leg.amount, source: 'Staff-recorded' }), ledgerEvents) %}{% endif %}
+  {% if leg.cleared_at %}{% set ledgerEvents = (ledgerEvents.push({ date: leg.cleared_at, event: leg.label ~ ' Cleared', amount: leg.amount, source: 'Staff-recorded' }), ledgerEvents) %}{% endif %}
+{% endfor %}
+{% for r in (clientPaymentReports or []) %}
+  {% set ledgerEvents = (ledgerEvents.push({ date: (r.payment_date or r.reported_at), event: (r.payment_type | capitalize) ~ ' Payment Reported by Client', amount: r.amount, source: 'Client-reported (reviewed)' if r.status == 'reviewed' else 'Client-reported (new)' }), ledgerEvents) %}
+{% endfor %}
+{% set ledgerEvents = ledgerEvents | sort(attribute='date') %}
+{% set paymentLegsResolved = 0 %}
+{% set paymentLegsApplicable = 0 %}
+{% for leg in paymentLegs %}
+  {% if leg.cleared_at %}{% set paymentLegsResolved = paymentLegsResolved + 1 %}{% endif %}
+  {% if leg.amount != null or leg.received_at %}{% set paymentLegsApplicable = paymentLegsApplicable + 1 %}{% endif %}
+{% endfor %}
+
+{# Order Details at-a-glance summary (redesign) — quick counts reused from
+   data already loaded for other sections, so no extra queries. #}
+{% set complianceApproved = 0 %}
+{% for ct in (complianceTasks or []) %}
+  {% if ct.status == 'approved' or ct.status == 'skipped' %}{% set complianceApproved = complianceApproved + 1 %}{% endif %}
+{% endfor %}
+{% set complianceTotal = (complianceTasks or []) | length %}
+{% set currentStage = null %}
+{% for s in stages %}
+  {% if not currentStage and s.status != 'gate_passed' and s.status != 'skipped' %}{% set currentStage = s %}{% endif %}
+{% endfor %}
+
 <div class="card page-wide">
   <p class="muted small"><a href="/orders">&larr; Back to Orders</a></p>
   <h1>{{ order.order_reference }}
@@ -212,7 +253,19 @@
 
   <div class="section">
     <h2>Order Details</h2>
+    <p class="muted small">At a glance — everything else on this page in one place, so you don't have to scroll through every section just to see where this order stands.</p>
     <div class="kv-grid">
+      <div><span class="k">Current Stage</span><span class="v">{{ ('Stage ' ~ currentStage.stage_number ~ ' — ' ~ currentStage.stage_name) if currentStage else ('Complete — all 9 stages resolved' if orderClosed else '—') }}</span></div>
+      <div><span class="k">Products</span><span class="v">{{ products.length }} line{{ 's' if products.length != 1 else '' }}</span></div>
+      <div><span class="k">Payment Legs</span><span class="v">{{ paymentLegsResolved }} of {{ paymentLegsApplicable }} cleared{{ ' (nothing recorded yet)' if paymentLegsApplicable == 0 else '' }} — <a href="#payment-snapshot">see Payment Snapshot</a></span></div>
+      {% if permissions.close_orders %}
+      <div><span class="k">Compliance Checklist</span><span class="v">{{ 'No task types configured' if complianceTotal == 0 else (complianceApproved ~ ' of ' ~ complianceTotal ~ ' resolved') }} — <a href="#compliance-checklist">see checklist</a></span></div>
+      {% endif %}
+      <div><span class="k">Documents Generated</span><span class="v">{{ documents.length }}</span></div>
+      <div><span class="k">Client</span><span class="v">{{ order.company_legal_name }}</span></div>
+      <div><span class="k">Buyer Inquiry Ref</span><span class="v">{{ order.buyer_inquiry_ref }}</span></div>
+      <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v">{{ order.incoterm_code }} {{ order.port_of_loading_name or '—' }}</span></div>
+      <div><span class="k">Quotation Date</span><span class="v">{{ order.quotation_date or '—' }}</span></div>
       <div><span class="k">FOB Value</span><span class="v">{{ order.currency_code }} {{ fobTotal | money }}</span></div>
       <div><span class="k">Port of Discharge</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or 'To Be Confirmed' }}</span></div>
       <div><span class="k">Container Type</span><span class="v">{{ order.container_type or '—' }}</span></div>
@@ -785,31 +838,6 @@
     </form>
     {% endif %}
   </div>
-
-  {# Payment Snapshot + Payment Ledger (new) — a quick-glance summary plus a
-     single consolidated, read-only history of every payment-related event on
-     this order (advance/freight/balance remittance+clearance, and every
-     client-self-reported payment), instead of having to piece it together
-     from the Payment Status kv-grid and the Client-Reported Payments table
-     separately. Amounts are gated: everyone who can view the order sees the
-     STATUS of each leg; only manage_payments/close_orders (Super Admin
-     already covered transitively) see the actual figures — "only able to
-     see the needed things." #}
-  {% set canViewPaymentAmounts = permissions.manage_payments or permissions.close_orders %}
-  {% set paymentLegs = [
-    { label: 'Advance', amount: payment.advance_amount if payment else null, received_at: payment.advance_remittance_received_at if payment else null, cleared_at: payment.advance_cleared_at if payment else null },
-    { label: 'Freight', amount: payment.freight_amount if payment else null, received_at: payment.freight_remittance_received_at if payment else null, cleared_at: payment.freight_cleared_at if payment else null },
-    { label: 'Balance', amount: payment.balance_amount if payment else null, received_at: payment.balance_remittance_received_at if payment else null, cleared_at: payment.balance_cleared_at if payment else null }
-  ] %}
-  {% set ledgerEvents = [] %}
-  {% for leg in paymentLegs %}
-    {% if leg.received_at %}{% set ledgerEvents = (ledgerEvents.push({ date: leg.received_at, event: leg.label ~ ' Remittance Received', amount: leg.amount, source: 'Staff-recorded' }), ledgerEvents) %}{% endif %}
-    {% if leg.cleared_at %}{% set ledgerEvents = (ledgerEvents.push({ date: leg.cleared_at, event: leg.label ~ ' Cleared', amount: leg.amount, source: 'Staff-recorded' }), ledgerEvents) %}{% endif %}
-  {% endfor %}
-  {% for r in (clientPaymentReports or []) %}
-    {% set ledgerEvents = (ledgerEvents.push({ date: (r.payment_date or r.reported_at), event: (r.payment_type | capitalize) ~ ' Payment Reported by Client', amount: r.amount, source: 'Client-reported (reviewed)' if r.status == 'reviewed' else 'Client-reported (new)' }), ledgerEvents) %}
-  {% endfor %}
-  {% set ledgerEvents = ledgerEvents | sort(attribute='date') %}
 
   <div class="section">
     <h2>Payment Snapshot</h2>
