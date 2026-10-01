@@ -260,6 +260,7 @@ $orderClosed = $order['status'] === 'complete';
     <nav class="order-sidebar" id="order-sidebar" aria-label="Order sections"></nav>
     <div class="order-panels" id="order-panels">
 
+
   <div class="section">
     <h2>Order Details</h2>
     <div class="kv-grid">
@@ -360,8 +361,56 @@ $orderClosed = $order['status'] === 'complete';
     <?php endif; ?>
   </div>
 
-  <div class="section">
-    <h2>Documents</h2>
+  <div class="section" id="order-updates">
+    <h2>Order Communication</h2>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted. Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.</p>
+    <div class="chat-thread">
+      <?php if (empty($comments)): ?>
+        <p class="chat-empty">No updates posted yet.</p>
+      <?php endif; ?>
+      <?php foreach ($comments as $c): ?>
+        <?php $isStaff = $c['author_type'] === 'staff'; ?>
+        <div class="chat-bubble-row <?= $isStaff ? 'staff' : 'client' ?>">
+          <div class="chat-bubble <?= $isStaff ? 'staff' : 'client' ?>">
+            <div class="chat-bubble-meta">
+              <span class="who"><?= $isStaff ? 'Staff' : 'Client' ?> — <?= htmlspecialchars($isStaff ? ($c['staff_name'] ?? 'Unknown') : ($c['client_name'] ?? 'Unknown')) ?></span>
+              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?= $isStaff ? ($c['email_sent'] ? ' · emailed' : ' · not emailed (no client email on file)') : '' ?></span>
+            </div>
+            <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
+            <?php if (!empty($c['attachments'])): ?>
+              <div class="chat-attachments">
+                <?php foreach ($c['attachments'] as $att): ?>
+                  <?php
+                    $mime = (string) ($att['mime_type'] ?? '');
+                    $url = "/orders/{$order['id']}/comment-attachments/{$att['file_id']}/download";
+                  ?>
+                  <?php if (str_starts_with($mime, 'image/')): ?>
+                    <a href="<?= $url ?>" target="_blank"><img class="chat-attachment-image" src="<?= $url ?>" alt="<?= htmlspecialchars($att['original_filename']) ?>"></a>
+                  <?php elseif (str_starts_with($mime, 'video/')): ?>
+                    <video class="chat-attachment-video" controls src="<?= $url ?>"></video>
+                  <?php else: ?>
+                    <a class="chat-attachment-file" href="<?= $url ?>"><?= htmlspecialchars($att['original_filename']) ?></a>
+                  <?php endif; ?>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
+      <?= Csrf::field() ?>
+      <textarea name="body" placeholder="Write an update for the client…"></textarea>
+      <div class="chat-post-form-row">
+        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
+        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section" id="documents-approvals">
+    <h2>Documents &amp; Approvals</h2>
+    <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">
       <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th><th></th></tr>
       <?php foreach ($documents as $d): ?>
@@ -517,57 +566,8 @@ $orderClosed = $order['status'] === 'complete';
       <?php endif; ?>
     </div>
     <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>/annexure"><?= $order['include_annexure_a'] ? 'Manage Annexure A product entries &amp; images' : 'Enable / manage Annexure A' ?></a></p>
-  </div>
 
-  <div class="section" id="order-updates">
-    <h2>Order Updates</h2>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted. Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.</p>
-    <div class="chat-thread">
-      <?php if (empty($comments)): ?>
-        <p class="chat-empty">No updates posted yet.</p>
-      <?php endif; ?>
-      <?php foreach ($comments as $c): ?>
-        <?php $isStaff = $c['author_type'] === 'staff'; ?>
-        <div class="chat-bubble-row <?= $isStaff ? 'staff' : 'client' ?>">
-          <div class="chat-bubble <?= $isStaff ? 'staff' : 'client' ?>">
-            <div class="chat-bubble-meta">
-              <span class="who"><?= $isStaff ? 'Staff' : 'Client' ?> — <?= htmlspecialchars($isStaff ? ($c['staff_name'] ?? 'Unknown') : ($c['client_name'] ?? 'Unknown')) ?></span>
-              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?= $isStaff ? ($c['email_sent'] ? ' · emailed' : ' · not emailed (no client email on file)') : '' ?></span>
-            </div>
-            <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
-            <?php if (!empty($c['attachments'])): ?>
-              <div class="chat-attachments">
-                <?php foreach ($c['attachments'] as $att): ?>
-                  <?php
-                    $mime = (string) ($att['mime_type'] ?? '');
-                    $url = "/orders/{$order['id']}/comment-attachments/{$att['file_id']}/download";
-                  ?>
-                  <?php if (str_starts_with($mime, 'image/')): ?>
-                    <a href="<?= $url ?>" target="_blank"><img class="chat-attachment-image" src="<?= $url ?>" alt="<?= htmlspecialchars($att['original_filename']) ?>"></a>
-                  <?php elseif (str_starts_with($mime, 'video/')): ?>
-                    <video class="chat-attachment-video" controls src="<?= $url ?>"></video>
-                  <?php else: ?>
-                    <a class="chat-attachment-file" href="<?= $url ?>"><?= htmlspecialchars($att['original_filename']) ?></a>
-                  <?php endif; ?>
-                <?php endforeach; ?>
-              </div>
-            <?php endif; ?>
-          </div>
-        </div>
-      <?php endforeach; ?>
-    </div>
-    <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
-      <?= Csrf::field() ?>
-      <textarea name="body" placeholder="Write an update for the client…"></textarea>
-      <div class="chat-post-form-row">
-        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
-        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
-      </div>
-    </form>
-  </div>
-
-  <div class="section">
-    <h2>Review, Approval &amp; Send to Buyer</h2>
+    <h3 style="font-size:0.95em; margin-top:18px;">Review &amp; Approval</h3>
     <p class="muted">A document generated above starts life <strong>draft</strong> with the DRAFT watermark. Assign at least one reviewer to move it to review; once every assigned reviewer approves (minimum required per document type), it's re-watermarked as final and can be sent to the buyer. The buyer only ever receives that final watermarked PDF — never the internal DOCX, never an unwatermarked copy.</p>
     <?php foreach ($documents as $d):
       $reviews = $reviewsByDocument[(int) $d['id']] ?? [];
@@ -768,6 +768,41 @@ $orderClosed = $order['status'] === 'complete';
   </div>
 
   <div class="section">
+    <h2>Stage 2 — Buyer PO</h2>
+    <?php if ($hasBuyerPo): ?>
+      <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
+    <?php elseif ($stage2 && $stage2['status'] !== 'locked'): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
+        <?= Csrf::field() ?>
+        <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+        <button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+      </form>
+    <?php else: ?>
+      <p class="muted">Generate the Quotation first to unlock this gate.</p>
+    <?php endif; ?>
+
+    <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+      <?php if (!empty($buyerPoDocuments)): ?>
+        <table class="list" style="margin-top:8px">
+          <tr><th>File</th><th>Uploaded</th><th></th></tr>
+          <?php foreach ($buyerPoDocuments as $bd): ?>
+            <tr>
+              <td><?= htmlspecialchars($bd['original_filename']) ?></td>
+              <td><?= htmlspecialchars($bd['uploaded_at']) ?></td>
+              <td><a href="/file-store/<?= (int) $bd['file_id'] ?>/download">Download</a></td>
+            </tr>
+          <?php endforeach; ?>
+        </table>
+      <?php endif; ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
+        <?= Csrf::field() ?>
+        <input type="file" name="document" required>
+        <button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+      </form>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
     <h2>PI-Stage Intake</h2>
     <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
     <?php if ($piIntake): ?>
@@ -810,117 +845,6 @@ $orderClosed = $order['status'] === 'complete';
       <?= Csrf::field() ?>
       <button type="submit" class="btn-sm"><?= $piIntake ? 'Regenerate PI Form Link' : 'Generate PI Form Link' ?></button>
     </form>
-    <?php endif; ?>
-  </div>
-
-  <div class="section">
-    <h2>Amendments &amp; Disputes</h2>
-    <?php if ($canManageDisputes): ?>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/dispute-visibility" style="margin-bottom:10px">
-      <?= Csrf::field() ?>
-      <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
-        <input type="checkbox" name="dispute_button_visible_to_client" value="1" onchange="this.form.submit()" <?= (int) $order['dispute_button_visible_to_client'] === 1 ? 'checked' : '' ?>>
-        Show "Raise a Dispute" button to the client in their portal for this order
-      </label>
-    </form>
-    <?php endif; ?>
-    <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Payment Terms Amendments (<?= (int) $amendmentCount ?>)</a>
-       &nbsp;·&nbsp;
-       <a href="/orders/<?= (int) $order['id'] ?>/disputes">Disputes (<?= (int) $openDisputeCount ?> open)</a>
-       <?php if ($canViewAuditLog): ?>
-       &nbsp;·&nbsp;
-       <a href="/orders/<?= (int) $order['id'] ?>/audit-log">Audit Log</a>
-       <?php endif; ?>
-       &nbsp;·&nbsp;
-       <a href="/orders/<?= (int) $order['id'] ?>/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
-    </p>
-  </div>
-
-  <?php if ($canEditLockedData): ?>
-  <div class="section">
-    <h2>Admin Override</h2>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/override-status-lock" onsubmit="return confirmFieldOverride(this, 'this order\'s status/lock');">
-      <?= Csrf::field() ?>
-      <label>Status
-        <select name="status">
-          <option value="active" <?= $order['status'] === 'active' ? 'selected' : '' ?>>Active</option>
-          <option value="complete" <?= $order['status'] === 'complete' ? 'selected' : '' ?>>Complete</option>
-          <option value="disputed" <?= $order['status'] === 'disputed' ? 'selected' : '' ?>>Disputed</option>
-          <option value="lost" <?= $order['status'] === 'lost' ? 'selected' : '' ?>>Lost</option>
-        </select>
-      </label>
-      <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" <?= $order['is_locked'] ? 'checked' : '' ?>> Locked (normally set automatically once status = complete)</label>
-      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
-      <button type="submit" class="btn-sm btn-danger">Override Status/Lock</button>
-    </form>
-  </div>
-  <script>
-  function confirmFieldOverride(form, label) {
-    var reasonEl = form.querySelector('.override-reason');
-    if (!reasonEl || reasonEl.value.trim() === '') {
-      alert('A reason is required before saving.');
-      return false;
-    }
-    return confirm('Override ' + label + '? This is logged and cannot be undone through this screen.');
-  }
-  </script>
-  <?php endif; ?>
-
-  <?php if ($canEditLockedData): ?>
-  <div class="section" style="border-color:#D9822B;">
-    <h2>Force-Generate a Document (privileged override)</h2>
-    <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" onsubmit="return confirmFieldOverride(this, 'generating this document out of sequence');">
-      <?= Csrf::field() ?>
-      <input type="hidden" name="override_gate" value="1">
-      <label>Document Type
-        <select name="document_type" required>
-          <?php foreach (['QT' => 'Quotation', 'BUYERPO' => 'Buyer PO', 'PI' => 'Proforma Invoice', 'OC' => 'Order Confirmation', 'SUPPO' => 'Supplier PO', 'FDN' => 'Freight Debit Note', 'PL' => 'Packing List', 'BLI' => 'BL Instruction Sheet', 'CI' => 'Commercial Invoice', 'COOPREP' => 'COO Prep Sheet (internal)'] as $code => $label): ?>
-            <option value="<?= $code ?>"><?= htmlspecialchars($label) ?> (<?= $code ?>)</option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> Also generate DOCX</label>
-      <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
-      </label>
-      <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
-    </form>
-  </div>
-  <?php endif; ?>
-
-  <div class="section">
-    <h2>Stage 2 — Buyer PO</h2>
-    <?php if ($hasBuyerPo): ?>
-      <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
-    <?php elseif ($stage2 && $stage2['status'] !== 'locked'): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
-        <?= Csrf::field() ?>
-        <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-        <button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
-      </form>
-    <?php else: ?>
-      <p class="muted">Generate the Quotation first to unlock this gate.</p>
-    <?php endif; ?>
-
-    <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
-      <?php if (!empty($buyerPoDocuments)): ?>
-        <table class="list" style="margin-top:8px">
-          <tr><th>File</th><th>Uploaded</th><th></th></tr>
-          <?php foreach ($buyerPoDocuments as $bd): ?>
-            <tr>
-              <td><?= htmlspecialchars($bd['original_filename']) ?></td>
-              <td><?= htmlspecialchars($bd['uploaded_at']) ?></td>
-              <td><a href="/file-store/<?= (int) $bd['file_id'] ?>/download">Download</a></td>
-            </tr>
-          <?php endforeach; ?>
-        </table>
-      <?php endif; ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
-        <?= Csrf::field() ?>
-        <input type="file" name="document" required>
-        <button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
-      </form>
     <?php endif; ?>
   </div>
 
@@ -997,182 +921,6 @@ $orderClosed = $order['status'] === 'complete';
         </tr>
         <?php endforeach; ?>
       </table>
-    <?php endif; ?>
-  </div>
-
-  <?php if ($canManageOrderFinancials): ?>
-  <div class="section" id="order-financials">
-    <h2>Order Financials — Government Benefits, Costs &amp; Profitability</h2>
-    <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
-
-    <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
-    <?php if (empty($linkedExportBenefits)): ?>
-      <p class="muted">Nothing claimed against this order yet.</p>
-    <?php else: ?>
-      <table class="list">
-        <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
-        <?php foreach ($linkedExportBenefits as $b): ?>
-        <tr>
-          <td><?= htmlspecialchars((string) $b['claimed_at']) ?></td>
-          <td><?= htmlspecialchars($b['scheme_name']) ?></td>
-          <td><?= htmlspecialchars($b['reference_number'] ?? '—') ?></td>
-          <td><?= number_format((float) $b['claimed_amount'], 2) ?> <?= htmlspecialchars($b['currency_code']) ?></td>
-          <td><?= $b['received_amount'] !== null ? number_format((float) $b['received_amount'], 2) . ' ' . htmlspecialchars($b['currency_code']) : '<span class="muted">—</span>' ?></td>
-          <td><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed</span>' ?></td>
-          <td>
-            <?php if ($b['received_amount'] === null): ?>
-              <details>
-                <summary class="small">Mark received</summary>
-                <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/received">
-                  <?= Csrf::field() ?>
-                  <label>Received Amount *<input type="text" name="received_amount" required></label>
-                  <label>Received On *<input type="date" name="received_at" value="<?= date('Y-m-d') ?>" required></label>
-                  <button type="submit" class="btn-sm">Save</button>
-                </form>
-              </details>
-            <?php endif; ?>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-    <?php endif; ?>
-    <details>
-      <summary>Record a new claim for this order</summary>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits">
-        <?= Csrf::field() ?>
-        <label>Scheme *
-          <select name="scheme_name" required>
-            <?php foreach ($exportBenefitSchemes as $opt): ?>
-              <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
-        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
-        <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
-        <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
-        <label>Currency<input type="text" name="currency_code" value="INR"></label>
-        <label>Notes<input type="text" name="notes"></label>
-        <button type="submit" class="btn-sm">Record Claim</button>
-      </form>
-    </details>
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Expenses Imported from Zoho Books</h3>
-    <?php if (empty($linkedCaExpenses)): ?>
-      <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
-    <?php else: ?>
-      <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
-        <?php foreach ($linkedCaExpenses as $e): ?>
-        <tr>
-          <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
-          <td><?= htmlspecialchars($e['category']) ?></td>
-          <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
-          <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-    <?php endif; ?>
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
-    <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
-    <?php if (empty($orderCostEntries)): ?>
-      <p class="muted">No other costs recorded for this order yet.</p>
-    <?php else: ?>
-      <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
-        <?php foreach ($orderCostEntries as $c): ?>
-        <tr>
-          <td><?= htmlspecialchars((string) ($c['incurred_at'] ?? '—')) ?></td>
-          <td><?= htmlspecialchars($costEntryCategories[$c['category']] ?? $c['category']) ?></td>
-          <td><?= htmlspecialchars($c['description'] ?? '—') ?></td>
-          <td><?= number_format((float) $c['amount_inr'], 2) ?></td>
-          <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
-          <td>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries/<?= (int) $c['id'] ?>/delete" onsubmit="return confirm('Remove this cost entry?');">
-              <?= Csrf::field() ?>
-              <button type="submit" class="btn-sm btn-danger">Remove</button>
-            </form>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-    <?php endif; ?>
-    <details>
-      <summary>Record a cost for this order</summary>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries">
-        <?= Csrf::field() ?>
-        <label>Category *
-          <select name="category" required>
-            <?php foreach ($costEntryCategories as $key => $label): ?>
-              <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
-        <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
-        <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
-        <label>Description<input type="text" name="description"></label>
-        <button type="submit" class="btn-sm">Record Cost</button>
-      </form>
-    </details>
-
-    <?php if ($profitability): ?>
-      <h3 style="font-size:0.95em; margin-top:14px;">Profitability Summary</h3>
-      <div class="kv-grid">
-        <div><span class="k">Revenue (INR)<?= $profitability['revenue_is_estimated'] ? ' — estimated' : '' ?></span><span class="v"><?= number_format($profitability['revenue_inr'], 2) ?></span></div>
-        <div><span class="k">Supplier Cost (INR)</span><span class="v"><?= number_format($profitability['supplier_cost_inr'], 2) ?></span></div>
-        <div><span class="k">Ocean Freight (INR)</span><span class="v"><?= number_format($profitability['freight_cost_inr'], 2) ?></span></div>
-        <div><span class="k">Insurance (INR)</span><span class="v"><?= number_format($profitability['insurance_cost_inr'], 2) ?></span></div>
-        <div><span class="k">Other Costs (INR)</span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
-        <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
-        <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
-        <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
-      </div>
-      <?php if ($profitability['revenue_is_estimated']): ?>
-        <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
-      <?php endif; ?>
-    <?php endif; ?>
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Internal-Only Financial Annexure</h3>
-    <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
-    <?php if ($canManageCaInternalDoc): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/toggle" style="margin-bottom:6px;">
-        <?= Csrf::field() ?>
-        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
-          <input type="checkbox" name="enabled" value="1" <?= !empty($order['ca_internal_doc_enabled']) ? 'checked' : '' ?> onchange="this.form.submit()">
-          Enable internal financial annexure for this order
-        </label>
-      </form>
-      <?php if (!empty($order['ca_internal_doc_enabled'])): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/generate" style="display:inline;">
-          <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
-        </form>
-      <?php endif; ?>
-    <?php else: ?>
-      <p class="muted small">Internal financial annexure is currently <strong><?= !empty($order['ca_internal_doc_enabled']) ? 'enabled' : 'disabled' ?></strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
-    <?php endif; ?>
-    <?php if ($caInternalDoc): ?>
-      <p class="small" style="margin-top:6px;">
-        Latest: <a href="/documents/<?= (int) $caInternalDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($caInternalDoc['document_reference']) ?></a>
-        (generated <?= htmlspecialchars((string) $caInternalDoc['generated_at']) ?>) — <span class="badge">INTERNAL ONLY — never shown to client</span>
-      </p>
-    <?php endif; ?>
-  </div>
-  <?php endif; ?>
-
-  <div class="section">
-    <h2>Production &amp; Estimated Shipment</h2>
-    <div class="kv-grid">
-      <div><span class="k">Production Status</span><span class="v"><?= htmlspecialchars($order['production_status_text'] ?? 'Not yet commenced') ?></span></div>
-      <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
-    </div>
-    <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/production-status">
-        <?= Csrf::field() ?>
-        <label>Production Status<input type="text" name="production_status_text" placeholder="e.g. Cutting and finishing in progress — 30% complete"></label>
-        <label>Estimated Shipment<input type="text" name="est_shipment_date_text" placeholder="e.g. Week of 15 October 2026"></label>
-        <button type="submit" class="btn-sm">Update</button>
-      </form>
     <?php endif; ?>
   </div>
 
@@ -1314,6 +1062,22 @@ $orderClosed = $order['status'] === 'complete';
           <button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
         </form>
       <?php endif; ?>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
+    <h2>Production &amp; Estimated Shipment</h2>
+    <div class="kv-grid">
+      <div><span class="k">Production Status</span><span class="v"><?= htmlspecialchars($order['production_status_text'] ?? 'Not yet commenced') ?></span></div>
+      <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
+    </div>
+    <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/production-status">
+        <?= Csrf::field() ?>
+        <label>Production Status<input type="text" name="production_status_text" placeholder="e.g. Cutting and finishing in progress — 30% complete"></label>
+        <label>Estimated Shipment<input type="text" name="est_shipment_date_text" placeholder="e.g. Week of 15 October 2026"></label>
+        <button type="submit" class="btn-sm">Update</button>
+      </form>
     <?php endif; ?>
   </div>
 
@@ -1483,6 +1247,166 @@ $orderClosed = $order['status'] === 'complete';
     <?php endif; ?>
   </div>
 
+  <?php if ($canManageOrderFinancials): ?>
+  <div class="section" id="order-financials">
+    <h2>Order Financials — Government Benefits, Costs &amp; Profitability</h2>
+    <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
+
+    <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
+    <?php if (empty($linkedExportBenefits)): ?>
+      <p class="muted">Nothing claimed against this order yet.</p>
+    <?php else: ?>
+      <table class="list">
+        <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
+        <?php foreach ($linkedExportBenefits as $b): ?>
+        <tr>
+          <td><?= htmlspecialchars((string) $b['claimed_at']) ?></td>
+          <td><?= htmlspecialchars($b['scheme_name']) ?></td>
+          <td><?= htmlspecialchars($b['reference_number'] ?? '—') ?></td>
+          <td><?= number_format((float) $b['claimed_amount'], 2) ?> <?= htmlspecialchars($b['currency_code']) ?></td>
+          <td><?= $b['received_amount'] !== null ? number_format((float) $b['received_amount'], 2) . ' ' . htmlspecialchars($b['currency_code']) : '<span class="muted">—</span>' ?></td>
+          <td><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed</span>' ?></td>
+          <td>
+            <?php if ($b['received_amount'] === null): ?>
+              <details>
+                <summary class="small">Mark received</summary>
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/received">
+                  <?= Csrf::field() ?>
+                  <label>Received Amount *<input type="text" name="received_amount" required></label>
+                  <label>Received On *<input type="date" name="received_at" value="<?= date('Y-m-d') ?>" required></label>
+                  <button type="submit" class="btn-sm">Save</button>
+                </form>
+              </details>
+            <?php endif; ?>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
+    <details>
+      <summary>Record a new claim for this order</summary>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits">
+        <?= Csrf::field() ?>
+        <label>Scheme *
+          <select name="scheme_name" required>
+            <?php foreach ($exportBenefitSchemes as $opt): ?>
+              <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
+        <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+        <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
+        <label>Currency<input type="text" name="currency_code" value="INR"></label>
+        <label>Notes<input type="text" name="notes"></label>
+        <button type="submit" class="btn-sm">Record Claim</button>
+      </form>
+    </details>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Expenses Imported from Zoho Books</h3>
+    <?php if (empty($linkedCaExpenses)): ?>
+      <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
+    <?php else: ?>
+      <table class="list">
+        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
+        <?php foreach ($linkedCaExpenses as $e): ?>
+        <tr>
+          <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
+          <td><?= htmlspecialchars($e['category']) ?></td>
+          <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
+          <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
+    <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
+    <?php if (empty($orderCostEntries)): ?>
+      <p class="muted">No other costs recorded for this order yet.</p>
+    <?php else: ?>
+      <table class="list">
+        <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
+        <?php foreach ($orderCostEntries as $c): ?>
+        <tr>
+          <td><?= htmlspecialchars((string) ($c['incurred_at'] ?? '—')) ?></td>
+          <td><?= htmlspecialchars($costEntryCategories[$c['category']] ?? $c['category']) ?></td>
+          <td><?= htmlspecialchars($c['description'] ?? '—') ?></td>
+          <td><?= number_format((float) $c['amount_inr'], 2) ?></td>
+          <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
+          <td>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries/<?= (int) $c['id'] ?>/delete" onsubmit="return confirm('Remove this cost entry?');">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm btn-danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
+    <details>
+      <summary>Record a cost for this order</summary>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries">
+        <?= Csrf::field() ?>
+        <label>Category *
+          <select name="category" required>
+            <?php foreach ($costEntryCategories as $key => $label): ?>
+              <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
+        <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
+        <label>Description<input type="text" name="description"></label>
+        <button type="submit" class="btn-sm">Record Cost</button>
+      </form>
+    </details>
+
+    <?php if ($profitability): ?>
+      <h3 style="font-size:0.95em; margin-top:14px;">Profitability Summary</h3>
+      <div class="kv-grid">
+        <div><span class="k">Revenue (INR)<?= $profitability['revenue_is_estimated'] ? ' — estimated' : '' ?></span><span class="v"><?= number_format($profitability['revenue_inr'], 2) ?></span></div>
+        <div><span class="k">Supplier Cost (INR)</span><span class="v"><?= number_format($profitability['supplier_cost_inr'], 2) ?></span></div>
+        <div><span class="k">Ocean Freight (INR)</span><span class="v"><?= number_format($profitability['freight_cost_inr'], 2) ?></span></div>
+        <div><span class="k">Insurance (INR)</span><span class="v"><?= number_format($profitability['insurance_cost_inr'], 2) ?></span></div>
+        <div><span class="k">Other Costs (INR)</span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
+        <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
+        <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
+        <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
+      </div>
+      <?php if ($profitability['revenue_is_estimated']): ?>
+        <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
+      <?php endif; ?>
+    <?php endif; ?>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Internal-Only Financial Annexure</h3>
+    <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
+    <?php if ($canManageCaInternalDoc): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/toggle" style="margin-bottom:6px;">
+        <?= Csrf::field() ?>
+        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
+          <input type="checkbox" name="enabled" value="1" <?= !empty($order['ca_internal_doc_enabled']) ? 'checked' : '' ?> onchange="this.form.submit()">
+          Enable internal financial annexure for this order
+        </label>
+      </form>
+      <?php if (!empty($order['ca_internal_doc_enabled'])): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/generate" style="display:inline;">
+          <?= Csrf::field() ?>
+          <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
+        </form>
+      <?php endif; ?>
+    <?php else: ?>
+      <p class="muted small">Internal financial annexure is currently <strong><?= !empty($order['ca_internal_doc_enabled']) ? 'enabled' : 'disabled' ?></strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
+    <?php endif; ?>
+    <?php if ($caInternalDoc): ?>
+      <p class="small" style="margin-top:6px;">
+        Latest: <a href="/documents/<?= (int) $caInternalDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($caInternalDoc['document_reference']) ?></a>
+        (generated <?= htmlspecialchars((string) $caInternalDoc['generated_at']) ?>) — <span class="badge">INTERNAL ONLY — never shown to client</span>
+      </p>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
   <div class="section">
     <h2>Stage 9 — Document Despatch &amp; Closure</h2>
     <?php if ($orderClosed): ?>
@@ -1523,6 +1447,87 @@ $orderClosed = $order['status'] === 'complete';
     <?php endif; ?>
   </div>
 
+  <div class="section" id="amendments">
+    <h2>Amendments</h2>
+    <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>
+    <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Payment Terms Amendments (<?= (int) $amendmentCount ?>)</a></p>
+  </div>
+
+  <div class="section" id="disputes">
+    <h2>Disputes</h2>
+    <p class="muted">A buyer complaint or claim raised against this order or shipment — separate from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
+    <?php if ($canManageDisputes): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/dispute-visibility" style="margin-bottom:10px">
+      <?= Csrf::field() ?>
+      <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
+        <input type="checkbox" name="dispute_button_visible_to_client" value="1" onchange="this.form.submit()" <?= (int) $order['dispute_button_visible_to_client'] === 1 ? 'checked' : '' ?>>
+        Show "Raise a Dispute" button to the client in their portal for this order
+      </label>
+    </form>
+    <?php endif; ?>
+    <p><a href="/orders/<?= (int) $order['id'] ?>/disputes">Disputes (<?= (int) $openDisputeCount ?> open)</a>
+       <?php if ($canViewAuditLog): ?>
+       &nbsp;·&nbsp;
+       <a href="/orders/<?= (int) $order['id'] ?>/audit-log">Audit Log</a>
+       <?php endif; ?>
+       &nbsp;·&nbsp;
+       <a href="/orders/<?= (int) $order['id'] ?>/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
+    </p>
+  </div>
+
+  <?php if ($canEditLockedData): ?>
+  <div class="section">
+    <h2>Admin Override</h2>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/override-status-lock" onsubmit="return confirmFieldOverride(this, 'this order\'s status/lock');">
+      <?= Csrf::field() ?>
+      <label>Status
+        <select name="status">
+          <option value="active" <?= $order['status'] === 'active' ? 'selected' : '' ?>>Active</option>
+          <option value="complete" <?= $order['status'] === 'complete' ? 'selected' : '' ?>>Complete</option>
+          <option value="disputed" <?= $order['status'] === 'disputed' ? 'selected' : '' ?>>Disputed</option>
+          <option value="lost" <?= $order['status'] === 'lost' ? 'selected' : '' ?>>Lost</option>
+        </select>
+      </label>
+      <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" <?= $order['is_locked'] ? 'checked' : '' ?>> Locked (normally set automatically once status = complete)</label>
+      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
+      <button type="submit" class="btn-sm btn-danger">Override Status/Lock</button>
+    </form>
+  </div>
+  <script>
+  function confirmFieldOverride(form, label) {
+    var reasonEl = form.querySelector('.override-reason');
+    if (!reasonEl || reasonEl.value.trim() === '') {
+      alert('A reason is required before saving.');
+      return false;
+    }
+    return confirm('Override ' + label + '? This is logged and cannot be undone through this screen.');
+  }
+  </script>
+  <?php endif; ?>
+
+  <?php if ($canEditLockedData): ?>
+  <div class="section" style="border-color:#D9822B;">
+    <h2>Force-Generate a Document (privileged override)</h2>
+    <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" onsubmit="return confirmFieldOverride(this, 'generating this document out of sequence');">
+      <?= Csrf::field() ?>
+      <input type="hidden" name="override_gate" value="1">
+      <label>Document Type
+        <select name="document_type" required>
+          <?php foreach (['QT' => 'Quotation', 'BUYERPO' => 'Buyer PO', 'PI' => 'Proforma Invoice', 'OC' => 'Order Confirmation', 'SUPPO' => 'Supplier PO', 'FDN' => 'Freight Debit Note', 'PL' => 'Packing List', 'BLI' => 'BL Instruction Sheet', 'CI' => 'Commercial Invoice', 'COOPREP' => 'COO Prep Sheet (internal)'] as $code => $label): ?>
+            <option value="<?= $code ?>"><?= htmlspecialchars($label) ?> (<?= $code ?>)</option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> Also generate DOCX</label>
+      <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
+        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+      </label>
+      <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
+    </form>
+  </div>
+  <?php endif; ?>
+
     </div>
   </div>
   <script>
@@ -1535,6 +1540,15 @@ $orderClosed = $order['status'] === 'complete';
       return el.classList.contains('section');
     });
     if (!panels.length) { return; }
+
+    // Remembers the active panel per-order in sessionStorage so that a
+    // plain form submit inside a panel (e.g. "Regenerate PI Form Link"),
+    // which redirects back to this same page with no #hash, still lands
+    // the user back on the panel they were just working in, instead of
+    // silently resetting to the first one. A #hash in the URL (e.g. from
+    // a direct link or the "Order Updates" comment form) always wins over
+    // the remembered panel, so existing deep links keep working.
+    var storageKey = 'orderActivePanel:<?= (int) $order['id'] ?>';
 
     function slugify(text) {
       var s = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -1575,11 +1589,19 @@ $orderClosed = $order['status'] === 'complete';
       if (updateHash && window.history && window.history.pushState) {
         window.history.pushState(null, '', '#' + id);
       }
+      try { sessionStorage.setItem(storageKey, id); } catch (e) { /* private browsing etc — fine to skip */ }
     }
 
     var initialId = (window.location.hash || '').replace('#', '');
     var initialPanel = null;
     panels.forEach(function (p) { if (p.id === initialId) { initialPanel = p; } });
+    if (!initialPanel) {
+      var rememberedId = null;
+      try { rememberedId = sessionStorage.getItem(storageKey); } catch (e) { /* ignore */ }
+      if (rememberedId) {
+        panels.forEach(function (p) { if (p.id === rememberedId) { initialPanel = p; } });
+      }
+    }
     activate(initialPanel ? initialPanel.id : panels[0].id, false);
 
     layout.classList.add('js-enabled');

@@ -209,6 +209,7 @@
     <nav class="order-sidebar" id="order-sidebar" aria-label="Order sections"></nav>
     <div class="order-panels" id="order-panels">
 
+
   <div class="section">
     <h2>Order Details</h2>
     <div class="kv-grid">
@@ -310,8 +311,53 @@
     {% endif %}
   </div>
 
-  <div class="section">
-    <h2>Documents</h2>
+  <div class="section" id="order-updates">
+    <h2>Order Communication</h2>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted. Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.</p>
+    <div class="chat-thread">
+      {% if comments.length == 0 %}
+        <p class="chat-empty">No updates posted yet.</p>
+      {% endif %}
+      {% for c in comments %}
+        {% set isStaff = c.author_type == 'staff' %}
+        <div class="chat-bubble-row {{ 'staff' if isStaff else 'client' }}">
+          <div class="chat-bubble {{ 'staff' if isStaff else 'client' }}">
+            <div class="chat-bubble-meta">
+              <span class="who">{{ 'Staff' if isStaff else 'Client' }} — {{ (c.staff_name if isStaff else c.client_name) or 'Unknown' }}</span>
+              <span>{{ c.created_at | humanDate }}{% if isStaff %}{{ ' · emailed' if c.email_sent else ' · not emailed (no client email on file)' }}{% endif %}</span>
+            </div>
+            {% if c.body %}<div class="chat-bubble-body">{{ c.body }}</div>{% endif %}
+            {% if c.attachments.length > 0 %}
+              <div class="chat-attachments">
+                {% for att in c.attachments %}
+                  {% set url = '/orders/' ~ order.id ~ '/comment-attachments/' ~ att.file_id ~ '/download' %}
+                  {% if att.mime_type and (att.mime_type | startswith('image/')) %}
+                    <a href="{{ url }}" target="_blank"><img class="chat-attachment-image" src="{{ url }}" alt="{{ att.original_filename }}"></a>
+                  {% elif att.mime_type and (att.mime_type | startswith('video/')) %}
+                    <video class="chat-attachment-video" controls src="{{ url }}"></video>
+                  {% else %}
+                    <a class="chat-attachment-file" href="{{ url }}">{{ att.original_filename }}</a>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <form class="chat-post-form" method="post" action="/orders/{{ order.id }}/comments#order-updates" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <textarea name="body" placeholder="Write an update for the client…"></textarea>
+      <div class="chat-post-form-row">
+        <input type="file" name="attachments" multiple accept="image/*,video/*,.pdf">
+        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section" id="documents-approvals">
+    <h2>Documents &amp; Approvals</h2>
+    <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">
       <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th><th></th></tr>
       {% for d in documents %}
@@ -467,54 +513,8 @@
       {% endif %}
     </div>
     <p class="muted small"><a href="/orders/{{ order.id }}/annexure">{% if order.include_annexure_a %}Manage Annexure A product entries &amp; images{% else %}Enable / manage Annexure A{% endif %}</a></p>
-  </div>
 
-  <div class="section" id="order-updates">
-    <h2>Order Updates</h2>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted. Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.</p>
-    <div class="chat-thread">
-      {% if comments.length == 0 %}
-        <p class="chat-empty">No updates posted yet.</p>
-      {% endif %}
-      {% for c in comments %}
-        {% set isStaff = c.author_type == 'staff' %}
-        <div class="chat-bubble-row {{ 'staff' if isStaff else 'client' }}">
-          <div class="chat-bubble {{ 'staff' if isStaff else 'client' }}">
-            <div class="chat-bubble-meta">
-              <span class="who">{{ 'Staff' if isStaff else 'Client' }} — {{ (c.staff_name if isStaff else c.client_name) or 'Unknown' }}</span>
-              <span>{{ c.created_at | humanDate }}{% if isStaff %}{{ ' · emailed' if c.email_sent else ' · not emailed (no client email on file)' }}{% endif %}</span>
-            </div>
-            {% if c.body %}<div class="chat-bubble-body">{{ c.body }}</div>{% endif %}
-            {% if c.attachments.length > 0 %}
-              <div class="chat-attachments">
-                {% for att in c.attachments %}
-                  {% set url = '/orders/' ~ order.id ~ '/comment-attachments/' ~ att.file_id ~ '/download' %}
-                  {% if att.mime_type and (att.mime_type | startswith('image/')) %}
-                    <a href="{{ url }}" target="_blank"><img class="chat-attachment-image" src="{{ url }}" alt="{{ att.original_filename }}"></a>
-                  {% elif att.mime_type and (att.mime_type | startswith('video/')) %}
-                    <video class="chat-attachment-video" controls src="{{ url }}"></video>
-                  {% else %}
-                    <a class="chat-attachment-file" href="{{ url }}">{{ att.original_filename }}</a>
-                  {% endif %}
-                {% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-    <form class="chat-post-form" method="post" action="/orders/{{ order.id }}/comments#order-updates" enctype="multipart/form-data">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <textarea name="body" placeholder="Write an update for the client…"></textarea>
-      <div class="chat-post-form-row">
-        <input type="file" name="attachments" multiple accept="image/*,video/*,.pdf">
-        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
-      </div>
-    </form>
-  </div>
-
-  <div class="section">
-    <h2>Review, Approval &amp; Send to Buyer</h2>
+    <h3 style="font-size:0.95em; margin-top:18px;">Review &amp; Approval</h3>
     <p class="muted">A document generated above starts life <strong>draft</strong> with the DRAFT watermark. Assign at least one reviewer to move it to review; once every assigned reviewer approves (minimum required per document type), it's re-watermarked as final and can be sent to the buyer. The buyer only ever receives that final watermarked PDF — never the internal DOCX, never an unwatermarked copy.</p>
     {% for d in documents %}
       {% set reviews = reviewsByDocument[d.id] or [] %}
@@ -703,6 +703,41 @@
   </div>
 
   <div class="section">
+    <h2>Stage 2 — Buyer PO</h2>
+    {% if hasBuyerPo %}
+      <p>Buyer PO recorded: <strong>{{ order.buyers_po_ref }}</strong></p>
+    {% elif stage2 and stage2.status != 'locked' %}
+      <form method="post" action="/orders/{{ order.id }}/buyer-po">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+        <button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+      </form>
+    {% else %}
+      <p class="muted">Generate the Quotation first to unlock this gate.</p>
+    {% endif %}
+
+    {% if stage2 and stage2.status != 'locked' %}
+      {% if buyerPoDocuments and buyerPoDocuments.length > 0 %}
+        <table class="list" style="margin-top:8px">
+          <tr><th>File</th><th>Uploaded</th><th></th></tr>
+          {% for bd in buyerPoDocuments %}
+            <tr>
+              <td>{{ bd.original_filename }}</td>
+              <td>{{ bd.uploaded_at }}</td>
+              <td><a href="/file-store/{{ bd.file_id }}/download">Download</a></td>
+            </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+      <form method="post" action="/orders/{{ order.id }}/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="file" name="document" required>
+        <button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <div class="section">
     <h2>PI-Stage Intake</h2>
     <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
     {% if piIntake %}
@@ -744,117 +779,6 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm">{{ 'Regenerate PI Form Link' if piIntake else 'Generate PI Form Link' }}</button>
     </form>
-    {% endif %}
-  </div>
-
-  <div class="section">
-    <h2>Amendments &amp; Disputes</h2>
-    {% if permissions.manage_disputes %}
-    <form method="post" action="/orders/{{ order.id }}/dispute-visibility" style="margin-bottom:10px">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
-        <input type="checkbox" name="dispute_button_visible_to_client" value="1" onchange="this.form.submit()" {{ 'checked' if order.dispute_button_visible_to_client == 1 }}>
-        Show "Raise a Dispute" button to the client in their portal for this order
-      </label>
-    </form>
-    {% endif %}
-    <p><a href="/orders/{{ order.id }}/amendments">Payment Terms Amendments ({{ amendmentCount }})</a>
-       &nbsp;&middot;&nbsp;
-       <a href="/orders/{{ order.id }}/disputes">Disputes ({{ openDisputeCount }} open)</a>
-       {% if permissions.view_audit_log %}
-       &nbsp;&middot;&nbsp;
-       <a href="/orders/{{ order.id }}/audit-log">Audit Log</a>
-       {% endif %}
-       &nbsp;&middot;&nbsp;
-       <a href="/orders/{{ order.id }}/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
-    </p>
-  </div>
-
-  {% if permissions.edit_locked_data %}
-  <div class="section">
-    <h2>Admin Override</h2>
-    <form method="post" action="/orders/{{ order.id }}/override-status-lock" onsubmit="return confirmFieldOverride(this, &quot;this order's status/lock&quot;);">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Status
-        <select name="status">
-          <option value="active" {{ 'selected' if order.status == 'active' else '' }}>Active</option>
-          <option value="complete" {{ 'selected' if order.status == 'complete' else '' }}>Complete</option>
-          <option value="disputed" {{ 'selected' if order.status == 'disputed' else '' }}>Disputed</option>
-          <option value="lost" {{ 'selected' if order.status == 'lost' else '' }}>Lost</option>
-        </select>
-      </label>
-      <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" {{ 'checked' if order.is_locked else '' }}> Locked (normally set automatically once status = complete)</label>
-      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
-      <button type="submit" class="btn-sm btn-danger">Override Status/Lock</button>
-    </form>
-  </div>
-  <script>
-  function confirmFieldOverride(form, label) {
-    var reasonEl = form.querySelector('.override-reason');
-    if (!reasonEl || reasonEl.value.trim() === '') {
-      alert('A reason is required before saving.');
-      return false;
-    }
-    return confirm('Override ' + label + '? This is logged and cannot be undone through this screen.');
-  }
-  </script>
-  {% endif %}
-
-  {% if permissions.edit_locked_data %}
-  <div class="section" style="border-color:#D9822B;">
-    <h2>Force-Generate a Document (privileged override)</h2>
-    <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
-    <form method="post" action="/orders/{{ order.id }}/documents/generate" onsubmit="return confirmFieldOverride(this, 'generating this document out of sequence');">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <input type="hidden" name="override_gate" value="1">
-      <label>Document Type
-        <select name="document_type" required>
-          {% for code, label in {"QT": "Quotation", "BUYERPO": "Buyer PO", "PI": "Proforma Invoice", "OC": "Order Confirmation", "SUPPO": "Supplier PO", "FDN": "Freight Debit Note", "PL": "Packing List", "BLI": "BL Instruction Sheet", "CI": "Commercial Invoice", "COOPREP": "COO Prep Sheet (internal)"} %}
-            <option value="{{ code }}">{{ label }} ({{ code }})</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> Also generate DOCX</label>
-      <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
-      </label>
-      <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
-    </form>
-  </div>
-  {% endif %}
-
-  <div class="section">
-    <h2>Stage 2 — Buyer PO</h2>
-    {% if hasBuyerPo %}
-      <p>Buyer PO recorded: <strong>{{ order.buyers_po_ref }}</strong></p>
-    {% elif stage2 and stage2.status != 'locked' %}
-      <form method="post" action="/orders/{{ order.id }}/buyer-po">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-        <button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
-      </form>
-    {% else %}
-      <p class="muted">Generate the Quotation first to unlock this gate.</p>
-    {% endif %}
-
-    {% if stage2 and stage2.status != 'locked' %}
-      {% if buyerPoDocuments and buyerPoDocuments.length > 0 %}
-        <table class="list" style="margin-top:8px">
-          <tr><th>File</th><th>Uploaded</th><th></th></tr>
-          {% for bd in buyerPoDocuments %}
-            <tr>
-              <td>{{ bd.original_filename }}</td>
-              <td>{{ bd.uploaded_at }}</td>
-              <td><a href="/file-store/{{ bd.file_id }}/download">Download</a></td>
-            </tr>
-          {% endfor %}
-        </table>
-      {% endif %}
-      <form method="post" action="/orders/{{ order.id }}/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <input type="file" name="document" required>
-        <button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
-      </form>
     {% endif %}
   </div>
 
@@ -931,182 +855,6 @@
         </tr>
         {% endfor %}
       </table>
-    {% endif %}
-  </div>
-
-  {% if canManageOrderFinancials %}
-  <div class="section" id="order-financials">
-    <h2>Order Financials — Government Benefits, Costs &amp; Profitability</h2>
-    <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
-
-    <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
-    {% if linkedExportBenefits.length == 0 %}
-      <p class="muted">Nothing claimed against this order yet.</p>
-    {% else %}
-      <table class="list">
-        <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
-        {% for b in linkedExportBenefits %}
-        <tr>
-          <td>{{ b.claimed_at }}</td>
-          <td>{{ b.scheme_name }}</td>
-          <td>{{ b.reference_number or '—' }}</td>
-          <td>{{ b.claimed_amount | money }} {{ b.currency_code }}</td>
-          <td>{% if b.received_amount != null %}{{ b.received_amount | money }} {{ b.currency_code }}{% else %}<span class="muted">—</span>{% endif %}</td>
-          <td>{% if b.received_amount != null %}<span class="badge good">Received</span>{% else %}<span class="badge">Claimed</span>{% endif %}</td>
-          <td>
-            {% if b.received_amount == null %}
-              <details>
-                <summary class="small">Mark received</summary>
-                <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/received">
-                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                  <label>Received Amount *<input type="text" name="received_amount" required></label>
-                  <label>Received On *<input type="date" name="received_at" value="{{ today() }}" required></label>
-                  <button type="submit" class="btn-sm">Save</button>
-                </form>
-              </details>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </table>
-    {% endif %}
-    <details>
-      <summary>Record a new claim for this order</summary>
-      <form method="post" action="/orders/{{ order.id }}/export-benefits">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Scheme *
-          <select name="scheme_name" required>
-            {% for opt in exportBenefitSchemes %}
-              <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
-        <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
-        <label>Claimed On *<input type="date" name="claimed_at" value="{{ today() }}" required></label>
-        <label>Currency<input type="text" name="currency_code" value="INR"></label>
-        <label>Notes<input type="text" name="notes"></label>
-        <button type="submit" class="btn-sm">Record Claim</button>
-      </form>
-    </details>
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Expenses Imported from Zoho Books</h3>
-    {% if linkedCaExpenses.length == 0 %}
-      <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
-    {% else %}
-      <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
-        {% for e in linkedCaExpenses %}
-        <tr>
-          <td>{{ e.expense_date }}</td>
-          <td>{{ e.category }}</td>
-          <td>{{ e.vendor_name or '—' }}</td>
-          <td>{{ e.amount | money }} {{ e.currency_code }}</td>
-        </tr>
-        {% endfor %}
-      </table>
-    {% endif %}
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
-    <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
-    {% if orderCostEntries.length == 0 %}
-      <p class="muted">No other costs recorded for this order yet.</p>
-    {% else %}
-      <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
-        {% for c in orderCostEntries %}
-        <tr>
-          <td>{{ c.incurred_at or '—' }}</td>
-          <td>{{ costEntryCategories[c.category] or c.category }}</td>
-          <td>{{ c.description or '—' }}</td>
-          <td>{{ c.amount_inr | money }}</td>
-          <td>{{ c.recorded_by_name }}</td>
-          <td>
-            <form method="post" action="/orders/{{ order.id }}/cost-entries/{{ c.id }}/delete" onsubmit="return confirm('Remove this cost entry?');">
-              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <button type="submit" class="btn-sm btn-danger">Remove</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </table>
-    {% endif %}
-    <details>
-      <summary>Record a cost for this order</summary>
-      <form method="post" action="/orders/{{ order.id }}/cost-entries">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Category *
-          <select name="category" required>
-            {% for key, label in costEntryCategories %}
-              <option value="{{ key }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
-        <label>Date<input type="date" name="incurred_at" value="{{ today() }}"></label>
-        <label>Description<input type="text" name="description"></label>
-        <button type="submit" class="btn-sm">Record Cost</button>
-      </form>
-    </details>
-
-    {% if profitability %}
-      <h3 style="font-size:0.95em; margin-top:14px;">Profitability Summary</h3>
-      <div class="kv-grid">
-        <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | money }}</span></div>
-        <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | money }}</span></div>
-        <div><span class="k">Ocean Freight (INR)</span><span class="v">{{ profitability.freight_cost_inr | money }}</span></div>
-        <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}</span></div>
-        <div><span class="k">Other Costs (INR)</span><span class="v">{{ profitability.other_costs_inr | money }}</span></div>
-        <div><span class="k">Total Order Cost (INR)</span><span class="v">{{ profitability.total_cost_inr | money }}</span></div>
-        <div><span class="k">Order Profit (INR)</span><span class="v">{{ profitability.profit_inr | money }}</span></div>
-        <div><span class="k">Order Margin %</span><span class="v">{% if profitability.margin_pct != null %}{{ profitability.margin_pct | money }}%{% else %}—{% endif %}</span></div>
-      </div>
-      {% if profitability.revenue_is_estimated %}
-        <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
-      {% endif %}
-    {% endif %}
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Internal-Only Financial Annexure</h3>
-    <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
-    {% if canManageCaInternalDoc %}
-      <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/toggle" style="margin-bottom:6px;">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
-          <input type="checkbox" name="enabled" value="1" {% if order.ca_internal_doc_enabled %}checked{% endif %} onchange="this.form.submit()">
-          Enable internal financial annexure for this order
-        </label>
-      </form>
-      {% if order.ca_internal_doc_enabled %}
-        <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/generate" style="display:inline;">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
-        </form>
-      {% endif %}
-    {% else %}
-      <p class="muted small">Internal financial annexure is currently <strong>{% if order.ca_internal_doc_enabled %}enabled{% else %}disabled{% endif %}</strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
-    {% endif %}
-    {% if caInternalDoc %}
-      <p class="small" style="margin-top:6px;">
-        Latest: <a href="/documents/{{ caInternalDoc.id }}/download?format=pdf">{{ caInternalDoc.document_reference }}</a>
-        (generated {{ caInternalDoc.generated_at }}) — <span class="badge">INTERNAL ONLY — never shown to client</span>
-      </p>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <div class="section">
-    <h2>Production &amp; Estimated Shipment</h2>
-    <div class="kv-grid">
-      <div><span class="k">Production Status</span><span class="v">{{ order.production_status_text or 'Not yet commenced' }}</span></div>
-      <div><span class="k">Est. Shipment</span><span class="v">{{ order.est_shipment_date_text or 'To Be Confirmed' }}</span></div>
-    </div>
-    {% if stage4 and stage4.status != 'locked' %}
-      <form method="post" action="/orders/{{ order.id }}/production-status">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Production Status<input type="text" name="production_status_text" placeholder="e.g. Cutting and finishing in progress — 30% complete"></label>
-        <label>Estimated Shipment<input type="text" name="est_shipment_date_text" placeholder="e.g. Week of 15 October 2026"></label>
-        <button type="submit" class="btn-sm">Update</button>
-      </form>
     {% endif %}
   </div>
 
@@ -1248,6 +996,22 @@
           <button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
         </form>
       {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Production &amp; Estimated Shipment</h2>
+    <div class="kv-grid">
+      <div><span class="k">Production Status</span><span class="v">{{ order.production_status_text or 'Not yet commenced' }}</span></div>
+      <div><span class="k">Est. Shipment</span><span class="v">{{ order.est_shipment_date_text or 'To Be Confirmed' }}</span></div>
+    </div>
+    {% if stage4 and stage4.status != 'locked' %}
+      <form method="post" action="/orders/{{ order.id }}/production-status">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Production Status<input type="text" name="production_status_text" placeholder="e.g. Cutting and finishing in progress — 30% complete"></label>
+        <label>Estimated Shipment<input type="text" name="est_shipment_date_text" placeholder="e.g. Week of 15 October 2026"></label>
+        <button type="submit" class="btn-sm">Update</button>
+      </form>
     {% endif %}
   </div>
 
@@ -1414,6 +1178,166 @@
     {% endif %}
   </div>
 
+  {% if canManageOrderFinancials %}
+  <div class="section" id="order-financials">
+    <h2>Order Financials — Government Benefits, Costs &amp; Profitability</h2>
+    <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
+
+    <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
+    {% if linkedExportBenefits.length == 0 %}
+      <p class="muted">Nothing claimed against this order yet.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
+        {% for b in linkedExportBenefits %}
+        <tr>
+          <td>{{ b.claimed_at }}</td>
+          <td>{{ b.scheme_name }}</td>
+          <td>{{ b.reference_number or '—' }}</td>
+          <td>{{ b.claimed_amount | money }} {{ b.currency_code }}</td>
+          <td>{% if b.received_amount != null %}{{ b.received_amount | money }} {{ b.currency_code }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if b.received_amount != null %}<span class="badge good">Received</span>{% else %}<span class="badge">Claimed</span>{% endif %}</td>
+          <td>
+            {% if b.received_amount == null %}
+              <details>
+                <summary class="small">Mark received</summary>
+                <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/received">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <label>Received Amount *<input type="text" name="received_amount" required></label>
+                  <label>Received On *<input type="date" name="received_at" value="{{ today() }}" required></label>
+                  <button type="submit" class="btn-sm">Save</button>
+                </form>
+              </details>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+    <details>
+      <summary>Record a new claim for this order</summary>
+      <form method="post" action="/orders/{{ order.id }}/export-benefits">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Scheme *
+          <select name="scheme_name" required>
+            {% for opt in exportBenefitSchemes %}
+              <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
+        <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+        <label>Claimed On *<input type="date" name="claimed_at" value="{{ today() }}" required></label>
+        <label>Currency<input type="text" name="currency_code" value="INR"></label>
+        <label>Notes<input type="text" name="notes"></label>
+        <button type="submit" class="btn-sm">Record Claim</button>
+      </form>
+    </details>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Expenses Imported from Zoho Books</h3>
+    {% if linkedCaExpenses.length == 0 %}
+      <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
+        {% for e in linkedCaExpenses %}
+        <tr>
+          <td>{{ e.expense_date }}</td>
+          <td>{{ e.category }}</td>
+          <td>{{ e.vendor_name or '—' }}</td>
+          <td>{{ e.amount | money }} {{ e.currency_code }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
+    <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
+    {% if orderCostEntries.length == 0 %}
+      <p class="muted">No other costs recorded for this order yet.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
+        {% for c in orderCostEntries %}
+        <tr>
+          <td>{{ c.incurred_at or '—' }}</td>
+          <td>{{ costEntryCategories[c.category] or c.category }}</td>
+          <td>{{ c.description or '—' }}</td>
+          <td>{{ c.amount_inr | money }}</td>
+          <td>{{ c.recorded_by_name }}</td>
+          <td>
+            <form method="post" action="/orders/{{ order.id }}/cost-entries/{{ c.id }}/delete" onsubmit="return confirm('Remove this cost entry?');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+    <details>
+      <summary>Record a cost for this order</summary>
+      <form method="post" action="/orders/{{ order.id }}/cost-entries">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Category *
+          <select name="category" required>
+            {% for key, label in costEntryCategories %}
+              <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
+        <label>Date<input type="date" name="incurred_at" value="{{ today() }}"></label>
+        <label>Description<input type="text" name="description"></label>
+        <button type="submit" class="btn-sm">Record Cost</button>
+      </form>
+    </details>
+
+    {% if profitability %}
+      <h3 style="font-size:0.95em; margin-top:14px;">Profitability Summary</h3>
+      <div class="kv-grid">
+        <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | money }}</span></div>
+        <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | money }}</span></div>
+        <div><span class="k">Ocean Freight (INR)</span><span class="v">{{ profitability.freight_cost_inr | money }}</span></div>
+        <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}</span></div>
+        <div><span class="k">Other Costs (INR)</span><span class="v">{{ profitability.other_costs_inr | money }}</span></div>
+        <div><span class="k">Total Order Cost (INR)</span><span class="v">{{ profitability.total_cost_inr | money }}</span></div>
+        <div><span class="k">Order Profit (INR)</span><span class="v">{{ profitability.profit_inr | money }}</span></div>
+        <div><span class="k">Order Margin %</span><span class="v">{% if profitability.margin_pct != null %}{{ profitability.margin_pct | money }}%{% else %}—{% endif %}</span></div>
+      </div>
+      {% if profitability.revenue_is_estimated %}
+        <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
+      {% endif %}
+    {% endif %}
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Internal-Only Financial Annexure</h3>
+    <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
+    {% if canManageCaInternalDoc %}
+      <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/toggle" style="margin-bottom:6px;">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
+          <input type="checkbox" name="enabled" value="1" {% if order.ca_internal_doc_enabled %}checked{% endif %} onchange="this.form.submit()">
+          Enable internal financial annexure for this order
+        </label>
+      </form>
+      {% if order.ca_internal_doc_enabled %}
+        <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/generate" style="display:inline;">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="muted small">Internal financial annexure is currently <strong>{% if order.ca_internal_doc_enabled %}enabled{% else %}disabled{% endif %}</strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
+    {% endif %}
+    {% if caInternalDoc %}
+      <p class="small" style="margin-top:6px;">
+        Latest: <a href="/documents/{{ caInternalDoc.id }}/download?format=pdf">{{ caInternalDoc.document_reference }}</a>
+        (generated {{ caInternalDoc.generated_at }}) — <span class="badge">INTERNAL ONLY — never shown to client</span>
+      </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="section">
     <h2>Stage 9 — Document Despatch &amp; Closure</h2>
     {% if orderClosed %}
@@ -1454,6 +1378,87 @@
     {% endif %}
   </div>
 
+  <div class="section" id="amendments">
+    <h2>Amendments</h2>
+    <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>
+    <p><a href="/orders/{{ order.id }}/amendments">Payment Terms Amendments ({{ amendmentCount }})</a></p>
+  </div>
+
+  <div class="section" id="disputes">
+    <h2>Disputes</h2>
+    <p class="muted">A buyer complaint or claim raised against this order or shipment — separate from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
+    {% if permissions.manage_disputes %}
+    <form method="post" action="/orders/{{ order.id }}/dispute-visibility" style="margin-bottom:10px">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
+        <input type="checkbox" name="dispute_button_visible_to_client" value="1" onchange="this.form.submit()" {{ 'checked' if order.dispute_button_visible_to_client == 1 }}>
+        Show "Raise a Dispute" button to the client in their portal for this order
+      </label>
+    </form>
+    {% endif %}
+    <p><a href="/orders/{{ order.id }}/disputes">Disputes ({{ openDisputeCount }} open)</a>
+       {% if permissions.view_audit_log %}
+       &nbsp;&middot;&nbsp;
+       <a href="/orders/{{ order.id }}/audit-log">Audit Log</a>
+       {% endif %}
+       &nbsp;&middot;&nbsp;
+       <a href="/orders/{{ order.id }}/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
+    </p>
+  </div>
+
+  {% if permissions.edit_locked_data %}
+  <div class="section">
+    <h2>Admin Override</h2>
+    <form method="post" action="/orders/{{ order.id }}/override-status-lock" onsubmit="return confirmFieldOverride(this, &quot;this order's status/lock&quot;);">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Status
+        <select name="status">
+          <option value="active" {{ 'selected' if order.status == 'active' else '' }}>Active</option>
+          <option value="complete" {{ 'selected' if order.status == 'complete' else '' }}>Complete</option>
+          <option value="disputed" {{ 'selected' if order.status == 'disputed' else '' }}>Disputed</option>
+          <option value="lost" {{ 'selected' if order.status == 'lost' else '' }}>Lost</option>
+        </select>
+      </label>
+      <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" {{ 'checked' if order.is_locked else '' }}> Locked (normally set automatically once status = complete)</label>
+      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
+      <button type="submit" class="btn-sm btn-danger">Override Status/Lock</button>
+    </form>
+  </div>
+  <script>
+  function confirmFieldOverride(form, label) {
+    var reasonEl = form.querySelector('.override-reason');
+    if (!reasonEl || reasonEl.value.trim() === '') {
+      alert('A reason is required before saving.');
+      return false;
+    }
+    return confirm('Override ' + label + '? This is logged and cannot be undone through this screen.');
+  }
+  </script>
+  {% endif %}
+
+  {% if permissions.edit_locked_data %}
+  <div class="section" style="border-color:#D9822B;">
+    <h2>Force-Generate a Document (privileged override)</h2>
+    <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
+    <form method="post" action="/orders/{{ order.id }}/documents/generate" onsubmit="return confirmFieldOverride(this, 'generating this document out of sequence');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="override_gate" value="1">
+      <label>Document Type
+        <select name="document_type" required>
+          {% for code, label in {"QT": "Quotation", "BUYERPO": "Buyer PO", "PI": "Proforma Invoice", "OC": "Order Confirmation", "SUPPO": "Supplier PO", "FDN": "Freight Debit Note", "PL": "Packing List", "BLI": "BL Instruction Sheet", "CI": "Commercial Invoice", "COOPREP": "COO Prep Sheet (internal)"} %}
+            <option value="{{ code }}">{{ label }} ({{ code }})</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> Also generate DOCX</label>
+      <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
+        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+      </label>
+      <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
+    </form>
+  </div>
+  {% endif %}
+
     </div>
   </div>
   <script>
@@ -1466,6 +1471,15 @@
       return el.classList.contains('section');
     });
     if (!panels.length) { return; }
+
+    // Remembers the active panel per-order in sessionStorage so that a
+    // plain form submit inside a panel (e.g. "Regenerate PI Form Link"),
+    // which redirects back to this same page with no #hash, still lands
+    // the user back on the panel they were just working in, instead of
+    // silently resetting to the first one. A #hash in the URL (e.g. from
+    // a direct link or the "Order Updates" comment form) always wins over
+    // the remembered panel, so existing deep links keep working.
+    var storageKey = 'orderActivePanel:{{ order.id }}';
 
     function slugify(text) {
       var s = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -1506,11 +1520,19 @@
       if (updateHash && window.history && window.history.pushState) {
         window.history.pushState(null, '', '#' + id);
       }
+      try { sessionStorage.setItem(storageKey, id); } catch (e) { /* private browsing etc — fine to skip */ }
     }
 
     var initialId = (window.location.hash || '').replace('#', '');
     var initialPanel = null;
     panels.forEach(function (p) { if (p.id === initialId) { initialPanel = p; } });
+    if (!initialPanel) {
+      var rememberedId = null;
+      try { rememberedId = sessionStorage.getItem(storageKey); } catch (e) { /* ignore */ }
+      if (rememberedId) {
+        panels.forEach(function (p) { if (p.id === rememberedId) { initialPanel = p; } });
+      }
+    }
     activate(initialPanel ? initialPanel.id : panels[0].id, false);
 
     layout.classList.add('js-enabled');
