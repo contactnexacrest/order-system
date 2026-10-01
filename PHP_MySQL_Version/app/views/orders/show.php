@@ -301,6 +301,26 @@ foreach ($stages as $s) {
   </script>
   <?php endif; ?>
 
+  <?php
+    // Point 2 (2026-10-01): a quick-glance horizontal line-with-dots
+    // indicator of where this order stands in the 9-stage pipeline, above
+    // the existing detailed stage-chip grid below — that grid still carries
+    // the full name/status-badge detail per stage; this is purely the
+    // at-a-glance "how far along are we" read, the thing a fresh glance at
+    // the top of the page was missing. The connecting line segment left of
+    // a step is colored via CSS purely off that step's own status class
+    // (in_progress/gate_passed/skipped all mean "the process has reached
+    // this far"), so no extra per-segment markup is needed.
+  ?>
+  <div class="process-stepper" role="list" aria-label="Order stage sequence">
+    <?php foreach ($stages as $s): ?>
+      <div class="process-step <?= htmlspecialchars($s['status']) ?>" role="listitem" <?= $s['status'] === 'in_progress' ? 'aria-current="step"' : '' ?>>
+        <div class="process-step-dot"><?= (int) $s['stage_number'] ?></div>
+        <div class="process-step-label"><?= htmlspecialchars($s['stage_name']) ?></div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+
   <div class="stage-track">
     <?php foreach ($stages as $s): ?>
       <div class="stage-chip <?= htmlspecialchars($s['status']) ?>">

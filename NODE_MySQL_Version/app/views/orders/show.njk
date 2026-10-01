@@ -236,6 +236,23 @@
   </script>
   {% endif %}
 
+  {# Point 2 (2026-10-01): a quick-glance horizontal line-with-dots
+     indicator of where this order stands in the 9-stage pipeline, above
+     the existing detailed stage-chip grid below — that grid still carries
+     the full name/status-badge detail per stage; this is purely the
+     at-a-glance "how far along are we" read. The connecting line segment
+     left of a step is colored via CSS purely off that step's own status
+     class (in_progress/gate_passed/skipped all mean "the process has
+     reached this far"), so no extra per-segment markup is needed. #}
+  <div class="process-stepper" role="list" aria-label="Order stage sequence">
+    {% for s in stages %}
+      <div class="process-step {{ s.status }}" role="listitem" {% if s.status == 'in_progress' %}aria-current="step"{% endif %}>
+        <div class="process-step-dot">{{ s.stage_number }}</div>
+        <div class="process-step-label">{{ s.stage_name }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
   <div class="stage-track">
     {% for s in stages %}
       <div class="stage-chip {{ s.status }}">

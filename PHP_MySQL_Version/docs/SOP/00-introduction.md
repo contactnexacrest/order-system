@@ -44,9 +44,15 @@ the normal order is meant to be the exception, not the routine.
 | 8 | Commercial Invoice & Balance | Balance payment cleared | [Chapter 8](./08-stage8-ci-balance.md) |
 | 9 | Document Despatch & Closure | Courier tracking number entered, order closed | [Chapter 9](./09-stage9-despatch-closure.md) |
 
-Every order detail page (`/orders/{id}`) shows all 9 as a row of chips at
-the top — grey (locked), amber (in progress / unlocked), green (gate
-passed) — so you can always tell where an order stands at a glance.
+Every order detail page (`/orders/{id}`) shows all 9 at the very top, two
+ways at once: first a horizontal line-with-dots **process stepper** —
+stage number in each dot, connected by a line, the stage name below it —
+for an instant "how far along is this order" read; then, right below it,
+the same 9 stages as a row of detail chips — grey (locked), amber (in
+progress / unlocked), green (gate passed) — each naming its own status in
+words, for when you need more than the quick glance. Both use the same
+three colors for the same three states, so they always agree with each
+other.
 
 ## Modules that sit alongside the 9 stages
 
