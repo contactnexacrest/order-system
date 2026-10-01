@@ -1,6 +1,44 @@
 <div class="card page-wide">
   <h1>CA / Accounting</h1>
-  <p class="muted">Independent of the order-pipeline system — nothing here affects order stages, and nothing in the order reports feeds this. <a href="/ca/reports">FY / calendar-year revenue reports &rarr;</a> &middot; <a href="/ca/expenses">Expenses &rarr;</a> &middot; <a href="/ca/export-benefits">Government Export Benefits &rarr;</a> &middot; <a href="/ca/tds-summary">TDS Payable Summary &rarr;</a> &middot; <a href="/ca/bank-statement">Bank statement &rarr;</a> &middot; <a href="/ca/reconciliation">Reconciliation &rarr;</a> &middot; <a href="/ca/zoho-sync">Zoho Books sync &rarr;</a> &middot; <a href="/ca/fy-locks">Financial Year Lock &rarr;</a></p>
+  <p class="muted">Independent of the order-pipeline system — nothing here affects order stages, and nothing in the order reports feeds this.</p>
+
+  <div class="section">
+    <h2>Revenue &amp; Benefits</h2>
+    <p class="muted">FY/calendar-year revenue, and the government export-benefit claims (RODTEP etc.) linked to individual orders.</p>
+    <div class="btn-row">
+      <a class="btn-sm" href="/ca/reports">Open Revenue Reports</a>
+      <a class="btn-sm" href="/ca/export-benefits">Open Export Benefits</a>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Expenses &amp; TDS</h2>
+    <p class="muted">Every recorded expense (ECGC, inspection, CHA, transport, ...), its TDS treatment, and a payable summary across all of them.</p>
+    <div class="btn-row">
+      <a class="btn-sm" href="/ca/expenses">Open Expenses</a>
+      <a class="btn-sm" href="/ca/tds-summary">Open TDS Payable Summary</a>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Bank &amp; Reconciliation</h2>
+    <p class="muted">Upload a bank statement and match its lines against revenue settlements and expenses.</p>
+    <div class="btn-row">
+      <a class="btn-sm" href="/ca/bank-statement">Open Bank Statement</a>
+      <a class="btn-sm" href="/ca/reconciliation">Open Reconciliation</a>
+    </div>
+  </div>
+
+  <?php if ($canManageCa): ?>
+  <div class="section">
+    <h2>Zoho Books &amp; Financial Year Lock</h2>
+    <p class="muted">Sync settlements/expenses to Zoho Books, and lock a financial year once it's fully reconciled. Both need the CA Manage permission — that's why they're only shown here, not above.</p>
+    <div class="btn-row">
+      <a class="btn-sm" href="/ca/zoho-sync">Open Zoho Books Sync</a>
+      <a class="btn-sm" href="/ca/fy-locks">Open Financial Year Lock</a>
+    </div>
+  </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>INR Settlement Register</h2>

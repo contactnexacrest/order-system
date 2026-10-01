@@ -177,10 +177,25 @@ side, to check exactly what each contains — nothing here blocks staff
 access, it only makes sure the two document sets can never cross paths on
 the client's side.
 
-## The INR Settlement Register
+## The CA / Accounting hub page
 
 **CA / Accounting** in the sidebar (visible only with `ca_module_view`)
-opens the module's first screen: a single table listing every
+opens `/ca` — a hub of card sections, each with a one-line description and
+a button to the screen it leads to, grouped by what they're for:
+**Revenue & Benefits** (FY/calendar-year reports, Government Export
+Benefits), **Expenses & TDS**, **Bank & Reconciliation**, and — only for
+someone holding `ca_module_manage` — **Zoho Books & Financial Year Lock**.
+A view-only CA-role user (who holds `ca_module_view` but not
+`ca_module_manage`) never sees that last card at all, so they're never
+offered a link to a screen they don't have access to. This follows the
+same card-section pattern as the order-pipeline Reports hub
+([Reports](./14-reports.md)), rather than a single paragraph of inline
+links, so the module reads as a set of distinct destinations rather than
+one undifferentiated block of text.
+
+## The INR Settlement Register
+
+Below those cards, on the same hub page, sits a single table listing every
 advance/balance/freight leg that has been marked cleared anywhere in the
 order pipeline, one row per leg, with:
 

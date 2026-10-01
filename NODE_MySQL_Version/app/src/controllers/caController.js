@@ -37,6 +37,11 @@ async function index(req, res) {
   res.renderView('ca/index', {
     settlements: await caRepository.settlementRegister(),
     usersById: await usersById(),
+    // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
+    // stricter ca_module_manage, not the plain ca_module_view every other
+    // link here needs — hiding their cards for a view-only CA user avoids
+    // offering a link that 403s.
+    canManageCa: !!(req.permissions && req.permissions.ca_module_manage),
   }, 'layout/base');
 }
 

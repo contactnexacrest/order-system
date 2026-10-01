@@ -45,9 +45,17 @@ final class CaController
 
     public function index(array $params): void
     {
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+
         View::render('ca/index', [
             'settlements' => CaRepository::settlementRegister(),
             'usersById' => $this->usersById(),
+            // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
+            // stricter ca_module_manage, not the plain ca_module_view every
+            // other link here needs — hiding their cards for a
+            // view-only CA user avoids offering a link that 403s.
+            'canManageCa' => PermissionService::can((int) $user['id'], $roleId, 'ca_module_manage'),
         ], 'layout/base');
     }
 
