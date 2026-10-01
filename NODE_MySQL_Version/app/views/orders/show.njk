@@ -786,14 +786,85 @@
     {% endif %}
   </div>
 
+  {# Payment Snapshot + Payment Ledger (new) — a quick-glance summary plus a
+     single consolidated, read-only history of every payment-related event on
+     this order (advance/freight/balance remittance+clearance, and every
+     client-self-reported payment), instead of having to piece it together
+     from the Payment Status kv-grid and the Client-Reported Payments table
+     separately. Amounts are gated: everyone who can view the order sees the
+     STATUS of each leg; only manage_payments/close_orders (Super Admin
+     already covered transitively) see the actual figures — "only able to
+     see the needed things." #}
+  {% set canViewPaymentAmounts = permissions.manage_payments or permissions.close_orders %}
+  {% set paymentLegs = [
+    { label: 'Advance', amount: payment.advance_amount if payment else null, received_at: payment.advance_remittance_received_at if payment else null, cleared_at: payment.advance_cleared_at if payment else null },
+    { label: 'Freight', amount: payment.freight_amount if payment else null, received_at: payment.freight_remittance_received_at if payment else null, cleared_at: payment.freight_cleared_at if payment else null },
+    { label: 'Balance', amount: payment.balance_amount if payment else null, received_at: payment.balance_remittance_received_at if payment else null, cleared_at: payment.balance_cleared_at if payment else null }
+  ] %}
+  {% set ledgerEvents = [] %}
+  {% for leg in paymentLegs %}
+    {% if leg.received_at %}{% set ledgerEvents = (ledgerEvents.push({ date: leg.received_at, event: leg.label ~ ' Remittance Received', amount: leg.amount, source: 'Staff-recorded' }), ledgerEvents) %}{% endif %}
+    {% if leg.cleared_at %}{% set ledgerEvents = (ledgerEvents.push({ date: leg.cleared_at, event: leg.label ~ ' Cleared', amount: leg.amount, source: 'Staff-recorded' }), ledgerEvents) %}{% endif %}
+  {% endfor %}
+  {% for r in (clientPaymentReports or []) %}
+    {% set ledgerEvents = (ledgerEvents.push({ date: (r.payment_date or r.reported_at), event: (r.payment_type | capitalize) ~ ' Payment Reported by Client', amount: r.amount, source: 'Client-reported (reviewed)' if r.status == 'reviewed' else 'Client-reported (new)' }), ledgerEvents) %}
+  {% endfor %}
+  {% set ledgerEvents = ledgerEvents | sort(attribute='date') %}
+
+  <div class="section">
+    <h2>Payment Snapshot</h2>
+    <div class="kv-grid">
+      {% for leg in paymentLegs %}
+      <div>
+        <span class="k">{{ leg.label }}</span>
+        <span class="v">
+          {% if leg.amount == null and leg.received_at == null %}
+            Not applicable / not yet recorded
+          {% elif canViewPaymentAmounts %}
+            {{ (leg.amount | money) ~ ' ' ~ (order.currency_code or '') if leg.amount != null else '—' }}
+            — {{ 'Cleared' if leg.cleared_at else ('Received, pending clearance' if leg.received_at else 'Not yet received') }}
+          {% else %}
+            {{ 'Cleared' if leg.cleared_at else ('Received, pending clearance' if leg.received_at else 'Not yet received') }}
+          {% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    {% if not canViewPaymentAmounts %}
+    <p class="muted small">Amounts are only shown to Accounts/Logistics/Export staff who can manage or close this order.</p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Payment Ledger</h2>
+    <p class="muted">A single, read-only history of every payment-related event recorded against this order — consolidating what's otherwise scattered across Payment Status and Client-Reported Payments. Nothing here can be edited; use the forms in Payment Status below to record new events.</p>
+    {% if ledgerEvents.length == 0 %}
+    <p class="muted small">No payment events recorded yet.</p>
+    {% else %}
+    <table class="list">
+      <tr><th>Date</th><th>Event</th>{% if canViewPaymentAmounts %}<th>Amount</th>{% endif %}<th>Source</th></tr>
+      {% for ev in ledgerEvents %}
+      <tr>
+        <td>{{ ev.date }}</td>
+        <td>{{ ev.event }}</td>
+        {% if canViewPaymentAmounts %}
+        <td>{{ (ev.amount | money) ~ ' ' ~ (order.currency_code or '') if ev.amount != null else '—' }}</td>
+        {% endif %}
+        <td>{{ ev.source }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+
   <div class="section">
     <h2>Payment Status</h2>
     {% if payment %}
     <div class="kv-grid">
-      <div><span class="k">Advance Amount</span><span class="v">{{ (payment.advance_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.advance_amount != null else '—' }}</span></div>
+      <div><span class="k">Advance Amount</span><span class="v">{% if not canViewPaymentAmounts %}Only shown to Accounts/Logistics/Export staff{% else %}{{ (payment.advance_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.advance_amount != null else '—' }}{% endif %}</span></div>
       <div><span class="k">Advance T/T Received</span><span class="v">{{ payment.advance_remittance_received_at or '—' }}</span></div>
       <div><span class="k">Advance Cleared</span><span class="v">{{ payment.advance_cleared_at or '—' }}</span></div>
-      <div><span class="k">Balance Amount</span><span class="v">{{ (payment.balance_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.balance_amount != null else '—' }}</span></div>
+      <div><span class="k">Balance Amount</span><span class="v">{% if not canViewPaymentAmounts %}Only shown to Accounts/Logistics/Export staff{% else %}{{ (payment.balance_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.balance_amount != null else '—' }}{% endif %}</span></div>
       <div><span class="k">Balance Due</span><span class="v">{{ payment.balance_due_date or 'event-triggered' }}</span></div>
     </div>
     {% endif %}

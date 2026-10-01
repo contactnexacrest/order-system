@@ -105,6 +105,35 @@ page explicitly warns staff to always verify against the actual bank
 statement before recording anything above, never to record a payment based
 on the client's self-report alone.
 
+## Payment Snapshot and Payment Ledger
+
+Two read-only panels sit right above Payment Status on the order page, and
+stay there for the rest of the order's life (they fill in further as
+freight and balance legs happen in later stages):
+
+- **Payment Snapshot** — a compact at-a-glance summary of the Advance,
+  Freight, and Balance legs, each shown as either an amount + status
+  ("5,000.00 USD — Received, pending clearance") or status only
+  ("Received, pending clearance") depending on what the viewer is
+  permitted to see (below).
+- **Payment Ledger** — a single chronological table of every
+  payment-related event recorded against the order so far: each leg's
+  remittance-received and cleared events, plus every client-self-reported
+  payment (see below) — consolidating what used to be scattered across the
+  Payment Status kv-grid and the separate Client-Reported Payments table.
+  It is purely a read-only history; nothing here can be edited — use the
+  forms in Payment Status (or the freight/balance equivalents at their own
+  stages) to record a new event.
+
+**Amounts are permission-gated**, the same way as Payment Status itself:
+anyone who can view the order sees each leg's status, but the actual
+figures are only shown to staff who can manage payments or close the order
+(`manage_payments` or `close_orders` — Accounts, Export, Logistics, Admin/
+MD/ED by default, Super Admin always). A role or a per-user override that
+carries `manage_orders` without either of those two permissions sees "Only
+shown to Accounts/Logistics/Export staff" instead of a number — "only able
+to see the needed things."
+
 ## What the client does (or doesn't)
 
 - **PI-stage intake form**, if staff sent it: the buyer fills in consignee/

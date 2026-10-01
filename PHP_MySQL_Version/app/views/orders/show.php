@@ -15,6 +15,12 @@ $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser
 $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_payments');
 $canManageShipping = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_shipping');
 $canCloseOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'close_orders');
+// Payment Ledger / Payment Snapshot (new): "only able to see the needed things" —
+// general staff see payment STATUS only (received/not received, dates), amounts
+// are restricted to manage_payments/close_orders (and Super Admin, already
+// covered transitively since PermissionService::can() bypasses for an
+// effective Super Admin on either check above).
+$canViewPaymentAmounts = $canManagePayments || $canCloseOrders;
 $canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
 // docs/schema.sql Section AO — split out of manage_orders so enabling the client-facing dispute button is privileged-only by default.
 $canManageDisputes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_disputes');
@@ -852,14 +858,95 @@ $orderClosed = $order['status'] === 'complete';
     <?php endif; ?>
   </div>
 
+  <?php
+    // Payment Snapshot + Payment Ledger (new) — a quick-glance summary plus a
+    // single consolidated, read-only history of every payment-related event
+    // on this order (advance/freight/balance remittance+clearance, and every
+    // client-self-reported payment), instead of having to piece it together
+    // from the Payment Status kv-grid and the Client-Reported Payments table
+    // separately. Amounts are gated per $canViewPaymentAmounts (see above) —
+    // everyone who can view the order sees the STATUS of each leg; only
+    // manage_payments/close_orders (Super Admin already covered transitively)
+    // see the actual figures.
+    $paymentLegs = [
+        ['label' => 'Advance', 'amount' => $payment['advance_amount'] ?? null, 'received_at' => $payment['advance_remittance_received_at'] ?? null, 'cleared_at' => $payment['advance_cleared_at'] ?? null],
+        ['label' => 'Freight', 'amount' => $payment['freight_amount'] ?? null, 'received_at' => $payment['freight_remittance_received_at'] ?? null, 'cleared_at' => $payment['freight_cleared_at'] ?? null],
+        ['label' => 'Balance', 'amount' => $payment['balance_amount'] ?? null, 'received_at' => $payment['balance_remittance_received_at'] ?? null, 'cleared_at' => $payment['balance_cleared_at'] ?? null],
+    ];
+    $ledgerEvents = [];
+    foreach ($paymentLegs as $leg) {
+        if ($leg['received_at'] !== null) {
+            $ledgerEvents[] = ['date' => $leg['received_at'], 'event' => "{$leg['label']} Remittance Received", 'amount' => $leg['amount'], 'source' => 'Staff-recorded'];
+        }
+        if ($leg['cleared_at'] !== null) {
+            $ledgerEvents[] = ['date' => $leg['cleared_at'], 'event' => "{$leg['label']} Cleared", 'amount' => $leg['amount'], 'source' => 'Staff-recorded'];
+        }
+    }
+    foreach ($clientPaymentReports as $r) {
+        $ledgerEvents[] = [
+            'date' => $r['payment_date'] ?? $r['reported_at'],
+            'event' => ucfirst($r['payment_type']) . ' Payment Reported by Client',
+            'amount' => $r['amount'],
+            'source' => $r['status'] === 'reviewed' ? 'Client-reported (reviewed)' : 'Client-reported (new)',
+        ];
+    }
+    usort($ledgerEvents, static fn(array $a, array $b): int => strcmp((string) $a['date'], (string) $b['date']));
+  ?>
+
+  <div class="section">
+    <h2>Payment Snapshot</h2>
+    <div class="kv-grid">
+      <?php foreach ($paymentLegs as $leg): ?>
+      <div>
+        <span class="k"><?= htmlspecialchars($leg['label']) ?></span>
+        <span class="v">
+          <?php if ($leg['amount'] === null && $leg['received_at'] === null): ?>
+            Not applicable / not yet recorded
+          <?php elseif ($canViewPaymentAmounts): ?>
+            <?= $leg['amount'] !== null ? number_format((float) $leg['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?>
+            — <?= $leg['cleared_at'] !== null ? 'Cleared' : ($leg['received_at'] !== null ? 'Received, pending clearance' : 'Not yet received') ?>
+          <?php else: ?>
+            <?= $leg['cleared_at'] !== null ? 'Cleared' : ($leg['received_at'] !== null ? 'Received, pending clearance' : 'Not yet received') ?>
+          <?php endif; ?>
+        </span>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <?php if (!$canViewPaymentAmounts): ?>
+    <p class="muted small">Amounts are only shown to Accounts/Logistics/Export staff who can manage or close this order.</p>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
+    <h2>Payment Ledger</h2>
+    <p class="muted">A single, read-only history of every payment-related event recorded against this order — consolidating what's otherwise scattered across Payment Status and Client-Reported Payments. Nothing here can be edited; use the forms in Payment Status below to record new events.</p>
+    <?php if (empty($ledgerEvents)): ?>
+    <p class="muted small">No payment events recorded yet.</p>
+    <?php else: ?>
+    <table class="list">
+      <tr><th>Date</th><th>Event</th><?php if ($canViewPaymentAmounts): ?><th>Amount</th><?php endif; ?><th>Source</th></tr>
+      <?php foreach ($ledgerEvents as $ev): ?>
+      <tr>
+        <td><?= htmlspecialchars((string) $ev['date']) ?></td>
+        <td><?= htmlspecialchars($ev['event']) ?></td>
+        <?php if ($canViewPaymentAmounts): ?>
+        <td><?= $ev['amount'] !== null ? number_format((float) $ev['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></td>
+        <?php endif; ?>
+        <td><?= htmlspecialchars($ev['source']) ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <?php endif; ?>
+  </div>
+
   <div class="section">
     <h2>Payment Status</h2>
     <?php if ($payment): ?>
     <div class="kv-grid">
-      <div><span class="k">Advance Amount</span><span class="v"><?= $payment['advance_amount'] !== null ? number_format((float) $payment['advance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
+      <div><span class="k">Advance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['advance_amount'] !== null ? number_format((float) $payment['advance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
       <div><span class="k">Advance T/T Received</span><span class="v"><?= htmlspecialchars($payment['advance_remittance_received_at'] ?? '—') ?></span></div>
       <div><span class="k">Advance Cleared</span><span class="v"><?= htmlspecialchars($payment['advance_cleared_at'] ?? '—') ?></span></div>
-      <div><span class="k">Balance Amount</span><span class="v"><?= $payment['balance_amount'] !== null ? number_format((float) $payment['balance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
+      <div><span class="k">Balance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['balance_amount'] !== null ? number_format((float) $payment['balance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
       <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($payment['balance_due_date'] ?? 'event-triggered') ?></span></div>
     </div>
     <?php endif; ?>
@@ -897,7 +984,7 @@ $orderClosed = $order['status'] === 'complete';
         <tr>
           <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
           <td><?= htmlspecialchars($r['transaction_ref']) ?></td>
-          <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></td>
+          <td><?= $canViewPaymentAmounts ? ($r['amount'] !== null ? number_format((float) $r['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—') : '—' ?></td>
           <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
           <td><?= htmlspecialchars($r['payer_bank_details'] ?? '—') ?></td>
           <td>
