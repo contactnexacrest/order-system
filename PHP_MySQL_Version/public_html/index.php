@@ -497,6 +497,7 @@ $router->get('/client/orders/{id}', [$clientPortal, 'showOrder'], [ClientAuth::r
 $router->get('/client/orders/{id}/reorder', [$clientPortal, 'showReorderForm'], [ClientAuth::required()]);
 $router->post('/client/orders/{id}/reorder', [$clientPortal, 'submitReorder'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/report-payment', [$clientPortal, 'reportPayment'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->post('/client/orders/{id}/buyer-po', [$clientPortal, 'uploadBuyerPo'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/acknowledge-oc', [$clientPortal, 'acknowledgeOc'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/disputes', [$clientPortal, 'raiseDispute'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/comments', [$clientPortal, 'postComment'], [ClientAuth::required(), CsrfCheck::verify()]);

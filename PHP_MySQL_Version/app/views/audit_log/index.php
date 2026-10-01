@@ -3,19 +3,21 @@
   <p class="muted">Immutable — no user, including Admin, can edit or delete a row here.</p>
 
   <form method="get" action="/audit-log">
-    <label>Entity Type<input type="text" name="entity_type" value="<?= htmlspecialchars($filters['entity_type'] ?? '') ?>" placeholder="e.g. orders, documents, amendments"></label>
-    <label>Entity ID<input type="number" name="entity_id" value="<?= htmlspecialchars((string) ($filters['entity_id'] ?? '')) ?>"></label>
-    <label>User ID<input type="number" name="user_id" value="<?= htmlspecialchars((string) ($filters['user_id'] ?? '')) ?>"></label>
-    <label>Action Type
-      <select name="action_type">
-        <option value="">All</option>
-        <?php foreach ($actionTypes as $at): ?>
-          <option value="<?= htmlspecialchars($at) ?>" <?= $filters['action_type'] === $at ? 'selected' : '' ?>><?= htmlspecialchars($at) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </label>
-    <label>From<input type="date" name="date_from" value="<?= htmlspecialchars($filters['date_from'] ?? '') ?>"></label>
-    <label>To<input type="date" name="date_to" value="<?= htmlspecialchars($filters['date_to'] ?? '') ?>"></label>
+    <div class="kv-grid">
+      <label>Entity Type<input type="text" name="entity_type" value="<?= htmlspecialchars($filters['entity_type'] ?? '') ?>" placeholder="e.g. orders, documents, amendments"></label>
+      <label>Entity ID<input type="number" name="entity_id" value="<?= htmlspecialchars((string) ($filters['entity_id'] ?? '')) ?>"></label>
+      <label>User ID<input type="number" name="user_id" value="<?= htmlspecialchars((string) ($filters['user_id'] ?? '')) ?>"></label>
+      <label>Action Type
+        <select name="action_type">
+          <option value="">All</option>
+          <?php foreach ($actionTypes as $at): ?>
+            <option value="<?= htmlspecialchars($at) ?>" <?= $filters['action_type'] === $at ? 'selected' : '' ?>><?= htmlspecialchars($at) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <label>From<input type="date" name="date_from" value="<?= htmlspecialchars($filters['date_from'] ?? '') ?>"></label>
+      <label>To<input type="date" name="date_to" value="<?= htmlspecialchars($filters['date_to'] ?? '') ?>"></label>
+    </div>
     <button type="submit" class="btn-sm">Filter</button>
   </form>
 

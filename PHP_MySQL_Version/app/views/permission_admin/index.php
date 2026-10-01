@@ -13,14 +13,16 @@
         <td><?= htmlspecialchars($r['description'] ?? '—') ?></td>
         <td><?= !empty($r['is_system_role']) ? 'Yes' : '—' ?></td>
         <td>
-          <a href="/admin/roles/<?= (int) $r['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
-          <a href="/admin/roles/<?= (int) $r['id'] ?>/permissions" class="btn-sm btn-secondary">Edit Permissions</a>
-          <?php if (empty($r['is_system_role'])): ?>
-          <form method="post" action="/admin/roles/<?= (int) $r['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Delete role &quot;<?= htmlspecialchars(addslashes($r['name'])) ?>&quot;? This only works if no user currently has this role.');">
-            <?= Csrf::field() ?>
-            <button type="submit" class="btn-sm btn-danger">Delete</button>
-          </form>
-          <?php endif; ?>
+          <div class="action-buttons">
+            <a href="/admin/roles/<?= (int) $r['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
+            <a href="/admin/roles/<?= (int) $r['id'] ?>/permissions" class="btn-sm btn-secondary">Edit Permissions</a>
+            <?php if (empty($r['is_system_role'])): ?>
+            <form method="post" action="/admin/roles/<?= (int) $r['id'] ?>/delete" onsubmit="return confirm('Delete role &quot;<?= htmlspecialchars(addslashes($r['name'])) ?>&quot;? This only works if no user currently has this role.');">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
+            <?php endif; ?>
+          </div>
         </td>
       </tr>
       <?php endforeach; ?>
@@ -67,13 +69,15 @@
         <td><?= htmlspecialchars($p['category'] ?? '—') ?></td>
         <td><?= !empty($p['is_system_permission']) ? 'Yes' : '—' ?></td>
         <td>
-          <a href="/admin/permission-definitions/<?= (int) $p['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
-          <?php if (empty($p['is_system_permission'])): ?>
-          <form method="post" action="/admin/permission-definitions/<?= (int) $p['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Delete permission &quot;<?= htmlspecialchars(addslashes($p['name'])) ?>&quot;? This only works if it is not currently granted to any role or user.');">
-            <?= Csrf::field() ?>
-            <button type="submit" class="btn-sm btn-danger">Delete</button>
-          </form>
-          <?php endif; ?>
+          <div class="action-buttons">
+            <a href="/admin/permission-definitions/<?= (int) $p['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
+            <?php if (empty($p['is_system_permission'])): ?>
+            <form method="post" action="/admin/permission-definitions/<?= (int) $p['id'] ?>/delete" onsubmit="return confirm('Delete permission &quot;<?= htmlspecialchars(addslashes($p['name'])) ?>&quot;? This only works if it is not currently granted to any role or user.');">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
+            <?php endif; ?>
+          </div>
         </td>
       </tr>
       <?php endforeach; ?>

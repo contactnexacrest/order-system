@@ -12,14 +12,16 @@
         <td>{{ r.description or '—' }}</td>
         <td>{{ 'Yes' if r.is_system_role else '—' }}</td>
         <td>
-          <a href="/admin/roles/{{ r.id }}/edit" class="btn-sm btn-secondary">Edit</a>
-          <a href="/admin/roles/{{ r.id }}/permissions" class="btn-sm btn-secondary">Edit Permissions</a>
-          {% if not r.is_system_role %}
-          <form method="post" action="/admin/roles/{{ r.id }}/delete" style="display:inline" onsubmit="return confirm('Delete role \'{{ r.name }}\'? This only works if no user currently has this role.');">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <button type="submit" class="btn-sm btn-danger">Delete</button>
-          </form>
-          {% endif %}
+          <div class="action-buttons">
+            <a href="/admin/roles/{{ r.id }}/edit" class="btn-sm btn-secondary">Edit</a>
+            <a href="/admin/roles/{{ r.id }}/permissions" class="btn-sm btn-secondary">Edit Permissions</a>
+            {% if not r.is_system_role %}
+            <form method="post" action="/admin/roles/{{ r.id }}/delete" onsubmit="return confirm('Delete role \'{{ r.name }}\'? This only works if no user currently has this role.');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
+            {% endif %}
+          </div>
         </td>
       </tr>
       {% endfor %}
@@ -66,13 +68,15 @@
         <td>{{ p.category or '—' }}</td>
         <td>{{ 'Yes' if p.is_system_permission else '—' }}</td>
         <td>
-          <a href="/admin/permission-definitions/{{ p.id }}/edit" class="btn-sm btn-secondary">Edit</a>
-          {% if not p.is_system_permission %}
-          <form method="post" action="/admin/permission-definitions/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Delete permission \'{{ p.name }}\'? This only works if it is not currently granted to any role or user.');">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <button type="submit" class="btn-sm btn-danger">Delete</button>
-          </form>
-          {% endif %}
+          <div class="action-buttons">
+            <a href="/admin/permission-definitions/{{ p.id }}/edit" class="btn-sm btn-secondary">Edit</a>
+            {% if not p.is_system_permission %}
+            <form method="post" action="/admin/permission-definitions/{{ p.id }}/delete" onsubmit="return confirm('Delete permission \'{{ p.name }}\'? This only works if it is not currently granted to any role or user.');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
+            {% endif %}
+          </div>
         </td>
       </tr>
       {% endfor %}

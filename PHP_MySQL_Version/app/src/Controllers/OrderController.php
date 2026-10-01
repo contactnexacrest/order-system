@@ -1038,13 +1038,17 @@ final class OrderController
     public function updateProductionStatus(array $params): void
     {
         $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $before = OrderRepository::find($orderId);
         $text = trim((string) ($_POST['production_status_text'] ?? ''));
-        if ($text !== '') {
+        if ($text !== '' && $text !== ($before['production_status_text'] ?? '')) {
             OrderRepository::setProductionStatus($orderId, $text);
+            AuditLogRepository::log((int) $user['id'], 'PRODUCTION_STATUS_UPDATED', 'orders', $orderId, 'production_status_text', $before['production_status_text'] ?? null, $text);
         }
         $shipmentText = trim((string) ($_POST['est_shipment_date_text'] ?? ''));
-        if ($shipmentText !== '') {
+        if ($shipmentText !== '' && $shipmentText !== ($before['est_shipment_date_text'] ?? '')) {
             OrderRepository::setEstShipmentDate($orderId, $shipmentText);
+            AuditLogRepository::log((int) $user['id'], 'EST_SHIPMENT_DATE_UPDATED', 'orders', $orderId, 'est_shipment_date_text', $before['est_shipment_date_text'] ?? null, $shipmentText);
         }
         Flash::set('success', 'Production status updated.');
         header("Location: /orders/{$orderId}");

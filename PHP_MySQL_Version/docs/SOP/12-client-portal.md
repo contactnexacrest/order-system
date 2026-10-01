@@ -42,18 +42,24 @@ Opening an order (**View documents**) shows, top to bottom:
 
    ![Documents table in the client portal](./images/portal_documents.png)
 
-3. **Order Updates** — a running two-way chat thread with staff, separate
+3. **Buyer PO** — lets the client upload a scanned copy of their own signed
+   Purchase Order at any time, once they've signed it, rather than relying
+   solely on emailing it to staff. Every past upload is listed (file name +
+   upload date); re-uploading a corrected copy never removes the earlier
+   one — see [Chapter 2](./02-stage2-buyer-po.md) for how this feeds the
+   same record the internal staff-side upload writes to.
+4. **Order Updates** — a running two-way chat thread with staff, separate
    from every stage-specific action. Either side can post a message and
    attach photos/videos/PDFs at any time; there's no approval step, it's
    simply a shared conversation log attached to the order:
 
    ![Order Updates — a two-way conversation thread](./images/portal_chat.png)
 
-4. **Report a Payment** — the buyer's own note that they've paid, covered
+5. **Report a Payment** — the buyer's own note that they've paid, covered
    in detail in [Chapter 3](./03-stage3-pi-advance.md) (Payment Status) —
    purely informational, staff still verify against the bank statement
    before recording anything themselves.
-5. **Raise a Dispute** — only shown when staff have switched it on for this
+6. **Raise a Dispute** — only shown when staff have switched it on for this
    specific order; see [Disputes](./11-disputes.md).
 
 ### My Account

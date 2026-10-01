@@ -258,14 +258,16 @@
         <div class="card-nested">
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Description *<input type="text" name="description" value="{{ p.description }}" required></label>
-            <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}"></label>
-            <label>Finish<input type="text" name="finish" value="{{ p.finish or '' }}"></label>
-            <label>Qty<input type="text" name="quantity" value="{{ p.quantity or '' }}"></label>
-            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
-            <label>Unit<input type="text" name="unit" value="{{ p.unit or '' }}"></label>
-            <label>Unit Price<input type="text" name="unit_price" value="{{ p.unit_price or '' }}"></label>
-            <label>HS Code<input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" required></label>
+            <div class="kv-grid">
+              <label>Description *<input type="text" name="description" value="{{ p.description }}" required></label>
+              <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}"></label>
+              <label>Finish<input type="text" name="finish" value="{{ p.finish or '' }}"></label>
+              <label>Qty<input type="text" name="quantity" value="{{ p.quantity or '' }}"></label>
+              <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
+              <label>Unit<input type="text" name="unit" value="{{ p.unit or '' }}"></label>
+              <label>Unit Price<input type="text" name="unit_price" value="{{ p.unit_price or '' }}"></label>
+              <label>HS Code<input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" required></label>
+            </div>
             {% if isPostConfirmationOrder %}
               <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing after confirmation?"></textarea></label>
             {% endif %}
@@ -289,14 +291,16 @@
         <strong>Add Product Line</strong>
         <form method="post" action="/orders/{{ order.id }}/products">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Description *<input type="text" name="description" required></label>
-          <label>Dimensions<input type="text" name="dimensions"></label>
-          <label>Finish<input type="text" name="finish"></label>
-          <label>Qty<input type="text" name="quantity"></label>
-          <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
-          <label>Unit<input type="text" name="unit"></label>
-          <label>Unit Price<input type="text" name="unit_price"></label>
-          <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
+          <div class="kv-grid">
+            <label>Description *<input type="text" name="description" required></label>
+            <label>Dimensions<input type="text" name="dimensions"></label>
+            <label>Finish<input type="text" name="finish"></label>
+            <label>Qty<input type="text" name="quantity"></label>
+            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
+            <label>Unit<input type="text" name="unit"></label>
+            <label>Unit Price<input type="text" name="unit_price"></label>
+            <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
+          </div>
           {% if isPostConfirmationOrder %}
             <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added after confirmation?"></textarea></label>
           {% endif %}
@@ -1005,6 +1009,7 @@
       <div><span class="k">Production Status</span><span class="v">{{ order.production_status_text or 'Not yet commenced' }}</span></div>
       <div><span class="k">Est. Shipment</span><span class="v">{{ order.est_shipment_date_text or 'To Be Confirmed' }}</span></div>
     </div>
+    <p class="muted small">Every update here is logged — <a href="/orders/{{ order.id }}/audit-log">view update history</a>.</p>
     {% if stage4 and stage4.status != 'locked' %}
       <form method="post" action="/orders/{{ order.id }}/production-status">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -1083,14 +1088,16 @@
       {% endif %}
       <form method="post" action="/orders/{{ order.id }}/packing" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="{{ packing.actual_quantity_packed or '' }}"></label>
-        <label>Crate Count<input type="text" name="crate_count" value="{{ packing.crate_count or '' }}"></label>
-        <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="{{ packing.total_net_weight_kg or '' }}"></label>
-        <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="{{ packing.total_gross_weight_kg or '' }}"></label>
-        <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="{{ packing.total_cbm or '' }}"></label>
-        <label>Packing Date<input type="date" name="packing_date" value="{{ packing.packing_date or '' }}"></label>
-        <label>Shortfall % {% if orderedQuantitySummary.comparable %}(auto-computed — this field is ignored when the ordered quantity is comparable){% endif %}<input type="text" name="shortfall_pct" value="{{ packing.shortfall_pct or '' }}" {% if orderedQuantitySummary.comparable %}readonly{% endif %}></label>
-        <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
+        <div class="kv-grid">
+          <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="{{ packing.actual_quantity_packed or '' }}"></label>
+          <label>Crate Count<input type="text" name="crate_count" value="{{ packing.crate_count or '' }}"></label>
+          <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="{{ packing.total_net_weight_kg or '' }}"></label>
+          <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="{{ packing.total_gross_weight_kg or '' }}"></label>
+          <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="{{ packing.total_cbm or '' }}"></label>
+          <label>Packing Date<input type="date" name="packing_date" value="{{ packing.packing_date or '' }}"></label>
+          <label>Shortfall % {% if orderedQuantitySummary.comparable %}(auto-computed — this field is ignored when the ordered quantity is comparable){% endif %}<input type="text" name="shortfall_pct" value="{{ packing.shortfall_pct or '' }}" {% if orderedQuantitySummary.comparable %}readonly{% endif %}></label>
+          <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
+        </div>
 
         <p class="muted small">Crate-level breakdown (add one row per physical crate):</p>
         <table class="list">
@@ -1099,9 +1106,9 @@
           {% for c in existingCrates %}
           <tr>
             <td><input type="text" name="crate_no[]" value="{{ c.crate_no or '' }}" style="width:70px;"></td>
-            <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:180px;"></td>
-            <td><input type="text" name="crate_product_description[]" value="{{ c.product_description or '' }}" style="width:150px;"></td>
-            <td><input type="text" name="crate_dimensions[]" value="{{ c.dimensions_lwh_cm or '' }}" style="width:90px;"></td>
+            <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:130px;"></td>
+            <td><input type="text" name="crate_product_description[]" value="{{ c.product_description or '' }}" style="width:110px;"></td>
+            <td><input type="text" name="crate_dimensions[]" value="{{ c.dimensions_lwh_cm or '' }}" style="width:80px;"></td>
             <td><input type="text" name="crate_pcs[]" value="{{ c.pcs or '' }}" style="width:50px;"></td>
             <td><input type="text" name="crate_net_weight_kg[]" value="{{ c.net_weight_kg or '' }}" style="width:70px;"></td>
             <td><input type="text" name="crate_gross_weight_kg[]" value="{{ c.gross_weight_kg or '' }}" style="width:70px;"></td>
@@ -1116,14 +1123,16 @@
       <h3>Shipping / Vessel Details</h3>
       <form method="post" action="/orders/{{ order.id }}/shipping">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Shipping Line<input type="text" name="shipping_line" value="{{ shipping.shipping_line or '' }}"></label>
-        <label>Vessel Name<input type="text" name="vessel_name" value="{{ shipping.vessel_name or '' }}"></label>
-        <label>Voyage Number<input type="text" name="voyage_number" value="{{ shipping.voyage_number or '' }}"></label>
-        <label>ETD<input type="date" name="etd" value="{{ shipping.etd or '' }}"></label>
-        <label>ETA<input type="date" name="eta" value="{{ shipping.eta or '' }}"></label>
-        <label>Container Type<input type="text" name="ship_container_type" value="{{ shipping.container_type or order.container_type or '' }}"></label>
-        <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}"></label>
-        <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}"></label>
+        <div class="kv-grid">
+          <label>Shipping Line<input type="text" name="shipping_line" value="{{ shipping.shipping_line or '' }}"></label>
+          <label>Vessel Name<input type="text" name="vessel_name" value="{{ shipping.vessel_name or '' }}"></label>
+          <label>Voyage Number<input type="text" name="voyage_number" value="{{ shipping.voyage_number or '' }}"></label>
+          <label>ETD<input type="date" name="etd" value="{{ shipping.etd or '' }}"></label>
+          <label>ETA<input type="date" name="eta" value="{{ shipping.eta or '' }}"></label>
+          <label>Container Type<input type="text" name="ship_container_type" value="{{ shipping.container_type or order.container_type or '' }}"></label>
+          <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}"></label>
+          <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}"></label>
+        </div>
         <button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
 

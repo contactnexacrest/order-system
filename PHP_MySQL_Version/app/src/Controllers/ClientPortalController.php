@@ -12,6 +12,7 @@ use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\HsCodeRepository;
+use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderProductRepository;
@@ -154,7 +155,48 @@ final class ClientPortalController
             'paymentReports' => ClientPaymentReportRepository::forOrder($orderId),
             'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
             'comments' => OrderCommentRepository::forOrder($orderId),
+            'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
         ], 'layout/client');
+    }
+
+    /**
+     * Lets the client attach their own scanned/signed copy of the Buyer PO
+     * at any time — a self-service supplement to the staff-side upload
+     * (OrderController::uploadBuyerPoDocument), sharing the same
+     * order_buyer_po_documents table so every copy, staff- or
+     * client-uploaded, shows up in one place with full version history
+     * (never overwrites a prior upload).
+     */
+    public function uploadBuyerPo(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        try {
+            $fileId = FileUploadService::handleUpload(
+                'document',
+                'buyer_po_copy',
+                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/buyer_po',
+                $clientId,
+                $orderId,
+                null,
+                null,
+                'Client (self-uploaded)',
+                'Buyer PO copy (client-uploaded)'
+            );
+            OrderBuyerPoDocumentRepository::attach($orderId, $fileId);
+            \App\Repositories\AuditLogRepository::log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', $orderId, null, null, null, 'Buyer PO copy uploaded by the client via the client portal.');
+            Flash::set('success', 'Your Buyer PO copy has been uploaded.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header("Location: /client/orders/{$orderId}");
     }
 
     /**

@@ -13,6 +13,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const disputeRepository = require('../repositories/disputeRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
@@ -158,7 +159,47 @@ async function showOrder(req, res) {
     paymentReports: await clientPaymentReportRepository.forOrder(orderId),
     ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
     comments: await orderCommentRepository.forOrder(orderId),
+    buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(orderId),
   }, 'layout/client');
+}
+
+/**
+ * Lets the client attach their own scanned/signed copy of the Buyer PO at
+ * any time — a self-service supplement to the staff-side upload
+ * (ordersController.uploadBuyerPoDocument), sharing the same
+ * order_buyer_po_documents table so every copy, staff- or client-uploaded,
+ * shows up in one place with full version history (never overwrites a
+ * prior upload).
+ */
+async function uploadBuyerPo(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  try {
+    const fileId = await fileUploadService.handleUpload(
+      req,
+      'document',
+      'buyer_po_copy',
+      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/buyer_po`,
+      clientId,
+      orderId,
+      null,
+      null,
+      'Client (self-uploaded)',
+      'Buyer PO copy (client-uploaded)'
+    );
+    await orderBuyerPoDocumentRepository.attach(orderId, fileId);
+    await auditLogRepository.log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', orderId, null, null, null, 'Buyer PO copy uploaded by the client via the client portal.');
+    flash.set(req, 'success', 'Your Buyer PO copy has been uploaded.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect(`/client/orders/${orderId}`);
 }
 
 /**
@@ -527,5 +568,5 @@ module.exports = {
   showLogin, login, logout, showSetPassword, setPassword, dashboard, showOrder,
   showReorderForm, submitReorder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
-  postComment, downloadCommentAttachment, downloadPaymentScreenshot,
+  postComment, downloadCommentAttachment, downloadPaymentScreenshot, uploadBuyerPo,
 };

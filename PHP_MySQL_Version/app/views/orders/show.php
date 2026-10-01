@@ -308,14 +308,16 @@ $orderClosed = $order['status'] === 'complete';
         <div class="card-nested">
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>">
             <?= Csrf::field() ?>
-            <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required></label>
-            <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
-            <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
-            <label>Qty<input type="text" name="quantity" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
-            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
-            <label>Unit<input type="text" name="unit" value="<?= htmlspecialchars($p['unit'] ?? '') ?>"></label>
-            <label>Unit Price<input type="text" name="unit_price" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
-            <label>HS Code<input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" required></label>
+            <div class="kv-grid">
+              <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required></label>
+              <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
+              <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
+              <label>Qty<input type="text" name="quantity" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
+              <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
+              <label>Unit<input type="text" name="unit" value="<?= htmlspecialchars($p['unit'] ?? '') ?>"></label>
+              <label>Unit Price<input type="text" name="unit_price" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
+              <label>HS Code<input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" required></label>
+            </div>
             <?php if ($isPostConfirmationOrder): ?>
               <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing after confirmation?"></textarea></label>
             <?php endif; ?>
@@ -339,14 +341,16 @@ $orderClosed = $order['status'] === 'complete';
         <strong>Add Product Line</strong>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/products">
           <?= Csrf::field() ?>
-          <label>Description *<input type="text" name="description" required></label>
-          <label>Dimensions<input type="text" name="dimensions"></label>
-          <label>Finish<input type="text" name="finish"></label>
-          <label>Qty<input type="text" name="quantity"></label>
-          <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
-          <label>Unit<input type="text" name="unit"></label>
-          <label>Unit Price<input type="text" name="unit_price"></label>
-          <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
+          <div class="kv-grid">
+            <label>Description *<input type="text" name="description" required></label>
+            <label>Dimensions<input type="text" name="dimensions"></label>
+            <label>Finish<input type="text" name="finish"></label>
+            <label>Qty<input type="text" name="quantity"></label>
+            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
+            <label>Unit<input type="text" name="unit"></label>
+            <label>Unit Price<input type="text" name="unit_price"></label>
+            <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
+          </div>
           <?php if ($isPostConfirmationOrder): ?>
             <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added after confirmation?"></textarea></label>
           <?php endif; ?>
@@ -1071,6 +1075,7 @@ $orderClosed = $order['status'] === 'complete';
       <div><span class="k">Production Status</span><span class="v"><?= htmlspecialchars($order['production_status_text'] ?? 'Not yet commenced') ?></span></div>
       <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
     </div>
+    <p class="muted small">Every update here is logged — <a href="/orders/<?= (int) $order['id'] ?>/audit-log">view update history</a>.</p>
     <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/production-status">
         <?= Csrf::field() ?>
@@ -1153,14 +1158,16 @@ $orderClosed = $order['status'] === 'complete';
       <?php endif; ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/packing" enctype="multipart/form-data">
         <?= Csrf::field() ?>
-        <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="<?= htmlspecialchars((string) ($packing['actual_quantity_packed'] ?? '')) ?>"></label>
-        <label>Crate Count<input type="text" name="crate_count" value="<?= htmlspecialchars((string) ($packing['crate_count'] ?? '')) ?>"></label>
-        <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_net_weight_kg'] ?? '')) ?>"></label>
-        <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_gross_weight_kg'] ?? '')) ?>"></label>
-        <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="<?= htmlspecialchars((string) ($packing['total_cbm'] ?? '')) ?>"></label>
-        <label>Packing Date<input type="date" name="packing_date" value="<?= htmlspecialchars((string) ($packing['packing_date'] ?? '')) ?>"></label>
-        <label>Shortfall % <?= $orderedSummary['comparable'] ? '(auto-computed — this field is ignored when the ordered quantity is comparable)' : '' ?><input type="text" name="shortfall_pct" value="<?= htmlspecialchars((string) ($packing['shortfall_pct'] ?? '')) ?>" <?= $orderedSummary['comparable'] ? 'readonly' : '' ?>></label>
-        <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
+        <div class="kv-grid">
+          <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="<?= htmlspecialchars((string) ($packing['actual_quantity_packed'] ?? '')) ?>"></label>
+          <label>Crate Count<input type="text" name="crate_count" value="<?= htmlspecialchars((string) ($packing['crate_count'] ?? '')) ?>"></label>
+          <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_net_weight_kg'] ?? '')) ?>"></label>
+          <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_gross_weight_kg'] ?? '')) ?>"></label>
+          <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="<?= htmlspecialchars((string) ($packing['total_cbm'] ?? '')) ?>"></label>
+          <label>Packing Date<input type="date" name="packing_date" value="<?= htmlspecialchars((string) ($packing['packing_date'] ?? '')) ?>"></label>
+          <label>Shortfall % <?= $orderedSummary['comparable'] ? '(auto-computed — this field is ignored when the ordered quantity is comparable)' : '' ?><input type="text" name="shortfall_pct" value="<?= htmlspecialchars((string) ($packing['shortfall_pct'] ?? '')) ?>" <?= $orderedSummary['comparable'] ? 'readonly' : '' ?>></label>
+          <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
+        </div>
 
         <p class="muted small">Crate-level breakdown (add one row per physical crate):</p>
         <table class="list">
@@ -1168,9 +1175,9 @@ $orderClosed = $order['status'] === 'complete';
           <?php $existingCrates = $crates ?: [[], [], []]; foreach ($existingCrates as $c): ?>
           <tr>
             <td><input type="text" name="crate_no[]" value="<?= htmlspecialchars($c['crate_no'] ?? '') ?>" style="width:70px;"></td>
-            <td><input type="text" name="crate_marks_numbers[]" value="<?= htmlspecialchars($c['marks_numbers'] ?? '') ?>" style="width:180px;"></td>
-            <td><input type="text" name="crate_product_description[]" value="<?= htmlspecialchars($c['product_description'] ?? '') ?>" style="width:150px;"></td>
-            <td><input type="text" name="crate_dimensions[]" value="<?= htmlspecialchars($c['dimensions_lwh_cm'] ?? '') ?>" style="width:90px;"></td>
+            <td><input type="text" name="crate_marks_numbers[]" value="<?= htmlspecialchars($c['marks_numbers'] ?? '') ?>" style="width:130px;"></td>
+            <td><input type="text" name="crate_product_description[]" value="<?= htmlspecialchars($c['product_description'] ?? '') ?>" style="width:110px;"></td>
+            <td><input type="text" name="crate_dimensions[]" value="<?= htmlspecialchars($c['dimensions_lwh_cm'] ?? '') ?>" style="width:80px;"></td>
             <td><input type="text" name="crate_pcs[]" value="<?= htmlspecialchars((string) ($c['pcs'] ?? '')) ?>" style="width:50px;"></td>
             <td><input type="text" name="crate_net_weight_kg[]" value="<?= htmlspecialchars((string) ($c['net_weight_kg'] ?? '')) ?>" style="width:70px;"></td>
             <td><input type="text" name="crate_gross_weight_kg[]" value="<?= htmlspecialchars((string) ($c['gross_weight_kg'] ?? '')) ?>" style="width:70px;"></td>
@@ -1185,14 +1192,16 @@ $orderClosed = $order['status'] === 'complete';
       <h3>Shipping / Vessel Details</h3>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/shipping">
         <?= Csrf::field() ?>
-        <label>Shipping Line<input type="text" name="shipping_line" value="<?= htmlspecialchars($shipping['shipping_line'] ?? '') ?>"></label>
-        <label>Vessel Name<input type="text" name="vessel_name" value="<?= htmlspecialchars($shipping['vessel_name'] ?? '') ?>"></label>
-        <label>Voyage Number<input type="text" name="voyage_number" value="<?= htmlspecialchars($shipping['voyage_number'] ?? '') ?>"></label>
-        <label>ETD<input type="date" name="etd" value="<?= htmlspecialchars($shipping['etd'] ?? '') ?>"></label>
-        <label>ETA<input type="date" name="eta" value="<?= htmlspecialchars($shipping['eta'] ?? '') ?>"></label>
-        <label>Container Type<input type="text" name="ship_container_type" value="<?= htmlspecialchars($shipping['container_type'] ?? $order['container_type'] ?? '') ?>"></label>
-        <label>Container No.<input type="text" name="container_no" value="<?= htmlspecialchars($shipping['container_no'] ?? '') ?>"></label>
-        <label>Seal No.<input type="text" name="seal_no" value="<?= htmlspecialchars($shipping['seal_no'] ?? '') ?>"></label>
+        <div class="kv-grid">
+          <label>Shipping Line<input type="text" name="shipping_line" value="<?= htmlspecialchars($shipping['shipping_line'] ?? '') ?>"></label>
+          <label>Vessel Name<input type="text" name="vessel_name" value="<?= htmlspecialchars($shipping['vessel_name'] ?? '') ?>"></label>
+          <label>Voyage Number<input type="text" name="voyage_number" value="<?= htmlspecialchars($shipping['voyage_number'] ?? '') ?>"></label>
+          <label>ETD<input type="date" name="etd" value="<?= htmlspecialchars($shipping['etd'] ?? '') ?>"></label>
+          <label>ETA<input type="date" name="eta" value="<?= htmlspecialchars($shipping['eta'] ?? '') ?>"></label>
+          <label>Container Type<input type="text" name="ship_container_type" value="<?= htmlspecialchars($shipping['container_type'] ?? $order['container_type'] ?? '') ?>"></label>
+          <label>Container No.<input type="text" name="container_no" value="<?= htmlspecialchars($shipping['container_no'] ?? '') ?>"></label>
+          <label>Seal No.<input type="text" name="seal_no" value="<?= htmlspecialchars($shipping['seal_no'] ?? '') ?>"></label>
+        </div>
         <button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
 

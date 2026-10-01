@@ -708,6 +708,7 @@ app.post('/client/orders/:id/comments', requireClientAuth, uploadMedia.array('at
 app.get('/client/orders/:id/comment-attachments/:fileId/download', requireClientAuth, asyncHandler(clientPortalController.downloadCommentAttachment));
 app.get('/client/orders/:id/payment-reports/:reportId/screenshot', requireClientAuth, asyncHandler(clientPortalController.downloadPaymentScreenshot));
 app.post('/client/orders/:id/report-payment', requireClientAuth, uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(clientPortalController.reportPayment));
+app.post('/client/orders/:id/buyer-po', requireClientAuth, uploadLarge.single('document'), verifyCsrf, asyncHandler(clientPortalController.uploadBuyerPo));
 app.post('/client/orders/:id/acknowledge-oc', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.acknowledgeOc));
 app.post('/client/orders/:id/disputes', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.raiseDispute));
 app.get('/client/documents/:id/download', requireClientAuth, asyncHandler(clientPortalController.downloadDocument));

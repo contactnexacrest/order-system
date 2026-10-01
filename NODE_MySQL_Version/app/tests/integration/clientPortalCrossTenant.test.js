@@ -109,6 +109,18 @@ describe('Client portal cross-tenant isolation (QA-4 P0.2)', () => {
     expect(after).toEqual(before);
   });
 
+  it('uploadBuyerPo blocks Client A and creates no Buyer PO document', async () => {
+    const before = (await db.query('SELECT COUNT(*) AS c FROM order_buyer_po_documents'))[0].c;
+    const csrf = await validCsrf();
+    const res = await agentA
+      .post(`/client/orders/${orderB}/buyer-po`)
+      .type('form')
+      .send({ _csrf: csrf });
+    expect(res.status).toBe(404);
+    const after = (await db.query('SELECT COUNT(*) AS c FROM order_buyer_po_documents'))[0].c;
+    expect(after).toBe(before);
+  });
+
   it('raiseDispute blocks Client A and creates no dispute', async () => {
     const before = (await db.query('SELECT COUNT(*) AS c FROM disputes'))[0].c;
     const csrf = await validCsrf();

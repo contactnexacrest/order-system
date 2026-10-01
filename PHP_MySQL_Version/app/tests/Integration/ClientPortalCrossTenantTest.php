@@ -107,6 +107,18 @@ final class ClientPortalCrossTenantTest extends DbTestCase
         self::assertSame($before, $after, 'a blocked cross-tenant acknowledgement must not touch the real order\'s stage gates');
     }
 
+    public function testUploadBuyerPoBlocksAnotherClientsOrderAndCreatesNoDocument(): void
+    {
+        $pdo = Database::connection();
+        $before = (int) $pdo->query('SELECT COUNT(*) FROM order_buyer_po_documents')->fetchColumn();
+
+        $this->call('uploadBuyerPo', ['id' => $this->orderB]);
+
+        self::assertSame(404, http_response_code());
+        $after = (int) $pdo->query('SELECT COUNT(*) FROM order_buyer_po_documents')->fetchColumn();
+        self::assertSame($before, $after, 'a blocked cross-tenant Buyer PO upload must create nothing');
+    }
+
     public function testRaiseDisputeBlocksAnotherClientsOrderAndCreatesNoDispute(): void
     {
         $pdo = Database::connection();

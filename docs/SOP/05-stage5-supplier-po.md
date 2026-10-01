@@ -84,3 +84,21 @@ On a CFR/CIF order, Stage 6 (Freight Payment) unlocks normally instead of
 being skipped — see [Chapter 6](./06-stage6-freight.md) for that path.
 Either way, [Chapter 7](./07-stage7-packing-bl.md) (Packing & BL
 Instruction) is where both paths meet again.
+
+## Production & Estimated Shipment — and where its history lives
+
+The order-detail page carries a standing "Production & Estimated
+Shipment" panel (just above Stage 6) where staff post free-text progress
+updates — e.g. "Cutting and finishing in progress — 30% complete" and
+"Week of 15 October 2026." It isn't gated to Stage 5 specifically; anyone
+with `manage_orders` can post an update any time Stage 4 or later is
+unlocked, independent of which stage is currently active.
+
+Every update to either field is audit-logged — who posted it, when, and
+the exact old/new text — the moment it's saved, under action types
+`PRODUCTION_STATUS_UPDATED` and `EST_SHIPMENT_DATE_UPDATED`. Re-saving the
+same text twice does not create a duplicate entry. The panel itself links
+straight to the order's own Audit Log page ("view update history") so this
+is never a dead end — click through any time to see the full trail of who
+said what, and when, without digging through the general Audit Log and
+filtering by order number.

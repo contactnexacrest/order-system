@@ -1015,13 +1015,17 @@ async function clearAdvancePayment(req, res) {
 
 async function updateProductionStatus(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const before = await orderRepository.find(orderId);
   const text = str(req.body.production_status_text);
-  if (text !== '') {
+  if (text !== '' && text !== (before.production_status_text || '')) {
     await orderRepository.setProductionStatus(orderId, text);
+    await auditLogRepository.log(user.id, 'PRODUCTION_STATUS_UPDATED', 'orders', orderId, 'production_status_text', before.production_status_text || null, text);
   }
   const shipmentText = str(req.body.est_shipment_date_text);
-  if (shipmentText !== '') {
+  if (shipmentText !== '' && shipmentText !== (before.est_shipment_date_text || '')) {
     await orderRepository.setEstShipmentDate(orderId, shipmentText);
+    await auditLogRepository.log(user.id, 'EST_SHIPMENT_DATE_UPDATED', 'orders', orderId, 'est_shipment_date_text', before.est_shipment_date_text || null, shipmentText);
   }
   flash.set(req, 'success', 'Production status updated.');
   res.redirect(`/orders/${orderId}`);

@@ -46,6 +46,29 @@
     </table>
   </div>
 
+  <div class="section">
+    <h2>Buyer PO</h2>
+    <p class="muted small">Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.</p>
+    <?php if (!empty($buyerPoDocuments)): ?>
+      <table class="list">
+        <tr><th>File</th><th>Uploaded</th></tr>
+        <?php foreach ($buyerPoDocuments as $doc): ?>
+        <tr>
+          <td><?= htmlspecialchars($doc['original_filename']) ?></td>
+          <td><?= htmlspecialchars(Dates::human($doc['uploaded_at'])) ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php else: ?>
+      <p class="muted">No Buyer PO copy on file yet.</p>
+    <?php endif; ?>
+    <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/buyer-po" enctype="multipart/form-data">
+      <?= Csrf::field() ?>
+      <label>Upload Buyer PO (signed) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
+      <button type="submit" class="btn-sm">Upload</button>
+    </form>
+  </div>
+
   <div class="section" id="order-updates">
     <h2>Order Updates</h2>
     <p class="muted">A running conversation with our team about this order. Post a message any time — you can attach photos or videos too.</p>

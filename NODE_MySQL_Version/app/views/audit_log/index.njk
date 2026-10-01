@@ -3,19 +3,21 @@
   <p class="muted">Immutable — no user, including Admin, can edit or delete a row here.</p>
 
   <form method="get" action="/audit-log">
-    <label>Entity Type<input type="text" name="entity_type" value="{{ filters.entity_type or '' }}" placeholder="e.g. orders, documents, amendments"></label>
-    <label>Entity ID<input type="number" name="entity_id" value="{{ filters.entity_id or '' }}"></label>
-    <label>User ID<input type="number" name="user_id" value="{{ filters.user_id or '' }}"></label>
-    <label>Action Type
-      <select name="action_type">
-        <option value="">All</option>
-        {% for at in actionTypes %}
-          <option value="{{ at }}" {{ 'selected' if filters.action_type == at else '' }}>{{ at }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>From<input type="date" name="date_from" value="{{ filters.date_from or '' }}"></label>
-    <label>To<input type="date" name="date_to" value="{{ filters.date_to or '' }}"></label>
+    <div class="kv-grid">
+      <label>Entity Type<input type="text" name="entity_type" value="{{ filters.entity_type or '' }}" placeholder="e.g. orders, documents, amendments"></label>
+      <label>Entity ID<input type="number" name="entity_id" value="{{ filters.entity_id or '' }}"></label>
+      <label>User ID<input type="number" name="user_id" value="{{ filters.user_id or '' }}"></label>
+      <label>Action Type
+        <select name="action_type">
+          <option value="">All</option>
+          {% for at in actionTypes %}
+            <option value="{{ at }}" {{ 'selected' if filters.action_type == at else '' }}>{{ at }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>From<input type="date" name="date_from" value="{{ filters.date_from or '' }}"></label>
+      <label>To<input type="date" name="date_to" value="{{ filters.date_to or '' }}"></label>
+    </div>
     <button type="submit" class="btn-sm">Filter</button>
   </form>
 

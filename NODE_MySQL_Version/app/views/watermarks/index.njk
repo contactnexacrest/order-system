@@ -29,25 +29,29 @@
 
       <fieldset style="margin-top:8px">
         <legend class="muted small">Text settings (used when mode is Text or Both)</legend>
-        <label>Text<input type="text" name="text_content" value="{{ w.text_content if (w and w.text_content) else ('DRAFT — NOT FOR RELEASE' if which == 'draft' else '') }}" style="width:280px"></label>
-        <label>Color<input type="color" name="color" value="{{ w.color if (w and w.color) else '#CCCCCC' }}"></label>
-        <label>Font size (pt)<input type="number" name="font_size" value="{{ w.font_size if (w and w.font_size) else 60 }}" style="width:80px"></label>
-        <label>Opacity (0–1)<input type="number" step="0.05" min="0" max="1" name="opacity" value="{{ w.opacity if (w and w.opacity != null) else 0.3 }}" style="width:80px"></label>
-        <label>Angle (degrees)<input type="number" name="angle" value="{{ w.angle if (w and w.angle != null) else 45 }}" style="width:80px"></label>
+        <div class="kv-grid">
+          <label>Text<input type="text" name="text_content" value="{{ w.text_content if (w and w.text_content) else ('DRAFT — NOT FOR RELEASE' if which == 'draft' else '') }}" style="width:280px"></label>
+          <label>Color<input type="color" name="color" value="{{ w.color if (w and w.color) else '#CCCCCC' }}"></label>
+          <label>Font size (pt)<input type="number" name="font_size" value="{{ w.font_size if (w and w.font_size) else 60 }}" style="width:80px"></label>
+          <label>Opacity (0–1)<input type="number" step="0.05" min="0" max="1" name="opacity" value="{{ w.opacity if (w and w.opacity != null) else 0.3 }}" style="width:80px"></label>
+          <label>Angle (degrees)<input type="number" name="angle" value="{{ w.angle if (w and w.angle != null) else 45 }}" style="width:80px"></label>
+        </div>
       </fieldset>
 
       <fieldset style="margin-top:8px">
         <legend class="muted small">Image settings (used when mode is Image or Both)</legend>
-        <label>Position
-          <select name="image_position">
-            <option value="center" {{ 'selected' if (w and w.image_position == 'center') }}>Center</option>
-            <option value="top-left" {{ 'selected' if (w and w.image_position == 'top-left') }}>Top left</option>
-            <option value="top-right" {{ 'selected' if (w and w.image_position == 'top-right') }}>Top right</option>
-            <option value="bottom-left" {{ 'selected' if (w and w.image_position == 'bottom-left') }}>Bottom left</option>
-            <option value="bottom-right" {{ 'selected' if (w and w.image_position == 'bottom-right') }}>Bottom right</option>
-          </select>
-        </label>
-        <label>Opacity (0–1)<input type="number" step="0.05" min="0" max="1" name="image_opacity" value="{{ w.image_opacity if (w and w.image_opacity != null) else 0.15 }}" style="width:80px"></label>
+        <div class="kv-grid">
+          <label>Position
+            <select name="image_position">
+              <option value="center" {{ 'selected' if (w and w.image_position == 'center') }}>Center</option>
+              <option value="top-left" {{ 'selected' if (w and w.image_position == 'top-left') }}>Top left</option>
+              <option value="top-right" {{ 'selected' if (w and w.image_position == 'top-right') }}>Top right</option>
+              <option value="bottom-left" {{ 'selected' if (w and w.image_position == 'bottom-left') }}>Bottom left</option>
+              <option value="bottom-right" {{ 'selected' if (w and w.image_position == 'bottom-right') }}>Bottom right</option>
+            </select>
+          </label>
+          <label>Opacity (0–1)<input type="number" step="0.05" min="0" max="1" name="image_opacity" value="{{ w.image_opacity if (w and w.image_opacity != null) else 0.15 }}" style="width:80px"></label>
+        </div>
       </fieldset>
 
       <button type="submit" class="btn-sm btn-accent" style="margin-top:8px">Save {{ which | capitalize }} Watermark</button>

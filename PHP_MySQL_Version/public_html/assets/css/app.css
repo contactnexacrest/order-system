@@ -187,6 +187,8 @@ table.list tr:hover td{background:var(--bg);}
 .table-scroll.is-scrollable:not(.at-start)::before{left:0;background:linear-gradient(to right, rgba(23,35,58,0.14), transparent);}
 .table-scroll.is-scrollable:not(.at-end)::after{right:0;background:linear-gradient(to left, rgba(23,35,58,0.14), transparent);}
 .btn-row{display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.75rem;}
+.action-buttons{display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;}
+.action-buttons form{display:inline-flex;}
 .btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .btn-secondary{background:var(--surface);color:var(--navy);border:1px solid var(--navy);}
 .btn-secondary:hover{background:var(--navy-soft);}

@@ -62,10 +62,19 @@ Once confirmed, the order updates immediately:
 
 The buyer's role here happens **entirely outside the system**: they receive
 the Buyer PO document (however staff send it), sign the "Buyer Acceptance"
-section by hand, and return it. There's no client-portal screen for this —
-they have no portal login yet at all at this point. Getting their signed PO
-back to staff (email, courier, whatever channel) is on them, but nothing in
-the system tracks or reminds them to do it.
+section by hand, and return it. There's no client-portal screen for this at
+this exact moment — they have no portal login yet at all at this point.
+Getting their signed PO back to staff (email, courier, whatever channel) is
+on them, but nothing in the system tracks or reminds them to do it.
+
+Once the client does get portal access (from Stage 3 onward, once a PI-stage
+or OC-stage link has been generated — see [Chapter 12](./12-client-portal.md)),
+a **"Buyer PO" section on their order page** lets them upload a scanned copy
+of their own signed PO themselves at any time, rather than relying solely on
+emailing it to staff and waiting for a staff member to attach it internally.
+This writes to the exact same `order_buyer_po_documents` table the internal
+upload uses, so every copy — staff- or client-uploaded — shows up together
+with full version history (an upload never overwrites an earlier one).
 
 ## What happens next
 
