@@ -11,6 +11,7 @@ use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Services\AuthService;
+use App\Services\EmailService;
 use App\Services\SuperAdminService;
 use App\Services\ZohoMailService;
 
@@ -176,6 +177,36 @@ final class SettingsController
             Flash::set('success', "Test email sent via Zoho Mail to {$to}.");
         } catch (\Throwable $e) {
             Flash::set('error', 'Zoho test send failed: ' . $e->getMessage());
+        }
+        header('Location: /settings');
+    }
+
+    /**
+     * docs/schema.sql Section AS — calls EmailService::sendTestEmail()
+     * directly (never through MailSenderService's Zoho-first fallback, and
+     * never through Test Mode/Mail Redirect) so a real SMTP error surfaces
+     * here instead of silently logging, which would be useless for
+     * actually verifying the SMTP_* .env credentials just configured.
+     */
+    public function testSmtpEmail(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $to = trim((string) ($_POST['test_to'] ?? ''));
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            Flash::set('error', 'Enter a valid email address to send the test to.');
+            header('Location: /settings');
+            return;
+        }
+
+        try {
+            EmailService::sendTestEmail(
+                $to,
+                'NexaCrest — SMTP test',
+                "This is a test email sent from the NexaCrest order system's SMTP connection.\n\nIf you received this, the connection is working.\n\nSent by {$user['name']}."
+            );
+            Flash::set('success', "Test email sent via SMTP to {$to}.");
+        } catch (\Throwable $e) {
+            Flash::set('error', 'SMTP test send failed: ' . $e->getMessage());
         }
         header('Location: /settings');
     }

@@ -6,6 +6,7 @@ const settingValueValidator = require('../helpers/settingValueValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const zohoMailService = require('../services/zohoMailService');
+const emailService = require('../services/emailService');
 const superAdminService = require('../services/superAdminService');
 
 // Port of App\Controllers\SettingsController.
@@ -141,4 +142,32 @@ async function testZohoEmail(req, res) {
   res.redirect('/settings');
 }
 
-module.exports = { index, update, testZohoEmail };
+/**
+ * docs/schema.sql Section AS — calls emailService.sendTestEmail() directly
+ * (never through mailSenderService's Zoho-first fallback, and never
+ * through Test Mode/Mail Redirect) so a real SMTP error surfaces here
+ * instead of silently logging, which would be useless for actually
+ * verifying the SMTP_* .env credentials just configured.
+ */
+async function testSmtpEmail(req, res) {
+  const to = String(req.body.test_to || '').trim();
+  if (to === '' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    flash.set(req, 'error', 'Enter a valid email address to send the test to.');
+    res.redirect('/settings');
+    return;
+  }
+
+  try {
+    await emailService.sendTestEmail(
+      to,
+      'NexaCrest — SMTP test',
+      `This is a test email sent from the NexaCrest order system's SMTP connection.\n\nIf you received this, the connection is working.\n\nSent by ${req.user.name}.`
+    );
+    flash.set(req, 'success', `Test email sent via SMTP to ${to}.`);
+  } catch (e) {
+    flash.set(req, 'error', `SMTP test send failed: ${e.message}`);
+  }
+  res.redirect('/settings');
+}
+
+module.exports = { index, update, testZohoEmail, testSmtpEmail };

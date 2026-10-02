@@ -125,4 +125,28 @@ async function deliverWithAttachments(to, subject, body, attachments, cc = []) {
   }
 }
 
-module.exports = { sendPlainText, sendWithAttachment, sendWithAttachments, deliverWithAttachments };
+/**
+ * Settings "Send Test Email" button (docs/schema.sql Section AS). Unlike
+ * sendPlainText()/sendWithAttachments(), this never swallows a failure
+ * into a logged line and a false return — the whole point of this entry
+ * point is letting an admin see the *actual* SMTP error (bad credentials,
+ * connection refused, TLS mismatch, …) right on the settings screen while
+ * they're configuring it, the same way settingsController.testZohoEmail
+ * calls zohoMailService.send() directly rather than through
+ * mailSenderService's silent fallback. Deliberately bypasses Test Mode
+ * and Mail Redirect entirely — this confirms the raw SMTP_* credentials
+ * actually work, not a simulated business email, so it must go to
+ * exactly the address the admin typed.
+ *
+ * @throws if SMTP isn't configured or the send itself fails
+ */
+async function sendTestEmail(toEmail, subject, body) {
+  const t = transport();
+  if (!t) {
+    throw new Error('SMTP_HOST is not configured in .env.');
+  }
+  await t.sendMail({ from: fromHeader(), to: toEmail, subject, text: body });
+  return true;
+}
+
+module.exports = { sendPlainText, sendWithAttachment, sendWithAttachments, deliverWithAttachments, sendTestEmail };

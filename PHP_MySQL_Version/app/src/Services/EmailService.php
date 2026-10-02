@@ -74,6 +74,52 @@ final class EmailService
     }
 
     /**
+     * Settings "Send Test Email" button (docs/schema.sql Section AS).
+     * Unlike sendPlainText()/sendWithAttachments(), this never swallows a
+     * failure into a logged line and a false return — the whole point of
+     * this entry point is letting an admin see the *actual* SMTP error
+     * (bad credentials, connection refused, TLS mismatch, …) right on the
+     * settings screen while they're configuring it, the same way
+     * SettingsController::testZohoEmail() calls ZohoMailService::send()
+     * directly rather than through MailSenderService's silent fallback.
+     * Deliberately bypasses Test Mode and Mail Redirect entirely — this
+     * confirms the raw SMTP_* credentials actually work, not a simulated
+     * business email, so it must go to exactly the address the admin typed.
+     *
+     * @throws \RuntimeException if SMTP isn't configured or PHPMailer isn't installed
+     * @throws \PHPMailer\PHPMailer\Exception if the send itself fails
+     */
+    public static function sendTestEmail(string $toEmail, string $subject, string $body): bool
+    {
+        $smtpHost = Env::get('SMTP_HOST');
+        if (!$smtpHost) {
+            throw new \RuntimeException('SMTP_HOST is not configured in .env.');
+        }
+        if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+            throw new \RuntimeException('PHPMailer is not installed (run composer install).');
+        }
+
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+        $mail->isSMTP();
+        $mail->CharSet = \PHPMailer\PHPMailer\PHPMailer::CHARSET_UTF8;
+        $mail->Host       = $smtpHost;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = Env::get('SMTP_USERNAME');
+        $mail->Password   = Env::get('SMTP_PASSWORD');
+        $mail->SMTPSecure = Env::get('SMTP_ENCRYPTION', 'tls');
+        $mail->Port       = (int) Env::get('SMTP_PORT', '587');
+        $mail->setFrom(
+            Env::get('SMTP_FROM_ADDRESS', 'no-reply@example.com'),
+            Env::get('SMTP_FROM_NAME', 'NexaCrest International Private Limited')
+        );
+        $mail->addAddress($toEmail);
+        $mail->Subject = $subject;
+        $mail->Body    = $body;
+        $mail->send();
+        return true;
+    }
+
+    /**
      * Phase D — deferred client document sends (Section 10). The buyer
      * gets exactly one attachment: the watermarked final PDF at
      * $attachmentPath — never the internal DOCX, never an unwatermarked

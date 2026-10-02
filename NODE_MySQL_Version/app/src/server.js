@@ -348,6 +348,7 @@ app.get('/', requireAuth, asyncHandler(dashboardController.index));
 app.get('/settings', requireAuth, requirePermission('manage_company_settings'), asyncHandler(settingsController.index));
 app.post('/settings/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.update));
 app.post('/settings/test-zoho-email', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testZohoEmail));
+app.post('/settings/test-smtp-email', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testSmtpEmail));
 
 // docs/schema.sql Section AI — email template CRUD (add/edit, never delete).
 app.get('/email-templates', requireAuth, requirePermission('manage_email_templates'), asyncHandler(emailTemplateController.index));

@@ -153,6 +153,7 @@ $router->get('/', [$dashboard, 'index'], [SessionAuth::required()]);
 $router->get('/settings', [$settings, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/settings/test-zoho-email', [$settings, 'testZohoEmail'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/settings/test-smtp-email', [$settings, 'testSmtpEmail'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->get('/holidays', [$holidays, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/holidays', [$holidays, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/holidays/{id}/update', [$holidays, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);

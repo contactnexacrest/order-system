@@ -70,7 +70,12 @@ mistake (or malice).
   never happen because of either switch. The CC list and default CC are
   marked **Super Admin only** right on the screen — anyone else sees them
   read-only, with no unlock option, since a standing CC address silently
-  sees every client email that goes out.
+  sees every client email that goes out. Below the main form, two **Send
+  Test Email** buttons — one for the SMTP server configured in `.env`,
+  one for Zoho Mail if it's enabled — send one real email straight through
+  that transport only, bypassing Test Mode, Mail Redirect, and each
+  other's fallback, so a connection/credential problem shows up as an
+  actual error on screen instead of a silent log line.
 - **Holiday Calendar** — the dates the Working Days Calculator (used for
   dispute response deadlines, see [Disputes](./11-disputes.md)) excludes.
 - **HS Codes** — the master list product HS codes must come from; an order
