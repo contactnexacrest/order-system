@@ -581,9 +581,9 @@ UPDATE company_settings SET is_protected = 1
 -- always watermarked. No clean PDF exists in this system."), just no
 -- longer the amber DRAFT one.
 -- ================================================================
-INSERT INTO watermark_settings (scope, is_draft_mode, mode, text_content, font, font_size, color, opacity, angle) VALUES
-  ('global', 1, 'text', 'DRAFT — NOT FOR RELEASE', 'Helvetica', 60, '#a8701f', 0.14, 45),
-  ('global', 0, 'text', 'NEXACREST INTERNATIONAL — ORIGINAL', 'Helvetica', 50, '#7a7a7a', 0.08, 45);
+INSERT INTO watermark_settings (scope, is_draft_mode, mode, text_content, font, font_size, color, opacity, angle, image_opacity) VALUES
+  ('global', 1, 'both', 'DRAFT — NOT FOR RELEASE', 'Helvetica', 60, '#a8701f', 0.15, 45, 0.05),
+  ('global', 0, 'both', 'NEXACREST INTERNATIONAL — ORIGINAL', 'Helvetica', 50, '#7a7a7a', 0.15, 45, 0.05);
 
 -- ================================================================
 -- DOCX_GENERATION_SETTINGS — every order-scoped document type can now

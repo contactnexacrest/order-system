@@ -39,6 +39,18 @@ final class WatermarkImageFixTest extends DbTestCase
         AssetRepository::insert('watermark', 'Test Watermark', $missingPath, 'image/png', null, true);
 
         $userId = $this->createTestUser('Admin');
+
+        // Seed defaults now default new rows to mode 'both' (see docs/seed.sql),
+        // so start from a known, different mode here — otherwise the
+        // "unchanged" assertion below would pass trivially even if the
+        // refused update wrongly saved, since 'both' would already be the
+        // pre-existing value regardless of what update() does.
+        WatermarkSettingsRepository::upsertGlobal(true, [
+            'mode' => 'text', 'text_content' => 'DRAFT', 'font' => 'Helvetica', 'font_size' => 60,
+            'color' => '#a8701f', 'opacity' => 0.15, 'angle' => 45,
+            'image_asset_id' => null, 'image_opacity' => 0.05, 'image_position' => 'center',
+        ], $userId);
+
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = ['mode' => 'both', 'text_content' => 'DRAFT'];
 
@@ -50,7 +62,7 @@ final class WatermarkImageFixTest extends DbTestCase
         self::assertSame('error', $flash[0]['type']);
         self::assertStringContainsString('missing from storage', $flash[0]['message']);
         $saved = WatermarkSettingsRepository::findGlobal(true);
-        self::assertNotSame('both', $saved['mode'] ?? null, 'must not save a mode the file behind it cannot support');
+        self::assertSame('text', $saved['mode'] ?? null, 'must not save a mode the file behind it cannot support');
     }
 
     public function testUpdateSavesBothModeWhenTheActiveWatermarkAssetFileExists(): void

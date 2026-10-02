@@ -50,6 +50,18 @@ describe('Watermark "both" mode missing-image fix (Point 8)', () => {
     await assetRepository.insert('watermark', 'Test Watermark', missingPath, 'image/png', null, true);
 
     const userId = await createTestUser('Admin');
+
+    // Seed defaults now default new rows to mode 'both' (see docs/seed.sql),
+    // so start from a known, different mode here — otherwise the
+    // "unchanged" assertion below would pass trivially even if the refused
+    // update wrongly saved, since 'both' would already be the pre-existing
+    // value regardless of what update() does.
+    await watermarkSettingsRepository.upsertGlobal(true, {
+      mode: 'text', text_content: 'DRAFT', font: 'Helvetica', font_size: 60,
+      color: '#a8701f', opacity: 0.15, angle: 45,
+      image_asset_id: null, image_opacity: 0.05, image_position: 'center',
+    }, userId);
+
     const req = { params: { which: 'draft' }, body: { mode: 'both', text_content: 'DRAFT' }, user: { id: userId }, session: {} };
     await watermarkController.update(req, fakeRes());
 
@@ -57,7 +69,7 @@ describe('Watermark "both" mode missing-image fix (Point 8)', () => {
     expect(messages[0].type).toBe('error');
     expect(messages[0].message).toMatch(/missing from storage/);
     const saved = await watermarkSettingsRepository.findGlobal(true);
-    expect(saved ? saved.mode : null).not.toBe('both');
+    expect(saved ? saved.mode : null).toBe('text');
   });
 
   it('update() saves both mode when the active watermark asset file exists', async () => {
