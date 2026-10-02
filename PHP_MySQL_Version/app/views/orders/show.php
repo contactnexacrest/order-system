@@ -956,7 +956,7 @@ foreach ($stages as $s) {
     <?php endif; ?>
   </div>
 
-  <div class="section">
+  <div class="section" id="payment-snapshot">
     <h2>Payment Snapshot</h2>
     <div class="kv-grid">
       <?php foreach ($paymentLegs as $leg): ?>
@@ -1790,6 +1790,24 @@ foreach ($stages as $s) {
       }
       try { sessionStorage.setItem(storageKey, id); } catch (e) { /* private browsing etc — fine to skip */ }
     }
+
+    // Order Details' "see Payment Snapshot" / "see checklist" links (and any
+    // other in-page #anchor pointing at a panel) only ever changed the URL
+    // hash — since every non-active panel is display:none, the browser had
+    // nothing visible to scroll to, so the click appeared to do nothing.
+    // Intercepting the click lets us activate the right panel first, then
+    // scroll to it.
+    panelsContainer.addEventListener('click', function (e) {
+      var link = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+      if (!link) { return; }
+      var targetId = link.getAttribute('href').slice(1);
+      var targetPanel = null;
+      panels.forEach(function (p) { if (p.id === targetId) { targetPanel = p; } });
+      if (!targetPanel) { return; }
+      e.preventDefault();
+      activate(targetPanel.id, true);
+      targetPanel.scrollIntoView({ block: 'start' });
+    });
 
     var initialId = (window.location.hash || '').replace('#', '');
     var initialPanel = null;
