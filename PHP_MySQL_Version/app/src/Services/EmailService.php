@@ -30,6 +30,8 @@ final class EmailService
             // never fall back to sending this to the real address.
             return false;
         }
+        $to = MailRedirectService::resolveRecipient($to, $isSecurityEmail);
+        $cc = MailRedirectService::ccList($isSecurityEmail);
         $smtpHost = Env::get('SMTP_HOST');
         $hasPhpMailer = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
 
@@ -53,6 +55,9 @@ final class EmailService
                     Env::get('SMTP_FROM_NAME', 'NexaCrest International Private Limited')
                 );
                 $mail->addAddress($to);
+                foreach ($cc as $ccAddress) {
+                    $mail->addCC($ccAddress);
+                }
                 $mail->Subject = $subject;
                 $mail->Body    = $body;
                 $mail->send();
@@ -97,7 +102,8 @@ final class EmailService
             // QA-5 TM-07: see sendPlainText() above.
             return false;
         }
-        return self::deliverWithAttachments($to, $subject, $body, $attachments);
+        $to = MailRedirectService::resolveRecipient($to, $isSecurityEmail);
+        return self::deliverWithAttachments($to, $subject, $body, $attachments, MailRedirectService::ccList($isSecurityEmail));
     }
 
     /**
@@ -109,9 +115,10 @@ final class EmailService
      * path; $to here is never re-checked against Test Mode.
      *
      * @param array<int, array{path:string, name:string}> $attachments
+     * @param string[] $cc
      * @return bool true if actually handed to a transport, false if only logged (dev fallback)
      */
-    public static function deliverWithAttachments(string $to, string $subject, string $body, array $attachments): bool
+    public static function deliverWithAttachments(string $to, string $subject, string $body, array $attachments, array $cc = []): bool
     {
         $smtpHost = Env::get('SMTP_HOST');
         $hasPhpMailer = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
@@ -134,6 +141,9 @@ final class EmailService
                     Env::get('SMTP_FROM_NAME', 'NexaCrest International Private Limited')
                 );
                 $mail->addAddress($to);
+                foreach ($cc as $ccAddress) {
+                    $mail->addCC($ccAddress);
+                }
                 $mail->Subject = $subject;
                 $mail->Body    = $body;
                 foreach ($attachments as $att) {

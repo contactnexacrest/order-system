@@ -1231,6 +1231,18 @@ INSERT INTO compliance_task_types (name) VALUES
   ('Phytosanitary Certificate'),
   ('Due Diligence');
 
+-- ================================================================
+-- MAIL REDIRECT & CC (Section AS) — off by default (mail_redirect_enabled
+-- = '0'), so nothing changes for any installation until Admin turns it on.
+-- mail_cc_emails/mail_default_cc_email ship blank and are Super-Admin-only
+-- to edit (requires_super_admin = 1).
+-- ================================================================
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
+  ('mail_redirect_enabled', '0', 'boolean', 'mail_redirect', 'Independent of Test Mode — when on, every non-security outbound email (order updates, document sends, etc.) is redirected to mail_redirect_address below instead of its real recipient. Staff 2FA codes and password-reset links are never redirected.', 0, 0),
+  ('mail_redirect_address', '', 'email', 'mail_redirect', 'Where redirected mail goes when mail_redirect_enabled is on. Required for the redirect to actually work — if left blank while enabled, redirected mail is logged, never sent.', 0, 0),
+  ('mail_cc_emails', '', 'email_list', 'mail_redirect', 'Comma-separated additional CC addresses applied to every non-security outbound email, regardless of mail_redirect_enabled. Super Admin only.', 0, 1),
+  ('mail_default_cc_email', '', 'email', 'mail_redirect', 'A single default CC address always applied to every non-security outbound email, in addition to mail_cc_emails above. Super Admin only.', 0, 1);
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ================================================================

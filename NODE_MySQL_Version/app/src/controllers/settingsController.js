@@ -6,6 +6,7 @@ const settingValueValidator = require('../helpers/settingValueValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const zohoMailService = require('../services/zohoMailService');
+const superAdminService = require('../services/superAdminService');
 
 // Port of App\Controllers\SettingsController.
 
@@ -15,7 +16,8 @@ async function index(req, res) {
   for (const row of settings) {
     (grouped[row.category] ||= []).push(row);
   }
-  res.renderView('settings/index', { grouped }, 'layout/base');
+  const isSuperAdmin = await superAdminService.isEffective(req.user.id);
+  res.renderView('settings/index', { grouped, isSuperAdmin }, 'layout/base');
 }
 
 async function update(req, res) {
@@ -85,6 +87,19 @@ async function update(req, res) {
     flash.set(req, 'error', `Protected field(s) must be unlocked before editing (${blockedProtected.join(', ')}) — nothing was saved.`);
     res.redirect('/settings');
     return;
+  }
+
+  // docs/schema.sql Section AS: requires_super_admin fields (the mail
+  // redirect CC list) refuse the edit outright for anyone who isn't an
+  // effective Super Admin — no unlock gesture can override this, unlike
+  // is_protected above.
+  if (!(await superAdminService.isEffective(user.id))) {
+    const blockedSuperAdmin = Object.keys(toApply).filter((key) => byKey[key].requires_super_admin);
+    if (blockedSuperAdmin.length > 0) {
+      flash.set(req, 'error', `Only a Super Admin can change: ${blockedSuperAdmin.join(', ')} — nothing was saved.`);
+      res.redirect('/settings');
+      return;
+    }
   }
 
   for (const [key, change] of Object.entries(toApply)) {

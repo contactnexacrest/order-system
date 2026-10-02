@@ -25,9 +25,10 @@ async function isEnabled() {
 
 /**
  * @param {Array<{path: string, name: string}>} [attachments]
+ * @param {string[]} [cc] docs/schema.sql Section AS mail-redirect CC list
  * @throws on any missing config, HTTP failure, or unexpected response
  */
-async function send(to, subject, body, attachments = []) {
+async function send(to, subject, body, attachments = [], cc = []) {
   const clientId = (await companySettingsRepository.get('zoho_client_id')) || '';
   const clientSecret = (await companySettingsRepository.get('zoho_client_secret')) || '';
   const refreshToken = (await companySettingsRepository.get('zoho_refresh_token')) || '';
@@ -56,6 +57,9 @@ async function send(to, subject, body, attachments = []) {
     content: body,
     mailFormat: 'plaintext',
   };
+  if (cc.length) {
+    payload.ccAddress = cc.join(',');
+  }
   if (uploaded.length) {
     payload.attachments = uploaded;
   }

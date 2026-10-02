@@ -30,9 +30,10 @@ final class ZohoMailService
 
     /**
      * @param array<int, array{path:string, name:string}> $attachments
+     * @param string[] $cc docs/schema.sql Section AS mail-redirect CC list
      * @throws \RuntimeException on any missing config, HTTP failure, or unexpected response
      */
-    public static function send(string $to, string $subject, string $body, array $attachments = []): bool
+    public static function send(string $to, string $subject, string $body, array $attachments = [], array $cc = []): bool
     {
         $clientId = (string) CompanySettingsRepository::get('zoho_client_id');
         $clientSecret = (string) CompanySettingsRepository::get('zoho_client_secret');
@@ -64,6 +65,9 @@ final class ZohoMailService
             'content'     => $body,
             'mailFormat'  => 'plaintext',
         ];
+        if (!empty($cc)) {
+            $payload['ccAddress'] = implode(',', $cc);
+        }
         if (!empty($uploaded)) {
             $payload['attachments'] = $uploaded;
         }

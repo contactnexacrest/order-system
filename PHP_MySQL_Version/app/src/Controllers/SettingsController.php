@@ -11,6 +11,7 @@ use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Services\AuthService;
+use App\Services\SuperAdminService;
 use App\Services\ZohoMailService;
 
 final class SettingsController
@@ -22,7 +23,11 @@ final class SettingsController
         foreach ($settings as $row) {
             $grouped[$row['category']][] = $row;
         }
-        View::render('settings/index', ['grouped' => $grouped], 'layout/base');
+        $user = AuthService::currentUser();
+        View::render('settings/index', [
+            'grouped' => $grouped,
+            'isSuperAdmin' => SuperAdminService::isEffective((int) $user['id']),
+        ], 'layout/base');
     }
 
     public function update(array $params): void
@@ -103,6 +108,24 @@ final class SettingsController
         }
         if (!empty($blockedProtected)) {
             Flash::set('error', 'Protected field(s) must be unlocked before editing (' . implode(', ', $blockedProtected) . ') — nothing was saved.');
+            header('Location: /settings');
+            return;
+        }
+
+        // docs/schema.sql Section AS: requires_super_admin fields (the mail
+        // redirect CC list) refuse the edit outright for anyone who isn't
+        // an effective Super Admin — no unlock gesture can override this,
+        // unlike is_protected above.
+        $blockedSuperAdmin = [];
+        if (!SuperAdminService::isEffective((int) $user['id'])) {
+            foreach ($toApply as $key => $change) {
+                if ($byKey[$key]['requires_super_admin']) {
+                    $blockedSuperAdmin[] = $key;
+                }
+            }
+        }
+        if (!empty($blockedSuperAdmin)) {
+            Flash::set('error', 'Only a Super Admin can change: ' . implode(', ', $blockedSuperAdmin) . ' — nothing was saved.');
             header('Location: /settings');
             return;
         }

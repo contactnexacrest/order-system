@@ -57,7 +57,20 @@ mistake (or malice).
 - **Company Settings** — legal name, registered/corporate office, GSTIN/IEC,
   bank details, LUT number — the exact fields snapshotted onto every
   generated document (see the note in [Chapter 1](./01-stage1-enquiry-quotation.md)
-  about data integrity).
+  about data integrity). The same screen's **Mail Redirect** section holds
+  four settings, independent of [Test Mode](./16-test-mode.md)'s own email
+  redirect: a **Redirect all mail** toggle plus address — when on, every
+  non-security outbound email (order updates, document sends, and so on)
+  goes to that one address instead of its real recipient, useful for
+  rehearsing real mail without touching Test Mode at all — and a **CC
+  emails** list (comma-separated) plus a single **Default CC email**,
+  both applied to every non-security outbound email regardless of whether
+  redirect is on. Staff 2FA codes and password-reset links are never
+  redirected or CC'd, the same carve-out Test Mode uses, so a lockout can
+  never happen because of either switch. The CC list and default CC are
+  marked **Super Admin only** right on the screen — anyone else sees them
+  read-only, with no unlock option, since a standing CC address silently
+  sees every client email that goes out.
 - **Holiday Calendar** — the dates the Working Days Calculator (used for
   dispute response deadlines, see [Disputes](./11-disputes.md)) excludes.
 - **HS Codes** — the master list product HS codes must come from; an order

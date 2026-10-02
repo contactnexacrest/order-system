@@ -2598,6 +2598,34 @@ CREATE TABLE order_compliance_tasks (
 -- ================================================================
 
 -- ================================================================
+-- SECTION AS — MAIL REDIRECT & CC (added 2026-10-02)
+-- Independent of Test Mode (Section V) — a separate switch so staff can
+-- rehearse real outgoing mail (CC lists, templates, attachments) without
+-- turning on the whole Test Mode sandbox. When mail_redirect_enabled is
+-- on, every non-security outbound email is sent to mail_redirect_address
+-- instead of its real recipient — same "security emails are exempt"
+-- carve-out as TestModeService::resolveEmailRecipient(), for the same
+-- reason (2FA/reset must never be redirectable, or staff could lock
+-- themselves out). mail_cc_emails/mail_default_cc_email are CC'd onto
+-- every non-security email regardless of whether redirect is on.
+--
+-- requires_super_admin follows the same shape as is_protected but is a
+-- distinct, simpler concept: is_protected needs an explicit per-edit
+-- unlock gesture from ANY authorized editor; requires_super_admin simply
+-- refuses the edit outright unless the acting user is an effective Super
+-- Admin (SuperAdminService::isEffective()) — appropriate here because CC
+-- recipients are a standing list that silently sees every client email,
+-- so expanding it is a Super-Admin-only action, not a routine settings
+-- change anyone with manage_company_settings can make.
+ALTER TABLE company_settings
+  MODIFY COLUMN value_type ENUM('string','number','boolean','date','json','email','email_list') NOT NULL DEFAULT 'string';
+ALTER TABLE company_settings
+  ADD COLUMN requires_super_admin TINYINT(1) NOT NULL DEFAULT 0 AFTER is_protected;
+-- Seed keys (see seed.sql): mail_redirect_enabled, mail_redirect_address,
+-- mail_cc_emails, mail_default_cc_email.
+-- ================================================================
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2638,4 +2666,5 @@ CREATE TABLE order_compliance_tasks (
 -- Section AP (reorder-to-supplier linking + order profitability) added 2026-09-30.
 -- Section AQ (logistics partners directory) added 2026-10-01.
 -- Section AR (compliance/pre-closure task checklist) added 2026-10-01.
+-- Section AS (mail redirect & CC) added 2026-10-02.
 -- ================================================================

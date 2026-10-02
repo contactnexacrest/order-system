@@ -59,6 +59,26 @@ final class SettingValueValidator
                 }
                 return null;
 
+            // docs/schema.sql Section AS: 'email'/'email_list' are blank-
+            // allowed (an unconfigured redirect/CC address is a valid,
+            // common state — mail_redirect_enabled or the CC list simply
+            // has nothing to use yet) but reject a non-blank value that
+            // isn't actually a deliverable address.
+            case 'email':
+                if ($value !== '' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                    return "must be a valid email address (got \"{$rawValue}\")";
+                }
+                return null;
+
+            case 'email_list':
+                foreach (explode(',', $value) as $addr) {
+                    $addr = trim($addr);
+                    if ($addr !== '' && !filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+                        return "contains an invalid email address \"{$addr}\"";
+                    }
+                }
+                return null;
+
             case 'string':
             default:
                 return null;

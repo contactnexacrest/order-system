@@ -4,6 +4,7 @@
   <p class="muted">Every value here is what document templates actually read at generation time — nothing is hardcoded in a template. Fields marked <span class="badge badge-sensitive">sensitive</span> affect banking/RBI-facing documents; double-check before saving.</p>
   <p class="muted small">Spec Section 13 — every edit here is logged with who/when/field/old value/new value/reason, and cannot be undone through this UI; only a further edit can change a value back.</p>
   <p class="muted small">&#128274; <strong>Protected</strong> fields are locked against accidental edits — click <em>Unlock</em> on a row before you can change it. Protecting or unprotecting a field itself is a separate, peer-approved request: see <a href="/admin/field-protection">Field Protection</a>.</p>
+  <p class="muted small"><strong>Super Admin only</strong> fields (the mail CC list) can only be changed by a Super Admin — everyone else sees them read-only, with no unlock option.</p>
 
   <form method="post" action="/settings/update" onsubmit="return confirmSettingsSave(this);">
     <?= Csrf::field() ?>
@@ -11,12 +12,14 @@
       <fieldset>
         <legend><?= htmlspecialchars(ucfirst($category)) ?></legend>
         <?php foreach ($rows as $row): ?>
+          <?php $lockedToSuperAdmin = $row['requires_super_admin'] && !$isSuperAdmin; ?>
           <label class="setting-row<?= $row['is_protected'] ? ' protected-row' : '' ?>">
             <span class="setting-label">
               <?php if ($row['is_protected']): ?><span class="lock-icon" title="Protected — unlock to edit">&#128274;</span><?php endif; ?>
               <?= htmlspecialchars($row['setting_key']) ?>
               <?php if ($row['is_sensitive']): ?><span class="badge badge-sensitive">sensitive</span><?php endif; ?>
               <?php if ($row['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
+              <?php if ($row['requires_super_admin']): ?><span class="badge badge-superadmin" title="Only a Super Admin can change this">Super Admin only</span><?php endif; ?>
               <?php if ($row['description']): ?><small class="muted"><?= htmlspecialchars($row['description']) ?></small><?php endif; ?>
             </span>
             <?php if ($row['value_type'] === 'boolean'): ?>
@@ -28,7 +31,7 @@
                 <?= $row['setting_value'] === '1' ? 'checked' : '' ?>
                 data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
                 data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
-                <?= $row['is_protected'] ? 'disabled' : '' ?>
+                <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'disabled' : '' ?>
                 onchange="this.previousElementSibling.value = this.checked ? '1' : '0';"
               >
             <?php elseif (mb_strlen((string) ($row['setting_value'] ?? '')) > 100): ?>
@@ -38,7 +41,7 @@
                 rows="3"
                 data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
                 data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
-                <?= $row['is_protected'] ? 'readonly' : '' ?>
+                <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'readonly' : '' ?>
               ><?= htmlspecialchars($row['setting_value'] ?? '') ?></textarea>
             <?php else: ?>
               <input
@@ -48,7 +51,7 @@
                 value="<?= htmlspecialchars($row['setting_value'] ?? '') ?>"
                 data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
                 data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
-                <?= $row['is_protected'] ? 'readonly' : '' ?>
+                <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'readonly' : '' ?>
               >
             <?php endif; ?>
             <?php if ($row['is_protected']): ?>

@@ -36,10 +36,16 @@ final class MailSenderService
             // Zoho or SMTP.
             return false;
         }
+        // docs/schema.sql Section AS: chained immediately after Test Mode's
+        // own resolution, for the same reason QA-5 TM-08 resolves Test Mode
+        // here rather than inside each transport — both transports below
+        // must see the same, already-resolved address and CC list.
+        $resolved = MailRedirectService::resolveRecipient($resolved, $isSecurityEmail);
+        $cc = MailRedirectService::ccList($isSecurityEmail);
 
         if (!$isSecurityEmail && ZohoMailService::isEnabled()) {
             try {
-                if (ZohoMailService::send($resolved, $subject, $body, $attachments)) {
+                if (ZohoMailService::send($resolved, $subject, $body, $attachments, $cc)) {
                     return true;
                 }
                 error_log('[ZOHO MAIL — send returned false, falling back to SMTP] To: ' . $resolved);
@@ -48,6 +54,6 @@ final class MailSenderService
             }
         }
 
-        return EmailService::deliverWithAttachments($resolved, $subject, $body, $attachments);
+        return EmailService::deliverWithAttachments($resolved, $subject, $body, $attachments, $cc);
     }
 }

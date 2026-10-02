@@ -3,6 +3,7 @@
 const emailService = require('./emailService');
 const testModeService = require('./testModeService');
 const zohoMailService = require('./zohoMailService');
+const mailRedirectService = require('./mailRedirectService');
 
 /**
  * docs/schema.sql Section AI — the one chokepoint every outbound email in
@@ -26,16 +27,22 @@ async function send(to, subject, body, attachments = [], opts = {}) {
   // outbound email a way around Test Mode entirely, straight to the real
   // buyer's inbox. Both transports below now see the same, already-
   // resolved address.
-  const resolved = await testModeService.resolveEmailRecipient(to, !!opts.isSecurityEmail, subject);
+  let resolved = await testModeService.resolveEmailRecipient(to, !!opts.isSecurityEmail, subject);
   if (resolved === null) {
     // QA-5 TM-07: Test Mode is on and no test_email is configured — never
     // fall back to sending this to the real address, via Zoho or SMTP.
     return false;
   }
+  // docs/schema.sql Section AS: chained immediately after Test Mode's own
+  // resolution, for the same reason QA-5 TM-08 resolves Test Mode here
+  // rather than inside each transport — both transports below must see the
+  // same, already-resolved address and CC list.
+  resolved = await mailRedirectService.resolveRecipient(resolved, !!opts.isSecurityEmail);
+  const cc = await mailRedirectService.ccList(!!opts.isSecurityEmail);
 
   if (!opts.isSecurityEmail && (await zohoMailService.isEnabled())) {
     try {
-      const sent = await zohoMailService.send(resolved, subject, body, attachments);
+      const sent = await zohoMailService.send(resolved, subject, body, attachments, cc);
       if (sent) return true;
       console.error('[ZOHO MAIL — send returned false, falling back to SMTP] To:', resolved);
     } catch (e) {
@@ -43,7 +50,7 @@ async function send(to, subject, body, attachments = [], opts = {}) {
     }
   }
 
-  return emailService.deliverWithAttachments(resolved, subject, body, attachments);
+  return emailService.deliverWithAttachments(resolved, subject, body, attachments, cc);
 }
 
 module.exports = { send };

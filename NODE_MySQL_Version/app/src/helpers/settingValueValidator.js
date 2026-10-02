@@ -1,5 +1,7 @@
 'use strict';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * QA-5 SET-02: company_settings.value_type (docs/schema.sql Section A) was
  * defined at the schema level but never actually enforced anywhere —
@@ -54,6 +56,24 @@ function check(valueType, rawValue) {
       } catch (e) {
         return `must be valid JSON (got "${rawValue}")`;
       }
+    }
+    // docs/schema.sql Section AS: 'email'/'email_list' are blank-allowed
+    // (an unconfigured redirect/CC address is a valid, common state) but
+    // reject a non-blank value that isn't actually a deliverable address.
+    case 'email': {
+      if (value !== '' && !EMAIL_RE.test(value)) {
+        return `must be a valid email address (got "${rawValue}")`;
+      }
+      return null;
+    }
+    case 'email_list': {
+      for (const part of value.split(',')) {
+        const addr = part.trim();
+        if (addr !== '' && !EMAIL_RE.test(addr)) {
+          return `contains an invalid email address "${addr}"`;
+        }
+      }
+      return null;
     }
     case 'string':
     default:

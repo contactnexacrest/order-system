@@ -164,6 +164,7 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .badge-active{background:var(--success-soft);color:var(--success);}
 .badge-inactive{background:var(--danger-soft);color:var(--danger);}
 .badge-protected{background:var(--gold-soft);color:var(--gold-strong);}
+.badge-superadmin{background:var(--navy-soft);color:var(--navy);}
 .badge-lost{background:var(--danger-soft);color:var(--danger);}
 .badge-complete{background:var(--navy-soft);color:var(--navy);}
 .badge-disputed{background:var(--gold-soft);color:var(--gold-strong);}
