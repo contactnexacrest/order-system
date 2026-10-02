@@ -148,9 +148,10 @@ button:hover{background:var(--navy-strong);}
 .alert-dev{background:var(--gold-soft);color:var(--gold-strong);border:1px dashed var(--gold);}
 .alert-warning{background:var(--gold-soft);color:var(--gold-strong);border:1px solid var(--gold);}
 .test-mode-banner{background:#8A1F1F;color:#fff;text-align:center;font-weight:700;font-size:0.85rem;padding:0.5rem 1rem;letter-spacing:0.02em;}
-.muted{color:var(--ink-soft);font-size:0.85rem;}
+/* Explicit weight so nesting inside a bold <label> doesn't bold the hint text too. */
+.muted{color:var(--ink-soft);font-size:0.85rem;font-weight:400;}
 .muted.small{font-size:0.78rem;}
-.reason-hint{display:block;color:var(--ink-soft);font-size:0.78rem;margin:0.2rem 0 0.5rem;}
+.reason-hint{display:block;color:var(--ink-soft);font-size:0.78rem;font-weight:400;margin:0.2rem 0 0.5rem;}
 .reason-error{display:block;color:var(--danger);font-size:0.78rem;font-weight:600;margin:0.2rem 0 0.5rem;}
 .field-invalid{border-color:var(--danger) !important;}
 fieldset{border:1px solid var(--line);border-radius:10px;margin-bottom:1.25rem;padding:1rem 1.25rem;}
