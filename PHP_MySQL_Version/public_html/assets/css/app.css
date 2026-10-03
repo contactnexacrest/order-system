@@ -168,6 +168,20 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .badge-lost{background:var(--danger-soft);color:var(--danger);}
 .badge-complete{background:var(--navy-soft);color:var(--navy);}
 .badge-disputed{background:var(--gold-soft);color:var(--gold-strong);}
+
+/* Annexure A "Additional Terms" WYSIWYG editor (Section AT) — a small
+   hand-rolled contenteditable toolbar, consistent with the rest of this
+   app's no-framework-dependency approach, rather than pulling in a
+   third-party rich-text library for one screen. */
+.wysiwyg-toolbar{display:flex;flex-wrap:wrap;gap:0.3rem;align-items:center;background:var(--bg);border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0;padding:0.4rem 0.5rem;}
+.wysiwyg-btn{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:0.3rem 0.55rem;font-size:0.8rem;cursor:pointer;color:var(--ink);line-height:1;}
+.wysiwyg-btn:hover{background:var(--navy-soft);border-color:var(--navy);}
+.wysiwyg-sep{width:1px;align-self:stretch;background:var(--line);margin:0 0.15rem;}
+.wysiwyg-surface{min-height:220px;max-height:520px;overflow-y:auto;border:1px solid var(--line);border-radius:0 0 8px 8px;padding:0.75rem 0.9rem;background:var(--surface);font-size:0.9rem;line-height:1.5;}
+.wysiwyg-surface:focus{outline:2px solid var(--gold);outline-offset:-2px;}
+.wysiwyg-surface img{max-width:100%;}
+.wysiwyg-surface table{border-collapse:collapse;}
+.wysiwyg-surface table td,.wysiwyg-surface table th{border:1px solid var(--line);padding:0.3rem 0.5rem;}
 .badge-success{background:var(--success-soft);color:var(--success);}
 .badge-warning{background:var(--gold-soft);color:var(--gold-strong);}
 .badge-danger{background:var(--danger-soft);color:var(--danger);}

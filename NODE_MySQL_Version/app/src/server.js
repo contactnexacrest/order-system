@@ -545,6 +545,8 @@ app.get('/orders/:id/comment-attachments/:fileId/download', requireAuth, require
 // with no screen ever built against them; this is that missing piece).
 app.get('/orders/:id/annexure', requireAuth, requirePermission('manage_orders'), asyncHandler(annexureController.index));
 app.post('/orders/:id/annexure/toggle', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.toggleInclude));
+app.post('/orders/:id/annexure/mode', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateMode));
+app.post('/orders/:id/annexure/terms', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateTerms));
 app.post('/orders/:id/annexure/products', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.createProduct));
 app.post('/orders/:id/annexure/products/:productId', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateProduct));
 app.post('/orders/:id/annexure/products/:productId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.deleteProduct));

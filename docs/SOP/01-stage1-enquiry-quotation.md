@@ -74,6 +74,42 @@ Once the Quotation is approved, send it to the buyer from the order page
 [Document Review & Approval](./13-document-review-approval.md) for the full
 send workflow.
 
+## Annexure A — Product Specification and/or Additional Terms
+
+Annexure A is an optional attachment staff can turn on for an order
+(**Enable / manage Annexure A** link on the order page). Once enabled, it's
+appended to every buyer-facing document that supports it (QT, PI, OC, Buyer
+PO, Packing List, Commercial Invoice) as a guaranteed, never-skippable
+appendix, and can also be generated as its own standalone document.
+
+From the Annexure A management screen (`/orders/{id}/annexure`), a **content
+mode** dropdown decides what Annexure A actually shows:
+
+- **Product Specification (current view)** — the structured per-product
+  table (dimensions, finish, components, technical notes, photos) staff fill
+  in below the dropdown. This is the original, only mode Annexure A used to
+  have.
+- **Additional Terms** — a free-form rich-text block, entered through a
+  small on-screen WYSIWYG editor (bold/italic/underline/strikethrough,
+  headings, quote, bullet/numbered lists, inserted images, links). Use this
+  for anything that doesn't fit the product table — a special clause, an
+  inspection condition, a one-off note agreed with the buyer.
+- **Both** — prints Product Specification first, then Additional Terms,
+  in the same document/appendix.
+
+Switching the dropdown only changes what's printed — it never deletes either
+section's saved content, so staff can go back and forth without re-entering
+anything. If the selected mode has nothing saved yet, the generated document
+shows a plain "No product entries/additional terms have been added yet"
+line rather than an empty gap.
+
+Additional Terms supports pasted or inserted **images** (via the editor's
+Image button) but not video or audio: a generated PDF or Word document
+can't play embedded media, so there was nothing to gain by accepting it.
+Content is sanitized on save (and again every time a document is generated)
+to a fixed set of safe formatting tags — scripts, event handlers, and
+remote/relative image sources are stripped automatically.
+
 ## What the client does (or doesn't)
 
 - **If they came through Path A**, they filled the public form — that's

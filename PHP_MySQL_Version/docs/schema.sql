@@ -2626,6 +2626,45 @@ ALTER TABLE company_settings
 -- ================================================================
 
 -- ================================================================
+-- SECTION AT — ANNEXURE A CONTENT MODE (added 2026-10-03)
+-- Annexure A used to mean exactly one thing — the structured per-product
+-- spec table (order_annexure_products/order_annexure_images). Real usage
+-- is broader: sometimes what the buyer and seller actually agreed on is
+-- free-form text (special terms, a pasted clause, reference notes) that
+-- doesn't fit a product-spec row at all. annexure_mode lets staff choose,
+-- per order, whether Annexure A shows the structured Product Specification
+-- view, a free-form Additional Terms rich-text block, or both (Product
+-- Specification first, then Additional Terms — see
+-- DocumentDataAssembler::annexureFlagsBlock()). Defaulting to 'SPEC' keeps
+-- every existing order's generated documents byte-for-byte unchanged.
+ALTER TABLE orders
+  ADD COLUMN annexure_mode ENUM('SPEC','TERMS','BOTH') NOT NULL DEFAULT 'SPEC' AFTER include_annexure_a;
+
+-- One free-form rich-text block per order (not per-product — this is a
+-- whole-annexure "additional terms" blob, not a per-item note).
+-- content_html is staff-authored via a contenteditable WYSIWYG editor and
+-- is HTML-sanitized (allowlist: basic text formatting, lists, tables,
+-- links, and <img> with embedded data: URIs only — no <script>, no
+-- event-handler attributes, no remote image/iframe/video embeds) both at
+-- save time (AnnexureTermsSanitizer/annexureTermsSanitizer) and again at
+-- document-generation read time, since this HTML is later emitted
+-- unescaped (|raw / |safe) into every generated PDF and DOCX — a stored-
+-- XSS-shaped surface if either sanitization pass were ever skipped.
+-- Video/audio is deliberately not supported: a generated PDF/DOCX cannot
+-- play embedded media, so the sanitizer strips <video>/<audio> entirely
+-- rather than keep something it can never actually render.
+CREATE TABLE order_annexure_terms (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL UNIQUE,
+  content_html  LONGTEXT NULL,
+  updated_by    BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+-- ================================================================
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2667,4 +2706,5 @@ ALTER TABLE company_settings
 -- Section AQ (logistics partners directory) added 2026-10-01.
 -- Section AR (compliance/pre-closure task checklist) added 2026-10-01.
 -- Section AS (mail redirect & CC) added 2026-10-02.
+-- Section AT (Annexure A content mode: Spec/Terms/Both) added 2026-10-03.
 -- ================================================================

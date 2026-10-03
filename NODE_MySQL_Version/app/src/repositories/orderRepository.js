@@ -341,8 +341,13 @@ async function setIncludeAnnexureA(orderId, include) {
   await db.execute('UPDATE orders SET include_annexure_a = :flag WHERE id = :id', { flag: include ? 1 : 0, id: orderId });
 }
 
+/** SPEC (structured product table) / TERMS (free-form rich text) / BOTH — see docs/schema.sql Section AT. */
+async function setAnnexureMode(orderId, mode) {
+  await db.execute('UPDATE orders SET annexure_mode = :mode WHERE id = :id', { mode, id: orderId });
+}
+
 module.exports = {
   all, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
-  setIncludeAnnexureA, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
+  setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
 };

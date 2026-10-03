@@ -6,8 +6,11 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\OrderAnnexureRepository;
+use App\Repositories\OrderAnnexureTermsRepository;
 use App\Repositories\OrderRepository;
+use App\Services\AnnexureTermsSanitizer;
 use App\Services\AuthService;
 use App\Services\FileUploadService;
 
@@ -34,6 +37,7 @@ final class AnnexureController
         View::render('annexure/index', [
             'order' => $order,
             'products' => OrderAnnexureRepository::forOrder($orderId),
+            'terms' => OrderAnnexureTermsRepository::find($orderId),
         ], 'layout/base');
     }
 
@@ -42,6 +46,37 @@ final class AnnexureController
         $orderId = (int) $params['id'];
         OrderRepository::setIncludeAnnexureA($orderId, !empty($_POST['include_annexure_a']));
         Flash::set('success', 'Annexure A ' . (!empty($_POST['include_annexure_a']) ? 'enabled' : 'disabled') . ' for this order.');
+        header("Location: /orders/{$orderId}/annexure");
+    }
+
+    private const VALID_MODES = ['SPEC', 'TERMS', 'BOTH'];
+
+    public function updateMode(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $mode = (string) ($_POST['mode'] ?? '');
+        if (!in_array($mode, self::VALID_MODES, true)) {
+            Flash::set('error', 'Invalid Annexure A content mode.');
+            header("Location: /orders/{$orderId}/annexure");
+            return;
+        }
+
+        OrderRepository::setAnnexureMode($orderId, $mode);
+        $user = AuthService::currentUser();
+        AuditLogRepository::log((int) $user['id'], 'ANNEXURE_MODE_UPDATED', 'order', $orderId, 'annexure_mode', null, $mode);
+        Flash::set('success', 'Annexure A content mode updated.');
+        header("Location: /orders/{$orderId}/annexure");
+    }
+
+    public function updateTerms(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $sanitized = AnnexureTermsSanitizer::sanitize((string) ($_POST['content_html'] ?? ''));
+
+        $user = AuthService::currentUser();
+        OrderAnnexureTermsRepository::upsert($orderId, $sanitized, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'ANNEXURE_TERMS_UPDATED', 'order', $orderId, 'content_html', null, null);
+        Flash::set('success', 'Additional Terms saved.');
         header("Location: /orders/{$orderId}/annexure");
     }
 

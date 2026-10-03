@@ -162,6 +162,20 @@
   table.annexure-images td { border: 1px solid #D7DEE6; padding: 4pt; text-align: center; }
   table.annexure-images img { max-width: 220px; max-height: 160px; }
 
+  /* Section AT — Additional Terms WYSIWYG content, sanitized HTML emitted
+     straight from order_annexure_terms.content_html (see _annexure_body
+     and annexureTermsSanitizer). Kept visually distinct from but
+     consistent with the rest of the document's typography. */
+  .annexure-terms { font-size: 10pt; line-height: 1.5; color: #17233A; }
+  .annexure-terms p { margin: 0 0 6pt; }
+  .annexure-terms h3 { font-size: 11pt; margin: 8pt 0 4pt; color: #17233A; }
+  .annexure-terms h4 { font-size: 10pt; margin: 6pt 0 3pt; color: #17233A; }
+  .annexure-terms ul, .annexure-terms ol { margin: 0 0 6pt 18pt; padding: 0; }
+  .annexure-terms blockquote { margin: 0 0 6pt; padding: 4pt 10pt; border-left: 3px solid #D7DEE6; color: #4A5568; }
+  .annexure-terms img { max-width: 100%; }
+  .annexure-terms table { border-collapse: collapse; width: 100%; margin: 4pt 0 8pt; }
+  .annexure-terms table td, .annexure-terms table th { border: 1px solid #D7DEE6; padding: 4pt 6pt; text-align: left; }
+
   {% if watermark.enabled and watermark.show_text %}
   .watermark-text { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
     opacity: {{ watermark.opacity }}; transform: rotate(-{{ watermark.angle }}deg); z-index: 0; }
@@ -223,8 +237,8 @@
 {% block terms_section %}
 {% if terms is defined and terms|length > 0 %}
 <div class="section-title">{{ terms_section_number }}. {{ terms_section_title }}</div>
-{% if order.include_annexure_a %}
-<div class="annexure-notice">&#9888; Annexure A — Product Technical Specifications is attached and forms an integral part of this {{ doc_title|lower }}. Refer Annexure A for product images, technical drawings, and component dimensions.</div>
+{% if order.include_annexure_a and annexure_has_content %}
+<div class="annexure-notice">&#9888; Annexure A is attached and forms an integral part of this {{ doc_title|lower }}. Refer Annexure A for full details.</div>
 {% endif %}
 <ul class="terms">
   {% for clause in terms %}

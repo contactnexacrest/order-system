@@ -441,11 +441,11 @@ final class DocxComponents
             return;
         }
         self::addSectionTitle($section, "{$number}. {$title}");
-        if (!empty($context['order']['include_annexure_a'])) {
+        if (!empty($context['order']['include_annexure_a']) && !empty($context['annexure_has_content'])) {
             self::addColorBox($section, self::RED_BG, self::RED_BORDER, function (AbstractContainer $cell) use ($context) {
                 $docTitle = strtolower((string) ($context['doc_title'] ?? 'document'));
                 $cell->addText(
-                    "\u{26A0} Annexure A — Product Technical Specifications is attached and forms an integral part of this {$docTitle}. Refer Annexure A for product images, technical drawings, and component dimensions.",
+                    "\u{26A0} Annexure A is attached and forms an integral part of this {$docTitle}. Refer Annexure A for full details.",
                     ['bold' => true, 'size' => 10, 'color' => self::RED_TEXT]
                 );
             });

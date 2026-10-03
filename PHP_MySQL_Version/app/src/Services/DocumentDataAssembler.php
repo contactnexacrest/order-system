@@ -9,6 +9,7 @@ use App\Repositories\AssetRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\OrderAnnexureRepository;
+use App\Repositories\OrderAnnexureTermsRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPackingRepository;
@@ -85,6 +86,9 @@ final class DocumentDataAssembler
         $activeAmendment = !empty($order['has_active_amendment']) && !empty($order['active_amendment_id'])
             ? AmendmentRepository::find((int) $order['active_amendment_id'])
             : null;
+
+        $annexureProducts = self::annexureProductsBlock($orderId);
+        $annexureFlags = self::annexureFlagsBlock($orderId, (string) ($order['annexure_mode'] ?? 'SPEC'), $annexureProducts);
 
         return [
             'company' => $company,
@@ -191,9 +195,9 @@ final class DocumentDataAssembler
             'crates'      => self::cratesBlock($orderId),
             'shipping'    => self::shippingBlock($orderId),
             'production'  => self::productionBlock($orderId),
-            'annexure_products' => self::annexureProductsBlock($orderId),
+            'annexure_products' => $annexureProducts,
             'bl'          => self::blBlock($company['legal_name']),
-        ];
+        ] + $annexureFlags;
     }
 
     /**
@@ -239,6 +243,40 @@ final class DocumentDataAssembler
                 }, $p['images']),
             ];
         }, $products);
+    }
+
+    /**
+     * Section AT — Annexure A content mode. annexure_show_spec/
+     * annexure_show_terms reflect the staff's SPEC/TERMS/BOTH choice alone
+     * (independent of whether either side is actually filled in yet, so
+     * the standalone Annexure A page still shows its usual "No product
+     * entries/additional terms have been added yet" placeholder for an
+     * empty section the mode says should appear). annexure_has_content is
+     * the stricter check used everywhere else (the appendix baked into
+     * QT/PI/OC/BUYERPO/PL/CI, and the red "Annexure A is attached" notice)
+     * — those should only fire when there is something real to point at.
+     *
+     * annexure_terms_html is re-sanitized here (not just trusted from the
+     * DB) because it's emitted unescaped into every PDF/DOCX this method
+     * feeds — see AnnexureTermsSanitizer's docblock.
+     */
+    private static function annexureFlagsBlock(int $orderId, string $mode, array $annexureProducts): array
+    {
+        $termsRow = OrderAnnexureTermsRepository::find($orderId);
+        $termsHtml = $termsRow && $termsRow['content_html']
+            ? AnnexureTermsSanitizer::sanitize((string) $termsRow['content_html'])
+            : '';
+
+        $showSpec = $mode !== 'TERMS';
+        $showTerms = $mode !== 'SPEC';
+
+        return [
+            'annexure_mode' => $mode,
+            'annexure_terms_html' => $termsHtml,
+            'annexure_show_spec' => $showSpec,
+            'annexure_show_terms' => $showTerms,
+            'annexure_has_content' => ($showSpec && !empty($annexureProducts)) || ($showTerms && $termsHtml !== ''),
+        ];
     }
 
     /**

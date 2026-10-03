@@ -1061,7 +1061,7 @@ async function renderDocx(targetPath, documentTypeCode, context) {
 function titleFor(code) {
   const map = {
     QT: 'QUOTATION',
-    ANNEXA: 'ANNEXURE A — PRODUCT TECHNICAL SPECIFICATIONS',
+    ANNEXA: 'ANNEXURE A',
     PI: 'PROFORMA INVOICE',
     OC: 'ORDER CONFIRMATION',
     BUYERPO: 'PURCHASE ORDER',

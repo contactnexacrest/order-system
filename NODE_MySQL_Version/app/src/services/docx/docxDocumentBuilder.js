@@ -22,6 +22,7 @@
 
 const { Document, Paragraph, Table, TableRow, AlignmentType, VerticalAlign } = require('docx');
 const C = require('./docxComponents');
+const { convertAnnexureTermsHtml } = require('./annexureTermsDocx');
 
 // ------------------------------------------------------------------
 // Small local helpers (mirrors PHP's DocxDocumentBuilder::g()/titleFor()/etc.)
@@ -39,7 +40,7 @@ function g(obj, path, fallback = '—') {
 function titleFor(code) {
   const map = {
     QT: 'QUOTATION',
-    ANNEXA: 'ANNEXURE A — PRODUCT TECHNICAL SPECIFICATIONS',
+    ANNEXA: 'ANNEXURE A',
     PI: 'PROFORMA INVOICE',
     OC: 'ORDER CONFIRMATION',
     BUYERPO: 'PURCHASE ORDER',
@@ -550,7 +551,51 @@ function renderOc(context) {
 function annexureBody(context) {
   const order = context.order || {};
   const meta = context.meta || {};
-  const products = context.annexure_products || [];
+  const showSpec = !!context.annexure_show_spec;
+  const showTerms = !!context.annexure_show_terms;
+  const children = [];
+
+  if (showSpec) {
+    children.push(...annexureSpecBody(context.annexure_products || []));
+  }
+
+  if (showTerms) {
+    if (showSpec) children.push(...C.sectionTitle('ADDITIONAL TERMS'));
+    const termsHtml = context.annexure_terms_html || '';
+    if (termsHtml) {
+      // Already HTML-sanitized (annexureTermsSanitizer, both at save time
+      // and again here at read time) to exactly the tag/attribute
+      // allowlist annexureTermsDocx understands — nothing in this string
+      // can reach outside a docx.js Paragraph/TextRun/Table/ImageRun.
+      children.push(...convertAnnexureTermsHtml(termsHtml));
+    } else {
+      children.push(C.plain('No additional terms have been added to this Annexure yet.', { italics: true, color: C.MUTED }));
+    }
+    children.push(C.spacer(120));
+  }
+
+  const refDoc = g(order, 'quotation_ref') !== '—' ? g(order, 'quotation_ref') : g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : 'the referenced document';
+  children.push(
+    ...C.colorBox(
+      C.BLUE_BG,
+      C.BLUE_BORDER2,
+      [
+        C.rich([
+          [`This Annexure A forms an integral part of ${refDoc} dated ${g(meta, 'generated_date')}. `, { color: C.NAVY, size: 19 }],
+          [
+            `The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases.${showSpec ? ' Product images and technical drawings in this annexure are for reference and identification purposes only.' : ''} This Annexure is not valid as a standalone document.`,
+            { italics: true, color: C.BLUE_TEXT, size: 19 },
+          ],
+        ]),
+      ],
+      0
+    )
+  );
+
+  return children;
+}
+
+function annexureSpecBody(products) {
   const children = [];
 
   children.push(
@@ -618,30 +663,12 @@ function annexureBody(context) {
     }
   });
 
-  const refDoc = g(order, 'quotation_ref') !== '—' ? g(order, 'quotation_ref') : g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : 'the referenced document';
-  children.push(
-    ...C.colorBox(
-      C.BLUE_BG,
-      C.BLUE_BORDER2,
-      [
-        C.rich([
-          [`This Annexure A forms an integral part of ${refDoc} dated ${g(meta, 'generated_date')}. `, { color: C.NAVY, size: 19 }],
-          [
-            'The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases. Product images and technical drawings in this annexure are for reference and identification purposes only. This Annexure is not valid as a standalone document.',
-            { italics: true, color: C.BLUE_TEXT, size: 19 },
-          ],
-        ]),
-      ],
-      0
-    )
-  );
-
   return children;
 }
 
 function annexureAppendixIfAny(context) {
-  if (!(context.order || {}).include_annexure_a || !(context.annexure_products || []).length) return [];
-  return [new Paragraph({ children: [], pageBreakBefore: true }), ...C.sectionTitle('ANNEXURE A  —  PRODUCT TECHNICAL SPECIFICATIONS'), ...annexureBody(context)];
+  if (!(context.order || {}).include_annexure_a || !context.annexure_has_content) return [];
+  return [new Paragraph({ children: [], pageBreakBefore: true }), ...C.sectionTitle('ANNEXURE A'), ...annexureBody(context)];
 }
 
 function renderAnnexa(context) {

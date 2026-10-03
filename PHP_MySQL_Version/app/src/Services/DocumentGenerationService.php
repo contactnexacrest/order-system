@@ -1076,7 +1076,7 @@ final class DocumentGenerationService
     {
         return match ($code) {
             'QT' => 'QUOTATION',
-            'ANNEXA' => 'ANNEXURE A — PRODUCT TECHNICAL SPECIFICATIONS',
+            'ANNEXA' => 'ANNEXURE A',
             'PI' => 'PROFORMA INVOICE',
             'OC' => 'ORDER CONFIRMATION',
             'BUYERPO' => 'PURCHASE ORDER',

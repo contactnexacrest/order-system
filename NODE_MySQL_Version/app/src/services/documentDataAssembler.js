@@ -16,6 +16,8 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const assetRepository = require('../repositories/assetRepository');
 const documentRepository = require('../repositories/documentRepository');
 const orderAnnexureRepository = require('../repositories/orderAnnexureRepository');
+const orderAnnexureTermsRepository = require('../repositories/orderAnnexureTermsRepository');
+const annexureTermsSanitizer = require('../helpers/annexureTermsSanitizer');
 const amendmentRepository = require('../repositories/amendmentRepository');
 const { addWorkingDays } = require('./workingDaysCalculator');
 
@@ -80,6 +82,9 @@ async function assemble(orderId, documentTypeCode = null) {
   const activeAmendment = order.has_active_amendment && order.active_amendment_id
     ? await amendmentRepository.find(order.active_amendment_id)
     : null;
+
+  const annexureProducts = await annexureProductsBlock(orderId);
+  const annexureFlags = await annexureFlagsBlock(orderId, order.annexure_mode || 'SPEC', annexureProducts);
 
   return {
     company,
@@ -187,8 +192,9 @@ async function assemble(orderId, documentTypeCode = null) {
     crates: await cratesBlock(orderId),
     shipping: await shippingBlock(orderId),
     production: await productionBlock(orderId),
-    annexure_products: await annexureProductsBlock(orderId),
+    annexure_products: annexureProducts,
     bl: await blBlock(company.legal_name),
+    ...annexureFlags,
   };
 }
 
@@ -230,6 +236,39 @@ async function annexureProductsBlock(orderId) {
       return { data_uri: dataUri };
     }),
   }));
+}
+
+/**
+ * Section AT — Annexure A content mode. annexure_show_spec/
+ * annexure_show_terms reflect the staff's SPEC/TERMS/BOTH choice alone
+ * (independent of whether either side is actually filled in yet, so the
+ * standalone Annexure A page still shows its usual "No product entries/
+ * additional terms have been added yet" placeholder for an empty section
+ * the mode says should appear). annexure_has_content is the stricter check
+ * used everywhere else (the appendix baked into QT/PI/OC/BUYERPO/PL/CI,
+ * and the red "Annexure A is attached" notice) — those should only fire
+ * when there is something real to point at.
+ *
+ * annexure_terms_html is re-sanitized here (not just trusted from the DB)
+ * because it's emitted unescaped into every PDF/DOCX this function feeds —
+ * see annexureTermsSanitizer's docblock.
+ */
+async function annexureFlagsBlock(orderId, mode, annexureProducts) {
+  const termsRow = await orderAnnexureTermsRepository.find(orderId);
+  const termsHtml = termsRow && termsRow.content_html
+    ? annexureTermsSanitizer.sanitize(termsRow.content_html)
+    : '';
+
+  const showSpec = mode !== 'TERMS';
+  const showTerms = mode !== 'SPEC';
+
+  return {
+    annexure_mode: mode,
+    annexure_terms_html: termsHtml,
+    annexure_show_spec: showSpec,
+    annexure_show_terms: showTerms,
+    annexure_has_content: (showSpec && annexureProducts.length > 0) || (showTerms && termsHtml !== ''),
+  };
 }
 
 /**

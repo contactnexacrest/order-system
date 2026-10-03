@@ -355,6 +355,8 @@ $router->get('/orders/{id}/comment-attachments/{fileId}/download', [$orderCommen
 // with no screen ever built against them; this is that missing piece).
 $router->get('/orders/{id}/annexure', [$annexure, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/annexure/toggle', [$annexure, 'toggleInclude'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/mode', [$annexure, 'updateMode'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/terms', [$annexure, 'updateTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/annexure/products', [$annexure, 'createProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/annexure/products/{productId}', [$annexure, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/annexure/products/{productId}/delete', [$annexure, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

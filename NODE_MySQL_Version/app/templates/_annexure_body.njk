@@ -1,13 +1,22 @@
 {#
-  Shared Annexure A product-card markup — included both by ANNEXA's own
-  standalone document (annexure.njk, used when a buyer/staff member wants
-  Annexure A on its own) and by _layout.njk's annexure_appendix block (used
-  to bake Annexure A into the SAME PDF as QT/PI/CI/etc. as a guaranteed
-  appendix — see documentGenerationService's per-user mandate: "if
-  Annexure is present, it must be an integral part of the document, and
-  must not get missed by anyone under any condition"). One copy of the
-  per-product rendering so the two can never drift apart.
+  Shared Annexure A markup — included both by ANNEXA's own standalone
+  document (annexure.njk, used when a buyer/staff member wants Annexure A
+  on its own) and by _layout.njk's annexure_appendix block (used to bake
+  Annexure A into the SAME PDF as QT/PI/CI/etc. as a guaranteed appendix —
+  see documentGenerationService's per-user mandate: "if Annexure is
+  present, it must be an integral part of the document, and must not get
+  missed by anyone under any condition"). One copy of the rendering so the
+  two can never drift apart.
+
+  Section AT — annexure_mode (SPEC/TERMS/BOTH) decides which of the two
+  blocks below actually show: the structured per-product Product
+  Specification table (unchanged from before this section — same markup,
+  same fields), and/or a free-form Additional Terms rich-text block the
+  staff authored via a WYSIWYG editor (annexure_terms_html, already
+  HTML-sanitized — see annexureTermsSanitizer). When both are shown,
+  Product Specification prints first and Additional Terms second.
 #}
+{% if annexure_show_spec %}
 <div class="banner" style="background:#FAEEDA; color:#633806; text-align:left; font-weight:normal;"><strong style="color:#8A6D1D;">Note:</strong> <em>Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.</em></div>
 
 {% for p in annexure_products %}
@@ -44,5 +53,15 @@
 {% else %}
 <p class="placeholder-italic">No product entries have been added to this Annexure yet.</p>
 {% endfor %}
+{% endif %}
 
-<div class="banner" style="background:#E6F1FB; color:#17233A; text-align:left; font-weight:normal;">This Annexure A forms an integral part of {{ order.quotation_ref or order.pi_ref or 'the referenced document' }} dated {{ meta.generated_date }}. <em style="color:#185FA5;">The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases. Product images and technical drawings in this annexure are for reference and identification purposes only. This Annexure is not valid as a standalone document.</em></div>
+{% if annexure_show_terms %}
+{% if annexure_show_spec %}<div class="section-title">ADDITIONAL TERMS</div>{% endif %}
+{% if annexure_terms_html %}
+<div class="annexure-terms">{{ annexure_terms_html|safe }}</div>
+{% else %}
+<p class="placeholder-italic">No additional terms have been added to this Annexure yet.</p>
+{% endif %}
+{% endif %}
+
+<div class="banner" style="background:#E6F1FB; color:#17233A; text-align:left; font-weight:normal;">This Annexure A forms an integral part of {{ order.quotation_ref or order.pi_ref or 'the referenced document' }} dated {{ meta.generated_date }}. <em style="color:#185FA5;">The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases.{% if annexure_show_spec %} Product images and technical drawings in this annexure are for reference and identification purposes only.{% endif %} This Annexure is not valid as a standalone document.</em></div>

@@ -8,6 +8,7 @@ use PhpOffice\PhpWord\Element\AbstractContainer;
 use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\IOFactory as PhpWordIOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\Shared\Html as PhpWordHtml;
 use PhpOffice\PhpWord\SimpleType\Jc;
 
 /**
@@ -578,7 +579,46 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $products = $context['annexure_products'] ?? [];
+        $showSpec = !empty($context['annexure_show_spec']);
+        $showTerms = !empty($context['annexure_show_terms']);
 
+        if ($showSpec) {
+            self::addAnnexureSpecBody($section, $products);
+        }
+
+        if ($showTerms) {
+            if ($showSpec) {
+                DocxComponents::addSectionTitle($section, 'ADDITIONAL TERMS');
+            }
+            $termsHtml = (string) ($context['annexure_terms_html'] ?? '');
+            if ($termsHtml !== '') {
+                // The content is already HTML-sanitized (AnnexureTermsSanitizer,
+                // both at save time and again here at read time) to exactly the
+                // tag/attribute allowlist PhpWord's HTML importer is told about
+                // above — nothing in this string can reach outside a Word
+                // paragraph/run/table/image.
+                PhpWordHtml::addHtml($section, $termsHtml, false, false);
+            } else {
+                DocxComponents::addPlainParagraph($section, 'No additional terms have been added to this Annexure yet.', ['italic' => true, 'color' => DocxComponents::MUTED]);
+            }
+            $section->addTextBreak(1, 6);
+        }
+
+        $refDoc = self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : 'the referenced document');
+        DocxComponents::addColorBox($section, DocxComponents::BLUE_BG, DocxComponents::BLUE_BORDER2, function (AbstractContainer $cell) use ($refDoc, $meta, $showSpec) {
+            $run = $cell->addTextRun();
+            $run->addText('This Annexure A forms an integral part of ' . $refDoc . ' dated ' . self::g($meta, 'generated_date') . '. ', ['color' => DocxComponents::NAVY, 'size' => 9.5]);
+            $text = 'The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases.';
+            if ($showSpec) {
+                $text .= ' Product images and technical drawings in this annexure are for reference and identification purposes only.';
+            }
+            $text .= ' This Annexure is not valid as a standalone document.';
+            $run->addText($text, ['italic' => true, 'color' => DocxComponents::BLUE_TEXT, 'size' => 9.5]);
+        }, 0);
+    }
+
+    private static function addAnnexureSpecBody(Section $section, array $products): void
+    {
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG2, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) {
             $run = $cell->addTextRun();
             $run->addText('Note: ', ['bold' => true, 'color' => DocxComponents::AMBER_BORDER, 'size' => 9]);
@@ -645,22 +685,15 @@ final class DocxDocumentBuilder
                 $section->addTextBreak(1, 6);
             }
         }
-
-        $refDoc = self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : 'the referenced document');
-        DocxComponents::addColorBox($section, DocxComponents::BLUE_BG, DocxComponents::BLUE_BORDER2, function (AbstractContainer $cell) use ($refDoc, $meta) {
-            $run = $cell->addTextRun();
-            $run->addText('This Annexure A forms an integral part of ' . $refDoc . ' dated ' . self::g($meta, 'generated_date') . '. ', ['color' => DocxComponents::NAVY, 'size' => 9.5]);
-            $run->addText('The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases. Product images and technical drawings in this annexure are for reference and identification purposes only. This Annexure is not valid as a standalone document.', ['italic' => true, 'color' => DocxComponents::BLUE_TEXT, 'size' => 9.5]);
-        }, 0);
     }
 
     private static function addAnnexureAppendixIfAny(Section $section, array $context): void
     {
-        if (empty($context['order']['include_annexure_a']) || empty($context['annexure_products'])) {
+        if (empty($context['order']['include_annexure_a']) || empty($context['annexure_has_content'])) {
             return;
         }
         $section->addPageBreak();
-        DocxComponents::addSectionTitle($section, 'ANNEXURE A  —  PRODUCT TECHNICAL SPECIFICATIONS');
+        DocxComponents::addSectionTitle($section, 'ANNEXURE A');
         self::addAnnexureBody($section, $context);
     }
 

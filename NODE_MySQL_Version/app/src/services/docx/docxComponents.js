@@ -655,7 +655,7 @@ function termsSection(context, number, title) {
   const terms = context.terms || [];
   if (!terms.length) return [];
   const out = [...sectionTitle(`${number}. ${title}`)];
-  if (context.order && context.order.include_annexure_a) {
+  if (context.order && context.order.include_annexure_a && context.annexure_has_content) {
     const docTitle = String(context.doc_title || 'document').toLowerCase();
     out.push(
       ...colorBox(
@@ -663,7 +663,7 @@ function termsSection(context, number, title) {
         RED_BORDER,
         [
           plain(
-            `⚠ Annexure A — Product Technical Specifications is attached and forms an integral part of this ${docTitle}. Refer Annexure A for product images, technical drawings, and component dimensions.`,
+            `⚠ Annexure A is attached and forms an integral part of this ${docTitle}. Refer Annexure A for full details.`,
             { bold: true, size: 20, color: RED_TEXT }
           ),
         ]

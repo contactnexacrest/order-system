@@ -394,4 +394,12 @@ final class OrderRepository
             ->prepare('UPDATE orders SET include_annexure_a = :flag WHERE id = :id')
             ->execute(['flag' => $include ? 1 : 0, 'id' => $orderId]);
     }
+
+    /** SPEC (structured product table) / TERMS (free-form rich text) / BOTH — see docs/schema.sql Section AT. */
+    public static function setAnnexureMode(int $orderId, string $mode): void
+    {
+        Database::connection()
+            ->prepare('UPDATE orders SET annexure_mode = :mode WHERE id = :id')
+            ->execute(['mode' => $mode, 'id' => $orderId]);
+    }
 }
