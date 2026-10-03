@@ -9,6 +9,9 @@
 <script src="/js/app.js" defer></script>
 </head>
 <body class="bare">
+{% if devServerEnabled %}
+  <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
+{% endif %}
 <div class="bare-wrap{{ ' ' + wrapClass if wrapClass }}">
   <div class="bare-brand">
     <span class="bare-brand-mark" aria-hidden="true"><img src="/img/logo.jpg" alt=""></span>

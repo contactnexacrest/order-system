@@ -252,6 +252,7 @@ app.use((req, res, next) => {
       isSuperAdmin: req.isSuperAdmin || false,
       unreadCount: req.unreadCount || 0,
       testModeEnabled: req.testModeEnabled || false,
+      devServerEnabled: env.isDevServer(),
       currentPath: req.path,
     };
     const context = Object.assign({}, common, data);

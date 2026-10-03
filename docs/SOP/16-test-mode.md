@@ -61,3 +61,22 @@ to Test Mode at all.
 Once Test Mode is disabled (after test data cleanup), the system returns
 exactly to normal operation — nothing about production data, settings, or
 behavior is altered by having rehearsed in Test Mode.
+
+## Not to be confused with: the DEV / TEST ENVIRONMENT banner
+
+A second, separate red strip can appear at the top of every page: a bright
+red diagonal-striped **"DEV / TEST ENVIRONMENT"** banner. It looks similar
+to the Test Mode banner but means something different, and the two are
+completely independent of each other:
+
+| | Test Mode banner | DEV / TEST ENVIRONMENT banner |
+|---|---|---|
+| Means | "This system's **business data** is in a sandboxed rehearsal — orders/clients created now are flagged test data." | "This **deployment itself** is a dev/staging/UAT copy of the system, not the real production server — any data here, real or test, isn't production." |
+| Turned on by | The **Test Mode** screen (staff action, stored in the database) | The `DEV_SERVER` setting in the server's `.env` file (set once by whoever deploys the server, not from any in-app screen) |
+| Where it shows | Staff screens only | Every page, including the login screen and the client portal |
+
+Either banner can be showing on its own, both can show together (a
+rehearsal running on a staging server), or neither — turning one off never
+turns off the other. On the real production server, `DEV_SERVER` should
+always be left `false`/absent so this banner never appears there; see the
+production go-live checklist.

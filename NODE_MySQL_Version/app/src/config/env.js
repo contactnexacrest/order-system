@@ -47,4 +47,12 @@ function isLocal() {
   return String(get('APP_ENV', 'production')).toLowerCase() === 'local';
 }
 
-module.exports = { get, getBool, getInt, isLocal };
+// Deliberately independent of APP_ENV/isLocal() — a real staging/UAT
+// deployment that staff poke at over the internet is not "local" but is
+// exactly where a loud on-screen "this isn't production" reminder matters
+// most, so this gets its own .env switch rather than riding on APP_ENV.
+function isDevServer() {
+  return getBool('DEV_SERVER', false);
+}
+
+module.exports = { get, getBool, getInt, isLocal, isDevServer };

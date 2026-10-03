@@ -65,6 +65,9 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
 <script src="/assets/js/app.js" defer></script>
 </head>
 <body>
+<?php if (\App\Config\Env::isDevServer()): ?>
+  <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
+<?php endif; ?>
 <div class="app-shell">
 <header class="sidebar">
   <div class="sidebar-brand">

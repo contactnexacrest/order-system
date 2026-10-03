@@ -148,6 +148,14 @@ button:hover{background:var(--navy-strong);}
 .alert-dev{background:var(--gold-soft);color:var(--gold-strong);border:1px dashed var(--gold);}
 .alert-warning{background:var(--gold-soft);color:var(--gold-strong);border:1px solid var(--gold);}
 .test-mode-banner{background:#8A1F1F;color:#fff;text-align:center;font-weight:700;font-size:0.85rem;padding:0.5rem 1rem;letter-spacing:0.02em;}
+
+/* Independent of .test-mode-banner (see Env::isDevServer() /
+   env.isDevServer()) — one flags "business data here is sandboxed", the
+   other flags "this isn't the production server at all"; either, both, or
+   neither can be showing at once. Sticky + bright red + repeating
+   diagonal-stripe background so it reads as "caution tape" at a glance and
+   stays visible while scrolling a long page. */
+.dev-server-banner{position:sticky;top:0;z-index:999;background:repeating-linear-gradient(45deg,#D32F2F,#D32F2F 12px,#B71C1C 12px,#B71C1C 24px);color:#fff;text-align:center;font-weight:800;font-size:0.85rem;padding:0.5rem 1rem;letter-spacing:0.04em;text-shadow:0 1px 2px rgba(0,0,0,0.45);}
 /* Explicit weight so nesting inside a bold <label> doesn't bold the hint text too. */
 .muted{color:var(--ink-soft);font-size:0.85rem;font-weight:400;}
 .muted.small{font-size:0.78rem;}

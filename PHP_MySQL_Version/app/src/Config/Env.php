@@ -92,4 +92,16 @@ final class Env
     {
         return strtolower(self::get('APP_ENV', 'production') ?? 'production') === 'local';
     }
+
+    /**
+     * Deliberately independent of APP_ENV/isLocal() — a real staging/UAT
+     * deployment that staff poke at over the internet is not "local" (it
+     * needs HTTPS, real HSTS, etc. — see hstsHeader()) but is exactly where
+     * a loud on-screen "this isn't production" reminder matters most, so
+     * this gets its own .env switch rather than riding on APP_ENV.
+     */
+    public static function isDevServer(): bool
+    {
+        return self::getBool('DEV_SERVER', false);
+    }
 }

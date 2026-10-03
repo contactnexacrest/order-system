@@ -10,6 +10,9 @@
 <script src="/assets/js/app.js" defer></script>
 </head>
 <body>
+<?php if (\App\Config\Env::isDevServer()): ?>
+  <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
+<?php endif; ?>
 <header class="client-topbar">
   <div class="topbar-brand">
     <span class="bare-brand-mark" aria-hidden="true"><img src="/assets/img/logo.jpg" alt=""></span>

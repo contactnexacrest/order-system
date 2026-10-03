@@ -9,6 +9,9 @@
 <script src="/js/app.js" defer></script>
 </head>
 <body>
+{% if devServerEnabled %}
+  <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
+{% endif %}
 {% set canDisputes = permissions.manage_disputes or permissions.respond_to_disputes %}
 {% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log or permissions.approve_email_send %}
