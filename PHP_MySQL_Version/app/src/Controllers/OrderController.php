@@ -764,6 +764,7 @@ final class OrderController
             'exportBenefitSchemes' => LookupRepository::dropdownOptions('export_benefit_scheme'),
             'duplicatedFromOrder' => $duplicatedFromOrder,
             'duplicatedIntoOrders' => $duplicatedIntoOrders,
+            'additionalDocuments' => FileStoreRepository::additionalDocumentsForOrder($orderId),
         ], 'layout/base');
     }
 
@@ -945,6 +946,71 @@ final class OrderController
         } catch (\Throwable $e) {
             Flash::set('error', $e->getMessage());
         }
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Batch 3 #13b — a free-form extra document attached to this order
+     * that doesn't fit any fixed document type and isn't part of the
+     * order progress chat (that's for back-and-forth discussion; this is
+     * for a standalone file, e.g. a buyer-supplied certificate template).
+     * Reuses file_store/FileUploadService rather than a new table — see
+     * schema.sql Section AZ.
+     */
+    public function uploadAdditionalDocument(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $title = trim((string) ($_POST['title'] ?? ''));
+        if ($title === '') {
+            Flash::set('error', 'A title is required for the document.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
+
+        try {
+            $fileId = FileUploadService::handleUpload(
+                'document',
+                'order_additional_document',
+                'clients/' . FileStoreRepository::sanitizePathSegment((string) $order['client_unique_number']) . '/' . FileStoreRepository::sanitizePathSegment((string) $order['order_reference']) . '/additional_documents',
+                null,
+                $orderId,
+                (int) AuthService::currentUser()['id'],
+                null,
+                trim((string) ($_POST['received_from'] ?? '')) ?: null,
+                $title
+            );
+            FileStoreRepository::markAsAdditionalDocument($fileId, $notes);
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'ORDER_ADDITIONAL_DOCUMENT_ADDED', 'file_store', $fileId, 'document_type_label', null, $title);
+            Flash::set('success', "\"{$title}\" attached to this order.");
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header("Location: /orders/{$orderId}");
+    }
+
+    /** Soft delete only — the row is deactivated, the file on disk is never touched. */
+    public function deleteAdditionalDocument(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $fileId = (int) $params['fileId'];
+        $file = FileStoreRepository::find($fileId);
+        if (!$file || (int) $file['order_id'] !== $orderId || !$file['is_additional_document']) {
+            Flash::set('error', 'Document not found.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        FileStoreRepository::deactivate($fileId);
+        AuditLogRepository::log((int) AuthService::currentUser()['id'], 'ORDER_ADDITIONAL_DOCUMENT_REMOVED', 'file_store', $fileId, 'document_type_label', $file['document_type_label'], null);
+        Flash::set('success', "\"{$file['document_type_label']}\" removed. The file itself is never deleted from disk.");
         header("Location: /orders/{$orderId}");
     }
 

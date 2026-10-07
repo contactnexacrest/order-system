@@ -549,6 +549,40 @@ foreach ($stages as $s) {
       }
     </script>
 
+    <h3 style="font-size:0.95em; margin-top:18px;">Additional Documents</h3>
+    <p class="muted small">Free-form extras that don't fit any fixed document type above — e.g. a buyer-supplied certificate template, a special packing instruction sheet.</p>
+    <table class="list">
+      <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
+      <?php foreach ($additionalDocuments as $ad): ?>
+      <tr>
+        <td><?= htmlspecialchars($ad['document_type_label'] ?? '') ?></td>
+        <td class="muted small"><?= htmlspecialchars($ad['notes'] ?? '') ?></td>
+        <td><a href="/file-store/<?= (int) $ad['id'] ?>/download"><?= htmlspecialchars($ad['original_filename']) ?></a></td>
+        <td><?= htmlspecialchars((string) $ad['uploaded_at']) ?><?php if (!empty($ad['uploaded_by_name'])): ?> <span class="muted small">by <?= htmlspecialchars($ad['uploaded_by_name']) ?></span><?php endif; ?></td>
+        <td>
+          <?php if ($canManageOrders): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents/<?= (int) $ad['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove &quot;<?= htmlspecialchars(addslashes((string) $ad['document_type_label'])) ?>&quot;? The file itself is never deleted from disk.');">
+            <?= Csrf::field() ?>
+            <button type="submit" class="btn-sm btn-danger">Remove</button>
+          </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+      <?php if (empty($additionalDocuments)): ?>
+      <tr><td colspan="5" class="muted">No additional documents attached yet.</td></tr>
+      <?php endif; ?>
+    </table>
+    <?php if ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+      <?= Csrf::field() ?>
+      <input type="text" name="title" placeholder="Title *" required style="width:220px">
+      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
+      <input type="file" name="document" required>
+      <button type="submit" class="btn-sm">Attach Document</button>
+    </form>
+    <?php endif; ?>
+
     <?php
       // Batch 3 #5 — differentiate 'not yet generated' vs 'already generated, this regenerates
       // it' document buttons visually, instead of every visible button looking identical.

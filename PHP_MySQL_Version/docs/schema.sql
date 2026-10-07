@@ -2816,6 +2816,7 @@ ALTER TABLE clients
 -- Section AX (client-level agreement T&C footer) added 2026-10-07.
 -- Section AY (RBAC scoping: Reference Library categories + view-only
 -- clients/orders tier) added 2026-10-07.
+-- Section AZ (additional documents — order/client level) added 2026-10-07.
 -- ================================================================
 
 -- ================================================================
@@ -2857,4 +2858,31 @@ ALTER TABLE reference_library_documents
 -- as manage_orders-only (or its existing finer siblings —
 -- manage_payments, manage_shipping, close_orders, ...) — these two
 -- permissions only ever widen who can look, never who can act.
+-- ================================================================
+
+-- ================================================================
+-- SECTION AZ — ADDITIONAL DOCUMENTS (ORDER/CLIENT LEVEL) (added 2026-10-07)
+-- ================================================================
+-- Batch 3 #13b. Free-form, ad-hoc file attachments that don't fit any of
+-- the fixed document types (QT/PI/OC/...) or the order-progress chat
+-- thread's media (Section AI) — e.g. a buyer's own certificate template, a
+-- signed NDA, a special packing-instruction sheet a client emailed in.
+-- Rather than a new table, this reuses file_store (which already carries
+-- client_id/order_id, document_type_label — used here as the staff-
+-- entered title — received_from, notes, and the never-delete-the-row-
+-- for-real is_active soft-delete flag: exactly this feature's shape).
+-- The one addition is a marker column so this feature's own list (shown
+-- on the order/client page) can be queried without pulling in every other
+-- RECEIVED/GENERATED file_store row (buyer PO copies, dispute documents,
+-- generated PDFs, etc.) that already lives in the same table.
+-- ================================================================
+ALTER TABLE file_store
+  ADD COLUMN is_additional_document TINYINT(1) NOT NULL DEFAULT 0 AFTER notes;
+-- New file_upload_contexts rows (see seed.sql): order_additional_document,
+-- client_additional_document. No new permission — add/remove stays
+-- manage_orders-only (consistent with every other mutating order/client
+-- action); viewing the list follows the surrounding page's own permission
+-- (manage_orders, or view_orders/view_clients per Section AY). The
+-- existing generic /file-store/{id}/download route is widened the same
+-- way so a view-only visitor can open what they can already see listed.
 -- ================================================================

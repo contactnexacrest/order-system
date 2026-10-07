@@ -60,6 +60,42 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
   <?php endif; ?>
 
   <div class="section">
+    <h2>Additional Documents</h2>
+    <p class="muted small">Free-form extras attached to this client (not tied to one order) — e.g. a standing NDA, a general compliance certificate.</p>
+    <table class="list">
+      <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
+      <?php foreach ($additionalDocuments as $ad): ?>
+      <tr>
+        <td><?= htmlspecialchars($ad['document_type_label'] ?? '') ?></td>
+        <td class="muted small"><?= htmlspecialchars($ad['notes'] ?? '') ?></td>
+        <td><a href="/file-store/<?= (int) $ad['id'] ?>/download"><?= htmlspecialchars($ad['original_filename']) ?></a></td>
+        <td><?= htmlspecialchars((string) $ad['uploaded_at']) ?><?php if (!empty($ad['uploaded_by_name'])): ?> <span class="muted small">by <?= htmlspecialchars($ad['uploaded_by_name']) ?></span><?php endif; ?></td>
+        <td>
+          <?php if ($canManageOrders): ?>
+          <form method="post" action="/clients/<?= (int) $client['id'] ?>/additional-documents/<?= (int) $ad['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove &quot;<?= htmlspecialchars(addslashes((string) $ad['document_type_label'])) ?>&quot;? The file itself is never deleted from disk.');">
+            <?= Csrf::field() ?>
+            <button type="submit" class="btn-sm btn-danger">Remove</button>
+          </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+      <?php if (empty($additionalDocuments)): ?>
+      <tr><td colspan="5" class="muted">No additional documents attached yet.</td></tr>
+      <?php endif; ?>
+    </table>
+    <?php if ($canManageOrders): ?>
+    <form method="post" action="/clients/<?= (int) $client['id'] ?>/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+      <?= Csrf::field() ?>
+      <input type="text" name="title" placeholder="Title *" required style="width:220px">
+      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
+      <input type="file" name="document" required>
+      <button type="submit" class="btn-sm">Attach Document</button>
+    </form>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
     <h2>Orders</h2>
     <?php if ($canManageOrders): ?>
     <div class="btn-row"><a class="btn btn-sm" href="/orders/create?client_id=<?= (int) $client['id'] ?>">+ New Order for this client</a></div>

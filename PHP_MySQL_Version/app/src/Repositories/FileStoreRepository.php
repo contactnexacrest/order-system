@@ -142,4 +142,53 @@ final class FileStoreRepository
         $stmt->execute(['order_id' => $orderId]);
         return $stmt->fetchAll();
     }
+
+    /**
+     * Batch 3 #13b — flips the marker that separates this feature's own
+     * ad-hoc attachments from every other RECEIVED/GENERATED file_store
+     * row (buyer PO copies, dispute documents, generated PDFs, ...) that
+     * already lives in the same table. Called right after
+     * FileUploadService::handleUpload() stores the row, rather than
+     * widening that shared service's own parameter list for one caller.
+     */
+    public static function markAsAdditionalDocument(int $fileId, ?string $notes): void
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE file_store SET is_additional_document = 1, notes = :notes WHERE id = :id'
+        );
+        $stmt->execute(['notes' => $notes, 'id' => $fileId]);
+    }
+
+    /** @return array<int, array<string,mixed>> */
+    public static function additionalDocumentsForOrder(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT fs.*, u.name AS uploaded_by_name FROM file_store fs
+             LEFT JOIN users u ON u.id = fs.uploaded_by
+             WHERE fs.order_id = :order_id AND fs.is_active = 1 AND fs.is_additional_document = 1
+             ORDER BY fs.uploaded_at DESC'
+        );
+        $stmt->execute(['order_id' => $orderId]);
+        return $stmt->fetchAll();
+    }
+
+    /** @return array<int, array<string,mixed>> */
+    public static function additionalDocumentsForClient(int $clientId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT fs.*, u.name AS uploaded_by_name FROM file_store fs
+             LEFT JOIN users u ON u.id = fs.uploaded_by
+             WHERE fs.client_id = :client_id AND fs.is_active = 1 AND fs.is_additional_document = 1
+             ORDER BY fs.uploaded_at DESC'
+        );
+        $stmt->execute(['client_id' => $clientId]);
+        return $stmt->fetchAll();
+    }
+
+    /** Soft delete only — file_store rows are never hard-deleted, and the file on disk is never touched. */
+    public static function deactivate(int $id): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE file_store SET is_active = 0 WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
 }

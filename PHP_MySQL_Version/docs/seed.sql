@@ -443,7 +443,9 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
   ('product_image',         'jpg,jpeg,png,webp', 5242880, 'Product image/technical drawing attached to an Annexure A entry.'),
   ('buyer_po_copy',         'pdf,jpg,jpeg,png,eml,msg', 10485760, 'Buyer''s actual signed Purchase Order (Stage 2 gate evidence — Addition beyond the spec''s named key list: recordBuyerPo() previously only captured a reference number typed by staff, with no copy of the PO itself on file).'),
   ('supplier_po_ack',       'pdf,jpg,jpeg,png,eml,msg', 10485760, 'Supplier''s signed acknowledgment of the Supplier PO (Stage 5 gate evidence — same addition/rationale as buyer_po_copy).'),
-  ('order_comment_media',   'jpg,jpeg,png,gif,webp,mp4,mov,webm,pdf', 52428800, 'Images/videos/files attached to an order progress chat comment (50 MB per file). Attachments over MailSenderService''s direct-attach cap are sent to the client as a portal download link instead of an email attachment.');
+  ('order_comment_media',   'jpg,jpeg,png,gif,webp,mp4,mov,webm,pdf', 52428800, 'Images/videos/files attached to an order progress chat comment (50 MB per file). Attachments over MailSenderService''s direct-attach cap are sent to the client as a portal download link instead of an email attachment.'),
+  ('order_additional_document',  'pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 15728640, 'Batch 3 #13b — a free-form extra document attached to an order that does not fit any fixed document type (e.g. a buyer-supplied certificate template, a special packing instruction sheet).'),
+  ('client_additional_document', 'pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 15728640, 'Batch 3 #13b — same as order_additional_document, but attached to a client rather than one specific order (e.g. a standing NDA, a general compliance certificate).');
 
 -- ================================================================
 -- COMPANY_SETTINGS — every key schema.sql reserves for this table.

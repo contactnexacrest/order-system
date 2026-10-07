@@ -282,6 +282,9 @@ $router->post('/clients/{id}/update', [$clients, 'update'], [SessionAuth::requir
 // Batch 3 #12 — separate endpoint, deliberately NOT gated by the data-lock check inside update() above.
 $router->post('/clients/{id}/agreement-footer', [$clients, 'updateAgreementFooter'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/toggle-active', [$clients, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// Batch 3 #13b — free-form extra documents attached to this client (schema.sql Section AZ).
+$router->post('/clients/{id}/additional-documents', [$clients, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/additional-documents/{fileId}/delete', [$clients, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 // docs/schema.sql Section AV — the per-client flag is a manage_company_settings action (same tier as other
 // global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch
 // inside ClientController::impersonate(), on top of its own impersonate_client permission gate here.
@@ -315,6 +318,9 @@ $router->post('/orders/{id}/unarchive', [$orders, 'unarchive'], [SessionAuth::re
 $router->post('/orders/{id}/duplicate', [$orders, 'duplicateOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/buyer-po', [$orders, 'recordBuyerPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/buyer-po/documents', [$orders, 'uploadBuyerPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
+$router->post('/orders/{id}/additional-documents', [$orders, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/additional-documents/{fileId}/delete', [$orders, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products', [$orders, 'addProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}', [$orders, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/delete', [$orders, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
@@ -415,7 +421,8 @@ $router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask']
 $router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/documents/{documentId}/delete', [$documents, 'delete'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->get('/documents/{documentId}/download', [$documents, 'download'], [SessionAuth::required(), PermissionCheck::requires('download_pdf')]);
-$router->get('/file-store/{id}/download', [$fileStore, 'download'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+// Batch 3 #13b/#13a — widened so a view-only visitor (view_orders/view_clients) can open what they can already see listed on the order/client page.
+$router->get('/file-store/{id}/download', [$fileStore, 'download'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders', 'view_clients'])]);
 
 // --- Phase D: review/approval, deferred send, amendments, disputes, audit log ---
 

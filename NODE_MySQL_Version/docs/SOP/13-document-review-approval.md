@@ -127,6 +127,22 @@ nothing changes from the behaviour above until an admin turns one on):
   a failed immediate attempt (e.g. SMTP still not configured) shows up as
   an error right away rather than silently sitting in the queue forever.
 
+## Additional Documents (free-form attachments)
+
+Separate from everything above — these are staff-uploaded extras that don't
+fit any fixed document type and aren't part of the order progress chat
+either. Both the order detail page and the client detail page carry their
+own **Additional Documents** section (inside Documents & Approvals on the
+order page): a title (required), optional notes, and a file. Typical use:
+a buyer-supplied certificate template, a special packing instruction sheet,
+a standing NDA on a client's own page. There's no approval workflow here —
+whoever can edit the order/client (`manage_orders`) can add or remove one;
+removing one only hides it (the file itself is never deleted from disk,
+same as everywhere else in this app). Viewing and downloading the list
+follows whatever permission already let you open that order/client page in
+the first place — a read-only Viewer/Auditor can see and download these
+too, just not add or remove them.
+
 ## What the client does (or doesn't)
 
 Nothing in this workflow involves the buyer directly — they simply receive

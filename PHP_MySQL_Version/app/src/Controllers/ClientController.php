@@ -11,9 +11,11 @@ use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
+use App\Repositories\FileStoreRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AuthService;
 use App\Services\ClientPortalService;
+use App\Services\FileUploadService;
 use App\Services\ReferenceNumberService;
 use App\Services\SuperAdminService;
 use App\Services\TestModeService;
@@ -82,7 +84,8 @@ final class ClientController
             return;
         }
         $orders = OrderRepository::forClient((int) $client['id']);
-        View::render('clients/show', ['client' => $client, 'orders' => $orders], 'layout/base');
+        $additionalDocuments = FileStoreRepository::additionalDocumentsForClient((int) $client['id']);
+        View::render('clients/show', ['client' => $client, 'orders' => $orders, 'additionalDocuments' => $additionalDocuments], 'layout/base');
     }
 
     public function editForm(array $params): void
@@ -372,5 +375,68 @@ final class ClientController
         $user = AuthService::currentUser();
         ClientPortalService::startImpersonation((int) $user['id'], $clientId);
         header('Location: /client');
+    }
+
+    /**
+     * Batch 3 #13b — a free-form extra document attached to this client
+     * (not tied to one specific order), e.g. a standing NDA or a general
+     * compliance certificate. Reuses file_store/FileUploadService rather
+     * than a new table — see schema.sql Section AZ.
+     */
+    public function uploadAdditionalDocument(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        $title = trim((string) ($_POST['title'] ?? ''));
+        if ($title === '') {
+            Flash::set('error', 'A title is required for the document.');
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+        $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
+
+        try {
+            $fileId = FileUploadService::handleUpload(
+                'document',
+                'client_additional_document',
+                'clients/' . FileStoreRepository::sanitizePathSegment((string) $client['client_unique_number']) . '/additional_documents',
+                $clientId,
+                null,
+                (int) AuthService::currentUser()['id'],
+                null,
+                trim((string) ($_POST['received_from'] ?? '')) ?: null,
+                $title
+            );
+            FileStoreRepository::markAsAdditionalDocument($fileId, $notes);
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_ADDITIONAL_DOCUMENT_ADDED', 'file_store', $fileId, 'document_type_label', null, $title);
+            Flash::set('success', "\"{$title}\" attached to this client.");
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header("Location: /clients/{$clientId}");
+    }
+
+    /** Soft delete only — the row is deactivated, the file on disk is never touched. */
+    public function deleteAdditionalDocument(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $fileId = (int) $params['fileId'];
+        $file = FileStoreRepository::find($fileId);
+        if (!$file || (int) $file['client_id'] !== $clientId || !$file['is_additional_document']) {
+            Flash::set('error', 'Document not found.');
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+
+        FileStoreRepository::deactivate($fileId);
+        AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_ADDITIONAL_DOCUMENT_REMOVED', 'file_store', $fileId, 'document_type_label', $file['document_type_label'], null);
+        Flash::set('success', "\"{$file['document_type_label']}\" removed. The file itself is never deleted from disk.");
+        header("Location: /clients/{$clientId}");
     }
 }
