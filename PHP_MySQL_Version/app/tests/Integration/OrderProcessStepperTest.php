@@ -42,6 +42,33 @@ final class OrderProcessStepperTest extends DbTestCase
         );
     }
 
+    /**
+     * Batch 3 #14 — the stepper is now clickable: each step carries
+     * data-stage="N" and the JS jumps to whichever panel carries the
+     * matching data-stage attribute. This doesn't exercise the JS itself
+     * (no headless browser here), but pins the markup contract the JS
+     * depends on — both sides of the match must be present in the HTML.
+     */
+    public function testStepperStepsAndTheirTargetPanelsCarryMatchingDataStageAttributes(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+
+        $_SESSION['_auth_user_id'] = $userId;
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        foreach ([1, 2, 3, 4, 5, 6, 7, 8, 9] as $stage) {
+            self::assertStringContainsString("role=\"button\" tabindex=\"0\" data-stage=\"{$stage}\"", $output, "stepper step {$stage} must be focusable and carry data-stage");
+            self::assertMatchesRegularExpression(
+                '/<div class="section"[^>]*data-stage="' . $stage . '"/',
+                $output,
+                "a panel carrying data-stage=\"{$stage}\" must exist for the stepper to jump to"
+            );
+        }
+    }
+
     public function testStepperMarksAGatePassedStageDistinctlyFromALockedOne(): void
     {
         $userId = $this->createTestUser('Admin');

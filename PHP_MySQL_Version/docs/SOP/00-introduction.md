@@ -52,7 +52,9 @@ the same 9 stages as a row of detail chips — grey (locked), amber (in
 progress / unlocked), green (gate passed) — each naming its own status in
 words, for when you need more than the quick glance. Both use the same
 three colors for the same three states, so they always agree with each
-other.
+other. Each dot in the stepper is also clickable (and keyboard-focusable)
+— clicking one jumps straight to that stage's own section further down
+the page, the same as clicking any of the sidebar links on the left.
 
 ## Modules that sit alongside the 9 stages
 

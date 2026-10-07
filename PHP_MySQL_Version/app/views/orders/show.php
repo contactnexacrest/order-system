@@ -312,7 +312,7 @@ foreach ($stages as $s) {
   ?>
   <div class="process-stepper" role="list" aria-label="Order stage sequence">
     <?php foreach ($stages as $s): ?>
-      <div class="process-step <?= htmlspecialchars($s['status']) ?>" role="listitem" <?= $s['status'] === 'in_progress' ? 'aria-current="step"' : '' ?>>
+      <div class="process-step <?= htmlspecialchars($s['status']) ?>" role="button" tabindex="0" data-stage="<?= (int) $s['stage_number'] ?>" aria-label="Jump to Stage <?= (int) $s['stage_number'] ?> — <?= htmlspecialchars($s['stage_name']) ?>" <?= $s['status'] === 'in_progress' ? 'aria-current="step"' : '' ?>>
         <div class="process-step-dot"><?= (int) $s['stage_number'] ?></div>
         <div class="process-step-label"><?= htmlspecialchars($s['stage_name']) ?></div>
       </div>
@@ -497,7 +497,7 @@ foreach ($stages as $s) {
     </form>
   </div>
 
-  <div class="section" id="documents-approvals">
+  <div class="section" id="documents-approvals" data-stage="1">
     <h2>Documents &amp; Approvals</h2>
     <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">
@@ -913,7 +913,7 @@ foreach ($stages as $s) {
     <?php endforeach; ?>
   </div>
 
-  <div class="section">
+  <div class="section" data-stage="2">
     <h2>Stage 2 — Buyer PO</h2>
     <?php if ($hasBuyerPo): ?>
       <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
@@ -948,7 +948,7 @@ foreach ($stages as $s) {
     <?php endif; ?>
   </div>
 
-  <div class="section">
+  <div class="section" data-stage="3">
     <h2>PI-Stage Intake</h2>
     <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
     <?php if ($piIntake): ?>
@@ -1115,7 +1115,7 @@ foreach ($stages as $s) {
     <?php endif; ?>
   </div>
 
-  <div class="section">
+  <div class="section" data-stage="4">
     <h2>Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
     <?php if ($buyerAcknowledged): ?>
       <?php if ($ocAcknowledgment && $ocAcknowledgment['acknowledged_via'] === 'client_portal'): ?>
@@ -1146,7 +1146,7 @@ foreach ($stages as $s) {
     <?php endif; ?>
   </div>
 
-  <div class="section">
+  <div class="section" data-stage="5">
     <h2>Stage 5 — Supplier Purchase Order (Material Procurement)</h2>
     <?php if (!$stage5 || $stage5['status'] === 'locked'): ?>
       <?php if ($supplierPo): ?>
@@ -1273,7 +1273,7 @@ foreach ($stages as $s) {
     <?php endif; ?>
   </div>
 
-  <div class="section">
+  <div class="section" data-stage="6">
     <h2>Stage 6 — Freight Payment<?= $isFob ? ' (skipped — FOB)' : '' ?></h2>
     <?php if ($isFob): ?>
       <p class="muted">FOB order — buyer arranges and pays freight directly. This stage is auto-skipped once Stage 5 passes.</p>
@@ -1325,7 +1325,7 @@ foreach ($stages as $s) {
     <?php endif; ?>
   </div>
 
-  <div class="section">
+  <div class="section" data-stage="7">
     <h2>Stage 7 — Packing &amp; BL Instruction</h2>
     <?php if (!$stage7 || $stage7['status'] === 'locked'): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
@@ -1405,7 +1405,7 @@ foreach ($stages as $s) {
     <?php endif; ?>
   </div>
 
-  <div class="section">
+  <div class="section" data-stage="8">
     <h2>Stage 8 — Commercial Invoice &amp; Balance Payment</h2>
     <?php
       // Batch 3 #11 — the Commercial Invoice is conventionally dated to match the recorded BL date;
@@ -1617,7 +1617,7 @@ foreach ($stages as $s) {
   </div>
   <?php endif; ?>
 
-  <div class="section">
+  <div class="section" data-stage="9">
     <h2>Stage 9 — Document Despatch &amp; Closure</h2>
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; Order closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
@@ -1853,6 +1853,31 @@ foreach ($stages as $s) {
       e.preventDefault();
       activate(targetPanel.id, true);
       targetPanel.scrollIntoView({ block: 'start' });
+    });
+
+    // Batch 3 #14 — the at-a-glance stepper at the top of the page was
+    // purely visual; clicking a step now jumps straight to whichever
+    // panel covers that stage, exactly like the Order Details "see →"
+    // links above intercept and activate(). Matched via each panel's own
+    // data-stage attribute (set on the Documents & Approvals panel for
+    // Stage 1/Stage 3's PI-Stage Intake panel and on each "Stage N — ..."
+    // panel) rather than by guessing the auto-slugified id, since several
+    // panels share one stage and the slug depends on the heading text.
+    var stepperSteps = document.querySelectorAll('.process-stepper .process-step');
+    function jumpToStage(stageNumber) {
+      var targetPanel = null;
+      panels.forEach(function (p) { if (p.dataset.stage === String(stageNumber)) { targetPanel = p; } });
+      if (!targetPanel) { return; }
+      activate(targetPanel.id, true);
+      targetPanel.scrollIntoView({ block: 'start' });
+    }
+    Array.prototype.forEach.call(stepperSteps, function (step) {
+      var stageNumber = step.dataset.stage;
+      if (!stageNumber) { return; }
+      step.addEventListener('click', function () { jumpToStage(stageNumber); });
+      step.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToStage(stageNumber); }
+      });
     });
 
     var initialId = (window.location.hash || '').replace('#', '');
