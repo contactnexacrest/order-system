@@ -140,6 +140,10 @@ final class DocumentDataAssembler
             'buyer' => [
                 'company_legal_name'     => $order['company_legal_name'],
                 'billing_address'        => $order['billing_address'],
+                'billing_address_line1'  => $order['billing_address_line1'] ?? null,
+                'billing_address_line2'  => $order['billing_address_line2'] ?? null,
+                'billing_city'           => $order['billing_city'] ?? null,
+                'billing_postcode'       => $order['billing_postcode'] ?? null,
                 'consignee_name'         => $order['consignee_name'],
                 'consignee_address'      => $order['consignee_address'],
                 'vat_eori_tax_no'        => $order['vat_eori_tax_no'],
@@ -150,6 +154,8 @@ final class DocumentDataAssembler
                 'notify_party'           => $order['notify_party'],
                 'agreement_footer_text'  => $order['agreement_footer_text'] ?? null,
             ],
+            'consignee' => self::resolveConsignee($order),
+            'notify_party_block' => self::resolveNotifyParty($order, self::resolveConsignee($order)),
             'products' => array_map(static function (array $p): array {
                 return [
                     'description'    => $p['description'],
@@ -710,11 +716,109 @@ final class DocumentDataAssembler
      */
     public static function balanceTriggerSentence(?string $option, ?int $days): string
     {
+        // Calendar Days, not Working Days — NexaCrest_Change_Log.txt's
+        // "Calendar Days standardisation" replacement, applied everywhere
+        // a buyer payment obligation states a day count (dozens of
+        // identical OLD "working days" -> NEW "Calendar Days" entries
+        // across every buyer-facing document in that log). Tier 2's
+        // trigger is also clarified to the date NexaCrest EMAILS the
+        // scanned BL copy, not the BL's own issue date — the two can
+        // differ by however long customs/the shipping line takes to
+        // actually hand the scan over, and only the email date is
+        // something NexaCrest can evidence.
         $days = $days ?? 0;
         if ($option === 'A_BEFORE_SHIPMENT') {
-            return "Payable before shipment — within {$days} working days of receiving shipment readiness confirmation from NexaCrest.";
+            return "Payable before shipment — within {$days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest.";
         }
-        return "Payable against scanned copy of Bill of Lading, within {$days} days of BL date.";
+        return "Payable against scanned copy of Bill of Lading, within {$days} Calendar Days of the date NexaCrest emails the scanned BL copy.";
+    }
+
+    /**
+     * Resolves the Consignee Details section (QT/PI/OC/PL/CI — Developer
+     * Spec Section 5) for one order's client. "Same as Buyer?" (default
+     * checked) means every field below is the BUYER's own current value,
+     * resolved fresh here rather than copied once at data-entry time, so
+     * a later edit to the buyer's own details is reflected automatically
+     * on every document generated after it. Unchecked means the client's
+     * own stored consignee_* columns are used instead — consignee_name/
+     * consignee_address stay the Company Legal Name / Address Line 1
+     * equivalents (pre-existing columns, reused rather than duplicated).
+     *
+     * @return array{same_as_buyer:bool, company_legal_name:?string, address_line1:?string, address_line2:?string, city:?string, postcode:?string, country:?string, vat_eori_tax_no:?string, contact_person:?string, phone:?string, email:?string}
+     */
+    public static function resolveConsignee(array $order): array
+    {
+        $sameAsBuyer = (bool) ($order['consignee_same_as_buyer'] ?? true);
+        if ($sameAsBuyer) {
+            return [
+                'same_as_buyer'      => true,
+                'company_legal_name' => $order['company_legal_name'],
+                'address_line1'      => $order['billing_address_line1'] ?: $order['billing_address'],
+                'address_line2'      => $order['billing_address_line2'] ?? null,
+                'city'               => $order['billing_city'] ?? null,
+                'postcode'           => $order['billing_postcode'] ?? null,
+                'country'            => $order['country_of_destination'] ?? null,
+                'vat_eori_tax_no'    => $order['vat_eori_tax_no'] ?? null,
+                'contact_person'     => $order['contact_person'] ?? null,
+                'phone'              => $order['client_phone'] ?? null,
+                'email'              => $order['client_email'] ?? null,
+            ];
+        }
+        return [
+            'same_as_buyer'      => false,
+            'company_legal_name' => $order['consignee_name'] ?? null,
+            'address_line1'      => $order['consignee_address_line1'] ?: $order['consignee_address'],
+            'address_line2'      => $order['consignee_address_line2'] ?? null,
+            'city'               => $order['consignee_city'] ?? null,
+            'postcode'           => $order['consignee_postcode'] ?? null,
+            'country'            => $order['consignee_country'] ?? null,
+            'vat_eori_tax_no'    => $order['consignee_vat_eori_tax_no'] ?? null,
+            'contact_person'     => $order['consignee_contact_person'] ?? null,
+            'phone'              => $order['consignee_phone'] ?? null,
+            'email'              => $order['consignee_email'] ?? null,
+        ];
+    }
+
+    /**
+     * Resolves the Notify Party section (PI/PL/CI only — Developer Spec
+     * Section 6). "Same as Consignee?" (default checked) resolves from
+     * the ALREADY-RESOLVED Consignee (whatever that computed to —
+     * buyer's own details, or the client's independent consignee data)
+     * for the same always-fresh-not-copied reason as resolveConsignee().
+     * Unchecked uses the client's own stored notify_party_* columns;
+     * notify_party (pre-existing column) stays the Notify Party Name.
+     *
+     * @return array{same_as_consignee:bool, name:?string, address_line1:?string, address_line2:?string, city:?string, postcode:?string, country:?string, contact_person:?string, phone:?string, email:?string}
+     */
+    public static function resolveNotifyParty(array $order, array $resolvedConsignee): array
+    {
+        $sameAsConsignee = (bool) ($order['notify_party_same_as_consignee'] ?? true);
+        if ($sameAsConsignee) {
+            return [
+                'same_as_consignee' => true,
+                'name'              => $resolvedConsignee['company_legal_name'],
+                'address_line1'     => $resolvedConsignee['address_line1'],
+                'address_line2'     => $resolvedConsignee['address_line2'],
+                'city'              => $resolvedConsignee['city'],
+                'postcode'          => $resolvedConsignee['postcode'],
+                'country'           => $resolvedConsignee['country'],
+                'contact_person'    => $resolvedConsignee['contact_person'],
+                'phone'             => $resolvedConsignee['phone'],
+                'email'             => $resolvedConsignee['email'],
+            ];
+        }
+        return [
+            'same_as_consignee' => false,
+            'name'              => $order['notify_party'] ?? null,
+            'address_line1'     => $order['notify_party_address_line1'] ?? null,
+            'address_line2'     => $order['notify_party_address_line2'] ?? null,
+            'city'              => $order['notify_party_city'] ?? null,
+            'postcode'          => $order['notify_party_postcode'] ?? null,
+            'country'           => $order['notify_party_country'] ?? null,
+            'contact_person'    => $order['notify_party_contact_person'] ?? null,
+            'phone'             => $order['notify_party_phone'] ?? null,
+            'email'             => $order['notify_party_email'] ?? null,
+        ];
     }
 
     private static function formatNumber(string|int|float|null $value): string

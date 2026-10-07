@@ -12,6 +12,7 @@ use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\FileStoreRepository;
+use App\Repositories\LookupRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AuthService;
 use App\Services\ClientPortalService;
@@ -36,7 +37,10 @@ final class ClientController
     {
         // Batch 3 #4 — if this page is being shown again after a validation failure on submit,
         // re-populate the form from what was typed rather than making the user retype everything.
-        View::render('clients/create', ['old' => Flash::pullOld()], 'layout/base');
+        View::render('clients/create', [
+            'old' => Flash::pullOld(),
+            'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
+        ], 'layout/base');
     }
 
     public function store(array $params): void
@@ -54,19 +58,16 @@ final class ClientController
         }
 
         $clientUniqueNumber = ReferenceNumberService::generateClientUniqueNumber();
-        $clientId = ClientRepository::create([
+        $clientId = ClientRepository::create(array_merge([
             'company_legal_name'    => $companyLegalName,
             'billing_address'       => $billingAddress,
-            'consignee_name'        => trim((string) ($_POST['consignee_name'] ?? '')) ?: null,
-            'consignee_address'     => trim((string) ($_POST['consignee_address'] ?? '')) ?: null,
             'vat_eori_tax_no'       => trim((string) ($_POST['vat_eori_tax_no'] ?? '')) ?: null,
             'contact_person'        => trim((string) ($_POST['contact_person'] ?? '')) ?: null,
             'email'                 => trim((string) ($_POST['email'] ?? '')) ?: null,
             'phone'                 => trim((string) ($_POST['phone'] ?? '')) ?: null,
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
             'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: 'To Be Confirmed',
-            'notify_party'          => trim((string) ($_POST['notify_party'] ?? '')) ?: null,
-        ], (int) $user['id'], $clientUniqueNumber);
+        ], self::collectPartyFields()), (int) $user['id'], $clientUniqueNumber);
         if (TestModeService::isEnabled()) {
             ClientRepository::markTest($clientId);
         }
@@ -100,6 +101,7 @@ final class ClientController
         View::render('clients/edit', [
             'client' => $client,
             'isSuperAdmin' => SuperAdminService::isEffective((int) $user['id']),
+            'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
         ], 'layout/base');
     }
 
@@ -149,19 +151,16 @@ final class ClientController
             }
         }
 
-        $data = [
+        $data = array_merge([
             'company_legal_name'    => $companyLegalName,
             'billing_address'       => $billingAddress,
-            'consignee_name'        => trim((string) ($_POST['consignee_name'] ?? '')) ?: null,
-            'consignee_address'     => trim((string) ($_POST['consignee_address'] ?? '')) ?: null,
             'vat_eori_tax_no'       => trim((string) ($_POST['vat_eori_tax_no'] ?? '')) ?: null,
             'contact_person'        => trim((string) ($_POST['contact_person'] ?? '')) ?: null,
             'email'                 => trim((string) ($_POST['email'] ?? '')) ?: null,
             'phone'                 => trim((string) ($_POST['phone'] ?? '')) ?: null,
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
             'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: null,
-            'notify_party'          => trim((string) ($_POST['notify_party'] ?? '')) ?: null,
-        ];
+        ], self::collectPartyFields());
 
         $changes = array_filter(
             array_map(
@@ -191,6 +190,77 @@ final class ClientController
 
         Flash::set('success', "{$companyLegalName} updated.");
         header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * Billing address line fields, plus the Consignee/Notify Party "Same
+     * as" blocks: each one's own fields are read from $_POST only when its
+     * checkbox is off, since the checked state leaves them disabled client-
+     * side (so the browser never submits them) — this keeps a stale,
+     * previously-typed value from silently overwriting a flip back to
+     * same-as-buyer/consignee from this same request.
+     */
+    private static function collectPartyFields(): array
+    {
+        $consigneeSameAsBuyer = !empty($_POST['consignee_same_as_buyer']);
+        $notifySameAsConsignee = !empty($_POST['notify_party_same_as_consignee']);
+
+        $fields = [
+            'billing_address_line1'          => trim((string) ($_POST['billing_address_line1'] ?? '')) ?: null,
+            'billing_address_line2'          => trim((string) ($_POST['billing_address_line2'] ?? '')) ?: null,
+            'billing_city'                   => trim((string) ($_POST['billing_city'] ?? '')) ?: null,
+            'billing_postcode'               => trim((string) ($_POST['billing_postcode'] ?? '')) ?: null,
+            'consignee_same_as_buyer'        => $consigneeSameAsBuyer ? 1 : 0,
+            'notify_party_same_as_consignee' => $notifySameAsConsignee ? 1 : 0,
+        ];
+
+        if ($consigneeSameAsBuyer) {
+            $fields['consignee_name'] = null;
+            $fields['consignee_address_line1'] = null;
+            $fields['consignee_address_line2'] = null;
+            $fields['consignee_city'] = null;
+            $fields['consignee_postcode'] = null;
+            $fields['consignee_country'] = null;
+            $fields['consignee_vat_eori_tax_no'] = null;
+            $fields['consignee_contact_person'] = null;
+            $fields['consignee_phone'] = null;
+            $fields['consignee_email'] = null;
+        } else {
+            $fields['consignee_name'] = trim((string) ($_POST['consignee_name'] ?? '')) ?: null;
+            $fields['consignee_address_line1'] = trim((string) ($_POST['consignee_address_line1'] ?? '')) ?: null;
+            $fields['consignee_address_line2'] = trim((string) ($_POST['consignee_address_line2'] ?? '')) ?: null;
+            $fields['consignee_city'] = trim((string) ($_POST['consignee_city'] ?? '')) ?: null;
+            $fields['consignee_postcode'] = trim((string) ($_POST['consignee_postcode'] ?? '')) ?: null;
+            $fields['consignee_country'] = trim((string) ($_POST['consignee_country'] ?? '')) ?: null;
+            $fields['consignee_vat_eori_tax_no'] = trim((string) ($_POST['consignee_vat_eori_tax_no'] ?? '')) ?: null;
+            $fields['consignee_contact_person'] = trim((string) ($_POST['consignee_contact_person'] ?? '')) ?: null;
+            $fields['consignee_phone'] = trim((string) ($_POST['consignee_phone'] ?? '')) ?: null;
+            $fields['consignee_email'] = trim((string) ($_POST['consignee_email'] ?? '')) ?: null;
+        }
+
+        if ($notifySameAsConsignee) {
+            $fields['notify_party'] = null;
+            $fields['notify_party_address_line1'] = null;
+            $fields['notify_party_address_line2'] = null;
+            $fields['notify_party_city'] = null;
+            $fields['notify_party_postcode'] = null;
+            $fields['notify_party_country'] = null;
+            $fields['notify_party_contact_person'] = null;
+            $fields['notify_party_phone'] = null;
+            $fields['notify_party_email'] = null;
+        } else {
+            $fields['notify_party'] = trim((string) ($_POST['notify_party'] ?? '')) ?: null;
+            $fields['notify_party_address_line1'] = trim((string) ($_POST['notify_party_address_line1'] ?? '')) ?: null;
+            $fields['notify_party_address_line2'] = trim((string) ($_POST['notify_party_address_line2'] ?? '')) ?: null;
+            $fields['notify_party_city'] = trim((string) ($_POST['notify_party_city'] ?? '')) ?: null;
+            $fields['notify_party_postcode'] = trim((string) ($_POST['notify_party_postcode'] ?? '')) ?: null;
+            $fields['notify_party_country'] = trim((string) ($_POST['notify_party_country'] ?? '')) ?: null;
+            $fields['notify_party_contact_person'] = trim((string) ($_POST['notify_party_contact_person'] ?? '')) ?: null;
+            $fields['notify_party_phone'] = trim((string) ($_POST['notify_party_phone'] ?? '')) ?: null;
+            $fields['notify_party_email'] = trim((string) ($_POST['notify_party_email'] ?? '')) ?: null;
+        }
+
+        return $fields;
     }
 
     /**

@@ -118,7 +118,10 @@ final class DocumentGenerationService
             ?? ReferenceNumberService::generateDocumentRef((int) $docType['id']);
 
         $watermark = self::withRevisionStamp(self::draftWatermark(), $clientRevisionNumber, $docType['category'] ?? null);
-        $terms = self::resolveTerms($documentTypeCode, $data);
+        $balanceTriggerOption = $order['balance_trigger_option'] ?? null;
+        $terms = self::resolveTerms($documentTypeCode, $data, $balanceTriggerOption);
+        $legalTerms = self::resolveClauseGroup($documentTypeCode, 'legal_terms', $data, $balanceTriggerOption);
+        $definitions = self::resolveClauseGroup($documentTypeCode, 'definitions', $data, $balanceTriggerOption);
         $signatory = DocumentDataAssembler::signatoryBlock((int) $docType['id'], $signatoryOverrideUserId);
 
         $context = array_merge($data, [
@@ -136,6 +139,9 @@ final class DocumentGenerationService
             'terms' => $terms,
             'terms_section_number' => self::termsSectionNumberFor($documentTypeCode),
             'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
+            'legal_terms_clauses' => $legalTerms,
+            'definition_clauses' => $definitions,
+            'legal_terms_section_number' => self::legalTermsSectionNumberFor($documentTypeCode),
             'signatory' => $signatory,
         ]);
 
@@ -1081,7 +1087,7 @@ final class DocumentGenerationService
             'OC' => 'ORDER CONFIRMATION',
             'BUYERPO' => 'PURCHASE ORDER',
             'SUPPO' => 'PURCHASE ORDER — MATERIAL PROCUREMENT',
-            'FDN' => 'FREIGHT DEBIT NOTE',
+            'FDN' => 'DEBIT NOTE',
             'PL' => 'PACKING LIST',
             'BLI' => 'BILL OF LADING INSTRUCTION SHEET',
             'CI' => 'COMMERCIAL INVOICE',
@@ -1114,10 +1120,15 @@ final class DocumentGenerationService
 
     private static function termsSectionNumberFor(string $code): int
     {
+        // QT/OC moved from 7->8 and PI from 9->10 when the Buyer/
+        // Consignee split (and PI's own new Notify Party section) added
+        // one (QT/OC) or two (PI) sections ahead of this one — see
+        // legalTermsSectionNumberFor() just below for the section that
+        // now follows this one in every case.
         return match ($code) {
-            'QT' => 7,
-            'PI' => 9,
-            'OC' => 7,
+            'QT' => 8,
+            'PI' => 10,
+            'OC' => 8,
             'BUYERPO' => 5,
             'SUPPO' => 6, // "6. QUALITY & INSPECTION" in the source template
             default => 9,
@@ -1141,25 +1152,74 @@ final class DocumentGenerationService
     }
 
     /** @return string[] fully-substituted clause text, in order */
-    private static function resolveTerms(string $documentTypeCode, array $data): array
+    private static function resolveTerms(string $documentTypeCode, array $data, ?string $balanceTriggerOption): array
     {
-        $clauses = TermsClauseRepository::forDocumentTypeCode($documentTypeCode);
+        $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, 'standard', $balanceTriggerOption);
+        return array_map(
+            static fn(array $c) => strtr($c['text'], self::clauseTextReplacements($data)),
+            $clauses
+        );
+    }
+
+    /**
+     * Legal Terms (red box) / Definitions (blue box) — Section [N] of
+     * every buyer-facing document (never BLI). Same admin-editable
+     * tc_clauses table as resolveTerms() above, filtered to
+     * clause_group instead of 'standard', and run through the same
+     * placeholder substitution for consistency even though neither
+     * group's seeded text currently uses one.
+     *
+     * @return array<int, array{title:string, text:string}>
+     */
+    private static function resolveClauseGroup(string $documentTypeCode, string $clauseGroup, array $data, ?string $balanceTriggerOption): array
+    {
+        $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, $clauseGroup, $balanceTriggerOption);
+        $replacements = self::clauseTextReplacements($data);
+        return array_map(
+            static fn(array $c) => ['title' => $c['title'], 'text' => strtr($c['text'], $replacements)],
+            $clauses
+        );
+    }
+
+    /** @return array<string,string> */
+    private static function clauseTextReplacements(array $data): array
+    {
         $tolerance = CompanySettingsRepository::get('quantity_shortfall_tolerance_pct') ?? '5';
         $quotationValidityDays = CompanySettingsRepository::get('quotation_validity_days') ?? '30';
         $piValidityDays = CompanySettingsRepository::get('pi_validity_days') ?? '15';
 
-        $replacements = [
+        return [
             '{tolerance}'                => rtrim(rtrim($tolerance, '0'), '.'),
             '{advance_pct}'              => $data['financial']['advance_pct'],
             '{balance_pct}'              => $data['financial']['balance_pct'],
             '{quotation_validity_days}'  => $quotationValidityDays,
             '{pi_validity_days}'         => $piValidityDays,
         ];
+    }
 
-        return array_map(
-            static fn(array $c) => strtr($c['text'], $replacements),
-            $clauses
-        );
+    /**
+     * Section number of "LEGAL TERMS & DEFINITIONS" per document type —
+     * matches the real position of that section in each type's own
+     * numbering (NexaCrest_Developer_Spec.txt Section 3), not a fixed
+     * constant across all of them, since some documents (PI/CI) carry
+     * more preceding sections than others. null = this document type
+     * never gets the section at all (BLI, and every internal-only type:
+     * SUPPO/COOPREP/AMD/CAFIN/CHECKLIST* — none of those are buyer-facing
+     * contracts, so there is nothing here for a buyer to need defined).
+     */
+    private static function legalTermsSectionNumberFor(string $code): ?int
+    {
+        return match ($code) {
+            'QT' => 9,
+            'PI' => 11,
+            'OC' => 9,
+            'PL' => 8,
+            'CI' => 11,
+            'FDN' => 7,
+            'BUYERPO' => 8,
+            'ANNEXA' => 8,
+            default => null,
+        };
     }
 
     private static function sanitizePathSegment(string $value): string

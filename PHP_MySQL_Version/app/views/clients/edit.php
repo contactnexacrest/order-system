@@ -1,4 +1,4 @@
-<?php use App\Helpers\Csrf; $locked = (int) $client['is_data_locked'] === 1; ?>
+<?php use App\Helpers\Csrf; $locked = (int) $client['is_data_locked'] === 1; $cooTypes = $cooTypes ?? []; ?>
 <div class="card">
   <h1>Edit Client</h1>
   <p class="muted small"><a href="/clients/<?= (int) $client['id'] ?>">&larr; Back to Client</a></p>
@@ -23,19 +23,63 @@
 
   <form method="post" action="/clients/<?= (int) $client['id'] ?>/update">
     <?= Csrf::field() ?>
-    <?php $ro = ($locked && !$isSuperAdmin) ? 'readonly disabled' : ''; ?>
-    <fieldset <?= $locked && !$isSuperAdmin ? 'disabled' : '' ?>>
-      <legend>Buyer / Consignee</legend>
+    <?php $fieldsetDisabled = $locked && !$isSuperAdmin; ?>
+    <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
+      <legend>Buyer Details</legend>
       <label>Company Legal Name *<input type="text" name="company_legal_name" value="<?= htmlspecialchars($client['company_legal_name']) ?>" required></label>
       <label>Billing Address *<textarea name="billing_address" rows="2" required><?= htmlspecialchars($client['billing_address']) ?></textarea></label>
-      <label>Consignee Name <small class="muted">(leave blank if same as buyer)</small><input type="text" name="consignee_name" value="<?= htmlspecialchars($client['consignee_name'] ?? '') ?>"></label>
-      <label>Consignee Address <small class="muted">(leave blank if same as buyer)</small><textarea name="consignee_address" rows="2"><?= htmlspecialchars($client['consignee_address'] ?? '') ?></textarea></label>
+      <label>Billing Address Line 1<input type="text" name="billing_address_line1" value="<?= htmlspecialchars($client['billing_address_line1'] ?? '') ?>"></label>
+      <label>Billing Address Line 2<input type="text" name="billing_address_line2" value="<?= htmlspecialchars($client['billing_address_line2'] ?? '') ?>"></label>
+      <label>City / Town<input type="text" name="billing_city" value="<?= htmlspecialchars($client['billing_city'] ?? '') ?>"></label>
+      <label>Postcode<input type="text" name="billing_postcode" value="<?= htmlspecialchars($client['billing_postcode'] ?? '') ?>"></label>
       <label>VAT / EORI / Tax Reg. No.<input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($client['vat_eori_tax_no'] ?? '') ?>"></label>
       <label>Country of Destination<input type="text" name="country_of_destination" value="<?= htmlspecialchars($client['country_of_destination'] ?? '') ?>"></label>
-      <label>Certificate of Origin Type<input type="text" name="coo_type" value="<?= htmlspecialchars($client['coo_type'] ?? '') ?>" placeholder="e.g. Non-Preferential"></label>
-      <label>Notify Party <small class="muted">(leave blank for "SAME as buyer")</small><input type="text" name="notify_party" value="<?= htmlspecialchars($client['notify_party'] ?? '') ?>"></label>
+      <label>Certificate of Origin Type
+        <select name="coo_type">
+          <option value="">— To Be Confirmed —</option>
+          <?php foreach ($cooTypes as $o): ?>
+            <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= (($client['coo_type'] ?? '') === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
     </fieldset>
-    <fieldset <?= $locked && !$isSuperAdmin ? 'disabled' : '' ?>>
+
+    <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
+      <legend>Consignee Details</legend>
+      <?php $consigneeSame = (int) ($client['consignee_same_as_buyer'] ?? 1) === 1; ?>
+      <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" <?= $consigneeSame ? 'checked' : '' ?>> Same as Buyer</label>
+      <div id="consignee_fields" style="display:none">
+        <label>Consignee Company Name<input type="text" name="consignee_name" value="<?= htmlspecialchars($client['consignee_name'] ?? '') ?>"></label>
+        <label>Address Line 1<input type="text" name="consignee_address_line1" value="<?= htmlspecialchars($client['consignee_address_line1'] ?? '') ?>"></label>
+        <label>Address Line 2<input type="text" name="consignee_address_line2" value="<?= htmlspecialchars($client['consignee_address_line2'] ?? '') ?>"></label>
+        <label>City / Town<input type="text" name="consignee_city" value="<?= htmlspecialchars($client['consignee_city'] ?? '') ?>"></label>
+        <label>Postcode<input type="text" name="consignee_postcode" value="<?= htmlspecialchars($client['consignee_postcode'] ?? '') ?>"></label>
+        <label>Country<input type="text" name="consignee_country" value="<?= htmlspecialchars($client['consignee_country'] ?? '') ?>"></label>
+        <label>VAT / EORI / Tax Reg. No.<input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($client['consignee_vat_eori_tax_no'] ?? '') ?>"></label>
+        <label>Contact Person<input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($client['consignee_contact_person'] ?? '') ?>"></label>
+        <label>Phone<input type="text" name="consignee_phone" value="<?= htmlspecialchars($client['consignee_phone'] ?? '') ?>"></label>
+        <label>Email<input type="email" name="consignee_email" value="<?= htmlspecialchars($client['consignee_email'] ?? '') ?>"></label>
+      </div>
+    </fieldset>
+
+    <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
+      <legend>Notify Party</legend>
+      <?php $notifySame = (int) ($client['notify_party_same_as_consignee'] ?? 1) === 1; ?>
+      <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" <?= $notifySame ? 'checked' : '' ?>> Same as Consignee</label>
+      <div id="notify_party_fields" style="display:none">
+        <label>Notify Party Name<input type="text" name="notify_party" value="<?= htmlspecialchars($client['notify_party'] ?? '') ?>"></label>
+        <label>Address Line 1<input type="text" name="notify_party_address_line1" value="<?= htmlspecialchars($client['notify_party_address_line1'] ?? '') ?>"></label>
+        <label>Address Line 2<input type="text" name="notify_party_address_line2" value="<?= htmlspecialchars($client['notify_party_address_line2'] ?? '') ?>"></label>
+        <label>City / Town<input type="text" name="notify_party_city" value="<?= htmlspecialchars($client['notify_party_city'] ?? '') ?>"></label>
+        <label>Postcode<input type="text" name="notify_party_postcode" value="<?= htmlspecialchars($client['notify_party_postcode'] ?? '') ?>"></label>
+        <label>Country<input type="text" name="notify_party_country" value="<?= htmlspecialchars($client['notify_party_country'] ?? '') ?>"></label>
+        <label>Contact Person<input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($client['notify_party_contact_person'] ?? '') ?>"></label>
+        <label>Phone<input type="text" name="notify_party_phone" value="<?= htmlspecialchars($client['notify_party_phone'] ?? '') ?>"></label>
+        <label>Email<input type="email" name="notify_party_email" value="<?= htmlspecialchars($client['notify_party_email'] ?? '') ?>"></label>
+      </div>
+    </fieldset>
+
+    <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
       <legend>Contact</legend>
       <label>Contact Person<input type="text" name="contact_person" value="<?= htmlspecialchars($client['contact_person'] ?? '') ?>"></label>
       <label>Email<input type="email" name="email" value="<?= htmlspecialchars($client['email'] ?? '') ?>"></label>
@@ -67,3 +111,22 @@
     <button type="submit">Save Agreement Footer</button>
   </form>
 </div>
+<script>
+(function () {
+  function wireSameAs(checkboxId, fieldsId) {
+    var checkbox = document.getElementById(checkboxId);
+    var container = document.getElementById(fieldsId);
+    if (!checkbox || !container) { return; }
+    var inputs = container.querySelectorAll('input, textarea, select');
+    function apply() {
+      var same = checkbox.checked;
+      container.style.display = same ? 'none' : 'block';
+      inputs.forEach(function (el) { el.disabled = same; });
+    }
+    checkbox.addEventListener('change', apply);
+    apply();
+  }
+  wireSameAs('consignee_same_as_buyer', 'consignee_fields');
+  wireSameAs('notify_party_same_as_consignee', 'notify_party_fields');
+})();
+</script>

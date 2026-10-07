@@ -16,7 +16,7 @@
 {% block banner %}
 <div class="banner banner-red">
   <span class="headline">&#9201;&nbsp; PAYMENT REQUIRED BEFORE SHIPMENT</span>
-  <span class="sub">Payment of this Freight Debit Note is required within <strong>3 working days</strong> of the date above. NexaCrest will confirm shipment booking and hand over cargo to the shipping line <strong>only upon receipt of full freight payment.</strong></span>
+  <span class="sub">Payment of this Debit Note is required within <strong>3 Calendar Days</strong> of the date above. NexaCrest will confirm shipment booking and hand over cargo to the shipping line <strong>only upon receipt of full freight payment.</strong></span>
 </div>
 {% endblock %}
 
@@ -70,7 +70,7 @@
     <td>GST / IGST (if applicable)</td>
     <td></td>
     <td class="num">{{ freight.gst_treatment == 'IGST_18' ? '18% IGST' : 'NIL' }}</td>
-    <td class="placeholder-italic" style="font-size:8.5pt;">As advised by CA — NIL if pure cost reimbursement</td>
+    <td class="placeholder-italic" style="font-size:8.5pt;">{{ freight.gst_treatment == 'IGST_18' ? 'Treated as taxable service supply' : 'Treated as pure cost reimbursement' }}</td>
   </tr>
 </table>
 <table class="totals">
@@ -79,10 +79,10 @@
 
 <div class="section-title">5. PAYMENT INSTRUCTIONS</div>
 <div class="banner banner-red" style="text-align:left; font-size:9.5pt; font-weight:normal;">
-  <p style="margin:0 0 4pt;"><strong>Payment Due:</strong> <span style="color:#5A1414;">Within 3 working days of this Debit Note date — by <em>{{ freight.payment_due_date ?: 'To Be Confirmed' }}</em></span> <strong style="color:#C0392B;">*</strong></p>
+  <p style="margin:0 0 4pt;"><strong>Payment Due:</strong> <span style="color:#5A1414;">Within 3 Calendar Days of this Debit Note date — by <em>{{ freight.payment_due_date ?: 'To Be Confirmed' }}</em></span> <strong style="color:#C0392B;">*</strong></p>
   <p style="margin:0 0 4pt;"><strong>Payment Method:</strong> <span style="color:#5A1414;">T/T (Telegraphic Transfer) to the NexaCrest bank account below</span></p>
   <p style="margin:0 0 4pt;"><strong>Reference:</strong> <span style="color:#5A1414;">Quote Debit Note No. <em>{{ meta.document_reference }}</em> and PI No. <em>{{ order.pi_ref ?: '—' }}</em> in the remittance</span></p>
-  <p style="margin:0;"><strong>&#9888; Critical:</strong> <span style="color:#5A1414;">Share bank remittance copy as per Section 1 contact details above immediately after payment. Shipment booking will be confirmed only upon verification of freight receipt.</span></p>
+  <p style="margin:0;"><strong>&#9888; Critical:</strong> <span style="color:#5A1414;">Share bank remittance copy as per Section 1 contact details above within 24 hours of payment. Shipment booking will be confirmed only upon verification of freight receipt.</span></p>
 </div>
 
 <div class="section-title">6. BANK DETAILS &nbsp;(for freight T/T payment)</div>

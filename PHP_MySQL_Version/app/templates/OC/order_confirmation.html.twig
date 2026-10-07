@@ -22,18 +22,10 @@
 
 {% block body %}
 
-<div class="section-title">2. BUYER / CONSIGNEE DETAILS</div>
-<table class="kv">
-  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
-  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
-  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Phone *</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
-</table>
+{% include '_buyer_details.html.twig' with {'section_number': 2} %}
+{% include '_consignee_details.html.twig' with {'section_number': 3} %}
 
-<div class="section-title">3. ORDER SUMMARY</div>
+<div class="section-title">4. ORDER SUMMARY</div>
 {% set productList = [] %}
 {% for p in products %}
   {% set productList = productList|merge([p.description ~ ' (Qty: ' ~ p.quantity ~ ' ' ~ p.unit ~ ')']) %}
@@ -50,18 +42,18 @@
   <tr><td class="k">Certificate of Origin</td><td class="v">{{ order.coo_type }}</td></tr>
 </table>
 
-<div class="section-title">4. PAYMENT STATUS</div>
+<div class="section-title">5. PAYMENT STATUS</div>
 <table class="kv">
   <tr><td class="k">{{ financial.advance_pct }}% Advance (USD) *</td><td class="v">{{ payment_status.advance_amount ?: financial.advance_amount }}</td></tr>
   <tr><td class="k">Advance T/T Received On *</td><td class="v">{{ payment_status.advance_remittance_received_at ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Balance Due (USD) *</td><td class="v">{{ payment_status.balance_amount ?: financial.balance_amount }} <span style="font-size:8.5pt; color:#5B6573;">&nbsp;—&nbsp;{{ financial.balance_terms_text }}</span></td></tr>
   <tr><td class="k">Currency</td><td class="v" style="font-weight:bold;">USD (always)</td></tr>
   {% if not order.is_fob %}
-  <tr><td class="k" style="background:#FBEAEA; color:#8A1F1F;">CFR / CIF Freight <span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(if applicable)</span></td><td class="v" style="background:#FBEAEA; color:#5A1414; font-size:8.5pt;">A Freight Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. <strong style="color:#8A1F1F;">Payment required within 3 working days of the Debit Note date.</strong> <strong style="color:#8A1F1F;">NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.</strong></td></tr>
+  <tr><td class="k" style="background:#FBEAEA; color:#8A1F1F;">CFR / CIF Freight <span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(if applicable)</span></td><td class="v" style="background:#FBEAEA; color:#5A1414; font-size:8.5pt;">A Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. <strong style="color:#8A1F1F;">Payment required within 3 Calendar Days of the Debit Note date.</strong> <strong style="color:#8A1F1F;">NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.</strong></td></tr>
   {% endif %}
 </table>
 
-<div class="section-title">5. PRODUCTION &amp; ESTIMATED SHIPMENT</div>
+<div class="section-title">6. PRODUCTION &amp; ESTIMATED SHIPMENT</div>
 <table class="kv">
   <tr><td colspan="2" style="background:#F1F5F9;">
     <p style="margin:0 0 4pt;"><strong style="color:#17233A;">Production status: </strong>{{ order.production_status_text }} &nbsp;&nbsp; <strong style="color:#17233A;">Estimated shipment: </strong><span style="font-style:italic; color:#5B6573;">{{ order.est_shipment_date_text }}</span> <span style="font-weight:bold; color:#C0392B;">*</span></p>
@@ -69,7 +61,7 @@
   </td></tr>
 </table>
 
-<div class="section-title">6. DOCUMENTS TO BE PROVIDED</div>
+<div class="section-title">7. DOCUMENTS TO BE PROVIDED</div>
 <table class="kv">
   <tr><td colspan="2">
     <p style="margin:0 0 4pt;"><strong>Upon shipment, the following documents will be provided:</strong></p>

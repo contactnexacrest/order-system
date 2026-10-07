@@ -18,23 +18,15 @@
 
 {% block body %}
 
-<div class="section-title">2. BUYER / CONSIGNEE DETAILS</div>
+{% include '_buyer_details.html.twig' with {'section_number': 2} %}
+{% include '_consignee_details.html.twig' with {'section_number': 3} %}
+{% include '_notify_party.html.twig' with {'section_number': 4} %}
 <table class="kv">
-  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
-  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
-  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Certificate of Origin Type</td><td class="v">{{ order.coo_type }}</td></tr>
   <tr><td class="k">Buyer's PO / Ref No.</td><td class="v">{{ order.buyers_po_ref }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Phone</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
-  <tr><td class="k">Notify Party</td><td class="v">{{ buyer.notify_party ?: 'SAME as buyer' }}</td></tr>
 </table>
 
-<div class="section-title">3. PRODUCT / ORDER DETAILS</div>
+<div class="section-title">5. PRODUCT / ORDER DETAILS</div>
 <table class="products">
   <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
   {% for p in products %}
@@ -73,10 +65,10 @@
 <table class="totals">
   <tr><td class="k">FOB Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.fob_value }}</td></tr>
   <tr><td class="k">Freight ({{ order.currency_code }})</td><td class="v">
-    {% if order.is_fob %}NIL — freight arranged by buyer.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_low ?: 'XXX' }}–{{ order.indicative_freight_high ?: 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}. Subject to confirmation at time of booking. Actual freight confirmed and recovered IN ADVANCE by separate Freight Debit Note when cargo is packed and ready — payment required within 3 working days, and must be received BEFORE shipment booking is confirmed.{% endif %}
+    {% if order.is_fob %}NIL — freight arranged by buyer.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_low ?: 'XXX' }}–{{ order.indicative_freight_high ?: 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}. Subject to confirmation at time of booking. Actual freight confirmed and recovered IN ADVANCE by separate Debit Note when cargo is packed and ready — payment required within 3 Calendar Days, and must be received BEFORE shipment booking is confirmed.{% endif %}
   </td></tr>
   <tr><td class="k">Insurance ({{ order.currency_code }})</td><td class="v">
-    {% if order.is_fob %}NIL — buyer's responsibility.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount ?: 'XX' }}. Confirmed by Freight Debit Note when cargo is ready.{% endif %}
+    {% if order.is_fob %}NIL — buyer's responsibility.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount ?: 'XX' }}. Confirmed by Debit Note when cargo is ready.{% endif %}
   </td></tr>
   <tr class="highlight"><td class="k">TOTAL PI VALUE ({{ order.currency_code }}) *</td><td class="v">{{ financial.total_value }}</td></tr>
 </table>
@@ -91,7 +83,7 @@
   <tr><td>Package Type</td><td>{{ order.estimated_package_type }}</td><td>—</td></tr>
 </table>
 
-<div class="section-title">4. SHIPPING / COMMERCIAL TERMS</div>
+<div class="section-title">6. SHIPPING / COMMERCIAL TERMS</div>
 <table class="kv">
   <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
@@ -101,19 +93,18 @@
   <tr><td class="k">Insurance</td><td class="v">{% if order.is_fob %}Buyer's responsibility.{% else %}Seller arranges — cost included in invoice.{% endif %}</td></tr>
 </table>
 
-<div class="section-title">5. PAYMENT TERMS</div>
+<div class="section-title">7. PAYMENT TERMS</div>
 <div class="bullet-block">
-  <p>&#8226; {{ financial.advance_pct }}% advance T/T (Telegraphic Transfer) on FOB Value against this document. <span class="mand-star">*</span></p>
+  <p>&#8226; {{ financial.advance_pct }}% Advance Payment on FOB Value against this document. <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.advance_amount }} <span class="mand-star">*</span></p>
-  <p>&#8226; {{ financial.balance_pct }}% balance T/T on FOB Value {% if financial.balance_trigger_option == 'A_BEFORE_SHIPMENT' %}payable before shipment — within {{ financial.balance_days }} working days of receiving shipment readiness confirmation from NexaCrest.{% else %}payable against scanned copy of Bill of Lading, within {{ financial.balance_days }} days of BL date.{% endif %} <span class="mand-star">*</span></p>
+  <p>&#8226; {{ financial.balance_pct }}% Balance Payment on FOB Value {{ financial.balance_terms_text }} <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }} <span class="mand-star">*</span></p>
   {% if not order.is_fob %}
-  <p>&#8226; Freight &amp; Insurance (CFR/CIF orders only): <span class="sub-line">Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 working days of Freight Debit Note date.</span></p>
+  <p>&#8226; Freight &amp; Insurance (CFR/CIF orders only): <span class="sub-line">Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.</span></p>
   {% endif %}
   <p>&nbsp;&nbsp;Currency: {{ order.currency_code }}</p>
 </div>
 
-<div class="section-title">6. PRODUCTION &amp; ESTIMATED SHIPMENT</div>
 <table class="kv">
   <tr><td colspan="2" style="background:#F1F5F9;">
     <p style="margin:0 0 4pt;"><strong style="color:#17233A;">Production status: </strong>{{ order.production_status_text }} &nbsp;&nbsp; <strong style="color:#17233A;">Estimated shipment: </strong><span style="font-style:italic; color:#5B6573;">{{ order.est_shipment_date_text }}</span> <span style="font-weight:bold; color:#C0392B;">*</span></p>
@@ -121,7 +112,7 @@
   </td></tr>
 </table>
 
-<div class="section-title">7. BANK DETAILS</div>
+<div class="section-title">8. BANK DETAILS</div>
 <table class="kv">
   <tr><td class="k">Account Holder</td><td class="v">{{ company.legal_name|upper }}</td></tr>
   <tr><td class="k">Bank</td><td class="v">{{ company.bank_name }}</td></tr>
@@ -131,16 +122,20 @@
   <tr><td class="k">SWIFT / BIC</td><td class="v">{{ company.swift_bic }}</td></tr>
   <tr><td class="k">Bank Address</td><td class="v">{{ company.bank_address }}</td></tr>
   <tr><td class="k">Payment Reference</td><td class="v" style="color:#185FA5;">Please quote PI No. {{ meta.document_reference }} in your wire transfer remarks.</td></tr>
-  <tr><td class="k">RBI Purpose Code</td><td class="v" style="color:#185FA5; font-weight:bold;">{{ company.rbi_purpose_code_advance }} — enter in the "Purpose of Remittance" field of your wire transfer form.</td></tr>
+  <tr><td class="k">RBI Purpose Code</td><td class="v" style="color:#185FA5;">
+    <strong>P0103</strong> — Advance Payment &nbsp;|&nbsp; <strong>P0102</strong> — Balance Payment &nbsp;|&nbsp; <strong>P0602</strong> — Freight/Insurance Recovery &nbsp;|&nbsp; <strong>P1022</strong> — Inspection/Certificate Fees &nbsp;|&nbsp; <strong>P0214</strong> — Port/Demurrage Recovery &nbsp;|&nbsp; <strong>P0701</strong> — Bank Charge Recovery &nbsp;|&nbsp; <strong>P1099</strong> — Any Other Export-Related Charge
+    <br>Enter the applicable code in the "Purpose of Remittance" field of your wire transfer form.
+    <br><span style="font-style:italic; font-size:8.5pt; color:#5B6573;">Purpose codes are indicative — confirm with your bank at time of remittance.</span>
+  </td></tr>
 </table>
 
-<div class="section-title">8. EXPORT DOCUMENTATION</div>
+<div class="section-title">9. EXPORT DOCUMENTATION</div>
 <div class="numbered-block">
   <p><strong>Upon shipment, the following documents will be provided:</strong></p>
-  <p>1.&nbsp;&nbsp;Commercial Invoice (signed and stamped)</p>
-  <p>2.&nbsp;&nbsp;Packing List (signed and stamped)</p>
+  <p>1.&nbsp;&nbsp;Commercial Invoice (digitally authorised)</p>
+  <p>2.&nbsp;&nbsp;Packing List (digitally authorised)</p>
   <p>3.&nbsp;&nbsp;Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL</p>
-  <p>4.&nbsp;&nbsp;Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after {{ financial.balance_pct }}% balance T/T is received and cleared in NexaCrest bank account</p>
+  <p>4.&nbsp;&nbsp;Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest</p>
   <p>5.&nbsp;&nbsp;Fumigation Certificate — provided as standard with every shipment</p>
 </div>
 

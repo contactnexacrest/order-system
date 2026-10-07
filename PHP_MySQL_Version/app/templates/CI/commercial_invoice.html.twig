@@ -17,20 +17,11 @@
 
 {% block body %}
 
-<div class="section-title">2. BUYER / CONSIGNEE</div>
-<table class="kv">
-  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
-  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
-  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Notify Party</td><td class="v">{{ buyer.notify_party ?: 'SAME as consignee' }}</td></tr>
-  <tr><td class="k">Country of Final Destination *</td><td class="v">{{ buyer.country_of_destination ?: 'To Be Confirmed' }}</td></tr>
-</table>
+{% include '_buyer_details.html.twig' with {'section_number': 2} %}
+{% include '_consignee_details.html.twig' with {'section_number': 3} %}
+{% include '_notify_party.html.twig' with {'section_number': 4} %}
 
-<div class="section-title">3. SHIPPING DETAILS</div>
+<div class="section-title">5. SHIPPING DETAILS</div>
 <table class="kv">
   <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
@@ -42,7 +33,7 @@
   <tr><td class="k">No. of Packages *</td><td class="v">{{ packing.crate_count ? packing.crate_count ~ ' Wooden Crates' : 'To Be Confirmed' }} — must match Packing List</td></tr>
 </table>
 
-<div class="section-title">4. PRODUCT / ORDER DETAILS</div>
+<div class="section-title">6. PRODUCT / ORDER DETAILS</div>
 <p class="placeholder-italic" style="font-size:9pt; margin:0 0 4pt;">Quantities and values below reflect ACTUAL shipment — must match Packing List. Must not exceed PI quantities.</p>
 <table class="products">
   <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
@@ -82,8 +73,8 @@
   {%- if crates|length > 1 %} — Crates {{ (crates|first).crate_no }} to {{ (crates|last).crate_no }}{% else %} — Crate {{ (crates|first).crate_no }}{% endif -%}
 {%- endif -%}.</p>
 
-<div class="section-title">5. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
-<div class="banner" style="background:#E8F1FB; color:#185FA5;">FOB Value is the basis for all payments and required for Indian Shipping Bill &amp; IGST refund. Freight &amp; Insurance (if applicable) are recovered separately via Freight Debit Note and are not included in this Commercial Invoice value.</div>
+<div class="section-title">7. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
+<div class="banner" style="background:#E8F1FB; color:#185FA5;">FOB Value is the basis for all payments and required for Indian Shipping Bill &amp; IGST refund. Freight &amp; Insurance (if applicable) are recovered separately via Debit Note and are not included in this Commercial Invoice value.</div>
 
 <table class="kv" style="table-layout:fixed;">
   <tr><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION A — INVOICE VALUE</td></tr>
@@ -96,7 +87,7 @@
     <td class="k">Freight &amp; Insurance</td>
     <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB order <strong style="color:#C0392B;">*</strong>{% else %}Paid via FDN <strong style="color:#C0392B;">*</strong>{% endif %}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">
-      {% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}Paid separately via Freight Debit Note No. {{ order.fdn_ref ?: 'To Be Confirmed' }} dated {{ order.fdn_date ?: 'To Be Confirmed' }}. Not included in CI value.{% endif %}
+      {% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}Paid separately via Debit Note No. {{ order.fdn_ref ?: 'To Be Confirmed' }} dated {{ order.fdn_date ?: 'To Be Confirmed' }}. Not included in CI value.{% endif %}
     </td>
   </tr>
   <tr>
@@ -133,7 +124,7 @@
 </table>
 <p class="mandatory-note" style="margin-top:6pt;"><strong>Total Invoice Value in Words ({{ order.currency_code }}):</strong> <span class="placeholder-italic">{{ financial.fob_value_in_words ?: '_________________________________________________________' }}</span> <strong style="color:#C0392B;">*</strong></p>
 
-<div class="section-title">6. BANK DETAILS &nbsp;(for balance T/T payment)</div>
+<div class="section-title">8. BANK DETAILS &nbsp;(for balance T/T payment)</div>
 <table class="kv">
   <tr><td class="k">Account Holder</td><td class="v">{{ company.legal_name|upper }}</td></tr>
   <tr><td class="k">Bank</td><td class="v">{{ company.bank_name }}</td></tr>
@@ -146,17 +137,17 @@
   <tr><td class="k">RBI Purpose Code</td><td class="v" style="color:#185FA5; font-weight:bold;">{{ company.rbi_purpose_code_balance }} — enter in the "Purpose of Remittance" field of your wire transfer form.</td></tr>
 </table>
 
-<div class="section-title">7. DOCUMENTS PROVIDED WITH THIS SHIPMENT</div>
+<div class="section-title">9. DOCUMENTS PROVIDED WITH THIS SHIPMENT</div>
 <div class="numbered-block">
   <p><strong>The following documents are provided with this shipment:</strong></p>
-  <p>1.&nbsp;&nbsp;Commercial Invoice (this document — signed and stamped)</p>
-  <p>2.&nbsp;&nbsp;Packing List (signed and stamped)</p>
+  <p>1.&nbsp;&nbsp;Commercial Invoice (this document — digitally authorised)</p>
+  <p>2.&nbsp;&nbsp;Packing List (digitally authorised)</p>
   <p>3.&nbsp;&nbsp;Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL</p>
-  <p>4.&nbsp;&nbsp;Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared</p>
+  <p>4.&nbsp;&nbsp;Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest</p>
   <p>5.&nbsp;&nbsp;Fumigation Certificate — provided as standard with every shipment</p>
 </div>
 
-<div class="section-title">8. DECLARATION</div>
+<div class="section-title">10. DECLARATION</div>
 <div class="numbered-block" style="font-style:italic; color:#5B6573;">
   <p style="margin:0 0 4pt;">We hereby declare that the goods described in this Commercial Invoice are of Indian origin and that the particulars given are true and correct.</p>
   <p style="margin:0;">This invoice is issued under Letter of Undertaking (LUT Order No. {{ company.lut_number }}) for export of goods without payment of IGST under the provisions of the IGST Act, 2017.</p>

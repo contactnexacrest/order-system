@@ -1,0 +1,20 @@
+{#
+  Buyer Details — Developer Spec Section 4. Shared across QT/PI/OC/PL/CI
+  so the field list/order is defined once, not duplicated five times.
+  Caller sets `section_number` (via {% include with %}) before including.
+  No "Same as X" checkbox here — this section is always the buyer's own
+  independently-entered details.
+#}
+<div class="section-title">{{ section_number }}. BUYER DETAILS</div>
+<table class="kv">
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Billing Address Line 1 *</td><td class="v">{{ buyer.billing_address_line1 ?: buyer.billing_address }}</td></tr>
+  {% if buyer.billing_address_line2 %}<tr><td class="k">Billing Address Line 2</td><td class="v">{{ buyer.billing_address_line2 }}</td></tr>{% endif %}
+  {% if buyer.billing_city %}<tr><td class="k">City / Town *</td><td class="v">{{ buyer.billing_city }}</td></tr>{% endif %}
+  {% if buyer.billing_postcode %}<tr><td class="k">Postcode *</td><td class="v">{{ buyer.billing_postcode }}</td></tr>{% endif %}
+  <tr><td class="k">Country *</td><td class="v">{{ buyer.country_of_destination ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. No. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Phone *</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
+</table>
