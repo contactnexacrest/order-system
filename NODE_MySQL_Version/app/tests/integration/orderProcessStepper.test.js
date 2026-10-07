@@ -46,6 +46,25 @@ describe('Order-page process stepper (Point 2)', () => {
     expect(res.text).toMatch(/process-step locked[\s\S]*?process-step-dot">9<[\s\S]*?Document Despatch &amp; Closure/);
   });
 
+  /**
+   * Batch 3 #14 — the stepper is now clickable: each step carries
+   * data-stage="N" and the JS jumps to whichever panel carries the
+   * matching data-stage attribute. This doesn't exercise the JS itself
+   * (no headless browser here), but pins the markup contract the JS
+   * depends on — both sides of the match must be present in the HTML.
+   */
+  it('stepper steps and their target panels carry matching data-stage attributes', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+
+    const res = await agent.get(`/orders/${orderId}`);
+    expect(res.status).toBe(200);
+
+    for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+      expect(res.text).toContain(`role="button" tabindex="0" data-stage="${stage}"`);
+      expect(res.text).toMatch(new RegExp(`<div class="section"[^>]*data-stage="${stage}"`));
+    }
+  });
+
   it('marks a gate_passed stage distinctly from a locked one', async () => {
     const orderId = await createTestOrder(await createTestClient());
 
