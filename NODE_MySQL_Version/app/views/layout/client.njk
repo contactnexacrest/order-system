@@ -12,6 +12,12 @@
 {% if devServerEnabled %}
   <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
 {% endif %}
+{% if isImpersonating %}
+  <div class="impersonation-banner">
+    &#128100; A staff member is viewing this portal on this client's behalf.
+    <form method="post" action="/client/end-impersonation" style="margin:0"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="impersonation-banner-end">End impersonation</button></form>
+  </div>
+{% endif %}
 <header class="client-topbar">
   <div class="topbar-brand">
     <span class="bare-brand-mark" aria-hidden="true"><img src="/img/logo.jpg" alt=""></span>

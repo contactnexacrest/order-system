@@ -10,14 +10,16 @@ even if the buyer never responds at all.
 
 ## The system does this automatically
 
-- The 48-hour acknowledgment clock starts the moment the OC is actually
-  **emailed** to the buyer (not when it's generated, and not when it's
-  merely approved internally) — see
+- The acknowledgment clock starts the moment the OC is actually **emailed**
+  to the buyer (not when it's generated, and not when it's merely approved
+  internally) — see
   [Document Review & Approval](./13-document-review-approval.md) for the
   full draft → review → approved → sent path every document goes through
-  first.
+  first. The window defaults to 48 hours and is admin-configurable
+  (`oc_ack_auto_confirm_hours` in Company Settings) — useful to shorten
+  while testing.
 - If the buyer neither acknowledges in their portal nor replies by email
-  within that 48-hour window, a scheduled routine **auto-confirms** the OC
+  within that window, a scheduled routine **auto-confirms** the OC
   on their behalf and passes Stage 4's gate automatically — the order is
   never permanently stuck waiting on a buyer who simply doesn't respond.
 
@@ -42,6 +44,23 @@ If the buyer replies to the email itself rather than using their portal
 this requires typing in the evidence (quoting the buyer's reply is normal
 practice) before it's accepted; there's no way to record this without some
 note attached. Once submitted, this **passes Stage 4's gate** directly.
+
+This action no longer requires the OC to have actually been emailed first —
+only that it's been **generated**. If the send itself is stuck (a hosting
+SMTP problem, or a deferred send still waiting on Level-2 approval — see
+[Document Review & Approval](./13-document-review-approval.md)), staff can
+still record the acknowledgment and move the order forward instead of being
+stuck waiting on a send that may never complete. This is also how staff
+handle a buyer who cannot use the portal at all (no email, not
+tech-comfortable, etc.) — recording what the buyer confirmed by phone or in
+person, with that conversation described as the evidence note.
+
+By default any user who can manage the order can use this. An admin can
+restrict it to a specific permission instead — turn on
+`oc_ack_override_restricted` in Company Settings, then grant the **Override
+buyer Order Confirmation acknowledgment** permission only to the roles who
+should have it (Roles & Permissions). Turning the restriction on does not
+retroactively change anyone's access until permissions are also edited.
 
 Once resolved by any of the three paths, the section simply shows how and
 when:

@@ -35,7 +35,7 @@ $canDataExport = $can('data_export_run');
 $canDisputes = $can('manage_disputes') || $can('respond_to_disputes');
 
 $opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes;
-$insightsGroupVisible = $canReports || $canAudit || $canApproveEmail;
+$insightsGroupVisible = $canReports || $canAudit;
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
     || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners;
 
@@ -49,7 +49,7 @@ $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
 $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes');
-$insightsGroupActive = $isActive('/reports') || $isActive('/audit-log') || $isActive('/email-approvals');
+$insightsGroupActive = $isActive('/reports') || $isActive('/audit-log');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates')
     || $isActive('/logistics-partners');
@@ -86,6 +86,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
       <a href="/reference-docs" class="<?= $isActive('/reference-docs') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>Reference Library</a>
       <a href="/sop" target="_blank" rel="noopener"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>SOP / Operations Guide</a>
       <a href="/reviews" class="<?= $isActive('/reviews') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>My Reviews</a>
+      <?php if ($canApproveEmail): ?><a href="/email-approvals" class="<?= $isActive('/email-approvals') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-10 6L2 7"></path></svg></span>Email Approvals</a><?php endif; ?>
       <?php if ($canCaModule): ?><a href="/ca" class="<?= $isActive('/ca') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>CA / Accounting</a><?php endif; ?>
       <?php if ($canViewProducts): ?><a href="/products" class="<?= $isActive('/products') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>Products</a><?php endif; ?>
     <?php endif; ?>
@@ -109,7 +110,6 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <div class="nav-dropdown">
           <?php if ($canReports): ?><a href="/reports" class="<?= $isActive('/reports') ? 'active' : '' ?>">Reports</a><?php endif; ?>
           <?php if ($canAudit): ?><a href="/audit-log" class="<?= $isActive('/audit-log') ? 'active' : '' ?>">Audit Log</a><?php endif; ?>
-          <?php if ($canApproveEmail): ?><a href="/email-approvals" class="<?= $isActive('/email-approvals') ? 'active' : '' ?>">Email Approvals</a><?php endif; ?>
         </div>
       </details>
     <?php endif; ?>

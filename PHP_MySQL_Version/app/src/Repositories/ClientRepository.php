@@ -112,6 +112,13 @@ final class ClientRepository
             ->execute(['active' => $active ? 1 : 0, 'id' => $id]);
     }
 
+    /** docs/schema.sql Section AV — per-client gate on staff impersonation, independent of the global company_settings switch. */
+    public static function setAllowStaffImpersonation(int $id, bool $allow): void
+    {
+        Database::connection()->prepare('UPDATE clients SET allow_staff_impersonation = :allow WHERE id = :id')
+            ->execute(['allow' => $allow ? 1 : 0, 'id' => $id]);
+    }
+
     /**
      * Permanent — nothing in this app ever sets is_data_locked back to 0.
      * Called once, from whichever of the two trigger points happens first:

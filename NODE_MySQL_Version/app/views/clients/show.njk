@@ -52,6 +52,32 @@
     {% endif %}
   </div>
 
+  {% if permissions.manage_company_settings or permissions.impersonate_client %}
+  <div class="section">
+    <h2>Client Portal Access</h2>
+    {% if permissions.manage_company_settings %}
+      <form method="post" action="/clients/{{ client.id }}/impersonation-allowed">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label><input type="checkbox" name="allow_staff_impersonation" value="1" {{ 'checked' if client.allow_staff_impersonation }} onchange="this.form.submit()"> Allow staff to log in as this client ("Log in as this client")</label>
+      </form>
+      <p class="muted small">
+        Global switch is currently <strong>{{ 'ON' if impersonationGloballyEnabled else 'OFF' }}</strong> (<a href="/settings">Settings</a>).
+        {% if not impersonationGloballyEnabled %}Turning this on alone won't allow impersonation until the global switch is also on.{% endif %}
+      </p>
+    {% endif %}
+    {% if permissions.impersonate_client %}
+      {% if impersonationGloballyEnabled and client.allow_staff_impersonation and client.is_active %}
+        <form method="post" action="/clients/{{ client.id }}/impersonate" onsubmit="return confirm('Log in as {{ client.company_legal_name }}? This opens their client-portal view in this session. This is logged.');">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm btn-secondary">Log in as this client</button>
+        </form>
+      {% else %}
+        <p class="muted small">"Log in as this client" isn't available right now — {{ impersonationUnavailableReason }}.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if permissions.edit_locked_data %}
   <div class="section">
     <h2>Admin Override</h2>

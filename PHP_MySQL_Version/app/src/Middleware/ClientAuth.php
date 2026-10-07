@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Middleware;
 
 use App\Repositories\ClientLoginRepository;
+use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Services\ClientPortalService;
 
@@ -40,6 +41,21 @@ final class ClientAuth
                 return false;
             }
             $_SESSION[self::LAST_ACTIVITY_KEY] = time();
+
+            // docs/schema.sql Section AV: a staff-impersonated session has
+            // no client_logins row to check at all — it's a separate
+            // channel, not a stand-in for the client's own password login
+            // (that row may not even exist yet, e.g. before Stage 3). Only
+            // the client record itself needs to still be active.
+            if (ClientPortalService::isImpersonating()) {
+                $client = ClientRepository::find($clientId);
+                if (!$client || !$client['is_active']) {
+                    ClientPortalService::endImpersonation();
+                    header('Location: /client/login');
+                    return false;
+                }
+                return true;
+            }
 
             // CP-06: a client (or their portal login specifically) deactivated
             // mid-session must lose access on their very next request — like

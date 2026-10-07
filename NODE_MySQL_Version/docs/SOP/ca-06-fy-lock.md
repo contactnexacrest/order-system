@@ -42,9 +42,9 @@ naming the year and pointing back to this page:
 
 - Recording, correcting, or removing an advance/balance/freight leg's
   **INR actual** (blocked against that leg's cleared-on date).
-- Recording or updating the **assumed exchange rate** for an order
-  (blocked if *any* of its cleared legs falls in a locked year, since the
-  rate feeds every leg's forex gain/loss figure at once).
+- Recording or updating a leg's own **exchange rate** (blocked against
+  that same leg's cleared-on date — advance/balance/freight each have
+  their own rate, so locking one leg never blocks the others).
 - Recording a **FIRC/eBRC reference** for a leg (blocked against that
   leg's cleared-on date).
 - Setting an expense's **TDS annotation** (blocked against the expense's

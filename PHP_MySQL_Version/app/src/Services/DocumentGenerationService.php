@@ -1116,7 +1116,7 @@ final class DocumentGenerationService
     {
         return match ($code) {
             'QT' => 7,
-            'PI' => 8,
+            'PI' => 9,
             'OC' => 7,
             'BUYERPO' => 5,
             'SUPPO' => 6, // "6. QUALITY & INSPECTION" in the source template

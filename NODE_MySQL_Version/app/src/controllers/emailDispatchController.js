@@ -34,7 +34,24 @@ async function composeGeneric(req, res) {
 }
 
 async function renderCompose(req, res, orderId, documentId) {
-  const templateKey = String(req.query.template_key || '').trim() || null;
+  let templateKey = String(req.query.template_key || '').trim() || null;
+  const document = documentId ? await documentRepository.find(documentId) : null;
+
+  // docs/schema.sql Section AU: every seeded template_key follows the
+  // convention send_{lowercase document_type_code} (send_qt, send_pi,
+  // send_oc, send_ci, send_fdn, ...) — when the buyer-facing document being
+  // sent is known and nothing was explicitly picked yet, try that exact
+  // match so staff land on a ready preview instead of an empty "Select a
+  // template…" dropdown. Silently falls back to the ordinary manual picker
+  // if no template with that key exists yet (e.g. a document type nobody
+  // has added a template for).
+  if (!templateKey && document && document.document_type_code) {
+    const guess = `send_${String(document.document_type_code).toLowerCase()}`;
+    const guessedTemplate = await emailTemplateRepository.find(guess);
+    if (guessedTemplate && guessedTemplate.is_active) {
+      templateKey = guess;
+    }
+  }
 
   let preview = null;
   let previewError = null;
@@ -50,7 +67,7 @@ async function renderCompose(req, res, orderId, documentId) {
     'email/compose',
     {
       order: await orderRepository.find(orderId),
-      document: documentId ? await documentRepository.find(documentId) : null,
+      document,
       orderId,
       documentId,
       templates: await emailTemplateRepository.all(),
@@ -73,8 +90,14 @@ async function requestSend(req, res) {
   const scheduledAt = scheduledAtRaw !== '' ? `${scheduledAtRaw.replace('T', ' ')}:00` : null;
 
   try {
-    await emailDispatchService.requestSend(orderId, documentId, templateKey, scheduledAt, req.user.id);
-    flash.set(req, 'success', 'Send submitted for approval.');
+    const result = await emailDispatchService.requestSend(orderId, documentId, templateKey, scheduledAt, req.user.id);
+    if (result.dispatched) {
+      flash.set(req, result.sent ? 'success' : 'error', result.sent
+        ? 'Sent immediately — the 2-level approval queue is currently switched off (Settings).'
+        : 'Send attempted immediately (approval queue is off) but it failed — check Settings for the SMTP/mail configuration.');
+    } else {
+      flash.set(req, 'success', 'Send submitted for approval.');
+    }
   } catch (e) {
     flash.set(req, 'error', e.message);
   }

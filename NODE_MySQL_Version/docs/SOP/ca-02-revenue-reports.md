@@ -8,33 +8,39 @@ INR Settlement Register: a forex gain/loss figure per settlement leg, a
 place to record each leg's FIRC/eBRC realization proof, and a revenue
 report you can view by financial year or by calendar year.
 
-## Assumed Exchange Rate
+## Exchange Rate (per settlement leg)
 
 Every order is quoted and settled in a foreign currency, but for
 accounting purposes it's useful to know whether the INR your bank actually
-credited was better or worse than what was expected when the order was
-priced. That comparison needs a baseline — the **assumed exchange rate**.
+credited was better or worse than what was expected when that leg was
+priced. That comparison needs a baseline — the leg's own **exchange
+rate**.
 
-- This is entered once per order (not once per leg), on the order's
-  Payment Status section, in a box titled **"Assumed Exchange Rate
-  (CA/Accounting)"** — visible to anyone with the "View INR actual"
-  permission, editable by anyone with "Add/edit INR actual".
-- It's the INR-per-unit-foreign-currency rate you're booking the order
-  against — typically entered at quotation or PI stage, whenever your
-  accounts team fixes a working rate for that order.
+- Advance, Balance and Freight each have their **own** exchange rate box,
+  right alongside that leg's INR Actual widget on the order's Payment
+  Status section — not one rate shared by the whole order. Advance and
+  Balance can genuinely clear months apart at a different market rate
+  each time, so a single order-wide rate would misstate the gain/loss on
+  whichever leg it didn't match.
+- Each box is titled **"Advance/Balance/Freight Exchange Rate"** —
+  visible to anyone with the "View INR actual" permission, editable by
+  anyone with "Add/edit INR actual".
+- It's the INR-per-unit-foreign-currency rate you're booking that leg
+  against — typically entered once that leg is about to clear, whenever
+  your accounts team fixes a working rate for it.
 - **It never changes what INR actual gets recorded.** The INR actual is
-  always the real, bank-confirmed figure (Phase 1). The assumed rate only
-  exists to compute what you *expected* to receive, so the register can
-  show the difference.
+  always the real, bank-confirmed figure (Phase 1). The rate only exists
+  to compute what you *expected* to receive for that leg, so the
+  register can show the difference.
 - It can be corrected at any time by re-submitting the same form — each
   update is audit-logged.
 
 ## Forex Gain/(Loss)
 
-Once both the assumed exchange rate and the INR actual are on record for
-a leg, the system shows:
+Once both a leg's own exchange rate and its INR actual are on record,
+the system shows:
 
-> Forex gain/(loss) = INR actual − (foreign amount × assumed exchange rate)
+> Forex gain/(loss) = INR actual − (foreign amount × that leg's own exchange rate)
 
 This appears directly under the INR actual figure on the order page, and
 as its own column in the CA module's INR Settlement Register and revenue

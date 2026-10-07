@@ -132,16 +132,21 @@ async function clearedSettlements() {
 }
 
 // ----------------------------------------------------------------
-// CA / Accounting module (Phase 2) — assumed exchange rate (for the
-// forex gain/loss shown in the register) and per-leg FIRC/eBRC
-// references. Same inr_actual_edit gating as Phase 1's INR-actual
-// fields — this is the same CA financial-data set, not a new
-// permission tier.
+// CA / Accounting module (Phase 2, Batch 3 #3) — one exchange rate per
+// settlement leg (for the forex gain/loss shown in the register) and
+// per-leg FIRC/eBRC references. Same inr_actual_edit gating as Phase
+// 1's INR-actual fields — this is the same CA financial-data set, not a
+// new permission tier.
 // ----------------------------------------------------------------
 
-async function setAssumedExchangeRate(orderId, rate, setBy) {
+const EXCHANGE_RATE_LEGS = ['advance', 'balance', 'freight'];
+
+async function setLegExchangeRate(orderId, leg, rate, setBy) {
+  if (!EXCHANGE_RATE_LEGS.includes(leg)) {
+    throw new Error(`Unknown settlement leg: ${leg}`);
+  }
   await db.execute(
-    'UPDATE order_payment_status SET assumed_exchange_rate = :rate, assumed_exchange_rate_set_at = NOW(), assumed_exchange_rate_set_by = :set_by WHERE order_id = :order_id',
+    `UPDATE order_payment_status SET ${leg}_exchange_rate = :rate, ${leg}_exchange_rate_set_at = NOW(), ${leg}_exchange_rate_set_by = :set_by WHERE order_id = :order_id`,
     { rate, set_by: setBy, order_id: orderId }
   );
 }
@@ -199,6 +204,6 @@ module.exports = {
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
   setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,
   setFreightInrActual, clearFreightInrActual, clearedSettlements,
-  setAssumedExchangeRate, setAdvanceFirc, setBalanceFirc, setFreightFirc,
+  setLegExchangeRate, setAdvanceFirc, setBalanceFirc, setFreightFirc,
   setAdvanceZohoSync, setBalanceZohoSync, setFreightZohoSync,
 };

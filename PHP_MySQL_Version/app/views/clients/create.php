@@ -1,4 +1,4 @@
-<?php use App\Helpers\Csrf; ?>
+<?php use App\Helpers\Csrf; $old = $old ?? []; ?>
 <div class="card">
   <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
   <h1>New Client</h1>
@@ -10,20 +10,20 @@
     <?= Csrf::field() ?>
     <fieldset>
       <legend>Buyer / Consignee</legend>
-      <label>Company Legal Name *<input type="text" name="company_legal_name" required></label>
-      <label>Billing Address *<textarea name="billing_address" rows="2" required></textarea></label>
-      <label>Consignee Name <small class="muted">(leave blank if same as buyer)</small><input type="text" name="consignee_name"></label>
-      <label>Consignee Address <small class="muted">(leave blank if same as buyer)</small><textarea name="consignee_address" rows="2"></textarea></label>
-      <label>VAT / EORI / Tax Reg. No.<input type="text" name="vat_eori_tax_no"></label>
-      <label>Country of Destination<input type="text" name="country_of_destination"></label>
-      <label>Certificate of Origin Type<input type="text" name="coo_type" placeholder="e.g. Non-Preferential"></label>
-      <label>Notify Party <small class="muted">(leave blank for "SAME as buyer")</small><input type="text" name="notify_party"></label>
+      <label>Company Legal Name *<input type="text" name="company_legal_name" value="<?= htmlspecialchars((string) ($old['company_legal_name'] ?? '')) ?>" required></label>
+      <label>Billing Address *<textarea name="billing_address" rows="2" required><?= htmlspecialchars((string) ($old['billing_address'] ?? '')) ?></textarea></label>
+      <label>Consignee Name <small class="muted">(leave blank if same as buyer)</small><input type="text" name="consignee_name" value="<?= htmlspecialchars((string) ($old['consignee_name'] ?? '')) ?>"></label>
+      <label>Consignee Address <small class="muted">(leave blank if same as buyer)</small><textarea name="consignee_address" rows="2"><?= htmlspecialchars((string) ($old['consignee_address'] ?? '')) ?></textarea></label>
+      <label>VAT / EORI / Tax Reg. No.<input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars((string) ($old['vat_eori_tax_no'] ?? '')) ?>"></label>
+      <label>Country of Destination<input type="text" name="country_of_destination" value="<?= htmlspecialchars((string) ($old['country_of_destination'] ?? '')) ?>"></label>
+      <label>Certificate of Origin Type<input type="text" name="coo_type" value="<?= htmlspecialchars((string) ($old['coo_type'] ?? '')) ?>" placeholder="e.g. Non-Preferential"></label>
+      <label>Notify Party <small class="muted">(leave blank for "SAME as buyer")</small><input type="text" name="notify_party" value="<?= htmlspecialchars((string) ($old['notify_party'] ?? '')) ?>"></label>
     </fieldset>
     <fieldset>
       <legend>Contact</legend>
-      <label>Contact Person<input type="text" name="contact_person"></label>
-      <label>Email<input type="email" name="email"></label>
-      <label>Phone<input type="text" name="phone"></label>
+      <label>Contact Person<input type="text" name="contact_person" value="<?= htmlspecialchars((string) ($old['contact_person'] ?? '')) ?>"></label>
+      <label>Email<input type="email" name="email" value="<?= htmlspecialchars((string) ($old['email'] ?? '')) ?>"></label>
+      <label>Phone<input type="text" name="phone" value="<?= htmlspecialchars((string) ($old['phone'] ?? '')) ?>"></label>
     </fieldset>
     <button type="submit">Create Client</button>
   </form>

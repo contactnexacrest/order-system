@@ -127,7 +127,20 @@ async function buildPreview(orderId, documentId, templateKey, senderUserId) {
   };
 }
 
-/** Level 1 — submits for Level 2 approval. Never sends directly, whatever the scheduled time. */
+/**
+ * Level 1 — submits for Level 2 approval. Never sends directly, whatever
+ * the scheduled time — UNLESS company_settings.mail_approval_queue_enabled
+ * is off (docs/schema.sql Section AU), in which case there is no Level 2 to
+ * wait for: the row is still created (so the email log stays a complete
+ * record either way), immediately marked approved by the system, and
+ * dispatched synchronously in this same request instead of waiting for the
+ * background job's next tick.
+ *
+ * @returns {{id: number, dispatched: boolean, sent: ?boolean}} dispatched
+ *   is true when the queue was bypassed (sent tells you whether that
+ *   immediate attempt actually succeeded); false means it's queued for
+ *   Level 2 as usual and sent is always null.
+ */
 async function requestSend(orderId, documentId, templateKey, scheduledAt, requestedByUserId) {
   const preview = await buildPreview(orderId, documentId, templateKey, requestedByUserId);
 
@@ -146,6 +159,15 @@ async function requestSend(orderId, documentId, templateKey, scheduledAt, reques
     requestedByUserId
   );
 
+  if ((await companySettingsRepository.get('mail_approval_queue_enabled')) === '0') {
+    await emailLogRepository.approve(id, requestedByUserId);
+    await auditLogRepository.log(requestedByUserId, 'EMAIL_SEND_REQUESTED', 'email_log', id, 'recipient_email', null, preview.recipient_email);
+    await auditLogRepository.log(requestedByUserId, 'EMAIL_SEND_AUTO_APPROVED', 'email_log', id, null, null, null, 'mail_approval_queue_enabled is off — no Level-2 approval required.');
+    const row = await emailLogRepository.find(id);
+    const sent = row ? await dispatch(row) : false;
+    return { id, dispatched: true, sent };
+  }
+
   // Notify whoever can actually approve this (approve_email_send — the
   // same permission this exact approval route is gated on). Checked by
   // permission, not a hardcoded role name, since roles can be renamed via
@@ -156,7 +178,7 @@ async function requestSend(orderId, documentId, templateKey, scheduledAt, reques
   }
 
   await auditLogRepository.log(requestedByUserId, 'EMAIL_SEND_REQUESTED', 'email_log', id, 'recipient_email', null, preview.recipient_email);
-  return id;
+  return { id, dispatched: false, sent: null };
 }
 
 async function approveSend(emailLogId, approverUserId) {
@@ -288,8 +310,11 @@ async function dispatch(emailLogRow) {
     // autoConfirmOcAcknowledgments cron are the three ways it later
     // resolves).
     if (document.document_type_code === 'OC' && document.order_id !== null && document.order_id !== undefined) {
+      // docs/schema.sql Section AU: admin-configurable, default 48 (matches
+      // the original hardcoded value exactly).
+      const hours = parseInt((await companySettingsRepository.get('oc_ack_auto_confirm_hours')) || '48', 10);
       const now = new Date();
-      const due = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      const due = new Date(now.getTime() + hours * 60 * 60 * 1000);
       const fmt = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
       await orderOcAcknowledgmentRepository.recordSent(document.order_id, document.id, fmt(now), fmt(due));
     }

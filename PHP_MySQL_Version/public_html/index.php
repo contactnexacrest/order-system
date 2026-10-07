@@ -141,6 +141,7 @@ $router->post('/pi-details/{token}', [$piIntake, 'submit'], [CsrfCheck::verify()
 $router->get('/client/login', [$clientPortal, 'showLogin']);
 $router->post('/client/login', [$clientPortal, 'login'], [CsrfCheck::verify()]);
 $router->post('/client/logout', [$clientPortal, 'logout'], [CsrfCheck::verify()]);
+$router->post('/client/end-impersonation', [$clientPortal, 'endImpersonation'], [CsrfCheck::verify()]);
 $router->get('/client/set-password/{token}', [$clientPortal, 'showSetPassword']);
 $router->post('/client/set-password/{token}', [$clientPortal, 'setPassword'], [CsrfCheck::verify()]);
 
@@ -272,6 +273,11 @@ $router->get('/clients/{id}', [$clients, 'show'], [SessionAuth::required(), Perm
 $router->get('/clients/{id}/edit', [$clients, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients/{id}/update', [$clients, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/toggle-active', [$clients, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// docs/schema.sql Section AV — the per-client flag is a manage_company_settings action (same tier as other
+// global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch
+// inside ClientController::impersonate(), on top of its own impersonate_client permission gate here.
+$router->post('/clients/{id}/impersonation-allowed', [$clients, 'setImpersonationAllowed'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/impersonate', [$clients, 'impersonate'], [SessionAuth::required(), PermissionCheck::requires('impersonate_client'), CsrfCheck::verify()]);
 
 // Staff review queue for public quotation-details submissions.
 $router->get('/client-intake', [$clientIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
@@ -328,7 +334,9 @@ $router->post('/ca/export-benefits/{id}/mark-received', [$ca, 'markExportBenefit
 $router->get('/ca/fy-locks', [$ca, 'fyLocks'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 $router->post('/ca/fy-locks/lock', [$ca, 'lockFinancialYear'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->post('/ca/fy-locks/unlock', [$ca, 'unlockFinancialYear'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/exchange-rate', [$orders, 'recordAssumedExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/advance/exchange-rate', [$orders, 'recordAdvanceExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance/exchange-rate', [$orders, 'recordBalanceExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight/exchange-rate', [$orders, 'recordFreightExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/advance/firc', [$orders, 'recordAdvanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/balance/firc', [$orders, 'recordBalanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/freight/firc', [$orders, 'recordFreightFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);

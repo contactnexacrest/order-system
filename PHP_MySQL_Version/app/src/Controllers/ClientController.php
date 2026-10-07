@@ -10,8 +10,10 @@ use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientRepository;
+use App\Repositories\CompanySettingsRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AuthService;
+use App\Services\ClientPortalService;
 use App\Services\ReferenceNumberService;
 use App\Services\SuperAdminService;
 use App\Services\TestModeService;
@@ -30,7 +32,9 @@ final class ClientController
 
     public function create(array $params): void
     {
-        View::render('clients/create', [], 'layout/base');
+        // Batch 3 #4 — if this page is being shown again after a validation failure on submit,
+        // re-populate the form from what was typed rather than making the user retype everything.
+        View::render('clients/create', ['old' => Flash::pullOld()], 'layout/base');
     }
 
     public function store(array $params): void
@@ -42,6 +46,7 @@ final class ClientController
 
         if ($companyLegalName === '' || $billingAddress === '') {
             Flash::set('error', 'Company legal name and billing address are required.');
+            Flash::setOld($_POST);
             header('Location: /clients/create');
             return;
         }
@@ -254,5 +259,80 @@ final class ClientController
         AuditLogRepository::log((int) $user['id'], 'FIELD_EDIT', 'clients', $clientId, 'client_unique_number', $client['client_unique_number'], $newNumber, $reason);
         Flash::set('success', "Buyer Inquiry Ref overridden to {$newNumber}.");
         header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * docs/schema.sql Section AV — admin-only toggle deciding whether THIS
+     * client can ever be impersonated, independent of the global
+     * client_impersonation_enabled switch and of who holds the
+     * impersonate_client permission. Deliberately gated behind
+     * manage_company_settings (not manage_orders, which every ordinary
+     * client-edit action uses) since it's a security-relevant switch, not
+     * routine client data.
+     */
+    public function setImpersonationAllowed(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        $allow = !empty($_POST['allow_staff_impersonation']);
+        ClientRepository::setAllowStaffImpersonation($clientId, $allow);
+        $user = AuthService::currentUser();
+        AuditLogRepository::log(
+            (int) $user['id'],
+            'CLIENT_IMPERSONATION_ALLOWED_CHANGED',
+            'clients',
+            $clientId,
+            'allow_staff_impersonation',
+            $client['allow_staff_impersonation'] ? '1' : '0',
+            $allow ? '1' : '0'
+        );
+        Flash::set('success', $allow
+            ? "Staff can now log in as {$client['company_legal_name']} (if the global switch and the impersonate_client permission also allow it)."
+            : "Staff can no longer log in as {$client['company_legal_name']}.");
+        header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * docs/schema.sql Section AV — staff-initiated client-portal session,
+     * for a client who cannot use the portal themselves. Three gates, all
+     * re-checked here (defense in depth — the button itself is only shown
+     * when all three already hold): the route's own impersonate_client
+     * permission, the global client_impersonation_enabled switch, and this
+     * specific client's own allow_staff_impersonation flag.
+     */
+    public function impersonate(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+        if (CompanySettingsRepository::get('client_impersonation_enabled') !== '1') {
+            Flash::set('error', 'Staff client-portal impersonation is switched off (Company Settings).');
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+        if (!$client['allow_staff_impersonation']) {
+            Flash::set('error', "Impersonation isn't enabled for {$client['company_legal_name']} — turn it on below first.");
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+        if (!$client['is_active']) {
+            Flash::set('error', 'This client is deactivated and cannot be impersonated.');
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        ClientPortalService::startImpersonation((int) $user['id'], $clientId);
+        header('Location: /client');
     }
 }

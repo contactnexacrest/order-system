@@ -2665,6 +2665,93 @@ CREATE TABLE order_annexure_terms (
 -- ================================================================
 
 -- ================================================================
+-- SECTION AU — DEFERRED-MAIL ADMIN CONTROLS + OC ACKNOWLEDGMENT OVERRIDE
+-- CONFIGURABILITY (added 2026-10-07)
+-- Two independent problems surfaced during live testing: (1) nothing could
+-- turn off the always-on Level-1/Level-2 email approval queue for a small
+-- team, or kill outbound sending entirely while diagnosing a hosting SMTP
+-- issue; (2) the Stage 4 "buyer acknowledged the Order Confirmation"
+-- override only worked once an order_oc_acknowledgments row already
+-- existed (i.e. only after a send had actually completed) — so if sending
+-- was itself broken, staff had no way to move the order past Stage 4 at
+-- all, exactly the trap a non-tech-savvy or unresponsive buyer can also
+-- create. All five settings below are company_settings rows — no ALTER
+-- needed for them (see Section A); only the new permission below is new
+-- schema.
+-- ================================================================
+-- Seed keys (see seed.sql): mail_sending_enabled, mail_approval_queue_enabled,
+-- oc_ack_override_restricted, oc_ack_auto_confirm_hours.
+-- New permission (see seed.sql): override_buyer_acknowledgment — only
+-- consulted when oc_ack_override_restricted is '1'; when '0' (default),
+-- the existing manage_orders permission alone is enough, as before.
+-- ================================================================
+
+-- ================================================================
+-- SECTION AV — STAFF CLIENT-PORTAL IMPERSONATION (added 2026-10-07)
+-- A client who cannot use the portal themselves (no email, not
+-- tech-comfortable, or an order that hasn't reached Stage 3 yet so no
+-- client_logins row exists at all) otherwise has no way for staff to act
+-- on their behalf in the portal — e.g. to e-sign a Buyer PO or acknowledge
+-- an Order Confirmation when the client has asked staff to just handle it.
+-- Three independent gates, all off/unset by default so nothing changes
+-- for any installation until an admin deliberately opts in:
+--   1. company_settings.client_impersonation_enabled — a global kill
+--      switch for the whole feature.
+--   2. clients.allow_staff_impersonation — per-client; only a client
+--      explicitly marked this way can ever be impersonated, even with (1)
+--      and (3) both satisfied.
+--   3. the impersonate_client permission — who may use the feature at all,
+--      assignable per role/user like any other permission.
+-- Impersonation deliberately does NOT require a client_logins row to
+-- exist — it's a separate, staff-initiated channel into the portal, not a
+-- stand-in for the client's own password login, so it works even before
+-- Stage 3 provisioning.
+-- ================================================================
+ALTER TABLE clients
+  ADD COLUMN allow_staff_impersonation TINYINT(1) NOT NULL DEFAULT 0 AFTER is_sample_data;
+-- Seed keys (see seed.sql): client_impersonation_enabled.
+-- New permission (see seed.sql): impersonate_client.
+-- ================================================================
+
+-- ================================================================
+-- Section AW (2026-10-07) — Batch 3 #3: per-payment-leg exchange rate.
+-- order_payment_status.assumed_exchange_rate was a single rate shared by
+-- all three settlement legs (advance/balance/freight), set once — but in
+-- practice advance, balance and freight each clear on different dates,
+-- often months apart, with a genuinely different market rate each time.
+-- Showing a forex gain/(loss) for the balance leg against a rate that was
+-- really only ever observed for the advance leg produces a number with no
+-- real meaning. Replaced with one rate per leg, captured at the same time
+-- staff would naturally have it (alongside that leg's own INR actual),
+-- same "never used to derive the INR actual itself, only to show forex
+-- gain/loss once it's recorded" contract as before.
+-- ================================================================
+ALTER TABLE order_payment_status
+  ADD COLUMN advance_exchange_rate          DECIMAL(10,4) NULL AFTER assumed_exchange_rate_set_by,
+  ADD COLUMN advance_exchange_rate_set_at   TIMESTAMP NULL AFTER advance_exchange_rate,
+  ADD COLUMN advance_exchange_rate_set_by   BIGINT UNSIGNED NULL AFTER advance_exchange_rate_set_at,
+  ADD COLUMN balance_exchange_rate          DECIMAL(10,4) NULL AFTER advance_exchange_rate_set_by,
+  ADD COLUMN balance_exchange_rate_set_at   TIMESTAMP NULL AFTER balance_exchange_rate,
+  ADD COLUMN balance_exchange_rate_set_by   BIGINT UNSIGNED NULL AFTER balance_exchange_rate_set_at,
+  ADD COLUMN freight_exchange_rate          DECIMAL(10,4) NULL AFTER balance_exchange_rate_set_by,
+  ADD COLUMN freight_exchange_rate_set_at   TIMESTAMP NULL AFTER freight_exchange_rate,
+  ADD COLUMN freight_exchange_rate_set_by   BIGINT UNSIGNED NULL AFTER freight_exchange_rate_set_at;
+-- Backfill: carry any already-recorded single rate forward onto all three
+-- legs, so an order with a rate on file doesn't silently lose it — it was
+-- genuinely the best (only) estimate the business had for every leg at
+-- the time it was entered.
+UPDATE order_payment_status
+  SET advance_exchange_rate = assumed_exchange_rate, advance_exchange_rate_set_at = assumed_exchange_rate_set_at, advance_exchange_rate_set_by = assumed_exchange_rate_set_by,
+      balance_exchange_rate = assumed_exchange_rate, balance_exchange_rate_set_at = assumed_exchange_rate_set_at, balance_exchange_rate_set_by = assumed_exchange_rate_set_by,
+      freight_exchange_rate = assumed_exchange_rate, freight_exchange_rate_set_at = assumed_exchange_rate_set_at, freight_exchange_rate_set_by = assumed_exchange_rate_set_by
+  WHERE assumed_exchange_rate IS NOT NULL;
+ALTER TABLE order_payment_status
+  DROP COLUMN assumed_exchange_rate,
+  DROP COLUMN assumed_exchange_rate_set_at,
+  DROP COLUMN assumed_exchange_rate_set_by;
+-- ================================================================
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2707,4 +2794,8 @@ CREATE TABLE order_annexure_terms (
 -- Section AR (compliance/pre-closure task checklist) added 2026-10-01.
 -- Section AS (mail redirect & CC) added 2026-10-02.
 -- Section AT (Annexure A content mode: Spec/Terms/Both) added 2026-10-03.
+-- Section AU (deferred-mail admin controls + OC acknowledgment override
+-- configurability) added 2026-10-07.
+-- Section AV (staff client-portal impersonation) added 2026-10-07.
+-- Section AW (per-payment-leg exchange rate) added 2026-10-07.
 -- ================================================================

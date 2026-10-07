@@ -1097,7 +1097,7 @@ function section1TitleFor(code) {
 }
 
 function termsSectionNumberFor(code) {
-  const map = { QT: 7, PI: 8, OC: 7, BUYERPO: 5, SUPPO: 6 }; // SUPPO: "6. QUALITY & INSPECTION" in the source template
+  const map = { QT: 7, PI: 9, OC: 7, BUYERPO: 5, SUPPO: 6 }; // SUPPO: "6. QUALITY & INSPECTION" in the source template
   return map[code] ?? 9;
 }
 

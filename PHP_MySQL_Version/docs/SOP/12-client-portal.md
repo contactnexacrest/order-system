@@ -15,11 +15,61 @@ account page.
 - **The portal login doesn't exist until Stage 3 → 4** (the advance payment
   clearing) — see [Chapter 3](./03-stage3-pi-advance.md). Before that point,
   the buyer has no way to log in at all, regardless of what they've done on
-  public forms.
+  public forms — except via staff impersonation, below.
 - The buyer only ever sees the **final, approved/sent** PDF of a
   customer-facing document — never a draft, never an internal-only file
   type, regardless of what's requested. This is enforced on every single
   document download, not just filtered from the list.
+
+## Staff access on behalf of a client ("Log in as this client")
+
+Not every buyer can realistically use the portal themselves — a client
+who created no email, a 70-year-old buyer with only a phone, or simply an
+order that hasn't reached Stage 3 yet so no portal login exists at all.
+For exactly this situation, staff can open a client-portal session on a
+client's behalf from that client's own staff-side page, without needing
+their password (there may not even be one yet) and without creating or
+touching a `client_logins` row.
+
+This is deliberately gated behind **three independent switches**, all of
+which must be on before the "Log in as this client" button even appears:
+
+1. **A permission** (`impersonate_client`) — who may use the feature at
+   all. Granted to Admin/MD/ED/Super Admin by default, the same tier as
+   other sensitive, wide-blast-radius actions (e.g. `manage_disputes`).
+2. **A per-client toggle**, set on that client's own staff-side page
+   ("Client Portal Access" section) — whether *this specific client* may
+   ever be impersonated. Off by default for every client.
+3. **A global kill switch** (Settings → `client_impersonation_enabled`) —
+   off by default. With this off, the feature is unavailable for every
+   client, no matter what permission a staff member holds or what any
+   individual client's own toggle says.
+
+All three hold → the button appears and works. Any one missing → it either
+doesn't appear, or (if reached directly) is refused with a message naming
+which gate is closed — the controller re-checks all three itself rather
+than trusting the button's own visibility.
+
+Once started, the portal shows an amber banner on every screen —
+**"A staff member is viewing this portal on this client's behalf"** — with
+an **End impersonation** button that returns to that client's own
+staff-side page. The staff member's own login is untouched throughout:
+starting or ending impersonation never logs them out of the staff app, and
+the usual **ClientAuth** per-request checks are relaxed only for the
+`client_logins`-row requirement (which may not exist yet) — the client
+record itself must still be active, or the session is ended automatically
+on the very next portal request.
+
+Every start and end of an impersonated session is written to the audit
+log (`CLIENT_IMPERSONATION_STARTED` / `CLIENT_IMPERSONATION_ENDED`), and
+changing a client's own toggle is logged as
+`CLIENT_IMPERSONATION_ALLOWED_CHANGED`. While impersonating, a staff member
+can do anything the client themselves could do in the portal — download
+documents, acknowledge the OC, upload the signed Buyer PO, self-report a
+payment, raise a dispute, request a reorder — with one exception: changing
+the client's own portal password still requires their current password,
+so impersonation cannot be used to take over or lock out a real client
+login.
 
 ## What the client sees and does
 

@@ -18,18 +18,20 @@ use App\Helpers\FinancialYear;
 final class CaRepository
 {
     private const LEGS = [
-        ['leg' => 'advance', 'amount_col' => 'advance_amount', 'cleared_col' => 'advance_cleared_at', 'inr_col' => 'advance_inr_actual', 'inr_at_col' => 'advance_inr_actual_recorded_at', 'inr_by_col' => 'advance_inr_actual_recorded_by', 'firc_col' => 'advance_firc_reference', 'firc_at_col' => 'advance_firc_received_at', 'zoho_at_col' => 'advance_zoho_synced_at', 'zoho_ref_col' => 'advance_zoho_reference'],
-        ['leg' => 'balance', 'amount_col' => 'balance_amount', 'cleared_col' => 'balance_cleared_at', 'inr_col' => 'balance_inr_actual', 'inr_at_col' => 'balance_inr_actual_recorded_at', 'inr_by_col' => 'balance_inr_actual_recorded_by', 'firc_col' => 'balance_firc_reference', 'firc_at_col' => 'balance_firc_received_at', 'zoho_at_col' => 'balance_zoho_synced_at', 'zoho_ref_col' => 'balance_zoho_reference'],
-        ['leg' => 'freight', 'amount_col' => 'freight_amount', 'cleared_col' => 'freight_cleared_at', 'inr_col' => 'freight_inr_actual', 'inr_at_col' => 'freight_inr_actual_recorded_at', 'inr_by_col' => 'freight_inr_actual_recorded_by', 'firc_col' => 'freight_firc_reference', 'firc_at_col' => 'freight_firc_received_at', 'zoho_at_col' => 'freight_zoho_synced_at', 'zoho_ref_col' => 'freight_zoho_reference'],
+        ['leg' => 'advance', 'amount_col' => 'advance_amount', 'cleared_col' => 'advance_cleared_at', 'inr_col' => 'advance_inr_actual', 'inr_at_col' => 'advance_inr_actual_recorded_at', 'inr_by_col' => 'advance_inr_actual_recorded_by', 'rate_col' => 'advance_exchange_rate', 'firc_col' => 'advance_firc_reference', 'firc_at_col' => 'advance_firc_received_at', 'zoho_at_col' => 'advance_zoho_synced_at', 'zoho_ref_col' => 'advance_zoho_reference'],
+        ['leg' => 'balance', 'amount_col' => 'balance_amount', 'cleared_col' => 'balance_cleared_at', 'inr_col' => 'balance_inr_actual', 'inr_at_col' => 'balance_inr_actual_recorded_at', 'inr_by_col' => 'balance_inr_actual_recorded_by', 'rate_col' => 'balance_exchange_rate', 'firc_col' => 'balance_firc_reference', 'firc_at_col' => 'balance_firc_received_at', 'zoho_at_col' => 'balance_zoho_synced_at', 'zoho_ref_col' => 'balance_zoho_reference'],
+        ['leg' => 'freight', 'amount_col' => 'freight_amount', 'cleared_col' => 'freight_cleared_at', 'inr_col' => 'freight_inr_actual', 'inr_at_col' => 'freight_inr_actual_recorded_at', 'inr_by_col' => 'freight_inr_actual_recorded_by', 'rate_col' => 'freight_exchange_rate', 'firc_col' => 'freight_firc_reference', 'firc_at_col' => 'freight_firc_received_at', 'zoho_at_col' => 'freight_zoho_synced_at', 'zoho_ref_col' => 'freight_zoho_reference'],
     ];
 
     /**
      * One row per cleared settlement leg (advance/balance/freight),
      * flattened from OrderPaymentStatusRepository::clearedSettlements() —
      * newest cleared date first. Each row also carries the forex
-     * gain/loss (inr_actual - foreign_amount * assumed_exchange_rate, when
-     * both are on record) and whether its FIRC/eBRC reference is still
-     * missing past the configured alert window.
+     * gain/loss (inr_actual - foreign_amount * that leg's own
+     * exchange_rate, when both are on record — Batch 3 #3: each leg has
+     * its own rate, since each can clear months apart at a different
+     * market rate) and whether its FIRC/eBRC reference is still missing
+     * past the configured alert window.
      *
      * @return array<int, array<string,mixed>>
      */
@@ -46,9 +48,9 @@ final class CaRepository
                 }
                 $foreignAmount = $ops[$legDef['amount_col']] !== null ? (float) $ops[$legDef['amount_col']] : null;
                 $inrActual = $ops[$legDef['inr_col']] !== null ? (float) $ops[$legDef['inr_col']] : null;
-                $assumedRate = $ops['assumed_exchange_rate'] !== null ? (float) $ops['assumed_exchange_rate'] : null;
+                $legRate = $ops[$legDef['rate_col']] !== null ? (float) $ops[$legDef['rate_col']] : null;
 
-                $expectedInr = ($foreignAmount !== null && $assumedRate !== null) ? $foreignAmount * $assumedRate : null;
+                $expectedInr = ($foreignAmount !== null && $legRate !== null) ? $foreignAmount * $legRate : null;
                 $forexGainLoss = ($inrActual !== null && $expectedInr !== null) ? $inrActual - $expectedInr : null;
 
                 $clearedAtTs = strtotime((string) $ops[$legDef['cleared_col']]);
@@ -67,7 +69,7 @@ final class CaRepository
                     'inr_actual' => $inrActual,
                     'inr_actual_recorded_at' => $ops[$legDef['inr_at_col']],
                     'inr_actual_recorded_by' => $ops[$legDef['inr_by_col']] !== null ? (int) $ops[$legDef['inr_by_col']] : null,
-                    'assumed_exchange_rate' => $assumedRate,
+                    'exchange_rate' => $legRate,
                     'expected_inr' => $expectedInr,
                     'forex_gain_loss' => $forexGainLoss,
                     'firc_reference' => $ops[$legDef['firc_col']],

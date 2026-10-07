@@ -50,6 +50,7 @@ const piIntakeController = require('./controllers/piIntakeController');
 const piIntakeReviewController = require('./controllers/piIntakeReviewController');
 const reorderRequestController = require('./controllers/reorderRequestController');
 const clientPortalController = require('./controllers/clientPortalController');
+const clientPortalService = require('./services/clientPortalService');
 const ordersController = require('./controllers/ordersController');
 const annexureController = require('./controllers/annexureController');
 const documentController = require('./controllers/documentController');
@@ -116,6 +117,14 @@ njkEnv.addFilter('money', (value) => {
   if (Number.isNaN(num)) return value;
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 });
+// Mirrors PHP's number_format($v, 4) — used for CA exchange rates, which
+// are recorded and displayed to 4 decimal places (e.g. "88.5000"), not
+// the 2-decimal "money" convention used for amounts.
+njkEnv.addFilter('rate4', (value) => {
+  const num = parseFloat(value);
+  if (Number.isNaN(num)) return value;
+  return num.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+});
 // Mirrors PHP's rtrim(rtrim(number_format($v, 3), '0'), '.') — 3 decimals
 // with trailing zeros (and a trailing bare dot) trimmed off, used for
 // quantity totals where whole numbers shouldn't show ".000".
@@ -141,6 +150,9 @@ njkEnv.addGlobal('today', () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 });
+// Batch 3 #5 — document generate buttons: whether a document of this type code already
+// exists for the order, so the view can pick btn-doc-new vs btn-doc-regenerate.
+njkEnv.addGlobal('docGenerated', (documents, code) => (documents || []).some((d) => d.document_type_code === code));
 
 // --- Session store (MySQL-backed via knex, not PHP's file-session
 // equivalent — Node is a long-running multi-connection process, so a
@@ -253,6 +265,7 @@ app.use((req, res, next) => {
       unreadCount: req.unreadCount || 0,
       testModeEnabled: req.testModeEnabled || false,
       devServerEnabled: env.isDevServer(),
+      isImpersonating: clientPortalService.isImpersonating(req),
       currentPath: req.path,
     };
     const context = Object.assign({}, common, data);
@@ -337,6 +350,7 @@ app.post('/pi-details/:token', verifyCsrf, asyncHandler(piIntakeController.submi
 app.get('/client/login', asyncHandler(clientPortalController.showLogin));
 app.post('/client/login', verifyCsrf, asyncHandler(clientPortalController.login));
 app.post('/client/logout', verifyCsrf, asyncHandler(clientPortalController.logout));
+app.post('/client/end-impersonation', verifyCsrf, asyncHandler(clientPortalController.endImpersonation));
 app.get('/client/set-password/:token', asyncHandler(clientPortalController.showSetPassword));
 app.post('/client/set-password/:token', verifyCsrf, asyncHandler(clientPortalController.setPassword));
 
@@ -466,6 +480,11 @@ app.get('/clients/:id', requireAuth, requirePermission('manage_orders'), asyncHa
 app.get('/clients/:id/edit', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.editForm));
 app.post('/clients/:id/update', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.update));
 app.post('/clients/:id/toggle-active', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.toggleActive));
+// docs/schema.sql Section AV — the per-client flag is a manage_company_settings action (same tier as other
+// global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch
+// inside clientsController.impersonate(), on top of its own impersonate_client permission gate here.
+app.post('/clients/:id/impersonation-allowed', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(clientsController.setImpersonationAllowed));
+app.post('/clients/:id/impersonate', requireAuth, requirePermission('impersonate_client'), verifyCsrf, asyncHandler(clientsController.impersonate));
 
 // Staff review queue for public quotation-details submissions.
 app.get('/client-intake', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.index));
@@ -522,7 +541,9 @@ app.post('/ca/export-benefits/:id/mark-received', requireAuth, requirePermission
 app.get('/ca/fy-locks', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.fyLocks));
 app.post('/ca/fy-locks/lock', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.lockFinancialYear));
 app.post('/ca/fy-locks/unlock', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.unlockFinancialYear));
-app.post('/orders/:id/payment/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAssumedExchangeRate));
+app.post('/orders/:id/payment/advance/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceExchangeRate));
+app.post('/orders/:id/payment/balance/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceExchangeRate));
+app.post('/orders/:id/payment/freight/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordFreightExchangeRate));
 app.post('/orders/:id/payment/advance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceFirc));
 app.post('/orders/:id/payment/balance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceFirc));
 app.post('/orders/:id/payment/freight/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordFreightFirc));

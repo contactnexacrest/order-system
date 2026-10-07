@@ -23,6 +23,11 @@ use App\Repositories\LoginAttemptRepository;
 final class ClientPortalService
 {
     private const SESSION_CLIENT_ID = '_client_portal_client_id';
+    // docs/schema.sql Section AV — set only when the current client-portal
+    // session was started by staff (impersonate()), not a real client
+    // password login. Holds the staff user's id, both to show "you are
+    // viewing as staff" in the portal and to audit-log who ends up acting.
+    private const SESSION_IMPERSONATED_BY = '_client_portal_impersonated_by_staff_id';
 
     // CP-07: a fixed dummy hash so password_verify() always runs real
     // bcrypt work, even for an email with no client_logins row — otherwise
@@ -135,8 +140,60 @@ final class ClientPortalService
         if ($clientId) {
             AuditLogRepository::log(null, 'CLIENT_LOGOUT', 'clients', $clientId);
         }
-        unset($_SESSION[self::SESSION_CLIENT_ID]);
+        unset($_SESSION[self::SESSION_CLIENT_ID], $_SESSION[self::SESSION_IMPERSONATED_BY]);
         session_regenerate_id(true);
+    }
+
+    /**
+     * docs/schema.sql Section AV — a staff-initiated client-portal session,
+     * for a client who cannot use the portal themselves (no email, not
+     * tech-comfortable, or an order still short of Stage 3 so no
+     * client_logins row exists at all yet). Deliberately does NOT touch
+     * client_logins — this is a separate channel into the portal, not a
+     * stand-in for the client's own password login, and ClientAuth's
+     * per-request checks are relaxed accordingly while impersonating (see
+     * that class). Call-site (ClientController::impersonate()) is
+     * responsible for checking client_impersonation_enabled,
+     * clients.allow_staff_impersonation, and the impersonate_client
+     * permission before this is ever called — this method itself only
+     * requires the client to exist and be active.
+     */
+    public static function startImpersonation(int $staffUserId, int $clientId): void
+    {
+        session_regenerate_id(true);
+        $_SESSION[self::SESSION_CLIENT_ID] = $clientId;
+        $_SESSION[self::SESSION_IMPERSONATED_BY] = $staffUserId;
+        AuditLogRepository::log($staffUserId, 'CLIENT_IMPERSONATION_STARTED', 'clients', $clientId);
+    }
+
+    /**
+     * Ends an impersonated session and returns the client id that was
+     * being impersonated (for the caller's redirect), or null if the
+     * current session wasn't actually impersonating anyone.
+     */
+    public static function endImpersonation(): ?int
+    {
+        $staffUserId = self::impersonatedByStaffId();
+        if ($staffUserId === null) {
+            return null;
+        }
+        $clientId = self::currentClientId();
+        if ($clientId !== null) {
+            AuditLogRepository::log($staffUserId, 'CLIENT_IMPERSONATION_ENDED', 'clients', $clientId);
+        }
+        unset($_SESSION[self::SESSION_CLIENT_ID], $_SESSION[self::SESSION_IMPERSONATED_BY]);
+        session_regenerate_id(true);
+        return $clientId;
+    }
+
+    public static function isImpersonating(): bool
+    {
+        return self::impersonatedByStaffId() !== null;
+    }
+
+    public static function impersonatedByStaffId(): ?int
+    {
+        return $_SESSION[self::SESSION_IMPERSONATED_BY] ?? null;
     }
 
     public static function changePassword(int $clientId, string $newPassword): void

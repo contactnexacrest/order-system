@@ -188,6 +188,10 @@ final class OrderController
             'containerTypes'  => LookupRepository::dropdownOptions('container_type'),
             'preselectedClientId' => $preselectedClientId,
             'hsCodes'         => HsCodeRepository::active(),
+            // Batch 3 #4 — if we're showing this page again after a validation failure on
+            // submit, re-populate the whole form (including product rows) instead of making
+            // the user retype everything.
+            'old'             => Flash::pullOld(),
         ], 'layout/base');
     }
 
@@ -199,6 +203,7 @@ final class OrderController
         $client = $clientId ? ClientRepository::find($clientId) : null;
         if (!$client) {
             Flash::set('error', 'Please select a valid client.');
+            Flash::setOld($_POST);
             header('Location: /orders/create');
             return;
         }
@@ -210,6 +215,7 @@ final class OrderController
         // already cut off.
         if (!$client['is_active']) {
             Flash::set('error', 'This client is not active — reactivate them before creating a new order.');
+            Flash::setOld($_POST);
             header('Location: /orders/create');
             return;
         }
@@ -219,6 +225,7 @@ final class OrderController
         $paymentPresetId = (int) ($_POST['payment_preset_id'] ?? 0);
         if (!$incotermId || !$currencyId || !$paymentPresetId) {
             Flash::set('error', 'Incoterm, currency, and a payment preset are all required.');
+            Flash::setOld($_POST);
             header('Location: /orders/create?client_id=' . $clientId);
             return;
         }
@@ -233,6 +240,7 @@ final class OrderController
         }
         if (!$hasAtLeastOneProduct) {
             Flash::set('error', 'At least one product line (with a description) is required.');
+            Flash::setOld($_POST);
             header('Location: /orders/create?client_id=' . $clientId);
             return;
         }
@@ -248,6 +256,7 @@ final class OrderController
             $hsCode = trim((string) ($_POST['product_hs_code'][$i] ?? ''));
             if ($hsCode === '' || !HsCodeRepository::isActiveCode($hsCode)) {
                 Flash::set('error', "HS code \"{$hsCode}\" is not on the HS Code master list — add it there first (HS Codes, under Admin) before using it on an order.");
+                Flash::setOld($_POST);
                 header('Location: /orders/create?client_id=' . $clientId);
                 return;
             }
@@ -270,12 +279,14 @@ final class OrderController
             );
             if ($quantityError !== null) {
                 Flash::set('error', 'Product line ' . ($i + 1) . ": {$quantityError}");
+                Flash::setOld($_POST);
                 header('Location: /orders/create?client_id=' . $clientId);
                 return;
             }
             $priceError = OrderLineValidator::checkUnitPrice((string) ($_POST['product_unit_price'][$i] ?? ''));
             if ($priceError !== null) {
                 Flash::set('error', 'Product line ' . ($i + 1) . ": {$priceError}");
+                Flash::setOld($_POST);
                 header('Location: /orders/create?client_id=' . $clientId);
                 return;
             }
@@ -1085,11 +1096,41 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+
+        // docs/schema.sql Section AU: off by default (today's behaviour) —
+        // manage_orders alone, already required to reach this route, is
+        // enough. When an admin turns this on, a second, narrower
+        // permission is also required, so the override can be restricted
+        // to specific roles without touching code.
+        if (CompanySettingsRepository::get('oc_ack_override_restricted') === '1') {
+            $user = AuthService::currentUser();
+            $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+            if (!PermissionService::can((int) $user['id'], $roleId, 'override_buyer_acknowledgment')) {
+                Flash::set('error', 'Recording a buyer acknowledgment manually has been restricted — you do not hold the required permission.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+        }
+
         $ack = OrderOcAcknowledgmentRepository::find($orderId);
-        if (!$ack || $ack['acknowledged_at'] !== null) {
-            Flash::set('error', 'No pending Order Confirmation acknowledgment for this order — send the OC to the buyer first.');
+        if ($ack && $ack['acknowledged_at'] !== null) {
+            Flash::set('error', 'This order\'s Order Confirmation has already been acknowledged.');
             header("Location: /orders/{$orderId}");
             return;
+        }
+        if (!$ack) {
+            // No OC send has ever completed for this order (e.g. mail
+            // sending is misconfigured, or a send is still stuck awaiting
+            // Level-2 approval) — there is nothing yet for recordSent() to
+            // have created. The OC must at least have been generated so
+            // there's a real document to point this record at.
+            $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
+            if (!$ocDoc) {
+                Flash::set('error', 'Generate the Order Confirmation for this order first.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            OrderOcAcknowledgmentRepository::ensureRowExists($orderId, (int) $ocDoc['id']);
         }
 
         $note = trim((string) ($_POST['acknowledged_note'] ?? ''));
@@ -1625,35 +1666,48 @@ final class OrderController
     }
 
     // ----------------------------------------------------------------
-    // CA / Accounting module (Phase 2) — assumed exchange rate (one per
-    // order, for the register's forex gain/loss column) and per-leg
-    // FIRC/eBRC references. Same inr_actual_edit gating as Phase 1.
+    // CA / Accounting module (Phase 2, Batch 3 #3) — exchange rate, one
+    // per settlement leg (advance/balance/freight), for the register's
+    // forex gain/loss column — each leg can genuinely clear on a
+    // different date with a different market rate, so a single
+    // order-wide rate (the original Phase 2 design) overstated/
+    // understated gain/loss for whichever leg didn't match it. Same
+    // inr_actual_edit gating as Phase 1.
     // ----------------------------------------------------------------
 
-    public function recordAssumedExchangeRate(array $params): void
+    public function recordAdvanceExchangeRate(array $params): void
     {
-        $orderId = (int) $params['id'];
+        $this->recordLegExchangeRate((int) $params['id'], 'advance');
+    }
+
+    public function recordBalanceExchangeRate(array $params): void
+    {
+        $this->recordLegExchangeRate((int) $params['id'], 'balance');
+    }
+
+    public function recordFreightExchangeRate(array $params): void
+    {
+        $this->recordLegExchangeRate((int) $params['id'], 'freight');
+    }
+
+    private function recordLegExchangeRate(int $orderId, string $leg): void
+    {
         $user = AuthService::currentUser();
-        $rate = (float) ($_POST['assumed_exchange_rate'] ?? 0);
+        $rate = (float) ($_POST[$leg . '_exchange_rate'] ?? 0);
         if ($rate <= 0) {
-            Flash::set('error', 'Enter the assumed INR exchange rate for this order.');
+            Flash::set('error', 'Enter the exchange rate for this leg.');
             header("Location: /orders/{$orderId}");
             return;
         }
-        // Not tied to one leg — changing it would change the forex gain/loss
-        // shown for every cleared leg on the order, so it's blocked if ANY
-        // of them falls in a locked FY, not just one.
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        $ops = OrderPaymentStatusRepository::find($orderId) ?? [];
-        foreach (['advance_cleared_at', 'balance_cleared_at', 'freight_cleared_at'] as $col) {
-            if (!CaFyLockGuard::allow($ops[$col] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'assumed_exchange_rate')) {
-                header("Location: /orders/{$orderId}");
-                return;
-            }
+        $clearedAt = (OrderPaymentStatusRepository::find($orderId) ?? [])[$leg . '_cleared_at'] ?? null;
+        if (!CaFyLockGuard::allow($clearedAt, (int) $user['id'], $roleId, 'order_payment_status', $orderId, $leg . '_exchange_rate')) {
+            header("Location: /orders/{$orderId}");
+            return;
         }
-        OrderPaymentStatusRepository::setAssumedExchangeRate($orderId, $rate, (int) $user['id']);
-        AuditLogRepository::log((int) $user['id'], 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'assumed_exchange_rate', null, (string) $rate);
-        Flash::set('success', 'Assumed exchange rate recorded.');
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, $leg, $rate, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, $leg . '_exchange_rate', null, (string) $rate);
+        Flash::set('success', ucfirst($leg) . ' exchange rate recorded.');
         header("Location: /orders/{$orderId}");
     }
 

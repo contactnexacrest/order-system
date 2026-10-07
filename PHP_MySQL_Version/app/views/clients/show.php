@@ -1,11 +1,16 @@
 <?php
 use App\Helpers\Csrf;
 use App\Helpers\Mask;
+use App\Repositories\CompanySettingsRepository;
 use App\Services\AuthService;
 use App\Services\PermissionService;
 $__u = AuthService::currentUser();
 $canViewFullEmail = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_client_email_full');
 $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'edit_locked_data');
+// docs/schema.sql Section AV
+$__canManageSettings = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_company_settings');
+$__canImpersonate = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'impersonate_client');
+$__impersonationGloballyEnabled = CompanySettingsRepository::get('client_impersonation_enabled') === '1';
 ?>
 <div class="card page-wide">
   <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
@@ -60,6 +65,38 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
     </table>
     <?php endif; ?>
   </div>
+
+  <?php if ($__canManageSettings || $__canImpersonate): ?>
+  <div class="section">
+    <h2>Client Portal Access</h2>
+    <?php if ($__canManageSettings): ?>
+      <form method="post" action="/clients/<?= (int) $client['id'] ?>/impersonation-allowed">
+        <?= Csrf::field() ?>
+        <label><input type="checkbox" name="allow_staff_impersonation" value="1" <?= !empty($client['allow_staff_impersonation']) ? 'checked' : '' ?> onchange="this.form.submit()"> Allow staff to log in as this client ("Log in as this client")</label>
+      </form>
+      <p class="muted small">
+        Global switch is currently <strong><?= $__impersonationGloballyEnabled ? 'ON' : 'OFF' ?></strong> (<a href="/settings">Settings</a>).
+        <?php if (!$__impersonationGloballyEnabled): ?>Turning this on alone won't allow impersonation until the global switch is also on.<?php endif; ?>
+      </p>
+    <?php endif; ?>
+    <?php if ($__canImpersonate): ?>
+      <?php if ($__impersonationGloballyEnabled && !empty($client['allow_staff_impersonation']) && (int) $client['is_active'] === 1): ?>
+        <form method="post" action="/clients/<?= (int) $client['id'] ?>/impersonate" onsubmit="return confirm('Log in as <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>? This opens their client-portal view in this session. This is logged.');">
+          <?= Csrf::field() ?>
+          <button type="submit" class="btn-sm btn-secondary">Log in as this client</button>
+        </form>
+      <?php else: ?>
+        <?php
+          $__reasons = [];
+          if (!$__impersonationGloballyEnabled) { $__reasons[] = 'the global switch is off'; }
+          if (empty($client['allow_staff_impersonation'])) { $__reasons[] = 'it is not enabled for this client'; }
+          if ((int) $client['is_active'] !== 1) { $__reasons[] = 'this client is deactivated'; }
+        ?>
+        <p class="muted small">"Log in as this client" isn't available right now — <?= htmlspecialchars(implode(', ', $__reasons)) ?>.</p>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
 
   <?php if ($canEditLockedData): ?>
   <div class="section">

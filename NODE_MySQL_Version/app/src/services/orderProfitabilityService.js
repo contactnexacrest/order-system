@@ -17,10 +17,12 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
  * asking staff to re-enter them:
  *   - Revenue: this order's product FOB value, converted to INR using the
  *     REAL settled rate wherever both the advance and balance legs have
- *     already cleared with their INR actual recorded, falling back to the
- *     order's own assumed_exchange_rate for any leg not yet cleared.
- *     Never partly-real, partly-estimated without saying so —
- *     revenueIsEstimated tells the view which case applies.
+ *     already cleared with their INR actual recorded, falling back to
+ *     that leg's own exchange rate (Batch 3 #3: advance/balance/freight
+ *     each carry their own rate now, not one shared order-wide rate) for
+ *     any leg not yet cleared. Never partly-real, partly-estimated
+ *     without saying so — revenueIsEstimated tells the view which case
+ *     applies.
  *   - Supplier cost: order_supplier_po.total_payable_inr (already INR).
  *   - Freight/insurance cost: order_freight.confirmed_freight_rate +
  *     insurance_amount. ASSUMPTION (documented, not verified against a
@@ -95,14 +97,23 @@ function revenueInInr(fobValue, payment) {
     return [0, true];
   }
 
+  const advanceAmount = payment.advance_amount !== null && payment.advance_amount !== undefined
+    ? Number(payment.advance_amount)
+    : null;
+  const balanceAmount = payment.balance_amount !== null && payment.balance_amount !== undefined
+    ? Number(payment.balance_amount)
+    : null;
   const advanceInrActual = payment.advance_inr_actual !== null && payment.advance_inr_actual !== undefined
     ? Number(payment.advance_inr_actual)
     : null;
   const balanceInrActual = payment.balance_inr_actual !== null && payment.balance_inr_actual !== undefined
     ? Number(payment.balance_inr_actual)
     : null;
-  const assumedRate = payment.assumed_exchange_rate !== null && payment.assumed_exchange_rate !== undefined
-    ? Number(payment.assumed_exchange_rate)
+  const advanceRate = payment.advance_exchange_rate !== null && payment.advance_exchange_rate !== undefined
+    ? Number(payment.advance_exchange_rate)
+    : null;
+  const balanceRate = payment.balance_exchange_rate !== null && payment.balance_exchange_rate !== undefined
+    ? Number(payment.balance_exchange_rate)
     : null;
 
   // Both legs cleared with a real INR actual recorded — the exact, fully-
@@ -111,14 +122,29 @@ function revenueInInr(fobValue, payment) {
     return [advanceInrActual + balanceInrActual, false];
   }
 
-  // Partial or no realization yet — fall back to the assumed rate applied
-  // to the full FOB value, clearly flagged as an estimate.
-  if (assumedRate !== null) {
-    return [fobValue * assumedRate, true];
+  // Pre-PI order: advance/balance amounts haven't even been split out
+  // yet, so there's nothing per-leg to apply a per-leg rate to — the
+  // best estimate available is still the full FOB value, at whichever
+  // leg's rate has been recorded so far (in practice the same rate
+  // either way, this early).
+  if (advanceAmount === null && balanceAmount === null) {
+    const rate = advanceRate ?? balanceRate;
+    return rate !== null ? [fobValue * rate, true] : [0, true];
   }
 
-  // No assumed rate set at all yet — nothing to convert with.
-  return [0, true];
+  // Batch 3 #3: each leg now carries its own exchange rate, so a leg
+  // that has already cleared (real INR actual) is never re-estimated
+  // just because the OTHER leg hasn't cleared yet — only the leg(s)
+  // still outstanding fall back to an estimate, using THEIR OWN rate.
+  const advancePortion = advanceInrActual ?? ((advanceAmount !== null && advanceRate !== null) ? advanceAmount * advanceRate : null);
+  const balancePortion = balanceInrActual ?? ((balanceAmount !== null && balanceRate !== null) ? balanceAmount * balanceRate : null);
+
+  if (advancePortion === null && balancePortion === null) {
+    return [0, true];
+  }
+
+  const isEstimated = advanceInrActual === null || balanceInrActual === null;
+  return [(advancePortion ?? 0) + (balancePortion ?? 0), isEstimated];
 }
 
 function round2(value) {

@@ -207,7 +207,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $currency = self::g($order, 'currency_code', '');
         DocxComponents::addRichParagraph($section, [
-            ['• ', []], [self::g($financial, 'advance_pct', '') . '% advance T/T on FOB Value against Proforma Invoice. ', []], self::starRun(),
+            ['• ', []], [self::g($financial, 'advance_pct', '') . '% advance T/T (Telegraphic Transfer) on FOB Value against Proforma Invoice. ', []], self::starRun(),
         ]);
         DocxComponents::addRichParagraph($section, [
             ['   ' . self::g($financial, 'advance_pct', '') . '% Advance Amount:  ' . $currency . ' ' . self::g($financial, 'advance_amount', ''), []], self::starRun(),
@@ -424,14 +424,31 @@ final class DocxDocumentBuilder
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
         self::paymentTermsBlock($section, $context);
 
-        DocxComponents::addSectionTitle($section, '6. BANK DETAILS');
+        DocxComponents::addSectionTitle($section, '6. PRODUCTION & ESTIMATED SHIPMENT');
+        DocxComponents::addKvTable($section, [[
+            'full' => true,
+            'bg' => DocxComponents::GRAY_LIGHT,
+            'value' => function (AbstractContainer $cell) use ($order) {
+                $run = $cell->addTextRun(['spaceAfter' => 60]);
+                $run->addText('Production status: ', ['bold' => true, 'color' => DocxComponents::NAVY]);
+                $run->addText(self::g($order, 'production_status_text') . '   ', []);
+                $run->addText('Estimated shipment: ', ['bold' => true, 'color' => DocxComponents::NAVY]);
+                $run->addText(self::g($order, 'est_shipment_date_text'), ['italic' => true, 'color' => DocxComponents::MUTED]);
+                $run->addText(' *', ['bold' => true, 'color' => 'C0392B']);
+                $run2 = $cell->addTextRun();
+                $run2->addText('Note: ', ['bold' => true, 'color' => DocxComponents::NAVY, 'size' => 9]);
+                $run2->addText('Estimated shipment date is indicative and subject to production completion, packing, and port scheduling. A confirmed Bill of Lading date will be communicated once the shipment is booked.', ['italic' => true, 'color' => DocxComponents::MUTED, 'size' => 9]);
+            },
+        ]]);
+
+        DocxComponents::addSectionTitle($section, '7. BANK DETAILS');
         DocxComponents::addKvTable($section, self::bankDetailsRows(
             $context,
             'Please quote PI No. ' . self::g($meta, 'document_reference', '') . ' in your wire transfer remarks.',
             self::g($company, 'rbi_purpose_code_advance') . ' — enter in the "Purpose of Remittance" field of your wire transfer form.'
         ));
 
-        DocxComponents::addSectionTitle($section, '7. EXPORT DOCUMENTATION');
+        DocxComponents::addSectionTitle($section, '8. EXPORT DOCUMENTATION');
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
             '1.  Commercial Invoice (signed and stamped)',
             '2.  Packing List (signed and stamped)',
@@ -440,7 +457,7 @@ final class DocxDocumentBuilder
             '5.  Fumigation Certificate — provided as standard with every shipment',
         ]);
 
-        DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 8), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
+        DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 9), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
         self::addAnnexureAppendixIfAny($section, $context);
         DocxComponents::addSignatureBlock($section, $context);
     }
@@ -469,7 +486,7 @@ final class DocxDocumentBuilder
         ]);
         DocxComponents::addColorBox($section, DocxComponents::GREEN_BG, DocxComponents::GREEN_BORDER, function (AbstractContainer $cell) use ($financial) {
             $cell->addText("\u{2713}  ORDER CONFIRMED", ['bold' => true, 'size' => 13, 'color' => DocxComponents::GREEN_BORDER]);
-            $cell->addText('This order is confirmed upon receipt and clearance of ' . self::g($financial, 'advance_pct') . '% advance T/T payment against the referenced Proforma Invoice.', ['italic' => true, 'size' => 9.5, 'color' => DocxComponents::GREEN_VALUE]);
+            $cell->addText('This order is confirmed upon receipt and clearance of ' . self::g($financial, 'advance_pct') . '% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.', ['italic' => true, 'size' => 9.5, 'color' => DocxComponents::GREEN_VALUE]);
         });
 
         self::addDefaultSection1($section, $context, 'SELLER / EXPORTER');
@@ -759,7 +776,7 @@ final class DocxDocumentBuilder
             ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Certificate of Origin *', 'value' => self::g($order, 'coo_type')],
-            ['label' => 'Payment Terms', 'value' => self::g($financial, 'advance_pct') . '% advance T/T against Proforma Invoice before production. ' . self::g($financial, 'balance_pct') . '% balance T/T before shipment — ' . self::g($financial, 'balance_terms_text') . ' Freight & Insurance (CFR/CIF): invoiced separately by Freight Debit Note before shipment.'],
+            ['label' => 'Payment Terms', 'value' => self::g($financial, 'advance_pct') . '% advance T/T (Telegraphic Transfer) against Proforma Invoice before production. ' . self::g($financial, 'balance_pct') . '% balance T/T before shipment — ' . self::g($financial, 'balance_terms_text') . ' Freight & Insurance (CFR/CIF): invoiced separately by Freight Debit Note before shipment.'],
         ]);
 
         DocxComponents::addSectionTitle($section, '4. BUYER ACCEPTANCE  (Buyer fills this section, signs and returns)');
@@ -1377,7 +1394,7 @@ final class DocxDocumentBuilder
             ["\u{2713}  " . self::g($financial, 'advance_pct') . '% Advance — ' . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
             ["\u{2713}  Freight & Insurance — {$freightStatus}", $freightAmtCell, $freightRemark2],
             ['SUBTOTAL ALREADY PAID', $subtotalPaid, self::g($financial, 'advance_pct') . '% Advance' . (!$isFob ? ' + FDN (if applicable)' : '')],
-            ["\u{21D2}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', '= FOB Value minus ' . self::g($financial, 'advance_pct') . "% advance received\nPayable by T/T within " . self::g($financial, 'balance_days') . " days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
+            ["\u{21D2}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', '= FOB Value minus ' . self::g($financial, 'advance_pct') . "% advance received\nPayable by T/T (Telegraphic Transfer) within " . self::g($financial, 'balance_days') . " days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
             ['VERIFICATION', "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = " . self::g($financial, 'fob_value') . " \u{2713}", 'Freight & Insurance paid separately via FDN — not included in CI value or this verification.'],
         ];
         self::threeColFinanceTable($section, 'SECTION B — PAYMENT SETTLEMENT', $sectionBRows, DocxComponents::NAVY_MID);

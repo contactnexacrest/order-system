@@ -77,6 +77,21 @@ final class ClientPortalController
         header('Location: /client/login');
     }
 
+    /**
+     * docs/schema.sql Section AV — ends a staff-started impersonation and
+     * returns the staff member to that client's own staff-side page. Their
+     * own staff session (a different $_SESSION key, untouched throughout)
+     * is still intact, so this is "stop viewing as the client", not a
+     * logout. No permission gate here deliberately — matches /client/logout
+     * — the worst case of calling this with nothing to end is a no-op
+     * redirect to /client/login.
+     */
+    public function endImpersonation(array $params): void
+    {
+        $clientId = ClientPortalService::endImpersonation();
+        header('Location: ' . ($clientId ? "/clients/{$clientId}" : '/client/login'));
+    }
+
     public function showSetPassword(array $params): void
     {
         $token = (string) ($params['token'] ?? '');

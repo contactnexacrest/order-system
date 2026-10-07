@@ -92,7 +92,7 @@
 
 <div class="section-title">5. PAYMENT TERMS</div>
 <div class="bullet-block">
-  <p>&#8226; {{ financial.advance_pct }}% advance T/T on FOB Value against Proforma Invoice. <span class="mand-star">*</span></p>
+  <p>&#8226; {{ financial.advance_pct }}% advance T/T (Telegraphic Transfer) on FOB Value against Proforma Invoice. <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.advance_amount }} <span class="mand-star">*</span></p>
   <p>&#8226; {{ financial.balance_pct }}% balance T/T on FOB Value {% if financial.balance_trigger_option == 'A_BEFORE_SHIPMENT' %}payable before shipment — within {{ financial.balance_days }} working days of receiving shipment readiness confirmation from NexaCrest.{% else %}payable against scanned copy of Bill of Lading, within {{ financial.balance_days }} days of BL date.{% endif %} <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }} <span class="mand-star">*</span></p>

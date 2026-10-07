@@ -57,8 +57,9 @@ final class FinancialIntegrityTest extends DbTestCase
     // ---------------------------------------------------------------
     // 2. CA settlement register's forex gain/loss
     //    (CaRepository::settlementRegister(), ~line 51-52): expected_inr =
-    //    foreign_amount * assumed_exchange_rate; forex_gain_loss =
-    //    inr_actual - expected_inr. Pinned against a hand-computed value.
+    //    foreign_amount * that leg's own exchange_rate (Batch 3 #3: one
+    //    rate per leg); forex_gain_loss = inr_actual - expected_inr.
+    //    Pinned against a hand-computed value.
     // ---------------------------------------------------------------
 
     public function testCaSettlementRegisterForexGainLossMatchesHandComputedValue(): void
@@ -68,7 +69,7 @@ final class FinancialIntegrityTest extends DbTestCase
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 1000.00, '2026-01-10');
         OrderPaymentStatusRepository::markAdvanceCleared($orderId, '2026-01-15', $userId);
-        OrderPaymentStatusRepository::setAssumedExchangeRate($orderId, 90.5, $userId);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 90.5, $userId);
         OrderPaymentStatusRepository::setAdvanceInrActual($orderId, 91200.00, $userId);
 
         $row = $this->findSettlementRow($orderId, 'advance');
@@ -87,7 +88,7 @@ final class FinancialIntegrityTest extends DbTestCase
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 2000.00, '2026-01-10');
         OrderPaymentStatusRepository::markAdvanceCleared($orderId, '2026-01-15', $userId);
-        OrderPaymentStatusRepository::setAssumedExchangeRate($orderId, 85.0, $userId);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $userId);
         // Hand-computed: expected_inr = 2000.00 * 85.0 = 170000.00; actual came
         // in lower, a real forex loss.
         OrderPaymentStatusRepository::setAdvanceInrActual($orderId, 168500.00, $userId);

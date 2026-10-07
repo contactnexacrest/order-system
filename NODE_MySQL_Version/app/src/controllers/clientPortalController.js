@@ -86,6 +86,20 @@ async function logout(req, res) {
   res.redirect('/client/login');
 }
 
+/**
+ * docs/schema.sql Section AV — ends a staff-started impersonation and
+ * returns the staff member to that client's own staff-side page. Their
+ * own staff session (preserved through regeneratePreserving() the whole
+ * time) is still intact, so this is "stop viewing as the client", not a
+ * logout. No permission gate here deliberately — matches /client/logout
+ * — the worst case of calling this with nothing to end is a no-op
+ * redirect to /client/login.
+ */
+async function endImpersonation(req, res) {
+  const clientId = await clientPortalService.endImpersonation(req);
+  res.redirect(clientId ? `/clients/${clientId}` : '/client/login');
+}
+
 async function showSetPassword(req, res) {
   const token = String(req.params.token || '');
   const row = await clientPasswordResetTokenRepository.findValidByHash(crypto.createHash('sha256').update(token).digest('hex'));
@@ -565,7 +579,7 @@ async function changePassword(req, res) {
 }
 
 module.exports = {
-  showLogin, login, logout, showSetPassword, setPassword, dashboard, showOrder,
+  showLogin, login, logout, endImpersonation, showSetPassword, setPassword, dashboard, showOrder,
   showReorderForm, submitReorder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
   postComment, downloadCommentAttachment, downloadPaymentScreenshot, uploadBuyerPo,

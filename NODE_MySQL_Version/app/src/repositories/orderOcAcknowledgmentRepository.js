@@ -27,6 +27,28 @@ async function find(orderId) {
 }
 
 /**
+ * docs/schema.sql Section AU: the staff "buyer acknowledged by email reply"
+ * override used to only work once recordSent() had already run (i.e. only
+ * after an OC email had actually, successfully gone out) — if the send was
+ * itself stuck (SMTP misconfigured, still awaiting Level-2 approval, etc.)
+ * there was no row here to act on at all, and staff had no way to move the
+ * order past Stage 4. This idempotently guarantees a row exists
+ * (document_id/sent_at/due_at are NOT NULL and FK-constrained, so a bare
+ * order_id-only row isn't possible) WITHOUT touching any existing row's
+ * state — a concurrent genuine send recording itself via recordSent() and
+ * this call race safely, since neither overwrites the other's
+ * already-landed values.
+ */
+async function ensureRowExists(orderId, documentId) {
+  await db.execute(
+    `INSERT INTO order_oc_acknowledgments (order_id, document_id, sent_at, due_at)
+     VALUES (:order_id, :document_id, NOW(), NOW())
+     ON DUPLICATE KEY UPDATE order_id = order_id`,
+    { order_id: orderId, document_id: documentId }
+  );
+}
+
+/**
  * QA-5 EML-06 (same overlapping-cron-run defect class, folded in while
  * fixing the email dispatcher): the three callers of this function
  * (staff-recorded, client-portal, and the 48h auto-confirm job) each used
@@ -57,4 +79,4 @@ async function dueForAutoConfirm() {
   return db.query("SELECT * FROM order_oc_acknowledgments WHERE acknowledged_at IS NULL AND due_at <= NOW()");
 }
 
-module.exports = { recordSent, find, markAcknowledged, dueForAutoConfirm };
+module.exports = { recordSent, find, ensureRowExists, markAcknowledged, dueForAutoConfirm };

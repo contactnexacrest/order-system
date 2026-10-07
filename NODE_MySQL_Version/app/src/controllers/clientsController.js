@@ -6,9 +6,11 @@ const clientRepository = require('../repositories/clientRepository');
 const orderRepository = require('../repositories/orderRepository');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const companySettingsRepository = require('../repositories/companySettingsRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const testModeService = require('../services/testModeService');
 const superAdminService = require('../services/superAdminService');
+const clientPortalService = require('../services/clientPortalService');
 const env = require('../config/env');
 
 // Port of App\Controllers\ClientController.
@@ -25,7 +27,9 @@ async function inactiveIndex(req, res) {
 }
 
 async function create(req, res) {
-  res.renderView('clients/create', {}, 'layout/base');
+  // Batch 3 #4 — if this page is being shown again after a validation failure on submit,
+  // re-populate the form from what was typed rather than making the user retype everything.
+  res.renderView('clients/create', { old: flash.pullOld(req) }, 'layout/base');
 }
 
 async function store(req, res) {
@@ -36,6 +40,7 @@ async function store(req, res) {
 
   if (companyLegalName === '' || billingAddress === '') {
     flash.set(req, 'error', 'Company legal name and billing address are required.');
+    flash.setOld(req, req.body);
     res.redirect('/clients/create');
     return;
   }
@@ -73,7 +78,14 @@ async function show(req, res) {
     return;
   }
   const orders = await orderRepository.forClient(client.id);
-  res.renderView('clients/show', { client, orders }, 'layout/base');
+  // docs/schema.sql Section AV
+  const impersonationGloballyEnabled = (await companySettingsRepository.get('client_impersonation_enabled')) === '1';
+  const impersonationReasons = [];
+  if (!impersonationGloballyEnabled) impersonationReasons.push('the global switch is off');
+  if (!client.allow_staff_impersonation) impersonationReasons.push('it is not enabled for this client');
+  if (!client.is_active) impersonationReasons.push('this client is deactivated');
+  const impersonationUnavailableReason = impersonationReasons.join(', ');
+  res.renderView('clients/show', { client, orders, impersonationGloballyEnabled, impersonationUnavailableReason }, 'layout/base');
 }
 
 async function editForm(req, res) {
@@ -225,4 +237,64 @@ async function overrideUniqueNumber(req, res) {
   res.redirect(`/clients/${clientId}`);
 }
 
-module.exports = { index, inactiveIndex, create, store, show, editForm, update, toggleActive, overrideUniqueNumber };
+/** docs/schema.sql Section AV — the per-client gate; manage_company_settings tier, same as other global/client-config toggles. */
+async function setImpersonationAllowed(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const allow = !!req.body.allow_staff_impersonation;
+  await clientRepository.setAllowStaffImpersonation(clientId, allow);
+  const user = req.user;
+  await auditLogRepository.log(
+    user.id, 'CLIENT_IMPERSONATION_ALLOWED_CHANGED', 'clients', clientId,
+    'allow_staff_impersonation', client.allow_staff_impersonation ? '1' : '0', allow ? '1' : '0'
+  );
+  flash.set(req, 'success', allow
+    ? `Staff can now log in as ${client.company_legal_name} (if the global switch and the impersonate_client permission also allow it).`
+    : `Staff can no longer log in as ${client.company_legal_name}.`);
+  res.redirect(`/clients/${clientId}`);
+}
+
+/**
+ * docs/schema.sql Section AV — re-checks all three gates itself (global
+ * switch, per-client flag, client active state) rather than relying
+ * solely on the route-level impersonate_client permission check, matching
+ * this project's established pattern for security-sensitive actions.
+ */
+async function impersonate(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  if ((await companySettingsRepository.get('client_impersonation_enabled')) !== '1') {
+    flash.set(req, 'error', 'Staff client-portal impersonation is switched off (Company Settings).');
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+  if (!client.allow_staff_impersonation) {
+    flash.set(req, 'error', `Impersonation isn't enabled for ${client.company_legal_name} — turn it on below first.`);
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+  if (!client.is_active) {
+    flash.set(req, 'error', 'This client is deactivated and cannot be impersonated.');
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+
+  const user = req.user;
+  await clientPortalService.startImpersonation(req, user.id, clientId);
+  res.redirect('/client');
+}
+
+module.exports = {
+  index, inactiveIndex, create, store, show, editForm, update, toggleActive, overrideUniqueNumber,
+  setImpersonationAllowed, impersonate,
+};

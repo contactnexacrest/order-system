@@ -196,6 +196,10 @@ async function create(req, res) {
       containerTypes: await lookupRepository.dropdownOptions('container_type'),
       hsCodes: await hsCodeRepository.active(),
       preselectedClientId,
+      // Batch 3 #4 — if we're showing this page again after a validation failure on submit,
+      // re-populate the whole form (including product rows) instead of making the user
+      // retype everything.
+      old: flash.pullOld(req),
     },
     'layout/base'
   );
@@ -209,6 +213,7 @@ async function store(req, res) {
   const client = clientId ? await clientRepository.find(clientId) : null;
   if (!client) {
     flash.set(req, 'error', 'Please select a valid client.');
+    flash.setOld(req, body);
     res.redirect('/orders/create');
     return;
   }
@@ -219,6 +224,7 @@ async function store(req, res) {
   // a client the business has already cut off.
   if (!client.is_active) {
     flash.set(req, 'error', 'This client is not active — reactivate them before creating a new order.');
+    flash.setOld(req, body);
     res.redirect('/orders/create');
     return;
   }
@@ -228,6 +234,7 @@ async function store(req, res) {
   const paymentPresetId = parseInt(body.payment_preset_id || 0, 10);
   if (!incotermId || !currencyId || !paymentPresetId) {
     flash.set(req, 'error', 'Incoterm, currency, and a payment preset are all required.');
+    flash.setOld(req, body);
     res.redirect(`/orders/create?client_id=${clientId}`);
     return;
   }
@@ -236,6 +243,7 @@ async function store(req, res) {
   const hasAtLeastOneProduct = descriptions.some((d) => str(d) !== '');
   if (!hasAtLeastOneProduct) {
     flash.set(req, 'error', 'At least one product line (with a description) is required.');
+    flash.setOld(req, body);
     res.redirect(`/orders/create?client_id=${clientId}`);
     return;
   }
@@ -251,6 +259,7 @@ async function store(req, res) {
       const hsCode = str(hsCodesInput[i]);
       if (hsCode === '' || !(await hsCodeRepository.isActiveCode(hsCode))) {
         flash.set(req, 'error', `HS code "${hsCode}" is not on the HS Code master list — add it there first (HS Codes, under Admin) before using it on an order.`);
+        flash.setOld(req, body);
         res.redirect(`/orders/create?client_id=${clientId}`);
         return;
       }
@@ -274,12 +283,14 @@ async function store(req, res) {
       const quantityError = orderLineValidator.checkQuantity(quantitiesInput[i], !!quantityTbcInput[i]);
       if (quantityError) {
         flash.set(req, 'error', `Product line ${i + 1}: ${quantityError}`);
+        flash.setOld(req, body);
         res.redirect(`/orders/create?client_id=${clientId}`);
         return;
       }
       const priceError = orderLineValidator.checkUnitPrice(unitPricesInput[i]);
       if (priceError) {
         flash.set(req, 'error', `Product line ${i + 1}: ${priceError}`);
+        flash.setOld(req, body);
         res.redirect(`/orders/create?client_id=${clientId}`);
         return;
       }
@@ -665,12 +676,14 @@ async function show(req, res) {
   // can't await a repository call — mirrors the PHP view's inline closures,
   // which call CaFyLockRepository::lockMessageForDate() directly.
   const paymentForLocks = await orderPaymentStatusRepository.find(orderId);
-  const caLockMessages = { advance: null, balance: null, freight: null, exchangeRate: null };
+  // Batch 3 #3: each leg's exchange-rate widget reuses that SAME leg's own
+  // lock message (no more combined exchangeRate key) — same per-leg FY
+  // lock as its INR Actual widget.
+  const caLockMessages = { advance: null, balance: null, freight: null };
   if (paymentForLocks) {
     caLockMessages.advance = await caFyLockRepository.lockMessageForDate(paymentForLocks.advance_cleared_at);
     caLockMessages.balance = await caFyLockRepository.lockMessageForDate(paymentForLocks.balance_cleared_at);
     caLockMessages.freight = await caFyLockRepository.lockMessageForDate(paymentForLocks.freight_cleared_at);
-    caLockMessages.exchangeRate = caLockMessages.advance || caLockMessages.balance || caLockMessages.freight;
   }
   const piIntake = await piIntakeRepository.latestForOrder(orderId);
   let piFormFullLink = null;
@@ -1051,11 +1064,39 @@ async function recordOcAcknowledgment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+
+  // docs/schema.sql Section AU: off by default (today's behaviour) —
+  // manage_orders alone, already required to reach this route, is enough.
+  // When an admin turns this on, a second, narrower permission is also
+  // required, so the override can be restricted to specific roles without
+  // touching code.
+  if ((await companySettingsRepository.get('oc_ack_override_restricted')) === '1') {
+    if (!(req.permissions && req.permissions.override_buyer_acknowledgment)) {
+      flash.set(req, 'error', 'Recording a buyer acknowledgment manually has been restricted — you do not hold the required permission.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+  }
+
   const ack = await orderOcAcknowledgmentRepository.find(orderId);
-  if (!ack || ack.acknowledged_at !== null) {
-    flash.set(req, 'error', 'No pending Order Confirmation acknowledgment for this order — send the OC to the buyer first.');
+  if (ack && ack.acknowledged_at !== null) {
+    flash.set(req, 'error', "This order's Order Confirmation has already been acknowledged.");
     res.redirect(`/orders/${orderId}`);
     return;
+  }
+  if (!ack) {
+    // No OC send has ever completed for this order (e.g. mail sending is
+    // misconfigured, or a send is still stuck awaiting Level-2 approval) —
+    // there is nothing yet for recordSent() to have created. The OC must
+    // at least have been generated so there's a real document to point
+    // this record at.
+    const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
+    if (!ocDoc) {
+      flash.set(req, 'error', 'Generate the Order Confirmation for this order first.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    await orderOcAcknowledgmentRepository.ensureRowExists(orderId, ocDoc.id);
   }
 
   const note = String(req.body.acknowledged_note || '').trim();
@@ -1587,34 +1628,44 @@ async function deleteFreightInrActual(req, res) {
 }
 
 // ----------------------------------------------------------------
-// CA / Accounting module (Phase 2) — assumed exchange rate (one per
-// order, for the register's forex gain/loss column) and per-leg
-// FIRC/eBRC references. Same inr_actual_edit gating as Phase 1.
+// CA / Accounting module (Phase 2, Batch 3 #3) — exchange rate, one per
+// settlement leg (advance/balance/freight), for the register's forex
+// gain/loss column — each leg can genuinely clear on a different date
+// with a different market rate, so a single order-wide rate (the
+// original Phase 2 design) overstated/understated gain/loss for
+// whichever leg didn't match it. Same inr_actual_edit gating as Phase 1.
 // ----------------------------------------------------------------
 
-async function recordAssumedExchangeRate(req, res) {
+async function recordLegExchangeRate(req, res, leg) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
-  const rate = parseFloat(req.body.assumed_exchange_rate || 0);
+  const rate = parseFloat(req.body[`${leg}_exchange_rate`] || 0);
   if (!(rate > 0)) {
-    flash.set(req, 'error', 'Enter the assumed INR exchange rate for this order.');
+    flash.set(req, 'error', 'Enter the exchange rate for this leg.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  // Not tied to one leg — changing it would change the forex gain/loss
-  // shown for every cleared leg on the order, so it's blocked if ANY of
-  // them falls in a locked FY, not just one.
   const ops = (await orderPaymentStatusRepository.find(orderId)) || {};
-  for (const col of ['advance_cleared_at', 'balance_cleared_at', 'freight_cleared_at']) {
-    if (!(await caFyLockGuard.allow(req, ops[col] ?? null, 'order_payment_status', orderId, 'assumed_exchange_rate'))) {
-      res.redirect(`/orders/${orderId}`);
-      return;
-    }
+  if (!(await caFyLockGuard.allow(req, ops[`${leg}_cleared_at`] ?? null, 'order_payment_status', orderId, `${leg}_exchange_rate`))) {
+    res.redirect(`/orders/${orderId}`);
+    return;
   }
-  await orderPaymentStatusRepository.setAssumedExchangeRate(orderId, rate, user.id);
-  await auditLogRepository.log(user.id, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'assumed_exchange_rate', null, String(rate));
-  flash.set(req, 'success', 'Assumed exchange rate recorded.');
+  await orderPaymentStatusRepository.setLegExchangeRate(orderId, leg, rate, user.id);
+  await auditLogRepository.log(user.id, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, `${leg}_exchange_rate`, null, String(rate));
+  flash.set(req, 'success', `${leg.charAt(0).toUpperCase()}${leg.slice(1)} exchange rate recorded.`);
   res.redirect(`/orders/${orderId}`);
+}
+
+async function recordAdvanceExchangeRate(req, res) {
+  await recordLegExchangeRate(req, res, 'advance');
+}
+
+async function recordBalanceExchangeRate(req, res) {
+  await recordLegExchangeRate(req, res, 'balance');
+}
+
+async function recordFreightExchangeRate(req, res) {
+  await recordLegExchangeRate(req, res, 'freight');
 }
 
 async function recordAdvanceFirc(req, res) {
@@ -1849,5 +1900,5 @@ module.exports = {
   closeOrder, overrideStatusLock, markLost, updateComplianceTask,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,
-  recordAssumedExchangeRate, recordAdvanceFirc, recordBalanceFirc, recordFreightFirc,
+  recordAdvanceExchangeRate, recordBalanceExchangeRate, recordFreightExchangeRate, recordAdvanceFirc, recordBalanceFirc, recordFreightFirc,
 };

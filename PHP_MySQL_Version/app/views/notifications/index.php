@@ -7,7 +7,8 @@
         <td><?= htmlspecialchars($n['created_at']) ?></td>
         <td><?= htmlspecialchars($n['type']) ?></td>
         <td><?= htmlspecialchars($n['message']) ?></td>
-        <td><?php if ($n['related_order_id']): ?><a href="/orders/<?= (int) $n['related_order_id'] ?>">Order #<?= (int) $n['related_order_id'] ?></a><?php endif; ?></td>
+        <td><?php if ($n['type'] === 'email_send_pending_approval'): ?><a href="/email-approvals">Review &amp; approve</a>
+          <?php elseif ($n['related_order_id']): ?><a href="/orders/<?= (int) $n['related_order_id'] ?>">Order #<?= (int) $n['related_order_id'] ?></a><?php endif; ?></td>
       </tr>
     <?php endforeach; ?>
     <?php if (empty($notifications)): ?>

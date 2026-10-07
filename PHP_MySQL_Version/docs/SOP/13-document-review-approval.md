@@ -87,15 +87,20 @@ rejected one in place.
 
 ### Sending to the buyer — a two-level approval
 
-Once approved, **Send Document** opens a compose/preview screen showing the
-**exact** merged subject and body that will be sent, with a live preview
-against the real email template:
+Once approved, **Send Document** opens a compose/preview screen. When the
+document being sent has an obvious matching template (the normal case —
+e.g. Order Confirmation matches the "Order Confirmation" template), that
+template is pre-selected and its **exact** merged subject and body are
+shown immediately, with no extra click needed:
 
 ![Send compose screen — exact preview of subject, body, and recipient](./images/review_send_compose.png)
 
 **Submit for Level-2 Approval** doesn't send anything yet — it's Level 1.
 A separate approver (anyone with the `approve_email_send` permission) has
-to clear it from the **Email Send Approvals** queue before it goes out:
+to clear it from the **Email Send Approvals** queue before it goes out.
+That queue has its own item in the sidebar (next to **My Reviews** — not
+tucked under Insights), and a notification telling an approver a send is
+waiting links straight there:
 
 ![Email Send Approvals — Level 2, with Approve/Reject/Cancel actions](./images/review_email_approvals.png)
 
@@ -104,6 +109,23 @@ until it actually goes out — this whole span (submitted → approved →
 dispatched) is the "deferred send" window, giving staff a chance to catch a
 mistake before it reaches the buyer. Once it's actually dispatched, nothing
 here can pull it back.
+
+### Admin-configurable: turning sending off, or skipping Level 2
+
+Two independent switches in Company Settings, both off by default (meaning:
+nothing changes from the behaviour above until an admin turns one on):
+
+- **`mail_sending_enabled`** — a master kill switch for every non-security
+  email (2FA codes and password resets are never affected). Turn it off
+  while diagnosing a hosting SMTP problem, so nothing can accidentally reach
+  a real buyer while credentials are being worked out.
+- **`mail_approval_queue_enabled`** — on by default, preserving the two-level
+  flow above exactly. Turned **off**, Level 1's submit button sends the
+  email immediately instead of queuing it for a second approver — useful
+  for a small team, or while testing, where waiting for a second person
+  isn't practical. The email log still records the attempt either way, and
+  a failed immediate attempt (e.g. SMTP still not configured) shows up as
+  an error right away rather than silently sitting in the queue forever.
 
 ## What the client does (or doesn't)
 

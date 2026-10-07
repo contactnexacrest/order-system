@@ -88,6 +88,11 @@ async function setActive(id, active) {
   await db.execute('UPDATE clients SET is_active = :active WHERE id = :id', { active: active ? 1 : 0, id });
 }
 
+/** docs/schema.sql Section AV — per-client gate on staff impersonation, independent of the global company_settings switch. */
+async function setAllowStaffImpersonation(id, allow) {
+  await db.execute('UPDATE clients SET allow_staff_impersonation = :allow WHERE id = :id', { allow: allow ? 1 : 0, id });
+}
+
 async function markSample(id) {
   await db.execute('UPDATE clients SET is_sample_data = 1 WHERE id = :id', { id });
 }
@@ -112,4 +117,6 @@ async function lockData(id, reason) {
   );
 }
 
-module.exports = { all, find, allInactive, create, update, setActive, markSample, markTest, lockData, setZohoContactId };
+module.exports = {
+  all, find, allInactive, create, update, setActive, setAllowStaffImpersonation, markSample, markTest, lockData, setZohoContactId,
+};

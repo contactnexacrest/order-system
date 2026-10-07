@@ -75,14 +75,27 @@ final class EmailDispatchService
         ];
     }
 
-    /** Level 1 — submits for Level 2 approval. Never sends directly, whatever the scheduled time. */
+    /**
+     * Level 1 — submits for Level 2 approval. Never sends directly, whatever
+     * the scheduled time — UNLESS company_settings.mail_approval_queue_enabled
+     * is off (docs/schema.sql Section AU), in which case there is no Level 2
+     * to wait for: the row is still created (so the email log stays a
+     * complete record either way), immediately marked approved by the
+     * system, and dispatched synchronously in this same request instead of
+     * waiting for the cron's next tick.
+     *
+     * @return array{id:int, dispatched:bool, sent:?bool} dispatched is true
+     *   when the queue was bypassed (sent tells you whether that immediate
+     *   attempt actually succeeded); false means it's queued for Level 2 as
+     *   usual and sent is always null.
+     */
     public static function requestSend(
         int $orderId,
         int $documentId,
         string $templateKey,
         ?string $scheduledAt,
         int $requestedByUserId
-    ): int {
+    ): array {
         $preview = self::buildPreview($orderId, $documentId, $templateKey, $requestedByUserId);
 
         if (EmailLogRepository::hasActiveSendFor($documentId)) {
@@ -100,6 +113,15 @@ final class EmailDispatchService
             $requestedByUserId
         );
 
+        if (CompanySettingsRepository::get('mail_approval_queue_enabled') === '0') {
+            EmailLogRepository::approve($id, $requestedByUserId);
+            AuditLogRepository::log($requestedByUserId, 'EMAIL_SEND_REQUESTED', 'email_log', $id, 'recipient_email', null, $preview['recipient_email']);
+            AuditLogRepository::log($requestedByUserId, 'EMAIL_SEND_AUTO_APPROVED', 'email_log', $id, null, null, null, 'mail_approval_queue_enabled is off — no Level-2 approval required.');
+            $row = EmailLogRepository::find($id);
+            $sent = $row ? self::dispatch($row) : false;
+            return ['id' => $id, 'dispatched' => true, 'sent' => $sent];
+        }
+
         // Notify whoever can actually approve this (approve_email_send —
         // the same permission this exact approval route is gated on).
         // Checked by permission, not a hardcoded role name, since roles
@@ -109,7 +131,7 @@ final class EmailDispatchService
         }
 
         AuditLogRepository::log($requestedByUserId, 'EMAIL_SEND_REQUESTED', 'email_log', $id, 'recipient_email', null, $preview['recipient_email']);
-        return $id;
+        return ['id' => $id, 'dispatched' => false, 'sent' => null];
     }
 
     public static function approveSend(int $emailLogId, int $approverUserId): void
@@ -244,11 +266,14 @@ final class EmailDispatchService
             // are the three ways it later resolves).
             if ($document['document_type_code'] === 'OC' && $document['order_id'] !== null) {
                 $now = new \DateTimeImmutable();
+                // docs/schema.sql Section AU: admin-configurable, default 48
+                // (matches the original hardcoded value exactly).
+                $hours = (int) (CompanySettingsRepository::get('oc_ack_auto_confirm_hours') ?? '48');
                 \App\Repositories\OrderOcAcknowledgmentRepository::recordSent(
                     (int) $document['order_id'],
                     (int) $document['id'],
                     $now->format('Y-m-d H:i:s'),
-                    $now->modify('+48 hours')->format('Y-m-d H:i:s')
+                    $now->modify("+{$hours} hours")->format('Y-m-d H:i:s')
                 );
             }
         } else {

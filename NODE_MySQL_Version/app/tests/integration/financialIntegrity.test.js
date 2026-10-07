@@ -100,7 +100,7 @@ describe('Financial data integrity (QA-4 P1)', () => {
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 1000.0, '2026-01-10');
     await orderPaymentStatusRepository.markAdvanceCleared(orderId, '2026-01-15', userId);
-    await orderPaymentStatusRepository.setAssumedExchangeRate(orderId, 90.5, userId);
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 90.5, userId);
     await orderPaymentStatusRepository.setAdvanceInrActual(orderId, 91200.0, userId);
 
     const rows = await caRepository.settlementRegister();
@@ -119,7 +119,7 @@ describe('Financial data integrity (QA-4 P1)', () => {
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 2000.0, '2026-01-10');
     await orderPaymentStatusRepository.markAdvanceCleared(orderId, '2026-01-15', userId);
-    await orderPaymentStatusRepository.setAssumedExchangeRate(orderId, 85.0, userId);
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId);
     // Hand-computed: expected_inr = 2000.00 * 85.0 = 170000.00; actual came
     // in lower, a real forex loss.
     await orderPaymentStatusRepository.setAdvanceInrActual(orderId, 168500.0, userId);

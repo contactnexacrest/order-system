@@ -2,6 +2,7 @@
 
 const clientPortalService = require('../services/clientPortalService');
 const clientLoginRepository = require('../repositories/clientLoginRepository');
+const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 
 // Port of App\Middleware\ClientAuth. Gates every /client/* portal route.
@@ -32,6 +33,22 @@ function required() {
       return;
     }
     req.session[LAST_ACTIVITY_KEY] = Date.now();
+
+    // docs/schema.sql Section AV: a staff-impersonated session has no
+    // client_logins row to check at all — it's a separate channel, not a
+    // stand-in for the client's own password login (that row may not even
+    // exist yet, e.g. before Stage 3). Only the client record itself needs
+    // to still be active.
+    if (clientPortalService.isImpersonating(req)) {
+      const client = await clientRepository.find(clientId);
+      if (!client || !client.is_active) {
+        await clientPortalService.endImpersonation(req);
+        res.redirect('/client/login');
+        return;
+      }
+      next();
+      return;
+    }
 
     // CP-06: a client (or their portal login specifically) deactivated
     // mid-session must lose access on their very next request — like

@@ -30,6 +30,12 @@ const emailService = require('./emailService');
 
 const SESSION_CLIENT_ID = '_client_portal_client_id';
 
+// docs/schema.sql Section AV — set only when the current client-portal
+// session was started by staff (startImpersonation()), not a real client
+// password login. Holds the staff user's id, both to show "you are
+// viewing as staff" in the portal and to audit-log who ends up acting.
+const SESSION_IMPERSONATED_BY = '_client_portal_impersonated_by_staff_id';
+
 // QA-5 CP-13: mirrors authService.js's own SESSION_USER_ID. Kept as a
 // literal rather than required from authService.js to avoid a circular
 // require (that file needs this file's SESSION_CLIENT_ID the same way) —
@@ -146,11 +152,68 @@ async function logout(req) {
   await regeneratePreserving(req, [STAFF_SESSION_KEY]);
 }
 
+/**
+ * docs/schema.sql Section AV — a staff-initiated client-portal session,
+ * for a client who cannot use the portal themselves (no email, not
+ * tech-comfortable, or an order still short of Stage 3 so no
+ * client_logins row exists at all yet). Deliberately does NOT touch
+ * clientLoginRepository — this is a separate channel into the portal, not
+ * a stand-in for the client's own password login, and clientAuth.js's
+ * per-request checks are relaxed accordingly while impersonating (see that
+ * file). Call-site (clientController.impersonate()) is responsible for
+ * checking client_impersonation_enabled, clients.allow_staff_impersonation,
+ * and the impersonate_client permission before this is ever called — this
+ * function itself only requires the client to exist and be active.
+ */
+async function startImpersonation(req, staffUserId, clientId) {
+  await regeneratePreserving(req, [STAFF_SESSION_KEY], () => {
+    req.session[SESSION_CLIENT_ID] = clientId;
+    req.session[SESSION_IMPERSONATED_BY] = staffUserId;
+  });
+  await auditLogRepository.log(staffUserId, 'CLIENT_IMPERSONATION_STARTED', 'clients', clientId);
+}
+
+/**
+ * Ends an impersonated session and returns the client id that was being
+ * impersonated (for the caller's redirect), or null if the current
+ * session wasn't actually impersonating anyone.
+ */
+async function endImpersonation(req) {
+  const staffUserId = impersonatedByStaffId(req);
+  if (staffUserId === null) {
+    return null;
+  }
+  const clientId = currentClientId(req);
+  if (clientId !== null) {
+    await auditLogRepository.log(staffUserId, 'CLIENT_IMPERSONATION_ENDED', 'clients', clientId);
+  }
+  await regeneratePreserving(req, [STAFF_SESSION_KEY]);
+  return clientId;
+}
+
+function isImpersonating(req) {
+  return impersonatedByStaffId(req) !== null;
+}
+
+function impersonatedByStaffId(req) {
+  return req.session[SESSION_IMPERSONATED_BY] ?? null;
+}
+
 async function changePassword(clientId, newPassword) {
   await clientLoginRepository.updatePassword(clientId, await passwordHash.hash(newPassword, 12), false);
   await auditLogRepository.log(null, 'CLIENT_PASSWORD_CHANGED', 'clients', clientId);
 }
 
 module.exports = {
-  SESSION_CLIENT_ID, provisionIfNeeded, attemptLogin, currentClientId, currentClient, logout, changePassword,
+  SESSION_CLIENT_ID,
+  provisionIfNeeded,
+  attemptLogin,
+  currentClientId,
+  currentClient,
+  logout,
+  changePassword,
+  startImpersonation,
+  endImpersonation,
+  isImpersonating,
+  impersonatedByStaffId,
 };

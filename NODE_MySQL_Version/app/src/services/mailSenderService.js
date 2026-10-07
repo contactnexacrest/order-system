@@ -4,6 +4,7 @@ const emailService = require('./emailService');
 const testModeService = require('./testModeService');
 const zohoMailService = require('./zohoMailService');
 const mailRedirectService = require('./mailRedirectService');
+const companySettingsRepository = require('../repositories/companySettingsRepository');
 
 /**
  * docs/schema.sql Section AI — the one chokepoint every outbound email in
@@ -21,6 +22,16 @@ const mailRedirectService = require('./mailRedirectService');
  * @returns {Promise<boolean>} true if actually handed to a transport, false if only logged (dev fallback)
  */
 async function send(to, subject, body, attachments = [], opts = {}) {
+  // docs/schema.sql Section AU: a master kill switch for business email,
+  // separate from Test Mode/Mail Redirect — never applies to 2FA/password-
+  // reset, matching every other gate in this function. Checked here, the
+  // one chokepoint every non-security send passes through, so it can never
+  // be bypassed by a future transport added below Zoho/SMTP.
+  if (!opts.isSecurityEmail && (await companySettingsRepository.get('mail_sending_enabled')) === '0') {
+    console.error(`[EMAIL NOT SENT — sending disabled by admin (mail_sending_enabled=0)] To: ${to} | Subject: ${subject}`);
+    return false;
+  }
+
   // QA-5 TM-08: resolved ONCE, here, before either transport is chosen.
   // Test Mode's redirect used to live only inside emailService's own send
   // functions — the SMTP fallback path — so turning Zoho on gave every

@@ -107,17 +107,24 @@ The Profitability Sheet deliberately **reuses figures the system already
 tracks** rather than asking staff to re-enter them:
 
 - **Revenue.** This order's product FOB value, converted to INR, using a
-  three-tier rule so a viewer always knows whether a figure is exact or
-  an estimate:
-  1. If **both** the advance and balance legs have already cleared with
-     their real INR actual recorded (see
+  rule so a viewer always knows whether a figure is exact or an estimate.
+  Advance and Balance each carry their **own** exchange rate (not one
+  rate shared by the whole order — see
+  [Forex, FIRC Tracking & Revenue Reports](./ca-02-revenue-reports.md#exchange-rate-per-settlement-leg)):
+  1. If **both** legs have already cleared with their real INR actual
+     recorded (see
      [Overview — Recording an INR actual amount](./ca-01-overview.md#recording-an-inr-actual-amount)),
      revenue is their exact sum — never an estimate.
-  2. Otherwise, if the order has an assumed exchange rate recorded (CA
-     Phase 2), revenue is the FOB value × that rate — flagged as
-     **estimated** everywhere it's shown.
-  3. If neither exists yet, revenue is shown as zero, also flagged
-     estimated.
+  2. Before the advance/balance amounts are even split out (a pre-PI
+     order), revenue falls back to the full FOB value × whichever leg's
+     rate is on file — flagged as **estimated**.
+  3. Once split, a leg that has already cleared contributes its real INR
+     actual; a leg that hasn't yet contributes its own amount × its own
+     rate. A real figure for one leg is never re-estimated just because
+     the other leg hasn't cleared — only the outstanding leg is
+     estimated, using its own rate, not the other leg's.
+  4. If nothing exists yet for either leg, revenue is shown as zero, also
+     flagged estimated.
 - **Supplier cost** — `order_supplier_po.total_payable_inr`, already in
   INR, pulled automatically. Nothing to enter here.
 - **Ocean freight and insurance** — `order_freight.confirmed_freight_rate`

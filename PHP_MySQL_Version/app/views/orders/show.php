@@ -39,58 +39,54 @@ $usersById = [];
 foreach ($activeUsers as $u) {
     $usersById[(int) $u['id']] = $u['name'];
 }
-$renderExchangeRateWidget = function () use ($payment, $order, $canViewInrActual, $canEditInrActual, $canOverrideFyLock, $usersById): void {
+// Batch 3 #3 — each settlement leg carries its own exchange rate (advance/
+// balance/freight each clear on their own date, at their own market
+// rate), so the rate widget is rendered per-leg, right alongside that
+// leg's own INR Actual widget, instead of one shared order-wide widget.
+$renderExchangeRateWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canOverrideFyLock, $usersById): void {
     if (!$canViewInrActual) {
         return;
     }
-    $rate = $payment['assumed_exchange_rate'] ?? null;
-    $setBy = $payment['assumed_exchange_rate_set_by'] ?? null;
+    $rate = $payment[$leg . '_exchange_rate'] ?? null;
+    $setBy = $payment[$leg . '_exchange_rate_set_by'] ?? null;
     $setByName = $setBy !== null ? ($usersById[(int) $setBy] ?? ('User #' . $setBy)) : null;
-    $lockMessage = null;
-    foreach (['advance_cleared_at', 'balance_cleared_at', 'freight_cleared_at'] as $col) {
-        $lockMessage = CaFyLockRepository::lockMessageForDate($payment[$col] ?? null);
-        if ($lockMessage !== null) {
-            break;
-        }
-    }
+    $lockMessage = CaFyLockRepository::lockMessageForDate($payment[$leg . '_cleared_at'] ?? null);
     ?>
-    <div class="review-banner info" style="margin-top:10px;">
-      <div style="width:100%;">
-        <strong>Assumed Exchange Rate (CA/Accounting)</strong><br>
-        <?php if ($rate !== null): ?>
-          <span>1 unit foreign currency = &#8377;<?= number_format((float) $rate, 4) ?> — set <?= htmlspecialchars((string) ($payment['assumed_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
-          <?php if ($lockMessage !== null && !$canOverrideFyLock): ?>
-            <br><span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
-          <?php elseif ($canEditInrActual): ?>
-            <?php if ($lockMessage !== null): ?>
-              <p class="muted small" style="margin:6px 0 0;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
-            <?php endif; ?>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/exchange-rate" style="margin-top:6px;">
-              <?= Csrf::field() ?>
-              <label>Update Rate<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
-              <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Update' : 'Update' ?></button>
-            </form>
-          <?php endif; ?>
-        <?php elseif ($lockMessage !== null && !$canOverrideFyLock): ?>
-          <span class="muted">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
+    <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
+      <strong style="font-size:0.85em;"><?= htmlspecialchars($label) ?> Exchange Rate</strong><br>
+      <?php if ($rate !== null): ?>
+        <span class="muted small">1 unit foreign currency = &#8377;<?= number_format((float) $rate, 4) ?> — set <?= htmlspecialchars((string) ($payment[$leg . '_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
+        <?php if ($lockMessage !== null && !$canOverrideFyLock): ?>
+          <br><span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
         <?php elseif ($canEditInrActual): ?>
           <?php if ($lockMessage !== null): ?>
-            <p class="muted small" style="margin:0 0 6px;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
+            <p class="muted small" style="margin:6px 0 0;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
           <?php endif; ?>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/exchange-rate">
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/exchange-rate" style="margin-top:6px;">
             <?= Csrf::field() ?>
-            <label>Assumed Rate (INR per unit foreign currency) *<input type="text" name="assumed_exchange_rate" placeholder="e.g. 88.5000" required></label>
-            <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Record' : 'Record Rate' ?></button>
+            <label>Update Rate<input type="text" name="<?= $leg ?>_exchange_rate" placeholder="e.g. 88.5000" required></label>
+            <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Update' : 'Update' ?></button>
           </form>
-        <?php else: ?>
-          <span class="muted">Not yet recorded.</span>
         <?php endif; ?>
-      </div>
+      <?php elseif ($lockMessage !== null && !$canOverrideFyLock): ?>
+        <span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
+      <?php elseif ($canEditInrActual): ?>
+        <?php if ($lockMessage !== null): ?>
+          <p class="muted small" style="margin:0 0 6px;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
+        <?php endif; ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/exchange-rate">
+          <?= Csrf::field() ?>
+          <label>Rate (INR per unit foreign currency) *<input type="text" name="<?= $leg ?>_exchange_rate" placeholder="e.g. 88.5000" required></label>
+          <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Record' : 'Record Rate' ?></button>
+        </form>
+      <?php else: ?>
+        <span class="muted small">Not yet recorded.</span>
+      <?php endif; ?>
     </div>
     <?php
 };
 
-$renderInrActualWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canDeleteInrActual, $canOverrideFyLock, $usersById): void {
+$renderInrActualWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canDeleteInrActual, $canOverrideFyLock, $usersById, $renderExchangeRateWidget): void {
     $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
     if ($clearedAt === null || !$canViewInrActual) {
         return;
@@ -99,10 +95,10 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
     $recordedAt = $payment[$leg . '_inr_actual_recorded_at'] ?? null;
     $recordedBy = $payment[$leg . '_inr_actual_recorded_by'] ?? null;
     $recordedByName = $recordedBy !== null ? ($usersById[(int) $recordedBy] ?? ('User #' . $recordedBy)) : null;
-    $assumedRate = $payment['assumed_exchange_rate'] ?? null;
+    $legRate = $payment[$leg . '_exchange_rate'] ?? null;
     $foreignAmount = $payment[$leg . '_amount'] ?? null;
-    $forexGainLoss = ($amount !== null && $assumedRate !== null && $foreignAmount !== null)
-        ? (float) $amount - ((float) $foreignAmount * (float) $assumedRate)
+    $forexGainLoss = ($amount !== null && $legRate !== null && $foreignAmount !== null)
+        ? (float) $amount - ((float) $foreignAmount * (float) $legRate)
         : null;
     $fircReference = $payment[$leg . '_firc_reference'] ?? null;
     $fircReceivedAt = $payment[$leg . '_firc_received_at'] ?? null;
@@ -123,7 +119,7 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
             </form>
           <?php endif; ?>
           <?php if ($forexGainLoss !== null): ?>
-            <br><span class="muted small">Forex <?= $forexGainLoss >= 0 ? 'gain' : 'loss' ?>: &#8377;<?= number_format(abs($forexGainLoss), 2) ?> vs. the assumed rate.</span>
+            <br><span class="muted small">Forex <?= $forexGainLoss >= 0 ? 'gain' : 'loss' ?>: &#8377;<?= number_format(abs($forexGainLoss), 2) ?> vs. this leg's own recorded rate.</span>
           <?php endif; ?>
         <?php elseif ($lockMessage !== null && !$canOverrideFyLock): ?>
           <span class="muted">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
@@ -139,6 +135,8 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
         <?php else: ?>
           <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
         <?php endif; ?>
+
+        <?php $renderExchangeRateWidget($leg, $label); ?>
 
         <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
           <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
@@ -551,6 +549,12 @@ foreach ($stages as $s) {
       }
     </script>
 
+    <?php
+      // Batch 3 #5 — differentiate 'not yet generated' vs 'already generated, this regenerates
+      // it' document buttons visually, instead of every visible button looking identical.
+      $__genTypes = array_column($documents, 'document_type_code');
+      $__docBtnClass = static fn (string $code): string => 'btn-sm ' . (in_array($code, $__genTypes, true) ? 'btn-doc-regenerate' : 'btn-doc-new');
+    ?>
     <div class="btn-row">
       <?php if ($stage1 && $stage1['status'] !== 'locked'): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
@@ -558,7 +562,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="QT">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button>
+          <button type="submit" class="<?= $__docBtnClass('QT') ?>" data-loading-text="Generating…"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button>
         </form>
       <?php endif; ?>
 
@@ -568,7 +572,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="PI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Proforma Invoice</button>
+          <button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
         </form>
       <?php endif; ?>
 
@@ -578,7 +582,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="OC">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Order Confirmation</button>
+          <button type="submit" class="<?= $__docBtnClass('OC') ?>" data-loading-text="Generating…">Generate Order Confirmation</button>
         </form>
       <?php endif; ?>
 
@@ -588,7 +592,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="BUYERPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Buyer PO</button>
+          <button type="submit" class="<?= $__docBtnClass('BUYERPO') ?>" data-loading-text="Generating…">Generate Buyer PO</button>
         </form>
       <?php endif; ?>
 
@@ -598,7 +602,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="SUPPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Supplier PO</button>
+          <button type="submit" class="<?= $__docBtnClass('SUPPO') ?>" data-loading-text="Generating…">Generate Supplier PO</button>
         </form>
       <?php endif; ?>
 
@@ -608,7 +612,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="FDN">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Freight Debit Note</button>
+          <button type="submit" class="<?= $__docBtnClass('FDN') ?>" data-loading-text="Generating…">Generate Freight Debit Note</button>
         </form>
       <?php endif; ?>
 
@@ -618,7 +622,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="PL">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Packing List</button>
+          <button type="submit" class="<?= $__docBtnClass('PL') ?>" data-loading-text="Generating…">Generate Packing List</button>
         </form>
       <?php endif; ?>
 
@@ -628,7 +632,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="BLI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
+          <button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
         </form>
       <?php endif; ?>
 
@@ -638,7 +642,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="CI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Commercial Invoice</button>
+          <button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button>
         </form>
       <?php endif; ?>
 
@@ -648,7 +652,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="COOPREP">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate COO Prep Sheet (internal)</button>
+          <button type="submit" class="<?= $__docBtnClass('COOPREP') ?>" data-loading-text="Generating…">Generate COO Prep Sheet (internal)</button>
         </form>
       <?php endif; ?>
 
@@ -658,7 +662,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="ANNEXA">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate Annexure A</button>
+          <button type="submit" class="<?= $__docBtnClass('ANNEXA') ?>" data-loading-text="Generating…">Generate Annexure A</button>
         </form>
       <?php endif; ?>
     </div>
@@ -1035,7 +1039,6 @@ foreach ($stages as $s) {
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
     <?php endif; ?>
 
-    <?php $renderExchangeRateWidget(); ?>
     <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
 
     <?php if (!empty($clientPaymentReports)): ?>
@@ -1370,9 +1373,18 @@ foreach ($stages as $s) {
 
   <div class="section">
     <h2>Stage 8 — Commercial Invoice &amp; Balance Payment</h2>
+    <?php
+      // Batch 3 #11 — the Commercial Invoice is conventionally dated to match the recorded BL date;
+      // nothing enforces this, so flag it as an advisory (not a hard block — a same-day match is the
+      // norm but not the only valid business reason to differ) right where staff generate the CI.
+      $__ciBlDateMismatch = $shipping && !empty($shipping['bl_date']) && $shipping['bl_date'] !== date('Y-m-d');
+    ?>
     <?php if (!$stage8 || $stage8['status'] === 'locked'): ?>
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     <?php else: ?>
+      <?php if ($__ciBlDateMismatch): ?>
+        <p class="alert alert-warning">&#9888; Recorded BL date is <strong><?= htmlspecialchars($shipping['bl_date']) ?></strong>, not today. The Commercial Invoice is conventionally dated to match the BL — double-check before generating it if that's not intentional here.</p>
+      <?php endif; ?>
       <?php if ($shipping && !$shipping['scanned_bl_sent_to_buyer_at']): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/scanned-bl-sent">
           <?= Csrf::field() ?>

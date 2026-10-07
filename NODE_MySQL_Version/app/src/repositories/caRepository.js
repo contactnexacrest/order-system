@@ -15,18 +15,19 @@ const financialYear = require('../helpers/financialYear');
 // further.
 
 const LEGS = [
-  { leg: 'advance', amountCol: 'advance_amount', clearedCol: 'advance_cleared_at', inrCol: 'advance_inr_actual', inrAtCol: 'advance_inr_actual_recorded_at', inrByCol: 'advance_inr_actual_recorded_by', fircCol: 'advance_firc_reference', fircAtCol: 'advance_firc_received_at', zohoAtCol: 'advance_zoho_synced_at', zohoRefCol: 'advance_zoho_reference' },
-  { leg: 'balance', amountCol: 'balance_amount', clearedCol: 'balance_cleared_at', inrCol: 'balance_inr_actual', inrAtCol: 'balance_inr_actual_recorded_at', inrByCol: 'balance_inr_actual_recorded_by', fircCol: 'balance_firc_reference', fircAtCol: 'balance_firc_received_at', zohoAtCol: 'balance_zoho_synced_at', zohoRefCol: 'balance_zoho_reference' },
-  { leg: 'freight', amountCol: 'freight_amount', clearedCol: 'freight_cleared_at', inrCol: 'freight_inr_actual', inrAtCol: 'freight_inr_actual_recorded_at', inrByCol: 'freight_inr_actual_recorded_by', fircCol: 'freight_firc_reference', fircAtCol: 'freight_firc_received_at', zohoAtCol: 'freight_zoho_synced_at', zohoRefCol: 'freight_zoho_reference' },
+  { leg: 'advance', amountCol: 'advance_amount', clearedCol: 'advance_cleared_at', inrCol: 'advance_inr_actual', inrAtCol: 'advance_inr_actual_recorded_at', inrByCol: 'advance_inr_actual_recorded_by', rateCol: 'advance_exchange_rate', fircCol: 'advance_firc_reference', fircAtCol: 'advance_firc_received_at', zohoAtCol: 'advance_zoho_synced_at', zohoRefCol: 'advance_zoho_reference' },
+  { leg: 'balance', amountCol: 'balance_amount', clearedCol: 'balance_cleared_at', inrCol: 'balance_inr_actual', inrAtCol: 'balance_inr_actual_recorded_at', inrByCol: 'balance_inr_actual_recorded_by', rateCol: 'balance_exchange_rate', fircCol: 'balance_firc_reference', fircAtCol: 'balance_firc_received_at', zohoAtCol: 'balance_zoho_synced_at', zohoRefCol: 'balance_zoho_reference' },
+  { leg: 'freight', amountCol: 'freight_amount', clearedCol: 'freight_cleared_at', inrCol: 'freight_inr_actual', inrAtCol: 'freight_inr_actual_recorded_at', inrByCol: 'freight_inr_actual_recorded_by', rateCol: 'freight_exchange_rate', fircCol: 'freight_firc_reference', fircAtCol: 'freight_firc_received_at', zohoAtCol: 'freight_zoho_synced_at', zohoRefCol: 'freight_zoho_reference' },
 ];
 
 /**
  * One row per cleared settlement leg (advance/balance/freight), flattened
  * from orderPaymentStatusRepository.clearedSettlements() — newest cleared
  * date first. Each row also carries the forex gain/loss (inr_actual -
- * foreign_amount * assumed_exchange_rate, when both are on record) and
- * whether its FIRC/eBRC reference is still missing past the configured
- * alert window.
+ * foreign_amount * that leg's own exchange_rate, when both are on record —
+ * Batch 3 #3: each leg has its own rate, since each can clear months apart
+ * at a different market rate) and whether its FIRC/eBRC reference is still
+ * missing past the configured alert window.
  */
 async function settlementRegister() {
   const alertDays = parseInt((await companySettingsRepository.get('fema_realization_alert_days')) ?? '270', 10);
@@ -40,9 +41,9 @@ async function settlementRegister() {
       }
       const foreignAmount = ops[legDef.amountCol] !== null ? parseFloat(ops[legDef.amountCol]) : null;
       const inrActual = ops[legDef.inrCol] !== null ? parseFloat(ops[legDef.inrCol]) : null;
-      const assumedRate = ops.assumed_exchange_rate !== null && ops.assumed_exchange_rate !== undefined ? parseFloat(ops.assumed_exchange_rate) : null;
+      const legRate = ops[legDef.rateCol] !== null && ops[legDef.rateCol] !== undefined ? parseFloat(ops[legDef.rateCol]) : null;
 
-      const expectedInr = (foreignAmount !== null && assumedRate !== null) ? foreignAmount * assumedRate : null;
+      const expectedInr = (foreignAmount !== null && legRate !== null) ? foreignAmount * legRate : null;
       const forexGainLoss = (inrActual !== null && expectedInr !== null) ? inrActual - expectedInr : null;
 
       const clearedAtTs = new Date(ops[legDef.clearedCol]).getTime();
@@ -61,7 +62,7 @@ async function settlementRegister() {
         inr_actual: inrActual,
         inr_actual_recorded_at: ops[legDef.inrAtCol],
         inr_actual_recorded_by: ops[legDef.inrByCol],
-        assumed_exchange_rate: assumedRate,
+        exchange_rate: legRate,
         expected_inr: expectedInr,
         forex_gain_loss: forexGainLoss,
         firc_reference: ops[legDef.fircCol] ?? null,

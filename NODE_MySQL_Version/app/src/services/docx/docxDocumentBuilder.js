@@ -394,7 +394,30 @@ function renderPi(context) {
   children.push(...C.sectionTitle('5. PAYMENT TERMS'));
   children.push(...paymentTermsBlock(context));
 
-  children.push(...C.sectionTitle('6. BANK DETAILS'));
+  children.push(...C.sectionTitle('6. PRODUCTION & ESTIMATED SHIPMENT'));
+  children.push(
+    ...C.kvTable([
+      {
+        full: true,
+        bg: C.GRAY_LIGHT,
+        value: [
+          C.rich([
+            ['Production status: ', { bold: true, color: C.NAVY }],
+            [`${g(order, 'production_status_text')}   `, {}],
+            ['Estimated shipment: ', { bold: true, color: C.NAVY }],
+            [g(order, 'est_shipment_date_text'), { italics: true, color: C.MUTED }],
+            [' *', { bold: true, color: 'C0392B' }],
+          ]),
+          C.rich([
+            ['Note: ', { bold: true, color: C.NAVY, size: 18 }],
+            ['Estimated shipment date is indicative and subject to production completion, packing, and port scheduling. A confirmed Bill of Lading date will be communicated once the shipment is booked.', { italics: true, color: C.MUTED, size: 18 }],
+          ]),
+        ],
+      },
+    ])
+  );
+
+  children.push(...C.sectionTitle('7. BANK DETAILS'));
   children.push(
     ...C.kvTable(
       bankDetailsRows(
@@ -405,7 +428,7 @@ function renderPi(context) {
     )
   );
 
-  children.push(...C.sectionTitle('7. EXPORT DOCUMENTATION'));
+  children.push(...C.sectionTitle('8. EXPORT DOCUMENTATION'));
   children.push(
     ...documentsProvidedParagraphs('Upon shipment, the following documents will be provided:', [
       '1.  Commercial Invoice (signed and stamped)',
@@ -416,7 +439,7 @@ function renderPi(context) {
     ])
   );
 
-  children.push(...C.termsSection(context, context.terms_section_number ?? 8, context.terms_section_title || 'TERMS & CONDITIONS'));
+  children.push(...C.termsSection(context, context.terms_section_number ?? 9, context.terms_section_title || 'TERMS & CONDITIONS'));
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
 

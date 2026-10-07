@@ -123,7 +123,7 @@
   <tr>
     <td class="k" style="background:#FFF3CD; font-weight:bold;">&#8658;&nbsp; BALANCE DUE NOW</td>
     <td class="v" style="background:#FFF3CD; text-align:right; font-weight:bold; color:#8A1F1F;">{{ order.currency_code }} {{ payment_status.balance_amount or financial.balance_amount }} <strong>*</strong></td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">= FOB Value minus {{ financial.advance_pct }}% advance received<br>Payable by T/T within {{ financial.balance_days }} days of BL date<br>Against scanned copy of Bill of Lading<br>Payment Reference: Quote CI No. {{ meta.document_reference }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">= FOB Value minus {{ financial.advance_pct }}% advance received<br>Payable by T/T (Telegraphic Transfer) within {{ financial.balance_days }} days of BL date<br>Against scanned copy of Bill of Lading<br>Payment Reference: Quote CI No. {{ meta.document_reference }}</td>
   </tr>
   <tr>
     <td class="k">VERIFICATION</td>

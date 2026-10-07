@@ -99,7 +99,7 @@ final class OrderFinancialsTest extends DbTestCase
         OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
         // FOB value = 10 * 100 = 1000 (foreign currency units)
         OrderPaymentStatusRepository::initializeForOrder($orderId);
-        OrderPaymentStatusRepository::setAssumedExchangeRate($orderId, 85.0, $userId);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $userId);
 
         $p = OrderProfitabilityService::computeForOrder($orderId);
 
@@ -114,7 +114,7 @@ final class OrderFinancialsTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
         OrderPaymentStatusRepository::initializeForOrder($orderId);
-        OrderPaymentStatusRepository::setAssumedExchangeRate($orderId, 85.0, $userId);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $userId);
         OrderPaymentStatusRepository::setAdvanceInrActual($orderId, 40000.0, $userId);
         OrderPaymentStatusRepository::setBalanceInrActual($orderId, 46000.0, $userId);
 
@@ -130,7 +130,7 @@ final class OrderFinancialsTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
         OrderPaymentStatusRepository::initializeForOrder($orderId);
-        OrderPaymentStatusRepository::setAssumedExchangeRate($orderId, 85.0, $userId); // revenue 85000
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $userId); // revenue 85000
 
         $supplierId = SupplierRepository::create(['supplier_legal_name' => 'PHPUnit Test Supplier']);
         OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-TEST-1', $this->fullSupplierPoData(['total_payable_inr' => '30000']), 'issued');
@@ -364,12 +364,12 @@ final class OrderFinancialsTest extends DbTestCase
         $orderA = $this->createTestOrder($this->createTestClient());
         OrderProductRepository::add($orderA, 1, 'Stone A', null, null, '10', false, 'SQM', '100');
         OrderPaymentStatusRepository::initializeForOrder($orderA);
-        OrderPaymentStatusRepository::setAssumedExchangeRate($orderA, 80.0, $userId); // revenue 80000, no costs
+        OrderPaymentStatusRepository::setLegExchangeRate($orderA, 'advance', 80.0, $userId); // revenue 80000, no costs
 
         $orderB = $this->createTestOrder($this->createTestClient());
         OrderProductRepository::add($orderB, 1, 'Stone B', null, null, '5', false, 'SQM', '200');
         OrderPaymentStatusRepository::initializeForOrder($orderB);
-        OrderPaymentStatusRepository::setAssumedExchangeRate($orderB, 80.0, $userId); // revenue 80000
+        OrderPaymentStatusRepository::setLegExchangeRate($orderB, 'advance', 80.0, $userId); // revenue 80000
         OrderCostEntryRepository::create($orderB, 'other', null, 10000.0, null, $userId);
 
         $data = ReportRepository::orderProfitabilityReport(null, null);

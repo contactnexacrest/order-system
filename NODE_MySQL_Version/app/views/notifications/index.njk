@@ -7,7 +7,7 @@
         <td>{{ n.created_at }}</td>
         <td>{{ n.type }}</td>
         <td>{{ n.message }}</td>
-        <td>{% if n.related_order_id %}<a href="/orders/{{ n.related_order_id }}">Order #{{ n.related_order_id }}</a>{% endif %}</td>
+        <td>{% if n.type == 'email_send_pending_approval' %}<a href="/email-approvals">Review &amp; approve</a>{% elif n.related_order_id %}<a href="/orders/{{ n.related_order_id }}">Order #{{ n.related_order_id }}</a>{% endif %}</td>
       </tr>
     {% endfor %}
     {% if not notifications or notifications.length == 0 %}

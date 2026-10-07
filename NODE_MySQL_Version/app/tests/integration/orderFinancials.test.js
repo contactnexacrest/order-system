@@ -113,7 +113,7 @@ describe('Order Financials (Section AP)', () => {
     const orderId = await createTestOrder(await createTestClient());
     await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
     await orderPaymentStatusRepository.initializeForOrder(orderId);
-    await orderPaymentStatusRepository.setAssumedExchangeRate(orderId, 85.0, userId);
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId);
 
     const p = await orderProfitabilityService.computeForOrder(orderId);
 
@@ -127,7 +127,7 @@ describe('Order Financials (Section AP)', () => {
     const orderId = await createTestOrder(await createTestClient());
     await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
     await orderPaymentStatusRepository.initializeForOrder(orderId);
-    await orderPaymentStatusRepository.setAssumedExchangeRate(orderId, 85.0, userId);
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId);
     await orderPaymentStatusRepository.setAdvanceInrActual(orderId, 40000.0, userId);
     await orderPaymentStatusRepository.setBalanceInrActual(orderId, 46000.0, userId);
 
@@ -142,7 +142,7 @@ describe('Order Financials (Section AP)', () => {
     const orderId = await createTestOrder(await createTestClient());
     await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
     await orderPaymentStatusRepository.initializeForOrder(orderId);
-    await orderPaymentStatusRepository.setAssumedExchangeRate(orderId, 85.0, userId); // revenue 85000
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId); // revenue 85000
 
     const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
     await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JTEST-1', { total_payable_inr: '30000' }, 'issued');
@@ -359,12 +359,12 @@ describe('Order Financials (Section AP)', () => {
     const orderA = await createTestOrder(await createTestClient());
     await orderProductRepository.add(orderA, 1, 'Stone A', null, null, '10', false, 'SQM', '100');
     await orderPaymentStatusRepository.initializeForOrder(orderA);
-    await orderPaymentStatusRepository.setAssumedExchangeRate(orderA, 80.0, userId); // revenue 80000, no costs
+    await orderPaymentStatusRepository.setLegExchangeRate(orderA, 'advance', 80.0, userId); // revenue 80000, no costs
 
     const orderB = await createTestOrder(await createTestClient());
     await orderProductRepository.add(orderB, 1, 'Stone B', null, null, '5', false, 'SQM', '200');
     await orderPaymentStatusRepository.initializeForOrder(orderB);
-    await orderPaymentStatusRepository.setAssumedExchangeRate(orderB, 80.0, userId); // revenue 80000
+    await orderPaymentStatusRepository.setLegExchangeRate(orderB, 'advance', 80.0, userId); // revenue 80000
     await orderCostEntryRepository.create(orderB, 'other', null, 10000.0, null, userId);
 
     const data = await reportRepository.orderProfitabilityReport(null, null);

@@ -45,6 +45,23 @@ final class EmailDispatchController
     private function renderCompose(int $orderId, ?int $documentId): void
     {
         $templateKey = trim((string) ($_GET['template_key'] ?? '')) ?: null;
+        $document = $documentId ? DocumentRepository::find($documentId) : null;
+
+        // docs/schema.sql Section AU: every seeded template_key follows the
+        // convention send_{lowercase document_type_code} (send_qt, send_pi,
+        // send_oc, send_ci, send_fdn, ...) — when the buyer-facing document
+        // being sent is known and nothing was explicitly picked yet, try
+        // that exact match so staff land on a ready preview instead of an
+        // empty "Select a template…" dropdown. Silently falls back to the
+        // ordinary manual picker if no template with that key exists yet
+        // (e.g. a document type nobody has added a template for).
+        if ($templateKey === null && $document && !empty($document['document_type_code'])) {
+            $guess = 'send_' . strtolower((string) $document['document_type_code']);
+            $guessedTemplate = EmailTemplateRepository::find($guess);
+            if ($guessedTemplate && $guessedTemplate['is_active']) {
+                $templateKey = $guess;
+            }
+        }
 
         $preview = null;
         $previewError = null;
@@ -58,7 +75,7 @@ final class EmailDispatchController
 
         View::render('email/compose', [
             'order'        => OrderRepository::find($orderId),
-            'document'     => $documentId ? DocumentRepository::find($documentId) : null,
+            'document'     => $document,
             'orderId'      => $orderId,
             'documentId'   => $documentId,
             'templates'    => EmailTemplateRepository::all(),
@@ -80,8 +97,14 @@ final class EmailDispatchController
         $scheduledAt = $scheduledAtRaw !== '' ? str_replace('T', ' ', $scheduledAtRaw) . ':00' : null;
 
         try {
-            EmailDispatchService::requestSend($orderId, $documentId, $templateKey, $scheduledAt, (int) AuthService::currentUser()['id']);
-            Flash::set('success', 'Send submitted for approval.');
+            $result = EmailDispatchService::requestSend($orderId, $documentId, $templateKey, $scheduledAt, (int) AuthService::currentUser()['id']);
+            if ($result['dispatched']) {
+                Flash::set($result['sent'] ? 'success' : 'error', $result['sent']
+                    ? 'Sent immediately — the 2-level approval queue is currently switched off (Settings).'
+                    : 'Send attempted immediately (approval queue is off) but it failed — check Settings for the SMTP/mail configuration.');
+            } else {
+                Flash::set('success', 'Send submitted for approval.');
+            }
         } catch (\Throwable $e) {
             Flash::set('error', $e->getMessage());
         }

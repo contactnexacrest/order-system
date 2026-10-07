@@ -78,7 +78,9 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('respond_to_disputes',         'Respond to disputes',            'Post a reply in a dispute''s reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button.', 'orders'),
   ('manage_order_financials',     'Manage order financials',        'View/add/edit an order''s export benefit claims, other costs, and its profitability summary. Stricter than ca_module_view/inr_actual_edit: not auto-granted to Accounts/CA, only Admin/MD/ED and Super Admin by default.', 'ca'),
   ('manage_logistics_partners',   'Manage logistics partners',      'Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. Same tier as manage_hs_codes: Admin/MD/ED and Super Admin only by default.', 'catalog'),
-  ('manage_compliance_task_types', 'Manage compliance task types',   'Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). Does not grant the order-page checklist itself - that uses close_orders. Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog');
+  ('manage_compliance_task_types', 'Manage compliance task types',   'Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). Does not grant the order-page checklist itself - that uses close_orders. Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog'),
+  ('override_buyer_acknowledgment', 'Override buyer Order Confirmation acknowledgment', 'Record a buyer''s OC acknowledgment manually (e.g. an email reply). Only consulted when oc_ack_override_restricted is on; off by default, where manage_orders alone is enough.', 'orders'),
+  ('impersonate_client', 'Log in as a client', 'Start a staff-initiated client-portal session for a client who can''t use the portal themselves. Requires client_impersonation_enabled (global) and the client''s own allow_staff_impersonation flag both on. Every use is logged.', 'clients');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -92,19 +94,19 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Export Executive'
-  AND p.permission_key IN ('manage_orders','manage_payments','manage_shipping','close_orders','generate_documents','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','respond_to_disputes');
+  AND p.permission_key IN ('manage_orders','manage_payments','manage_shipping','close_orders','generate_documents','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','respond_to_disputes','override_buyer_acknowledgment');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Accounts Executive'
-  AND p.permission_key IN ('manage_orders','manage_payments','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override');
+  AND p.permission_key IN ('manage_orders','manage_payments','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override','override_buyer_acknowledgment');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Logistics Executive'
-  AND p.permission_key IN ('manage_orders','manage_shipping','close_orders','generate_documents','download_pdf','cross_verify_documents','view_product_catalog','browse_product_catalog','view_archived_orders');
+  AND p.permission_key IN ('manage_orders','manage_shipping','close_orders','generate_documents','download_pdf','cross_verify_documents','view_product_catalog','browse_product_catalog','view_archived_orders','override_buyer_acknowledgment');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
@@ -1242,6 +1244,27 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('mail_redirect_address', '', 'email', 'mail_redirect', 'Where redirected mail goes when mail_redirect_enabled is on. Required for the redirect to actually work — if left blank while enabled, redirected mail is logged, never sent.', 0, 0),
   ('mail_cc_emails', '', 'email_list', 'mail_redirect', 'Comma-separated additional CC addresses applied to every non-security outbound email, regardless of mail_redirect_enabled. Super Admin only.', 0, 1),
   ('mail_default_cc_email', '', 'email', 'mail_redirect', 'A single default CC address always applied to every non-security outbound email, in addition to mail_cc_emails above. Super Admin only.', 0, 1);
+
+-- ================================================================
+-- DEFERRED-MAIL ADMIN CONTROLS + OC ACKNOWLEDGMENT OVERRIDE (Section AU)
+-- All default to today's existing behaviour unchanged: sending is on,
+-- the 2-level approval queue is on, the OC override stays open to
+-- manage_orders, and the auto-confirm window stays 48 hours.
+-- ================================================================
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
+  ('mail_sending_enabled', '1', 'boolean', 'mail', 'Master kill switch for every non-security outbound email (order updates, document sends, etc.). Staff 2FA codes and password-reset links are never affected. Off = nothing sends, logged instead, useful while diagnosing a hosting SMTP problem without risking a stray send.', 0, 0),
+  ('mail_approval_queue_enabled', '1', 'boolean', 'mail', 'On (default) = every buyer-facing document send still needs a second person''s Level-2 approval before it goes out (Section 10). Off = a single staff member with generate_documents can send directly — useful for a small team or while testing.', 0, 0),
+  ('oc_ack_override_restricted', '0', 'boolean', 'orders', 'Off (default) = any user with manage_orders can record a buyer''s Order Confirmation acknowledgment manually, as before. On = that action also requires the override_buyer_acknowledgment permission, so it can be restricted to specific roles.', 0, 0),
+  ('oc_ack_auto_confirm_hours', '48', 'number', 'orders', 'Hours after the Order Confirmation email is sent before the order auto-confirms if the buyer hasn''t responded (docs/schema.sql Section AE). Lower it for testing; 48 is the production default.', 0, 0);
+
+-- ================================================================
+-- STAFF CLIENT-PORTAL IMPERSONATION (Section AV) — off by default. Also
+-- requires the per-client allow_staff_impersonation flag (clients table)
+-- and the impersonate_client permission (Admin/MD/ED/Super Admin only by
+-- default, same tier as manage_disputes/manage_order_financials).
+-- ================================================================
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
+  ('client_impersonation_enabled', '0', 'boolean', 'clients', 'Global switch for staff "Log in as this client" (Section AV). Off = the feature is unavailable for every client, regardless of any individual client''s own allow_staff_impersonation flag or who holds the impersonate_client permission.', 0, 0);
 
 SET FOREIGN_KEY_CHECKS = 1;
 

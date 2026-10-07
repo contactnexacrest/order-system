@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Repositories\CompanySettingsRepository;
+
 /**
  * docs/schema.sql Section AI — the one chokepoint every outbound email in
  * the app should go through from here on (order-comment notifications now;
@@ -23,6 +25,17 @@ final class MailSenderService
      */
     public static function send(string $to, string $subject, string $body, array $attachments = [], bool $isSecurityEmail = false): bool
     {
+        // docs/schema.sql Section AU: a master kill switch for business
+        // email, separate from Test Mode/Mail Redirect — never applies to
+        // 2FA/password-reset, matching every other gate in this method.
+        // Checked here, the one chokepoint every non-security send passes
+        // through, so it can never be bypassed by a future transport added
+        // below Zoho/SMTP the way a per-transport check could be.
+        if (!$isSecurityEmail && CompanySettingsRepository::get('mail_sending_enabled') === '0') {
+            error_log("[EMAIL NOT SENT — sending disabled by admin (mail_sending_enabled=0)] To: {$to} | Subject: {$subject}");
+            return false;
+        }
+
         // QA-5 TM-08: resolved ONCE, here, before either transport is
         // chosen. Test Mode's redirect used to live only inside
         // EmailService's own send methods — the SMTP fallback path — so

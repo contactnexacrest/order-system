@@ -103,7 +103,7 @@
 
 <div class="section-title">5. PAYMENT TERMS</div>
 <div class="bullet-block">
-  <p>&#8226; {{ financial.advance_pct }}% advance T/T on FOB Value against this document. <span class="mand-star">*</span></p>
+  <p>&#8226; {{ financial.advance_pct }}% advance T/T (Telegraphic Transfer) on FOB Value against this document. <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.advance_amount }} <span class="mand-star">*</span></p>
   <p>&#8226; {{ financial.balance_pct }}% balance T/T on FOB Value {% if financial.balance_trigger_option == 'A_BEFORE_SHIPMENT' %}payable before shipment — within {{ financial.balance_days }} working days of receiving shipment readiness confirmation from NexaCrest.{% else %}payable against scanned copy of Bill of Lading, within {{ financial.balance_days }} days of BL date.{% endif %} <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }} <span class="mand-star">*</span></p>
@@ -113,7 +113,15 @@
   <p>&nbsp;&nbsp;Currency: {{ order.currency_code }}</p>
 </div>
 
-<div class="section-title">6. BANK DETAILS</div>
+<div class="section-title">6. PRODUCTION &amp; ESTIMATED SHIPMENT</div>
+<table class="kv">
+  <tr><td colspan="2" style="background:#F1F5F9;">
+    <p style="margin:0 0 4pt;"><strong style="color:#17233A;">Production status: </strong>{{ order.production_status_text }} &nbsp;&nbsp; <strong style="color:#17233A;">Estimated shipment: </strong><span style="font-style:italic; color:#5B6573;">{{ order.est_shipment_date_text }}</span> <span style="font-weight:bold; color:#C0392B;">*</span></p>
+    <p style="margin:0; font-size:9pt;"><strong style="color:#17233A;">Note: </strong><span style="font-style:italic; color:#5B6573;">Estimated shipment date is indicative and subject to production completion, packing, and port scheduling. A confirmed Bill of Lading date will be communicated once the shipment is booked.</span></p>
+  </td></tr>
+</table>
+
+<div class="section-title">7. BANK DETAILS</div>
 <table class="kv">
   <tr><td class="k">Account Holder</td><td class="v">{{ company.legal_name | upper }}</td></tr>
   <tr><td class="k">Bank</td><td class="v">{{ company.bank_name }}</td></tr>
@@ -126,7 +134,7 @@
   <tr><td class="k">RBI Purpose Code</td><td class="v" style="color:#185FA5; font-weight:bold;">{{ company.rbi_purpose_code_advance }} — enter in the "Purpose of Remittance" field of your wire transfer form.</td></tr>
 </table>
 
-<div class="section-title">7. EXPORT DOCUMENTATION</div>
+<div class="section-title">8. EXPORT DOCUMENTATION</div>
 <div class="numbered-block">
   <p><strong>Upon shipment, the following documents will be provided:</strong></p>
   <p>1.&nbsp;&nbsp;Commercial Invoice (signed and stamped)</p>

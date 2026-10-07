@@ -10,7 +10,7 @@
         <select name="client_id" required>
           <option value="">— Select —</option>
           {% for c in clients %}
-            <option value="{{ c.id }}" {{ 'selected' if c.id == preselectedClientId else '' }}>
+            <option value="{{ c.id }}" {{ 'selected' if c.id == (old.client_id or preselectedClientId) else '' }}>
               {{ c.company_legal_name }} ({{ c.client_unique_number }})
             </option>
           {% endfor %}
@@ -24,28 +24,28 @@
         <label>Incoterm *
           <select name="incoterm_id" required>
             {% for i in incoterms %}
-              <option value="{{ i.id }}">{{ i.code }}</option>
+              <option value="{{ i.id }}" {{ 'selected' if old.incoterm_id and i.id == old.incoterm_id else '' }}>{{ i.code }}</option>
             {% endfor %}
           </select>
         </label>
         <label>Port of Loading
           <select name="port_of_loading_id">
             {% for p in loadingPorts %}
-              <option value="{{ p.id }}" {{ 'selected' if p.is_default else '' }}>{{ p.name }}</option>
+              <option value="{{ p.id }}" {{ ('selected' if p.id == old.port_of_loading_id else '') if old.port_of_loading_id else ('selected' if p.is_default else '') }}>{{ p.name }}</option>
             {% endfor %}
           </select>
         </label>
         <label>Currency *<small class="muted">(this order's foreign trade currency — everything priced below is in this currency unless marked INR)</small>
           <select name="currency_id" required>
             {% for cur in currencies %}
-              <option value="{{ cur.id }}" {{ 'selected' if cur.is_default else '' }}>{{ cur.code }} — {{ cur.name }}</option>
+              <option value="{{ cur.id }}" {{ ('selected' if cur.id == old.currency_id else '') if old.currency_id else ('selected' if cur.is_default else '') }}>{{ cur.code }} — {{ cur.name }}</option>
             {% endfor %}
           </select>
         </label>
         <label>Payment Preset *
           <select name="payment_preset_id" required>
             {% for p in paymentPresets %}
-              <option value="{{ p.id }}">{{ p.preset_name }} ({{ p.advance_pct }}% adv / {{ p.balance_pct }}% bal)</option>
+              <option value="{{ p.id }}" {{ 'selected' if old.payment_preset_id and p.id == old.payment_preset_id else '' }}>{{ p.preset_name }} ({{ p.advance_pct }}% adv / {{ p.balance_pct }}% bal)</option>
             {% endfor %}
           </select>
         </label>
@@ -53,7 +53,7 @@
           <select name="coo_type">
             <option value="">— To Be Confirmed —</option>
             {% for o in cooTypes %}
-              <option value="{{ o.option_value }}">{{ o.option_value }}</option>
+              <option value="{{ o.option_value }}" {{ 'selected' if (old.coo_type or '') == o.option_value else '' }}>{{ o.option_value }}</option>
             {% endfor %}
           </select>
         </label>
@@ -61,7 +61,7 @@
           <select name="container_type">
             <option value="">— To Be Confirmed —</option>
             {% for o in containerTypes %}
-              <option value="{{ o.option_value }}">{{ o.option_value }}</option>
+              <option value="{{ o.option_value }}" {{ 'selected' if (old.container_type or '') == o.option_value else '' }}>{{ o.option_value }}</option>
             {% endfor %}
           </select>
         </label>
@@ -69,15 +69,15 @@
           <select name="port_of_discharge_id">
             <option value="">— Type below instead —</option>
             {% for p in dischargePorts %}
-              <option value="{{ p.id }}">{{ p.name }}</option>
+              <option value="{{ p.id }}" {{ 'selected' if old.port_of_discharge_id and p.id == old.port_of_discharge_id else '' }}>{{ p.name }}</option>
             {% endfor %}
           </select>
         </label>
         <label>Port of Discharge (new / not listed)
-          <input type="text" name="port_of_discharge_text" placeholder="Buyer's nominated discharge port">
+          <input type="text" name="port_of_discharge_text" value="{{ old.port_of_discharge_text or '' }}" placeholder="Buyer's nominated discharge port">
         </label>
         <label class="full">Est. Lead Time <small class="muted">(free text, shown on the Quotation)</small>
-          <input type="text" name="est_lead_time_text" placeholder="e.g. 45-60 days from advance receipt">
+          <input type="text" name="est_lead_time_text" value="{{ old.est_lead_time_text or '' }}" placeholder="e.g. 45-60 days from advance receipt">
         </label>
       </div>
     </fieldset>
@@ -85,40 +85,47 @@
     <fieldset>
       <legend>Estimated Weight &amp; Volume <small class="muted">(shown on QT/PI — actuals confirmed later at Packing List)</small></legend>
       <div class="field-grid">
-        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm"></label>
-        <label>No. of Packages / Crates<input type="text" name="estimated_package_count" placeholder="e.g. 45 crates"></label>
-        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg"></label>
-        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg"></label>
-        <label class="full">Package Type<input type="text" name="estimated_package_type" placeholder="e.g. Wooden Crates"></label>
+        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="{{ old.estimated_total_cbm or '' }}"></label>
+        <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="{{ old.estimated_package_count or '' }}" placeholder="e.g. 45 crates"></label>
+        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="{{ old.estimated_gross_weight_kg or '' }}"></label>
+        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="{{ old.estimated_net_weight_kg or '' }}"></label>
+        <label class="full">Package Type<input type="text" name="estimated_package_type" value="{{ old.estimated_package_type or '' }}" placeholder="e.g. Wooden Crates"></label>
       </div>
     </fieldset>
 
     <fieldset>
       <legend>Indicative Freight / Insurance <small class="muted">(only shown when Incoterm is not FOB)</small></legend>
       <div class="field-grid">
-        <label>Freight — low (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_low"></label>
-        <label>Freight — high (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_high"></label>
-        <label class="full">Insurance (indicative, <span class="muted">order currency</span>)<input type="text" name="indicative_insurance_amount"></label>
+        <label>Freight — low (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_low" value="{{ old.indicative_freight_low or '' }}"></label>
+        <label>Freight — high (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_high" value="{{ old.indicative_freight_high or '' }}"></label>
+        <label class="full">Insurance (indicative, <span class="muted">order currency</span>)<input type="text" name="indicative_insurance_amount" value="{{ old.indicative_insurance_amount or '' }}"></label>
       </div>
       <p class="muted small">Why a range, not one figure: ocean freight isn't booked yet at this stage, so rates can move before the actual booking. This low&ndash;high range is indicative only — the real rate is confirmed and recovered by Freight Debit Note once cargo is packed and ready (Stage 6).</p>
     </fieldset>
 
     <fieldset>
       <legend>Products</legend>
+      {# Batch 3 #4 — on a validation failure (e.g. a bad HS code on one line) the old product
+         rows are rebuilt here instead of losing every line the user had typed. Falls back to a
+         single empty row, same as before this feature existed. #}
+      {% set oldDescriptions = old.product_description if old.product_description else [''] %}
+      {% set oldDescriptionsList = oldDescriptions if oldDescriptions is iterable and oldDescriptions is not string else [oldDescriptions] %}
       <div id="product-rows">
+        {% for desc in oldDescriptionsList %}
         <div class="product-row">
-          <label>Description *<input type="text" name="product_description[]"></label>
-          <label>Dimensions<input type="text" name="product_dimensions[]"></label>
-          <label>Finish<input type="text" name="product_finish[]"></label>
-          <label>Qty<input type="text" name="product_quantity[]"></label>
-          <label>Unit<input type="text" name="product_unit[]" placeholder="SQM/PCS"></label>
-          <label>Unit Price<input type="text" name="product_unit_price[]"></label>
-          <label>HS Code<input type="text" name="product_hs_code[]" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
+          <label>Description *<input type="text" name="product_description[]" value="{{ desc or '' }}"></label>
+          <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}"></label>
+          <label>Finish<input type="text" name="product_finish[]" value="{{ old.product_finish[loop.index0] or '' if old.product_finish else '' }}"></label>
+          <label>Qty<input type="text" name="product_quantity[]" value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}"></label>
+          <label>Unit<input type="text" name="product_unit[]" value="{{ old.product_unit[loop.index0] or '' if old.product_unit else '' }}" placeholder="SQM/PCS"></label>
+          <label>Unit Price<input type="text" name="product_unit_price[]" value="{{ old.product_unit_price[loop.index0] or '' if old.product_unit_price else '' }}"></label>
+          <label>HS Code<input type="text" name="product_hs_code[]" value="{{ old.product_hs_code[loop.index0] or '' if old.product_hs_code else '' }}" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">
             <button type="button" class="btn-sm btn-secondary duplicate-row" title="Clone this line with its values — handy when only the name or dimensions differ">Duplicate</button>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
           </div>
         </div>
+        {% endfor %}
       </div>
       <div class="btn-row"><button type="button" class="btn-secondary btn-sm" id="add-product-row">+ Add product line</button></div>
       <datalist id="hs_code_list">
@@ -133,12 +140,12 @@
 
     <fieldset>
       <legend>Special Requirements/Instructions</legend>
-      <textarea name="special_requirements" rows="2"></textarea>
+      <textarea name="special_requirements" rows="2">{{ old.special_requirements or '' }}</textarea>
     </fieldset>
 
     <fieldset>
       <legend>Annexure A</legend>
-      <label><input type="checkbox" name="include_annexure_a" value="1" style="display:inline-block;width:auto;"> Include Annexure A — Product Technical Specifications
+      <label><input type="checkbox" name="include_annexure_a" value="1" {{ 'checked' if old.include_annexure_a }} style="display:inline-block;width:auto;"> Include Annexure A — Product Technical Specifications
         <small class="muted">Referenced from the Quotation/PI/OC/Buyer PO as an attached, integral document. Manage its product entries and images from the order page once this order is created.</small>
       </label>
     </fieldset>
