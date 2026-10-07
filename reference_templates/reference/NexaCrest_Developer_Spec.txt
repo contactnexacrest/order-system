@@ -1,0 +1,633 @@
+================================================================================
+NEXACREST INTERNATIONAL PRIVATE LIMITED
+DOCUMENT SET — DEVELOPER SPECIFICATION & CHANGE LOG
+================================================================================
+Version: Final (October 2026)
+Status: AUTHORITATIVE — This file supersedes all previous addendum sections.
+Purpose: Single source of truth for app development. No contradictions.
+         If any instruction in this file conflicts with an earlier version,
+         this file is correct. Earlier versions are archived only.
+================================================================================
+
+SECTION 1: DOCUMENT SET OVERVIEW
+================================================================================
+
+1.1 TWO TIERS OF BUYER DOCUMENTS
+---------------------------------
+All buyer-facing documents exist in two versions:
+
+  Tier 1 — New Buyer (Option A):
+    Path: buyer_documents/01_Tier1_NewBuyer/
+    Payment trigger for Balance Payment: 3 Calendar Days from Shipment Readiness Confirmation
+    Use for: First-time buyers, buyers without established credit
+
+  Tier 2 — Established Buyer (Option B):
+    Path: buyer_documents/02_Tier2_EstablishedBuyer/
+    Payment trigger for Balance Payment: 7 Calendar Days from scanned BL email
+    Use for: Repeat buyers with established payment history
+
+  Document codes and filenames are IDENTICAL between tiers.
+  Only the payment trigger language differs between tiers.
+
+  PAYMENT TRIGGER — EXACT CLAUSE TEXT PER TIER:
+  Tier 1 Balance Payment clause (QT, PI, OC, CI):
+    "60% Balance Payment by T/T within 3 Working Days of NexaCrest's
+     Shipment Readiness Confirmation and before shipment booking is confirmed."
+  Tier 2 Balance Payment clause (QT, PI, OC, CI):
+    "60% Balance Payment by T/T within 7 Calendar Days of the BL date,
+     against scanned BL copy emailed by NexaCrest."
+  CRITICAL: These are different — Tier 1 pays BEFORE shipment. Tier 2 pays
+  AFTER shipment against BL copy. Do not copy one tier's payment clause into
+  the other tier's document. This must be template-enforced per tier.
+
+1.2 COMPLETE DOCUMENT INVENTORY
+---------------------------------
+BUYER-FACING DOCUMENTS (both tiers):
+  01_Quotation.docx            QT   Buyer External
+  02_ProformaInvoice.docx      PI   Buyer External
+  03_OrderConfirmation.docx    OC   Buyer External
+  04_PackingList.docx          PL   Buyer + Customs External
+  05_CommercialInvoice.docx    CI   Buyer + Customs External
+  06_DebitNote.docx            DN   Buyer External
+  08_BL_Instruction.docx       BLI  CHA / Shipping Line External
+  10_BuyerPO.docx              BPO  Buyer External
+  Annexure_A.docx              ANX  Buyer External
+
+SHIPPING / BL DOCUMENTS (internal_documents/):
+  BL_Endorsement.docx          BLE  Internal NexaCrest Staff
+  BL_Reasoning_Guide.docx      BLG  Internal NexaCrest Staff
+
+CONTRACT DOCUMENTS (contract/):
+  NexaCrest_NDA_Commercial.docx    Commercial NDA (Buyers/Vendors/Suppliers)
+  NexaCrest_NDA_Staff.docx         Staff Confidentiality Agreement
+  NexaCrest_Sales_Supply_Agreement.docx  Master Sales Agreement
+
+INTERNAL DOCUMENTS (internal_documents/):
+  07_COO_PrepSheet.docx
+  09_Checklists.docx
+  11_SupplierPO.docx
+  SOP_01 through SOP_05 (full guides and summary versions)
+  StageGate.docx
+  WallReference.docx
+  Payment_Terms_Amendment.docx
+
+REFERENCE FILES (reference/):
+  NexaCrest_Change_Log.txt           Developer spec (this file — authoritative)
+  NexaCrest_Terminology_Standard.xlsx  74-item terminology standard
+  NexaCrest_Master_Reference.xlsx    Client data requirements, terms, document index
+
+ASSETS (assets/):
+  nexacrest_logo.jpg    Company logo (used in all document headers)
+  company_seal.png      Company seal (used in signature blocks)
+  director_seal.png     Director seal (used in signature blocks)
+  gs_signature.png      GS handwritten signature (used in signature blocks)
+
+
+================================================================================
+SECTION 2: UNIVERSAL DOCUMENT DESIGN STANDARDS
+================================================================================
+
+2.1 DOCUMENT HEADER (ALL DOCUMENTS)
+--------------------------------------
+Structure: Single header table spanning full page width
+  Left cell:  NexaCrest logo (nexacrest_logo.jpg), 72×72 px
+  Right cell: Two lines —
+              Line 1: "NEXACREST INTERNATIONAL PRIVATE LIMITED" (bold, navy #17233A, 10pt)
+              Line 2: Document title (bold, navy #17233A, 13pt uppercase)
+              Some documents have a 3rd subtitle line (e.g. "FOB CHENNAI, INDIA")
+
+2.2 HEADER REFERENCE LINE (ALL BUYER DOCUMENTS)
+-------------------------------------------------
+Immediately after the "Fields marked * are mandatory..." italic line:
+
+  "Terms used in this document are defined in Section [N] — Legal Terms &
+   Definitions at the end of this document."
+
+  Format: italic, 8.5pt, colour #5B6573
+  Section number [N] varies by document:
+    QT:  Section 9   (after adding separate Consignee section)
+    PI:  Section 9   (after adding separate Consignee section + renumbering)
+    OC:  Section 9   (after adding separate Consignee section + renumbering)
+    PL:  Section 8   (Legal Terms already Section 8 in PL)
+    CI:  Section 9   (after adding separate Consignee section + renumbering)
+    DN:  Section 8   (no consignee section added to DN)
+
+  DO NOT add this line to BLI — the BLI goes to CHA, not the buyer.
+  DO NOT add this line to contracts or internal documents.
+
+2.3 SECTION NAV BARS (ALL DOCUMENTS)
+---------------------------------------
+Navy bar (#17233A), white bold text, 11pt, padding 80/200 twips.
+No borders on the nav bar table itself.
+All section content tables have standard border: single, colour #D0D8E4, sz=2.
+
+2.4 SIGNATURE BLOCK (ALL BUYER + CONTRACT DOCUMENTS)
+-------------------------------------------------------
+2-column layout:
+  Left:  Company seal (company_seal.png) 90×90 px
+  Right: GS signature (gs_signature.png) 120×40 px
+         Director seal (director_seal.png) 90×90 px
+Separator line (navy, sz=2) between seals and name block.
+Name block: Gulmohar Sontakke | Founder & Managing Director | NexaCrest International Private Limited
+
+2.5 SECTION 8 / LEGAL TERMS (ALL BUYER DOCUMENTS)
+----------------------------------------------------
+TWO BOXES — both built as SINGLE-ROW tables (not 2-row):
+  Box 1 — LEGAL TERMS (red border #C0392B, header fill #FFF0F0)
+  Box 2 — DEFINITIONS (blue border #1A5276, header fill #F0F4FF)
+
+CRITICAL: Single-row table only. Never 2-row. Reason: a 2-row table loses its
+top border on the content row when split across a page break in Word.
+The header is a paragraph with paragraph-level shading (pPr/shd) inside the
+same cell — not a separate row.
+
+INTRO LINE in Definitions box:
+  "The following terms have the meanings given below wherever they appear
+   in this document."
+  (Do NOT use "Capitalised terms" — no formatting dependency.)
+
+INTRO LINE in Legal Terms box:
+  "These terms govern all commercial obligations under this document."
+
+
+================================================================================
+SECTION 3: SECTION STRUCTURE BY DOCUMENT
+================================================================================
+
+3.1 QUOTATION (QT)
+-------------------
+  1. SELLER / EXPORTER
+  2. BUYER DETAILS         ← was "2. BUYER / CONSIGNEE DETAILS" — now buyer only
+  3. CONSIGNEE DETAILS     ← NEW — separate section
+  4. PRODUCT / ORDER DETAILS (was 3)
+  5. SHIPPING / COMMERCIAL TERMS (was 4)
+  6. PAYMENT TERMS (was 5)
+  7. DOCUMENTS TO BE PROVIDED (was 6)
+  8. TERMS & CONDITIONS (was 7)
+  9. LEGAL TERMS & DEFINITIONS (was 8)
+
+3.2 PROFORMA INVOICE (PI)
+--------------------------
+  1. SELLER / EXPORTER
+  2. BUYER DETAILS         ← was "2. BUYER / CONSIGNEE DETAILS" — now buyer only
+  3. CONSIGNEE DETAILS     ← NEW — separate section
+  4. NOTIFY PARTY          ← was "3. NOTIFY PARTY"
+  5. PRODUCT / ORDER DETAILS (was 3 — duplicate section number fixed)
+  6. SHIPPING / COMMERCIAL TERMS (was 4)
+  7. PAYMENT TERMS (was 5)
+  8. BANK DETAILS (was 6)
+  9. EXPORT DOCUMENTATION (was 7)
+  10. TERMS & CONDITIONS (was 8 — duplicate section number fixed)
+  11. LEGAL TERMS & DEFINITIONS (was 8)
+
+3.3 ORDER CONFIRMATION (OC)
+-----------------------------
+  1. SELLER / EXPORTER
+  2. BUYER DETAILS         ← was "2. BUYER / CONSIGNEE" — now buyer only
+  3. CONSIGNEE DETAILS     ← NEW — separate section
+  4. ORDER SUMMARY (was 3)
+  5. PAYMENT STATUS (was 4)
+  6. PRODUCTION & ESTIMATED SHIPMENT (was 5)
+  7. DOCUMENTS TO BE PROVIDED (was 6)
+  8. ORDER CONDITIONS (was 7)
+  9. LEGAL TERMS & DEFINITIONS (was 8)
+
+3.4 PACKING LIST (PL)
+----------------------
+  1. EXPORTER
+  2. BUYER DETAILS         ← was "2. CONSIGNEE / BUYER" — now buyer only
+  3. CONSIGNEE DETAILS     ← NEW — separate section
+  4. NOTIFY PARTY          ← was "3. NOTIFY PARTY"
+  5. PRODUCT SUMMARY       ← was "3. PRODUCT SUMMARY" — duplicate fixed
+  6. CRATE-LEVEL BREAKDOWN (was 4)
+  7. DECLARATION (was 5)
+  8. LEGAL TERMS & DEFINITIONS (was 8 — unchanged, no T&C in PL)
+
+3.5 COMMERCIAL INVOICE (CI)
+-----------------------------
+  1. EXPORTER / SELLER
+  2. BUYER DETAILS         ← was "2. BUYER / CONSIGNEE" — now buyer only
+  3. CONSIGNEE DETAILS     ← NEW — separate section
+  4. NOTIFY PARTY          ← was "3. NOTIFY PARTY"
+  5. SHIPPING DETAILS      ← was "3. SHIPPING DETAILS" — duplicate fixed
+  6. PRODUCT / ORDER DETAILS (was 4)
+  7. INVOICE VALUE & PAYMENT SETTLEMENT (was 5)
+  8. BANK DETAILS (was 6)
+  9. DOCUMENTS PROVIDED WITH THIS SHIPMENT (was 7)
+  10. DECLARATION (was 8 — duplicate fixed)
+  11. LEGAL TERMS & DEFINITIONS (was 8)
+
+3.6 DEBIT NOTE (DN)
+---------------------
+  1. FROM (SELLER / EXPORTER)
+  2. TO (BUYER)             ← buyer only — no consignee section in DN
+  3. ORDER REFERENCE
+  4. FREIGHT & CHARGES
+  5. PAYMENT INSTRUCTIONS
+  6. BANK DETAILS
+  7. LEGAL TERMS & DEFINITIONS (was 8)
+  Note: No Terms & Conditions section in DN — financial demand document only.
+
+3.7 BL INSTRUCTION SHEET (BLI)
+--------------------------------
+  Sections: 1-8 as previously documented in Addendum Section 10.
+  This document goes to CHA / shipping line — NOT to the buyer.
+  NO Legal Terms & Definitions section — CHA does not need them.
+  NO "Terms used in this document..." reference line.
+  Section 2 CONSIGNEE: Single pre-filled row only —
+    "TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED"
+    For LC terms (rare): full consignee detail fields available (Scenario B).
+  See Addendum Section 10 for full BLI structure.
+
+
+================================================================================
+SECTION 4: BUYER DETAILS FIELDS (SECTION 2 IN ALL BUYER DOCUMENTS)
+================================================================================
+
+SECTION LABEL: "2.  BUYER DETAILS"
+APPLIES TO: QT, PI, OC, PL, CI
+
+FIELDS (in this order, two-column table, col1=label, col2=placeholder):
+  Company Legal Name *        [Exact legal name as per company registration]
+  Billing Address Line 1 * *  [Street number and street name]
+  Billing Address Line 2       [Area / district — if applicable]
+  City / Town * *             [City or town name]
+  Postcode * *                [Postcode]
+  Country * *                 [UK / France / Norway / Other]
+  VAT / EORI / Tax Ref *      [UK: EORI No. | France: SIRET+TVA | Norway: Org. No.+MVA]
+  Contact Person *            [Full name]
+  Phone *                     [+country code number]
+  Email *                     [buyer@email.com]
+
+IMPORTANT: Company Legal Name placeholder text varies by document:
+  QT:  [Exact legal name as per company registration]
+  PI:  [Exact legal name — must match Quotation]
+  OC:  [Exact legal name — must match PI exactly]
+  PL:  [Must match PI and Commercial Invoice exactly]
+  CI:  [Must match PI, Packing List, and BL exactly]
+
+
+================================================================================
+SECTION 5: CONSIGNEE DETAILS FIELDS (SECTION 3 IN ALL BUYER DOCUMENTS)
+================================================================================
+
+SECTION LABEL: "3.  CONSIGNEE DETAILS"
+APPLIES TO: QT, PI, OC, PL, CI
+NOT IN: DN (buyer only document), BLI (has its own consignee structure)
+
+FIELDS (in this order, two-column table):
+  Same as Buyer?              If Consignee is same as Buyer — write SAME in
+                              Company Legal Name and leave all other fields blank.
+  Company Legal Name * *      [Exact legal name — must match CI and PL exactly]
+  Address Line 1 * *          [Street number and street name]
+  Address Line 2               [Area / district — if applicable]
+  City / Town * *             [City or town name]
+  Postcode * *                [Postcode — required for customs]
+  Country * *                 [UK / France / Norway / Other]
+  VAT / EORI / Tax Ref * *    [UK: EORI No. | France: SIRET+TVA | Norway: Org. No.+MVA]
+  Contact Person * *          [Full name — consignee contact for shipping line and port queries]
+  Phone * *                   [+country code number]
+  Email * *                   [consignee@email.com]
+
+IMPORTANT: NO "— OR —" separator in buyer documents.
+           The "— OR —" separator is ONLY in the BLI (BL Instruction Sheet).
+
+
+================================================================================
+SECTION 6: NOTIFY PARTY FIELDS (SECTION 4 IN PI, PL, CI)
+================================================================================
+
+SECTION LABEL: "4.  NOTIFY PARTY"
+APPLIES TO: PI, PL, CI only
+NOT IN: QT, OC, DN, BLI (BLI has its own Notify Party section)
+
+FIELDS (in this order, two-column table):
+  Same as Consignee?          If yes — write 'SAME AS CONSIGNEE'. If different
+                              (e.g., buyer's freight agent at destination), fill below.
+  Notify Party Name           [Name of freight agent / forwarder at destination]
+  Address Line 1              [Street number and street name]
+  Address Line 2              [Area / district — if applicable]
+  City / Town                 [City or town name]
+  Postcode                    [Postcode]
+  Country                     [Country]
+  Contact Person              [Name of freight agent / forwarder contact at destination]
+  Phone                       [+country code number]
+  Email                       [freight agent email — for arrival notices]
+
+
+================================================================================
+SECTION 7: BL CONSIGNEE POLICY — T&C CLAUSE
+================================================================================
+
+The following clause MUST appear in the Terms & Conditions section of all
+buyer-facing documents that have a T&C section (QT, PI, OC, CI):
+
+  "• Bill of Lading: NexaCrest issues all shipments with the Bill of Lading
+   consigned "To Order of NexaCrest International Private Limited". This is
+   NexaCrest company policy and cannot be changed under any circumstances.
+   Original BLs are released to the Buyer only after Balance Payment is
+   confirmed as Payment Cleared."
+
+This clause protects NexaCrest's financial position and documents the BL policy
+in the commercial agreement. It must appear in the T&C section, not in the
+Legal Terms box (Section 8/9 of each document).
+
+
+================================================================================
+SECTION 8: LEGAL TERMS — FINAL CANONICAL TEXT
+================================================================================
+
+LEGAL TERMS BOX — 6 CLAUSES IN THIS EXACT ORDER:
+
+  Cancellation:
+    Orders may not be cancelled after production commences. The Advance Payment
+    is non-refundable once production commences. In the event of cancellation
+    after production commences, NexaCrest's total recovery shall not exceed the
+    Advance Payment plus 20% of the total FOB Order value. The parties agree this
+    represents a genuine pre-estimate of NexaCrest's unrecoverable production
+    costs, overhead, opportunity loss, and market price risk.
+
+  Limitation of Liability:
+    NexaCrest's maximum liability under this document shall not exceed the total
+    FOB Order value stated herein. NexaCrest is not liable for any indirect,
+    consequential, or punitive damages, or for loss of profit or business.
+
+  Production Timeline:
+    The estimated shipment timeline stated in this document is indicative only
+    and does not constitute a guaranteed delivery date. NexaCrest will make every
+    effort to meet the estimated timeline. NexaCrest will notify the Buyer in
+    writing within 5 Business Days of becoming aware of any delay to production
+    or shipment, and will provide a revised estimated timeline within 10 Business
+    Days of such notification.
+
+  Re-inspection and Loading:
+    NexaCrest shall load only the confirmed passed pieces. Confirmed failed pieces
+    shall be excluded from the shipment. The Commercial Invoice and all payment
+    obligations shall be adjusted to reflect only the pieces actually loaded and
+    shipped. Neither Party shall have any further claim in respect of the excluded
+    pieces.
+
+  Structural Defect Claims:
+    NexaCrest confirms to the best of its knowledge that Products are free from
+    structural defects present at Loading and not detectable at Pre-loading
+    Inspection. No claim accepted for: (a) conditions detectable at Pre-loading
+    Inspection; (b) damage from Buyer's processing, cutting, handling, or
+    installation; or (c) natural stone characteristics. Any claim must be raised
+    by the Buyer in writing with photographic evidence within 14 Calendar Days of
+    confirmed receipt at Buyer's premises. No claim accepted after this period.
+
+  Governing Law and Dispute Resolution:
+    This document is governed by the laws of India. Any dispute shall first be
+    notified in writing by email or WhatsApp. Both parties shall attempt amicable
+    resolution within 45 Calendar Days of written notice. If unresolved, the
+    dispute shall be referred to binding arbitration under the Arbitration and
+    Conciliation Act, 1996. Seat: Bengaluru, Karnataka, India. Language: English.
+    The United Nations Convention on Contracts for the International Sale of Goods
+    is expressly excluded from this Agreement.
+
+  CRITICAL NOTE: The phrase MUST be "is expressly excluded from this Agreement" —
+  NOT "does not apply". "Does not apply" reads as a characterisation of current law.
+  "Is expressly excluded" is the parties' deliberate contractual choice and is
+  legally stronger in all jurisdictions. Never substitute "does not apply".
+
+DEFINITIONS BOX — 12 DEFINITIONS IN THIS EXACT ORDER:
+  NexaCrest, T/T, Payment Cleared, Remittance Copy, Advance Payment,
+  Balance Payment, Debit Note, Loading, Shipment, FCL, Production Commences,
+  Shipment Readiness Confirmation
+  (Exact text in reference/NexaCrest_Terminology_Standard.xlsx)
+
+
+================================================================================
+SECTION 9: LEGAL LANGUAGE RULES — NEVER DEVIATE
+================================================================================
+
+The following substitutions were applied during the legal language audit and
+MUST be preserved in all documents and in the app template engine:
+
+  NEVER USE              → USE INSTEAD
+  ──────────────────────────────────────────────────────────────────────────────
+  "will notify"          → "will notify within 5 Business Days of becoming aware"
+  "NexaCrest warrants"   → "NexaCrest confirms to the best of its knowledge"
+  "must be raised"       → "must be raised by the Buyer"
+  "immediately after"    → "within 24 hours of"
+  "Capitalised terms"    → "Terms used" or "The following terms"
+  "reasonable effort"    → "every effort" (drop "reasonable")
+  "reasonable efforts"   → specific timeframe (5 Business Days / 10 Business Days)
+  "warrants" (any form)  → "confirms to the best of its knowledge"
+  "guarantees"           → never use — use "estimates" or "endeavours"
+  "ensures"              → "endeavours to ensure" or rewrite specifically
+
+  ALWAYS use:
+  - Specific numbers for all timeframes (days, not "promptly" or "immediately")
+  - Named party for every obligation ("by the Buyer", "by NexaCrest")
+  - "genuine pre-estimate" language for liquidated damages clauses
+  - Governing law = India, Seat = Bengaluru, Language = English, CISG excluded
+
+
+================================================================================
+SECTION 10: BL DOCUMENT SET — FINAL SPECIFICATION
+================================================================================
+
+Three separate documents. Use ONLY the files uploaded by GS on 6 October 2026:
+  BL_Instruction.docx     (sender's copy uploaded 6 Oct 2026 — FINAL)
+  BL_Endorsement.docx     (sender's copy uploaded 6 Oct 2026 — FINAL)
+  BL_Reasoning_Guide.docx (sender's copy uploaded 6 Oct 2026 — FINAL)
+
+DO NOT regenerate from earlier versions. These are the authoritative final files.
+
+10.1 BL INSTRUCTION SHEET (BLI) — SECTION STRUCTURE:
+  1. SHIPPER / EXPORTER (appears on BL exactly as written) — pre-filled NexaCrest
+  2. CONSIGNEE (appears on BL exactly as written):
+       Single pre-filled row: "TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED"
+       [For LC terms only — rare, management approval required: full consignee fields]
+  3. NOTIFY PARTY — name, address (split lines), contact, phone, email
+  4. SHIPMENT DETAILS — port, vessel, ETD/ETA, carrier, free days, also notify
+  5. CONTAINER & CARGO DETAILS — FCL/LCL, size, stuffing location/date, weights/CBM
+  6. CARGO DESCRIPTION — goods description, HS code, marks, COO, dangerous goods
+  7. FREIGHT & CHARGES — terms, amount, cargo insurance
+  8. BILL OF LADING TYPE:
+       Red box: MANDATORY — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL
+       BL Type = ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS
+       BL Consignee instruction = TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED
+
+10.2 BL ENDORSEMENT — FIELDS:
+  Pay to the order of (Consignee):  [Buyer/Consignee full legal name — the party
+                                     you are transferring ownership to —
+                                     e.g. ABC Memorial Stones Ltd, France]
+  BL Number:
+  Vessel / Voyage:
+  Port of Loading:
+  Port of Discharge:
+  Proforma Invoice No.:
+  Commercial Invoice No.:
+  Date of Endorsement:
+  Authorised Signatory: [GS signature + company seal]
+  Fixed: Gulmohar Sontakke | Founder & Managing Director |
+         NexaCrest International Private Limited |
+         GSTIN: 29AAKCN8733G1ZZ | IEC: AAKCN8733G
+
+10.3 APP BEHAVIOUR FOR BL DOCUMENTS:
+  - BLI, Endorsement, Reasoning Guide are NOT generated per order
+  - They are template documents issued per shipment
+  - App fills variable fields (buyer/consignee details, shipment details)
+  - Endorsement: app generates per shipment, staff print and sign physically
+
+
+================================================================================
+SECTION 11: CONTACT FIELDS — SINGLE FIELD RULE
+================================================================================
+
+RULE: Every Contact, Phone, and Email must be SEPARATE fields.
+      NEVER combine them as "Contact / Phone" or "Contact / Email" in one row.
+
+STANDARD PATTERN for any party section:
+  Contact Person   [field]
+  Phone            [field]
+  Email            [field]
+
+This applies to: Buyer, Consignee, Notify Party, and any other party section.
+Applies across ALL documents — buyer-facing, contracts, and BL documents.
+
+
+================================================================================
+SECTION 12: ASSETS
+================================================================================
+
+All brand assets are in the assets/ folder:
+  nexacrest_logo.jpg    — Company logo. Use in all document headers.
+                          Dimensions: 72×72 px in documents.
+  company_seal.png      — Round company seal. Use in signature blocks.
+                          Dimensions: 90×90 px in documents.
+  director_seal.png     — Round director seal. Use in signature blocks.
+                          Dimensions: 90×90 px in documents.
+  gs_signature.png      — GS handwritten signature. Use in signature blocks.
+                          Dimensions: 120×40 px in documents.
+
+These assets are embedded in all documents. When regenerating any document,
+load from assets/ folder and embed using the same dimensions above.
+
+
+================================================================================
+SECTION 13: NDA DOCUMENTS
+================================================================================
+
+Two NDA templates in contract/ folder:
+
+13.1 NexaCrest_NDA_Commercial.docx — MUTUAL NON-DISCLOSURE AND NON-CIRCUMVENTION
+  Use for: Buyers, vendors, suppliers, factories, agents, commercial partners
+  Key points:
+    - Entity definition line REQUIRED in Definitions section (not just hereinafter
+      in parties clause): "In this Agreement, 'NexaCrest International Private
+      Limited' is referred to as 'NexaCrest'. Both names refer to the same legal entity."
+    - Non-Circumvention clause: 24 months post-termination
+    - Trade Secrets: indefinite protection
+    - Term: 3 years + 3 years survival
+    - Governing law: India, Bengaluru, sole arbitrator, 45 days amicable
+    - Schedule B: compensation amount USD [___] — set at signing by counter-party type:
+        Individual/sole trader: USD 10,000
+        Small company: USD 25,000
+        Medium/large company: USD 50,000
+    - REMOVE Schedule B internal guidance line before issuing signed document
+
+13.2 NexaCrest_NDA_Staff.docx — STAFF CONFIDENTIALITY AND NDA
+  Use for: All employees and contractors at onboarding
+  Key points:
+    - Non-Solicitation: 12 months, tied to Confidential Information only
+    - Digital credentials explicitly covered (Zoho, CRM, social media, GitHub)
+    - AI tools restriction: staff cannot upload Company info to any AI platform
+    - IP assignment: all work product belongs to Company from creation
+    - Schedule A: compensation amount INR [___] — set at signing by role:
+        Junior (coordinator, executive): INR 2,00,000
+        Mid-level (manager, operations): INR 5,00,000
+        Senior (BD, commercial, director): INR 10,00,000
+    - REMOVE Schedule A internal guidance line before issuing signed document
+    - Survival: 5 years for confidentiality, 12 months for non-solicitation
+    - Non-compete carve-out clause REQUIRED (Section 27 Indian Contract Act
+      protection): "Nothing in this Agreement prohibits the Staff Member from
+      accepting employment with any other employer, including a competitor of
+      the Company. This Agreement restricts the USE of Confidential Information,
+      not the Staff Member's right to work."
+      This clause is mandatory — without it the NDA could be challenged as an
+      unlawful restraint of trade under Section 27 ICA.
+
+
+================================================================================
+SECTION 13B: INTERNAL DOCUMENTS — SPECIAL RULES
+================================================================================
+
+13B.1 Payment_Terms_Amendment.docx
+  - This document is sent to buyers/counterparties to formally amend payment
+    terms from a prior agreement.
+  - The document MUST NOT contain any internal staff guidance notes in the
+    body of the document. Any internal guidance to staff (e.g. "copy terms
+    exactly from PI") must be placed in SOP_01_Sales.docx instead.
+  - CRITICAL: Remove ALL [⚠ INTERNAL NOTE...] annotations from the document
+    body before including in the ZIP or sending to any recipient. These notes
+    expose NexaCrest's internal legal strategy to the counterparty.
+  - In the app: internal guidance notes must be surfaced as UI tooltips or
+    help text visible only to the NexaCrest staff user — NEVER embedded in
+    the generated document output.
+
+================================================================================
+SECTION 14: FOLDER STRUCTURE OF FINAL ZIP
+================================================================================
+
+NexaCrest_Complete_Document_Set_Final.zip
+│
+├── assets/
+│   ├── nexacrest_logo.jpg
+│   ├── company_seal.png
+│   ├── director_seal.png
+│   └── gs_signature.png
+│
+├── buyer_documents/
+│   ├── 01_Tier1_NewBuyer/
+│   │   ├── 01_Quotation.docx
+│   │   ├── 02_ProformaInvoice.docx
+│   │   ├── 03_OrderConfirmation.docx
+│   │   ├── 04_PackingList.docx
+│   │   ├── 05_CommercialInvoice.docx
+│   │   ├── 06_DebitNote.docx
+│   │   ├── 08_BL_Instruction.docx
+│   │   ├── 10_BuyerPO.docx
+│   │   └── Annexure_A.docx
+│   └── 02_Tier2_EstablishedBuyer/
+│       └── [same files as Tier 1]
+│
+├── contract/
+│   ├── NexaCrest_NDA_Commercial.docx
+│   ├── NexaCrest_NDA_Staff.docx
+│   └── NexaCrest_Sales_Supply_Agreement.docx
+│
+├── internal_documents/
+│   ├── BL_Endorsement.docx           ← FINAL (uploaded by GS 6 Oct 2026)
+│   ├── BL_Reasoning_Guide.docx       ← FINAL (uploaded by GS 6 Oct 2026)
+│   ├── 07_COO_PrepSheet.docx
+│   ├── 09_Checklists.docx
+│   ├── 11_SupplierPO.docx
+│   ├── Payment_Terms_Amendment.docx
+│   ├── SOP_01_Sales.docx
+│   ├── SOP_01_Sales_FullGuide.docx
+│   ├── SOP_02_Accounts.docx
+│   ├── SOP_02_Accounts_FullGuide.docx
+│   ├── SOP_03_Packing.docx
+│   ├── SOP_03_Packing_FullGuide.docx
+│   ├── SOP_04_Shipping.docx
+│   ├── SOP_04_Shipping_FullGuide.docx
+│   ├── SOP_05_Compliance.docx
+│   ├── SOP_05_Compliance_FullGuide.docx
+│   ├── StageGate.docx
+│   └── WallReference.docx
+│
+└── reference/
+    ├── NexaCrest_Developer_Spec.txt          ← THIS FILE (authoritative)
+    ├── NexaCrest_Terminology_Standard.xlsx
+    └── NexaCrest_Master_Reference.xlsx       ← Client data + Terms + Doc index
+
+
+================================================================================
+END OF DEVELOPER SPECIFICATION
+Version: Final October 2026
+This file is the single authoritative source. All previous addendum sections
+in NexaCrest_Change_Log.txt are superseded by this file.
+================================================================================

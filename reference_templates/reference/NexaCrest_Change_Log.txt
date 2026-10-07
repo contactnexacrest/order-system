@@ -1,0 +1,3047 @@
+================================================================================
+NEXACREST DOCUMENT SET — COMPLETE CHANGE LOG
+Version: 2.0 | Date: October 2026
+Purpose: Complete record of every change made to every document
+         for application developers to update the webapp accordingly
+================================================================================
+
+HOW TO READ THIS LOG
+----------------------------------------
+DOCUMENT: which file was changed
+SECTION:  where in the document
+TYPE:     ADD (new content), REPLACE (old to new), FIX (error correction)
+OLD:      exact text before change (or 'not present' for ADDs)
+NEW:      exact text after change
+COUNT:    how many times this replacement occurred
+NOTE:     reason for change
+
+IMPORTANT FOR APP DEVELOPERS:
+- All ADD changes require inserting new content into the T&C section
+- The Definitions block goes FIRST in T&C, before all existing clauses
+- The Legal Terms block goes AFTER Definitions, before existing clauses
+- Template brackets [like this] must remain — filled at runtime
+- Internal notes marked [INTERNAL NOTE] must be REMOVED before sending to buyer
+
+
+================================================================================
+DOCUMENT: Tier1/01_Quotation
+Total changes in this document: 22
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (6 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 6 occurrence(s)
+  Note    : Terminology standardisation — 6 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : payment receipt
+  NEW     : Remittance Copy
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : production has commenced
+  NEW     : production commences
+
+  REPLACE #6
+  Section : Payment Terms
+  Count   : 4 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: Tier1/02_ProformaInvoice
+Total changes in this document: 24
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (8 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 6 occurrence(s)
+  Note    : Terminology standardisation — 6 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 3 occurrence(s)
+  Note    : Terminology standardisation — 3 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment receipt
+  NEW     : Remittance Copy
+
+  REPLACE #6
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : production has commenced
+  NEW     : production commences
+
+  REPLACE #7
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : destination port
+  NEW     : Port of Discharge
+
+  REPLACE #8
+  Section : Payment Terms
+  Count   : 4 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: Tier1/03_OrderConfirmation
+Total changes in this document: 25
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (9 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment receipt
+  NEW     : Remittance Copy
+
+  REPLACE #6
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment received
+  NEW     : Remittance Copy received
+
+  REPLACE #7
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : production has commenced
+  NEW     : production commences
+
+  REPLACE #8
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  REPLACE #9
+  Section : Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: Tier1/05_CommercialInvoice
+Total changes in this document: 22
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (5 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : SC/FDN/
+  NEW     : SC/DN/
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #5
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  FIXES (1 items):
+
+  FIX #1
+  Section : Meta bar — PI Reference field
+  Note    : PI reference format corrected — DD was missing
+  OLD     : [SC/PI/YYYY/MMNNN]
+  NEW     : [SC/PI/YYYY/DDMMNNN]
+
+================================================================================
+DOCUMENT: Tier1/06_DebitNote
+Total changes in this document: 5
+================================================================================
+
+  REPLACEMENTS (5 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : SC/FDN/
+  NEW     : SC/DN/
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #4
+  Section : Payment Terms
+  Count   : 2 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+  REPLACE #5
+  Section : Section 4 — GST field
+  Count   : 1 occurrence(s)
+  Note    : Internal note marked — remove before sending to buyer
+  OLD     : As advised by CA — NIL if pure cost reimbursement / 18% IGST if treated as service supply. Confirm with CA before issuing.
+  NEW     : [⚠ INTERNAL NOTE — remove before sending: Confirm GST treatment with CA before issuing. Enter confirmed amount below — do not send this note to buyer....
+
+================================================================================
+DOCUMENT: Tier1/08_BL_Instruction
+Total changes in this document: 4
+================================================================================
+
+  REPLACEMENTS (4 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 3 occurrence(s)
+  Note    : Terminology standardisation — 3 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : destination port
+  NEW     : Port of Discharge
+
+================================================================================
+DOCUMENT: Tier1/10_BuyerPO
+Total changes in this document: 21
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (5 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+  REPLACE #5
+  Section : Section 4 — Buyer Acceptance — signing note
+  Count   : 1 occurrence(s)
+  Note    : Corrected — PI issuance and production start are separate events
+  OLD     : This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production upon receipt of the 40% advance payment.
+  NEW     : This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice. Production commences only after the Advance Payment stated in the PI is...
+
+================================================================================
+DOCUMENT: Tier1/Annexure_A
+Total changes in this document: 3
+================================================================================
+
+  REPLACEMENTS (3 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : natural characteristic
+  NEW     : Natural Variation
+
+  REPLACE #2
+  Section : Note box at top
+  Count   : 1 occurrence(s)
+  Note    : "Vary slightly" is undefined and vague — replaced with precise Natural Variation language
+  OLD     : Actual product appearance may vary slightly due to the natural characteristics of granite.
+  NEW     : Natural stone characteristics including colour variation, veining, and texture may differ between pieces and are not defects, provided the product mee...
+
+  REPLACE #3
+  Section : Note box at top
+  Count   : 1 occurrence(s)
+  Note    : Strengthened — clarifies images are not specifications
+  OLD     : Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All bind...
+  NEW     : All images, drawings, and photographs in this Annexure are for product identification purposes only and do not constitute agreed specifications. The b...
+
+================================================================================
+DOCUMENT: Tier2/01_Quotation
+Total changes in this document: 23
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (7 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 6 occurrence(s)
+  Note    : Terminology standardisation — 6 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : payment receipt
+  NEW     : Remittance Copy
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : production has commenced
+  NEW     : production commences
+
+  REPLACE #6
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  REPLACE #7
+  Section : Payment Terms
+  Count   : 3 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: Tier2/02_ProformaInvoice
+Total changes in this document: 25
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (9 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 6 occurrence(s)
+  Note    : Terminology standardisation — 6 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 3 occurrence(s)
+  Note    : Terminology standardisation — 3 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment receipt
+  NEW     : Remittance Copy
+
+  REPLACE #6
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : production has commenced
+  NEW     : production commences
+
+  REPLACE #7
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : destination port
+  NEW     : Port of Discharge
+
+  REPLACE #8
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  REPLACE #9
+  Section : Payment Terms
+  Count   : 3 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: Tier2/03_OrderConfirmation
+Total changes in this document: 25
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (9 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment receipt
+  NEW     : Remittance Copy
+
+  REPLACE #6
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment received
+  NEW     : Remittance Copy received
+
+  REPLACE #7
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : production has commenced
+  NEW     : production commences
+
+  REPLACE #8
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  REPLACE #9
+  Section : Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: Tier2/05_CommercialInvoice
+Total changes in this document: 22
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (5 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : SC/FDN/
+  NEW     : SC/DN/
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #5
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  FIXES (1 items):
+
+  FIX #1
+  Section : Meta bar — PI Reference field
+  Note    : PI reference format corrected — DD was missing
+  OLD     : [SC/PI/YYYY/MMNNN]
+  NEW     : [SC/PI/YYYY/DDMMNNN]
+
+================================================================================
+DOCUMENT: Tier2/06_DebitNote
+Total changes in this document: 5
+================================================================================
+
+  REPLACEMENTS (5 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : SC/FDN/
+  NEW     : SC/DN/
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #4
+  Section : Payment Terms
+  Count   : 2 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+  REPLACE #5
+  Section : Section 4 — GST field
+  Count   : 1 occurrence(s)
+  Note    : Internal note marked — remove before sending to buyer
+  OLD     : As advised by CA — NIL if pure cost reimbursement / 18% IGST if treated as service supply. Confirm with CA before issuing.
+  NEW     : [⚠ INTERNAL NOTE — remove before sending: Confirm GST treatment with CA before issuing. Enter confirmed amount below — do not send this note to buyer....
+
+================================================================================
+DOCUMENT: Tier2/08_BL_Instruction
+Total changes in this document: 4
+================================================================================
+
+  REPLACEMENTS (4 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 3 occurrence(s)
+  Note    : Terminology standardisation — 3 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : destination port
+  NEW     : Port of Discharge
+
+================================================================================
+DOCUMENT: Tier2/10_BuyerPO
+Total changes in this document: 21
+================================================================================
+
+  ADDITIONS (16 items):
+
+  ADD #1
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A1] NexaCrest short form definition
+
+  ADD #2
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A2] T/T definition
+
+  ADD #3
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A3] Payment Cleared definition
+
+  ADD #4
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A4] Remittance Copy definition
+
+  ADD #5
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A5] Advance Payment definition
+
+  ADD #6
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A6] Balance Payment definition
+
+  ADD #7
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A7] Debit Note definition
+
+  ADD #8
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A8] Loading definition
+
+  ADD #9
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A9] Shipment definition
+
+  ADD #10
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A10] FCL definition
+
+  ADD #11
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A11] Production Commences definition
+
+  ADD #12
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [A12] Shipment Readiness Confirmation definition
+
+  ADD #13
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B1] Cancellation cap clause
+
+  ADD #14
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B2] Limitation of Liability clause
+
+  ADD #15
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B3] Production Timeline clause
+
+  ADD #16
+  Section : Terms & Conditions — Definitions / Legal Terms block
+  Note    : New standard term added — see Terminology Standard Sheet 3 / Sheet 8
+  Content : [B4] Governing Law and Dispute Resolution clause
+
+  REPLACEMENTS (5 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  REPLACE #5
+  Section : Section 4 — Buyer Acceptance — signing note
+  Count   : 1 occurrence(s)
+  Note    : Corrected — PI issuance and production start are separate events
+  OLD     : This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production upon receipt of the 40% advance payment.
+  NEW     : This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice. Production commences only after the Advance Payment stated in the PI is...
+
+================================================================================
+DOCUMENT: Tier2/Annexure_A
+Total changes in this document: 3
+================================================================================
+
+  REPLACEMENTS (3 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : natural characteristic
+  NEW     : Natural Variation
+
+  REPLACE #2
+  Section : Note box at top
+  Count   : 1 occurrence(s)
+  Note    : "Vary slightly" is undefined and vague — replaced with precise Natural Variation language
+  OLD     : Actual product appearance may vary slightly due to the natural characteristics of granite.
+  NEW     : Natural stone characteristics including colour variation, veining, and texture may differ between pieces and are not defects, provided the product mee...
+
+  REPLACE #3
+  Section : Note box at top
+  Count   : 1 occurrence(s)
+  Note    : Strengthened — clarifies images are not specifications
+  OLD     : Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All bind...
+  NEW     : All images, drawings, and photographs in this Annexure are for product identification purposes only and do not constitute agreed specifications. The b...
+
+================================================================================
+DOCUMENT: Internal/COO_PrepSheet
+Total changes in this document: 1
+================================================================================
+
+  REPLACEMENTS (1 items):
+
+  REPLACE #1
+  Section : Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: Internal/Checklists
+Total changes in this document: 11
+================================================================================
+
+  REPLACEMENTS (11 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 7 occurrence(s)
+  Note    : Terminology standardisation — 7 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : SC/FDN/
+  NEW     : SC/DN/
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 4 occurrence(s)
+  Note    : Terminology standardisation — 4 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 5 occurrence(s)
+  Note    : Terminology standardisation — 5 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #6
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #7
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment received
+  NEW     : Remittance Copy received
+
+  REPLACE #8
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment is cleared
+  NEW     : Payment Cleared
+
+  REPLACE #9
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment confirmed
+  NEW     : Payment Cleared
+
+  REPLACE #10
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  REPLACE #11
+  Section : Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: Internal/Payment_Terms_Amendment
+Total changes in this document: 6
+================================================================================
+
+  REPLACEMENTS (6 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : advance T/T
+  NEW     : Advance Payment
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : balance T/T
+  NEW     : Balance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 4 occurrence(s)
+  Note    : Terminology standardisation — 4 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #4
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+  REPLACE #5
+  Section : Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+  REPLACE #6
+  Section : Section 3 — Original Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Internal instruction marked — must be removed before sending to buyer
+  OLD     : Any difference between what is written here and what appears on the PI may be used to argue that the terms were already varied before this amendment. ...
+  NEW     : [⚠ INTERNAL NOTE — remove before sending: Copy terms exactly from PI. Any difference can be used to argue terms were already varied.]
+
+================================================================================
+DOCUMENT: Internal/StageGate
+Total changes in this document: 5
+================================================================================
+
+  REPLACEMENTS (5 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment receipt
+  NEW     : Remittance Copy
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Despatch
+  NEW     : Dispatch
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : despatch
+  NEW     : Dispatch
+
+================================================================================
+DOCUMENT: Internal/WallReference
+Total changes in this document: 3
+================================================================================
+
+  REPLACEMENTS (3 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Despatch
+  NEW     : Dispatch
+
+================================================================================
+DOCUMENT: SOP_A/SOP_01_Sales
+Total changes in this document: 2
+================================================================================
+
+  REPLACEMENTS (2 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : wire transfer
+  NEW     : T/T
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment is cleared
+  NEW     : Payment Cleared
+
+================================================================================
+DOCUMENT: SOP_A/SOP_02_Accounts
+Total changes in this document: 5
+================================================================================
+
+  REPLACEMENTS (5 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 4 occurrence(s)
+  Note    : Terminology standardisation — 4 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : SC/FDN/
+  NEW     : SC/DN/
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 4 occurrence(s)
+  Note    : Terminology standardisation — 4 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : production starts
+  NEW     : production commences
+
+  REPLACE #5
+  Section : Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: SOP_A/SOP_04_Shipping
+Total changes in this document: 3
+================================================================================
+
+  REPLACEMENTS (3 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 8 occurrence(s)
+  Note    : Terminology standardisation — 8 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Despatch
+  NEW     : Dispatch
+
+  REPLACE #3
+  Section : Section 4 — Payment Status
+  Count   : 1 occurrence(s)
+  Note    : Clarified BL trigger — email date not BL issue date
+  OLD     : within 7 days of BL date
+  NEW     : within 7 Calendar Days of the date NexaCrest emails the scanned BL copy
+
+================================================================================
+DOCUMENT: SOP_B/SOP_01_Sales_FullGuide
+Total changes in this document: 2
+================================================================================
+
+  REPLACEMENTS (2 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment is cleared
+  NEW     : Payment Cleared
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : production starts
+  NEW     : production commences
+
+================================================================================
+DOCUMENT: SOP_B/SOP_02_Accounts_FullGuide
+Total changes in this document: 7
+================================================================================
+
+  REPLACEMENTS (7 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Freight Debit Note
+  NEW     : Debit Note
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 2 occurrence(s)
+  Note    : Terminology standardisation — 2 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : bank transfer
+  NEW     : T/T
+
+  REPLACE #4
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : payment confirmed
+  NEW     : Payment Cleared
+
+  REPLACE #5
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : production started
+  NEW     : production commences
+
+  REPLACE #6
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : production starts
+  NEW     : production commences
+
+  REPLACE #7
+  Section : Payment Terms
+  Count   : 1 occurrence(s)
+  Note    : Calendar Days standardisation — buyer payment obligations always in Calendar Days
+  OLD     : 3 working days
+  NEW     : 3 Calendar Days
+
+================================================================================
+DOCUMENT: SOP_B/SOP_03_Packing_FullGuide
+Total changes in this document: 1
+================================================================================
+
+  REPLACEMENTS (1 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : destination port
+  NEW     : Port of Discharge
+
+================================================================================
+DOCUMENT: SOP_B/SOP_04_Shipping_FullGuide
+Total changes in this document: 3
+================================================================================
+
+  REPLACEMENTS (3 items):
+
+  REPLACE #1
+  Section : Throughout document
+  Count   : 4 occurrence(s)
+  Note    : Terminology standardisation — 4 occurrence(s)
+  OLD     : 60% balance
+  NEW     : Balance Payment
+
+  REPLACE #2
+  Section : Throughout document
+  Count   : 3 occurrence(s)
+  Note    : Terminology standardisation — 3 occurrence(s)
+  OLD     : destination port
+  NEW     : Port of Discharge
+
+  REPLACE #3
+  Section : Throughout document
+  Count   : 1 occurrence(s)
+  Note    : Terminology standardisation — 1 occurrence(s)
+  OLD     : Despatch
+  NEW     : Dispatch
+
+================================================================================
+SUMMARY
+================================================================================
+Total documents processed : 28
+Total changes             : 303
+  Additions               : 160
+  Replacements            : 141
+  Fixes                   : 2
+
+KEY CHANGES FOR APP DEVELOPER:
+
+1. DOCUMENT RENAMED
+   OLD FILE: 06_FreightDebitNote.docx
+   NEW FILE: 06_DebitNote.docx
+   OLD PREFIX: SC/FDN/
+   NEW PREFIX: SC/DN/
+   ACTION: Update all DB references, dropdown values, document generation code
+
+2. NEW T&C BLOCK — DEFINITIONS (12 items, ref A1-A12)
+   Insert at START of T&C section in: QT, PI, OC, CI, DN, BuyerPO
+   Items: NexaCrest short form, T/T, Payment Cleared, Remittance Copy,
+   Advance Payment, Balance Payment, Debit Note, Loading, Shipment,
+   FCL, Production Commences, Shipment Readiness Confirmation
+
+3. NEW T&C BLOCK — LEGAL TERMS (4 items, ref B1-B4)
+   Insert AFTER Definitions block in: QT, PI, OC, CI, BuyerPO
+   Items: Cancellation cap, Limitation of Liability,
+   Production Timeline, Governing Law and Dispute Resolution
+
+4. TIER DIFFERENCE — ONLY 3 DOCUMENTS DIFFER BETWEEN TIER 1 AND TIER 2
+   Affected files: 01_Quotation.docx, 02_ProformaInvoice.docx, 10_BuyerPO.docx
+   Tier 1 — Balance Payment trigger:
+     'within 3 Calendar Days of Shipment Readiness Confirmation from NexaCrest'
+   Tier 2 — Balance Payment trigger:
+     'against scanned BL copy within 7 Calendar Days of date NexaCrest emails scanned BL'
+   All other documents: IDENTICAL between Tier 1 and Tier 2
+
+5. INTERNAL NOTES — MUST STRIP BEFORE SENDING TO BUYER
+   06_DebitNote.docx — Section 4 GST field
+   Payment_Terms_Amendment.docx — Section 3 instruction note
+   Marker text: [INTERNAL NOTE — remove before sending]
+   App action: Strip all text between [INTERNAL NOTE] markers before PDF generation
+
+6. TERMINOLOGY — GLOBAL FIND/REPLACE IN APP TEMPLATES
+   advance T/T           -> Advance Payment
+   balance T/T           -> Balance Payment
+   60% balance           -> Balance Payment
+   wire transfer         -> T/T
+   bank transfer         -> T/T
+   TT (no slashes)       -> T/T
+   Freight Debit Note    -> Debit Note
+   FDN (abbreviation)    -> DN
+   SC/FDN/               -> SC/DN/
+   production has commenced -> production commences
+   production starts     -> production commences
+   Despatch / despatch   -> Dispatch
+   destination port      -> Port of Discharge
+   payment receipt       -> Remittance Copy
+   payment received      -> Remittance Copy received
+   payment is cleared    -> Payment Cleared
+   natural characteristic -> Natural Variation
+
+7. CI REFERENCE FORMAT FIX
+   OLD: [SC/PI/YYYY/MMNNN] in meta bar PI Reference field
+   NEW: [SC/PI/YYYY/DDMMNNN]
+   Action: Update CI template PI reference field format in app
+
+8. BUYER PO — PRODUCTION AUTHORISATION TEXT CORRECTED
+   OLD: 'authorises NexaCrest to issue the PI and commence production'
+   NEW: 'authorises NexaCrest to issue the PI. Production commences only
+         after Advance Payment is confirmed as Payment Cleared.'
+
+9. ANNEXURE A — REWRITTEN NOTES
+   Image/drawing note: strengthened to clarify images are not specifications
+   'Vary slightly' removed: replaced with precise Natural Variation language
+
+================================================================================
+ADDENDUM — CHANGES MADE AFTER INITIAL LOG
+Session: October 2026 — Post A-G Terminology Standard Implementation
+================================================================================
+
+This addendum records all changes applied AFTER the initial change log was written.
+These are critical for the app developer — these changes are not in the initial log above.
+
+================================================================================
+ADDENDUM SECTION 1 — DEFINITIONS BLOCK (A1-A12) INJECTED INTO ALL BUYER DOCS
+================================================================================
+
+ACTION REQUIRED FOR APP:
+  Every buyer-facing document T&C section must now begin with a DEFINITIONS block
+  followed by a LEGAL TERMS block, before all existing T&C bullets.
+
+  Documents affected: QT, PI, OC, PL, CI, DN, BLI, BuyerPO, Annexure A (both tiers)
+
+DEFINITIONS BLOCK — inject at START of T&C, before all existing bullets:
+
+  A1  NexaCrest short form:
+      In this document, "NexaCrest International Private Limited" is referred to
+      as "NexaCrest". Both names refer to the same legal entity.
+
+  A2  T/T (Telegraphic Transfer):
+      an electronic bank wire transfer sent directly from the Buyer's bank to
+      NexaCrest's designated bank account at State Bank of India as stated in
+      this document.
+
+  A3  Payment Cleared:
+      the relevant payment confirmed as actually credited to NexaCrest's bank
+      account by NexaCrest's accounts team. A Remittance Copy alone does not
+      constitute Payment Cleared.
+
+  A4  Remittance Copy:
+      the bank transfer receipt or SWIFT confirmation sent by the Buyer as
+      evidence of transfer. Receipt of a Remittance Copy by NexaCrest does not
+      constitute Payment Cleared.
+
+  A5  Advance Payment:
+      the advance percentage of the FOB Order value paid by T/T before production
+      commences, as stated in this document.
+
+  A6  Balance Payment:
+      the remaining FOB Order value after the Advance Payment, paid by T/T as per
+      the payment trigger stated in this document.
+
+  A7  Debit Note:
+      a written demand issued by NexaCrest for any agreed cost additional to the
+      FOB Order value, including but not limited to freight, cargo insurance,
+      inspection fees, or certificate fees. Each Debit Note must be confirmed as
+      Payment Cleared before NexaCrest proceeds with the related activity.
+
+  A8  Loading:
+      the physical act of stuffing Products into the container at NexaCrest's
+      designated processing facility. Loading is distinct from Shipment.
+
+  A9  Shipment:
+      the departure of the vessel from the port of loading. Shipment is distinct
+      from Loading and from Delivery.
+
+  A10 FCL (Full Container Load):
+      a shipment occupying one complete container, approximately 24-27 MT
+      including packing. Minimum order quantity is 1 FCL.
+
+  A11 Production Commences:
+      the point at which NexaCrest begins manufacturing the Products for this
+      Order. Production commences only after the Advance Payment is confirmed
+      as Payment Cleared. The Advance Payment is non-refundable from this point.
+
+  A12 Shipment Readiness Confirmation:
+      a written notification from NexaCrest by email or WhatsApp confirming that
+      the Products have passed quality inspection (NexaCrest's internal quality
+      check, or third-party Pre-loading Inspection where applicable), are fully
+      packed, and are ready for vessel booking.
+      NOTE: Sequence is critical — inspected FIRST, packed SECOND, ready THIRD.
+
+================================================================================
+ADDENDUM SECTION 2 — LEGAL TERMS BLOCK (B1-B4) INJECTED INTO ALL BUYER DOCS
+================================================================================
+
+ACTION REQUIRED FOR APP:
+  After the Definitions block, inject the LEGAL TERMS block before existing bullets.
+
+  LEGAL TERMS BLOCK — inject AFTER Definitions block, before all existing bullets:
+
+  B1  Cancellation:
+      Orders may not be cancelled after production commences. The Advance Payment
+      is non-refundable once production commences. In the event of cancellation
+      after production commences, NexaCrest's total recovery shall not exceed the
+      Advance Payment plus 20% of the total FOB Order value. The parties agree this
+      represents a genuine pre-estimate of NexaCrest's unrecoverable production
+      costs, overhead, opportunity loss, and market price risk.
+      KEY PHRASES: "20% of the total FOB Order value" AND "genuine pre-estimate"
+      — BOTH must be present. Do not use one without the other.
+
+  B2  Limitation of Liability:
+      NexaCrest's maximum liability under this document shall not exceed the total
+      FOB Order value stated herein. NexaCrest is not liable for any indirect,
+      consequential, or punitive damages, or for loss of profit or business.
+
+  B3  Production Timeline:
+      the estimated shipment timeline stated in this document is indicative only
+      and does not constitute a guaranteed delivery date. NexaCrest will make every
+      reasonable effort to meet the estimated timeline. If production or shipment
+      is delayed for any reason beyond NexaCrest's reasonable control, NexaCrest
+      will notify the Buyer in writing at the earliest opportunity with a revised
+      timeline.
+
+  B4  Governing Law and Dispute Resolution:
+      This document is governed by the laws of India. Any dispute shall first be
+      notified in writing by email or WhatsApp. Both parties shall attempt amicable
+      resolution within 45 Calendar Days of written notice. If unresolved, the
+      dispute shall be referred to binding arbitration under the Arbitration and
+      Conciliation Act, 1996. Seat: Bengaluru, Karnataka, India. Language: English.
+      The United Nations Convention on Contracts for the International Sale of
+      Goods (CISG) does not apply.
+      NOTE: CISG exclusion — full name only, no abbreviation alone, no explanation.
+
+================================================================================
+ADDENDUM SECTION 3 — ADDITIONAL T&C BULLETS ADDED TO QT, PI, OC (BOTH TIERS)
+================================================================================
+
+The following new bullet points were added to the T&C section of QT, PI, and OC:
+
+  NEW BULLET: Re-inspection and Loading
+  LOCATION: T&C bullets section, before last bullet
+  TEXT: "Re-inspection and Loading: NexaCrest shall load only the confirmed passed
+  pieces. Confirmed failed pieces shall be excluded from the shipment. The
+  Commercial Invoice and all payment obligations shall be adjusted to reflect
+  only the pieces actually loaded and shipped. Neither Party shall have any
+  further claim in respect of the excluded pieces."
+
+  NEW BULLET: Structural Defect Claims
+  LOCATION: T&C bullets section, after Re-inspection bullet
+  TEXT: "Structural Defect Claims: NexaCrest warrants Products are free from
+  structural defects present at Loading and not detectable at Pre-loading
+  Inspection. No claim accepted for: (a) conditions detectable at Pre-loading
+  Inspection; (b) damage from Buyer's processing, cutting, handling, or
+  installation; or (c) natural stone characteristics. Any claim must be raised
+  in writing with photographic evidence within 14 Calendar Days of confirmed
+  receipt at Buyer's premises. No claim accepted after this period."
+  KEY TERM: "14 Calendar Days" from CONFIRMED RECEIPT at premises.
+  NOT from discovery during processing — that wording is intentionally removed.
+
+  Inspection Report — 48-hour window (already existed in QT/PI/OC T&C):
+  TEXT: "On completion of Pre-loading Inspection, the Buyer's inspector shall
+  submit a written Inspection Report confirming either: (a) approval of the
+  inspected pieces; or (b) rejection of specific pieces with full supporting
+  documentation. If no written Inspection Report is received by NexaCrest within
+  48 hours of completion of the inspection, the Products shall be deemed approved
+  and no rejection shall be accepted thereafter."
+  NOTE: BOTH positive (submit approval report) AND negative (silence = approval)
+  are covered. 48 hours — not 24, not 72.
+
+================================================================================
+ADDENDUM SECTION 4 — RBI PURPOSE CODES EXPANDED IN PI
+================================================================================
+
+LOCATION: PI bank details section — RBI Purpose Code row
+DOCUMENT: 02_ProformaInvoice.docx (both Tier 1 and Tier 2)
+
+OLD: P0103 — enter in the "Purpose of Remittance" field of your T/T form.
+
+NEW: P0103 — Advance Payment | P0102 — Balance Payment |
+     P0602 — Freight/Insurance Recovery | P1022 — Inspection/Certificate Fees |
+     P0214 — Port/Demurrage Recovery | P0701 — Bank Charge Recovery |
+     P1099 — Any Other Export-Related Charge
+     Enter the applicable code in the "Purpose of Remittance" field of your T/T
+     form. Purpose codes are indicative — confirm with your bank at time of
+     remittance.
+
+APP ACTION:
+  - PI bank details row "RBI Purpose Code" — replace with expanded 7-code list
+  - Add caveat line: "Purpose codes are indicative. Confirm with your bank."
+  - Only INWARD (P) codes go in buyer-facing documents
+  - OUTWARD (S) codes are for NexaCrest's own banking — do not show to buyer
+
+================================================================================
+ADDENDUM SECTION 5 — ADDITIONAL TERMINOLOGY FIXES APPLIED
+================================================================================
+
+These replacements were applied after the initial log — add to global find/replace:
+
+  payment is cleared    -> Payment Cleared  (including uppercase "CLEARED")
+  payment is CLEARED    -> Payment Cleared
+  Balance Payment payment is Cleared -> Balance Payment is confirmed as Payment Cleared
+  balance payment payment -> Balance Payment  (duplicate word removed)
+
+  Documents fixed: PI, OC, CI, BLI, SOPs, Checklists (both Tier 1 and Tier 2)
+
+================================================================================
+ADDENDUM SECTION 6 — REFERENCE NUMBER FORMAT FIXES
+================================================================================
+
+The following reference number formats were corrected (missing DD prefix):
+
+  DOCUMENT: 06_DebitNote.docx (both tiers)
+    OLD: SC/PI/YYYY/MMNNN  →  NEW: SC/PI/YYYY/DDMMNNN  (PI reference field)
+    OLD: [DN/YYYY/MMNNN]   →  NEW: [SC/DN/YYYY/DDMMNNN] (own number field)
+
+  DOCUMENT: 08_BL_Instruction.docx (both tiers)
+    OLD: SC/PI/YYYY/MMNNN  →  NEW: SC/PI/YYYY/DDMMNNN  (PI reference field)
+    OLD: [BLI/YYYY/MMNNN]  →  NEW: [SC/BLI/YYYY/DDMMNNN] (own number field)
+
+  DOCUMENT: Annexure_A.docx (both tiers)
+    OLD: Quotation No.: SC/QT/YYYY/MMNNN
+    NEW: Quotation No.: [SC/QT/YYYY/DDMMNNN]
+
+  CORRECT FORMAT FOR ALL DOCUMENTS: SC/XX/YYYY/DDMMNNN
+  Where: XX = document code, YYYY = year, DD = day (2 digits),
+         MM = month abbreviation (3 letters), NNN = sequential number (3 digits)
+  Example: SC/QT/2026/15OCT001
+
+================================================================================
+ADDENDUM SECTION 7 — IMAGES UPDATED IN ALL 37 DOCUMENTS
+================================================================================
+
+All 4 images replaced with new JPEG versions (white background, smaller files):
+
+  nexacrest_logo.jpg    — 114,956 bytes  — NexaCrest blue N logo (unchanged)
+  company_seal.png      — 174,806 bytes  — Round "Seamless. Secure. Trusted" seal
+                          (was 1,159,328 bytes RGBA PNG — now JPEG, 85% smaller)
+  gs_signature.png      — 11,086 bytes   — GS handwritten signature (unchanged)
+  director_seal.png     — 249,682 bytes  — DIRECTOR / GULMOHAR SONTAKKE seal
+                          (was 1,524,669 bytes RGBA PNG — now JPEG, 84% smaller)
+
+  APP ACTION: Update image assets in app with new JPEG versions from assets/ folder
+  Total ZIP size reduction: ~82 MB (from ~102 MB to ~20 MB) due to image compression
+
+================================================================================
+ADDENDUM SECTION 8 — TERMINOLOGY STANDARD EXCEL UPDATED
+================================================================================
+
+FILE: reference/NexaCrest_Terminology_Standard.xlsx
+
+SHEET 3 (Payment Terms) — 8 new rows added (E1-E8):
+  E1: Advance Payment, E2: Balance Payment, E3a: Option A trigger (3 Cal Days),
+  E3b: Option B trigger (7 Cal Days), E4: Debit Note Cleared, E5: T/T,
+  E6: Production Commences, E7: Shipment Readiness Confirmation
+
+SHEET 7 (Golden Rules) — 10 new rules added (G1-G10), total now 22 rules:
+  G1: Always include Definitions block (A1-A12) in every buyer-facing document
+  G2: Never use "advance T/T" or "balance T/T"
+  G3: Never use "60% balance" alone
+  G4: Never use "wire transfer" or "bank transfer" as standalone payment terms
+  G5: Never use "Despatch"
+  G6: Never use "destination port"
+  G7: "Stuffing" only with CHA/shipping line — use "Loading" in buyer documents
+  G8: Every buyer-facing document must have NexaCrest short form + Definitions + Legal Terms
+  G9: "production commences" — always present tense
+  G10: Payment Trigger Option A or B must be explicitly selected on every PI and OC
+
+SHEET 8 (Legal Terms) — NEW SHEET ADDED with 11 entries (F1-F11):
+  F1: NexaCrest short form, F2: Cancellation cap, F3: Liability cap,
+  F4: Production Timeline, F5: Governing Law and Dispute, F6: CISG exclusion,
+  F7: Payment Terms Finality, F8: Acceptance and Order of Precedence,
+  F9: RBI Purpose Codes, F10: Grade A, F11: Quantity Tolerance
+
+================================================================================
+ADDENDUM SECTION 9 — SUMMARY OF ALL CRITICAL APP ACTIONS
+================================================================================
+
+Priority actions for app developer — in order of importance:
+
+1. INJECT DEFINITIONS BLOCK at start of T&C in every buyer-facing document (A1-A12)
+   — See Addendum Section 1 for exact text of all 12 definitions
+
+2. INJECT LEGAL TERMS BLOCK after Definitions in every buyer-facing document (B1-B4)
+   — See Addendum Section 2 for exact text of all 4 clauses
+
+3. ADD NEW T&C BULLETS to QT, PI, OC:
+   — Re-inspection and Loading clause
+   — Structural Defect Claims clause (14 Calendar Days from receipt)
+   — See Addendum Section 3 for exact text
+
+4. EXPAND RBI CODES in PI bank details section
+   — 7 codes with caveat line
+   — See Addendum Section 4 for exact replacement text
+
+5. FIX TERMINOLOGY globally:
+   — payment is cleared / payment is CLEARED -> Payment Cleared
+   — See Addendum Section 5 for complete list
+
+6. FIX REFERENCE FORMATS in DN, BLI, Annexure A
+   — All must use SC/XX/YYYY/DDMMNNN format
+   — See Addendum Section 6 for specific corrections
+
+7. UPDATE IMAGE ASSETS from assets/ folder in ZIP
+   — Use new JPEG versions (smaller, white background)
+   — See Addendum Section 7 for file sizes
+
+8. UPDATE TERMINOLOGY STANDARD EXCEL
+   — New Sheet 8, updated Sheet 3 and Sheet 7
+   — See Addendum Section 8 for details
+
+END OF ADDENDUM
+================================================================================
+
+================================================================================
+ADDENDUM SECTIONS 10-12 — October 2026 Document Restructure & Legal Audit
+⚠ SECTIONS 1, 2, 3 OF THIS ADDENDUM ARE SUPERSEDED BY SECTION 10
+================================================================================
+
+
+================================================================================
+ADDENDUM SECTION 10 — COMPLETE RESTRUCTURE: SECTION 8 LEGAL TERMS & DEFINITIONS
+SESSION: October 2026 — Document Structure Redesign + Legal Language Audit
+================================================================================
+
+⚠ SUPERSEDES ADDENDUM SECTIONS 1, 2, AND 3 ENTIRELY.
+  The injection approach described in Sections 1-3 has been abandoned and replaced.
+  Do NOT implement Sections 1, 2, or 3. Implement Section 10 instead.
+
+--------------------------------------------------------------------------------
+10.1  WHAT CHANGED AND WHY
+--------------------------------------------------------------------------------
+
+PROBLEM WITH OLD APPROACH (Sections 1-3):
+  Injecting Definitions and Legal Terms blocks into the existing T&C cell of each
+  document caused:
+  - Definitions appearing inside "6. Documents to be Provided" section in OC
+  - Re-inspection and Structural Defect clauses appearing in the documents list
+  - Each section losing its original purpose
+  - Document unprofessional and confusing to fill
+
+NEW APPROACH:
+  - Main document body stays completely clean — every section serves its original purpose
+  - One italic reference line added near top of every document
+  - New Section 8 "LEGAL TERMS & DEFINITIONS" added as the last section before signature
+  - Section 8 contains two separate styled boxes: Legal Terms (red) and Definitions (blue)
+  - Both boxes use single-row table structure (critical — see 10.4)
+
+--------------------------------------------------------------------------------
+10.2  REFERENCE LINE — NEAR TOP OF EVERY DOCUMENT
+--------------------------------------------------------------------------------
+
+LOCATION: Immediately after the "Fields marked * are mandatory..." line.
+          For BuyerPO and Annexure A (no "Fields marked" line): after first
+          instruction paragraph.
+
+FORMAT: Italic, font size 8.5pt (sz=17), colour #5B6573, spacing after 60 twips
+
+EXACT TEXT:
+  "Terms used in this document are defined in Section 8 — Legal Terms &
+  Definitions at the end of this document."
+
+CRITICAL: Do NOT use "Capitalised terms" — no formatting dependency.
+          The definition applies by virtue of being listed, not by how the
+          word appears in the body.
+
+--------------------------------------------------------------------------------
+10.3  SECTION 8 HEADER — NAVY BAR
+--------------------------------------------------------------------------------
+
+LOCATION: Last section before signature block. After Section 7 in OC/QT/PI.
+          After last content section in all other documents.
+
+FORMAT: Standard navy bar table (same as sections 1-7)
+        Fill: #17233A, text: white, bold, 11pt (sz=22)
+
+EXACT TEXT: "8.  LEGAL TERMS & DEFINITIONS"
+            (two spaces between "8." and "LEGAL")
+
+--------------------------------------------------------------------------------
+10.4  BOX STRUCTURE — CRITICAL TECHNICAL REQUIREMENT
+--------------------------------------------------------------------------------
+
+BOTH boxes MUST be built as SINGLE-ROW tables — NOT 2-row tables.
+
+REASON: A 2-row table loses its top border on the content row when the table
+splits across a page break in Word. A single-row table has no row boundary
+to lose — the border stays intact on all sides at all times regardless of
+where the page break falls.
+
+IMPLEMENTATION:
+  - One table, one row, one cell
+  - Header ("LEGAL TERMS" or "DEFINITIONS") = first paragraph inside the cell,
+    with paragraph-level shading (pPr/shd) set to the header fill colour
+  - Content paragraphs follow in the same cell
+  - Border on all 4 sides of the table (top/left/bottom/right) = single, sz=4
+  - insideH and insideV = none (no inner borders)
+  - tblLook val="0000", all attributes = 0 (prevents Word from treating row 1
+    as a special "header row" with different border behaviour)
+
+DO NOT use:
+  - 2-row table with header row + content row
+  - tcBorders on individual cells for the outer border
+  - insideH to draw the line between header and content
+
+--------------------------------------------------------------------------------
+10.5  BOX 1 — LEGAL TERMS (RED)
+--------------------------------------------------------------------------------
+
+HEADER:
+  Text:       "LEGAL TERMS"
+  Fill:       #FFF0F0 (light red tint)
+  Text color: #17233A (navy)
+  Font:       Aptos, bold, 10pt (sz=20)
+  Spacing:    before 80, after 80 twips
+  Indent:     left 180, right 180 twips
+
+INTRO LINE (italic, inside same cell, after header paragraph):
+  Text:    "These terms govern all commercial obligations under this document."
+  Format:  italic, 8.5pt (sz=17), colour #5B6573
+  Spacing: before 60, after 40 twips
+  Indent:  left 180, right 180 twips
+
+OUTER BORDER:
+  All 4 sides: single, colour #C0392B (deep red), sz=4
+
+CONTENT — 6 LEGAL TERM BULLETS (exact text, in this order):
+
+  • Cancellation:
+    Orders may not be cancelled after production commences. The Advance Payment
+    is non-refundable once production commences. In the event of cancellation
+    after production commences, NexaCrest's total recovery shall not exceed the
+    Advance Payment plus 20% of the total FOB Order value. The parties agree this
+    represents a genuine pre-estimate of NexaCrest's unrecoverable production
+    costs, overhead, opportunity loss, and market price risk.
+
+  • Limitation of Liability:
+    NexaCrest's maximum liability under this document shall not exceed the total
+    FOB Order value stated herein. NexaCrest is not liable for any indirect,
+    consequential, or punitive damages, or for loss of profit or business.
+
+  • Production Timeline:
+    The estimated shipment timeline stated in this document is indicative only
+    and does not constitute a guaranteed delivery date. NexaCrest will make every
+    effort to meet the estimated timeline. NexaCrest will notify the Buyer in
+    writing within 5 Business Days of becoming aware of any delay to production
+    or shipment, and will provide a revised estimated timeline within 10 Business
+    Days of such notification.
+
+  • Re-inspection and Loading:
+    NexaCrest shall load only the confirmed passed pieces. Confirmed failed pieces
+    shall be excluded from the shipment. The Commercial Invoice and all payment
+    obligations shall be adjusted to reflect only the pieces actually loaded and
+    shipped. Neither Party shall have any further claim in respect of the excluded
+    pieces.
+
+  • Structural Defect Claims:
+    NexaCrest confirms to the best of its knowledge that Products are free from
+    structural defects present at Loading and not detectable at Pre-loading
+    Inspection. No claim accepted for: (a) conditions detectable at Pre-loading
+    Inspection; (b) damage from Buyer's processing, cutting, handling, or
+    installation; or (c) natural stone characteristics. Any claim must be raised
+    by the Buyer in writing with photographic evidence within 14 Calendar Days of
+    confirmed receipt at Buyer's premises. No claim accepted after this period.
+
+  • Governing Law and Dispute Resolution:
+    This document is governed by the laws of India. Any dispute shall first be
+    notified in writing by email or WhatsApp. Both parties shall attempt amicable
+    resolution within 45 Calendar Days of written notice. If unresolved, the
+    dispute shall be referred to binding arbitration under the Arbitration and
+    Conciliation Act, 1996. Seat: Bengaluru, Karnataka, India. Language: English.
+    The United Nations Convention on Contracts for the International Sale of Goods
+    does not apply.
+
+BULLET FORMAT (all 6 bullets):
+  Bold prefix:  bullet term + colon (e.g. "• Cancellation: ") — navy #17233A
+  Rest of text: regular weight, black #000000
+  Font:         Aptos, 9pt (sz=18)
+  Spacing:      before 40, after 40 twips
+  Indent:       left 180, right 180 twips
+
+--------------------------------------------------------------------------------
+10.6  BOX 2 — DEFINITIONS (BLUE)
+--------------------------------------------------------------------------------
+
+HEADER:
+  Text:       "DEFINITIONS"
+  Fill:       #F0F4FF (light blue tint)
+  Text color: #17233A (navy)
+  Font:       Aptos, bold, 10pt (sz=20)
+  Spacing:    before 80, after 80 twips
+  Indent:     left 180, right 180 twips
+
+INTRO LINE:
+  Text:    "The following terms have the meanings given below wherever they
+            appear in this document."
+  Format:  italic, 8.5pt (sz=17), colour #5B6573
+  Spacing: before 60, after 40 twips
+  Indent:  left 180, right 180 twips
+
+OUTER BORDER:
+  All 4 sides: single, colour #1A5276 (steel blue), sz=4
+
+CONTENT — 12 DEFINITION BULLETS (exact text, in this order):
+
+  • NexaCrest:
+    In this document, "NexaCrest International Private Limited" is referred to
+    as "NexaCrest". Both names refer to the same legal entity.
+
+  • T/T (Telegraphic Transfer):
+    an electronic bank wire transfer sent directly from the Buyer's bank to
+    NexaCrest's designated bank account at State Bank of India as stated in
+    this document.
+
+  • Payment Cleared:
+    the relevant payment confirmed as actually credited to NexaCrest's bank
+    account by NexaCrest's accounts team. A Remittance Copy alone does not
+    constitute Payment Cleared.
+
+  • Remittance Copy:
+    the bank transfer receipt or SWIFT confirmation sent by the Buyer as evidence
+    of transfer. Receipt of a Remittance Copy by NexaCrest does not constitute
+    Payment Cleared.
+
+  • Advance Payment:
+    the advance percentage of the FOB Order value paid by T/T before production
+    commences, as stated in this document.
+
+  • Balance Payment:
+    the remaining FOB Order value after the Advance Payment, paid by T/T as per
+    the payment trigger stated in this document.
+
+  • Debit Note:
+    a written demand issued by NexaCrest for any agreed cost additional to the
+    FOB Order value, including but not limited to freight, cargo insurance,
+    inspection fees, or certificate fees. Each Debit Note must be confirmed as
+    Payment Cleared before NexaCrest proceeds with the related activity.
+
+  • Loading:
+    the physical act of stuffing Products into the container at NexaCrest's
+    designated processing facility. Loading is distinct from Shipment.
+
+  • Shipment:
+    the departure of the vessel from the port of loading. Shipment is distinct
+    from Loading and from Delivery.
+
+  • FCL (Full Container Load):
+    a shipment occupying one complete container, approximately 24-27 MT including
+    packing. Minimum order quantity is 1 FCL.
+
+  • Production Commences:
+    the point at which NexaCrest begins manufacturing the Products for this Order.
+    Production commences only after the Advance Payment is confirmed as Payment
+    Cleared. The Advance Payment is non-refundable from this point.
+
+  • Shipment Readiness Confirmation:
+    a written notification from NexaCrest by email or WhatsApp confirming that the
+    Products have passed quality inspection (NexaCrest's internal quality check,
+    or third-party Pre-loading Inspection where applicable), are fully packed, and
+    are ready for vessel booking.
+
+BULLET FORMAT: same as Legal Terms box (see 10.5)
+
+SPACER after Definitions box: 80 twips before signature block.
+
+--------------------------------------------------------------------------------
+10.7  SPACING BETWEEN SECTION 8 ELEMENTS
+--------------------------------------------------------------------------------
+
+  Spacer before Section 8 nav bar:       60 twips (blank paragraph, after=60)
+  Spacer after Section 8 nav bar:        60 twips
+  Spacer between Legal Terms and Defs:   40 twips
+  Spacer after Definitions box:          80 twips
+  Then: signature block
+
+--------------------------------------------------------------------------------
+10.8  DOCUMENTS AFFECTED — ALL 18 BUYER-FACING DOCUMENTS
+--------------------------------------------------------------------------------
+
+  Tier 1 (New Buyer — Option A):
+    01_Quotation.docx
+    02_ProformaInvoice.docx
+    03_OrderConfirmation.docx
+    04_PackingList.docx
+    05_CommercialInvoice.docx
+    06_DebitNote.docx
+    08_BL_Instruction.docx
+    10_BuyerPO.docx
+    Annexure_A.docx
+
+  Tier 2 (Established Buyer — Option B):
+    01_Quotation.docx
+    02_ProformaInvoice.docx
+    03_OrderConfirmation.docx
+    04_PackingList.docx
+    05_CommercialInvoice.docx
+    06_DebitNote.docx
+    08_BL_Instruction.docx
+    10_BuyerPO.docx
+    Annexure_A.docx
+
+  Tier difference: Only QT, PI, BuyerPO differ between tiers (Balance Payment
+  trigger only — Option A = 3 Cal Days from Shipment Readiness Confirmation,
+  Option B = 7 Cal Days from scanned BL email). Section 8 content is identical
+  in both tiers.
+
+================================================================================
+ADDENDUM SECTION 11 — LEGAL LANGUAGE FIXES APPLIED TO ALL 18 DOCUMENTS
+SESSION: October 2026 — Comprehensive Legal Language Audit
+================================================================================
+
+A full legal language audit was conducted on all 18 buyer-facing documents.
+The following changes were applied globally — every fix below is present in
+all 18 documents unless a specific document is named.
+
+--------------------------------------------------------------------------------
+11.1  PRODUCTION TIMELINE CLAUSE — COMPLETE REWRITE
+--------------------------------------------------------------------------------
+
+LOCATION: Section 8, Legal Terms box, "Production Timeline" bullet
+
+OLD TEXT:
+  "...NexaCrest will make every reasonable effort to meet the estimated timeline.
+  NexaCrest will use reasonable efforts to notify the Buyer in writing at the
+  earliest opportunity if production or shipment is delayed."
+
+NEW TEXT:
+  "...NexaCrest will make every effort to meet the estimated timeline. NexaCrest
+  will notify the Buyer in writing within 5 Business Days of becoming aware of
+  any delay to production or shipment, and will provide a revised estimated
+  timeline within 10 Business Days of such notification."
+
+REASON:
+  "Reasonable effort" is vague — creates argument about what "reasonable" means.
+  "At the earliest opportunity" is vague — no enforceable timeframe.
+  Replaced with specific, measurable obligations:
+  - 5 Business Days to notify from date of awareness (not from delay event)
+  - 10 Business Days to provide revised timeline
+  Clock starts from NexaCrest becoming AWARE — not from when delay occurred,
+  since delays in supply chain may not be immediately known.
+
+--------------------------------------------------------------------------------
+11.2  STRUCTURAL DEFECT CLAIMS — WARRANTY LANGUAGE REMOVED
+--------------------------------------------------------------------------------
+
+LOCATION: Section 8, Legal Terms box, "Structural Defect Claims" bullet
+
+OLD TEXT:
+  "NexaCrest warrants Products are free from structural defects..."
+
+NEW TEXT:
+  "NexaCrest confirms to the best of its knowledge that Products are free from
+  structural defects..."
+
+REASON:
+  "Warrants" creates an absolute guarantee in law — strict liability if any
+  defect exists regardless of detectability. "Confirms to the best of its
+  knowledge" is protective of the buyer while not creating an absolute warranty
+  NexaCrest cannot guarantee across a full supply chain.
+
+--------------------------------------------------------------------------------
+11.3  CLAIM OBLIGATION — PARTY NAMED
+--------------------------------------------------------------------------------
+
+LOCATION: Section 8, Legal Terms box, "Structural Defect Claims" bullet
+
+OLD TEXT:
+  "Any claim must be raised in writing with photographic evidence..."
+
+NEW TEXT:
+  "Any claim must be raised by the Buyer in writing with photographic evidence..."
+
+REASON:
+  "Must be raised" with no named party is ambiguous. A lawyer could argue
+  NexaCrest has an obligation to raise it on the buyer's behalf. "By the Buyer"
+  makes the obligation owner unambiguous.
+
+--------------------------------------------------------------------------------
+11.4  IMMEDIATE PAYMENT NOTIFICATION — VAGUE TIMEFRAME FIXED
+--------------------------------------------------------------------------------
+
+LOCATION: 06_DebitNote.docx (both tiers) — remittance copy instruction
+
+OLD TEXT:
+  "...send remittance copy...immediately after payment."
+
+NEW TEXT:
+  "...send remittance copy...within 24 hours of payment."
+
+REASON:
+  "Immediately" is legally vague and practically unenforceable in international
+  transactions across time zones. 24 hours is specific and measurable.
+
+--------------------------------------------------------------------------------
+11.5  DEFINITION TRIGGER — FORMATTING DEPENDENCY REMOVED
+--------------------------------------------------------------------------------
+
+LOCATION: Reference line near top of every document AND intro line in
+          Definitions box
+
+OLD REFERENCE LINE:
+  "Capitalised terms used in this document are defined in Section 8..."
+
+NEW REFERENCE LINE:
+  "Terms used in this document are defined in Section 8 — Legal Terms &
+  Definitions at the end of this document."
+
+OLD DEFINITIONS INTRO:
+  "Capitalised terms used throughout this document are defined below."
+
+NEW DEFINITIONS INTRO:
+  "The following terms have the meanings given below wherever they appear
+  in this document."
+
+REASON:
+  "Capitalised terms" creates a formatting-dependent trigger. If any defined
+  term appears in lowercase anywhere in the document body, a lawyer can argue
+  the definition does not apply to that instance. The new wording makes the
+  definition apply by virtue of being listed — not by how the word looks in
+  the body. No formatting dependency. No argument possible.
+
+--------------------------------------------------------------------------------
+11.6  SUMMARY — ALL FIXES APPLIED TO ALL 18 DOCUMENTS
+--------------------------------------------------------------------------------
+
+  FIX                          DOCUMENTS    STATUS
+  ─────────────────────────────────────────────────
+  Production Timeline rewrite  All 18       DONE
+  "warrants" → "confirms to    QT, PI       DONE
+   the best of its knowledge"  (both tiers)
+  "must be raised" → "must be  QT, PI, OC   DONE
+   raised by the Buyer"        (both tiers)
+  "immediately" → "within      DN           DONE
+   24 hours"                   (both tiers)
+  "Capitalised terms" →        All 18       DONE
+   plain "Terms used"
+  Section 8 structure          All 18       DONE
+  Reference line               All 18       DONE
+
+================================================================================
+ADDENDUM SECTION 12 — DEVELOPER PRIORITY ACTION LIST (UPDATED)
+SESSION: October 2026
+================================================================================
+
+⚠ This replaces the priority list in Addendum Section 9.
+  Section 9 described the old injection approach. Use this list instead.
+
+PRIORITY 1 — SECTION 8 STRUCTURE (all 18 buyer documents)
+  Build Section 8 as the last section before the signature block.
+  Two boxes: Legal Terms (red #C0392B) + Definitions (blue #1A5276).
+  SINGLE-ROW table structure only — never 2-row.
+  See Section 10 for exact text, colours, fonts, and spacing.
+
+PRIORITY 2 — REFERENCE LINE (all 18 buyer documents)
+  Add italic reference line just after "Fields marked *" line.
+  Exact text in Section 10.2.
+  BuyerPO and Annexure A: insert after first instruction paragraph.
+
+PRIORITY 3 — DO NOT inject into existing T&C sections
+  The old approach (Sections 1-3 of this addendum) injected definitions into
+  existing document sections. That is obsolete. The document body must remain
+  clean. Section 8 at the end is the only location for definitions and legal terms.
+
+PRIORITY 4 — LEGAL LANGUAGE — apply these globally in the template engine
+  When generating any buyer-facing document, ensure the following substitutions
+  are applied if any of the old text appears:
+
+  OLD                                    → NEW
+  ────────────────────────────────────────────────────────────────────────────
+  "will notify the Buyer...at the        → "will notify the Buyer in writing
+   earliest opportunity"                    within 5 Business Days of becoming
+                                            aware of any delay..."
+  "NexaCrest warrants Products are       → "NexaCrest confirms to the best of
+   free from structural defects"            its knowledge that Products are
+                                            free from structural defects"
+  "must be raised in writing"            → "must be raised by the Buyer in
+                                            writing"
+  "immediately after payment"            → "within 24 hours of payment"
+  "Capitalised terms used in this        → "Terms used in this document are
+   document are defined in Section 8"       defined in Section 8"
+  "Capitalised terms used throughout     → "The following terms have the
+   this document are defined below"         meanings given below wherever they
+                                            appear in this document"
+
+PRIORITY 5 — STRIP INTERNAL NOTES
+  Remove all "⚠ INTERNAL NOTE" markers before generating buyer-facing PDFs.
+
+PRIORITY 6 — IMAGE ASSETS (unchanged from Section 7)
+  Use JPEG versions from assets/ folder. See Section 7 for file sizes.
+
+PRIORITY 7 — REFERENCE NUMBER FORMAT (unchanged from Section 6)
+  All documents: SC/XX/YYYY/DDMMNNN format everywhere.
+  See Section 6 for specific corrections to DN, BLI, Annexure A.
+
+================================================================================
+END OF ADDENDUM SECTIONS 10-12
+================================================================================
+
+================================================================================
+ADDENDUM SECTION 13 — NDA DOCUMENTS ADDED TO CONTRACT FOLDER
+Session: October 2026
+================================================================================
+
+Two NDA documents have been added to the contract/ folder.
+These are master templates — issued per counter-party or staff member at signing.
+
+--------------------------------------------------------------------------------
+13.1  NexaCrest_NDA_Commercial.docx
+--------------------------------------------------------------------------------
+
+FULL TITLE: Mutual Non-Disclosure and Non-Circumvention Agreement
+LOCATION:   contract/NexaCrest_NDA_Commercial.docx
+USE FOR:    Buyers, vendors, suppliers, factories, agents, commercial partners
+GOVERNING:  Indian law — Bengaluru seat — sole arbitrator — 45 Calendar Days
+
+DOCUMENT STRUCTURE:
+  Header           — NexaCrest logo + document title (uniform with all 18 docs)
+  Parties          — NexaCrest + Counter-Party details
+  Background       — Purpose of disclosure
+  Clause 1         — Definition of Confidential Information (+ Trade Secret)
+  Clause 2         — Obligations of Receiving Party
+  Clause 3         — Non-Circumvention (24 months post-termination)
+  Clause 4         — Permitted Disclosures
+  Clause 5         — Return and Destruction of Confidential Information
+  Clause 6         — No Licence, No Warranty, No Obligation to Transact
+  Clause 7         — Remedies
+  Clause 8         — Term and Survival (3 years + 3 years; Trade Secrets indefinite)
+  Clause 9         — General (9 sub-clauses including electronic execution)
+  Execution        — NexaCrest signature block (exact match to 18 buyer docs)
+  Counter-Party    — Structured execution table with placeholders
+  Schedule A       — Contact Details for Notices
+  Schedule B       — Agreed Compensation Amount
+                     (3-column table: Field | What To Enter Here | Entry)
+                     Guidance: Individual USD 10,000 | Small USD 25,000 | Large USD 50,000
+
+VARIABLE FIELDS (fill at time of issue):
+  [DD Month YYYY]                  — Effective Date
+  [Full Legal Name of Counter-Party]
+  [Country]
+  [Full Address]
+  Schedule A — Counter-Party contact details
+  Schedule B — USD amount (set per counter-party type per internal guidance)
+
+KEY LEGAL POINTS:
+  - Non-Circumvention clause (Clause 3) — primary protection against buyer/supplier
+    bypassing NexaCrest to deal directly with quarry or other counter-party
+  - No "without bond" language — injunctive relief subject to applicable law
+  - Liquidated damages in Schedule B (not in main body) — separately initialled
+  - Trade Secrets protected indefinitely beyond 3+3 year survival period
+  - CISG excluded
+
+⚠ REMOVE Schedule B internal guidance line before issuing signed document.
+
+--------------------------------------------------------------------------------
+13.2  NexaCrest_NDA_Staff.docx
+--------------------------------------------------------------------------------
+
+FULL TITLE: Staff Confidentiality and Non-Disclosure Agreement
+LOCATION:   contract/NexaCrest_NDA_Staff.docx
+USE FOR:    All employees and contractors at time of onboarding
+GOVERNING:  Indian law — Bengaluru seat — sole arbitrator — 30 Calendar Days
+
+DOCUMENT STRUCTURE:
+  Header               — NexaCrest logo + document title (uniform with all 18 docs)
+  Parties              — NexaCrest ("the Company") + Staff Member details
+  Background           — Nature of access to confidential information
+  Clause 1             — Definition of Confidential Information (10 categories
+                         including digital credentials, AI tools restriction)
+  Clause 2             — Obligations of Staff Member (8 sub-clauses including
+                         personal device ban, AI platform ban, 24-hour breach notice)
+  Clause 3             — Company Property and Digital Assets (social media, credentials)
+  Clause 4             — Return of Company Property (last working day / 24 hours)
+  Clause 5             — Non-Solicitation (12 months, tied to Confidential Information
+                         only — does NOT create a general non-compete)
+  Clause 6             — Intellectual Property (full assignment + moral rights waiver)
+  Clause 7             — Data Protection
+  Clause 8             — Remedies
+  Clause 9             — Term and Survival (5 years; Trade Secrets indefinite;
+                         non-solicitation 12 months only)
+  Clause 10            — General (6 sub-clauses)
+  Execution            — NexaCrest signature block (exact match to 18 buyer docs)
+  Staff Member         — Structured execution table with placeholders:
+  Execution              Full Legal Name, Designation/Role, Employee ID,
+                         Date of Joining, Signature, Date Signed
+  Schedule A           — Agreed Compensation Amount
+                         (3-column table: Field | What To Enter Here | Entry)
+                         Guidance: Junior INR 2,00,000 | Mid INR 5,00,000 | Senior INR 10,00,000
+
+VARIABLE FIELDS (fill at time of issue):
+  [DD Month YYYY]                  — Effective Date
+  [Full Legal Name of Staff Member]
+  [Full Address]
+  [Designation / Role]
+  Staff Member Execution table — all fields
+  Schedule A — INR amount (set per role level per internal guidance)
+
+KEY LEGAL POINTS:
+  - Non-Solicitation (Clause 5) tied ONLY to Confidential Information obtained
+    during employment — NOT a general non-compete (compliant with Section 27
+    Indian Contract Act)
+  - Digital credential ownership explicitly stated (Zoho, CRM, WhatsApp Business,
+    LinkedIn, social media, GitHub, portals)
+  - AI tools restriction — staff cannot upload Company information to any AI
+    platform, chatbot, or generative AI service without written authorisation
+  - Supplementary to employment contract — employment contract prevails on conflict
+  - Trade Secrets protected indefinitely beyond 5-year survival period
+
+⚠ REMOVE Schedule A internal guidance line before issuing signed document.
+⚠ This document supplements but does NOT replace the employment contract.
+
+--------------------------------------------------------------------------------
+13.3  DEVELOPER NOTES
+--------------------------------------------------------------------------------
+
+NAMING CONVENTION:
+  NexaCrest_NDA_Commercial.docx  — commercial/external parties
+  NexaCrest_NDA_Staff.docx       — internal staff/contractors
+
+LOCATION IN ZIP: contract/ folder (alongside NexaCrest_Sales_Supply_Agreement.docx)
+
+DOCUMENT STYLE: Both NDAs use the exact same header and signature block XML
+  as the 18 buyer-facing documents. They are built from the OC (Order Confirmation)
+  as the base document — same fonts, images, styles, and relationships.
+
+APP BEHAVIOUR:
+  These are master templates issued per relationship — not generated per order.
+  The app should:
+  1. Allow staff to open the template
+  2. Fill variable fields (party name, date, address)
+  3. Set Schedule amount per internal guidance (remove guidance line before PDF export)
+  4. Generate PDF for signing
+  These do NOT feed into the order workflow — they are standalone legal documents.
+
+SCHEDULE B / SCHEDULE A (compensation amount):
+  The 3-column placeholder table (Field | What To Enter Here | Entry) must be
+  preserved in the app. When generating PDF for issue, the internal guidance
+  line (red ⚠ line) must be stripped — same as ⚠ INTERNAL NOTE stripping
+  applied to buyer-facing documents.
+
+================================================================================
+END OF ADDENDUM SECTION 13
+================================================================================
