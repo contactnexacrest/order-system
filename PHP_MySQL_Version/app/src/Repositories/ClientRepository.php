@@ -88,7 +88,8 @@ final class ClientRepository
                 phone = :phone,
                 country_of_destination = :country_of_destination,
                 coo_type = :coo_type,
-                notify_party = :notify_party
+                notify_party = :notify_party,
+                agreement_footer_text = :agreement_footer_text
              WHERE id = :id'
         )->execute([
             'company_legal_name'      => $data['company_legal_name'],
@@ -102,6 +103,7 @@ final class ClientRepository
             'country_of_destination'  => $data['country_of_destination'] ?? null,
             'coo_type'                => $data['coo_type'] ?? null,
             'notify_party'            => $data['notify_party'] ?? null,
+            'agreement_footer_text'   => $data['agreement_footer_text'] ?? null,
             'id'                      => $id,
         ]);
     }

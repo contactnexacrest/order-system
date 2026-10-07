@@ -235,6 +235,8 @@ table.list tr:hover td{background:var(--bg);}
 .btn-doc-new:hover{opacity:0.9;}
 .btn-doc-regenerate{background:#fff;color:#5B6573;border:1px solid #C9CFD6;}
 .btn-doc-regenerate:hover{background:#F1F5F9;}
+/* Batch 3 #12 — read-only preview of a client's custom T&C footer, on their Client page. */
+.client-agreement-footer-preview{border:1px solid #D7DEE6;background:#F7F9FC;padding:0.6rem 0.8rem;font-size:0.9rem;color:var(--navy);border-radius:4px;}
 .btn-secondary{background:var(--surface);color:var(--navy);border:1px solid var(--navy);}
 .btn-secondary:hover{background:var(--navy-soft);}
 .btn-success{background:var(--success);}

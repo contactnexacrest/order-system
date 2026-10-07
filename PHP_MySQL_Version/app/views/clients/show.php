@@ -46,6 +46,14 @@ $__impersonationGloballyEnabled = CompanySettingsRepository::get('client_imperso
     </div>
   </div>
 
+  <?php if (!empty($client['agreement_footer_text'])): ?>
+  <div class="section">
+    <h2>Agreement T&amp;C Footer</h2>
+    <p class="muted small">Shown as an extra note on every document generated for this client, in addition to the standard terms. Edit it from the <a href="/clients/<?= (int) $client['id'] ?>/edit">Edit</a> page.</p>
+    <div class="client-agreement-footer-preview"><?= nl2br(htmlspecialchars($client['agreement_footer_text'])) ?></div>
+  </div>
+  <?php endif; ?>
+
   <div class="section">
     <h2>Orders</h2>
     <div class="btn-row"><a class="btn btn-sm" href="/orders/create?client_id=<?= (int) $client['id'] ?>">+ New Order for this client</a></div>

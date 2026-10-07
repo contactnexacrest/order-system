@@ -85,6 +85,10 @@
   {% endfor %}
 </div>
 
+{% if buyer.agreement_footer_text is defined and buyer.agreement_footer_text %}
+<div class="client-agreement-footer"><span class="label">Special Terms (per Client Agreement)</span><span style="white-space: pre-line;">{{ buyer.agreement_footer_text }}</span></div>
+{% endif %}
+
 <table class="kv"><tr><td colspan="2" style="background:#F1F5F9; font-style:italic; font-size:8.5pt; color:#555555;">This Purchase Order form is prepared by NexaCrest International Private Limited for the exclusive use of the named buyer against Quotation No. {{ order.quotation_ref ?: '—' }} only. It is not transferable and cannot be used with any other supplier. Any unauthorised use or modification of this document is prohibited.</td></tr></table>
 
 {% endblock %}

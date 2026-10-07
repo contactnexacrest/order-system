@@ -171,6 +171,12 @@
   .annexure-terms table { border-collapse: collapse; width: 100%; margin: 4pt 0 8pt; }
   .annexure-terms table td, .annexure-terms table th { border: 1px solid #D7DEE6; padding: 4pt 6pt; text-align: left; }
 
+  /* Batch 3 #12 — a client-level custom clause (clients.agreement_footer_text),
+     separate from the standard numbered T&C list since it's agreed with this
+     one buyer specifically, not part of the company's general terms. */
+  .client-agreement-footer { border: 1pt solid #D7DEE6; background: #F7F9FC; padding: 7pt 9pt; margin-top: 6pt; font-size: 9.5pt; color: #17233A; }
+  .client-agreement-footer .label { font-weight: bold; margin-bottom: 2pt; display: block; }
+
   {% if watermark.enabled and watermark.show_text %}
   .watermark-text { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
     opacity: {{ watermark.opacity }}; transform: rotate(-{{ watermark.angle }}deg); z-index: 0; }
@@ -240,6 +246,12 @@
     <li>{{ clause }}</li>
   {% endfor %}
 </ul>
+{% endif %}
+{# Batch 3 #12 — deliberately outside the "terms is not empty" guard above:
+   CI has no numbered T&C clauses seeded at all, but a client's own agreed
+   footer must still show on its documents regardless. #}
+{% if buyer.agreement_footer_text is defined and buyer.agreement_footer_text %}
+<div class="client-agreement-footer"><span class="label">Special Terms (per Client Agreement)</span><span style="white-space: pre-line;">{{ buyer.agreement_footer_text }}</span></div>
 {% endif %}
 {% endblock %}
 

@@ -2750,6 +2750,21 @@ ALTER TABLE order_payment_status
 -- ================================================================
 
 -- ================================================================
+-- Section AX (2026-10-07) — Batch 3 #12: client-level agreement T&C
+-- footer. Some buyers negotiate a clause specific to their own
+-- commercial agreement with NexaCrest (e.g. an inspection right, a
+-- specific dispute-resolution forum) that isn't part of the company's
+-- general numbered T&C list and shouldn't be added there for every
+-- other buyer. Stored once per client, shown as an unnumbered footer
+-- note on every document generated for that client (QT/PI/OC/BUYERPO/CI)
+-- — rendered even for CI, which otherwise has no numbered T&C clauses
+-- seeded at all (see layout.njk's termsSection block).
+-- ================================================================
+ALTER TABLE clients
+  ADD COLUMN agreement_footer_text TEXT NULL AFTER allow_staff_impersonation;
+-- ================================================================
+
+-- ================================================================
 -- END OF SCHEMA — 71 tables. All open schema questions resolved
 -- 2026-09-18 (see ARCHITECTURE.md). Ready for Phase A build.
 -- Section L (protected fields) added 2026-09-19.
@@ -2796,4 +2811,5 @@ ALTER TABLE order_payment_status
 -- configurability) added 2026-10-07.
 -- Section AV (staff client-portal impersonation) added 2026-10-07.
 -- Section AW (per-payment-leg exchange rate) added 2026-10-07.
+-- Section AX (client-level agreement T&C footer) added 2026-10-07.
 -- ================================================================

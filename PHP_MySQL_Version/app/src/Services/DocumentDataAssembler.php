@@ -148,6 +148,7 @@ final class DocumentDataAssembler
                 'phone'                  => $order['client_phone'],
                 'country_of_destination' => $order['country_of_destination'],
                 'notify_party'           => $order['notify_party'],
+                'agreement_footer_text'  => $order['agreement_footer_text'] ?? null,
             ],
             'products' => array_map(static function (array $p): array {
                 return [

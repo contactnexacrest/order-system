@@ -158,6 +158,7 @@ final class ClientController
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
             'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: null,
             'notify_party'          => trim((string) ($_POST['notify_party'] ?? '')) ?: null,
+            'agreement_footer_text' => trim((string) ($_POST['agreement_footer_text'] ?? '')) ?: null,
         ];
 
         $changes = array_filter(

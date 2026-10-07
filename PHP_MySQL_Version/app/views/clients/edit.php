@@ -42,6 +42,13 @@
       <label>Phone<input type="text" name="phone" value="<?= htmlspecialchars($client['phone'] ?? '') ?>"></label>
     </fieldset>
 
+    <fieldset>
+      <legend>Agreement</legend>
+      <label>T&amp;C Footer <small class="muted">(a clause specific to this client's own commercial agreement — shown as an extra note on every document generated for them, in addition to the standard terms. Never locked by the data lock above, since it's a staff annotation of an external agreement, not a client-submitted detail.)</small>
+        <textarea name="agreement_footer_text" rows="4" placeholder="e.g. Pre-shipment inspection by buyer's nominated agent is permitted at supplier's premises, by prior appointment."><?= htmlspecialchars($client['agreement_footer_text'] ?? '') ?></textarea>
+      </label>
+    </fieldset>
+
     <?php if ($locked && $isSuperAdmin): ?>
       <fieldset>
         <legend>Super Admin Override</legend>

@@ -456,6 +456,28 @@ final class DocxComponents
         $section->addTextBreak(1, 4);
     }
 
+    /**
+     * Batch 3 #12 — a client-level custom clause (clients.agreement_footer_text),
+     * separate from the standard numbered T&C list since it's agreed with this
+     * one buyer specifically. Deliberately a standalone call (not folded into
+     * addTermsSection above), so it still prints even for a document type with
+     * no numbered T&C clauses seeded at all (e.g. CI), which early-returns
+     * out of addTermsSection before reaching this point.
+     */
+    public static function addClientAgreementFooter(Section $section, array $context): void
+    {
+        $footerText = trim((string) ($context['buyer']['agreement_footer_text'] ?? ''));
+        if ($footerText === '') {
+            return;
+        }
+        self::addColorBox($section, self::SPEC_BG, self::BORDER_GRAY, function (AbstractContainer $cell) use ($footerText) {
+            $cell->addText('Special Terms (per Client Agreement)', ['bold' => true, 'size' => 9.5, 'color' => self::NAVY]);
+            foreach (preg_split('/\r\n|\r|\n/', $footerText) as $line) {
+                $cell->addText($line, ['size' => 9.5, 'color' => self::NAVY]);
+            }
+        }, 4);
+    }
+
     // ------------------------------------------------------------------
     // Watermark: a rotated, semi-transparent diagonal PNG rendered with
     // GD (reliable across LibreOffice/Word, unlike relying on PHPWord's
