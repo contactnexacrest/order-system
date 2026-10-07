@@ -61,7 +61,7 @@ async function find(id) {
   return db.queryOne(
     `SELECT o.*, c.company_legal_name, c.billing_address, c.consignee_name, c.consignee_address,
             c.vat_eori_tax_no, c.contact_person, c.email AS client_email, c.phone AS client_phone,
-            c.country_of_destination, c.notify_party, c.client_unique_number,
+            c.country_of_destination, c.notify_party, c.client_unique_number, c.agreement_footer_text,
             sm.stage_name AS current_stage_name, sm.stage_slug AS current_stage_slug,
             sm.stage_number AS current_stage_number,
             i.code AS incoterm_code, cur.code AS currency_code,

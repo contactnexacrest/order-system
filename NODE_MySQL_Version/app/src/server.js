@@ -479,6 +479,8 @@ app.post('/clients', requireAuth, requirePermission('manage_orders'), verifyCsrf
 app.get('/clients/:id', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.show));
 app.get('/clients/:id/edit', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.editForm));
 app.post('/clients/:id/update', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.update));
+// Batch 3 #12 — separate endpoint, deliberately NOT gated by the data-lock check inside update() above.
+app.post('/clients/:id/agreement-footer', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.updateAgreementFooter));
 app.post('/clients/:id/toggle-active', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.toggleActive));
 // docs/schema.sql Section AV — the per-client flag is a manage_company_settings action (same tier as other
 // global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch

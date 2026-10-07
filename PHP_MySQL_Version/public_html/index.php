@@ -272,6 +272,8 @@ $router->post('/clients', [$clients, 'store'], [SessionAuth::required(), Permiss
 $router->get('/clients/{id}', [$clients, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->get('/clients/{id}/edit', [$clients, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients/{id}/update', [$clients, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// Batch 3 #12 — separate endpoint, deliberately NOT gated by the data-lock check inside update() above.
+$router->post('/clients/{id}/agreement-footer', [$clients, 'updateAgreementFooter'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/toggle-active', [$clients, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 // docs/schema.sql Section AV — the per-client flag is a manage_company_settings action (same tier as other
 // global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch

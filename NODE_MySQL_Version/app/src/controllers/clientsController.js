@@ -170,6 +170,34 @@ async function update(req, res) {
 }
 
 /**
+ * Batch 3 #12 — deliberately its own endpoint, bypassing is_data_locked
+ * entirely: a client-level agreement T&C footer is a staff-authored
+ * annotation of an externally-negotiated term, not a client-submitted
+ * identity detail, so it must stay editable at any time, lock or no lock.
+ */
+async function updateAgreementFooter(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const user = req.user;
+  const oldText = client.agreement_footer_text ?? null;
+  const newText = String(req.body.agreement_footer_text || '').trim() || null;
+
+  await clientRepository.updateAgreementFooterText(clientId, newText);
+
+  if (String(oldText ?? '') !== String(newText ?? '')) {
+    await auditLogRepository.log(user.id, 'CLIENT_UPDATED', 'clients', clientId, 'agreement_footer_text', oldText, newText, null);
+  }
+
+  flash.set(req, 'success', 'Agreement T&C footer updated.');
+  res.redirect(`/clients/${clientId}`);
+}
+
+/**
  * Deactivate/reactivate only — never a deletion path. A client with
  * orders on file must stay in the database indefinitely (same reasoning
  * as order archiving); this only removes them from the default
@@ -295,6 +323,6 @@ async function impersonate(req, res) {
 }
 
 module.exports = {
-  index, inactiveIndex, create, store, show, editForm, update, toggleActive, overrideUniqueNumber,
+  index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
   setImpersonationAllowed, impersonate,
 };

@@ -53,6 +53,31 @@ Add Client** (`/clients/create`), fill in the same details by hand, save.
 Then from that client's page, **Add Order** to create the order shell
 (buyer inquiry ref, incoterm, payment preset, etc.).
 
+### Agreement T&C Footer (per client)
+
+Some buyers negotiate a clause specific to their own commercial agreement
+with NexaCrest — e.g. a pre-shipment inspection right, or a specific
+dispute-resolution forum — that isn't part of the company's general
+numbered T&C list and shouldn't be added there for every other buyer.
+
+On a client's **Edit** page, a separate **Agreement** section holds a
+free-text **T&C Footer**. Whatever is entered there shows as an extra,
+unnumbered note — "Special Terms (per Client Agreement)" — on every
+Quotation, Proforma Invoice, Order Confirmation, Buyer PO and Commercial
+Invoice generated for that client, in addition to the standard numbered
+terms. It shows even on a Commercial Invoice, which otherwise carries no
+numbered T&C clauses at all.
+
+This field has its own **Save Agreement Footer** button, separate from the
+main **Save Changes** button above it, and is never affected by the
+client's data lock: once a client's other details lock permanently (see
+Stage 3's PI-details consent), the main form can no longer be saved by
+anyone but a Super Admin with a reason — but the Agreement T&C Footer stays
+editable by any staff member with client-management access at any time,
+since it's a staff-authored annotation of an externally-negotiated term,
+not a client-submitted identity detail the lock exists to protect. Every
+change here is still fully audit-logged.
+
 ### Both paths converge here — generating the Quotation
 
 From the order page, under **Documents**, click **Generate Quotation**.

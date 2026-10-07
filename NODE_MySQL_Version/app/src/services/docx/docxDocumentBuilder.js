@@ -281,6 +281,7 @@ function renderQt(context) {
   }
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 7, context.terms_section_title || 'TERMS & CONDITIONS'));
+  children.push(...C.clientAgreementFooter(context));
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
 
@@ -440,6 +441,7 @@ function renderPi(context) {
   );
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 9, context.terms_section_title || 'TERMS & CONDITIONS'));
+  children.push(...C.clientAgreementFooter(context));
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
 
@@ -562,6 +564,7 @@ function renderOc(context) {
   );
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 7, context.terms_section_title || 'ORDER CONDITIONS'));
+  children.push(...C.clientAgreementFooter(context));
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
 
@@ -835,6 +838,8 @@ function renderBuyerPo(context) {
       ...clauseParas,
     ], 0)
   );
+
+  children.push(...C.clientAgreementFooter(context));
 
   children.push(
     ...C.kvTable([
@@ -1563,6 +1568,7 @@ function renderCi(context) {
   children.push(C.plain(`This invoice is issued under Letter of Undertaking (LUT Order No. ${g(company, 'lut_number')}) for export of goods without payment of IGST under the provisions of the IGST Act, 2017.`, { italics: true, color: C.MUTED }));
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 9, context.terms_section_title || 'TERMS & CONDITIONS'));
+  children.push(...C.clientAgreementFooter(context));
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
   return children;

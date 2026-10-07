@@ -84,6 +84,17 @@ async function update(id, data) {
   );
 }
 
+// Batch 3 #12 — deliberately its own function/endpoint, never routed through
+// update() above: a client-level agreement T&C footer is a staff-authored
+// annotation of an externally-negotiated term, not a client-submitted
+// identity detail, so it must stay editable even after is_data_locked.
+async function updateAgreementFooterText(id, text) {
+  await db.execute('UPDATE clients SET agreement_footer_text = :agreement_footer_text WHERE id = :id', {
+    agreement_footer_text: text ?? null,
+    id,
+  });
+}
+
 async function setActive(id, active) {
   await db.execute('UPDATE clients SET is_active = :active WHERE id = :id', { active: active ? 1 : 0, id });
 }
@@ -119,4 +130,5 @@ async function lockData(id, reason) {
 
 module.exports = {
   all, find, allInactive, create, update, setActive, setAllowStaffImpersonation, markSample, markTest, lockData, setZohoContactId,
+  updateAgreementFooterText,
 };

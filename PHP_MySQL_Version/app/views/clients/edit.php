@@ -42,13 +42,6 @@
       <label>Phone<input type="text" name="phone" value="<?= htmlspecialchars($client['phone'] ?? '') ?>"></label>
     </fieldset>
 
-    <fieldset>
-      <legend>Agreement</legend>
-      <label>T&amp;C Footer <small class="muted">(a clause specific to this client's own commercial agreement — shown as an extra note on every document generated for them, in addition to the standard terms. Never locked by the data lock above, since it's a staff annotation of an external agreement, not a client-submitted detail.)</small>
-        <textarea name="agreement_footer_text" rows="4" placeholder="e.g. Pre-shipment inspection by buyer's nominated agent is permitted at supplier's premises, by prior appointment."><?= htmlspecialchars($client['agreement_footer_text'] ?? '') ?></textarea>
-      </label>
-    </fieldset>
-
     <?php if ($locked && $isSuperAdmin): ?>
       <fieldset>
         <legend>Super Admin Override</legend>
@@ -58,5 +51,19 @@
     <?php endif; ?>
 
     <button type="submit" <?= $locked && !$isSuperAdmin ? 'disabled' : '' ?>>Save Changes</button>
+  </form>
+
+  <!-- Batch 3 #12 — its own form/endpoint, deliberately separate from the form above:
+       this is a staff annotation of an external agreement, not a client-submitted
+       detail, so it stays editable even when the client's details are locked. -->
+  <form method="post" action="/clients/<?= (int) $client['id'] ?>/agreement-footer">
+    <?= Csrf::field() ?>
+    <fieldset>
+      <legend>Agreement</legend>
+      <label>T&amp;C Footer <small class="muted">(a clause specific to this client's own commercial agreement — shown as an extra note on every document generated for them, in addition to the standard terms. Never locked by the data lock above, since it's a staff annotation of an external agreement, not a client-submitted detail.)</small>
+        <textarea name="agreement_footer_text" rows="4" placeholder="e.g. Pre-shipment inspection by buyer's nominated agent is permitted at supplier's premises, by prior appointment."><?= htmlspecialchars($client['agreement_footer_text'] ?? '') ?></textarea>
+      </label>
+    </fieldset>
+    <button type="submit">Save Agreement Footer</button>
   </form>
 </div>

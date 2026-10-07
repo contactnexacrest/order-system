@@ -88,8 +88,7 @@ final class ClientRepository
                 phone = :phone,
                 country_of_destination = :country_of_destination,
                 coo_type = :coo_type,
-                notify_party = :notify_party,
-                agreement_footer_text = :agreement_footer_text
+                notify_party = :notify_party
              WHERE id = :id'
         )->execute([
             'company_legal_name'      => $data['company_legal_name'],
@@ -103,9 +102,21 @@ final class ClientRepository
             'country_of_destination'  => $data['country_of_destination'] ?? null,
             'coo_type'                => $data['coo_type'] ?? null,
             'notify_party'            => $data['notify_party'] ?? null,
-            'agreement_footer_text'   => $data['agreement_footer_text'] ?? null,
             'id'                      => $id,
         ]);
+    }
+
+    /**
+     * Batch 3 #12 — deliberately its own method/endpoint, never routed through
+     * update() above: a client-level agreement T&C footer is a staff-authored
+     * annotation of an externally-negotiated term, not a client-submitted
+     * identity detail, so it must stay editable even after is_data_locked.
+     */
+    public static function updateAgreementFooterText(int $id, ?string $text): void
+    {
+        Database::connection()->prepare(
+            'UPDATE clients SET agreement_footer_text = :agreement_footer_text WHERE id = :id'
+        )->execute(['agreement_footer_text' => $text, 'id' => $id]);
     }
 
     public static function setActive(int $id, bool $active): void

@@ -158,7 +158,6 @@ final class ClientController
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
             'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: null,
             'notify_party'          => trim((string) ($_POST['notify_party'] ?? '')) ?: null,
-            'agreement_footer_text' => trim((string) ($_POST['agreement_footer_text'] ?? '')) ?: null,
         ];
 
         $changes = array_filter(
@@ -188,6 +187,44 @@ final class ClientController
         }
 
         Flash::set('success', "{$companyLegalName} updated.");
+        header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * Batch 3 #12 — deliberately its own endpoint, bypassing is_data_locked
+     * entirely: a client-level agreement T&C footer is a staff-authored
+     * annotation of an externally-negotiated term, not a client-submitted
+     * identity detail, so it must stay editable at any time, lock or no lock.
+     */
+    public function updateAgreementFooter(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $oldText = $client['agreement_footer_text'] ?? null;
+        $newText = trim((string) ($_POST['agreement_footer_text'] ?? '')) ?: null;
+
+        ClientRepository::updateAgreementFooterText($clientId, $newText);
+
+        if ((string) ($oldText ?? '') !== (string) ($newText ?? '')) {
+            AuditLogRepository::log(
+                (int) $user['id'],
+                'CLIENT_UPDATED',
+                'clients',
+                $clientId,
+                'agreement_footer_text',
+                $oldText,
+                $newText
+            );
+        }
+
+        Flash::set('success', 'Agreement T&C footer updated.');
         header("Location: /clients/{$clientId}");
     }
 

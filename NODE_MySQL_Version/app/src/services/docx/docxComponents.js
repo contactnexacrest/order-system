@@ -675,6 +675,16 @@ function termsSection(context, number, title) {
   return out;
 }
 
+// Batch 3 #12 — a client-level custom clause (clients.agreement_footer_text),
+// separate from the standard numbered T&C list since it's agreed with this
+// one buyer specifically, not part of the company's general terms.
+function clientAgreementFooter(context) {
+  const footerText = String((context.buyer && context.buyer.agreement_footer_text) || '').trim();
+  if (footerText === '') return [];
+  const lines = footerText.split(/\r\n|\r|\n/).map((line) => plain(line, { size: 19, color: NAVY }));
+  return colorBox(SPEC_BG, BORDER_GRAY, [plain('Special Terms (per Client Agreement)', { bold: true, size: 19, color: NAVY }), ...lines], 4);
+}
+
 // --------------------------------------------------------------------
 // Watermark: a rotated, semi-transparent diagonal text box anchored to
 // the page, placed in the section header so it repeats on every page.
@@ -802,5 +812,6 @@ module.exports = {
   bulletList,
   signatureBlock,
   termsSection,
+  clientAgreementFooter,
   watermarkHeader,
 };
