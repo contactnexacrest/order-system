@@ -124,4 +124,47 @@ async function forOrderExcludingInternalCaDocs(orderId) {
   );
 }
 
-module.exports = { insertGenerated, insertReceived, find, forOrder, forOrderExcludingInternalCaDocs };
+/**
+ * Batch 3 #13b — flips the marker that separates this feature's own
+ * ad-hoc attachments from every other RECEIVED/GENERATED file_store
+ * row (buyer PO copies, dispute documents, generated PDFs, ...) that
+ * already lives in the same table. Called right after
+ * fileUploadService.handleUpload() stores the row, rather than
+ * widening that shared service's own parameter list for one caller.
+ */
+async function markAsAdditionalDocument(fileId, notes) {
+  await db.execute(
+    'UPDATE file_store SET is_additional_document = 1, notes = :notes WHERE id = :id',
+    { notes, id: fileId }
+  );
+}
+
+async function additionalDocumentsForOrder(orderId) {
+  return db.query(
+    `SELECT fs.*, u.name AS uploaded_by_name FROM file_store fs
+     LEFT JOIN users u ON u.id = fs.uploaded_by
+     WHERE fs.order_id = :order_id AND fs.is_active = 1 AND fs.is_additional_document = 1
+     ORDER BY fs.uploaded_at DESC`,
+    { order_id: orderId }
+  );
+}
+
+async function additionalDocumentsForClient(clientId) {
+  return db.query(
+    `SELECT fs.*, u.name AS uploaded_by_name FROM file_store fs
+     LEFT JOIN users u ON u.id = fs.uploaded_by
+     WHERE fs.client_id = :client_id AND fs.is_active = 1 AND fs.is_additional_document = 1
+     ORDER BY fs.uploaded_at DESC`,
+    { client_id: clientId }
+  );
+}
+
+/** Soft delete only — file_store rows are never hard-deleted, and the file on disk is never touched. */
+async function deactivate(id) {
+  await db.execute('UPDATE file_store SET is_active = 0 WHERE id = :id', { id });
+}
+
+module.exports = {
+  insertGenerated, insertReceived, find, forOrder, forOrderExcludingInternalCaDocs,
+  markAsAdditionalDocument, additionalDocumentsForOrder, additionalDocumentsForClient, deactivate,
+};

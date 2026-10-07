@@ -762,6 +762,7 @@ async function show(req, res) {
       exportBenefitSchemes: await lookupRepository.dropdownOptions('export_benefit_scheme'),
       duplicatedFromOrder,
       duplicatedIntoOrders,
+      additionalDocuments: await fileStoreRepository.additionalDocumentsForOrder(orderId),
     },
     'layout/base'
   );
@@ -925,6 +926,69 @@ async function uploadBuyerPoDocument(req, res) {
   } catch (e) {
     flash.set(req, 'error', e.message);
   }
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Batch 3 #13b — a free-form extra document attached to this order
+ * that doesn't fit any fixed document type and isn't part of the
+ * order progress chat (that's for back-and-forth discussion; this is
+ * for a standalone file, e.g. a buyer-supplied certificate template).
+ * Reuses file_store/fileUploadService rather than a new table — see
+ * schema.sql Section AZ.
+ */
+async function uploadAdditionalDocument(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const title = String(req.body.title || '').trim();
+  if (title === '') {
+    flash.set(req, 'error', 'A title is required for the document.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const notes = String(req.body.notes || '').trim() || null;
+
+  try {
+    const fileId = await fileUploadService.handleUpload(
+      req,
+      'document',
+      'order_additional_document',
+      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/additional_documents`,
+      null,
+      orderId,
+      req.user.id,
+      null,
+      String(req.body.received_from || '').trim() || null,
+      title
+    );
+    await fileStoreRepository.markAsAdditionalDocument(fileId, notes);
+    await auditLogRepository.log(req.user.id, 'ORDER_ADDITIONAL_DOCUMENT_ADDED', 'file_store', fileId, 'document_type_label', null, title);
+    flash.set(req, 'success', `"${title}" attached to this order.`);
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect(`/orders/${orderId}`);
+}
+
+/** Soft delete only — the row is deactivated, the file on disk is never touched. */
+async function deleteAdditionalDocument(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const fileId = parseInt(req.params.fileId, 10);
+  const file = await fileStoreRepository.find(fileId);
+  if (!file || file.order_id !== orderId || !file.is_additional_document) {
+    flash.set(req, 'error', 'Document not found.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  await fileStoreRepository.deactivate(fileId);
+  await auditLogRepository.log(req.user.id, 'ORDER_ADDITIONAL_DOCUMENT_REMOVED', 'file_store', fileId, 'document_type_label', file.document_type_label, null);
+  flash.set(req, 'success', `"${file.document_type_label}" removed. The file itself is never deleted from disk.`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -1901,4 +1965,5 @@ module.exports = {
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,
   recordAdvanceExchangeRate, recordBalanceExchangeRate, recordFreightExchangeRate, recordAdvanceFirc, recordBalanceFirc, recordFreightFirc,
+  uploadAdditionalDocument, deleteAdditionalDocument,
 };

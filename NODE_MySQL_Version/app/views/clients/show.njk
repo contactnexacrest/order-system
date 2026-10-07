@@ -43,6 +43,42 @@
   {% endif %}
 
   <div class="section">
+    <h2>Additional Documents</h2>
+    <p class="muted small">Free-form extras attached to this client (not tied to one order) — e.g. a standing NDA, a general compliance certificate.</p>
+    <table class="list">
+      <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
+      {% for ad in additionalDocuments %}
+      <tr>
+        <td>{{ ad.document_type_label }}</td>
+        <td class="muted small">{{ ad.notes }}</td>
+        <td><a href="/file-store/{{ ad.id }}/download">{{ ad.original_filename }}</a></td>
+        <td>{{ ad.uploaded_at }}{% if ad.uploaded_by_name %} <span class="muted small">by {{ ad.uploaded_by_name }}</span>{% endif %}</td>
+        <td>
+          {% if permissions.manage_orders %}
+          <form method="post" action="/clients/{{ client.id }}/additional-documents/{{ ad.id }}/delete" style="display:inline" onsubmit="return confirm('Remove &quot;{{ ad.document_type_label }}&quot;? The file itself is never deleted from disk.');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-danger">Remove</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not additionalDocuments or additionalDocuments.length == 0 %}
+      <tr><td colspan="5" class="muted">No additional documents attached yet.</td></tr>
+      {% endif %}
+    </table>
+    {% if permissions.manage_orders %}
+    <form method="post" action="/clients/{{ client.id }}/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="text" name="title" placeholder="Title *" required style="width:220px">
+      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
+      <input type="file" name="document" required>
+      <button type="submit" class="btn-sm">Attach Document</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="section">
     <h2>Orders</h2>
     {% if permissions.manage_orders %}
     <div class="btn-row"><a class="btn btn-sm" href="/orders/create?client_id={{ client.id }}">+ New Order for this client</a></div>

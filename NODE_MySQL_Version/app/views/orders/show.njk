@@ -485,6 +485,40 @@
       }
     </script>
 
+    <h3 style="font-size:0.95em; margin-top:18px;">Additional Documents</h3>
+    <p class="muted small">Free-form extras that don't fit any fixed document type above — e.g. a buyer-supplied certificate template, a special packing instruction sheet.</p>
+    <table class="list">
+      <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
+      {% for ad in additionalDocuments %}
+      <tr>
+        <td>{{ ad.document_type_label }}</td>
+        <td class="muted small">{{ ad.notes }}</td>
+        <td><a href="/file-store/{{ ad.id }}/download">{{ ad.original_filename }}</a></td>
+        <td>{{ ad.uploaded_at }}{% if ad.uploaded_by_name %} <span class="muted small">by {{ ad.uploaded_by_name }}</span>{% endif %}</td>
+        <td>
+          {% if permissions.manage_orders %}
+          <form method="post" action="/orders/{{ order.id }}/additional-documents/{{ ad.id }}/delete" style="display:inline" onsubmit="return confirm('Remove &quot;{{ ad.document_type_label }}&quot;? The file itself is never deleted from disk.');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-danger">Remove</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not additionalDocuments or additionalDocuments.length == 0 %}
+      <tr><td colspan="5" class="muted">No additional documents attached yet.</td></tr>
+      {% endif %}
+    </table>
+    {% if permissions.manage_orders %}
+    <form method="post" action="/orders/{{ order.id }}/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="text" name="title" placeholder="Title *" required style="width:220px">
+      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
+      <input type="file" name="document" required>
+      <button type="submit" class="btn-sm">Attach Document</button>
+    </form>
+    {% endif %}
+
     <div class="btn-row">
       {% if stage1 and stage1.status != 'locked' %}
         <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">

@@ -486,6 +486,9 @@ app.post('/clients/:id/update', requireAuth, requirePermission('manage_orders'),
 // Batch 3 #12 — separate endpoint, deliberately NOT gated by the data-lock check inside update() above.
 app.post('/clients/:id/agreement-footer', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.updateAgreementFooter));
 app.post('/clients/:id/toggle-active', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.toggleActive));
+// Batch 3 #13b — free-form extra documents attached to this client (schema.sql Section AZ).
+app.post('/clients/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(clientsController.uploadAdditionalDocument));
+app.post('/clients/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.deleteAdditionalDocument));
 // docs/schema.sql Section AV — the per-client flag is a manage_company_settings action (same tier as other
 // global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch
 // inside clientsController.impersonate(), on top of its own impersonate_client permission gate here.
@@ -521,6 +524,9 @@ app.post('/orders/:id/products/:productId/delete', requireAuth, requirePermissio
 app.post('/orders/:id/products/:productId/duplicate', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.duplicateProduct));
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
 app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
+// Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
+app.post('/orders/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadAdditionalDocument));
+app.post('/orders/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.deleteAdditionalDocument));
 app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.index));
 app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
@@ -609,7 +615,8 @@ app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('close_o
 app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));
 app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.deleteDraft));
 app.get('/documents/:documentId/download', requireAuth, requirePermission('download_pdf'), asyncHandler(documentController.download));
-app.get('/file-store/:id/download', requireAuth, requirePermission('manage_orders'), asyncHandler(fileStoreController.download));
+// Batch 3 #13b/#13a — widened so a view-only visitor (view_orders/view_clients) can open what they can already see listed on the order/client page.
+app.get('/file-store/:id/download', requireAuth, requirePermissionAny(['manage_orders', 'view_orders', 'view_clients']), asyncHandler(fileStoreController.download));
 
 // Admin field-override routes for clients/orders (Spec Section 13) — wired
 // here alongside their owning controllers rather than deferred to Phase E,

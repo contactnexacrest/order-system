@@ -7,10 +7,12 @@ const orderRepository = require('../repositories/orderRepository');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
+const fileStoreRepository = require('../repositories/fileStoreRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const testModeService = require('../services/testModeService');
 const superAdminService = require('../services/superAdminService');
 const clientPortalService = require('../services/clientPortalService');
+const fileUploadService = require('../services/fileUploadService');
 const env = require('../config/env');
 
 // Port of App\Controllers\ClientController.
@@ -85,7 +87,8 @@ async function show(req, res) {
   if (!client.allow_staff_impersonation) impersonationReasons.push('it is not enabled for this client');
   if (!client.is_active) impersonationReasons.push('this client is deactivated');
   const impersonationUnavailableReason = impersonationReasons.join(', ');
-  res.renderView('clients/show', { client, orders, impersonationGloballyEnabled, impersonationUnavailableReason }, 'layout/base');
+  const additionalDocuments = await fileStoreRepository.additionalDocumentsForClient(client.id);
+  res.renderView('clients/show', { client, orders, impersonationGloballyEnabled, impersonationUnavailableReason, additionalDocuments }, 'layout/base');
 }
 
 async function editForm(req, res) {
@@ -322,7 +325,68 @@ async function impersonate(req, res) {
   res.redirect('/client');
 }
 
+/**
+ * Batch 3 #13b — a free-form extra document attached to this client
+ * (not tied to one specific order), e.g. a standing NDA or a general
+ * compliance certificate. Reuses file_store/fileUploadService rather
+ * than a new table — see schema.sql Section AZ.
+ */
+async function uploadAdditionalDocument(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const title = String(req.body.title || '').trim();
+  if (title === '') {
+    flash.set(req, 'error', 'A title is required for the document.');
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+  const notes = String(req.body.notes || '').trim() || null;
+
+  try {
+    const fileId = await fileUploadService.handleUpload(
+      req,
+      'document',
+      'client_additional_document',
+      `clients/${fileUploadService.sanitizePathSegment(client.client_unique_number)}/additional_documents`,
+      clientId,
+      null,
+      req.user.id,
+      null,
+      String(req.body.received_from || '').trim() || null,
+      title
+    );
+    await fileStoreRepository.markAsAdditionalDocument(fileId, notes);
+    await auditLogRepository.log(req.user.id, 'CLIENT_ADDITIONAL_DOCUMENT_ADDED', 'file_store', fileId, 'document_type_label', null, title);
+    flash.set(req, 'success', `"${title}" attached to this client.`);
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect(`/clients/${clientId}`);
+}
+
+/** Soft delete only — the row is deactivated, the file on disk is never touched. */
+async function deleteAdditionalDocument(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const fileId = parseInt(req.params.fileId, 10);
+  const file = await fileStoreRepository.find(fileId);
+  if (!file || file.client_id !== clientId || !file.is_additional_document) {
+    flash.set(req, 'error', 'Document not found.');
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+
+  await fileStoreRepository.deactivate(fileId);
+  await auditLogRepository.log(req.user.id, 'CLIENT_ADDITIONAL_DOCUMENT_REMOVED', 'file_store', fileId, 'document_type_label', file.document_type_label, null);
+  flash.set(req, 'success', `"${file.document_type_label}" removed. The file itself is never deleted from disk.`);
+  res.redirect(`/clients/${clientId}`);
+}
+
 module.exports = {
   index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
-  setImpersonationAllowed, impersonate,
+  setImpersonationAllowed, impersonate, uploadAdditionalDocument, deleteAdditionalDocument,
 };
