@@ -414,6 +414,10 @@ app.get('/reference-docs/custom/:id/edit', requireAuth, requirePermission('manag
 app.post('/reference-docs/custom/:id/update', requireAuth, requirePermission('manage_company_settings'), uploadLarge.single('file'), verifyCsrf, asyncHandler(referenceDocController.customUpdate));
 app.post('/reference-docs/custom/:id/delete', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.customDelete));
 app.get('/reference-docs/custom/:id/download', requireAuth, asyncHandler(referenceDocController.customDownload));
+app.get('/reference-docs/categories', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.categoriesIndex));
+app.post('/reference-docs/categories', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.categoryCreate));
+app.post('/reference-docs/categories/:id/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.categoryUpdate));
+app.post('/reference-docs/categories/:id/delete', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.categoryDelete));
 app.get('/reference-docs/:code', requireAuth, asyncHandler(referenceDocController.show));
 app.get('/reference-docs/:code/edit', requireAuth, requirePermission('manage_company_settings'), asyncHandler(referenceDocController.edit));
 app.post('/reference-docs/:code', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.update));
@@ -472,11 +476,11 @@ app.post('/admin/permission-definitions/:id/update', requireAuth, requirePermiss
 app.post('/admin/permission-definitions/:id/delete', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.permissionDelete));
 
 // --- Phase B: clients / orders / stage gates / document generation ---
-app.get('/clients', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.index));
-app.get('/clients/inactive', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.inactiveIndex));
+app.get('/clients', requireAuth, requirePermissionAny(['manage_orders', 'view_clients']), asyncHandler(clientsController.index));
+app.get('/clients/inactive', requireAuth, requirePermissionAny(['manage_orders', 'view_clients']), asyncHandler(clientsController.inactiveIndex));
 app.get('/clients/create', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.create));
 app.post('/clients', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.store));
-app.get('/clients/:id', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.show));
+app.get('/clients/:id', requireAuth, requirePermissionAny(['manage_orders', 'view_clients']), asyncHandler(clientsController.show));
 app.get('/clients/:id/edit', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.editForm));
 app.post('/clients/:id/update', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.update));
 // Batch 3 #12 — separate endpoint, deliberately NOT gated by the data-lock check inside update() above.
@@ -501,11 +505,11 @@ app.get('/reorder-requests/:id', requireAuth, requirePermission('manage_orders')
 app.post('/reorder-requests/:id/approve', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(reorderRequestController.approve));
 app.post('/reorder-requests/:id/reject', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(reorderRequestController.reject));
 
-app.get('/orders', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.index));
+app.get('/orders', requireAuth, requirePermissionAny(['manage_orders', 'view_orders']), asyncHandler(ordersController.index));
 app.get('/orders/archived', requireAuth, requirePermission('view_archived_orders'), asyncHandler(ordersController.archivedIndex));
 app.get('/orders/create', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.create));
 app.post('/orders', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.store));
-app.get('/orders/:id', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.show));
+app.get('/orders/:id', requireAuth, requirePermissionAny(['manage_orders', 'view_orders']), asyncHandler(ordersController.show));
 app.get('/orders/:id/edit', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.editDetails));
 app.post('/orders/:id/edit', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateDetails));
 app.post('/orders/:id/archive', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.archive));

@@ -10,6 +10,7 @@
   {% if not client.is_active %}
     <p class="muted small">Deactivated — hidden from the main Clients list. Nothing was deleted.</p>
   {% endif %}
+  {% if permissions.manage_orders %}
   <div class="btn-row">
     <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/edit">Edit</a>
     <form method="post" action="/clients/{{ client.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if client.is_active else 'Reactivate' }} {{ client.company_legal_name }}?{{ ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' if client.is_active else '' }}');">
@@ -17,6 +18,7 @@
       <button type="submit" class="btn-sm {{ 'btn-danger' if client.is_active else 'btn-success' }}">{{ 'Deactivate' if client.is_active else 'Reactivate' }}</button>
     </form>
   </div>
+  {% endif %}
 
   <div class="section">
     <h2>Buyer / Consignee Details</h2>
@@ -42,7 +44,9 @@
 
   <div class="section">
     <h2>Orders</h2>
+    {% if permissions.manage_orders %}
     <div class="btn-row"><a class="btn btn-sm" href="/orders/create?client_id={{ client.id }}">+ New Order for this client</a></div>
+    {% endif %}
     {% if not orders or orders.length == 0 %}
       <p class="muted">No orders yet.</p>
     {% else %}

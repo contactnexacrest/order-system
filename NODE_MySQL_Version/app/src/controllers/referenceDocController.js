@@ -10,6 +10,8 @@ const referenceContent = require('../helpers/referenceContent');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const internalReferenceDocRepository = require('../repositories/internalReferenceDocRepository');
 const referenceLibraryRepository = require('../repositories/referenceLibraryRepository');
+const referenceLibraryCategoryRepository = require('../repositories/referenceLibraryCategoryRepository');
+const permissionRepository = require('../repositories/permissionRepository');
 
 /**
  * Port of App\Controllers\ReferenceDocController — the Internal Reference
@@ -36,11 +38,23 @@ const MIME_BY_EXT = {
   txt: 'text/plain',
 };
 
+/**
+ * docs/schema.sql Section AY — a custom entry filed under a category whose
+ * required_permission the current user doesn't hold is left out entirely;
+ * uncategorized entries (category_id NULL, the only kind that existed
+ * before this feature) are always visible, same as today's behaviour. The
+ * fixed 8 internal_reference_docs are never scoped — they're system-wide
+ * reference material every staff member needs.
+ */
 async function index(req, res) {
-  const [docs, customDocs] = await Promise.all([
+  const [docs, allCustomDocs] = await Promise.all([
     internalReferenceDocRepository.all(),
     referenceLibraryRepository.all(),
   ]);
+  const permissions = req.permissions || {};
+  const customDocs = allCustomDocs.filter(
+    (doc) => !doc.category_required_permission || permissions[doc.category_required_permission]
+  );
   res.renderView('reference_docs/index', { docs, customDocs }, 'layout/base');
 }
 
@@ -114,12 +128,14 @@ function saveUploadedFile(file) {
 }
 
 async function customCreateForm(req, res) {
-  res.renderView('reference_docs/custom_create', {}, 'layout/base');
+  const categories = await referenceLibraryCategoryRepository.all();
+  res.renderView('reference_docs/custom_create', { categories }, 'layout/base');
 }
 
 async function customCreate(req, res) {
   const title = String(req.body.title || '').trim();
   const content = String(req.body.content || '').trim() || null;
+  const categoryId = req.body.category_id ? parseInt(req.body.category_id, 10) : null;
 
   if (title === '') {
     flash.set(req, 'error', 'Title is required.');
@@ -127,7 +143,7 @@ async function customCreate(req, res) {
     return;
   }
 
-  const id = await referenceLibraryRepository.create(title, content, req.user.id);
+  const id = await referenceLibraryRepository.create(title, content, req.user.id, categoryId);
 
   if (req.file) {
     try {
@@ -145,11 +161,27 @@ async function customCreate(req, res) {
   res.redirect('/reference-docs');
 }
 
+/**
+ * docs/schema.sql Section AY — the index already filters out what a user
+ * can't see, but the same check is re-applied here (and in
+ * customDownload below) so a direct URL can't bypass the category scope.
+ */
+async function canViewCustomDoc(doc, permissions) {
+  if (doc.category_id === null) return true;
+  const category = await referenceLibraryCategoryRepository.find(doc.category_id);
+  if (!category || category.required_permission === null) return true;
+  return !!(permissions || {})[category.required_permission];
+}
+
 async function customShow(req, res) {
   const id = parseInt(req.params.id, 10);
   const doc = await referenceLibraryRepository.find(id);
   if (!doc) {
     res.status(404).send('Reference document not found.');
+    return;
+  }
+  if (!(await canViewCustomDoc(doc, req.permissions))) {
+    res.status(403).send('<h1>403 — Not permitted</h1><p>You do not have access to this category of Reference Library document.</p><p><a href="/reference-docs">Back to Reference Library</a></p>');
     return;
   }
   res.renderView(
@@ -166,7 +198,8 @@ async function customEditForm(req, res) {
     res.status(404).send('Reference document not found.');
     return;
   }
-  res.renderView('reference_docs/custom_edit', { doc }, 'layout/base');
+  const categories = await referenceLibraryCategoryRepository.all();
+  res.renderView('reference_docs/custom_edit', { doc, categories }, 'layout/base');
 }
 
 async function customUpdate(req, res) {
@@ -179,13 +212,14 @@ async function customUpdate(req, res) {
 
   const title = String(req.body.title || '').trim();
   const content = String(req.body.content || '').trim() || null;
+  const categoryId = req.body.category_id ? parseInt(req.body.category_id, 10) : null;
   if (title === '') {
     flash.set(req, 'error', 'Title is required.');
     res.redirect(`/reference-docs/custom/${id}/edit`);
     return;
   }
 
-  await referenceLibraryRepository.updateText(id, title, content, req.user.id);
+  await referenceLibraryRepository.updateText(id, title, content, req.user.id, categoryId);
 
   if (req.file) {
     try {
@@ -218,11 +252,76 @@ async function customDelete(req, res) {
   res.redirect('/reference-docs');
 }
 
+async function categoriesIndex(req, res) {
+  const [categories, permissions] = await Promise.all([
+    referenceLibraryCategoryRepository.all(),
+    permissionRepository.all(),
+  ]);
+  res.renderView('reference_docs/categories', { categories, permissions }, 'layout/base');
+}
+
+async function categoryCreate(req, res) {
+  const name = String(req.body.name || '').trim();
+  const requiredPermission = String(req.body.required_permission || '').trim() || null;
+  if (name === '') {
+    flash.set(req, 'error', 'Category name is required.');
+    res.redirect('/reference-docs/categories');
+    return;
+  }
+
+  const id = await referenceLibraryCategoryRepository.create(name, requiredPermission);
+  await auditLogRepository.log(req.user.id, 'REFERENCE_LIBRARY_CATEGORY_CREATED', 'reference_library_categories', id, 'name', null, name);
+  flash.set(req, 'success', `Category "${name}" created.`);
+  res.redirect('/reference-docs/categories');
+}
+
+async function categoryUpdate(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const category = await referenceLibraryCategoryRepository.find(id);
+  if (!category) {
+    flash.set(req, 'error', 'Category not found.');
+    res.redirect('/reference-docs/categories');
+    return;
+  }
+
+  const name = String(req.body.name || '').trim();
+  const requiredPermission = String(req.body.required_permission || '').trim() || null;
+  if (name === '') {
+    flash.set(req, 'error', 'Category name is required.');
+    res.redirect('/reference-docs/categories');
+    return;
+  }
+
+  await referenceLibraryCategoryRepository.update(id, name, requiredPermission);
+  await auditLogRepository.log(req.user.id, 'REFERENCE_LIBRARY_CATEGORY_UPDATED', 'reference_library_categories', id, 'required_permission', category.required_permission, requiredPermission);
+  flash.set(req, 'success', `Category "${name}" updated.`);
+  res.redirect('/reference-docs/categories');
+}
+
+async function categoryDelete(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const category = await referenceLibraryCategoryRepository.find(id);
+  if (!category) {
+    flash.set(req, 'error', 'Category not found.');
+    res.redirect('/reference-docs/categories');
+    return;
+  }
+
+  await referenceLibraryCategoryRepository.deleteCategory(id);
+  await auditLogRepository.log(req.user.id, 'REFERENCE_LIBRARY_CATEGORY_DELETED', 'reference_library_categories', id, 'name', category.name, null);
+  flash.set(req, 'success', `Category "${category.name}" deleted. Any documents filed under it are now uncategorized (visible to everyone), never deleted.`);
+  res.redirect('/reference-docs/categories');
+}
+
 async function customDownload(req, res) {
   const id = parseInt(req.params.id, 10);
   const doc = await referenceLibraryRepository.find(id);
   if (!doc || !doc.file_path || !fs.existsSync(doc.file_path)) {
     res.status(404).send('File is missing from storage.');
+    return;
+  }
+  if (!(await canViewCustomDoc(doc, req.permissions))) {
+    res.status(403).send('<h1>403 — Not permitted</h1><p>You do not have access to this category of Reference Library document.</p><p><a href="/reference-docs">Back to Reference Library</a></p>');
     return;
   }
 
@@ -247,4 +346,5 @@ async function customDownload(req, res) {
 module.exports = {
   index, show, edit, update,
   customCreateForm, customCreate, customShow, customEditForm, customUpdate, customDelete, customDownload,
+  categoriesIndex, categoryCreate, categoryUpdate, categoryDelete,
 };

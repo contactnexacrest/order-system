@@ -10,12 +10,19 @@ const db = require('../config/db');
  * typed content.
  */
 
+/**
+ * category_name/category_required_permission are joined in so
+ * referenceDocController.index() can filter visibility without a second
+ * query per row (docs/schema.sql Section AY).
+ */
 async function all() {
   return db.query(
-    `SELECT rld.*, cu.name AS created_by_name, uu.name AS updated_by_name
+    `SELECT rld.*, cu.name AS created_by_name, uu.name AS updated_by_name,
+            rlc.name AS category_name, rlc.required_permission AS category_required_permission
      FROM reference_library_documents rld
      LEFT JOIN users cu ON cu.id = rld.created_by
      LEFT JOIN users uu ON uu.id = rld.updated_by
+     LEFT JOIN reference_library_categories rlc ON rlc.id = rld.category_id
      ORDER BY rld.title`
   );
 }
@@ -24,19 +31,19 @@ async function find(id) {
   return db.queryOne('SELECT * FROM reference_library_documents WHERE id = :id', { id });
 }
 
-async function create(title, content, userId) {
+async function create(title, content, userId, categoryId = null) {
   const result = await db.execute(
-    `INSERT INTO reference_library_documents (title, content, created_by, updated_by)
-     VALUES (:title, :content, :user_id, :user_id)`,
-    { title, content, user_id: userId }
+    `INSERT INTO reference_library_documents (title, category_id, content, created_by, updated_by)
+     VALUES (:title, :category_id, :content, :user_id, :user_id)`,
+    { title, category_id: categoryId, content, user_id: userId }
   );
   return result.insertId;
 }
 
-async function updateText(id, title, content, userId) {
+async function updateText(id, title, content, userId, categoryId = null) {
   await db.execute(
-    'UPDATE reference_library_documents SET title = :title, content = :content, updated_by = :user_id WHERE id = :id',
-    { title, content, user_id: userId, id }
+    'UPDATE reference_library_documents SET title = :title, category_id = :category_id, content = :content, updated_by = :user_id WHERE id = :id',
+    { title, category_id: categoryId, content, user_id: userId, id }
   );
 }
 

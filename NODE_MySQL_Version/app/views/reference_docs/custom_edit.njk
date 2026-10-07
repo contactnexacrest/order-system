@@ -9,6 +9,14 @@
   <form method="post" action="/reference-docs/custom/{{ doc.id }}/update" enctype="multipart/form-data">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <label>Title * <input type="text" name="title" value="{{ doc.title }}" required style="width:100%"></label>
+    <p><label>Category <small class="muted">(optional — <a href="/reference-docs/categories">manage categories</a>. Leave blank to keep this visible to every staff member.)</small><br>
+      <select name="category_id" style="width:100%">
+        <option value="">— None (visible to everyone) —</option>
+        {% for c in categories %}
+          <option value="{{ c.id }}" {{ 'selected' if doc.category_id == c.id }}>{{ c.name }}{% if c.required_permission %} (restricted){% endif %}</option>
+        {% endfor %}
+      </select>
+    </label></p>
     <p><label>Content<br>
       <textarea name="content" rows="16" style="width:100%;font-family:monospace">{{ doc.content or '' }}</textarea>
     </label></p>
