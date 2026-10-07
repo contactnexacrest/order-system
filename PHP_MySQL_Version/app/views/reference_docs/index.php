@@ -22,12 +22,13 @@ $canManageSettings = $currentUser && PermissionService::can((int) $currentUser['
 
   <div class="section">
     <h2>Other Reference Documents</h2>
-    <p class="muted small">Freely add/edit/delete — for anything that isn't one of the fixed documents above. Each can carry typed content, an uploaded file (PDF/Word/Excel), or both.</p>
+    <p class="muted small">Freely add/edit/delete — for anything that isn't one of the fixed documents above. Each can carry typed content, an uploaded file (PDF/Word/Excel), or both. <?php if ($canManageSettings): ?>A document can also be filed under a <a href="/reference-docs/categories">category</a> that restricts who sees it — uncategorized documents (the default) stay visible to everyone.<?php endif; ?></p>
     <table class="list">
-      <tr><th>Title</th><th>File</th><th>Last Updated</th><th>Action</th></tr>
+      <tr><th>Title</th><th>Category</th><th>File</th><th>Last Updated</th><th>Action</th></tr>
       <?php foreach ($customDocs as $d): ?>
         <tr>
           <td><?= htmlspecialchars($d['title']) ?></td>
+          <td><?= $d['category_name'] ? htmlspecialchars($d['category_name']) : '<span class="muted">—</span>' ?></td>
           <td>
             <?php if (!empty($d['file_path'])): ?>
               <a href="/reference-docs/custom/<?= (int) $d['id'] ?>/download"><?= htmlspecialchars($d['file_original_name']) ?></a>
@@ -52,11 +53,14 @@ $canManageSettings = $currentUser && PermissionService::can((int) $currentUser['
         </tr>
       <?php endforeach; ?>
       <?php if (empty($customDocs)): ?>
-        <tr><td colspan="4" class="muted">No other reference documents added yet.</td></tr>
+        <tr><td colspan="5" class="muted">No other reference documents added yet.</td></tr>
       <?php endif; ?>
     </table>
     <?php if ($canManageSettings): ?>
-    <p><a href="/reference-docs/custom/create" class="btn-sm btn-accent">+ Add Reference Document</a></p>
+    <p class="btn-row">
+      <a href="/reference-docs/custom/create" class="btn-sm btn-accent">+ Add Reference Document</a>
+      <a href="/reference-docs/categories" class="btn-sm btn-secondary">Manage Categories</a>
+    </p>
     <?php endif; ?>
   </div>
 </div>

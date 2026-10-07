@@ -28,7 +28,7 @@ INSERT INTO roles (name, description, is_system_role) VALUES
   ('Export Executive',    'Day-to-day order handling, quotations through order confirmation, document generation.', 0),
   ('Accounts Executive',  'Payment tracking, balance follow-up, financial reporting.', 0),
   ('Logistics Executive', 'Packing, freight, BL instruction, shipping-stage documents.', 0),
-  ('Viewer / Auditor',    'Read-only access to reports and audit trail.', 0),
+  ('Viewer / Auditor',    'Read-only access to reports, audit trail, and the Orders/Clients modules.', 0),
   ('CA / Chartered Accountant', 'External or in-house Chartered Accountant — view-only access to the CA/Accounting module for statutory bookkeeping. No order-management access.', 0);
 
 -- ================================================================
@@ -80,7 +80,10 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('manage_logistics_partners',   'Manage logistics partners',      'Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. Same tier as manage_hs_codes: Admin/MD/ED and Super Admin only by default.', 'catalog'),
   ('manage_compliance_task_types', 'Manage compliance task types',   'Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). Does not grant the order-page checklist itself - that uses close_orders. Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog'),
   ('override_buyer_acknowledgment', 'Override buyer Order Confirmation acknowledgment', 'Record a buyer''s OC acknowledgment manually (e.g. an email reply). Only consulted when oc_ack_override_restricted is on; off by default, where manage_orders alone is enough.', 'orders'),
-  ('impersonate_client', 'Log in as a client', 'Start a staff-initiated client-portal session for a client who can''t use the portal themselves. Requires client_impersonation_enabled (global) and the client''s own allow_staff_impersonation flag both on. Every use is logged.', 'clients');
+  ('impersonate_client', 'Log in as a client', 'Start a staff-initiated client-portal session for a client who can''t use the portal themselves. Requires client_impersonation_enabled (global) and the client''s own allow_staff_impersonation flag both on. Every use is logged.', 'clients'),
+  -- docs/schema.sql Section AY
+  ('view_orders',  'View orders (read-only)',  'See the Orders list and an order''s detail page without being able to create, edit, or act on it. Anyone holding manage_orders already has this implicitly — this permission exists only for a view-only tier that holds no manage_orders.', 'orders'),
+  ('view_clients', 'View clients (read-only)', 'See the Clients list and a client''s detail page without being able to create, edit, or act on it. Anyone holding manage_orders already has this implicitly — this permission exists only for a view-only tier that holds no manage_orders.', 'clients');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -112,7 +115,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Viewer / Auditor'
-  AND p.permission_key IN ('view_reports','view_audit_log','view_product_catalog');
+  AND p.permission_key IN ('view_reports','view_audit_log','view_product_catalog','view_orders','view_clients');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1

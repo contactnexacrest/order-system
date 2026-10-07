@@ -206,6 +206,11 @@ $router->get('/reference-docs/custom/{id}/edit', [$referenceDocs, 'customEditFor
 $router->post('/reference-docs/custom/{id}/update', [$referenceDocs, 'customUpdate'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/reference-docs/custom/{id}/delete', [$referenceDocs, 'customDelete'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->get('/reference-docs/custom/{id}/download', [$referenceDocs, 'customDownload'], [SessionAuth::required()]);
+// docs/schema.sql Section AY — registered before the /reference-docs/{code} catch-all below so "categories" is never captured as a code.
+$router->get('/reference-docs/categories', [$referenceDocs, 'categoriesIndex'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/reference-docs/categories', [$referenceDocs, 'categoryCreate'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/reference-docs/categories/{id}/update', [$referenceDocs, 'categoryUpdate'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/reference-docs/categories/{id}/delete', [$referenceDocs, 'categoryDelete'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->get('/reference-docs/{code}', [$referenceDocs, 'show'], [SessionAuth::required()]);
 $router->get('/reference-docs/{code}/edit', [$referenceDocs, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/reference-docs/{code}', [$referenceDocs, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
@@ -265,11 +270,13 @@ $router->post('/admin/permission-definitions/{id}/update', [$permissionAdmin, 'p
 $router->post('/admin/permission-definitions/{id}/delete', [$permissionAdmin, 'permissionDelete'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
 
 // --- Phase B: clients / orders / stage gates / document generation ---
-$router->get('/clients', [$clients, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
-$router->get('/clients/inactive', [$clients, 'inactiveIndex'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+// docs/schema.sql Section AY — view_clients admits a read-only visitor alongside manage_orders;
+// every mutating route below stays manage_orders-only.
+$router->get('/clients', [$clients, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_clients'])]);
+$router->get('/clients/inactive', [$clients, 'inactiveIndex'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_clients'])]);
 $router->get('/clients/create', [$clients, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients', [$clients, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->get('/clients/{id}', [$clients, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->get('/clients/{id}', [$clients, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_clients'])]);
 $router->get('/clients/{id}/edit', [$clients, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients/{id}/update', [$clients, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 // Batch 3 #12 — separate endpoint, deliberately NOT gated by the data-lock check inside update() above.
@@ -294,11 +301,13 @@ $router->get('/reorder-requests/{id}', [$reorderRequests, 'show'], [SessionAuth:
 $router->post('/reorder-requests/{id}/approve', [$reorderRequests, 'approve'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/reorder-requests/{id}/reject', [$reorderRequests, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
-$router->get('/orders', [$orders, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+// docs/schema.sql Section AY — view_orders admits a read-only visitor alongside manage_orders;
+// every mutating route below stays manage_orders-only (or its existing finer siblings).
+$router->get('/orders', [$orders, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders'])]);
 $router->get('/orders/archived', [$orders, 'archivedIndex'], [SessionAuth::required(), PermissionCheck::requires('view_archived_orders')]);
 $router->get('/orders/create', [$orders, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders', [$orders, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->get('/orders/{id}', [$orders, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->get('/orders/{id}', [$orders, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders'])]);
 $router->get('/orders/{id}/edit', [$orders, 'editDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/edit', [$orders, 'updateDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/archive', [$orders, 'archive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

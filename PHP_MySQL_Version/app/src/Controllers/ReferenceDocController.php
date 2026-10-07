@@ -10,8 +10,11 @@ use App\Helpers\ReferenceContent;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\InternalReferenceDocRepository;
+use App\Repositories\PermissionRepository;
+use App\Repositories\ReferenceLibraryCategoryRepository;
 use App\Repositories\ReferenceLibraryRepository;
 use App\Services\AuthService;
+use App\Services\PermissionService;
 
 /**
  * The Internal Reference Library — any authenticated staff member can
@@ -38,11 +41,29 @@ final class ReferenceDocController
         'txt' => 'text/plain',
     ];
 
+    /**
+     * docs/schema.sql Section AY — a custom entry filed under a category
+     * whose required_permission the current user doesn't hold is left out
+     * entirely; uncategorized entries (category_id NULL, the only kind
+     * that existed before this feature) are always visible, same as
+     * today's behaviour. The fixed 8 internal_reference_docs are never
+     * scoped — they're system-wide material every staff member needs.
+     */
     public function index(array $params): void
     {
+        $user = AuthService::currentUser();
+        $roleId = $user && $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $customDocs = array_values(array_filter(
+            ReferenceLibraryRepository::all(),
+            static function (array $doc) use ($user, $roleId): bool {
+                $required = $doc['category_required_permission'] ?? null;
+                return $required === null || ($user && PermissionService::can((int) $user['id'], $roleId, $required));
+            }
+        ));
+
         View::render('reference_docs/index', [
             'docs' => InternalReferenceDocRepository::all(),
-            'customDocs' => ReferenceLibraryRepository::all(),
+            'customDocs' => $customDocs,
         ], 'layout/base');
     }
 
@@ -133,13 +154,14 @@ final class ReferenceDocController
 
     public function customCreateForm(array $params): void
     {
-        View::render('reference_docs/custom_create', [], 'layout/base');
+        View::render('reference_docs/custom_create', ['categories' => ReferenceLibraryCategoryRepository::all()], 'layout/base');
     }
 
     public function customCreate(array $params): void
     {
         $title = trim((string) ($_POST['title'] ?? ''));
         $content = trim((string) ($_POST['content'] ?? '')) ?: null;
+        $categoryId = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
 
         if ($title === '') {
             Flash::set('error', 'Title is required.');
@@ -148,7 +170,7 @@ final class ReferenceDocController
         }
 
         $user = AuthService::currentUser();
-        $id = ReferenceLibraryRepository::create($title, $content, (int) $user['id']);
+        $id = ReferenceLibraryRepository::create($title, $content, (int) $user['id'], $categoryId);
 
         if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
             try {
@@ -166,6 +188,25 @@ final class ReferenceDocController
         header('Location: /reference-docs');
     }
 
+    /**
+     * docs/schema.sql Section AY — the index already filters out what a
+     * user can't see, but the same check is re-applied here (and in
+     * customDownload below) so a direct URL can't bypass the category
+     * scope.
+     */
+    private function canViewCustomDoc(array $doc): bool
+    {
+        if ($doc['category_id'] === null) {
+            return true;
+        }
+        $category = ReferenceLibraryCategoryRepository::find((int) $doc['category_id']);
+        if (!$category || $category['required_permission'] === null) {
+            return true;
+        }
+        $user = AuthService::currentUser();
+        return $user !== null && PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, $category['required_permission']);
+    }
+
     public function customShow(array $params): void
     {
         $id = (int) $params['id'];
@@ -173,6 +214,11 @@ final class ReferenceDocController
         if (!$doc) {
             http_response_code(404);
             echo 'Reference document not found.';
+            return;
+        }
+        if (!$this->canViewCustomDoc($doc)) {
+            http_response_code(403);
+            echo '<h1>403 — Not permitted</h1><p>You do not have access to this category of Reference Library document.</p><p><a href="/reference-docs">Back to Reference Library</a></p>';
             return;
         }
         View::render('reference_docs/custom_show', [
@@ -190,7 +236,7 @@ final class ReferenceDocController
             echo 'Reference document not found.';
             return;
         }
-        View::render('reference_docs/custom_edit', ['doc' => $doc], 'layout/base');
+        View::render('reference_docs/custom_edit', ['doc' => $doc, 'categories' => ReferenceLibraryCategoryRepository::all()], 'layout/base');
     }
 
     public function customUpdate(array $params): void
@@ -205,6 +251,7 @@ final class ReferenceDocController
 
         $title = trim((string) ($_POST['title'] ?? ''));
         $content = trim((string) ($_POST['content'] ?? '')) ?: null;
+        $categoryId = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
         if ($title === '') {
             Flash::set('error', 'Title is required.');
             header("Location: /reference-docs/custom/{$id}/edit");
@@ -212,7 +259,7 @@ final class ReferenceDocController
         }
 
         $user = AuthService::currentUser();
-        ReferenceLibraryRepository::updateText($id, $title, $content, (int) $user['id']);
+        ReferenceLibraryRepository::updateText($id, $title, $content, (int) $user['id'], $categoryId);
 
         if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
             try {
@@ -247,6 +294,75 @@ final class ReferenceDocController
         header('Location: /reference-docs');
     }
 
+    // --- Categories: docs/schema.sql Section AY — gated the same as the custom-entry CRUD above (manage_company_settings) ---
+
+    public function categoriesIndex(array $params): void
+    {
+        View::render('reference_docs/categories', [
+            'categories' => ReferenceLibraryCategoryRepository::all(),
+            'permissions' => PermissionRepository::all(),
+        ], 'layout/base');
+    }
+
+    public function categoryCreate(array $params): void
+    {
+        $name = trim((string) ($_POST['name'] ?? ''));
+        $requiredPermission = trim((string) ($_POST['required_permission'] ?? '')) ?: null;
+        if ($name === '') {
+            Flash::set('error', 'Category name is required.');
+            header('Location: /reference-docs/categories');
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $id = ReferenceLibraryCategoryRepository::create($name, $requiredPermission);
+        AuditLogRepository::log((int) $user['id'], 'REFERENCE_LIBRARY_CATEGORY_CREATED', 'reference_library_categories', $id, 'name', null, $name);
+        Flash::set('success', "Category \"{$name}\" created.");
+        header('Location: /reference-docs/categories');
+    }
+
+    public function categoryUpdate(array $params): void
+    {
+        $id = (int) $params['id'];
+        $category = ReferenceLibraryCategoryRepository::find($id);
+        if (!$category) {
+            Flash::set('error', 'Category not found.');
+            header('Location: /reference-docs/categories');
+            return;
+        }
+
+        $name = trim((string) ($_POST['name'] ?? ''));
+        $requiredPermission = trim((string) ($_POST['required_permission'] ?? '')) ?: null;
+        if ($name === '') {
+            Flash::set('error', 'Category name is required.');
+            header('Location: /reference-docs/categories');
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        ReferenceLibraryCategoryRepository::update($id, $name, $requiredPermission);
+        AuditLogRepository::log((int) $user['id'], 'REFERENCE_LIBRARY_CATEGORY_UPDATED', 'reference_library_categories', $id, 'required_permission', $category['required_permission'], $requiredPermission);
+        Flash::set('success', "Category \"{$name}\" updated.");
+        header('Location: /reference-docs/categories');
+    }
+
+    public function categoryDelete(array $params): void
+    {
+        $id = (int) $params['id'];
+        $category = ReferenceLibraryCategoryRepository::find($id);
+        if (!$category) {
+            Flash::set('error', 'Category not found.');
+            header('Location: /reference-docs/categories');
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        ReferenceLibraryCategoryRepository::delete($id);
+        AuditLogRepository::log((int) $user['id'], 'REFERENCE_LIBRARY_CATEGORY_DELETED', 'reference_library_categories', $id, 'name', $category['name'], null);
+        Flash::set('success', "Category \"{$category['name']}\" deleted. Any documents filed under it are now uncategorized (visible to everyone), never deleted.");
+        header('Location: /reference-docs/categories');
+    }
+
     public function customDownload(array $params): void
     {
         $id = (int) $params['id'];
@@ -254,6 +370,11 @@ final class ReferenceDocController
         if (!$doc || empty($doc['file_path']) || !is_file($doc['file_path'])) {
             http_response_code(404);
             echo 'File is missing from storage.';
+            return;
+        }
+        if (!$this->canViewCustomDoc($doc)) {
+            http_response_code(403);
+            echo '<h1>403 — Not permitted</h1><p>You do not have access to this category of Reference Library document.</p><p><a href="/reference-docs">Back to Reference Library</a></p>';
             return;
         }
 

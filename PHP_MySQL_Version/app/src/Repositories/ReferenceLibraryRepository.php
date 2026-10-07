@@ -15,14 +15,22 @@ use App\Config\Database;
  */
 final class ReferenceLibraryRepository
 {
-    /** @return array<int, array<string,mixed>> */
+    /**
+     * category_name/category_required_permission are joined in so
+     * ReferenceDocController::index() can filter visibility without a
+     * second query per row (docs/schema.sql Section AY).
+     *
+     * @return array<int, array<string,mixed>>
+     */
     public static function all(): array
     {
         return Database::connection()->query(
-            'SELECT rld.*, cu.name AS created_by_name, uu.name AS updated_by_name
+            'SELECT rld.*, cu.name AS created_by_name, uu.name AS updated_by_name,
+                    rlc.name AS category_name, rlc.required_permission AS category_required_permission
              FROM reference_library_documents rld
              LEFT JOIN users cu ON cu.id = rld.created_by
              LEFT JOIN users uu ON uu.id = rld.updated_by
+             LEFT JOIN reference_library_categories rlc ON rlc.id = rld.category_id
              ORDER BY rld.title'
         )->fetchAll();
     }
@@ -34,25 +42,25 @@ final class ReferenceLibraryRepository
         return $stmt->fetch() ?: null;
     }
 
-    public static function create(string $title, ?string $content, int $userId): int
+    public static function create(string $title, ?string $content, int $userId, ?int $categoryId = null): int
     {
         // Two distinct placeholders, not :user_id reused twice — PDO::
         // ATTR_EMULATE_PREPARES is off (native prepares), which doesn't
         // allow binding one named parameter to two positions.
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
-            'INSERT INTO reference_library_documents (title, content, created_by, updated_by)
-             VALUES (:title, :content, :created_by, :updated_by)'
+            'INSERT INTO reference_library_documents (title, category_id, content, created_by, updated_by)
+             VALUES (:title, :category_id, :content, :created_by, :updated_by)'
         );
-        $stmt->execute(['title' => $title, 'content' => $content, 'created_by' => $userId, 'updated_by' => $userId]);
+        $stmt->execute(['title' => $title, 'category_id' => $categoryId, 'content' => $content, 'created_by' => $userId, 'updated_by' => $userId]);
         return (int) $pdo->lastInsertId();
     }
 
-    public static function updateText(int $id, string $title, ?string $content, int $userId): void
+    public static function updateText(int $id, string $title, ?string $content, int $userId, ?int $categoryId = null): void
     {
         Database::connection()->prepare(
-            'UPDATE reference_library_documents SET title = :title, content = :content, updated_by = :user_id WHERE id = :id'
-        )->execute(['title' => $title, 'content' => $content, 'user_id' => $userId, 'id' => $id]);
+            'UPDATE reference_library_documents SET title = :title, category_id = :category_id, content = :content, updated_by = :user_id WHERE id = :id'
+        )->execute(['title' => $title, 'category_id' => $categoryId, 'content' => $content, 'user_id' => $userId, 'id' => $id]);
     }
 
     /** Only ever points file_path/name/mime at the new file — never touches or deletes the previous one on disk. */

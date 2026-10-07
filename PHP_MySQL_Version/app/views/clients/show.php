@@ -11,6 +11,9 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
 $__canManageSettings = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_company_settings');
 $__canImpersonate = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'impersonate_client');
 $__impersonationGloballyEnabled = CompanySettingsRepository::get('client_impersonation_enabled') === '1';
+// docs/schema.sql Section AY — view_clients admits a read-only visitor to this page; only
+// manage_orders may actually edit/deactivate the client or create a new order for them.
+$canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_orders');
 ?>
 <div class="card page-wide">
   <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
@@ -24,6 +27,7 @@ $__impersonationGloballyEnabled = CompanySettingsRepository::get('client_imperso
   <?php if ((int) $client['is_active'] === 0): ?>
     <p class="muted small">Deactivated — hidden from the main Clients list. Nothing was deleted.</p>
   <?php endif; ?>
+  <?php if ($canManageOrders): ?>
   <div class="btn-row">
     <a class="btn-sm btn-secondary" href="/clients/<?= (int) $client['id'] ?>/edit">Edit</a>
     <form method="post" action="/clients/<?= (int) $client['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('<?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>?<?= (int) $client['is_active'] === 1 ? ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' : '' ?>');">
@@ -31,6 +35,7 @@ $__impersonationGloballyEnabled = CompanySettingsRepository::get('client_imperso
       <button type="submit" class="btn-sm <?= (int) $client['is_active'] === 1 ? 'btn-danger' : 'btn-success' ?>"><?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?></button>
     </form>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Buyer / Consignee Details</h2>
@@ -56,7 +61,9 @@ $__impersonationGloballyEnabled = CompanySettingsRepository::get('client_imperso
 
   <div class="section">
     <h2>Orders</h2>
+    <?php if ($canManageOrders): ?>
     <div class="btn-row"><a class="btn btn-sm" href="/orders/create?client_id=<?= (int) $client['id'] ?>">+ New Order for this client</a></div>
+    <?php endif; ?>
     <?php if (empty($orders)): ?>
       <p class="muted">No orders yet.</p>
     <?php else: ?>

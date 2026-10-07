@@ -1,0 +1,54 @@
+<?php use App\Helpers\Csrf; ?>
+<div class="card page-wide">
+  <p><a href="/reference-docs">&larr; Reference Library</a></p>
+  <h1>Reference Library Categories</h1>
+  <p class="muted">A category is a label you can file a custom Reference Library document under. Leave "Required Permission" blank for a category visible to every staff member (the default) — set it to restrict that category to only the users who hold that permission, e.g. a CA/Accounts-only working-papers folder.</p>
+
+  <table class="list">
+    <tr><th>Name &amp; Required Permission</th><th>Documents</th><th>Action</th></tr>
+    <?php foreach ($categories as $c): ?>
+      <tr>
+        <td>
+          <form method="post" action="/reference-docs/categories/<?= (int) $c['id'] ?>/update" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <?= Csrf::field() ?>
+            <input type="text" name="name" value="<?= htmlspecialchars($c['name']) ?>" required style="width:200px">
+            <select name="required_permission" style="width:280px">
+              <option value="">— None (visible to everyone) —</option>
+              <?php foreach ($permissions as $p): ?>
+                <option value="<?= htmlspecialchars($p['permission_key']) ?>" <?= $c['required_permission'] === $p['permission_key'] ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?> (<?= htmlspecialchars($p['permission_key']) ?>)</option>
+              <?php endforeach; ?>
+            </select>
+            <button type="submit" class="btn-sm">Save</button>
+          </form>
+        </td>
+        <td><?= (int) $c['document_count'] ?></td>
+        <td>
+          <form method="post" action="/reference-docs/categories/<?= (int) $c['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Delete category &quot;<?= htmlspecialchars(addslashes($c['name'])) ?>&quot;? Documents filed under it become uncategorized (visible to everyone) — nothing is deleted.');">
+            <?= Csrf::field() ?>
+            <button type="submit" class="btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    <?php if (empty($categories)): ?>
+      <tr><td colspan="3" class="muted">No categories yet — every custom document is visible to everyone.</td></tr>
+    <?php endif; ?>
+  </table>
+
+  <div class="section">
+    <h2>Add Category</h2>
+    <form method="post" action="/reference-docs/categories">
+      <?= Csrf::field() ?>
+      <label>Name * <input type="text" name="name" required style="width:100%"></label>
+      <label>Required Permission <small class="muted">(optional — leave blank to make it visible to everyone)</small>
+        <select name="required_permission" style="width:100%">
+          <option value="">— None (visible to everyone) —</option>
+          <?php foreach ($permissions as $p): ?>
+            <option value="<?= htmlspecialchars($p['permission_key']) ?>"><?= htmlspecialchars($p['name']) ?> (<?= htmlspecialchars($p['permission_key']) ?>)</option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <button type="submit" class="btn-sm btn-accent">Add Category</button>
+    </form>
+  </div>
+</div>

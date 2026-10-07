@@ -36,6 +36,19 @@ Below the roles list (not shown here) sits the full **Role Matrix** — every
 permission against every role in one table — and a **Permission
 Definitions** list for creating new permission keys.
 
+`manage_orders` has always been the single gate for both *seeing* and
+*editing* the Orders and Clients modules — there was no way to let
+someone look without also being able to touch anything. Two narrower
+permissions, **View Orders (read-only)** (`view_orders`) and **View
+Clients (read-only)** (`view_clients`), now admit a read-only visitor to
+the Orders list/detail page and the Clients list/detail page
+respectively, alongside `manage_orders` — never instead of it, and never
+touching any mutating route or button, which all stay gated on
+`manage_orders` (or its existing finer siblings like `manage_payments`,
+`manage_shipping`, `close_orders`). The seeded **Viewer / Auditor** role
+carries both, so it can finally see real order and client data instead
+of only reports and the audit log.
+
 ### Users
 
 Create logins, edit an existing one, deactivate one, or force a password
@@ -133,14 +146,23 @@ mistake (or malice).
   deleting one outright only works if no order has ever recorded a status
   against it, otherwise the screen asks you to deactivate instead.
 - **Reference Library** (`/reference-docs`) — any authenticated staff
-  member can view and download every entry here; adding, deleting, or
-  re-uploading a file requires `manage_company_settings`, the same gate
-  as Company Settings itself. Alongside the system's own fixed reference
-  documents (SOPs, the Stage Gate Reference, the Cross-Verification
-  Checklist), this is where documents a client might ask to see to verify
-  the business live — the Factory SOP, Quarry SOP, Factory Processing
-  Agreement template, and Quarry Block Supply Agreement template are the
-  first four seeded here, each downloadable straight from the list.
+  member can view and download every entry here by default; adding,
+  deleting, or re-uploading a file requires `manage_company_settings`,
+  the same gate as Company Settings itself. Alongside the system's own
+  fixed reference documents (SOPs, the Stage Gate Reference, the
+  Cross-Verification Checklist), this is where documents a client might
+  ask to see to verify the business live — the Factory SOP, Quarry SOP,
+  Factory Processing Agreement template, and Quarry Block Supply
+  Agreement template are the first four seeded here, each downloadable
+  straight from the list. A custom entry can optionally be filed under a
+  **Category** (**Manage Categories**, from the Reference Library page):
+  uncategorized stays visible to everyone (the default, unchanged
+  behaviour), but a category can carry a **Required Permission** — only
+  staff holding that permission then see documents filed under it, e.g. a
+  CA/Accounts-only working-papers folder restricted to `ca_module_view`.
+  Deleting a category never deletes its documents — they fall back to
+  uncategorized (visible to everyone again). The fixed 8 system reference
+  documents are never scoped this way.
 - **Assets** — logo, company seal, and signature images used across every
   document template.
 - **Signatories** — which users are eligible to sign which document types,

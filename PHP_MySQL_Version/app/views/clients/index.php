@@ -5,6 +5,9 @@ use App\Services\AuthService;
 use App\Services\PermissionService;
 $__u = AuthService::currentUser();
 $canViewFullEmail = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_client_email_full');
+// docs/schema.sql Section AY — view_clients admits a read-only visitor to this list; only
+// manage_orders may create a client or reach the per-client Edit link.
+$canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_orders');
 $quotationFormLink = rtrim(Env::get('APP_URL', ''), '/') . '/quotation-details';
 ?>
 <div class="card page-wide">
@@ -14,7 +17,7 @@ $quotationFormLink = rtrim(Env::get('APP_URL', ''), '/') . '/quotation-details';
       <p class="muted" style="margin:0;">Each client carries one Buyer Inquiry Ref for the whole relationship — every order and document for them reuses it.</p>
     </div>
     <div class="btn-row" style="margin-top:0;">
-      <a class="btn btn-accent" href="/clients/create">+ New Client</a>
+      <?php if ($canManageOrders): ?><a class="btn btn-accent" href="/clients/create">+ New Client</a><?php endif; ?>
       <a class="btn-sm btn-secondary" href="/clients/inactive">Deactivated Clients</a>
     </div>
   </div>
@@ -51,7 +54,7 @@ $quotationFormLink = rtrim(Env::get('APP_URL', ''), '/') . '/quotation-details';
       </div>
       <div class="entity-card-footer">
         <span class="muted small"><?= htmlspecialchars($c['country_of_destination'] ?? 'Country not set') ?></span>
-        <a class="entity-card-action" href="/clients/<?= (int) $c['id'] ?>/edit">Edit</a>
+        <?php if ($canManageOrders): ?><a class="entity-card-action" href="/clients/<?= (int) $c['id'] ?>/edit">Edit</a><?php endif; ?>
       </div>
     </div>
     <?php endforeach; ?>

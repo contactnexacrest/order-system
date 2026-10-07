@@ -5,6 +5,14 @@
   <form method="post" action="/reference-docs/custom" enctype="multipart/form-data">
     <?= Csrf::field() ?>
     <label>Title * <input type="text" name="title" required style="width:100%"></label>
+    <p><label>Category <small class="muted">(optional — <a href="/reference-docs/categories">manage categories</a>. Leave blank to keep this visible to every staff member, as before.)</small><br>
+      <select name="category_id" style="width:100%">
+        <option value="">— None (visible to everyone) —</option>
+        <?php foreach ($categories as $c): ?>
+          <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars($c['name']) ?><?= $c['required_permission'] ? ' (restricted)' : '' ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label></p>
     <p><label>Content (optional)<br>
       <textarea name="content" rows="16" style="width:100%;font-family:monospace" placeholder="A line starting with &quot;# &quot; is a heading, &quot;- &quot; a bullet, &quot;1. &quot; a numbered step, and a blank line starts a new paragraph."></textarea>
     </label></p>

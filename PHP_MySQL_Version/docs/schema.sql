@@ -2814,4 +2814,47 @@ ALTER TABLE clients
 -- Section AV (staff client-portal impersonation) added 2026-10-07.
 -- Section AW (per-payment-leg exchange rate) added 2026-10-07.
 -- Section AX (client-level agreement T&C footer) added 2026-10-07.
+-- Section AY (RBAC scoping: Reference Library categories + view-only
+-- clients/orders tier) added 2026-10-07.
+-- ================================================================
+
+-- ================================================================
+-- SECTION AY — RBAC SCOPING: REFERENCE LIBRARY CATEGORIES + VIEW-ONLY
+-- CLIENTS/ORDERS TIER (added 2026-10-07)
+-- ================================================================
+-- Part 1 — Reference Library categories. Until now every custom Reference
+-- Library entry (Section Y) was visible to every authenticated staff
+-- member, with no way to restrict a category of material (e.g. CA/
+-- Accounts-only working papers) to the roles that should actually see it.
+-- A category is optional (NULL = uncategorized, visible to everyone, same
+-- as today's behaviour — fully backward compatible) and carries an
+-- optional required_permission: when set, only a user who holds that
+-- permission key can see documents filed under the category. The fixed 8
+-- internal_reference_docs (SOPs, Stage Gate Reference, etc.) are
+-- deliberately left uncategorized — they're system-wide reference
+-- material every staff member needs, not scoped content.
+CREATE TABLE reference_library_categories (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name                VARCHAR(100) NOT NULL UNIQUE,
+  required_permission VARCHAR(100) NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+ALTER TABLE reference_library_documents
+  ADD COLUMN category_id BIGINT UNSIGNED NULL AFTER title,
+  ADD FOREIGN KEY (category_id) REFERENCES reference_library_categories(id);
+
+-- Part 2 — view-only clients/orders tier. manage_orders has, until now,
+-- been the single gate for BOTH viewing and editing the Orders and
+-- Clients modules — there was no way to let someone look without also
+-- being able to touch anything. Two new permissions, view_orders and
+-- view_clients (seeded in docs/seed.sql, alongside every other permission
+-- row — this file is DDL-only), are granted ALONGSIDE manage_orders
+-- (never instead of it) wherever a route should also admit a read-only
+-- visitor: see PermissionCheck::requiresAny() at the /orders,
+-- /orders/{id}, /clients, /clients/inactive and /clients/{id} routes.
+-- Every mutating route (create/edit/archive/payment/etc.) is left exactly
+-- as manage_orders-only (or its existing finer siblings —
+-- manage_payments, manage_shipping, close_orders, ...) — these two
+-- permissions only ever widen who can look, never who can act.
 -- ================================================================
