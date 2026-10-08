@@ -6,11 +6,12 @@
   <div class="section">
     <h2>Pending (<?= count($pending) ?>)</h2>
     <table class="list">
-      <tr><th>Company</th><th>Contact</th><th>Destination</th><th>Submitted</th><th>Action</th></tr>
+      <tr><th>Company</th><th>Contact</th><th>Consignee</th><th>Destination</th><th>Submitted</th><th>Action</th></tr>
       <?php foreach ($pending as $s): ?>
       <tr>
         <td><?= htmlspecialchars($s['company_legal_name']) ?><br><span class="muted small"><?= htmlspecialchars($s['billing_address']) ?></span></td>
         <td><?= htmlspecialchars($s['contact_person']) ?><br><span class="muted small"><?= htmlspecialchars($s['email']) ?> · <?= htmlspecialchars($s['phone'] ?? '') ?></span></td>
+        <td><?= (int) ($s['consignee_same_as_buyer'] ?? 1) === 1 ? 'Same as Buyer' : htmlspecialchars($s['consignee_name'] ?? '—') ?></td>
         <td>
           <?= htmlspecialchars($s['country_of_destination']) ?>
           <?php if ($s['port_of_discharge_text']): ?><br><span class="muted small">Port: <?= htmlspecialchars($s['port_of_discharge_text']) ?></span><?php endif; ?>
@@ -31,7 +32,7 @@
       </tr>
       <?php endforeach; ?>
       <?php if (empty($pending)): ?>
-        <tr><td colspan="5" class="muted">No pending requests.</td></tr>
+        <tr><td colspan="6" class="muted">No pending requests.</td></tr>
       <?php endif; ?>
     </table>
   </div>

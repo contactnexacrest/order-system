@@ -1556,6 +1556,32 @@
         <p class="muted small">Original BLs endorsed.</p>
       {% endif %}
 
+      {% if permissions.manage_shipping and shipping and shipping.bl_originals_received_at %}
+      <h3 style="font-size:0.95em; margin-top:14px;">BL Endorsement (print &amp; physically stamp all 3 originals)</h3>
+      <p class="muted small">Save these details, then generate the printable endorsement — it states who to endorse the BL to ("Pay to the order of"), the BL/vessel/voyage, both ports, the latest PI/CI references, and the authorised signatory, exactly as it should be written or stamped on the reverse of each original BL.</p>
+      <form method="post" action="/orders/{{ order.id }}/bl-endorsement">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>BL Number<input type="text" name="bl_number" value="{{ blEndorsement.bl_number or shipping.bl_number or '' }}"></label>
+        <label>Vessel / Voyage<input type="text" name="vessel_voyage" placeholder="e.g. MSC MAYA / 012W" value="{{ blEndorsement.vessel_voyage or ((shipping.vessel_name or '') + ' / ' + (shipping.voyage_number or '')) | trim }}"></label>
+        <label>Port of Loading<input type="text" name="port_of_loading" value="{{ blEndorsement.port_of_loading or order.port_of_loading_name or 'Chennai, India' }}"></label>
+        <label>Port of Discharge<input type="text" name="port_of_discharge" value="{{ blEndorsement.port_of_discharge or order.port_of_discharge_name or order.port_of_discharge_text or '' }}"></label>
+        <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="{{ blEndorsement.date_of_endorsement or today() }}"></label>
+        <button type="submit" class="btn-sm">Save BL Endorsement Details</button>
+      </form>
+      {% if blEndorsement %}
+      <form method="post" action="/orders/{{ order.id }}/bl-endorsement/generate" style="margin-top:8px;">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
+      </form>
+      {% endif %}
+      {% if blEndorsementDoc %}
+        <p class="small" style="margin-top:6px;">
+          Latest: <a href="/documents/{{ blEndorsementDoc.id }}/download?format=pdf">{{ blEndorsementDoc.document_reference }}</a>
+          (generated {{ blEndorsementDoc.generated_at }})
+        </p>
+      {% endif %}
+      {% endif %}
+
       {% if permissions.close_orders %}
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">

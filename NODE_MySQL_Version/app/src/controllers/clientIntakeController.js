@@ -107,7 +107,46 @@ function extractAndValidate(req) {
     flash.set(req, 'error', `"${data.email}" doesn't look like a valid email address.`);
     return null;
   }
-  return data;
+  return Object.assign(data, collectConsigneeFields(req));
+}
+
+/**
+ * Section BB — lets the client self-serve the same Consignee "Same as
+ * Buyer?" split staff already had on the admin Clients form (see
+ * clientController.collectPartyFields()). Never Notify Party here — the
+ * Quotation stage doesn't show a Notify Party section on any document
+ * (docs/SOP/01-stage1-enquiry-quotation.md), so there's nothing for this
+ * form to collect.
+ */
+function collectConsigneeFields(req) {
+  const consigneeSameAsBuyer = Boolean(req.body.consignee_same_as_buyer);
+  const fields = { consignee_same_as_buyer: consigneeSameAsBuyer ? 1 : 0 };
+
+  if (consigneeSameAsBuyer) {
+    fields.consignee_name = null;
+    fields.consignee_address_line1 = null;
+    fields.consignee_address_line2 = null;
+    fields.consignee_city = null;
+    fields.consignee_postcode = null;
+    fields.consignee_country = null;
+    fields.consignee_vat_eori_tax_no = null;
+    fields.consignee_contact_person = null;
+    fields.consignee_phone = null;
+    fields.consignee_email = null;
+  } else {
+    fields.consignee_name = String(req.body.consignee_name || '').trim() || null;
+    fields.consignee_address_line1 = String(req.body.consignee_address_line1 || '').trim() || null;
+    fields.consignee_address_line2 = String(req.body.consignee_address_line2 || '').trim() || null;
+    fields.consignee_city = String(req.body.consignee_city || '').trim() || null;
+    fields.consignee_postcode = String(req.body.consignee_postcode || '').trim() || null;
+    fields.consignee_country = String(req.body.consignee_country || '').trim() || null;
+    fields.consignee_vat_eori_tax_no = String(req.body.consignee_vat_eori_tax_no || '').trim() || null;
+    fields.consignee_contact_person = String(req.body.consignee_contact_person || '').trim() || null;
+    fields.consignee_phone = String(req.body.consignee_phone || '').trim() || null;
+    fields.consignee_email = String(req.body.consignee_email || '').trim() || null;
+  }
+
+  return fields;
 }
 
 /** Emails the client a one-time correction link and returns it, so the thank-you page can also show it directly. */

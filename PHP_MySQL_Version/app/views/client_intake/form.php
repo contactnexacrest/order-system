@@ -3,7 +3,7 @@
   <h1>Quotation Details Form</h1>
   <p class="muted">Just your company and shipping details — no product information needed here. We'll review and send your Quotation within 24 hours.</p>
   <div class="intake-summary">
-    <span>&#128203; 2 short sections</span>
+    <span>&#128203; 3 short sections</span>
     <span>&#9201;&#65039; About 2 minutes</span>
     <span>&#9989; Fields marked * are required</span>
   </div>
@@ -45,7 +45,45 @@
     </fieldset>
 
     <fieldset class="intake-step">
-      <legend><span class="intake-step-num">2</span> Shipping Preference</legend>
+      <legend><span class="intake-step-num">2</span> Consignee Details</legend>
+      <p class="muted small">The consignee is the company your goods actually ship to — often the same as you, but not always (e.g. if you're a trading company and the goods go straight to your end customer).</p>
+      <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" checked> Same as Buyer (my own company above)</label>
+      <div id="consignee_fields" class="field-grid" style="display:none">
+        <label class="full">Consignee Company Legal Name
+          <input type="text" name="consignee_name" placeholder="e.g., ABC Memorial Stones Ltd">
+        </label>
+        <label class="full">Consignee Address Line 1
+          <input type="text" name="consignee_address_line1" placeholder="Street number and street name">
+        </label>
+        <label>Address Line 2
+          <input type="text" name="consignee_address_line2" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town
+          <input type="text" name="consignee_city">
+        </label>
+        <label>Postcode
+          <input type="text" name="consignee_postcode">
+        </label>
+        <label>Country
+          <input type="text" name="consignee_country">
+        </label>
+        <label>VAT / EORI / Tax Reg. No.
+          <input type="text" name="consignee_vat_eori_tax_no">
+        </label>
+        <label>Contact Person
+          <input type="text" name="consignee_contact_person">
+        </label>
+        <label>Phone
+          <input type="text" name="consignee_phone">
+        </label>
+        <label>Email
+          <input type="email" name="consignee_email">
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="intake-step">
+      <legend><span class="intake-step-num">3</span> Shipping Preference</legend>
       <div class="field-grid">
         <label>Incoterm *
           <input type="text" name="incoterm_preference" placeholder="FOB / CFR / CIF — if unsure, write FOB" required>
@@ -65,3 +103,18 @@
     <button type="submit">Submit Request</button>
   </form>
 </div>
+<script>
+(function () {
+  var checkbox = document.getElementById('consignee_same_as_buyer');
+  var container = document.getElementById('consignee_fields');
+  if (!checkbox || !container) { return; }
+  var inputs = container.querySelectorAll('input, textarea, select');
+  function apply() {
+    var same = checkbox.checked;
+    container.style.display = same ? 'none' : 'block';
+    inputs.forEach(function (el) { el.disabled = same; });
+  }
+  checkbox.addEventListener('change', apply);
+  apply();
+})();
+</script>

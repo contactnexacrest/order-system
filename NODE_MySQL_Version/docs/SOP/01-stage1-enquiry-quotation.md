@@ -92,6 +92,26 @@ field — this keeps the value consistent with whatever CAPEXIL actually
 issues, rather than depending on each buyer or staff member typing the
 same term the same way.
 
+This same **Same as Buyer?** self-service — not just a staff-only admin
+screen — is also built into the two client-facing forms that create or
+confirm this data in the first place:
+
+- The public **`/quotation-details`** form (Path A, above) carries a
+  **Consignee Details** section with its own **Same as Buyer?** checkbox,
+  so a buyer can tell NexaCrest up front that their goods ship to a
+  different company, before staff ever touch the record. Never a Notify
+  Party section here, matching the Developer Spec's own document-data
+  requirements — the Quotation never shows one.
+- The per-order **`/pi-details/{token}`** form (Chapter 3) carries both a
+  **Consignee Details** and a **Notify Party** section, each with its own
+  checkbox, since Notify Party first becomes relevant at the PI stage.
+
+Either way, accepting the submission (Quotation-stage) or applying it
+(PI-stage) copies the buyer's own checkbox state and structured fields
+straight onto the `clients` row — the exact same columns the admin Clients
+form reads and writes — so there's only ever one Consignee/Notify Party
+story for a given client, however it was captured.
+
 ### Agreement T&C Footer (per client)
 
 Some buyers negotiate a clause specific to their own commercial agreement

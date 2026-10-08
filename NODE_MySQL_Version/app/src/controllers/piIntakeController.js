@@ -32,16 +32,13 @@ async function submit(req, res) {
     return;
   }
 
-  const data = {
+  const data = Object.assign({
     company_legal_name: String(req.body.company_legal_name || '').trim(),
     billing_address: String(req.body.billing_address || '').trim(),
-    consignee_name: String(req.body.consignee_name || '').trim(),
-    consignee_address: String(req.body.consignee_address || '').trim(),
     vat_eori_tax_no: String(req.body.vat_eori_tax_no || '').trim(),
     contact_person: String(req.body.contact_person || '').trim(),
     email: String(req.body.email || '').trim(),
     phone: String(req.body.phone || '').trim(),
-    notify_party: String(req.body.notify_party || '').trim(),
     port_of_discharge_text: String(req.body.port_of_discharge_text || '').trim(),
     country_of_destination: String(req.body.country_of_destination || '').trim(),
     incoterm_confirmed: String(req.body.incoterm_confirmed || '').trim(),
@@ -52,11 +49,14 @@ async function submit(req, res) {
     buyer_po_ref: String(req.body.buyer_po_ref || '').trim(),
     changes_from_quotation: String(req.body.changes_from_quotation || '').trim(),
     special_document_requirements: String(req.body.special_document_requirements || '').trim(),
-  };
+  }, collectPartyFields(req));
 
   // Required set per the business's own PI Form spec (Client_Forms.xlsx).
+  // Consignee/Notify Party are never in this list — they're self-service
+  // structured fields gated by their own "Same as X?" checkbox (see
+  // collectPartyFields()), not free-text requireds.
   const required = [
-    'company_legal_name', 'billing_address', 'consignee_name', 'consignee_address',
+    'company_legal_name', 'billing_address',
     'vat_eori_tax_no', 'contact_person', 'email', 'phone',
     'port_of_discharge_text', 'country_of_destination', 'incoterm_confirmed',
     'payment_terms_confirmation', 'quotation_acceptance_reference', 'coo_type',
@@ -81,6 +81,72 @@ async function submit(req, res) {
 
   await piIntakeRepository.submit(submission.id, data, req.ip || null);
   res.renderView('pi_intake/thank_you', {}, 'layout/bare');
+}
+
+/**
+ * Section BB — the client's own self-service Consignee/Notify Party
+ * "Same as X?" split on the PI-details form, mirroring
+ * clientController.collectPartyFields() field-for-field so the values
+ * land in pi_intake_submissions using the exact same column names
+ * clientRepository.update() already expects (see
+ * piIntakeReviewController.accept()).
+ */
+function collectPartyFields(req) {
+  const consigneeSameAsBuyer = Boolean(req.body.consignee_same_as_buyer);
+  const notifySameAsConsignee = Boolean(req.body.notify_party_same_as_consignee);
+
+  const fields = {
+    consignee_same_as_buyer: consigneeSameAsBuyer ? 1 : 0,
+    notify_party_same_as_consignee: notifySameAsConsignee ? 1 : 0,
+  };
+
+  if (consigneeSameAsBuyer) {
+    fields.consignee_name = null;
+    fields.consignee_address_line1 = null;
+    fields.consignee_address_line2 = null;
+    fields.consignee_city = null;
+    fields.consignee_postcode = null;
+    fields.consignee_country = null;
+    fields.consignee_vat_eori_tax_no = null;
+    fields.consignee_contact_person = null;
+    fields.consignee_phone = null;
+    fields.consignee_email = null;
+  } else {
+    fields.consignee_name = String(req.body.consignee_name || '').trim() || null;
+    fields.consignee_address_line1 = String(req.body.consignee_address_line1 || '').trim() || null;
+    fields.consignee_address_line2 = String(req.body.consignee_address_line2 || '').trim() || null;
+    fields.consignee_city = String(req.body.consignee_city || '').trim() || null;
+    fields.consignee_postcode = String(req.body.consignee_postcode || '').trim() || null;
+    fields.consignee_country = String(req.body.consignee_country || '').trim() || null;
+    fields.consignee_vat_eori_tax_no = String(req.body.consignee_vat_eori_tax_no || '').trim() || null;
+    fields.consignee_contact_person = String(req.body.consignee_contact_person || '').trim() || null;
+    fields.consignee_phone = String(req.body.consignee_phone || '').trim() || null;
+    fields.consignee_email = String(req.body.consignee_email || '').trim() || null;
+  }
+
+  if (notifySameAsConsignee) {
+    fields.notify_party = null;
+    fields.notify_party_address_line1 = null;
+    fields.notify_party_address_line2 = null;
+    fields.notify_party_city = null;
+    fields.notify_party_postcode = null;
+    fields.notify_party_country = null;
+    fields.notify_party_contact_person = null;
+    fields.notify_party_phone = null;
+    fields.notify_party_email = null;
+  } else {
+    fields.notify_party = String(req.body.notify_party || '').trim() || null;
+    fields.notify_party_address_line1 = String(req.body.notify_party_address_line1 || '').trim() || null;
+    fields.notify_party_address_line2 = String(req.body.notify_party_address_line2 || '').trim() || null;
+    fields.notify_party_city = String(req.body.notify_party_city || '').trim() || null;
+    fields.notify_party_postcode = String(req.body.notify_party_postcode || '').trim() || null;
+    fields.notify_party_country = String(req.body.notify_party_country || '').trim() || null;
+    fields.notify_party_contact_person = String(req.body.notify_party_contact_person || '').trim() || null;
+    fields.notify_party_phone = String(req.body.notify_party_phone || '').trim() || null;
+    fields.notify_party_email = String(req.body.notify_party_email || '').trim() || null;
+  }
+
+  return fields;
 }
 
 module.exports = { show, submit };

@@ -2990,3 +2990,113 @@ ALTER TABLE clients
 --    text change. See seed.sql for the UPDATE and app/templates/FDN/ for
 --    the title/prefix text changes.
 -- ================================================================
+
+-- ================================================================
+-- SECTION BB — CONSIGNEE/NOTIFY PARTY SELF-SERVICE ON CLIENT-FACING
+-- INTAKE FORMS (added 2026-10-08)
+-- ================================================================
+-- Commit 819910d (Section BA, above) added the structured Consignee/
+-- Notify Party "Same as X?" split to the `clients` table and to the
+-- staff-only Clients create/edit screens — but a client filling in the
+-- public /quotation-details or /pi-details/{token} forms themselves had
+-- no way to tell NexaCrest their goods ship to a different consignee, or
+-- that a freight forwarder needs notifying — only staff could enter that,
+-- after the fact, on the admin Clients screen. This closes that gap:
+-- client_intake_submissions and pi_intake_submissions each get their own
+-- copy of the same structured columns (never a shared row — a submission
+-- is reviewed data staff may edit/reject before it ever touches a real
+-- `clients` row), so the client can self-serve the same Consignee/Notify
+-- Party split NexaCrest staff already had.
+--
+-- Quotation-stage (client_intake_submissions) gets Consignee only, never
+-- Notify Party — matching the Developer Spec's own document-data
+-- requirements (docs/SOP/01-stage1-enquiry-quotation.md: "Notify Party
+-- only appears on the documents the Developer Spec defines it for
+-- (Proforma Invoice, Packing List, Commercial Invoice) — the Quotation...
+-- never show[s] a Notify Party section"), consistent with the Master
+-- Reference's "Client Data by Document" sheet which lists Notify Party as
+-- "—" (not applicable) for QT.
+--
+-- PI-stage (pi_intake_submissions) gets BOTH Consignee and Notify Party,
+-- replacing the old single free-text consignee_name/consignee_address/
+-- notify_party fields' role as the only way to capture this (those three
+-- flat columns stay, now meaning "Consignee/Notify Party company name /
+-- address-line-1 equivalent when same_as is off" — the exact same
+-- backward-compatible pattern Section BA used on `clients` itself).
+-- ================================================================
+ALTER TABLE client_intake_submissions
+  ADD COLUMN consignee_same_as_buyer TINYINT(1) NOT NULL DEFAULT 1 AFTER notes,
+  ADD COLUMN consignee_name VARCHAR(255) NULL AFTER consignee_same_as_buyer,
+  ADD COLUMN consignee_address_line1 VARCHAR(255) NULL AFTER consignee_name,
+  ADD COLUMN consignee_address_line2 VARCHAR(255) NULL AFTER consignee_address_line1,
+  ADD COLUMN consignee_city VARCHAR(100) NULL AFTER consignee_address_line2,
+  ADD COLUMN consignee_postcode VARCHAR(30) NULL AFTER consignee_city,
+  ADD COLUMN consignee_country VARCHAR(100) NULL AFTER consignee_postcode,
+  ADD COLUMN consignee_vat_eori_tax_no VARCHAR(100) NULL AFTER consignee_country,
+  ADD COLUMN consignee_contact_person VARCHAR(150) NULL AFTER consignee_vat_eori_tax_no,
+  ADD COLUMN consignee_phone VARCHAR(30) NULL AFTER consignee_contact_person,
+  ADD COLUMN consignee_email VARCHAR(190) NULL AFTER consignee_phone;
+
+ALTER TABLE pi_intake_submissions
+  ADD COLUMN consignee_same_as_buyer TINYINT(1) NOT NULL DEFAULT 1 AFTER consignee_address,
+  ADD COLUMN consignee_address_line1 VARCHAR(255) NULL AFTER consignee_same_as_buyer,
+  ADD COLUMN consignee_address_line2 VARCHAR(255) NULL AFTER consignee_address_line1,
+  ADD COLUMN consignee_city VARCHAR(100) NULL AFTER consignee_address_line2,
+  ADD COLUMN consignee_postcode VARCHAR(30) NULL AFTER consignee_city,
+  ADD COLUMN consignee_country VARCHAR(100) NULL AFTER consignee_postcode,
+  ADD COLUMN consignee_vat_eori_tax_no VARCHAR(100) NULL AFTER consignee_country,
+  ADD COLUMN consignee_contact_person VARCHAR(150) NULL AFTER consignee_vat_eori_tax_no,
+  ADD COLUMN consignee_phone VARCHAR(30) NULL AFTER consignee_contact_person,
+  ADD COLUMN consignee_email VARCHAR(190) NULL AFTER consignee_phone,
+  ADD COLUMN notify_party_same_as_consignee TINYINT(1) NOT NULL DEFAULT 1 AFTER notify_party,
+  ADD COLUMN notify_party_address_line1 VARCHAR(255) NULL AFTER notify_party_same_as_consignee,
+  ADD COLUMN notify_party_address_line2 VARCHAR(255) NULL AFTER notify_party_address_line1,
+  ADD COLUMN notify_party_city VARCHAR(100) NULL AFTER notify_party_address_line2,
+  ADD COLUMN notify_party_postcode VARCHAR(30) NULL AFTER notify_party_city,
+  ADD COLUMN notify_party_country VARCHAR(100) NULL AFTER notify_party_postcode,
+  ADD COLUMN notify_party_contact_person VARCHAR(150) NULL AFTER notify_party_country,
+  ADD COLUMN notify_party_phone VARCHAR(30) NULL AFTER notify_party_contact_person,
+  ADD COLUMN notify_party_email VARCHAR(190) NULL AFTER notify_party_phone;
+
+-- ================================================================
+-- SECTION BC — BILL OF LADING ENDORSEMENT (added 2026-10-08)
+-- ================================================================
+-- "Mark Original BLs Endorsed by NexaCrest" (Stage 9, order_shipping.
+-- bl_endorsed_at/bl_endorsed_by, added earlier) only ever recorded a
+-- timestamp — it never produced the actual printable endorsement text
+-- staff need to physically write/stamp on the reverse of each of the 3
+-- original BLs ("Pay to the order of (Consignee): ... / BL Number: ... /
+-- Vessel / Voyage: ... / Date of Endorsement: ..."), per the business's
+-- own BL_Endorsement reference template. order_bl_endorsements is a
+-- small, order-scoped CRUD record (one row per order, upsert on save)
+-- holding exactly the fields that template needs and that genuinely
+-- aren't already captured elsewhere as a single source of truth:
+-- Vessel/Voyage (order_shipping keeps vessel_name and voyage_number as
+-- two separate columns; the template prints one combined "Vessel /
+-- Voyage" line) and Port of Loading (NexaCrest's own fixed origin port,
+-- which has no column anywhere — orders.port_of_loading_id is nullable
+-- and not reliably set). BL Number and Port of Discharge are editable
+-- here too (pre-filled from order_shipping.bl_number / the order's own
+-- port of discharge) so staff can correct a typo without hunting through
+-- two other screens first. Everything else the endorsement needs — the
+-- resolved Consignee ("Pay to the order of"), the latest approved PI/CI
+-- document references, the authorised signatory — is read live from
+-- existing data at generate time, never duplicated here.
+-- ================================================================
+CREATE TABLE order_bl_endorsements (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id              BIGINT UNSIGNED NOT NULL UNIQUE,
+  bl_number             VARCHAR(60) NULL,
+  vessel_voyage         VARCHAR(150) NULL,
+  port_of_loading       VARCHAR(150) NULL,
+  port_of_discharge     VARCHAR(150) NULL,
+  date_of_endorsement   DATE NULL,
+  created_by            BIGINT UNSIGNED NULL,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by            BIGINT UNSIGNED NULL,
+  updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+

@@ -1,0 +1,36 @@
+'use strict';
+
+const db = require('../config/db');
+
+// Section BC — the small, order-scoped CRUD record backing the Bill of
+// Lading Endorsement print feature (see docs/schema.sql Section BC for
+// why these specific fields exist here rather than being read from
+// order_shipping/orders directly). One row per order, upserted on save.
+
+async function find(orderId) {
+  return db.queryOne('SELECT * FROM order_bl_endorsements WHERE order_id = :order_id', { order_id: orderId });
+}
+
+async function upsert(orderId, data, userId) {
+  await db.execute(
+    `INSERT INTO order_bl_endorsements
+        (order_id, bl_number, vessel_voyage, port_of_loading, port_of_discharge, date_of_endorsement, created_by, updated_by)
+     VALUES (:order_id, :bl_number, :vessel_voyage, :port_of_loading, :port_of_discharge, :date_of_endorsement, :created_by, :updated_by)
+     ON DUPLICATE KEY UPDATE
+        bl_number = VALUES(bl_number), vessel_voyage = VALUES(vessel_voyage),
+        port_of_loading = VALUES(port_of_loading), port_of_discharge = VALUES(port_of_discharge),
+        date_of_endorsement = VALUES(date_of_endorsement), updated_by = VALUES(updated_by)`,
+    {
+      order_id: orderId,
+      bl_number: data.bl_number ?? null,
+      vessel_voyage: data.vessel_voyage ?? null,
+      port_of_loading: data.port_of_loading ?? null,
+      port_of_discharge: data.port_of_discharge ?? null,
+      date_of_endorsement: (data.date_of_endorsement ?? null) || null,
+      created_by: userId,
+      updated_by: userId,
+    }
+  );
+}
+
+module.exports = { find, upsert };

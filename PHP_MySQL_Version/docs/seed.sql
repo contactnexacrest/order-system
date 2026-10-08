@@ -219,7 +219,8 @@ INSERT INTO document_types (code, name, category, ref_format, never_shown_to_buy
   ('SOP_B_SALES', 'SOP — Sales Process, Tier B (Established Buyer — Post-BL)', 'internal', NULL,        1, 1, 1, 1),
   ('STAGEGATE', 'Stage Gate Reference',                 'internal',       NULL,                        1, 0, 1, 1),
   ('WALLREF',   'Wall Reference',                       'internal',       NULL,                        1, 0, 1, 1),
-  ('CAFIN',     'CA Financial Annexure — Government Benefits & Expenses (Internal Only)', 'internal', 'SC/CAFIN/{YYYY}/{DDMM}{NNN}', 1, 1, 0, 1);
+  ('CAFIN',     'CA Financial Annexure — Government Benefits & Expenses (Internal Only)', 'internal', 'SC/CAFIN/{YYYY}/{DDMM}{NNN}', 1, 1, 0, 1),
+  ('BLE',       'Bill of Lading Endorsement',           'customer_facing', 'SC/BLE/{YYYY}/{DDMM}{NNN}', 0, 1, 1, 1);
 
 -- ================================================================
 -- TC_CLAUSES / TC_CLAUSE_DOCUMENTS — real Terms & Conditions text
@@ -1221,17 +1222,24 @@ CROSS JOIN users u
 WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
 -- Client-verification reference documents (Factory/Quarry SOPs and
--- agreement templates) for the internal Reference Library (Section Y,
--- reference_library_documents). The actual files ship in git under
--- storage/assets/reference_library/ alongside the other committed assets
--- (logos, seals, signatures) so a fresh clone/deploy always has them —
--- unlike storage/internal/reference_library/, which is gitignored runtime
--- state for staff-uploaded custom entries, not these four fixed originals.
+-- agreement templates) plus the company's own blank legal-document
+-- templates (Sales & Supply Agreement, Commercial NDA, Staff NDA — these
+-- three added so staff always have the current template a single click
+-- away instead of hunting for a copy on a laptop) for the internal
+-- Reference Library (Section Y, reference_library_documents). The actual
+-- files ship in git under storage/assets/reference_library/ alongside
+-- the other committed assets (logos, seals, signatures) so a fresh
+-- clone/deploy always has them — unlike storage/internal/reference_library/,
+-- which is gitignored runtime state for staff-uploaded custom entries,
+-- not these seven fixed originals.
 INSERT INTO reference_library_documents (title, file_path, file_original_name, file_mime_type) VALUES
   ('Quarry SOP – Block Selection & Reservation', '__STORAGE_BASE_PATH__/assets/reference_library/quarry_sop_block_selection_and_reservation.pdf', 'Quarry SOP – Block Selection & Reservation.pdf', 'application/pdf'),
   ('Factory SOP – Processing, QC & Packing', '__STORAGE_BASE_PATH__/assets/reference_library/factory_sop_processing_qc_and_packing.pdf', 'Factory SOP – Processing, QC & Packing.pdf', 'application/pdf'),
   ('Factory Processing Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/factory_processing_agreement_template.docx', 'Factory Processing Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
-  ('Quarry Block Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/quarry_block_supply_agreement_template.docx', 'Quarry Block Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  ('Quarry Block Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/quarry_block_supply_agreement_template.docx', 'Quarry Block Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+  ('International Sales & Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/sales_supply_agreement_template.docx', 'International Sales & Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+  ('Mutual NDA — Commercial Counterparty (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/nda_commercial_counterparty_template.docx', 'Mutual NDA - Commercial Counterparty (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+  ('Staff Confidentiality & NDA (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/nda_staff_template.docx', 'Staff Confidentiality and NDA (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
 -- ================================================================
 -- COMPLIANCE TASK TYPES — the defaults the checklist on every order ships

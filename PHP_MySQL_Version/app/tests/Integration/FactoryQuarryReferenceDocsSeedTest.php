@@ -9,14 +9,16 @@ use App\Repositories\ReferenceLibraryRepository;
 use App\Tests\Support\DbTestCase;
 
 /**
- * These 4 client-verification documents (Quarry SOP, Factory SOP, Factory
- * Processing Agreement template, Quarry Block Supply Agreement template)
- * used to exist only as rows hand-inserted into the two live dev
- * databases, pointing at dev-machine-specific absolute paths, with the
- * actual files sitting only in storage/internal/reference_library/ —
+ * These 7 client-verification/legal-template documents (Quarry SOP,
+ * Factory SOP, Factory Processing Agreement template, Quarry Block
+ * Supply Agreement template, plus — added alongside Section BB/BC —
+ * the International Sales & Supply Agreement template and the two NDA
+ * templates) used to exist only as rows hand-inserted into the two live
+ * dev databases, pointing at dev-machine-specific absolute paths, with
+ * the actual files sitting only in storage/internal/reference_library/ —
  * which is gitignored. A fresh clone or a production deploy from git
  * alone would have neither the rows nor the files. Pins both: seed.sql
- * must create exactly these 4 rows, and the file each one's file_path
+ * must create exactly these 7 rows, and the file each one's file_path
  * resolves to (once __STORAGE_BASE_PATH__ is substituted, same as
  * production's post-import step) must actually exist in the repo.
  */
@@ -27,9 +29,12 @@ final class FactoryQuarryReferenceDocsSeedTest extends DbTestCase
         'Factory SOP – Processing, QC & Packing',
         'Factory Processing Agreement (Template)',
         'Quarry Block Supply Agreement (Template)',
+        'International Sales & Supply Agreement (Template)',
+        'Mutual NDA — Commercial Counterparty (Template)',
+        'Staff Confidentiality & NDA (Template)',
     ];
 
-    public function testSeedCreatesAllFourDocumentsWithFilesAttached(): void
+    public function testSeedCreatesAllSevenDocumentsWithFilesAttached(): void
     {
         $all = ReferenceLibraryRepository::all();
         $byTitle = [];
@@ -59,6 +64,6 @@ final class FactoryQuarryReferenceDocsSeedTest extends DbTestCase
             $checked++;
         }
 
-        self::assertSame(4, $checked, 'expected exactly 4 seeded Factory/Quarry reference documents backed by a committed file');
+        self::assertSame(7, $checked, 'expected exactly 7 seeded reference-library documents backed by a committed file');
     }
 }

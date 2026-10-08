@@ -36,19 +36,32 @@ async function accept(req, res) {
   }
 
   const clientUniqueNumber = await referenceNumberService.generateClientUniqueNumber();
+  const consigneeSameAsBuyer = parseInt(submission.consignee_same_as_buyer ?? 1, 10) === 1;
   const clientId = await clientRepository.create(
     {
       company_legal_name: submission.company_legal_name,
       billing_address: submission.billing_address,
-      consignee_name: null,
-      consignee_address: null,
       vat_eori_tax_no: submission.vat_eori_tax_no,
       contact_person: submission.contact_person,
       email: submission.email,
       phone: submission.phone,
       country_of_destination: submission.country_of_destination,
       coo_type: submission.coo_type || 'To Be Confirmed',
-      notify_party: null,
+      // Section BB — the client's own self-service Consignee split from
+      // the quotation-details form; Notify Party is never collected at
+      // this stage (see clientIntakeController), so it stays at its
+      // default (same-as-consignee) here.
+      consignee_same_as_buyer: consigneeSameAsBuyer ? 1 : 0,
+      consignee_name: consigneeSameAsBuyer ? null : submission.consignee_name,
+      consignee_address_line1: consigneeSameAsBuyer ? null : submission.consignee_address_line1,
+      consignee_address_line2: consigneeSameAsBuyer ? null : submission.consignee_address_line2,
+      consignee_city: consigneeSameAsBuyer ? null : submission.consignee_city,
+      consignee_postcode: consigneeSameAsBuyer ? null : submission.consignee_postcode,
+      consignee_country: consigneeSameAsBuyer ? null : submission.consignee_country,
+      consignee_vat_eori_tax_no: consigneeSameAsBuyer ? null : submission.consignee_vat_eori_tax_no,
+      consignee_contact_person: consigneeSameAsBuyer ? null : submission.consignee_contact_person,
+      consignee_phone: consigneeSameAsBuyer ? null : submission.consignee_phone,
+      consignee_email: consigneeSameAsBuyer ? null : submission.consignee_email,
     },
     user.id,
     clientUniqueNumber

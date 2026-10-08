@@ -970,6 +970,128 @@ final class DocumentGenerationService
         ];
     }
 
+    /**
+     * docs/schema.sql Section BC — the Bill of Lading Endorsement print.
+     * Unlike CAFIN above, this one IS a genuine buyer-facing document
+     * (category='customer_facing' — it carries the exact "Pay to the
+     * order of (Consignee)" / BL / vessel / PI / CI detail staff are
+     * about to physically write/stamp onto each of the 3 original BLs
+     * before couriering them to the buyer), so it is deliberately left
+     * visible to DocumentRepository::customerFacingForOrder() and the
+     * client portal, never excluded the way CAFIN/BLI/SUPPO are.
+     *
+     * It skips the normal draft->review->approve cycle: DocumentRepository
+     * ::create() always starts a document at status='draft', so this
+     * calls markApproved() immediately afterwards — there is no
+     * meaningful second-person review step for a mechanical restatement
+     * of data staff already entered and confirmed on the CRUD form
+     * (OrderBlEndorsementRepository) one step earlier on the order page.
+     *
+     * Refused unless that CRUD row already exists for this order (staff
+     * must save BL Number/Vessel-Voyage/Ports/Date of Endorsement first).
+     */
+    public static function generateBlEndorsement(int $orderId, int $generatedByUserId): array
+    {
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            throw new \RuntimeException("Order {$orderId} not found");
+        }
+
+        $endorsement = \App\Repositories\OrderBlEndorsementRepository::find($orderId);
+        if (!$endorsement) {
+            throw new \RuntimeException("BL Endorsement details have not been saved for order {$orderId} yet.");
+        }
+
+        $docTypeId = self::documentTypeIdFor('BLE');
+        if (!$docTypeId) {
+            throw new \RuntimeException('BLE document type is not seeded.');
+        }
+
+        $consignee = DocumentDataAssembler::resolveConsignee($order);
+        $piDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
+        $ciDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CI');
+        $signatory = DocumentDataAssembler::signatoryBlock($docTypeId);
+
+        $revisionNumber = ReferenceNumberService::nextDocumentRevisionNumber($orderId, $docTypeId);
+        $existing = DocumentRepository::findLatestForOrderAndType($orderId, $docTypeId);
+        $documentReference = $existing['document_reference'] ?? ReferenceNumberService::generateDocumentRef($docTypeId);
+
+        $context = [
+            'company' => DocumentDataAssembler::companyBlock(),
+            'assets' => DocumentDataAssembler::assetsBlock(),
+            'order' => [
+                'order_reference' => $order['order_reference'],
+            ],
+            'meta' => [
+                'document_reference' => $documentReference,
+                'revision_number'    => $revisionNumber,
+                'generated_date'     => (new \DateTimeImmutable())->format('d F Y'),
+            ],
+            'consignee' => $consignee,
+            'endorsement' => [
+                'bl_number'           => $endorsement['bl_number'],
+                'vessel_voyage'       => $endorsement['vessel_voyage'],
+                'port_of_loading'     => $endorsement['port_of_loading'],
+                'port_of_discharge'   => $endorsement['port_of_discharge'],
+                'date_of_endorsement' => $endorsement['date_of_endorsement']
+                    ? (new \DateTimeImmutable($endorsement['date_of_endorsement']))->format('d F Y')
+                    : null,
+            ],
+            'pi_reference' => $piDoc['document_reference'] ?? null,
+            'ci_reference' => $ciDoc['document_reference'] ?? null,
+            'signatory' => $signatory,
+        ];
+
+        $twig = self::twigEnvironment();
+        $html = $twig->render('BLE/bl_endorsement.html.twig', $context);
+        $pdfBytes = self::renderPdf($html);
+
+        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
+        $orderRef = self::sanitizePathSegment($order['order_reference']);
+        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/bl-endorsement/generated";
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+
+        $filenameSafeReference = str_replace('/', '-', $documentReference);
+        $uuidName = self::uuidFilename('pdf');
+        $pdfPath = "{$targetDir}/{$uuidName}";
+        file_put_contents($pdfPath, $pdfBytes);
+
+        $pdfFileId = FileStoreRepository::insertGenerated(
+            null,
+            $orderId,
+            null,
+            $pdfPath,
+            $uuidName,
+            "BLE {$filenameSafeReference}.pdf",
+            strlen($pdfBytes),
+            'application/pdf',
+            $generatedByUserId,
+            false
+        );
+
+        $documentId = DocumentRepository::create(
+            $orderId,
+            $docTypeId,
+            $documentReference,
+            $revisionNumber,
+            $pdfFileId,
+            null,
+            $generatedByUserId,
+            $signatory
+        );
+        DocumentRepository::markApproved($documentId, $pdfFileId);
+
+        return [
+            'document_id'        => $documentId,
+            'document_reference' => $documentReference,
+            'revision_number'    => $revisionNumber,
+            'pdf_file_id'        => $pdfFileId,
+        ];
+    }
+
     private static function twigEnvironment(): TwigEnvironment
     {
         $loader = new TwigFilesystemLoader(dirname(__DIR__, 2) . '/templates');

@@ -39,16 +39,13 @@ final class PiIntakeController
             return;
         }
 
-        $data = [
+        $data = array_merge([
             'company_legal_name'             => trim((string) ($_POST['company_legal_name'] ?? '')),
             'billing_address'                => trim((string) ($_POST['billing_address'] ?? '')),
-            'consignee_name'                 => trim((string) ($_POST['consignee_name'] ?? '')),
-            'consignee_address'               => trim((string) ($_POST['consignee_address'] ?? '')),
             'vat_eori_tax_no'                => trim((string) ($_POST['vat_eori_tax_no'] ?? '')),
             'contact_person'                 => trim((string) ($_POST['contact_person'] ?? '')),
             'email'                          => trim((string) ($_POST['email'] ?? '')),
             'phone'                          => trim((string) ($_POST['phone'] ?? '')),
-            'notify_party'                   => trim((string) ($_POST['notify_party'] ?? '')),
             'port_of_discharge_text'          => trim((string) ($_POST['port_of_discharge_text'] ?? '')),
             'country_of_destination'          => trim((string) ($_POST['country_of_destination'] ?? '')),
             'incoterm_confirmed'             => trim((string) ($_POST['incoterm_confirmed'] ?? '')),
@@ -59,11 +56,14 @@ final class PiIntakeController
             'buyer_po_ref'                    => trim((string) ($_POST['buyer_po_ref'] ?? '')),
             'changes_from_quotation'          => trim((string) ($_POST['changes_from_quotation'] ?? '')),
             'special_document_requirements'   => trim((string) ($_POST['special_document_requirements'] ?? '')),
-        ];
+        ], self::collectPartyFields());
 
         // Required set per the business's own PI Form spec (Client_Forms.xlsx).
+        // Consignee/Notify Party are never in this list — they're
+        // self-service structured fields gated by their own "Same as X?"
+        // checkbox (see collectPartyFields()), not free-text requireds.
         $required = [
-            'company_legal_name', 'billing_address', 'consignee_name', 'consignee_address',
+            'company_legal_name', 'billing_address',
             'vat_eori_tax_no', 'contact_person', 'email', 'phone',
             'port_of_discharge_text', 'country_of_destination', 'incoterm_confirmed',
             'payment_terms_confirmation', 'quotation_acceptance_reference', 'coo_type',
@@ -88,5 +88,72 @@ final class PiIntakeController
 
         PiIntakeRepository::submit((int) $submission['id'], $data, $_SERVER['REMOTE_ADDR'] ?? null);
         View::render('pi_intake/thank_you', [], 'layout/bare');
+    }
+
+    /**
+     * Section BB — the client's own self-service Consignee/Notify Party
+     * "Same as X?" split on the PI-details form, mirroring
+     * ClientController::collectPartyFields() field-for-field so the
+     * values land in pi_intake_submissions using the exact same column
+     * names ClientRepository::update() already expects (see
+     * PiIntakeReviewController::accept()).
+     */
+    private static function collectPartyFields(): array
+    {
+        $consigneeSameAsBuyer = !empty($_POST['consignee_same_as_buyer']);
+        $notifySameAsConsignee = !empty($_POST['notify_party_same_as_consignee']);
+
+        $fields = [
+            'consignee_same_as_buyer'        => $consigneeSameAsBuyer ? 1 : 0,
+            'notify_party_same_as_consignee' => $notifySameAsConsignee ? 1 : 0,
+        ];
+
+        if ($consigneeSameAsBuyer) {
+            $fields['consignee_name'] = null;
+            $fields['consignee_address_line1'] = null;
+            $fields['consignee_address_line2'] = null;
+            $fields['consignee_city'] = null;
+            $fields['consignee_postcode'] = null;
+            $fields['consignee_country'] = null;
+            $fields['consignee_vat_eori_tax_no'] = null;
+            $fields['consignee_contact_person'] = null;
+            $fields['consignee_phone'] = null;
+            $fields['consignee_email'] = null;
+        } else {
+            $fields['consignee_name'] = trim((string) ($_POST['consignee_name'] ?? '')) ?: null;
+            $fields['consignee_address_line1'] = trim((string) ($_POST['consignee_address_line1'] ?? '')) ?: null;
+            $fields['consignee_address_line2'] = trim((string) ($_POST['consignee_address_line2'] ?? '')) ?: null;
+            $fields['consignee_city'] = trim((string) ($_POST['consignee_city'] ?? '')) ?: null;
+            $fields['consignee_postcode'] = trim((string) ($_POST['consignee_postcode'] ?? '')) ?: null;
+            $fields['consignee_country'] = trim((string) ($_POST['consignee_country'] ?? '')) ?: null;
+            $fields['consignee_vat_eori_tax_no'] = trim((string) ($_POST['consignee_vat_eori_tax_no'] ?? '')) ?: null;
+            $fields['consignee_contact_person'] = trim((string) ($_POST['consignee_contact_person'] ?? '')) ?: null;
+            $fields['consignee_phone'] = trim((string) ($_POST['consignee_phone'] ?? '')) ?: null;
+            $fields['consignee_email'] = trim((string) ($_POST['consignee_email'] ?? '')) ?: null;
+        }
+
+        if ($notifySameAsConsignee) {
+            $fields['notify_party'] = null;
+            $fields['notify_party_address_line1'] = null;
+            $fields['notify_party_address_line2'] = null;
+            $fields['notify_party_city'] = null;
+            $fields['notify_party_postcode'] = null;
+            $fields['notify_party_country'] = null;
+            $fields['notify_party_contact_person'] = null;
+            $fields['notify_party_phone'] = null;
+            $fields['notify_party_email'] = null;
+        } else {
+            $fields['notify_party'] = trim((string) ($_POST['notify_party'] ?? '')) ?: null;
+            $fields['notify_party_address_line1'] = trim((string) ($_POST['notify_party_address_line1'] ?? '')) ?: null;
+            $fields['notify_party_address_line2'] = trim((string) ($_POST['notify_party_address_line2'] ?? '')) ?: null;
+            $fields['notify_party_city'] = trim((string) ($_POST['notify_party_city'] ?? '')) ?: null;
+            $fields['notify_party_postcode'] = trim((string) ($_POST['notify_party_postcode'] ?? '')) ?: null;
+            $fields['notify_party_country'] = trim((string) ($_POST['notify_party_country'] ?? '')) ?: null;
+            $fields['notify_party_contact_person'] = trim((string) ($_POST['notify_party_contact_person'] ?? '')) ?: null;
+            $fields['notify_party_phone'] = trim((string) ($_POST['notify_party_phone'] ?? '')) ?: null;
+            $fields['notify_party_email'] = trim((string) ($_POST['notify_party_email'] ?? '')) ?: null;
+        }
+
+        return $fields;
     }
 }

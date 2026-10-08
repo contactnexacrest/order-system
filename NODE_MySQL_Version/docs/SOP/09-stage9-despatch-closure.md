@@ -45,6 +45,41 @@ Stage 9's gate and marks the order complete.**
 
 ![Stage 9 section — order closed](./images/s9_closed.png)
 
+## BL Endorsement document
+
+Once **Record Original BLs Received from CHA** has been ticked, a **BL
+Endorsement** panel appears on the order page (gated on the same
+`manage_shipping` permission as the two record-keeping steps above). It
+has two parts:
+
+1. **A small CRUD form** capturing the handful of endorsement-specific
+   details not already held anywhere else on the order: **BL Number**,
+   **Vessel / Voyage**, **Port of Loading** (pre-filled `Chennai, India` if
+   nothing else on the order suggests otherwise), **Port of Discharge**,
+   and **Date of Endorsement**. Saving this form is independent of — and
+   does not touch — the Freight-stage shipping record; it can be edited
+   and re-saved as many times as needed before (or after) generating the
+   document.
+2. **Generate / Print BL Endorsement** — appears once the form above has
+   been saved at least once. Produces a one-page PDF, in NexaCrest's
+   letterhead, meant to be physically written onto the reverse of each
+   original Bill of Lading: it restates the saved BL Number, Vessel /
+   Voyage, Port of Loading, Port of Discharge, and Date of Endorsement,
+   alongside the order's PI/CI reference numbers, the "Pay to the order
+   of" consignee (resolved live from the order's current Consignee
+   details — same-as-buyer or independent, whichever applies right now),
+   and the authorised signatory block.
+
+Unlike every other buyer-facing document in the system, the BL Endorsement
+skips the normal draft → in-review → approved cycle entirely — generating
+it immediately marks it **approved** and makes it visible to the buyer in
+their client-portal document list. This is deliberate: by the time staff
+reach this step they have already confirmed every value on the CRUD form
+one step earlier, so a second-person review of a mechanical restatement of
+those same values adds no real check. Each regeneration (editing the form
+and generating again) bumps the document's revision number on the same
+reference rather than starting a new one.
+
 ## Compliance Checklist
 
 A separate "Compliance Checklist" panel sits on every order's own page

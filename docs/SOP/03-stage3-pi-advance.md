@@ -29,9 +29,18 @@ intake in Chapter 1 — different form, different purpose, different review
 queue. Once the Quotation is out, staff can generate a one-time link
 (**Regenerate PI Form Link**, on the order page) and send it to the buyer to
 confirm the exact details that will appear on the PI and later shipping
-documents — consignee name and address, notify party, port of discharge,
-confirmed Incoterm, container type, payment-terms confirmation, and Country
-of Origin type — fields the Quotation stage never asked for.
+documents — consignee details, notify party, port of discharge, confirmed
+Incoterm, container type, payment-terms confirmation, and Country of Origin
+type — fields the Quotation stage never asked for.
+
+The buyer fills in **Consignee Details** and **Notify Party** here the same
+way staff would on the admin Clients form: a **Same as Buyer?** checkbox
+(Consignee) and a **Same as Consignee?** checkbox (Notify Party), both
+checked by default. Leaving a box checked means that section's fields stay
+disabled and resolve dynamically from whichever party it's "same as" —
+exactly the always-fresh resolution described in Chapter 1 — so a buyer
+only needs to uncheck a box and fill in independent details when the goods
+genuinely ship to, or need notifying, a different company than their own.
 
 The "Your Details" section (company name, billing address, consignee,
 VAT/EORI/tax no., contact person, email, phone) and the Incoterm/port of
@@ -56,13 +65,14 @@ either:
 - **Accept** — this is the authoritative correction point for the client's
   identity fields: accepting **overwrites the live client record** with
   exactly what the buyer confirmed (the PI Form spec requires these fields
-  to match official documents exactly), locks the client's data from further
-  edits, and — if the buyer supplied one — records the Buyer's PO Ref on the
-  order. Everything else on the submission (payment-terms confirmation,
-  confirmed Incoterm/port/COO, quotation-acceptance reference, any changes
-  from the quotation) stays visible on the order for staff to read before
-  generating the PI, but is never auto-written into the order's own
-  structured fields.
+  to match official documents exactly) — including the Consignee/Notify
+  Party "Same as X?" flags and every structured field underneath them —
+  locks the client's data from further edits, and — if the buyer supplied
+  one — records the Buyer's PO Ref on the order. Everything else on the
+  submission (payment-terms confirmation, confirmed Incoterm/port/COO,
+  quotation-acceptance reference, any changes from the quotation) stays
+  visible on the order for staff to read before generating the PI, but is
+  never auto-written into the order's own structured fields.
 - **Reject** (with a reason) — the buyer can resubmit via the same link.
 
 ### Generating the PI

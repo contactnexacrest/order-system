@@ -616,6 +616,8 @@ app.post('/orders/:id/payment/balance/clear', requireAuth, requirePermission('ma
 
 app.post('/orders/:id/bl-originals-received', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordBlOriginalsReceived));
 app.post('/orders/:id/bl-endorsed', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordBlEndorsed));
+app.post('/orders/:id/bl-endorsement', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.saveBlEndorsement));
+app.post('/orders/:id/bl-endorsement/generate', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.generateBlEndorsement));
 app.post('/orders/:id/close', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.closeOrder));
 app.post('/orders/:id/mark-lost', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.markLost));
 app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.updateComplianceTask));

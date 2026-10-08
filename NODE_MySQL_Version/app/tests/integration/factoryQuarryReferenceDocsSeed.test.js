@@ -6,14 +6,16 @@ const referenceLibraryRepository = require('../../src/repositories/referenceLibr
 const db = require('../../src/config/db');
 
 /**
- * These 4 client-verification documents (Quarry SOP, Factory SOP, Factory
- * Processing Agreement template, Quarry Block Supply Agreement template)
- * used to exist only as rows hand-inserted into the two live dev
- * databases, pointing at dev-machine-specific absolute paths, with the
- * actual files sitting only in storage/internal/reference_library/ —
+ * These 7 client-verification/legal-template documents (Quarry SOP,
+ * Factory SOP, Factory Processing Agreement template, Quarry Block
+ * Supply Agreement template, plus — added alongside Section BB/BC —
+ * the International Sales & Supply Agreement template and the two NDA
+ * templates) used to exist only as rows hand-inserted into the two live
+ * dev databases, pointing at dev-machine-specific absolute paths, with
+ * the actual files sitting only in storage/internal/reference_library/ —
  * which is gitignored. A fresh clone or a production deploy from git
  * alone would have neither the rows nor the files. Pins both: seed.sql
- * must create exactly these 4 rows, and the file each one's file_path
+ * must create exactly these 7 rows, and the file each one's file_path
  * resolves to (once __STORAGE_BASE_PATH__ is substituted, same as
  * production's post-import step) must actually exist in the repo.
  */
@@ -27,9 +29,12 @@ describe('Factory/Quarry reference documents seed', () => {
     'Factory SOP – Processing, QC & Packing',
     'Factory Processing Agreement (Template)',
     'Quarry Block Supply Agreement (Template)',
+    'International Sales & Supply Agreement (Template)',
+    'Mutual NDA — Commercial Counterparty (Template)',
+    'Staff Confidentiality & NDA (Template)',
   ];
 
-  it('seed creates all four documents with files attached', async () => {
+  it('seed creates all seven documents with files attached', async () => {
     const all = await referenceLibraryRepository.all();
     const byTitle = Object.fromEntries(all.map((row) => [row.title, row]));
 
@@ -54,6 +59,6 @@ describe('Factory/Quarry reference documents seed', () => {
       checked += 1;
     }
 
-    expect(checked).toBe(4);
+    expect(checked).toBe(7);
   });
 });

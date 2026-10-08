@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  {#
+    Deliberately standalone (does not extend _layout.html.twig) — this is
+    a single-page printable worksheet, not a sectioned legal document, so
+    it carries none of _layout's buyer/terms/annexure section machinery.
+    It still uses the full NexaCrest brand letterhead (logo, navy/gold)
+    since — unlike CAFIN — this IS a genuine buyer-facing document.
+  #}
+  @page { margin: 0.6in 0.65in; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Aptos', sans-serif; font-size: 10pt; color: #1A1A1A; }
+  table { border-collapse: collapse; width: 100%; }
+
+  .letterhead { display: table; width: 100%; margin-bottom: 14pt; border-bottom: 2pt solid #17233A; padding-bottom: 8pt; }
+  .letterhead .logo-cell { display: table-cell; width: 70pt; vertical-align: middle; }
+  .letterhead .logo-cell img { max-width: 60pt; max-height: 60pt; }
+  .letterhead .title-cell { display: table-cell; vertical-align: middle; padding-left: 10pt; }
+  .letterhead .company-name { font-size: 13pt; font-weight: bold; color: #17233A; }
+  .letterhead .doc-title { font-size: 15pt; font-weight: bold; color: #B8860B; margin-top: 2pt; letter-spacing: 0.5pt; }
+
+  .meta-line { font-size: 8.5pt; color: #555555; margin-bottom: 10pt; }
+
+  .how-to-use { border: 1pt solid #B8860B; background: #FBF6E9; padding: 8pt 10pt; margin-bottom: 14pt; font-size: 9.5pt; }
+  .how-to-use .label { font-weight: bold; color: #17233A; display: block; margin-bottom: 4pt; }
+  .how-to-use ul { margin: 0; padding-left: 16pt; }
+  .how-to-use li { margin-bottom: 3pt; }
+
+  .section-title { background: #17233A; color: #FFFFFF; font-size: 10.5pt; font-weight: bold;
+    padding: 5pt 9pt; margin-bottom: 0; }
+
+  table.endorsement td { border: 1pt solid #999999; padding: 6pt 9pt; vertical-align: top; font-size: 9.5pt; }
+  table.endorsement td.field-label { width: 32%; font-weight: bold; color: #17233A; background: #F4F4F4; }
+  table.endorsement td.field-value { width: 68%; }
+
+  .signatory-block { margin-top: 22pt; display: table; width: 100%; }
+  .signatory-block .seal-cell { display: table-cell; width: 50%; vertical-align: bottom; text-align: center; }
+  .signatory-block .sig-cell { display: table-cell; width: 50%; vertical-align: bottom; text-align: center; }
+  .signatory-block img.seal { max-height: 70pt; max-width: 70pt; }
+  .signatory-block img.signature { max-height: 40pt; max-width: 160pt; display: block; margin: 0 auto 4pt; }
+  .signatory-block .name { font-weight: bold; font-size: 10pt; margin-top: 4pt; }
+  .signatory-block .designation { font-size: 9pt; color: #444444; }
+  .signatory-block .for-company { font-size: 9pt; color: #444444; margin-bottom: 4pt; }
+  .signatory-block .line { border-top: 1pt solid #999999; margin-top: 6pt; padding-top: 3pt; font-size: 8.5pt; color: #666666; }
+
+  .footer-note { margin-top: 16pt; font-size: 8pt; font-style: italic; color: #666666; border-top: 1pt solid #CCCCCC; padding-top: 6pt; }
+</style>
+</head>
+<body>
+
+<div class="letterhead">
+  <div class="logo-cell">
+    {% if assets.logo_data_uri %}<img src="{{ assets.logo_data_uri }}" alt="NexaCrest">{% endif %}
+  </div>
+  <div class="title-cell">
+    <div class="company-name">{{ company.legal_name }}</div>
+    <div class="doc-title">BILL OF LADING ENDORSEMENT</div>
+  </div>
+</div>
+
+<div class="meta-line">
+  Order {{ order.order_reference }} &middot; Document Ref {{ meta.document_reference }} &middot; Rev.{{ '%02d'|format(meta.revision_number) }} &middot; Generated {{ meta.generated_date }}
+</div>
+
+<div class="how-to-use">
+  <span class="label">HOW TO USE</span>
+  <ul>
+    <li>Print and write by hand — or have a rubber stamp made of the endorsement box below.</li>
+    <li>Complete one endorsement on the reverse of EACH of the 3 original Bills of Lading. All 3 must be endorsed.</li>
+    <li>Endorse ONLY after the Balance Payment is confirmed as Payment Cleared in NexaCrest's bank account.</li>
+  </ul>
+</div>
+
+<div class="section-title">ENDORSEMENT — WRITE ON REVERSE OF EACH ORIGINAL BL</div>
+<table class="endorsement">
+  <tr>
+    <td class="field-label">Pay to the order of (Consignee)</td>
+    <td class="field-value">{{ consignee.company_legal_name|default('To Be Confirmed') }}</td>
+  </tr>
+  <tr>
+    <td class="field-label">BL Number</td>
+    <td class="field-value">{{ endorsement.bl_number|default('To Be Confirmed') }}</td>
+  </tr>
+  <tr>
+    <td class="field-label">Vessel / Voyage</td>
+    <td class="field-value">{{ endorsement.vessel_voyage|default('To Be Confirmed') }}</td>
+  </tr>
+  <tr>
+    <td class="field-label">Port of Loading</td>
+    <td class="field-value">{{ endorsement.port_of_loading|default('To Be Confirmed') }}</td>
+  </tr>
+  <tr>
+    <td class="field-label">Port of Discharge</td>
+    <td class="field-value">{{ endorsement.port_of_discharge|default('To Be Confirmed') }}</td>
+  </tr>
+  <tr>
+    <td class="field-label">Proforma Invoice No.</td>
+    <td class="field-value">{{ pi_reference|default('To Be Confirmed') }}</td>
+  </tr>
+  <tr>
+    <td class="field-label">Commercial Invoice No.</td>
+    <td class="field-value">{{ ci_reference|default('To Be Confirmed') }}</td>
+  </tr>
+  <tr>
+    <td class="field-label">Date of Endorsement</td>
+    <td class="field-value">{{ endorsement.date_of_endorsement|default('To Be Confirmed') }}</td>
+  </tr>
+</table>
+
+<div class="signatory-block">
+  <div class="seal-cell">
+    {% if signatory.company_seal_data_uri %}<img class="seal" src="{{ signatory.company_seal_data_uri }}" alt="Company Seal">{% endif %}
+    <div class="for-company">For {{ company.legal_name }}</div>
+  </div>
+  <div class="sig-cell">
+    {% if signatory.signature_data_uri %}<img class="signature" src="{{ signatory.signature_data_uri }}" alt="Signature">{% endif %}
+    {% if signatory.seal_data_uri %}<img class="seal" src="{{ signatory.seal_data_uri }}" alt="Designation Seal">{% endif %}
+    <div class="line">Authorised Signatory</div>
+    <div class="name">{{ signatory.name }}</div>
+    <div class="designation">{{ signatory.designation }}</div>
+    <div class="designation">GSTIN: {{ company.gstin }} | IEC: {{ company.iec_pan }}</div>
+  </div>
+</div>
+
+<div class="footer-note">
+  This endorsement record is generated from NexaCrest's own order data and is not itself a negotiable instrument — it exists solely to guide the physical endorsement written or stamped on the reverse of each original Bill of Lading.
+</div>
+
+</body>
+</html>

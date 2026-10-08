@@ -117,7 +117,47 @@ final class ClientIntakeController
             Flash::set('error', "\"{$data['email']}\" doesn't look like a valid email address.");
             return null;
         }
-        return $data;
+        return array_merge($data, self::collectConsigneeFields());
+    }
+
+    /**
+     * Section BB — lets the client self-serve the same Consignee "Same as
+     * Buyer?" split staff already had on the admin Clients form (see
+     * ClientController::collectPartyFields()). Never Notify Party here —
+     * the Quotation stage doesn't show a Notify Party section on any
+     * document (docs/SOP/01-stage1-enquiry-quotation.md), so there's
+     * nothing for this form to collect.
+     */
+    private static function collectConsigneeFields(): array
+    {
+        $consigneeSameAsBuyer = !empty($_POST['consignee_same_as_buyer']);
+        $fields = ['consignee_same_as_buyer' => $consigneeSameAsBuyer ? 1 : 0];
+
+        if ($consigneeSameAsBuyer) {
+            $fields['consignee_name'] = null;
+            $fields['consignee_address_line1'] = null;
+            $fields['consignee_address_line2'] = null;
+            $fields['consignee_city'] = null;
+            $fields['consignee_postcode'] = null;
+            $fields['consignee_country'] = null;
+            $fields['consignee_vat_eori_tax_no'] = null;
+            $fields['consignee_contact_person'] = null;
+            $fields['consignee_phone'] = null;
+            $fields['consignee_email'] = null;
+        } else {
+            $fields['consignee_name'] = trim((string) ($_POST['consignee_name'] ?? '')) ?: null;
+            $fields['consignee_address_line1'] = trim((string) ($_POST['consignee_address_line1'] ?? '')) ?: null;
+            $fields['consignee_address_line2'] = trim((string) ($_POST['consignee_address_line2'] ?? '')) ?: null;
+            $fields['consignee_city'] = trim((string) ($_POST['consignee_city'] ?? '')) ?: null;
+            $fields['consignee_postcode'] = trim((string) ($_POST['consignee_postcode'] ?? '')) ?: null;
+            $fields['consignee_country'] = trim((string) ($_POST['consignee_country'] ?? '')) ?: null;
+            $fields['consignee_vat_eori_tax_no'] = trim((string) ($_POST['consignee_vat_eori_tax_no'] ?? '')) ?: null;
+            $fields['consignee_contact_person'] = trim((string) ($_POST['consignee_contact_person'] ?? '')) ?: null;
+            $fields['consignee_phone'] = trim((string) ($_POST['consignee_phone'] ?? '')) ?: null;
+            $fields['consignee_email'] = trim((string) ($_POST['consignee_email'] ?? '')) ?: null;
+        }
+
+        return $fields;
     }
 
     /** Emails the client a one-time correction link and returns it, so the thank-you page can also show it directly. */

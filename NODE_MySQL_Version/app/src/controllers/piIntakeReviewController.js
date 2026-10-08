@@ -51,15 +51,37 @@ async function accept(req, res) {
   await clientRepository.update(order.client_id, {
     company_legal_name: submission.company_legal_name,
     billing_address: submission.billing_address,
-    consignee_name: submission.consignee_name,
-    consignee_address: submission.consignee_address,
     vat_eori_tax_no: submission.vat_eori_tax_no,
     contact_person: submission.contact_person,
     email: submission.email,
     phone: submission.phone,
     country_of_destination: submission.country_of_destination,
     coo_type: submission.coo_type,
+    // Section BB — the client's own self-service Consignee/Notify Party
+    // split from the PI-details form, carried through verbatim to the
+    // exact same clientRepository.update() columns the admin Clients
+    // edit screen writes to.
+    consignee_same_as_buyer: submission.consignee_same_as_buyer,
+    consignee_name: submission.consignee_name,
+    consignee_address_line1: submission.consignee_address_line1,
+    consignee_address_line2: submission.consignee_address_line2,
+    consignee_city: submission.consignee_city,
+    consignee_postcode: submission.consignee_postcode,
+    consignee_country: submission.consignee_country,
+    consignee_vat_eori_tax_no: submission.consignee_vat_eori_tax_no,
+    consignee_contact_person: submission.consignee_contact_person,
+    consignee_phone: submission.consignee_phone,
+    consignee_email: submission.consignee_email,
+    notify_party_same_as_consignee: submission.notify_party_same_as_consignee,
     notify_party: submission.notify_party,
+    notify_party_address_line1: submission.notify_party_address_line1,
+    notify_party_address_line2: submission.notify_party_address_line2,
+    notify_party_city: submission.notify_party_city,
+    notify_party_postcode: submission.notify_party_postcode,
+    notify_party_country: submission.notify_party_country,
+    notify_party_contact_person: submission.notify_party_contact_person,
+    notify_party_phone: submission.notify_party_phone,
+    notify_party_email: submission.notify_party_email,
   });
   if (submission.buyer_po_ref) {
     await orderRepository.setBuyersPoRef(order.id, submission.buyer_po_ref);

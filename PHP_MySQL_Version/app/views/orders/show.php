@@ -1645,6 +1645,32 @@ foreach ($stages as $s) {
         <p class="muted small">Original BLs endorsed.</p>
       <?php endif; ?>
 
+      <?php if ($canManageShipping && $shipping && $shipping['bl_originals_received_at']): ?>
+      <h3 style="font-size:0.95em; margin-top:14px;">BL Endorsement (print &amp; physically stamp all 3 originals)</h3>
+      <p class="muted small">Save these details, then generate the printable endorsement — it states who to endorse the BL to ("Pay to the order of"), the BL/vessel/voyage, both ports, the latest PI/CI references, and the authorised signatory, exactly as it should be written or stamped on the reverse of each original BL.</p>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsement">
+        <?= Csrf::field() ?>
+        <label>BL Number<input type="text" name="bl_number" value="<?= htmlspecialchars($blEndorsement['bl_number'] ?? $shipping['bl_number'] ?? '') ?>"></label>
+        <label>Vessel / Voyage<input type="text" name="vessel_voyage" placeholder="e.g. MSC MAYA / 012W" value="<?= htmlspecialchars($blEndorsement['vessel_voyage'] ?? (trim(($shipping['vessel_name'] ?? '') . ' / ' . ($shipping['voyage_number'] ?? '')) !== '/' ? trim(($shipping['vessel_name'] ?? '') . ' / ' . ($shipping['voyage_number'] ?? '')) : '')) ?>"></label>
+        <label>Port of Loading<input type="text" name="port_of_loading" value="<?= htmlspecialchars($blEndorsement['port_of_loading'] ?? $order['port_of_loading_name'] ?? 'Chennai, India') ?>"></label>
+        <label>Port of Discharge<input type="text" name="port_of_discharge" value="<?= htmlspecialchars($blEndorsement['port_of_discharge'] ?? $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '') ?>"></label>
+        <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="<?= htmlspecialchars($blEndorsement['date_of_endorsement'] ?? date('Y-m-d')) ?>"></label>
+        <button type="submit" class="btn-sm">Save BL Endorsement Details</button>
+      </form>
+      <?php if ($blEndorsement): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsement/generate" style="margin-top:8px;">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
+      </form>
+      <?php endif; ?>
+      <?php if ($blEndorsementDoc): ?>
+        <p class="small" style="margin-top:6px;">
+          Latest: <a href="/documents/<?= (int) $blEndorsementDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($blEndorsementDoc['document_reference']) ?></a>
+          (generated <?= htmlspecialchars((string) $blEndorsementDoc['generated_at']) ?>)
+        </p>
+      <?php endif; ?>
+      <?php endif; ?>
+
       <?php if ($canCloseOrders): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>

@@ -20,11 +20,17 @@ final class ClientIntakeRepository
             'INSERT INTO client_intake_submissions
                 (company_legal_name, billing_address, vat_eori_tax_no, contact_person, email, phone,
                  country_of_destination, port_of_discharge_text, coo_type, incoterm_preference,
-                 container_type_text, buyer_own_reference, notes, submitted_ip)
+                 container_type_text, buyer_own_reference, notes, submitted_ip,
+                 consignee_same_as_buyer, consignee_name, consignee_address_line1, consignee_address_line2,
+                 consignee_city, consignee_postcode, consignee_country, consignee_vat_eori_tax_no,
+                 consignee_contact_person, consignee_phone, consignee_email)
              VALUES
                 (:company_legal_name, :billing_address, :vat_eori_tax_no, :contact_person, :email, :phone,
                  :country_of_destination, :port_of_discharge_text, :coo_type, :incoterm_preference,
-                 :container_type_text, :buyer_own_reference, :notes, :ip)'
+                 :container_type_text, :buyer_own_reference, :notes, :ip,
+                 :consignee_same_as_buyer, :consignee_name, :consignee_address_line1, :consignee_address_line2,
+                 :consignee_city, :consignee_postcode, :consignee_country, :consignee_vat_eori_tax_no,
+                 :consignee_contact_person, :consignee_phone, :consignee_email)'
         );
         $stmt->execute([
             'company_legal_name'     => $data['company_legal_name'],
@@ -41,6 +47,17 @@ final class ClientIntakeRepository
             'buyer_own_reference'    => $data['buyer_own_reference'] ?: null,
             'notes'                  => $data['notes'] ?: null,
             'ip'                     => $ip,
+            'consignee_same_as_buyer'   => (int) ($data['consignee_same_as_buyer'] ?? 1),
+            'consignee_name'             => $data['consignee_name'] ?? null,
+            'consignee_address_line1'    => $data['consignee_address_line1'] ?? null,
+            'consignee_address_line2'    => $data['consignee_address_line2'] ?? null,
+            'consignee_city'             => $data['consignee_city'] ?? null,
+            'consignee_postcode'         => $data['consignee_postcode'] ?? null,
+            'consignee_country'          => $data['consignee_country'] ?? null,
+            'consignee_vat_eori_tax_no'  => $data['consignee_vat_eori_tax_no'] ?? null,
+            'consignee_contact_person'   => $data['consignee_contact_person'] ?? null,
+            'consignee_phone'            => $data['consignee_phone'] ?? null,
+            'consignee_email'            => $data['consignee_email'] ?? null,
         ]);
         return (int) $pdo->lastInsertId();
     }
@@ -84,7 +101,13 @@ final class ClientIntakeRepository
                 phone = :phone, country_of_destination = :country_of_destination,
                 port_of_discharge_text = :port_of_discharge_text, coo_type = :coo_type,
                 incoterm_preference = :incoterm_preference, container_type_text = :container_type_text,
-                buyer_own_reference = :buyer_own_reference, notes = :notes
+                buyer_own_reference = :buyer_own_reference, notes = :notes,
+                consignee_same_as_buyer = :consignee_same_as_buyer, consignee_name = :consignee_name,
+                consignee_address_line1 = :consignee_address_line1, consignee_address_line2 = :consignee_address_line2,
+                consignee_city = :consignee_city, consignee_postcode = :consignee_postcode,
+                consignee_country = :consignee_country, consignee_vat_eori_tax_no = :consignee_vat_eori_tax_no,
+                consignee_contact_person = :consignee_contact_person, consignee_phone = :consignee_phone,
+                consignee_email = :consignee_email
              WHERE id = :id'
         )->execute([
             'company_legal_name'     => $data['company_legal_name'],
@@ -101,6 +124,17 @@ final class ClientIntakeRepository
             'buyer_own_reference'    => $data['buyer_own_reference'] ?: null,
             'notes'                  => $data['notes'] ?: null,
             'id'                     => $id,
+            'consignee_same_as_buyer'   => (int) ($data['consignee_same_as_buyer'] ?? 1),
+            'consignee_name'             => $data['consignee_name'] ?? null,
+            'consignee_address_line1'    => $data['consignee_address_line1'] ?? null,
+            'consignee_address_line2'    => $data['consignee_address_line2'] ?? null,
+            'consignee_city'             => $data['consignee_city'] ?? null,
+            'consignee_postcode'         => $data['consignee_postcode'] ?? null,
+            'consignee_country'          => $data['consignee_country'] ?? null,
+            'consignee_vat_eori_tax_no'  => $data['consignee_vat_eori_tax_no'] ?? null,
+            'consignee_contact_person'   => $data['consignee_contact_person'] ?? null,
+            'consignee_phone'            => $data['consignee_phone'] ?? null,
+            'consignee_email'            => $data['consignee_email'] ?? null,
         ]);
     }
 

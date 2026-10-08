@@ -40,7 +40,46 @@
     </fieldset>
 
     <fieldset class="intake-step">
-      <legend><span class="intake-step-num">2</span> Shipping Preference</legend>
+      <legend><span class="intake-step-num">2</span> Consignee Details</legend>
+      <p class="muted small">The consignee is the company your goods actually ship to — often the same as you, but not always.</p>
+      <?php $consigneeSame = (int) ($submission['consignee_same_as_buyer'] ?? 1) === 1; ?>
+      <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" <?= $consigneeSame ? 'checked' : '' ?>> Same as Buyer (my own company above)</label>
+      <div id="consignee_fields" class="field-grid" style="display:none">
+        <label class="full">Consignee Company Legal Name
+          <input type="text" name="consignee_name" value="<?= htmlspecialchars($submission['consignee_name'] ?? '') ?>">
+        </label>
+        <label class="full">Consignee Address Line 1
+          <input type="text" name="consignee_address_line1" value="<?= htmlspecialchars($submission['consignee_address_line1'] ?? '') ?>">
+        </label>
+        <label>Address Line 2
+          <input type="text" name="consignee_address_line2" value="<?= htmlspecialchars($submission['consignee_address_line2'] ?? '') ?>">
+        </label>
+        <label>City / Town
+          <input type="text" name="consignee_city" value="<?= htmlspecialchars($submission['consignee_city'] ?? '') ?>">
+        </label>
+        <label>Postcode
+          <input type="text" name="consignee_postcode" value="<?= htmlspecialchars($submission['consignee_postcode'] ?? '') ?>">
+        </label>
+        <label>Country
+          <input type="text" name="consignee_country" value="<?= htmlspecialchars($submission['consignee_country'] ?? '') ?>">
+        </label>
+        <label>VAT / EORI / Tax Reg. No.
+          <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($submission['consignee_vat_eori_tax_no'] ?? '') ?>">
+        </label>
+        <label>Contact Person
+          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>">
+        </label>
+        <label>Phone
+          <input type="text" name="consignee_phone" value="<?= htmlspecialchars($submission['consignee_phone'] ?? '') ?>">
+        </label>
+        <label>Email
+          <input type="email" name="consignee_email" value="<?= htmlspecialchars($submission['consignee_email'] ?? '') ?>">
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="intake-step">
+      <legend><span class="intake-step-num">3</span> Shipping Preference</legend>
       <div class="field-grid">
         <label>Incoterm *
           <input type="text" name="incoterm_preference" value="<?= htmlspecialchars($submission['incoterm_preference'] ?? '') ?>" required>
@@ -60,3 +99,18 @@
     <button type="submit">Save Correction</button>
   </form>
 </div>
+<script>
+(function () {
+  var checkbox = document.getElementById('consignee_same_as_buyer');
+  var container = document.getElementById('consignee_fields');
+  if (!checkbox || !container) { return; }
+  var inputs = container.querySelectorAll('input, textarea, select');
+  function apply() {
+    var same = checkbox.checked;
+    container.style.display = same ? 'none' : 'block';
+    inputs.forEach(function (el) { el.disabled = same; });
+  }
+  checkbox.addEventListener('change', apply);
+  apply();
+})();
+</script>

@@ -423,6 +423,8 @@ $router->post('/orders/{id}/payment/balance/clear', [$orders, 'clearBalancePayme
 
 $router->post('/orders/{id}/bl-originals-received', [$orders, 'recordBlOriginalsReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-endorsement', [$orders, 'saveBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-endorsement/generate', [$orders, 'generateBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/close', [$orders, 'closeOrder'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/mark-lost', [$orders, 'markLost'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);

@@ -13,6 +13,7 @@ const caExportBenefitRepository = require('../repositories/caExportBenefitReposi
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const orderBlEndorsementRepository = require('../repositories/orderBlEndorsementRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
@@ -1031,6 +1032,115 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
   };
 }
 
+/**
+ * docs/schema.sql Section BC — the Bill of Lading Endorsement print.
+ * Unlike generateCaInternalAnnexure above, this one IS a genuine
+ * buyer-facing document (category='customer_facing' — it carries the
+ * exact "Pay to the order of (Consignee)" / BL / vessel / PI / CI detail
+ * staff are about to physically write/stamp onto each of the 3 original
+ * BLs before couriering them to the buyer), so it is deliberately left
+ * visible to documentRepository.customerFacingForOrder() and the client
+ * portal, never excluded the way CAFIN/BLI/SUPPO are.
+ *
+ * It skips the normal draft->review->approve cycle: documentRepository
+ * .create() always starts a document at status='draft', so this calls
+ * markApproved() immediately afterwards — there is no meaningful
+ * second-person review step for a mechanical restatement of data staff
+ * already entered and confirmed on the CRUD form
+ * (orderBlEndorsementRepository) one step earlier on the order page.
+ *
+ * Refused unless that CRUD row already exists for this order (staff
+ * must save BL Number/Vessel-Voyage/Ports/Date of Endorsement first).
+ */
+async function generateBlEndorsement(orderId, generatedByUserId) {
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    throw new Error(`Order ${orderId} not found`);
+  }
+
+  const endorsement = await orderBlEndorsementRepository.find(orderId);
+  if (!endorsement) {
+    throw new Error(`BL Endorsement details have not been saved for order ${orderId} yet.`);
+  }
+
+  const docTypeId = await documentTypeIdFor('BLE');
+  if (!docTypeId) {
+    throw new Error('BLE document type is not seeded.');
+  }
+
+  const consignee = documentDataAssembler.resolveConsignee(order);
+  const piDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
+  const ciDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CI');
+  const signatory = await documentDataAssembler.signatoryBlock(docTypeId);
+
+  const referenceNumberService = require('./referenceNumberService');
+  const revisionNumber = await referenceNumberService.nextDocumentRevisionNumber(orderId, docTypeId);
+  const existing = await documentRepository.findLatestForOrderAndType(orderId, docTypeId);
+  const documentReference = existing ? existing.document_reference : await referenceNumberService.generateDocumentRef(docTypeId);
+
+  const context = {
+    company: await documentDataAssembler.companyBlock(),
+    assets: await documentDataAssembler.assetsBlock(),
+    order: {
+      order_reference: order.order_reference,
+    },
+    meta: {
+      document_reference: documentReference,
+      revision_number: revisionNumber,
+      generated_date: formatNow(),
+    },
+    consignee,
+    endorsement: {
+      bl_number: endorsement.bl_number,
+      vessel_voyage: endorsement.vessel_voyage,
+      port_of_loading: endorsement.port_of_loading,
+      port_of_discharge: endorsement.port_of_discharge,
+      date_of_endorsement: endorsement.date_of_endorsement || null,
+    },
+    pi_reference: piDoc ? piDoc.document_reference : null,
+    ci_reference: ciDoc ? ciDoc.document_reference : null,
+    signatory,
+  };
+
+  const twig = templatesEnvironment();
+  const html = twig.render('BLE/bl_endorsement.njk', context);
+  const pdfBytes = await renderPdfFromHtml(html);
+
+  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const clientNumber = sanitizePathSegment(order.client_unique_number);
+  const orderRef = sanitizePathSegment(order.order_reference);
+  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, 'bl-endorsement', 'generated');
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  const filenameSafeReference = documentReference.replace(/\//g, '-');
+  const uuidName = uuidFilename('pdf');
+  const pdfPath = path.join(targetDir, uuidName);
+  fs.writeFileSync(pdfPath, pdfBytes);
+
+  const pdfFileId = await fileStoreRepository.insertGenerated(
+    null,
+    orderId,
+    null,
+    pdfPath,
+    uuidName,
+    `BLE ${filenameSafeReference}.pdf`,
+    pdfBytes.length,
+    'application/pdf',
+    generatedByUserId,
+    false
+  );
+
+  const documentId = await documentRepository.create(orderId, docTypeId, documentReference, revisionNumber, pdfFileId, null, generatedByUserId, signatory);
+  await documentRepository.markApproved(documentId, pdfFileId);
+
+  return {
+    document_id: documentId,
+    document_reference: documentReference,
+    revision_number: revisionNumber,
+    pdf_file_id: pdfFileId,
+  };
+}
+
 function templateFileFor(code) {
   const map = {
     QT: 'QT/quotation.njk',
@@ -1231,6 +1341,7 @@ module.exports = {
   supersedeOtherApprovedRevisions,
   generateAmendment,
   generateCaInternalAnnexure,
+  generateBlEndorsement,
   documentTypeIdFor,
   downstreamDocumentsAtRisk,
   templatesEnvironment,

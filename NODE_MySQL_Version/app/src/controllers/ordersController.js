@@ -37,6 +37,7 @@ const orderPaymentStatusRepository = require('../repositories/orderPaymentStatus
 const orderProductionRepository = require('../repositories/orderProductionRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
+const orderBlEndorsementRepository = require('../repositories/orderBlEndorsementRepository');
 const orderShippingRepository = require('../repositories/orderShippingRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
@@ -763,6 +764,8 @@ async function show(req, res) {
       duplicatedFromOrder,
       duplicatedIntoOrders,
       additionalDocuments: await fileStoreRepository.additionalDocumentsForOrder(orderId),
+      blEndorsement: await orderBlEndorsementRepository.find(orderId),
+      blEndorsementDoc: await documentRepository.findLatestForOrderAndTypeCode(orderId, 'BLE'),
     },
     'layout/base'
   );
@@ -1808,6 +1811,43 @@ async function recordBlEndorsed(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * docs/schema.sql Section BC — the CRUD save behind the BL Endorsement
+ * print feature. Pre-fills onto order_shipping's own vessel_name/
+ * voyage_number/bl_number when the form is first shown (see the view),
+ * but what's actually generated always reads from this independently-
+ * editable row, never back from order_shipping.
+ */
+async function saveBlEndorsement(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  await orderBlEndorsementRepository.upsert(
+    orderId,
+    {
+      bl_number: String(req.body.bl_number || '').trim() || null,
+      vessel_voyage: String(req.body.vessel_voyage || '').trim() || null,
+      port_of_loading: String(req.body.port_of_loading || '').trim() || null,
+      port_of_discharge: String(req.body.port_of_discharge || '').trim() || null,
+      date_of_endorsement: String(req.body.date_of_endorsement || '').trim() || null,
+    },
+    user.id
+  );
+  flash.set(req, 'success', 'BL Endorsement details saved.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function generateBlEndorsement(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  try {
+    await documentGenerationService.generateBlEndorsement(orderId, user.id);
+    flash.set(req, 'success', 'BL Endorsement generated — print it and physically endorse all 3 original BLs.');
+  } catch (err) {
+    flash.set(req, 'error', err.message);
+  }
+  res.redirect(`/orders/${orderId}`);
+}
+
 /** Stage 9 gate: COO received, BL originals endorsed, complete document set couriered to buyer -> order closed. */
 async function closeOrder(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -1961,6 +2001,7 @@ module.exports = {
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, recordBlIssued, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
+  saveBlEndorsement, generateBlEndorsement,
   closeOrder, overrideStatusLock, markLost, updateComplianceTask,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,

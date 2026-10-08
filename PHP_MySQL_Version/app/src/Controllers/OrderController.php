@@ -37,6 +37,7 @@ use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductionRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
+use App\Repositories\OrderBlEndorsementRepository;
 use App\Repositories\OrderShippingRepository;
 use App\Repositories\OrderStageRepository;
 use App\Repositories\OrderSupplierPoDocumentRepository;
@@ -765,6 +766,8 @@ final class OrderController
             'duplicatedFromOrder' => $duplicatedFromOrder,
             'duplicatedIntoOrders' => $duplicatedIntoOrders,
             'additionalDocuments' => FileStoreRepository::additionalDocumentsForOrder($orderId),
+            'blEndorsement' => OrderBlEndorsementRepository::find($orderId),
+            'blEndorsementDoc' => DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'BLE'),
         ], 'layout/base');
     }
 
@@ -1858,6 +1861,41 @@ final class OrderController
         $user = AuthService::currentUser();
         OrderShippingRepository::recordBlEndorsed($orderId, (int) $user['id']);
         Flash::set('success', 'Original BLs marked as endorsed by NexaCrest.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * docs/schema.sql Section BC — the CRUD save behind the BL
+     * Endorsement print feature. Pre-fills onto order_shipping's own
+     * vessel_name/voyage_number/bl_number when the form is first shown
+     * (see the view), but what's actually generated always reads from
+     * this independently-editable row, never back from order_shipping.
+     */
+    public function saveBlEndorsement(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        OrderBlEndorsementRepository::upsert($orderId, [
+            'bl_number'           => trim((string) ($_POST['bl_number'] ?? '')) ?: null,
+            'vessel_voyage'       => trim((string) ($_POST['vessel_voyage'] ?? '')) ?: null,
+            'port_of_loading'     => trim((string) ($_POST['port_of_loading'] ?? '')) ?: null,
+            'port_of_discharge'   => trim((string) ($_POST['port_of_discharge'] ?? '')) ?: null,
+            'date_of_endorsement' => trim((string) ($_POST['date_of_endorsement'] ?? '')) ?: null,
+        ], (int) $user['id']);
+        Flash::set('success', 'BL Endorsement details saved.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function generateBlEndorsement(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        try {
+            \App\Services\DocumentGenerationService::generateBlEndorsement($orderId, (int) $user['id']);
+            Flash::set('success', 'BL Endorsement generated — print it and physically endorse all 3 original BLs.');
+        } catch (\RuntimeException $e) {
+            Flash::set('error', $e->getMessage());
+        }
         header("Location: /orders/{$orderId}");
     }
 
