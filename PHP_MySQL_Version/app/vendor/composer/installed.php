@@ -3,7 +3,7 @@
         'name' => 'nexacrest/export-webapp',
         'pretty_version' => 'dev-claude/app-creation-review-lxxexc',
         'version' => 'dev-claude/app-creation-review-lxxexc',
-        'reference' => '2a7136be46809a13a76f3d2dc0f3eacb9eaad259',
+        'reference' => '19793642d3349a392743957e0eee998c535a2883',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -112,7 +112,7 @@
         'nexacrest/export-webapp' => array(
             'pretty_version' => 'dev-claude/app-creation-review-lxxexc',
             'version' => 'dev-claude/app-creation-review-lxxexc',
-            'reference' => '2a7136be46809a13a76f3d2dc0f3eacb9eaad259',
+            'reference' => '19793642d3349a392743957e0eee998c535a2883',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
