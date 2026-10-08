@@ -17,6 +17,7 @@ $canManageHsCodes = $can('manage_hs_codes');
 $canManageLogisticsPartners = $can('manage_logistics_partners');
 $canManagePaymentPresets = $can('manage_payment_presets');
 $canManageComplianceTaskTypes = $can('manage_compliance_task_types');
+$canManageDropdownOptions = $can('manage_dropdown_options');
 $canManageEmailTemplates = $can('manage_email_templates');
 $canAssets = $can('manage_assets');
 $canSignatories = $can('manage_signatories');
@@ -53,7 +54,7 @@ $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/c
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates')
-    || $isActive('/logistics-partners') || $isActive('/payment-presets');
+    || $isActive('/logistics-partners') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -128,6 +129,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canManageLogisticsPartners): ?><a href="/logistics-partners" class="<?= $isActive('/logistics-partners') ? 'active' : '' ?>">Logistics Partners</a><?php endif; ?>
           <?php if ($canManagePaymentPresets): ?><a href="/payment-presets" class="<?= $isActive('/payment-presets') ? 'active' : '' ?>">Payment Presets</a><?php endif; ?>
           <?php if ($canManageComplianceTaskTypes): ?><a href="/compliance-task-types" class="<?= $isActive('/compliance-task-types') ? 'active' : '' ?>">Compliance Task Types</a><?php endif; ?>
+          <?php if ($canManageDropdownOptions): ?><a href="/admin/dropdown-options" class="<?= $isActive('/admin/dropdown-options') ? 'active' : '' ?>">Dropdown Option Lists</a><?php endif; ?>
           <?php if ($canManageEmailTemplates): ?><a href="/email-templates" class="<?= $isActive('/email-templates') ? 'active' : '' ?>">Email Templates</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/watermarks" class="<?= $isActive('/watermarks') ? 'active' : '' ?>">Watermarks</a><?php endif; ?>
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>

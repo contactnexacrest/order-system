@@ -130,22 +130,19 @@
     </fieldset>
 
     <fieldset class="intake-step">
-      <legend><span class="intake-step-num">5</span> Payment &amp; Order Confirmation</legend>
+      <legend><span class="intake-step-num">5</span> Payment Terms &amp; Order Confirmation</legend>
       <div class="field-grid">
-        <label class="full">Payment Terms Confirmation *
-          <textarea name="payment_terms_confirmation" placeholder="e.g. CONFIRMED — 30% advance T/T + 70% balance against scanned BL copy within 7 days" required>{{ submission.payment_terms_confirmation or '' }}</textarea>
+        <label class="full">Payment Terms Confirmation as per quotation *
+          <textarea name="payment_terms_confirmation" placeholder="{{ paymentTermsPlaceholder }}" required>{{ submission.payment_terms_confirmation or '' }}</textarea>
         </label>
         <label class="full">Acceptance of Quotation No. *
           <textarea name="quotation_acceptance_reference" placeholder="e.g. We accept Quotation SC/QT/2026/MMNNN dated DD Month YYYY" required>{{ submission.quotation_acceptance_reference or '' }}</textarea>
         </label>
-        <label>Certificate of Origin Type *
-          <input type="text" name="coo_type" value="{{ submission.coo_type or '' }}" placeholder="GSP Form A / Non-preferential" required>
+        <label>Certificate of Origin Type <span class="info-bubble" tabindex="0" title="A certificate confirming the goods' country of manufacture, often required for customs/preferential duty. GSP Form A = preferential rate under a trade scheme (if your country qualifies); Non-preferential = standard certificate of origin. Leave blank if you're not sure — we'll confirm with you.">&#9432;</span>
+          <input type="text" name="coo_type" value="{{ submission.coo_type or '' }}" placeholder="GSP Form A / Non-preferential — leave blank if unsure">
         </label>
         <label>Buyer PO / Reference No.
           <input type="text" name="buyer_po_ref" value="{{ submission.buyer_po_ref or '' }}" placeholder="Write NIL if none">
-        </label>
-        <label class="full">Any Changes from Quotation
-          <textarea name="changes_from_quotation" placeholder="Write: No changes — or describe any changes to product / quantity / price">{{ submission.changes_from_quotation or '' }}</textarea>
         </label>
         <label class="full">Special Document Requirements
           <textarea name="special_document_requirements" placeholder="e.g. No special requirements / Consular legalised CI required">{{ submission.special_document_requirements or '' }}</textarea>

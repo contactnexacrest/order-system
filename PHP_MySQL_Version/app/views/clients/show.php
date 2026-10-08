@@ -51,11 +51,47 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
     </div>
   </div>
 
-  <?php if (!empty($client['agreement_footer_text'])): ?>
+  <?php if (!empty($client['agreement_footer_text']) || !empty($client['agreement_file_path'])): ?>
+  <?php
+    $__agreementForceExpired = (int) ($client['agreement_force_expired'] ?? 0) === 1;
+    $__agreementExpiryDate = $client['agreement_expiry_date'] ?? null;
+    $__agreementExpired = $__agreementExpiryDate && $__agreementExpiryDate < date('Y-m-d');
+    $__agreementActive = !$__agreementForceExpired && !$__agreementExpired;
+    // Renew button: only within 30 days of the current expiry date, or once it's already passed — a UI nudge, not a security gate.
+    $__agreementRenewEligible = $__agreementExpiryDate && (strtotime($__agreementExpiryDate) <= strtotime('+30 days'));
+  ?>
   <div class="section">
     <h2>Agreement T&amp;C Footer</h2>
-    <p class="muted small">Shown as an extra note on every document generated for this client, in addition to the standard terms. Edit it from the <a href="/clients/<?= (int) $client['id'] ?>/edit">Edit</a> page.</p>
-    <div class="client-agreement-footer-preview"><?= nl2br(htmlspecialchars($client['agreement_footer_text'])) ?></div>
+    <p class="muted small">Shown as an extra note on every document generated for this client, in addition to the standard terms, only while the agreement below is active. Edit the footer text from the <a href="/clients/<?= (int) $client['id'] ?>/edit">Edit</a> page.</p>
+    <?php if (!empty($client['agreement_footer_text'])): ?>
+      <div class="client-agreement-footer-preview"><?= nl2br(htmlspecialchars($client['agreement_footer_text'])) ?></div>
+    <?php endif; ?>
+
+    <div class="kv-grid" style="margin-top:10px">
+      <div><span class="k">Status</span><span class="v">
+        <?php if ($__agreementForceExpired): ?><span class="badge badge-inactive">Force-Expired</span>
+        <?php elseif ($__agreementExpired): ?><span class="badge badge-inactive">Expired</span>
+        <?php else: ?><span class="badge badge-active">Active</span>
+        <?php endif; ?>
+      </span></div>
+      <div><span class="k">Agreement File</span><span class="v"><?php if (!empty($client['agreement_file_path'])): ?><a href="/clients/<?= (int) $client['id'] ?>/agreement/download"><?= htmlspecialchars($client['agreement_file_original_name'] ?? 'Download') ?></a><?php else: ?>No file uploaded<?php endif; ?></span></div>
+      <div><span class="k">Expiry Date</span><span class="v"><?= $__agreementExpiryDate ? htmlspecialchars($__agreementExpiryDate) : 'No automatic expiry' ?></span></div>
+    </div>
+
+    <?php if ($canManageOrders): ?>
+    <div class="btn-row" style="margin-top:10px">
+      <form method="post" action="/clients/<?= (int) $client['id'] ?>/agreement/force-expire" style="display:inline" onsubmit="return confirm('Force-expire this agreement now? The T&amp;C footer will stop printing on new documents immediately.');">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn-sm btn-danger" <?= (!$__agreementActive || empty($client['agreement_file_path'])) ? 'disabled' : '' ?>>Force Expire</button>
+      </form>
+      <form method="post" action="/clients/<?= (int) $client['id'] ?>/agreement/renew" enctype="multipart/form-data" style="display:inline-flex;gap:6px;align-items:center">
+        <?= Csrf::field() ?>
+        <input type="date" name="agreement_expiry_date" value="<?= htmlspecialchars((string) ($__agreementExpiryDate ?? '')) ?>" <?= !$__agreementRenewEligible ? 'disabled' : '' ?>>
+        <button type="submit" class="btn-sm btn-success" <?= !$__agreementRenewEligible ? 'disabled title="Renew becomes available only within 30 days of the current expiry date, or once it has passed."' : '' ?>>Renew</button>
+      </form>
+      <?php if (!$__agreementRenewEligible): ?><span class="muted small">Renew appears only within 30 days of expiry, or after it's passed.</span><?php endif; ?>
+    </div>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 
@@ -132,9 +168,9 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
     <?php endif; ?>
     <?php if ($__canImpersonate): ?>
       <?php if ($__impersonationGloballyEnabled && !empty($client['allow_staff_impersonation']) && (int) $client['is_active'] === 1): ?>
-        <form method="post" action="/clients/<?= (int) $client['id'] ?>/impersonate" onsubmit="return confirm('Log in as <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>? This opens their client-portal view in this session. This is logged.');">
+        <form method="post" action="/clients/<?= (int) $client['id'] ?>/impersonate" target="_blank" onsubmit="return confirm('Log in as <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>? This opens their client-portal view in a new tab, alongside your own session here. This is logged.');">
           <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm btn-secondary">Log in as this client</button>
+          <button type="submit" class="btn-sm btn-secondary">Log in as this client &#8599;</button>
         </form>
       <?php else: ?>
         <?php

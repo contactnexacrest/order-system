@@ -9,6 +9,7 @@ use App\Helpers\Flash;
 use App\Helpers\RateLimiter;
 use App\Helpers\View;
 use App\Repositories\ClientIntakeRepository;
+use App\Repositories\LookupRepository;
 use App\Services\EmailService;
 
 /**
@@ -22,7 +23,10 @@ final class ClientIntakeController
 {
     public function show(array $params): void
     {
-        View::render('client_intake/form', ['wrapClass' => 'intake-wrap'], 'layout/bare');
+        View::render('client_intake/form', [
+            'wrapClass' => 'intake-wrap',
+            'containerTypes' => LookupRepository::dropdownOptions('container_type'),
+        ], 'layout/bare');
     }
 
     // QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order
@@ -62,7 +66,12 @@ final class ClientIntakeController
             View::render('client_intake/link_expired', [], 'layout/bare');
             return;
         }
-        View::render('client_intake/edit_form', ['submission' => $submission, 'token' => $params['token'], 'wrapClass' => 'intake-wrap'], 'layout/bare');
+        View::render('client_intake/edit_form', [
+            'submission' => $submission,
+            'token' => $params['token'],
+            'wrapClass' => 'intake-wrap',
+            'containerTypes' => LookupRepository::dropdownOptions('container_type'),
+        ], 'layout/bare');
     }
 
     public function updateSubmission(array $params): void
@@ -87,9 +96,31 @@ final class ClientIntakeController
     /** @return array<string,string>|null null means validation failed and a flash error was already set */
     private static function extractAndValidate(): ?array
     {
+        // Point 8 — the Billing Address field used to be one free-text box;
+        // it's now structured (Line 1/Line 2/City/Postcode/Country), same
+        // pattern as the Consignee section just below it on this same
+        // form, since documents need these as discrete fields. The flat
+        // billing_address column stays NOT NULL (every older consumer —
+        // reports, the review screen fallback — still reads it), so it's
+        // composed here from the structured parts rather than collected
+        // directly from the client.
+        $billingAddressLine1 = trim((string) ($_POST['billing_address_line1'] ?? ''));
+        $billingAddressLine2 = trim((string) ($_POST['billing_address_line2'] ?? ''));
+        $billingCity = trim((string) ($_POST['billing_city'] ?? ''));
+        $billingPostcode = trim((string) ($_POST['billing_postcode'] ?? ''));
+        $billingCountry = trim((string) ($_POST['billing_country'] ?? ''));
+        $composedBillingAddress = implode(', ', array_filter([
+            $billingAddressLine1, $billingAddressLine2, $billingCity, $billingPostcode, $billingCountry,
+        ], static fn ($part) => $part !== ''));
+
         $data = [
             'company_legal_name'     => trim((string) ($_POST['company_legal_name'] ?? '')),
-            'billing_address'        => trim((string) ($_POST['billing_address'] ?? '')),
+            'billing_address'        => $composedBillingAddress,
+            'billing_address_line1'  => $billingAddressLine1,
+            'billing_address_line2'  => $billingAddressLine2,
+            'billing_city'           => $billingCity,
+            'billing_postcode'       => $billingPostcode,
+            'billing_country'        => $billingCountry,
             'vat_eori_tax_no'        => trim((string) ($_POST['vat_eori_tax_no'] ?? '')),
             'contact_person'         => trim((string) ($_POST['contact_person'] ?? '')),
             'email'                  => trim((string) ($_POST['email'] ?? '')),
@@ -104,9 +135,11 @@ final class ClientIntakeController
         ];
 
         // Required set per the business's own Quotation Form spec (Client_Forms.xlsx):
-        // Company Legal Name, Billing Address, VAT/EORI/Tax Reg. No., Contact Person,
-        // Email, Country of Destination, Incoterm.
-        $required = ['company_legal_name', 'billing_address', 'vat_eori_tax_no', 'contact_person', 'email', 'country_of_destination', 'incoterm_preference'];
+        // Company Legal Name, Billing Address (now Line 1/City/Country),
+        // VAT/EORI/Tax Reg. No., Contact Person, Email, Country of
+        // Destination, Incoterm. Address Line 2/Postcode stay optional,
+        // same as the Consignee section's own optionality on this form.
+        $required = ['company_legal_name', 'billing_address_line1', 'billing_city', 'billing_country', 'vat_eori_tax_no', 'contact_person', 'email', 'country_of_destination', 'incoterm_preference'];
         foreach ($required as $field) {
             if ($data[$field] === '') {
                 Flash::set('error', 'Please fill in all required fields (marked *).');

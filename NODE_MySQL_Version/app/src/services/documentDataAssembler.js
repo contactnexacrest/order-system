@@ -144,6 +144,7 @@ async function assemble(orderId, documentTypeCode = null) {
       billing_address_line2: order.billing_address_line2 ?? null,
       billing_city: order.billing_city ?? null,
       billing_postcode: order.billing_postcode ?? null,
+      billing_country: order.billing_country ?? null,
       consignee_name: order.consignee_name,
       consignee_address: order.consignee_address,
       vat_eori_tax_no: order.vat_eori_tax_no,
@@ -152,7 +153,7 @@ async function assemble(orderId, documentTypeCode = null) {
       phone: order.client_phone,
       country_of_destination: order.country_of_destination,
       notify_party: order.notify_party,
-      agreement_footer_text: order.agreement_footer_text,
+      agreement_footer_text: resolveAgreementFooter(order),
     },
     consignee: resolvedConsignee,
     notify_party_block: resolvedNotifyParty,
@@ -718,6 +719,33 @@ function balanceTriggerSentence(option, days, wordingTemplate = null) {
 }
 
 /**
+ * Item 2 — the client-level agreement T&C footer only prints on a
+ * document while the agreement backing it is genuinely active: never once
+ * force-expired, and — when an expiry date is set — not past it. NULL
+ * expiry means no automatic expiry (force-expire is then the only way to
+ * end it). An empty/missing footer text is also treated as nothing to
+ * print, same as the pre-existing behavior.
+ */
+function resolveAgreementFooter(order) {
+  const text = String(order.agreement_footer_text || '').trim();
+  if (text === '') {
+    return null;
+  }
+  if (order.agreement_force_expired) {
+    return null;
+  }
+  const expiryDate = order.agreement_expiry_date;
+  if (expiryDate) {
+    const expiryStr = expiryDate instanceof Date ? expiryDate.toISOString().slice(0, 10) : String(expiryDate).slice(0, 10);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (expiryStr < todayStr) {
+      return null;
+    }
+  }
+  return text;
+}
+
+/**
  * Resolves the Consignee Details section (QT/PI/OC/PL/CI — Developer Spec
  * Section 5) for one order's client. "Same as Buyer?" (default checked)
  * means every field below is the BUYER's own current value, resolved
@@ -876,6 +904,7 @@ module.exports = {
   formatNumber,
   formatDate,
   balanceTriggerSentence,
+  resolveAgreementFooter,
   resolveConsignee,
   resolveNotifyParty,
   sectionDisplayFlags,

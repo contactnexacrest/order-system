@@ -45,6 +45,9 @@
         <label>Postcode
           <input type="text" name="billing_postcode" value="<?= htmlspecialchars($client['billing_postcode'] ?? '') ?>" placeholder="e.g., B1 1AA">
         </label>
+        <label>Billing Country
+          <input type="text" name="billing_country" value="<?= htmlspecialchars($client['billing_country'] ?? '') ?>" placeholder="e.g., United Kingdom">
+        </label>
         <label>VAT / EORI / Tax Reg. No.
           <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($client['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>
@@ -175,6 +178,29 @@
       </label>
     </fieldset>
     <button type="submit">Save Agreement Footer</button>
+  </form>
+
+  <!-- Item 2 — the actual signed agreement file + expiry date, tracked separately
+       from the footer text above (which still prints independently of this). -->
+  <form method="post" action="/clients/<?= (int) $client['id'] ?>/agreement/upload" enctype="multipart/form-data">
+    <?= Csrf::field() ?>
+    <fieldset>
+      <legend>Agreement File &amp; Expiry</legend>
+      <?php if (!empty($client['agreement_file_path'])): ?>
+        <p class="muted small">Current file: <a href="/clients/<?= (int) $client['id'] ?>/agreement/download"><?= htmlspecialchars($client['agreement_file_original_name'] ?? 'agreement file') ?></a> — uploaded <?= htmlspecialchars((string) ($client['agreement_uploaded_at'] ?? '')) ?>. Uploading a new file below replaces it and resets Force Expire.</p>
+      <?php else: ?>
+        <p class="muted small">No agreement file uploaded yet. Upload one below — the expiry date controls how long the T&amp;C footer above keeps printing on this client's documents.</p>
+      <?php endif; ?>
+      <div class="field-grid">
+        <label>Agreement File (PDF/DOC/DOCX)
+          <input type="file" name="agreement_file" accept=".pdf,.doc,.docx">
+        </label>
+        <label>Expiry Date <small class="muted">(leave blank for no automatic expiry — only Force Expire will end it then)</small>
+          <input type="date" name="agreement_expiry_date" value="<?= htmlspecialchars((string) ($client['agreement_expiry_date'] ?? '')) ?>">
+        </label>
+      </div>
+    </fieldset>
+    <button type="submit">Upload Agreement File</button>
   </form>
 </div>
 <script>

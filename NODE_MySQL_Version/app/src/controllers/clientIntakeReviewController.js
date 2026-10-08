@@ -41,6 +41,11 @@ async function accept(req, res) {
     {
       company_legal_name: submission.company_legal_name,
       billing_address: submission.billing_address,
+      billing_address_line1: submission.billing_address_line1 ?? null,
+      billing_address_line2: submission.billing_address_line2 ?? null,
+      billing_city: submission.billing_city ?? null,
+      billing_postcode: submission.billing_postcode ?? null,
+      billing_country: submission.billing_country ?? null,
       vat_eori_tax_no: submission.vat_eori_tax_no,
       contact_person: submission.contact_person,
       email: submission.email,

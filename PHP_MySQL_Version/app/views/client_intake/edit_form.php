@@ -1,4 +1,4 @@
-<?php use App\Helpers\Csrf; ?>
+<?php use App\Helpers\Csrf; $containerTypes = $containerTypes ?? []; ?>
 <div class="card">
   <h1>Correct Your Quotation Details</h1>
   <p class="muted">We haven't reviewed your request yet, so you can still fix anything here. Fields marked * are required.</p>
@@ -12,8 +12,20 @@
         <label class="full">Company Legal Name *
           <input type="text" name="company_legal_name" value="<?= htmlspecialchars($submission['company_legal_name']) ?>" placeholder="e.g., Test Company Ltd" required>
         </label>
-        <label class="full">Billing Address *
-          <textarea name="billing_address" placeholder="e.g., 123 Example Street, Test City, Country" required><?= htmlspecialchars($submission['billing_address']) ?></textarea>
+        <label class="full">Billing Address Line 1 *
+          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($submission['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name" required>
+        </label>
+        <label>Address Line 2
+          <input type="text" name="billing_address_line2" value="<?= htmlspecialchars($submission['billing_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town *
+          <input type="text" name="billing_city" value="<?= htmlspecialchars($submission['billing_city'] ?? '') ?>" placeholder="e.g., Rotterdam" required>
+        </label>
+        <label>Postcode
+          <input type="text" name="billing_postcode" value="<?= htmlspecialchars($submission['billing_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
+        </label>
+        <label>Country *
+          <input type="text" name="billing_country" value="<?= htmlspecialchars($submission['billing_country'] ?? '') ?>" placeholder="e.g., Netherlands" required>
         </label>
         <label>Contact Person *
           <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person']) ?>" placeholder="e.g., John Doe" required>
@@ -85,7 +97,12 @@
           <input type="text" name="incoterm_preference" value="<?= htmlspecialchars($submission['incoterm_preference'] ?? '') ?>" placeholder="FOB / CFR / CIF — if unsure, write FOB" required>
         </label>
         <label>Container Type
-          <input type="text" name="container_type_text" value="<?= htmlspecialchars($submission['container_type_text'] ?? '') ?>" placeholder="e.g., 1 × 20ft FCL (optional)">
+          <select name="container_type_text">
+            <option value="">— Not sure / To Be Confirmed —</option>
+            <?php foreach ($containerTypes as $o): ?>
+              <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($submission['container_type_text'] ?? '') === $o['option_value'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
         </label>
         <label class="full">Your Own Reference Number
           <input type="text" name="buyer_own_reference" value="<?= htmlspecialchars($submission['buyer_own_reference'] ?? '') ?>" placeholder="Your internal reference number, if any — write NIL if none">

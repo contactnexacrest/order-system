@@ -50,12 +50,19 @@ async function findValidByToken(rawToken) {
             c.coo_type AS client_coo_type,
             COALESCE(p.name, o.port_of_discharge_text) AS order_port_of_discharge,
             i.code AS order_incoterm_code,
-            o.container_type AS order_container_type
+            o.container_type AS order_container_type,
+            pp.advance_trigger_text AS order_advance_trigger_text,
+            pp.balance_trigger_wording AS order_balance_trigger_wording,
+            COALESCE(o.advance_pct_override, pp.advance_pct) AS order_advance_pct,
+            COALESCE(o.balance_pct_override, pp.balance_pct) AS order_balance_pct,
+            COALESCE(o.balance_trigger_option_override, pp.balance_trigger_option) AS order_balance_trigger_option,
+            COALESCE(o.balance_days_override, pp.balance_days) AS order_balance_days
      FROM pi_intake_submissions pis
      JOIN orders o ON o.id = pis.order_id
      JOIN clients c ON c.id = o.client_id
      LEFT JOIN ports p ON p.id = o.port_of_discharge_id
      LEFT JOIN incoterms i ON i.id = o.incoterm_id
+     JOIN payment_presets pp ON pp.id = o.payment_preset_id
      WHERE pis.access_token_hash = :hash AND pis.access_token_expires_at > NOW()
        AND pis.status IN ('awaiting_client', 'rejected')`,
     { hash }

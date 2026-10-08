@@ -49,7 +49,7 @@ final class ClientRepository
         $stmt = $pdo->prepare(
             'INSERT INTO clients
                 (client_unique_number, company_legal_name, billing_address,
-                 billing_address_line1, billing_address_line2, billing_city, billing_postcode,
+                 billing_address_line1, billing_address_line2, billing_city, billing_postcode, billing_country,
                  consignee_name, consignee_address, consignee_same_as_buyer,
                  consignee_address_line1, consignee_address_line2, consignee_city, consignee_postcode,
                  consignee_country, consignee_vat_eori_tax_no, consignee_contact_person, consignee_phone, consignee_email,
@@ -60,7 +60,7 @@ final class ClientRepository
                  created_by)
              VALUES
                 (:client_unique_number, :company_legal_name, :billing_address,
-                 :billing_address_line1, :billing_address_line2, :billing_city, :billing_postcode,
+                 :billing_address_line1, :billing_address_line2, :billing_city, :billing_postcode, :billing_country,
                  :consignee_name, :consignee_address, :consignee_same_as_buyer,
                  :consignee_address_line1, :consignee_address_line2, :consignee_city, :consignee_postcode,
                  :consignee_country, :consignee_vat_eori_tax_no, :consignee_contact_person, :consignee_phone, :consignee_email,
@@ -78,6 +78,7 @@ final class ClientRepository
             'billing_address_line2'   => $data['billing_address_line2'] ?? null,
             'billing_city'            => $data['billing_city'] ?? null,
             'billing_postcode'        => $data['billing_postcode'] ?? null,
+            'billing_country'         => $data['billing_country'] ?? null,
             'consignee_name'          => ($data['consignee_name'] ?? null) ?: ((int) ($data['consignee_same_as_buyer'] ?? 1) === 1 ? null : 'SAME'),
             'consignee_address'       => $data['consignee_address'] ?? null,
             'consignee_same_as_buyer' => (int) ($data['consignee_same_as_buyer'] ?? 1),
@@ -121,6 +122,7 @@ final class ClientRepository
                 billing_address_line2 = :billing_address_line2,
                 billing_city = :billing_city,
                 billing_postcode = :billing_postcode,
+                billing_country = :billing_country,
                 consignee_name = :consignee_name,
                 consignee_address = :consignee_address,
                 consignee_same_as_buyer = :consignee_same_as_buyer,
@@ -157,6 +159,7 @@ final class ClientRepository
             'billing_address_line2'   => $data['billing_address_line2'] ?? null,
             'billing_city'            => $data['billing_city'] ?? null,
             'billing_postcode'        => $data['billing_postcode'] ?? null,
+            'billing_country'         => $data['billing_country'] ?? null,
             'consignee_name'          => $data['consignee_name'] ?? null,
             'consignee_address'       => $data['consignee_address'] ?? null,
             'consignee_same_as_buyer' => (int) ($data['consignee_same_as_buyer'] ?? 1),
@@ -200,6 +203,50 @@ final class ClientRepository
         Database::connection()->prepare(
             'UPDATE clients SET agreement_footer_text = :agreement_footer_text WHERE id = :id'
         )->execute(['agreement_footer_text' => $text, 'id' => $id]);
+    }
+
+    /**
+     * Item 2 — uploading a new agreement file resets the agreement to a
+     * fresh "active" state: force_expired is always cleared (a newly
+     * uploaded file is never force-expired on arrival), and the expiry
+     * date is set from whatever staff entered (NULL means no automatic
+     * expiry — only Force Expire can end it then).
+     */
+    public static function setAgreementFile(int $id, string $filePath, string $originalFilename, ?string $expiryDate): void
+    {
+        Database::connection()->prepare(
+            'UPDATE clients SET
+                agreement_file_path = :path, agreement_file_original_name = :original_name,
+                agreement_uploaded_at = NOW(), agreement_expiry_date = :expiry_date, agreement_force_expired = 0
+             WHERE id = :id'
+        )->execute(['path' => $filePath, 'original_name' => $originalFilename, 'expiry_date' => $expiryDate, 'id' => $id]);
+    }
+
+    public static function setAgreementForceExpired(int $id, bool $forced): void
+    {
+        Database::connection()->prepare('UPDATE clients SET agreement_force_expired = :forced WHERE id = :id')
+            ->execute(['forced' => $forced ? 1 : 0, 'id' => $id]);
+    }
+
+    /**
+     * Resets the expiry date and clears force_expired; optionally also
+     * replaces the file itself (staff may renew with just a new date, if
+     * the underlying signed document hasn't actually changed).
+     */
+    public static function renewAgreement(int $id, ?string $expiryDate, ?string $filePath = null, ?string $originalFilename = null): void
+    {
+        if ($filePath !== null) {
+            Database::connection()->prepare(
+                'UPDATE clients SET
+                    agreement_file_path = :path, agreement_file_original_name = :original_name,
+                    agreement_uploaded_at = NOW(), agreement_expiry_date = :expiry_date, agreement_force_expired = 0
+                 WHERE id = :id'
+            )->execute(['path' => $filePath, 'original_name' => $originalFilename, 'expiry_date' => $expiryDate, 'id' => $id]);
+            return;
+        }
+        Database::connection()->prepare(
+            'UPDATE clients SET agreement_expiry_date = :expiry_date, agreement_force_expired = 0 WHERE id = :id'
+        )->execute(['expiry_date' => $expiryDate, 'id' => $id]);
     }
 
     public static function setActive(int $id, bool $active): void

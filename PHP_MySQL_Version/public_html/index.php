@@ -29,6 +29,7 @@ use App\Controllers\HolidayController;
 use App\Controllers\HsCodeController;
 use App\Controllers\ComplianceTaskTypeController;
 use App\Controllers\LogisticsPartnerController;
+use App\Controllers\DropdownOptionController;
 use App\Controllers\PaymentPresetController;
 use App\Controllers\WatermarkController;
 use App\Controllers\ReferenceDocController;
@@ -87,6 +88,7 @@ $disputes = new DisputeController();
 $holidays = new HolidayController();
 $hsCodes = new HsCodeController();
 $logisticsPartners = new LogisticsPartnerController();
+$dropdownOptions = new DropdownOptionController();
 $paymentPresets = new PaymentPresetController();
 $complianceTaskTypes = new ComplianceTaskTypeController();
 $watermarks = new WatermarkController();
@@ -178,6 +180,10 @@ $router->get('/logistics-partners/{id}/edit', [$logisticsPartners, 'editForm'], 
 $router->post('/logistics-partners/{id}/update', [$logisticsPartners, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/toggle', [$logisticsPartners, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/delete', [$logisticsPartners, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+
+$router->get('/admin/dropdown-options', [$dropdownOptions, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_dropdown_options')]);
+$router->post('/admin/dropdown-options/{listKey}/create', [$dropdownOptions, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_dropdown_options'), CsrfCheck::verify()]);
+$router->post('/admin/dropdown-options/{listKey}/update', [$dropdownOptions, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_dropdown_options'), CsrfCheck::verify()]);
 
 $router->get('/payment-presets', [$paymentPresets, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_payment_presets')]);
 $router->get('/payment-presets/create', [$paymentPresets, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_payment_presets')]);
@@ -290,6 +296,11 @@ $router->get('/clients/{id}/edit', [$clients, 'editForm'], [SessionAuth::require
 $router->post('/clients/{id}/update', [$clients, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 // Batch 3 #12 — separate endpoint, deliberately NOT gated by the data-lock check inside update() above.
 $router->post('/clients/{id}/agreement-footer', [$clients, 'updateAgreementFooter'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// Item 2 — agreement file upload + expiry + force-expire + renew (schema.sql Section BE).
+$router->post('/clients/{id}/agreement/upload', [$clients, 'uploadAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/agreement/force-expire', [$clients, 'forceExpireAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/agreement/renew', [$clients, 'renewAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->get('/clients/{id}/agreement/download', [$clients, 'downloadAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients/{id}/toggle-active', [$clients, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 // Batch 3 #13b — free-form extra documents attached to this client (schema.sql Section AZ).
 $router->post('/clients/{id}/additional-documents', [$clients, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

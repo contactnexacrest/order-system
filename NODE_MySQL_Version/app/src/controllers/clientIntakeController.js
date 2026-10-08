@@ -6,6 +6,7 @@ const env = require('../config/env');
 const emailService = require('../services/emailService');
 const rateLimiter = require('../helpers/rateLimiter');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
+const lookupRepository = require('../repositories/lookupRepository');
 
 // QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order token
 // the way PI-intake does — a scripted flood from a single IP is otherwise
@@ -25,8 +26,11 @@ const RATE_LIMIT_WINDOW_MINUTES = 15;
  * queue (clientIntakeReviewController).
  */
 
-function show(req, res) {
-  res.renderView('client_intake/form', { wrapClass: 'intake-wrap' }, 'layout/bare');
+async function show(req, res) {
+  res.renderView('client_intake/form', {
+    wrapClass: 'intake-wrap',
+    containerTypes: await lookupRepository.dropdownOptions('container_type'),
+  }, 'layout/bare');
 }
 
 async function submit(req, res) {
@@ -54,7 +58,12 @@ async function showEdit(req, res) {
     res.renderView('client_intake/link_expired', {}, 'layout/bare');
     return;
   }
-  res.renderView('client_intake/edit_form', { submission, token: req.params.token, wrapClass: 'intake-wrap' }, 'layout/bare');
+  res.renderView('client_intake/edit_form', {
+    submission,
+    token: req.params.token,
+    wrapClass: 'intake-wrap',
+    containerTypes: await lookupRepository.dropdownOptions('container_type'),
+  }, 'layout/bare');
 }
 
 async function updateSubmission(req, res) {
@@ -77,9 +86,30 @@ async function updateSubmission(req, res) {
 
 /** @returns {object|null} null means validation failed and a flash error was already set */
 function extractAndValidate(req) {
+  // Point 8 — the Billing Address field used to be one free-text box; it's
+  // now structured (Line 1/Line 2/City/Postcode/Country), same pattern as
+  // the Consignee section just below it on this same form, since documents
+  // need these as discrete fields. The flat billing_address column stays
+  // NOT NULL (every older consumer — reports, the review screen fallback —
+  // still reads it), so it's composed here from the structured parts
+  // rather than collected directly from the client.
+  const billingAddressLine1 = String(req.body.billing_address_line1 || '').trim();
+  const billingAddressLine2 = String(req.body.billing_address_line2 || '').trim();
+  const billingCity = String(req.body.billing_city || '').trim();
+  const billingPostcode = String(req.body.billing_postcode || '').trim();
+  const billingCountry = String(req.body.billing_country || '').trim();
+  const composedBillingAddress = [billingAddressLine1, billingAddressLine2, billingCity, billingPostcode, billingCountry]
+    .filter((part) => part !== '')
+    .join(', ');
+
   const data = {
     company_legal_name: String(req.body.company_legal_name || '').trim(),
-    billing_address: String(req.body.billing_address || '').trim(),
+    billing_address: composedBillingAddress,
+    billing_address_line1: billingAddressLine1,
+    billing_address_line2: billingAddressLine2,
+    billing_city: billingCity,
+    billing_postcode: billingPostcode,
+    billing_country: billingCountry,
     vat_eori_tax_no: String(req.body.vat_eori_tax_no || '').trim(),
     contact_person: String(req.body.contact_person || '').trim(),
     email: String(req.body.email || '').trim(),
@@ -94,9 +124,11 @@ function extractAndValidate(req) {
   };
 
   // Required set per the business's own Quotation Form spec (Client_Forms.xlsx):
-  // Company Legal Name, Billing Address, VAT/EORI/Tax Reg. No., Contact Person,
-  // Email, Country of Destination, Incoterm.
-  const required = ['company_legal_name', 'billing_address', 'vat_eori_tax_no', 'contact_person', 'email', 'country_of_destination', 'incoterm_preference'];
+  // Company Legal Name, Billing Address (now Line 1/City/Country),
+  // VAT/EORI/Tax Reg. No., Contact Person, Email, Country of Destination,
+  // Incoterm. Address Line 2/Postcode stay optional, same as the Consignee
+  // section's own optionality on this form.
+  const required = ['company_legal_name', 'billing_address_line1', 'billing_city', 'billing_country', 'vat_eori_tax_no', 'contact_person', 'email', 'country_of_destination', 'incoterm_preference'];
   for (const field of required) {
     if (data[field] === '') {
       flash.set(req, 'error', 'Please fill in all required fields (marked *).');

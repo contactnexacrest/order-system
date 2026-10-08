@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\PiIntakeRepository;
+use App\Services\DocumentDataAssembler;
 
 /**
  * Public, unauthenticated PI-stage intake form — a SEPARATE second stage
@@ -27,7 +28,31 @@ final class PiIntakeController
             View::render('pi_intake/link_expired', [], 'layout/bare');
             return;
         }
-        View::render('pi_intake/form', ['submission' => $submission, 'token' => $params['token'], 'wrapClass' => 'intake-wrap'], 'layout/bare');
+        View::render('pi_intake/form', [
+            'submission' => $submission,
+            'token' => $params['token'],
+            'wrapClass' => 'intake-wrap',
+            'paymentTermsPlaceholder' => self::buildPaymentTermsPlaceholder($submission),
+        ], 'layout/bare');
+    }
+
+    /**
+     * Point 6 — the Payment Terms Confirmation field's placeholder used to
+     * be a generic made-up example; it now mirrors this specific order's
+     * own payment preset wording (the same sentence DocumentDataAssembler
+     * prints on the PI itself), so the client sees exactly what they're
+     * expected to confirm rather than guessing at the format.
+     */
+    private static function buildPaymentTermsPlaceholder(array $submission): string
+    {
+        $advancePct = rtrim(rtrim(number_format((float) $submission['order_advance_pct'], 2), '0'), '.');
+        $balancePct = rtrim(rtrim(number_format((float) $submission['order_balance_pct'], 2), '0'), '.');
+        $balanceTerms = DocumentDataAssembler::balanceTriggerSentence(
+            $submission['order_balance_trigger_option'] ?? null,
+            isset($submission['order_balance_days']) ? (int) $submission['order_balance_days'] : null,
+            $submission['order_balance_trigger_wording'] ?? null
+        );
+        return "CONFIRMED — {$advancePct}% advance T/T on FOB Value {$submission['order_advance_trigger_text']} + {$balancePct}% balance {$balanceTerms}";
     }
 
     public function submit(array $params): void
@@ -66,7 +91,7 @@ final class PiIntakeController
             'company_legal_name', 'billing_address',
             'vat_eori_tax_no', 'contact_person', 'email', 'phone',
             'port_of_discharge_text', 'country_of_destination', 'incoterm_confirmed',
-            'payment_terms_confirmation', 'quotation_acceptance_reference', 'coo_type',
+            'payment_terms_confirmation', 'quotation_acceptance_reference',
         ];
         foreach ($required as $field) {
             if ($data[$field] === '') {

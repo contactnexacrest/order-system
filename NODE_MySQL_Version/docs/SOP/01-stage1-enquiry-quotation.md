@@ -33,6 +33,17 @@ at the PI stage):
 
 ![Public Quotation Details form](./images/s1_public_intake_form.png)
 
+The Billing Address on this form is structured — Line 1 (required),
+Line 2, City (required), Postcode, Country (required) — same pattern as
+the Consignee section just below it on this same form, since documents
+need these as discrete fields rather than one free-text blob. The older
+single-field Billing Address column is composed automatically from these
+parts behind the scenes, so every existing report or screen that reads it
+keeps working unchanged. **Container Type** is a dropdown (Admin → Dropdown
+Option Lists, `container_type`), not free text, with a
+"— Not sure / To Be Confirmed —" option for a buyer who genuinely doesn't
+know yet — same admin-managed-list mechanism as Certificate of Origin Type.
+
 That submission lands in **Operations → Quotation Intake Review**
 (`/client-intake`) as a pending row. Staff review it here and either:
 
@@ -165,6 +176,41 @@ editable by any staff member with client-management access at any time,
 since it's a staff-authored annotation of an externally-negotiated term,
 not a client-submitted identity detail the lock exists to protect. Every
 change here is still fully audit-logged.
+
+#### Agreement file, expiry, force-expire, and renew
+
+The footer text is one half of the agreement; the other half is the actual
+signed copy of it, with an expiry date so the footer doesn't keep printing
+on new documents after the agreement itself has lapsed. On the same
+client's page, an **Agreement File & Expiry** form (Edit page) and a
+status widget (client's own page) handle this:
+
+- **Upload** — a PDF/DOC/DOCX file plus an optional **Expiry Date**.
+  Uploading always starts the agreement fresh: any previous Force Expire
+  is cleared the moment a new file is saved, regardless of its prior
+  state. Leaving Expiry Date blank means no automatic expiry — the
+  agreement then stays active until someone deliberately clicks **Force
+  Expire**.
+- **Status** shows as **Active**, **Expired** (past its own expiry date),
+  or **Force-Expired** (the manual override, below) — and the footer text
+  only prints on a newly generated document while the status is Active.
+  Force-Expired always wins over a future expiry date; an expired-by-date
+  agreement is distinct from one that was deliberately force-expired, but
+  both stop the footer from printing.
+- **Force Expire** — ends the agreement immediately, regardless of its
+  expiry date — e.g. the client breached a term and staff don't want to
+  wait for the natural expiry date to arrive. Fully audit-logged.
+- **Renew** — resets the expiry date (and, optionally, replaces the file
+  itself, if the underlying signed document actually changed) and clears
+  Force Expire. The Renew button and its date field only appear (are not
+  greyed out) within 30 days of the current expiry date, or once it has
+  already passed — this is a staff workflow nudge against renewing a
+  fresh agreement early for no reason, not a security gate: nothing
+  server-side blocks an early renewal if someone genuinely needs one.
+
+The file itself downloads only through the client's own page
+(permission-gated, same `manage_orders` tier as everything else on this
+screen) — never a public link.
 
 ### Both paths converge here — generating the Quotation
 

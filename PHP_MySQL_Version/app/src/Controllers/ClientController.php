@@ -210,6 +210,7 @@ final class ClientController
             'billing_address_line2'          => trim((string) ($_POST['billing_address_line2'] ?? '')) ?: null,
             'billing_city'                   => trim((string) ($_POST['billing_city'] ?? '')) ?: null,
             'billing_postcode'               => trim((string) ($_POST['billing_postcode'] ?? '')) ?: null,
+            'billing_country'                => trim((string) ($_POST['billing_country'] ?? '')) ?: null,
             'consignee_same_as_buyer'        => $consigneeSameAsBuyer ? 1 : 0,
             'notify_party_same_as_consignee' => $notifySameAsConsignee ? 1 : 0,
         ];
@@ -299,6 +300,125 @@ final class ClientController
 
         Flash::set('success', 'Agreement T&C footer updated.');
         header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * Item 2 — the actual signed-agreement file, with an expiry date so
+     * downstream orders know how long the footer text above should keep
+     * printing. Uploading always starts the agreement fresh: force_expired
+     * is cleared regardless of its previous state.
+     */
+    public function uploadAgreement(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        $expiryDate = trim((string) ($_POST['agreement_expiry_date'] ?? '')) ?: null;
+
+        try {
+            $fileId = FileUploadService::handleUpload(
+                'agreement_file',
+                'client_agreement_file',
+                'clients/' . FileUploadService::sanitizePathSegment((string) $client['client_unique_number']) . '/agreement',
+                $clientId,
+                null,
+                (int) AuthService::currentUser()['id']
+            );
+            $file = FileStoreRepository::find($fileId);
+            ClientRepository::setAgreementFile($clientId, $file['server_path'], $file['original_filename'], $expiryDate);
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_AGREEMENT_FILE_UPLOADED', 'clients', $clientId, 'agreement_file_original_name', null, $file['original_filename']);
+            Flash::set('success', 'Agreement file uploaded.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * Manually ends an agreement immediately, regardless of its expiry
+     * date — e.g. the client breached a term and staff don't want to wait
+     * for the natural expiry.
+     */
+    public function forceExpireAgreement(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        ClientRepository::setAgreementForceExpired($clientId, true);
+        AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_AGREEMENT_FORCE_EXPIRED', 'clients', $clientId, 'agreement_force_expired', '0', '1');
+        Flash::set('success', 'Agreement force-expired. The footer will stop printing on new documents immediately.');
+        header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * Resets the expiry date (and, optionally, the file) and clears
+     * force_expired. The UI only shows this button within 30 days of the
+     * current expiry date or after it's passed (see clients/show.php) —
+     * that's a staff workflow nudge, not a security gate, so nothing here
+     * enforces it server-side.
+     */
+    public function renewAgreement(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        $expiryDate = trim((string) ($_POST['agreement_expiry_date'] ?? '')) ?: null;
+
+        try {
+            if (!empty($_FILES['agreement_file']['name'])) {
+                $fileId = FileUploadService::handleUpload(
+                    'agreement_file',
+                    'client_agreement_file',
+                    'clients/' . FileUploadService::sanitizePathSegment((string) $client['client_unique_number']) . '/agreement',
+                    $clientId,
+                    null,
+                    (int) AuthService::currentUser()['id']
+                );
+                $file = FileStoreRepository::find($fileId);
+                ClientRepository::renewAgreement($clientId, $expiryDate, $file['server_path'], $file['original_filename']);
+            } else {
+                ClientRepository::renewAgreement($clientId, $expiryDate);
+            }
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_AGREEMENT_RENEWED', 'clients', $clientId, 'agreement_expiry_date', $client['agreement_expiry_date'] ?? null, $expiryDate);
+            Flash::set('success', 'Agreement renewed.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header("Location: /clients/{$clientId}");
+    }
+
+    /** Streams the agreement file directly from its stored path — never public, always permission-gated by the route. */
+    public function downloadAgreement(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client || empty($client['agreement_file_path']) || !is_file($client['agreement_file_path'])) {
+            http_response_code(404);
+            echo 'File is missing from storage.';
+            return;
+        }
+
+        $safeDownloadName = str_replace(['/', '\\'], '-', (string) $client['agreement_file_original_name']);
+        $safeDownloadName = preg_replace('/[\x00-\x1F\x7F"]/', '', $safeDownloadName) ?? $safeDownloadName;
+        header('Content-Type: ' . (mime_content_type($client['agreement_file_path']) ?: 'application/octet-stream'));
+        header('Content-Disposition: attachment; filename="' . $safeDownloadName . '"');
+        header('Content-Length: ' . (string) filesize($client['agreement_file_path']));
+        readfile($client['agreement_file_path']);
     }
 
     /**
@@ -475,7 +595,7 @@ final class ClientController
             $fileId = FileUploadService::handleUpload(
                 'document',
                 'client_additional_document',
-                'clients/' . FileStoreRepository::sanitizePathSegment((string) $client['client_unique_number']) . '/additional_documents',
+                'clients/' . FileUploadService::sanitizePathSegment((string) $client['client_unique_number']) . '/additional_documents',
                 $clientId,
                 null,
                 (int) AuthService::currentUser()['id'],

@@ -198,6 +198,22 @@ mistake (or malice).
   forward without touching any status already recorded against it;
   deleting one outright only works if no order has ever recorded a status
   against it, otherwise the screen asks you to deactivate instead.
+- **Dropdown Option Lists** (`/admin/dropdown-options`) — the admin screen
+  for `dropdown_options`, the generic small-option-list table several
+  dropdowns elsewhere in the app already read from (Container Type,
+  Certificate of Origin Type, and others) but that, until now, could only
+  be edited by hand-editing `seed.sql`. Gated by `manage_dropdown_options`,
+  same tier as HS Codes/Logistics Partners/Compliance Task Types (Admin/MD/
+  ED and Super Admin by default). One group per `list_key`, each with its
+  own bulk-save form (Value/Sort Order/Default radio/Active checkbox per
+  row) and its own "Add Option" field underneath — mirrors the Admin
+  Overrides screen's per-section pattern. An option is never deleted
+  outright, only deactivated (the **Active** checkbox) — an existing order
+  or submission may still carry its exact text in a plain VARCHAR column
+  with no foreign key back to this table, so removing the row itself could
+  orphan that reference. Exactly one option per list may be the **Default**
+  (the radio column) — marking a new one silently clears the previous
+  default, same convention as Payment Presets below.
 - **Reference Library** (`/reference-docs`) — any authenticated staff
   member can view and download every entry here by default; adding,
   deleting, or re-uploading a file requires `manage_company_settings`,

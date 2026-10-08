@@ -29,6 +29,9 @@
         <label>Postcode
           <input type="text" name="billing_postcode" value="<?= htmlspecialchars((string) ($old['billing_postcode'] ?? '')) ?>" placeholder="e.g., B1 1AA">
         </label>
+        <label>Billing Country
+          <input type="text" name="billing_country" value="<?= htmlspecialchars((string) ($old['billing_country'] ?? '')) ?>" placeholder="e.g., United Kingdom">
+        </label>
         <label>VAT / EORI / Tax Reg. No.
           <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars((string) ($old['vat_eori_tax_no'] ?? '')) ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>

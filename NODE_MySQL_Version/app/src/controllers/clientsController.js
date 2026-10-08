@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
 const clientRepository = require('../repositories/clientRepository');
@@ -87,7 +89,22 @@ async function show(req, res) {
   if (!client.is_active) impersonationReasons.push('this client is deactivated');
   const impersonationUnavailableReason = impersonationReasons.join(', ');
   const additionalDocuments = await fileStoreRepository.additionalDocumentsForClient(client.id);
-  res.renderView('clients/show', { client, orders, impersonationGloballyEnabled, impersonationUnavailableReason, additionalDocuments }, 'layout/base');
+
+  // Item 2 — agreement status: never once force-expired, and (when an
+  // expiry date is set) not past it. Renew is only offered within 30 days
+  // of the current expiry date, or once it's already passed — a UI nudge,
+  // not a security gate.
+  const agreementForceExpired = !!client.agreement_force_expired;
+  const agreementExpiryDate = client.agreement_expiry_date || null;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const agreementExpired = !!(agreementExpiryDate && agreementExpiryDate < todayStr);
+  const agreementActive = !agreementForceExpired && !agreementExpired;
+  const agreementRenewEligible = !!(agreementExpiryDate && new Date(agreementExpiryDate).getTime() <= Date.now() + 30 * 86400000);
+
+  res.renderView('clients/show', {
+    client, orders, impersonationGloballyEnabled, impersonationUnavailableReason, additionalDocuments,
+    agreementForceExpired, agreementExpiryDate, agreementExpired, agreementActive, agreementRenewEligible,
+  }, 'layout/base');
 }
 
 async function editForm(req, res) {
@@ -186,6 +203,7 @@ function collectPartyFields(req) {
     billing_address_line2: String(req.body.billing_address_line2 || '').trim() || null,
     billing_city: String(req.body.billing_city || '').trim() || null,
     billing_postcode: String(req.body.billing_postcode || '').trim() || null,
+    billing_country: String(req.body.billing_country || '').trim() || null,
     consignee_same_as_buyer: consigneeSameAsBuyer ? 1 : 0,
     notify_party_same_as_consignee: notifySameAsConsignee ? 1 : 0,
   };
@@ -265,6 +283,123 @@ async function updateAgreementFooter(req, res) {
 
   flash.set(req, 'success', 'Agreement T&C footer updated.');
   res.redirect(`/clients/${clientId}`);
+}
+
+/**
+ * Item 2 — the actual signed-agreement file, with an expiry date so
+ * downstream orders know how long the footer text above should keep
+ * printing. Uploading always starts the agreement fresh: force_expired is
+ * cleared regardless of its previous state.
+ */
+async function uploadAgreement(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const expiryDate = String(req.body.agreement_expiry_date || '').trim() || null;
+
+  try {
+    const fileId = await fileUploadService.handleUpload(
+      req,
+      'agreement_file',
+      'client_agreement_file',
+      `clients/${fileUploadService.sanitizePathSegment(client.client_unique_number)}/agreement`,
+      clientId,
+      null,
+      req.user.id
+    );
+    const file = await fileStoreRepository.find(fileId);
+    await clientRepository.setAgreementFile(clientId, file.server_path, file.original_filename, expiryDate);
+    await auditLogRepository.log(req.user.id, 'CLIENT_AGREEMENT_FILE_UPLOADED', 'clients', clientId, 'agreement_file_original_name', null, file.original_filename);
+    flash.set(req, 'success', 'Agreement file uploaded.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect(`/clients/${clientId}`);
+}
+
+/**
+ * Manually ends an agreement immediately, regardless of its expiry date —
+ * e.g. the client breached a term and staff don't want to wait for the
+ * natural expiry.
+ */
+async function forceExpireAgreement(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  await clientRepository.setAgreementForceExpired(clientId, true);
+  await auditLogRepository.log(req.user.id, 'CLIENT_AGREEMENT_FORCE_EXPIRED', 'clients', clientId, 'agreement_force_expired', '0', '1');
+  flash.set(req, 'success', 'Agreement force-expired. The footer will stop printing on new documents immediately.');
+  res.redirect(`/clients/${clientId}`);
+}
+
+/**
+ * Resets the expiry date (and, optionally, the file) and clears
+ * force_expired. The UI only shows this button within 30 days of the
+ * current expiry date or after it's passed (see clients/show.njk) — that's
+ * a staff workflow nudge, not a security gate, so nothing here enforces
+ * it server-side.
+ */
+async function renewAgreement(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const expiryDate = String(req.body.agreement_expiry_date || '').trim() || null;
+
+  try {
+    if (req.file && req.file.buffer) {
+      const fileId = await fileUploadService.handleUpload(
+        req,
+        'agreement_file',
+        'client_agreement_file',
+        `clients/${fileUploadService.sanitizePathSegment(client.client_unique_number)}/agreement`,
+        clientId,
+        null,
+        req.user.id
+      );
+      const file = await fileStoreRepository.find(fileId);
+      await clientRepository.renewAgreement(clientId, expiryDate, file.server_path, file.original_filename);
+    } else {
+      await clientRepository.renewAgreement(clientId, expiryDate);
+    }
+    await auditLogRepository.log(req.user.id, 'CLIENT_AGREEMENT_RENEWED', 'clients', clientId, 'agreement_expiry_date', client.agreement_expiry_date ?? null, expiryDate);
+    flash.set(req, 'success', 'Agreement renewed.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect(`/clients/${clientId}`);
+}
+
+/** Streams the agreement file directly from its stored path — never public, always permission-gated by the route. */
+async function downloadAgreement(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client || !client.agreement_file_path || !fs.existsSync(client.agreement_file_path)) {
+    res.status(404).send('File is missing from storage.');
+    return;
+  }
+
+  const safeDownloadName = String(client.agreement_file_original_name || 'agreement')
+    .replace(/[/\\]/g, '-')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1F\x7F"]/g, '');
+  const agreementMimeTypes = { '.pdf': 'application/pdf', '.doc': 'application/msword', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+  const contentType = agreementMimeTypes[path.extname(client.agreement_file_path).toLowerCase()] || 'application/octet-stream';
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', `attachment; filename="${safeDownloadName}"`);
+  res.setHeader('Content-Length', String(fs.statSync(client.agreement_file_path).size));
+  fs.createReadStream(client.agreement_file_path).pipe(res);
 }
 
 /**
@@ -456,4 +591,5 @@ async function deleteAdditionalDocument(req, res) {
 module.exports = {
   index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
   setImpersonationAllowed, impersonate, uploadAdditionalDocument, deleteAdditionalDocument,
+  uploadAgreement, forceExpireAgreement, renewAgreement, downloadAgreement,
 };

@@ -982,7 +982,7 @@ final class OrderController
             $fileId = FileUploadService::handleUpload(
                 'document',
                 'order_additional_document',
-                'clients/' . FileStoreRepository::sanitizePathSegment((string) $order['client_unique_number']) . '/' . FileStoreRepository::sanitizePathSegment((string) $order['order_reference']) . '/additional_documents',
+                'clients/' . FileUploadService::sanitizePathSegment((string) $order['client_unique_number']) . '/' . FileUploadService::sanitizePathSegment((string) $order['order_reference']) . '/additional_documents',
                 null,
                 $orderId,
                 (int) AuthService::currentUser()['id'],

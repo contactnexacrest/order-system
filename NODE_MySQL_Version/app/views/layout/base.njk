@@ -79,6 +79,7 @@
           {% if permissions.manage_logistics_partners %}<a href="/logistics-partners" class="{{ 'active' if (currentPath | startswith('/logistics-partners')) else '' }}">Logistics Partners</a>{% endif %}
           {% if permissions.manage_payment_presets %}<a href="/payment-presets" class="{{ 'active' if (currentPath | startswith('/payment-presets')) else '' }}">Payment Presets</a>{% endif %}
           {% if permissions.manage_compliance_task_types %}<a href="/compliance-task-types" class="{{ 'active' if (currentPath | startswith('/compliance-task-types')) else '' }}">Compliance Task Types</a>{% endif %}
+          {% if permissions.manage_dropdown_options %}<a href="/admin/dropdown-options" class="{{ 'active' if (currentPath | startswith('/admin/dropdown-options')) else '' }}">Dropdown Option Lists</a>{% endif %}
           {% if permissions.manage_email_templates %}<a href="/email-templates" class="{{ 'active' if (currentPath | startswith('/email-templates')) else '' }}">Email Templates</a>{% endif %}
           {% if permissions.manage_company_settings %}<a href="/watermarks" class="{{ 'active' if (currentPath | startswith('/watermarks')) else '' }}">Watermarks</a>{% endif %}
           {% if permissions.manage_assets %}<a href="/company-assets" class="{{ 'active' if (currentPath | startswith('/company-assets')) else '' }}">Assets</a>{% endif %}

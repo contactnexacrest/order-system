@@ -75,6 +75,7 @@ const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const logisticsPartnerController = require('./controllers/logisticsPartnerController');
 const paymentPresetController = require('./controllers/paymentPresetController');
+const dropdownOptionController = require('./controllers/dropdownOptionController');
 const complianceTaskTypeController = require('./controllers/complianceTaskTypeController');
 const watermarkController = require('./controllers/watermarkController');
 const orderCommentController = require('./controllers/orderCommentController');
@@ -397,6 +398,10 @@ app.post('/logistics-partners/:id/update', requireAuth, requirePermission('manag
 app.post('/logistics-partners/:id/toggle', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.toggleActive));
 app.post('/logistics-partners/:id/delete', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.remove));
 
+app.get('/admin/dropdown-options', requireAuth, requirePermission('manage_dropdown_options'), asyncHandler(dropdownOptionController.index));
+app.post('/admin/dropdown-options/:listKey/create', requireAuth, requirePermission('manage_dropdown_options'), verifyCsrf, asyncHandler(dropdownOptionController.create));
+app.post('/admin/dropdown-options/:listKey/update', requireAuth, requirePermission('manage_dropdown_options'), verifyCsrf, asyncHandler(dropdownOptionController.update));
+
 app.get('/payment-presets', requireAuth, requirePermission('manage_payment_presets'), asyncHandler(paymentPresetController.index));
 app.get('/payment-presets/create', requireAuth, requirePermission('manage_payment_presets'), asyncHandler(paymentPresetController.createForm));
 app.post('/payment-presets', requireAuth, requirePermission('manage_payment_presets'), verifyCsrf, asyncHandler(paymentPresetController.create));
@@ -493,6 +498,11 @@ app.get('/clients/:id/edit', requireAuth, requirePermission('manage_orders'), as
 app.post('/clients/:id/update', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.update));
 // Batch 3 #12 — separate endpoint, deliberately NOT gated by the data-lock check inside update() above.
 app.post('/clients/:id/agreement-footer', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.updateAgreementFooter));
+// Item 2 — agreement file upload + expiry + force-expire + renew (schema.sql Section BE).
+app.post('/clients/:id/agreement/upload', requireAuth, requirePermission('manage_orders'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(clientsController.uploadAgreement));
+app.post('/clients/:id/agreement/force-expire', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.forceExpireAgreement));
+app.post('/clients/:id/agreement/renew', requireAuth, requirePermission('manage_orders'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(clientsController.renewAgreement));
+app.get('/clients/:id/agreement/download', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.downloadAgreement));
 app.post('/clients/:id/toggle-active', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.toggleActive));
 // Batch 3 #13b — free-form extra documents attached to this client (schema.sql Section AZ).
 app.post('/clients/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(clientsController.uploadAdditionalDocument));

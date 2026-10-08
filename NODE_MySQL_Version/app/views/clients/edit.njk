@@ -44,6 +44,9 @@
         <label>Postcode
           <input type="text" name="billing_postcode" value="{{ client.billing_postcode or '' }}" placeholder="e.g., B1 1AA">
         </label>
+        <label>Billing Country
+          <input type="text" name="billing_country" value="{{ client.billing_country or '' }}" placeholder="e.g., United Kingdom">
+        </label>
         <label>VAT / EORI / Tax Reg. No.
           <input type="text" name="vat_eori_tax_no" value="{{ client.vat_eori_tax_no or '' }}" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>
@@ -174,6 +177,29 @@
       </label>
     </fieldset>
     <button type="submit">Save Agreement Footer</button>
+  </form>
+
+  {# Item 2 — the actual signed agreement file + expiry date, tracked separately
+     from the footer text above (which still prints independently of this). #}
+  <form method="post" action="/clients/{{ client.id }}/agreement/upload" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <fieldset>
+      <legend>Agreement File &amp; Expiry</legend>
+      {% if client.agreement_file_path %}
+        <p class="muted small">Current file: <a href="/clients/{{ client.id }}/agreement/download">{{ client.agreement_file_original_name or 'agreement file' }}</a> — uploaded {{ client.agreement_uploaded_at or '' }}. Uploading a new file below replaces it and resets Force Expire.</p>
+      {% else %}
+        <p class="muted small">No agreement file uploaded yet. Upload one below — the expiry date controls how long the T&amp;C footer above keeps printing on this client's documents.</p>
+      {% endif %}
+      <div class="field-grid">
+        <label>Agreement File (PDF/DOC/DOCX)
+          <input type="file" name="agreement_file" accept=".pdf,.doc,.docx">
+        </label>
+        <label>Expiry Date <small class="muted">(leave blank for no automatic expiry — only Force Expire will end it then)</small>
+          <input type="date" name="agreement_expiry_date" value="{{ client.agreement_expiry_date or '' }}">
+        </label>
+      </div>
+    </fieldset>
+    <button type="submit">Upload Agreement File</button>
   </form>
 </div>
 <script>

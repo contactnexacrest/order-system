@@ -375,6 +375,8 @@ a.entity-card:hover{text-decoration:none;}
 .tag-gold{color:var(--gold-strong);background:var(--gold-soft);}
 .tag-navy{color:var(--navy);background:var(--navy-soft);}
 .tag-hint{font-size:0.66rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:6px;white-space:nowrap;color:var(--ink-soft);background:var(--bg);border:1px solid var(--line);margin-left:0.35rem;}
+.info-bubble{display:inline-flex;align-items:center;justify-content:center;width:1.1rem;height:1.1rem;margin-left:0.3rem;color:var(--ink-soft);cursor:help;font-size:0.95rem;vertical-align:-0.15rem;border-radius:50%;}
+.info-bubble:hover,.info-bubble:focus-visible{color:var(--navy);}
 .mini-stage-track{display:flex;gap:3px;margin-bottom:0.4rem;}
 .mini-stage-seg{flex:1;height:5px;border-radius:3px;background:var(--line);}
 .mini-stage-seg.filled{background:var(--gold);}

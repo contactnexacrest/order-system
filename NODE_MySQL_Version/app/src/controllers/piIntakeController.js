@@ -2,6 +2,7 @@
 
 const flash = require('../helpers/flash');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
+const { balanceTriggerSentence } = require('../services/documentDataAssembler');
 
 /**
  * Port of App\Controllers\PiIntakeController. Public, unauthenticated
@@ -15,13 +16,33 @@ const piIntakeRepository = require('../repositories/piIntakeRepository');
  * review queue (piIntakeReviewController).
  */
 
+// Point 6 — the Payment Terms Confirmation field's placeholder used to be a
+// generic made-up example; it now mirrors this specific order's own payment
+// preset wording (the same sentence documentDataAssembler prints on the PI
+// itself), so the client sees exactly what they're expected to confirm.
+function buildPaymentTermsPlaceholder(submission) {
+  const advancePct = String(parseFloat(submission.order_advance_pct).toFixed(2)).replace(/\.?0+$/, '');
+  const balancePct = String(parseFloat(submission.order_balance_pct).toFixed(2)).replace(/\.?0+$/, '');
+  const balanceTerms = balanceTriggerSentence(
+    submission.order_balance_trigger_option || null,
+    submission.order_balance_days != null ? parseInt(submission.order_balance_days, 10) : null,
+    submission.order_balance_trigger_wording || null
+  );
+  return `CONFIRMED — ${advancePct}% advance T/T on FOB Value ${submission.order_advance_trigger_text} + ${balancePct}% balance ${balanceTerms}`;
+}
+
 async function show(req, res) {
   const submission = await piIntakeRepository.findValidByToken(req.params.token || '');
   if (!submission) {
     res.renderView('pi_intake/link_expired', {}, 'layout/bare');
     return;
   }
-  res.renderView('pi_intake/form', { submission, token: req.params.token, wrapClass: 'intake-wrap' }, 'layout/bare');
+  res.renderView('pi_intake/form', {
+    submission,
+    token: req.params.token,
+    wrapClass: 'intake-wrap',
+    paymentTermsPlaceholder: buildPaymentTermsPlaceholder(submission),
+  }, 'layout/bare');
 }
 
 async function submit(req, res) {
@@ -59,7 +80,7 @@ async function submit(req, res) {
     'company_legal_name', 'billing_address',
     'vat_eori_tax_no', 'contact_person', 'email', 'phone',
     'port_of_discharge_text', 'country_of_destination', 'incoterm_confirmed',
-    'payment_terms_confirmation', 'quotation_acceptance_reference', 'coo_type',
+    'payment_terms_confirmation', 'quotation_acceptance_reference',
   ];
   for (const field of required) {
     if (data[field] === '') {

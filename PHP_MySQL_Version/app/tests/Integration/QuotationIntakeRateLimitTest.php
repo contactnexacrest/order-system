@@ -82,7 +82,9 @@ final class QuotationIntakeRateLimitTest extends DbTestCase
     {
         return [
             'company_legal_name'     => 'Rate Limit Test Co',
-            'billing_address'        => '1 Test Street',
+            'billing_address_line1'  => '1 Test Street',
+            'billing_city'           => 'Testville',
+            'billing_country'        => 'Testland',
             'vat_eori_tax_no'        => 'VAT123',
             'contact_person'         => 'Jane Test',
             'email'                  => 'jane-' . bin2hex(random_bytes(4)) . '@example.test',

@@ -3098,3 +3098,68 @@ CREATE TABLE order_bl_endorsements (
   FOREIGN KEY (updated_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
+
+-- ================================================================
+-- SECTION BD — DROPDOWN OPTIONS ADMIN SCREEN (added 2026-10-08)
+-- ================================================================
+-- dropdown_options (defined earlier in this file) was built "admin can
+-- add/edit" by its own doc comment, but no admin screen was ever wired
+-- up to it — options like container_type/coo_type were only ever
+-- editable by hand-editing seed.sql. This adds the permission only; the
+-- table's DDL is unchanged. Same tier as manage_hs_codes/
+-- manage_logistics_partners: Admin/MD/ED and Super Admin only.
+-- ================================================================
+INSERT INTO permissions (permission_key, name, description, category) VALUES
+  ('manage_dropdown_options', 'Manage dropdown option lists', 'Add, edit, and deactivate the admin-editable option lists used across the app (Container Type, Certificate of Origin Type, etc. — see dropdown_options.list_key). Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog');
+
+-- ================================================================
+-- SECTION BE — CLIENT AGREEMENT: FILE UPLOAD + EXPIRY (added 2026-10-08)
+-- ================================================================
+-- Extends the existing agreement_footer_text (Section AX) with an
+-- actual uploaded copy of the signed agreement, an expiry date, and a
+-- manual force-expire switch. The footer text stays admin-editable from
+-- the same screen as before; what's new is that it only actually prints
+-- on a document (documentDataAssembler.resolveAgreementFooter — see
+-- below) while the agreement is genuinely active: not force-expired,
+-- and — when an expiry date is set — not yet past it. NULL expiry means
+-- no automatic expiry; only the Force Expire button can end it then.
+-- Renew re-sets the expiry date (and optionally the file) and clears
+-- force_expired; the UI only lets staff click Renew within 30 days of
+-- the current expiry date or after it's passed, so a fresh agreement
+-- isn't renewed early for no reason, but nothing server-side blocks it —
+-- this is a staff workflow nudge, not a security gate, unlike an Admin
+-- Override.
+-- ================================================================
+ALTER TABLE clients
+  ADD COLUMN agreement_file_path VARCHAR(500) NULL AFTER agreement_footer_text,
+  ADD COLUMN agreement_file_original_name VARCHAR(255) NULL AFTER agreement_file_path,
+  ADD COLUMN agreement_uploaded_at TIMESTAMP NULL AFTER agreement_file_original_name,
+  ADD COLUMN agreement_expiry_date DATE NULL AFTER agreement_uploaded_at,
+  ADD COLUMN agreement_force_expired TINYINT(1) NOT NULL DEFAULT 0 AFTER agreement_expiry_date;
+
+-- ================================================================
+-- SECTION BF — QT INTAKE: STRUCTURED BILLING ADDRESS (added 2026-10-08)
+-- ================================================================
+-- client_intake_submissions (the public Quotation-stage form) only ever
+-- had one free-text billing_address box — unlike the Consignee/Notify
+-- Party sections on the very same form (Feature A, Section AY-area) and
+-- unlike the `clients` table itself (Section BA), both of which already
+-- got a structured line1/2/city/postcode breakdown. Documents need these
+-- as discrete fields, not one blob, so this adds the same pattern here:
+-- billing_address stays (never removed — still what a pre-this-change
+-- row has, and what the review screen falls back to), and the new
+-- structured columns are used when present, same fallback convention as
+-- Section BA. Also backfills clients.billing_country, missing from
+-- Section BA's own breakdown (billing_address_line1/2/city/postcode
+-- were added there but not country) — an oversight fixed here so the
+-- two tables' structured breakdowns finally match column-for-column.
+-- ================================================================
+ALTER TABLE client_intake_submissions
+  ADD COLUMN billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
+  ADD COLUMN billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
+  ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2,
+  ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city,
+  ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode;
+
+ALTER TABLE clients
+  ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode;
