@@ -17,11 +17,15 @@
 
 {% block body %}
 
-{% set section_number = 2 %}{% include '_buyer_details.njk' %}
-{% set section_number = 3 %}{% include '_consignee_details.njk' %}
-{% set section_number = 4 %}{% include '_notify_party.njk' %}
+{% set section_number = section_numbers.buyer %}{% include '_buyer_details.njk' %}
+{% if show_consignee_section %}
+{% set section_number = section_numbers.consignee %}{% include '_consignee_details.njk' %}
+{% endif %}
+{% if show_notify_party_section %}
+{% set section_number = section_numbers.notify_party %}{% include '_notify_party.njk' %}
+{% endif %}
 
-<div class="section-title">5. SHIPPING DETAILS</div>
+<div class="section-title">{{ section_numbers.shipping_details }}. SHIPPING DETAILS</div>
 <table class="kv">
   <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
@@ -33,7 +37,7 @@
   <tr><td class="k">No. of Packages *</td><td class="v">{{ (packing.crate_count ~ ' Wooden Crates') if packing.crate_count else 'To Be Confirmed' }} — must match Packing List</td></tr>
 </table>
 
-<div class="section-title">6. PRODUCT / ORDER DETAILS</div>
+<div class="section-title">{{ section_numbers.product }}. PRODUCT / ORDER DETAILS</div>
 <p class="placeholder-italic" style="font-size:9pt; margin:0 0 4pt;">Quantities and values below reflect ACTUAL shipment — must match Packing List. Must not exceed PI quantities.</p>
 <table class="products">
   <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
@@ -73,7 +77,7 @@
   {%- if crates.length > 1 %} — Crates {{ (crates|first).crate_no }} to {{ (crates|last).crate_no }}{% else %} — Crate {{ (crates|first).crate_no }}{% endif -%}
 {%- endif -%}.</p>
 
-<div class="section-title">7. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
+<div class="section-title">{{ section_numbers.invoice_value }}. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
 <div class="banner" style="background:#E8F1FB; color:#185FA5;">FOB Value is the basis for all payments and required for Indian Shipping Bill &amp; IGST refund. Freight &amp; Insurance (if applicable) are recovered separately via Debit Note and are not included in this Commercial Invoice value.</div>
 
 <table class="kv" style="table-layout:fixed;">
@@ -124,7 +128,7 @@
 </table>
 <p class="mandatory-note" style="margin-top:6pt;"><strong>Total Invoice Value in Words ({{ order.currency_code }}):</strong> <span class="placeholder-italic">{{ financial.fob_value_in_words or '_________________________________________________________' }}</span> <strong style="color:#C0392B;">*</strong></p>
 
-<div class="section-title">8. BANK DETAILS &nbsp;(for balance T/T payment)</div>
+<div class="section-title">{{ section_numbers.bank }}. BANK DETAILS &nbsp;(for balance T/T payment)</div>
 <table class="kv">
   <tr><td class="k">Account Holder</td><td class="v">{{ company.legal_name | upper }}</td></tr>
   <tr><td class="k">Bank</td><td class="v">{{ company.bank_name }}</td></tr>
@@ -137,7 +141,7 @@
   <tr><td class="k">RBI Purpose Code</td><td class="v" style="color:#185FA5; font-weight:bold;">{{ company.rbi_purpose_code_balance }} — enter in the "Purpose of Remittance" field of your wire transfer form.</td></tr>
 </table>
 
-<div class="section-title">9. DOCUMENTS PROVIDED WITH THIS SHIPMENT</div>
+<div class="section-title">{{ section_numbers.documents_provided }}. DOCUMENTS PROVIDED WITH THIS SHIPMENT</div>
 <div class="numbered-block">
   <p><strong>The following documents are provided with this shipment:</strong></p>
   <p>1.&nbsp;&nbsp;Commercial Invoice (this document — digitally authorised)</p>
@@ -147,7 +151,7 @@
   <p>5.&nbsp;&nbsp;Fumigation Certificate — provided as standard with every shipment</p>
 </div>
 
-<div class="section-title">10. DECLARATION</div>
+<div class="section-title">{{ section_numbers.declaration }}. DECLARATION</div>
 <div class="numbered-block" style="font-style:italic; color:#5B6573;">
   <p style="margin:0 0 4pt;">We hereby declare that the goods described in this Commercial Invoice are of Indian origin and that the particulars given are true and correct.</p>
   <p style="margin:0;">This invoice is issued under Letter of Undertaking (LUT Order No. {{ company.lut_number }}) for export of goods without payment of IGST under the provisions of the IGST Act, 2017.</p>

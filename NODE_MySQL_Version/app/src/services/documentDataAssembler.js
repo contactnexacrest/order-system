@@ -86,6 +86,10 @@ async function assemble(orderId, documentTypeCode = null) {
   const annexureProducts = await annexureProductsBlock(orderId);
   const annexureFlags = await annexureFlagsBlock(orderId, order.annexure_mode || 'SPEC', annexureProducts);
 
+  const resolvedConsignee = resolveConsignee(order);
+  const resolvedNotifyParty = resolveNotifyParty(order, resolvedConsignee);
+  const [showConsigneeSection, showNotifyPartySection] = await sectionDisplayFlags(resolvedConsignee, resolvedNotifyParty);
+
   return {
     company,
     assets,
@@ -150,8 +154,10 @@ async function assemble(orderId, documentTypeCode = null) {
       notify_party: order.notify_party,
       agreement_footer_text: order.agreement_footer_text,
     },
-    consignee: resolveConsignee(order),
-    notify_party_block: resolveNotifyParty(order, resolveConsignee(order)),
+    consignee: resolvedConsignee,
+    notify_party_block: resolvedNotifyParty,
+    show_consignee_section: showConsigneeSection,
+    show_notify_party_section: showNotifyPartySection,
     products: products.map((p) => ({
       description: p.description,
       dimensions: p.dimensions,
@@ -797,6 +803,34 @@ function resolveNotifyParty(order, resolvedConsignee) {
   };
 }
 
+/**
+ * Whether the CONSIGNEE DETAILS / NOTIFY PARTY sections should print on a
+ * buyer-facing document. Each has a company_settings toggle
+ * (always_show_consignee_section / always_show_notify_party_section) that,
+ * when enabled, prints the section even if it's identical to the Buyer;
+ * when disabled, the section is omitted whenever it's identical to the
+ * Buyer. Either way, a section that is genuinely DIFFERENT from the Buyer
+ * always prints — the setting can never hide real information.
+ *
+ * Notify Party is only "effectively same as Buyer" when BOTH links of the
+ * resolution chain hold: it must resolve same_as_consignee AND the
+ * Consignee itself must resolve same_as_buyer. Any break in that chain
+ * means the Notify Party's printed content is independent of the Buyer's,
+ * so the override applies.
+ */
+async function sectionDisplayFlags(resolvedConsignee, resolvedNotifyParty) {
+  const alwaysShowConsignee = (await companySettingsRepository.get('always_show_consignee_section')) === '1';
+  const alwaysShowNotifyParty = (await companySettingsRepository.get('always_show_notify_party_section')) === '1';
+
+  const consigneeSameAsBuyer = !!resolvedConsignee.same_as_buyer;
+  const notifyEffectivelySameAsBuyer = !!resolvedNotifyParty.same_as_consignee && consigneeSameAsBuyer;
+
+  return [
+    !consigneeSameAsBuyer || alwaysShowConsignee,
+    !notifyEffectivelySameAsBuyer || alwaysShowNotifyParty,
+  ];
+}
+
 function formatNumber(value) {
   if (value === null || value === undefined || value === '') {
     return 'To Be Confirmed';
@@ -844,4 +878,5 @@ module.exports = {
   balanceTriggerSentence,
   resolveConsignee,
   resolveNotifyParty,
+  sectionDisplayFlags,
 };

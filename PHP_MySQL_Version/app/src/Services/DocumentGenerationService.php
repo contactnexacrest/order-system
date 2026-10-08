@@ -124,6 +124,12 @@ final class DocumentGenerationService
         $definitions = self::resolveClauseGroup($documentTypeCode, 'definitions', $data, $balanceTriggerOption);
         $signatory = DocumentDataAssembler::signatoryBlock((int) $docType['id'], $signatoryOverrideUserId);
 
+        $sectionNumbers = self::sectionNumbers(
+            $documentTypeCode,
+            (bool) ($data['show_consignee_section'] ?? true),
+            (bool) ($data['show_notify_party_section'] ?? true)
+        );
+
         $context = array_merge($data, [
             'meta' => [
                 'document_reference' => $documentReference,
@@ -136,12 +142,13 @@ final class DocumentGenerationService
             'watermark' => $watermark,
             'doc_title' => self::titleFor($documentTypeCode),
             'section1_title' => self::section1TitleFor($documentTypeCode),
+            'section_numbers' => $sectionNumbers,
             'terms' => $terms,
-            'terms_section_number' => self::termsSectionNumberFor($documentTypeCode),
+            'terms_section_number' => $sectionNumbers['terms'],
             'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
             'legal_terms_clauses' => $legalTerms,
             'definition_clauses' => $definitions,
-            'legal_terms_section_number' => self::legalTermsSectionNumberFor($documentTypeCode),
+            'legal_terms_section_number' => $sectionNumbers['legal_terms'],
             'signatory' => $signatory,
         ]);
 
@@ -459,6 +466,11 @@ final class DocumentGenerationService
 
         $data = DocumentDataAssembler::assemble($orderId, $documentTypeCode);
         $terms = self::resolveTerms($documentTypeCode, $data);
+        $sectionNumbers = self::sectionNumbers(
+            $documentTypeCode,
+            (bool) ($data['show_consignee_section'] ?? true),
+            (bool) ($data['show_notify_party_section'] ?? true)
+        );
 
         $context = array_merge($data, [
             'meta' => [
@@ -472,8 +484,9 @@ final class DocumentGenerationService
             'watermark' => self::withRevisionStamp(self::finalWatermark(), (int) $document['client_revision_number'], $document['document_type_category'] ?? null),
             'doc_title' => self::titleFor($documentTypeCode),
             'section1_title' => self::section1TitleFor($documentTypeCode),
+            'section_numbers' => $sectionNumbers,
             'terms' => $terms,
-            'terms_section_number' => self::termsSectionNumberFor($documentTypeCode),
+            'terms_section_number' => $sectionNumbers['terms'],
             'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
             // Re-rendering the SAME document (draft -> final watermark
             // swap) must keep showing the same signatory it was originally
@@ -600,6 +613,11 @@ final class DocumentGenerationService
 
         $data = DocumentDataAssembler::assemble($orderId, $documentTypeCode);
         $terms = self::resolveTerms($documentTypeCode, $data);
+        $sectionNumbers = self::sectionNumbers(
+            $documentTypeCode,
+            (bool) ($data['show_consignee_section'] ?? true),
+            (bool) ($data['show_notify_party_section'] ?? true)
+        );
 
         $context = array_merge($data, [
             'meta' => [
@@ -613,8 +631,9 @@ final class DocumentGenerationService
             'watermark' => self::invalidWatermark(),
             'doc_title' => self::titleFor($documentTypeCode),
             'section1_title' => self::section1TitleFor($documentTypeCode),
+            'section_numbers' => $sectionNumbers,
             'terms' => $terms,
-            'terms_section_number' => self::termsSectionNumberFor($documentTypeCode),
+            'terms_section_number' => $sectionNumbers['terms'],
             'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
             'signatory' => DocumentDataAssembler::signatoryFromSnapshot($document),
             'company' => DocumentDataAssembler::companyFromSnapshot($document),
@@ -1240,21 +1259,89 @@ final class DocumentGenerationService
         };
     }
 
-    private static function termsSectionNumberFor(string $code): int
+    /**
+     * Every named section number for $code, accounting for whether the
+     * CONSIGNEE DETAILS / NOTIFY PARTY sections actually render this time
+     * (see DocumentDataAssembler::sectionDisplayFlags() — "always show"
+     * company settings, overridden the moment the section is genuinely
+     * different from the Buyer). Replaces the old hardcoded
+     * termsSectionNumberFor()/legalTermsSectionNumberFor() match
+     * statements, which assumed both sections were always present —
+     * since they can now be omitted, every later numbered section (and
+     * the cross-referenced Legal Terms & Definitions section) has to
+     * shift to match.
+     *
+     * $showConsignee/$showNotify are ignored for document types that
+     * never carry these two sections in the first place (BUYERPO, SUPPO,
+     * FDN, BLI, ANNEXA, COOPREP, AMD, ...) — those keep their historical
+     * fixed numbers unchanged.
+     *
+     * @return array<string,int|null>
+     */
+    private static function sectionNumbers(string $code, bool $showConsignee, bool $showNotify): array
     {
-        // QT/OC moved from 7->8 and PI from 9->10 when the Buyer/
-        // Consignee split (and PI's own new Notify Party section) added
-        // one (QT/OC) or two (PI) sections ahead of this one — see
-        // legalTermsSectionNumberFor() just below for the section that
-        // now follows this one in every case.
-        return match ($code) {
-            'QT' => 8,
-            'PI' => 10,
-            'OC' => 8,
-            'BUYERPO' => 5,
-            'SUPPO' => 6, // "6. QUALITY & INSPECTION" in the source template
-            default => 9,
-        };
+        $slotsByType = [
+            'QT' => ['product', 'shipping', 'payment', 'documents_provided'],
+            'PI' => ['product', 'shipping', 'payment', 'bank', 'export_doc'],
+            'OC' => ['order_summary', 'payment_status', 'production', 'documents_provided'],
+            'PL' => ['product_summary', 'crate_breakdown', 'declaration'],
+            'CI' => ['shipping_details', 'product', 'invoice_value', 'bank', 'documents_provided', 'declaration'],
+        ];
+        // QT/OC never carry a Notify Party section at all (Developer Spec
+        // Section 6 — PI/PL/CI only), regardless of $showNotify.
+        $hasNotifySlot = ['PI' => true, 'PL' => true, 'CI' => true];
+
+        if (!isset($slotsByType[$code])) {
+            // Not one of the 5 types with a toggleable Consignee/Notify
+            // Party section — unaffected by either setting, same fixed
+            // numbers as before this feature existed.
+            return [
+                'terms' => match ($code) {
+                    'BUYERPO' => 5,
+                    'SUPPO' => 6, // "6. QUALITY & INSPECTION" in the source template
+                    default => 9,
+                },
+                'legal_terms' => match ($code) {
+                    'FDN' => 7,
+                    'BUYERPO' => 8,
+                    'ANNEXA' => 8,
+                    default => null,
+                },
+            ];
+        }
+
+        $n = 2; // "1." is always SELLER/EXPORTER; "2." is always BUYER DETAILS
+        $numbers = ['buyer' => $n];
+        $n++;
+        if ($showConsignee) {
+            $numbers['consignee'] = $n;
+            $n++;
+        }
+        if (!empty($hasNotifySlot[$code]) && $showNotify) {
+            $numbers['notify_party'] = $n;
+            $n++;
+        }
+        foreach ($slotsByType[$code] as $slot) {
+            $numbers[$slot] = $n;
+            $n++;
+        }
+
+        // PL and CI never have Terms & Conditions clauses configured (see
+        // resolveTerms()'s caller / termsSectionTitleFor()'s docblock) —
+        // Legal Terms & Definitions follows the last visible named
+        // section directly, with no number reserved for the
+        // never-rendered Terms & Conditions heading, matching the
+        // historical fixed numbering this replaces (PL legal_terms=8
+        // right after Declaration=7; CI legal_terms=11 right after
+        // Declaration=10 — never terms+1).
+        if (in_array($code, ['PL', 'CI'], true)) {
+            $numbers['terms'] = $n;
+            $numbers['legal_terms'] = $n;
+        } else {
+            $numbers['terms'] = $n;
+            $numbers['legal_terms'] = $n + 1;
+        }
+        return $numbers;
     }
 
     private static function termsSectionTitleFor(string $code): string
@@ -1329,21 +1416,6 @@ final class DocumentGenerationService
      * SUPPO/COOPREP/AMD/CAFIN/CHECKLIST* — none of those are buyer-facing
      * contracts, so there is nothing here for a buyer to need defined).
      */
-    private static function legalTermsSectionNumberFor(string $code): ?int
-    {
-        return match ($code) {
-            'QT' => 9,
-            'PI' => 11,
-            'OC' => 9,
-            'PL' => 8,
-            'CI' => 11,
-            'FDN' => 7,
-            'BUYERPO' => 8,
-            'ANNEXA' => 8,
-            default => null,
-        };
-    }
-
     private static function sanitizePathSegment(string $value): string
     {
         return preg_replace('/[^A-Za-z0-9_-]+/', '-', $value) ?? 'x';

@@ -552,6 +552,20 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('show_generated_document_disclaimer', '1', 'boolean', 'documents', 'Show the "system-generated document" disclaimer under the signature block on any generated document that carries a signature/seal image. Set to 0 to hide it everywhere.', 0),
   ('generated_document_disclaimer_text', 'This is a system-generated document. The signature and company seal shown are NexaCrest''s authorised electronic signature and digital company seal, applied automatically by the order management system under internal document-authorisation controls.', 'string', 'documents', 'Exact wording shown under the signature block when the disclaimer above is enabled. Edit freely — no code change needed.', 0);
 
+-- Consignee/Notify Party section visibility on buyer-facing documents
+-- (QT/PI/OC/PL/CI). These only ever matter when the Consignee is the
+-- same as the Buyer (resp. the Notify Party effectively the same as the
+-- Buyer, tracing through the Consignee) — documentDataAssembler.assemble()
+-- ALWAYS shows the section the moment it is genuinely different from the
+-- Buyer, regardless of either setting below; a real difference can never
+-- be hidden. Default '1' on both reproduces the system's original
+-- behaviour (both sections always printed, even when identical to the
+-- Buyer) so turning this feature on changes nothing until an Admin
+-- deliberately flips one off.
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('always_show_consignee_section', '1', 'boolean', 'documents', 'Print the CONSIGNEE DETAILS section on QT/PI/OC/PL/CI even when the Consignee is identical to the Buyer. Set to 0 to omit that section whenever Consignee = Buyer — it still always prints the moment the two genuinely differ, regardless of this setting.', 0),
+  ('always_show_notify_party_section', '1', 'boolean', 'documents', 'Print the NOTIFY PARTY section on PI/PL/CI even when the Notify Party is identical to the Buyer (directly, or via "same as Consignee" when the Consignee itself is the Buyer). Set to 0 to omit that section whenever Notify Party = Buyer — it still always prints the moment the two genuinely differ, regardless of this setting.', 0);
+
 -- Wet-signature-required flags. This was discussed early on but left
 -- unbuilt (docs/SOP/README.md "Still pending", task tracker item #106):
 -- recordBuyerPo() (Stage 2) and confirmSupplierSigned() (Stage 5) have

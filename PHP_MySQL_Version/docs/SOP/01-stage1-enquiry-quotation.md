@@ -112,6 +112,35 @@ straight onto the `clients` row — the exact same columns the admin Clients
 form reads and writes — so there's only ever one Consignee/Notify Party
 story for a given client, however it was captured.
 
+#### Whether the Consignee/Notify Party sections print when identical to the Buyer
+
+Two Admin Settings rows (**Settings → Documents**) — **Always show
+Consignee Details section** (`always_show_consignee_section`) and
+**Always show Notify Party section** (`always_show_notify_party_section`)
+— control whether a buyer-facing document (Quotation, Proforma Invoice,
+Order Confirmation, Packing List, Commercial Invoice) prints the CONSIGNEE
+DETAILS / NOTIFY PARTY section at all when its content is identical to
+the Buyer Details already shown above it. Both default to **on**
+(matching the system's original behaviour of always printing every
+section), so turning this on changes nothing on any existing document
+until an Admin deliberately switches one off.
+
+With a setting switched **off**, that section is omitted whenever it
+resolves to the Buyer's own details — "Same as Buyer?" checked for
+Consignee, or "Same as Consignee?" checked for Notify Party while the
+Consignee itself is also "Same as Buyer?". The moment either section is
+genuinely different from the Buyer — whichever checkbox produced that
+difference — it **always prints**, regardless of what either setting is
+set to. Neither setting can ever hide information that is actually
+different from the Buyer; they only control whether a *redundant* repeat
+of the Buyer's own details is shown a second time.
+
+When a section is omitted this way, every section number after it on that
+document shifts up to close the gap (e.g. Quotation's "4. PRODUCT / ORDER
+DETAILS" becomes "3." when Consignee is hidden) — the document's section
+numbering is always computed fresh for each generated document, never
+left with a gap.
+
 ### Agreement T&C Footer (per client)
 
 Some buyers negotiate a clause specific to their own commercial agreement

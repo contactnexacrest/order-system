@@ -16,14 +16,16 @@
 
 {% block body %}
 
-{% include '_buyer_details.html.twig' with {'section_number': 2} %}
-{% include '_consignee_details.html.twig' with {'section_number': 3} %}
+{% include '_buyer_details.html.twig' with {'section_number': section_numbers.buyer} %}
+{% if show_consignee_section %}
+{% include '_consignee_details.html.twig' with {'section_number': section_numbers.consignee} %}
+{% endif %}
 <table class="kv">
   <tr><td class="k">Certificate of Origin Type</td><td class="v">{{ order.coo_type }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
 </table>
 
-<div class="section-title">4. PRODUCT / ORDER DETAILS</div>
+<div class="section-title">{{ section_numbers.product }}. PRODUCT / ORDER DETAILS</div>
 <table class="products">
   <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
   {% for p in products %}
@@ -72,7 +74,7 @@
   <tr><td>Package Type</td><td>{{ order.estimated_package_type }}</td><td>—</td></tr>
 </table>
 
-<div class="section-title">5. SHIPPING / COMMERCIAL TERMS</div>
+<div class="section-title">{{ section_numbers.shipping }}. SHIPPING / COMMERCIAL TERMS</div>
 <table class="kv">
   <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
@@ -82,7 +84,7 @@
   <tr><td class="k">Insurance</td><td class="v">{% if order.is_fob %}Buyer's responsibility.{% else %}Seller arranges — cost included in invoice.{% endif %}</td></tr>
 </table>
 
-<div class="section-title">6. PAYMENT TERMS</div>
+<div class="section-title">{{ section_numbers.payment }}. PAYMENT TERMS</div>
 <div class="bullet-block">
   <p>&#8226; {{ financial.advance_pct }}% Advance Payment on FOB Value against Proforma Invoice. <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.advance_amount }} <span class="mand-star">*</span></p>
@@ -94,7 +96,7 @@
   <p>&nbsp;&nbsp;Currency: {{ order.currency_code }}</p>
 </div>
 
-<div class="section-title">7. DOCUMENTS TO BE PROVIDED</div>
+<div class="section-title">{{ section_numbers.documents_provided }}. DOCUMENTS TO BE PROVIDED</div>
 <div class="numbered-block">
   <p><strong>Upon shipment, the following documents will be provided:</strong></p>
   <p>1.&nbsp;&nbsp;Commercial Invoice (digitally authorised)</p>

@@ -219,6 +219,12 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   const definitions = await resolveClauseGroup(documentTypeCode, 'definitions', data, balanceTriggerOption);
   const signatory = await documentDataAssembler.signatoryBlock(docType.id, signatoryOverrideUserId);
 
+  const sectionNumbers = sectionNumbersFor(
+    documentTypeCode,
+    data.show_consignee_section ?? true,
+    data.show_notify_party_section ?? true
+  );
+
   const context = {
     fonts: fontsBlock(),
     ...data,
@@ -233,12 +239,13 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     watermark,
     doc_title: titleFor(documentTypeCode),
     section1_title: section1TitleFor(documentTypeCode),
+    section_numbers: sectionNumbers,
     terms,
-    terms_section_number: termsSectionNumberFor(documentTypeCode),
+    terms_section_number: sectionNumbers.terms,
     terms_section_title: termsSectionTitleFor(documentTypeCode),
     legal_terms_clauses: legalTerms,
     definition_clauses: definitions,
-    legal_terms_section_number: legalTermsSectionNumberFor(documentTypeCode),
+    legal_terms_section_number: sectionNumbers.legal_terms,
     signatory,
   };
 
@@ -536,6 +543,11 @@ async function finalizeApproval(documentId) {
 
   const data = await documentDataAssembler.assemble(orderId, documentTypeCode);
   const terms = await resolveTerms(documentTypeCode, data);
+  const sectionNumbers = sectionNumbersFor(
+    documentTypeCode,
+    data.show_consignee_section ?? true,
+    data.show_notify_party_section ?? true
+  );
 
   const context = {
     fonts: fontsBlock(),
@@ -551,8 +563,9 @@ async function finalizeApproval(documentId) {
     watermark: withRevisionStamp(await finalWatermark(), document.client_revision_number, document.document_type_category),
     doc_title: titleFor(documentTypeCode),
     section1_title: section1TitleFor(documentTypeCode),
+    section_numbers: sectionNumbers,
     terms,
-    terms_section_number: termsSectionNumberFor(documentTypeCode),
+    terms_section_number: sectionNumbers.terms,
     terms_section_title: termsSectionTitleFor(documentTypeCode),
     // Re-rendering the SAME document (draft -> final watermark swap) must
     // keep showing the same signatory it was originally generated with —
@@ -671,6 +684,11 @@ async function markSuperseded(documentId) {
 
   const data = await documentDataAssembler.assemble(orderId, documentTypeCode);
   const terms = await resolveTerms(documentTypeCode, data);
+  const sectionNumbers = sectionNumbersFor(
+    documentTypeCode,
+    data.show_consignee_section ?? true,
+    data.show_notify_party_section ?? true
+  );
 
   const context = {
     fonts: fontsBlock(),
@@ -686,8 +704,9 @@ async function markSuperseded(documentId) {
     watermark: invalidWatermark(),
     doc_title: titleFor(documentTypeCode),
     section1_title: section1TitleFor(documentTypeCode),
+    section_numbers: sectionNumbers,
     terms,
-    terms_section_number: termsSectionNumberFor(documentTypeCode),
+    terms_section_number: sectionNumbers.terms,
     terms_section_title: termsSectionTitleFor(documentTypeCode),
     signatory: await documentDataAssembler.signatoryFromSnapshot(document),
     company: await documentDataAssembler.companyFromSnapshot(document),
@@ -1212,28 +1231,76 @@ function section1TitleFor(code) {
   return map[code] ?? 'SELLER / EXPORTER'; // QT, PI, OC
 }
 
-// QT/OC moved from 7->8 and PI from 9->10 when the Buyer/Consignee split
-// (and PI's own new Notify Party section) added one (QT/OC) or two (PI)
-// sections ahead of this one — see legalTermsSectionNumberFor() just
-// below for the section that now follows this one in every case.
-function termsSectionNumberFor(code) {
-  const map = { QT: 8, PI: 10, OC: 8, BUYERPO: 5, SUPPO: 6 }; // SUPPO: "6. QUALITY & INSPECTION" in the source template
-  return map[code] ?? 9;
-}
-
 /**
- * Section number of "LEGAL TERMS & DEFINITIONS" per document type — matches
- * the real position of that section in each type's own numbering
- * (NexaCrest_Developer_Spec.txt Section 3), not a fixed constant across
- * all of them, since some documents (PI/CI) carry more preceding sections
- * than others. null = this document type never gets the section at all
- * (BLI, and every internal-only type: SUPPO/COOPREP/AMD/CAFIN/CHECKLIST* —
- * none of those are buyer-facing contracts, so there is nothing here for
- * a buyer to need defined).
+ * Every named section number for `code`, accounting for whether the
+ * CONSIGNEE DETAILS / NOTIFY PARTY sections actually render this time (see
+ * documentDataAssembler.js's sectionDisplayFlags() — "always show" company
+ * settings, overridden the moment the section is genuinely different from
+ * the Buyer). Replaces the old hardcoded termsSectionNumberFor()/
+ * legalTermsSectionNumberFor() lookup maps, which assumed both sections
+ * were always present — since they can now be omitted, every later
+ * numbered section (and the cross-referenced Legal Terms & Definitions
+ * section) has to shift to match.
+ *
+ * showConsignee/showNotify are ignored for document types that never carry
+ * these two sections in the first place (BUYERPO, SUPPO, FDN, BLI, ANNEXA,
+ * COOPREP, AMD, ...) — those keep their historical fixed numbers unchanged.
  */
-function legalTermsSectionNumberFor(code) {
-  const map = { QT: 9, PI: 11, OC: 9, PL: 8, CI: 11, FDN: 7, BUYERPO: 8, ANNEXA: 8 };
-  return map[code] ?? null;
+function sectionNumbersFor(code, showConsignee, showNotify) {
+  const slotsByType = {
+    QT: ['product', 'shipping', 'payment', 'documents_provided'],
+    PI: ['product', 'shipping', 'payment', 'bank', 'export_doc'],
+    OC: ['order_summary', 'payment_status', 'production', 'documents_provided'],
+    PL: ['product_summary', 'crate_breakdown', 'declaration'],
+    CI: ['shipping_details', 'product', 'invoice_value', 'bank', 'documents_provided', 'declaration'],
+  };
+  // QT/OC never carry a Notify Party section at all (Developer Spec
+  // Section 6 — PI/PL/CI only), regardless of showNotify.
+  const hasNotifySlot = { PI: true, PL: true, CI: true };
+
+  if (!slotsByType[code]) {
+    // Not one of the 5 types with a toggleable Consignee/Notify Party
+    // section — unaffected by either setting, same fixed numbers as
+    // before this feature existed.
+    const termsMap = { BUYERPO: 5, SUPPO: 6 }; // SUPPO: "6. QUALITY & INSPECTION" in the source template
+    const legalTermsMap = { FDN: 7, BUYERPO: 8, ANNEXA: 8 };
+    return {
+      terms: termsMap[code] ?? 9,
+      legal_terms: legalTermsMap[code] ?? null,
+    };
+  }
+
+  let n = 2; // "1." is always SELLER/EXPORTER; "2." is always BUYER DETAILS
+  const numbers = { buyer: n };
+  n++;
+  if (showConsignee) {
+    numbers.consignee = n;
+    n++;
+  }
+  if (hasNotifySlot[code] && showNotify) {
+    numbers.notify_party = n;
+    n++;
+  }
+  for (const slot of slotsByType[code]) {
+    numbers[slot] = n;
+    n++;
+  }
+
+  // PL and CI never have Terms & Conditions clauses configured (see
+  // resolveTerms()'s caller / termsSectionTitleFor()'s docblock) — Legal
+  // Terms & Definitions follows the last visible named section directly,
+  // with no number reserved for the never-rendered Terms & Conditions
+  // heading, matching the historical fixed numbering this replaces (PL
+  // legal_terms=8 right after Declaration=7; CI legal_terms=11 right
+  // after Declaration=10 — never terms+1).
+  if (code === 'PL' || code === 'CI') {
+    numbers.terms = n;
+    numbers.legal_terms = n;
+  } else {
+    numbers.terms = n;
+    numbers.legal_terms = n + 1;
+  }
+  return numbers;
 }
 
 function termsSectionTitleFor(code) {
@@ -1360,4 +1427,9 @@ module.exports = {
   titleFor,
   section1TitleFor,
   templateFileFor,
+  // Exported for tests only — same reasoning as titleFor/etc above: lets
+  // Jest verify the Consignee/Notify Party show/hide renumbering logic
+  // directly for every document type/scenario, mirroring PHP's
+  // reflection-based test of the equivalent private method.
+  sectionNumbersFor,
 };

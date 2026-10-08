@@ -15,16 +15,20 @@
 
 {% block body %}
 
-{% set section_number = 2 %}{% include '_buyer_details.njk' %}
-{% set section_number = 3 %}{% include '_consignee_details.njk' %}
-{% set section_number = 4 %}{% include '_notify_party.njk' %}
+{% set section_number = section_numbers.buyer %}{% include '_buyer_details.njk' %}
+{% if show_consignee_section %}
+{% set section_number = section_numbers.consignee %}{% include '_consignee_details.njk' %}
+{% endif %}
+{% if show_notify_party_section %}
+{% set section_number = section_numbers.notify_party %}{% include '_notify_party.njk' %}
+{% endif %}
 <table class="kv">
   <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
 </table>
 
-<div class="section-title">5. PRODUCT SUMMARY</div>
+<div class="section-title">{{ section_numbers.product_summary }}. PRODUCT SUMMARY</div>
 {% set productList = [] %}
 {% set hsCodeList = [] %}
 {% for p in products %}
@@ -42,7 +46,7 @@
   <tr><td class="k">Total CBM *</td><td class="v">{{ (packing.total_cbm ~ ' m³') if packing.total_cbm else 'To Be Confirmed' }}</td></tr>
 </table>
 
-<div class="section-title">6. CRATE-LEVEL BREAKDOWN &nbsp;(from factory packing data)</div>
+<div class="section-title">{{ section_numbers.crate_breakdown }}. CRATE-LEVEL BREAKDOWN &nbsp;(from factory packing data)</div>
 <p class="placeholder-italic" style="font-size:9pt; margin:0 0 3pt;">Filled from the factory packing supervisor's actual measurements. Each row = one physical crate.</p>
 <p style="font-size:9pt; margin:0 0 6pt;"><strong style="color:#17233A;">Marks &amp; Numbers format:</strong> <span style="color:#5B6573;">NEXACREST &nbsp;/&nbsp; {{ buyer.company_legal_name | upper }} &nbsp;/&nbsp; {{ order.port_of_discharge | upper }} &nbsp;/&nbsp; C-NNN/TOTAL &nbsp;/&nbsp; {{ order.pi_ref or 'PI NUMBER' }} &nbsp;/&nbsp; MADE IN INDIA</span></p>
 
@@ -78,7 +82,7 @@
 <p style="font-size:8.7px; color:#5b6774; font-style:italic;">Crate-level breakdown not yet recorded.</p>
 {% endif %}
 
-<div class="section-title">7. DECLARATION</div>
+<div class="section-title">{{ section_numbers.declaration }}. DECLARATION</div>
 <table class="kv">
   <tr><td colspan="2" style="font-style:italic; color:#5B6573;">We hereby declare that the particulars given above are true and correct to the best of our knowledge and belief, and that the goods described herein are of Indian origin.
     <br><span style="font-size:9pt;">Fumigation Certificate: A Fumigation Certificate is provided as standard with every NexaCrest shipment and will be included in the final document set couriered to the buyer.</span>

@@ -90,6 +90,10 @@ final class DocumentDataAssembler
         $annexureProducts = self::annexureProductsBlock($orderId);
         $annexureFlags = self::annexureFlagsBlock($orderId, (string) ($order['annexure_mode'] ?? 'SPEC'), $annexureProducts);
 
+        $resolvedConsignee = self::resolveConsignee($order);
+        $resolvedNotifyParty = self::resolveNotifyParty($order, $resolvedConsignee);
+        [$showConsigneeSection, $showNotifyPartySection] = self::sectionDisplayFlags($resolvedConsignee, $resolvedNotifyParty);
+
         return [
             'company' => $company,
             'assets' => $assets,
@@ -154,8 +158,10 @@ final class DocumentDataAssembler
                 'notify_party'           => $order['notify_party'],
                 'agreement_footer_text'  => $order['agreement_footer_text'] ?? null,
             ],
-            'consignee' => self::resolveConsignee($order),
-            'notify_party_block' => self::resolveNotifyParty($order, self::resolveConsignee($order)),
+            'consignee' => $resolvedConsignee,
+            'notify_party_block' => $resolvedNotifyParty,
+            'show_consignee_section' => $showConsigneeSection,
+            'show_notify_party_section' => $showNotifyPartySection,
             'products' => array_map(static function (array $p): array {
                 return [
                     'description'    => $p['description'],
@@ -833,6 +839,40 @@ final class DocumentDataAssembler
             'contact_person'    => $order['notify_party_contact_person'] ?? null,
             'phone'             => $order['notify_party_phone'] ?? null,
             'email'             => $order['notify_party_email'] ?? null,
+        ];
+    }
+
+    /**
+     * Whether the CONSIGNEE DETAILS / NOTIFY PARTY sections actually print
+     * on a buyer-facing document. The two `always_show_*_section` settings
+     * only ever matter when a section would otherwise be a word-for-word
+     * duplicate of the Buyer's own details — the moment it is genuinely
+     * different from the Buyer, it always prints, regardless of either
+     * setting; no configuration can hide a real difference from the buyer
+     * reading their own document.
+     *
+     * Notify Party's "different from Buyer" is NOT just its own
+     * same_as_consignee flag — it traces back through Consignee too: if
+     * Notify = Consignee (same_as_consignee true) and Consignee = Buyer
+     * (same_as_buyer true), Notify is transitively identical to the Buyer
+     * and so is still subject to its own setting. Any break in that
+     * chain (an independent Consignee, or an independent Notify Party)
+     * means Notify Party's printed content differs from the Buyer's, so
+     * it always shows.
+     *
+     * @return array{0: bool, 1: bool} [$showConsigneeSection, $showNotifyPartySection]
+     */
+    private static function sectionDisplayFlags(array $resolvedConsignee, array $resolvedNotifyParty): array
+    {
+        $alwaysShowConsignee = CompanySettingsRepository::get('always_show_consignee_section') === '1';
+        $alwaysShowNotifyParty = CompanySettingsRepository::get('always_show_notify_party_section') === '1';
+
+        $consigneeSameAsBuyer = (bool) $resolvedConsignee['same_as_buyer'];
+        $notifyEffectivelySameAsBuyer = (bool) $resolvedNotifyParty['same_as_consignee'] && $consigneeSameAsBuyer;
+
+        return [
+            !$consigneeSameAsBuyer || $alwaysShowConsignee,
+            !$notifyEffectivelySameAsBuyer || $alwaysShowNotifyParty,
         ];
     }
 

@@ -22,10 +22,12 @@
 
 {% block body %}
 
-{% set section_number = 2 %}{% include '_buyer_details.njk' %}
-{% set section_number = 3 %}{% include '_consignee_details.njk' %}
+{% set section_number = section_numbers.buyer %}{% include '_buyer_details.njk' %}
+{% if show_consignee_section %}
+{% set section_number = section_numbers.consignee %}{% include '_consignee_details.njk' %}
+{% endif %}
 
-<div class="section-title">4. ORDER SUMMARY</div>
+<div class="section-title">{{ section_numbers.order_summary }}. ORDER SUMMARY</div>
 {% set productList = [] %}
 {% for p in products %}
   {% set productList = productList.concat([p.description ~ ' (Qty: ' ~ p.quantity ~ ' ' ~ p.unit ~ ')']) %}
@@ -42,7 +44,7 @@
   <tr><td class="k">Certificate of Origin</td><td class="v">{{ order.coo_type }}</td></tr>
 </table>
 
-<div class="section-title">5. PAYMENT STATUS</div>
+<div class="section-title">{{ section_numbers.payment_status }}. PAYMENT STATUS</div>
 <table class="kv">
   <tr><td class="k">{{ financial.advance_pct }}% Advance (USD) *</td><td class="v">{{ payment_status.advance_amount or financial.advance_amount }}</td></tr>
   <tr><td class="k">Advance T/T Received On *</td><td class="v">{{ payment_status.advance_remittance_received_at or 'To Be Confirmed' }}</td></tr>
@@ -53,7 +55,7 @@
   {% endif %}
 </table>
 
-<div class="section-title">6. PRODUCTION &amp; ESTIMATED SHIPMENT</div>
+<div class="section-title">{{ section_numbers.production }}. PRODUCTION &amp; ESTIMATED SHIPMENT</div>
 <table class="kv">
   <tr><td colspan="2" style="background:#F1F5F9;">
     <p style="margin:0 0 4pt;"><strong style="color:#17233A;">Production status: </strong>{{ order.production_status_text }} &nbsp;&nbsp; <strong style="color:#17233A;">Estimated shipment: </strong><span style="font-style:italic; color:#5B6573;">{{ order.est_shipment_date_text }}</span> <span style="font-weight:bold; color:#C0392B;">*</span></p>
@@ -61,7 +63,7 @@
   </td></tr>
 </table>
 
-<div class="section-title">7. DOCUMENTS TO BE PROVIDED</div>
+<div class="section-title">{{ section_numbers.documents_provided }}. DOCUMENTS TO BE PROVIDED</div>
 <table class="kv">
   <tr><td colspan="2">
     <p style="margin:0 0 4pt;"><strong>Upon shipment, the following documents will be provided:</strong></p>
