@@ -212,7 +212,10 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     (await require('./referenceNumberService').generateDocumentRef(docType.id));
 
   const watermark = withRevisionStamp(await draftWatermark(), clientRevisionNumber, docType.category);
-  const terms = await resolveTerms(documentTypeCode, data);
+  const balanceTriggerOption = order.balance_trigger_option ?? null;
+  const terms = await resolveTerms(documentTypeCode, data, balanceTriggerOption);
+  const legalTerms = await resolveClauseGroup(documentTypeCode, 'legal_terms', data, balanceTriggerOption);
+  const definitions = await resolveClauseGroup(documentTypeCode, 'definitions', data, balanceTriggerOption);
   const signatory = await documentDataAssembler.signatoryBlock(docType.id, signatoryOverrideUserId);
 
   const context = {
@@ -232,6 +235,9 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     terms,
     terms_section_number: termsSectionNumberFor(documentTypeCode),
     terms_section_title: termsSectionTitleFor(documentTypeCode),
+    legal_terms_clauses: legalTerms,
+    definition_clauses: definitions,
+    legal_terms_section_number: legalTermsSectionNumberFor(documentTypeCode),
     signatory,
   };
 
@@ -1066,7 +1072,7 @@ function titleFor(code) {
     OC: 'ORDER CONFIRMATION',
     BUYERPO: 'PURCHASE ORDER',
     SUPPO: 'PURCHASE ORDER — MATERIAL PROCUREMENT',
-    FDN: 'FREIGHT DEBIT NOTE',
+    FDN: 'DEBIT NOTE',
     PL: 'PACKING LIST',
     BLI: 'BILL OF LADING INSTRUCTION SHEET',
     CI: 'COMMERCIAL INVOICE',
@@ -1096,9 +1102,28 @@ function section1TitleFor(code) {
   return map[code] ?? 'SELLER / EXPORTER'; // QT, PI, OC
 }
 
+// QT/OC moved from 7->8 and PI from 9->10 when the Buyer/Consignee split
+// (and PI's own new Notify Party section) added one (QT/OC) or two (PI)
+// sections ahead of this one — see legalTermsSectionNumberFor() just
+// below for the section that now follows this one in every case.
 function termsSectionNumberFor(code) {
-  const map = { QT: 7, PI: 9, OC: 7, BUYERPO: 5, SUPPO: 6 }; // SUPPO: "6. QUALITY & INSPECTION" in the source template
+  const map = { QT: 8, PI: 10, OC: 8, BUYERPO: 5, SUPPO: 6 }; // SUPPO: "6. QUALITY & INSPECTION" in the source template
   return map[code] ?? 9;
+}
+
+/**
+ * Section number of "LEGAL TERMS & DEFINITIONS" per document type — matches
+ * the real position of that section in each type's own numbering
+ * (NexaCrest_Developer_Spec.txt Section 3), not a fixed constant across
+ * all of them, since some documents (PI/CI) carry more preceding sections
+ * than others. null = this document type never gets the section at all
+ * (BLI, and every internal-only type: SUPPO/COOPREP/AMD/CAFIN/CHECKLIST* —
+ * none of those are buyer-facing contracts, so there is nothing here for
+ * a buyer to need defined).
+ */
+function legalTermsSectionNumberFor(code) {
+  const map = { QT: 9, PI: 11, OC: 9, PL: 8, CI: 11, FDN: 7, BUYERPO: 8, ANNEXA: 8 };
+  return map[code] ?? null;
 }
 
 function termsSectionTitleFor(code) {
@@ -1115,27 +1140,47 @@ function termsSectionTitleFor(code) {
 }
 
 /** @returns {Promise<string[]>} fully-substituted clause text, in order */
-async function resolveTerms(documentTypeCode, data) {
-  const clauses = await termsClauseRepository.forDocumentTypeCode(documentTypeCode);
+async function resolveTerms(documentTypeCode, data, balanceTriggerOption = null) {
+  const clauses = await termsClauseRepository.forDocumentTypeCodeAndGroup(documentTypeCode, 'standard', balanceTriggerOption);
+  const replacements = await clauseTextReplacements(data);
+  return clauses.map((c) => applyReplacements(c.text, replacements));
+}
+
+/**
+ * Legal Terms (red box) / Definitions (blue box) — Section [N] of every
+ * buyer-facing document (never BLI). Same admin-editable tc_clauses table
+ * as resolveTerms() above, filtered to clause_group instead of 'standard',
+ * and run through the same placeholder substitution for consistency even
+ * though neither group's seeded text currently uses one.
+ *
+ * @returns {Promise<Array<{title:string,text:string}>>}
+ */
+async function resolveClauseGroup(documentTypeCode, clauseGroup, data, balanceTriggerOption = null) {
+  const clauses = await termsClauseRepository.forDocumentTypeCodeAndGroup(documentTypeCode, clauseGroup, balanceTriggerOption);
+  const replacements = await clauseTextReplacements(data);
+  return clauses.map((c) => ({ title: c.title, text: applyReplacements(c.text, replacements) }));
+}
+
+async function clauseTextReplacements(data) {
   const tolerance = (await companySettingsRepository.get('quantity_shortfall_tolerance_pct')) || '5';
   const quotationValidityDays = (await companySettingsRepository.get('quotation_validity_days')) || '30';
   const piValidityDays = (await companySettingsRepository.get('pi_validity_days')) || '15';
 
-  const replacements = {
+  return {
     '{tolerance}': trimTrailingZeros(String(tolerance)),
     '{advance_pct}': data.financial.advance_pct,
     '{balance_pct}': data.financial.balance_pct,
     '{quotation_validity_days}': quotationValidityDays,
     '{pi_validity_days}': piValidityDays,
   };
+}
 
-  return clauses.map((c) => {
-    let text = c.text;
-    for (const [needle, value] of Object.entries(replacements)) {
-      text = text.split(needle).join(String(value));
-    }
-    return text;
-  });
+function applyReplacements(text, replacements) {
+  let out = text;
+  for (const [needle, value] of Object.entries(replacements)) {
+    out = out.split(needle).join(String(value));
+  }
+  return out;
 }
 
 function sanitizePathSegment(value) {

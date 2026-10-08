@@ -74,6 +74,7 @@ const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const logisticsPartnerController = require('./controllers/logisticsPartnerController');
+const paymentPresetController = require('./controllers/paymentPresetController');
 const complianceTaskTypeController = require('./controllers/complianceTaskTypeController');
 const watermarkController = require('./controllers/watermarkController');
 const orderCommentController = require('./controllers/orderCommentController');
@@ -395,6 +396,13 @@ app.get('/logistics-partners/:id/edit', requireAuth, requirePermission('manage_l
 app.post('/logistics-partners/:id/update', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.update));
 app.post('/logistics-partners/:id/toggle', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.toggleActive));
 app.post('/logistics-partners/:id/delete', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.remove));
+
+app.get('/payment-presets', requireAuth, requirePermission('manage_payment_presets'), asyncHandler(paymentPresetController.index));
+app.get('/payment-presets/create', requireAuth, requirePermission('manage_payment_presets'), asyncHandler(paymentPresetController.createForm));
+app.post('/payment-presets', requireAuth, requirePermission('manage_payment_presets'), verifyCsrf, asyncHandler(paymentPresetController.create));
+app.get('/payment-presets/:id/edit', requireAuth, requirePermission('manage_payment_presets'), asyncHandler(paymentPresetController.editForm));
+app.post('/payment-presets/:id/update', requireAuth, requirePermission('manage_payment_presets'), verifyCsrf, asyncHandler(paymentPresetController.update));
+app.post('/payment-presets/:id/toggle', requireAuth, requirePermission('manage_payment_presets'), verifyCsrf, asyncHandler(paymentPresetController.toggleActive));
 
 app.get('/compliance-task-types', requireAuth, requirePermission('manage_compliance_task_types'), asyncHandler(complianceTaskTypeController.index));
 app.get('/compliance-task-types/create', requireAuth, requirePermission('manage_compliance_task_types'), asyncHandler(complianceTaskTypeController.createForm));

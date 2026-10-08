@@ -1152,7 +1152,7 @@ final class DocumentGenerationService
     }
 
     /** @return string[] fully-substituted clause text, in order */
-    private static function resolveTerms(string $documentTypeCode, array $data, ?string $balanceTriggerOption): array
+    private static function resolveTerms(string $documentTypeCode, array $data, ?string $balanceTriggerOption = null): array
     {
         $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, 'standard', $balanceTriggerOption);
         return array_map(

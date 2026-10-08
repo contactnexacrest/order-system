@@ -130,6 +130,55 @@ mistake (or malice).
   paperwork side. This directory is standalone for now — a quick
   "who do we call for this" lookup — not yet wired into a specific order
   or Order Cost Entry.
+- **Payment Presets** (`/payment-presets`) — full CRUD for the advance/
+  balance split every order picks up, gated by its own
+  `manage_payment_presets` permission (same tier as Logistics Partners:
+  Admin/MD/ED and Super Admin by default). Each preset carries **Advance
+  %** and **Balance %** (must add to 100), the **Advance Trigger Text**
+  (the second half of the printed advance sentence), a **Balance Trigger
+  Option** (Before Shipment vs. Against Scanned BL Copy), **Balance
+  Days**, a **Currency**, a **Default** flag (exactly one preset may be
+  default — saving one as default silently clears the flag on every
+  other preset), and whether it **Requires MD Approval**. Creating a new
+  preset — say a 20% advance / 80% balance trial-order preset — needs no
+  further code change anywhere: every order on that preset calculates
+  its advance/balance amounts and prints the right percentages
+  automatically, since the figures are computed purely from whatever
+  `advance_pct`/`balance_pct` the assigned preset carries, never a
+  hardcoded 40/60 split.
+  Balance Trigger Wording is a free-text field holding the exact sentence
+  printed on the Quotation, Proforma Invoice, and Buyer PO (the only
+  three documents whose balance clause varies by preset — the Commercial
+  Invoice's own Section 7 balance clause is fixed at a company-wide
+  "Calendar Days after NexaCrest emails the scanned BL copy" wording
+  regardless of preset, driven by Company Settings' own
+  `ci_balance_days_post_bl` value instead). It must contain the literal
+  token `{days}`, substituted with that preset's own Balance Days value
+  at render time; leaving it blank falls back to one of two built-in
+  sentences depending on the Balance Trigger Option, so an admin never
+  needs to backfill older preset rows. Both seeded presets ship
+  **protected** — unlock via **Field Protection** before editing or
+  deactivating, same as a protected Company Setting or T&C clause — since
+  they drive where money is actually sent and received. A preset is never
+  hard-deleted: orders reference it by ID, so even a deactivated preset
+  stays readable on every document already generated against it.
+- **Legal Terms & Definitions** — on every buyer-facing document except
+  the BL Instruction Sheet, a final numbered section ("N. LEGAL TERMS &
+  DEFINITIONS") prints a red **Legal Terms** box and a blue
+  **Definitions** box, each a plain list of admin-editable clauses — same
+  table, same edit screen, and the same `tc_clauses` rows as the
+  ordinary numbered Terms & Conditions list already uses, just tagged
+  with `clause_group` set to `legal_terms` or `definitions` instead of
+  the default `standard`. There is no separate admin screen for these:
+  editing one is an ordinary clause edit, exactly as described for the
+  regular T&C list. One further per-clause setting, **visibility_rule**,
+  can scope a Legal Terms clause to only the orders on a matching
+  **Balance Trigger Option** — used for a Bill of Lading Policy clause
+  that only makes sense on a "balance against scanned BL copy" preset,
+  so it never shows on an order using a "before shipment" preset instead
+  (and vice versa). Leaving visibility_rule on its default ("always")
+  shows the clause on every order regardless of preset, same as every
+  ordinary T&C clause already does.
 - **Compliance Task Types** (`/compliance-task-types`) — the admin-editable
   list of names (ECGC Cover, Pre-Shipment Inspection, Fumigation
   Certificate, Phytosanitary Certificate, Due Diligence by default) that

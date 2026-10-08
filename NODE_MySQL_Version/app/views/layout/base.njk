@@ -15,10 +15,10 @@
 {% set canDisputes = permissions.manage_disputes or permissions.respond_to_disputes %}
 {% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log %}
-{% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data or permissions.data_export_run or permissions.manage_logistics_partners %}
+{% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data or permissions.data_export_run or permissions.manage_logistics_partners or permissions.manage_payment_presets %}
 {% set opsGroupActive = (currentPath | startswith('/clients')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/reorder-requests')) or (currentPath | startswith('/disputes')) %}
 {% set insightsGroupActive = (currentPath | startswith('/reports')) or (currentPath | startswith('/audit-log')) %}
-{% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/hs-codes')) or (currentPath | startswith('/watermarks')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) or (currentPath | startswith('/email-templates')) or (currentPath | startswith('/logistics-partners')) %}
+{% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/hs-codes')) or (currentPath | startswith('/watermarks')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) or (currentPath | startswith('/email-templates')) or (currentPath | startswith('/logistics-partners')) or (currentPath | startswith('/payment-presets')) %}
 {% set ordersActive = currentPath === '/orders' or ((currentPath | startswith('/orders/')) and not (currentPath | startswith('/orders/archived'))) %}
 <div class="app-shell">
 <header class="sidebar">
@@ -73,6 +73,7 @@
           {% if permissions.manage_company_settings %}<a href="/holidays" class="{{ 'active' if (currentPath | startswith('/holidays')) else '' }}">Holiday Calendar</a>{% endif %}
           {% if permissions.manage_hs_codes %}<a href="/hs-codes" class="{{ 'active' if (currentPath | startswith('/hs-codes')) else '' }}">HS Codes</a>{% endif %}
           {% if permissions.manage_logistics_partners %}<a href="/logistics-partners" class="{{ 'active' if (currentPath | startswith('/logistics-partners')) else '' }}">Logistics Partners</a>{% endif %}
+          {% if permissions.manage_payment_presets %}<a href="/payment-presets" class="{{ 'active' if (currentPath | startswith('/payment-presets')) else '' }}">Payment Presets</a>{% endif %}
           {% if permissions.manage_compliance_task_types %}<a href="/compliance-task-types" class="{{ 'active' if (currentPath | startswith('/compliance-task-types')) else '' }}">Compliance Task Types</a>{% endif %}
           {% if permissions.manage_email_templates %}<a href="/email-templates" class="{{ 'active' if (currentPath | startswith('/email-templates')) else '' }}">Email Templates</a>{% endif %}
           {% if permissions.manage_company_settings %}<a href="/watermarks" class="{{ 'active' if (currentPath | startswith('/watermarks')) else '' }}">Watermarks</a>{% endif %}

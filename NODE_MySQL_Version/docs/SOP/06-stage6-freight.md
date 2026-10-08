@@ -4,9 +4,20 @@
 
 Collecting the freight and insurance charges from the buyer on **CFR and
 CIF orders only** — where NexaCrest arranges and pays the shipping line,
-then recovers that cost from the buyer via a separate Freight Debit Note
-(FDN). On an FOB order this whole stage is irrelevant, since the buyer
-books and pays for their own freight directly.
+then recovers that cost from the buyer via a separate Debit Note. On an
+FOB order this whole stage is irrelevant, since the buyer books and pays
+for their own freight directly.
+
+The internal code for this document type stays **FDN** (the **Generate
+Freight Debit Note** button, the reference number's old `SC/FDN/…`
+pattern pre-dating this change, and this chapter's own wording below all
+still say "Freight Debit Note") — only the printed document's own title
+changed, to plain **"Debit Note"**, since it's a buyer-facing paper and
+"Freight" in the name was confusing it with a line item rather than the
+document itself. New reference numbers generated after the rename use
+`SC/DN/{YYYY}/{DDMM}{NNN}` instead of `SC/FDN/…`; a Debit Note generated
+before the rename keeps its original `SC/FDN/…` reference — it is never
+retroactively renumbered.
 
 > This chapter uses a **second example order** (a CIF order to a Norwegian
 > buyer) rather than the main running example — SC/OC/2026/001-2 is on FOB
@@ -36,6 +47,15 @@ orders, forwarder details, GST treatment) — this is internal record-keeping
 only and doesn't pass any gate. From **Documents**, **Generate Freight Debit
 Note** then produces the FDN — the actual invoice sent to the buyer for
 these charges.
+
+The Debit Note itself states payment is due within **3 Calendar Days**
+of its own date (previously "3 working days" — every buyer payment
+obligation across the system now counts in Calendar Days, not Working
+Days, for consistency). Its GST/IGST line now reads "Treated as taxable
+service supply" or "Treated as pure cost reimbursement" depending on the
+GST Treatment recorded in Freight Terms, rather than leaking NexaCrest's
+own internal CA guidance text ("As advised by CA — NIL if pure cost
+reimbursement") onto a document the buyer actually sees.
 
 Recording and clearing the payment itself follows the exact same
 two-step pattern as the advance payment in Stage 3:

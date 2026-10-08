@@ -29,6 +29,17 @@ From **Documents**, **Generate Commercial Invoice** produces the CI —
 pre-filled with the actual shipped quantities and final figures rather than
 the estimates the PI was built on.
 
+The CI's own Section 7 "Balance Due Now" clause always states payment is
+due within a fixed number of **Calendar Days of the date NexaCrest emails
+the scanned BL copy** — this is deliberately **not** the order's own
+payment-preset wording that the Quotation/Proforma Invoice/Buyer PO use
+(which can vary by preset, e.g. "before shipment" vs. "against BL"): by
+the time the CI is generated the goods have already shipped, so every CI
+states the same tier-invariant trigger regardless of which preset the
+order was on. The day count itself comes from a single company-wide
+setting (**Company Settings → `ci_balance_days_post_bl`**, default 7),
+never from the order's own preset.
+
 Recording and clearing the balance payment follows the same two-step
 pattern as every other payment in this pipeline:
 

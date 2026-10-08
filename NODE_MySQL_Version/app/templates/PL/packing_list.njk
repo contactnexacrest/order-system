@@ -15,24 +15,16 @@
 
 {% block body %}
 
-<div class="section-title">2. CONSIGNEE / BUYER</div>
-<table class="kv"><tr>
-  <td class="v" style="width:50%; vertical-align:top;">
-    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Company Legal Name *</strong><br>{{ buyer.company_legal_name }}</p>
-    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Consignee Name *</strong><br>{{ buyer.consignee_name }}</p>
-    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Consignee Address *</strong><br>{{ buyer.consignee_address }}</p>
-    <p style="margin:0;"><strong style="color:#17233A;">VAT / EORI / Tax Reg. No. *</strong><br>{{ buyer.vat_eori_tax_no or 'To Be Confirmed' }}</p>
-  </td>
-  <td class="v" style="width:50%; vertical-align:top; background:#F1F5F9;">
-    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Incoterm *</strong><br>{{ order.incoterm_label }}</p>
-    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Port of Loading *</strong><br>{{ order.port_of_loading }}</p>
-    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Port of Discharge *</strong><br>{{ order.port_of_discharge }}</p>
-    <p style="margin:0 0 6pt;"><strong style="color:#17233A;">Country of Final Destination *</strong><br>{{ buyer.country_of_destination or 'To Be Confirmed' }}</p>
-    <p style="margin:0;"><strong style="color:#17233A;">Notify Party</strong><br>{{ buyer.notify_party or 'Same as consignee' }}</p>
-  </td>
-</tr></table>
+{% set section_number = 2 %}{% include '_buyer_details.njk' %}
+{% set section_number = 3 %}{% include '_consignee_details.njk' %}
+{% set section_number = 4 %}{% include '_notify_party.njk' %}
+<table class="kv">
+  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
+  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+</table>
 
-<div class="section-title">3. PRODUCT SUMMARY</div>
+<div class="section-title">5. PRODUCT SUMMARY</div>
 {% set productList = [] %}
 {% set hsCodeList = [] %}
 {% for p in products %}
@@ -50,7 +42,7 @@
   <tr><td class="k">Total CBM *</td><td class="v">{{ (packing.total_cbm ~ ' m³') if packing.total_cbm else 'To Be Confirmed' }}</td></tr>
 </table>
 
-<div class="section-title">4. CRATE-LEVEL BREAKDOWN &nbsp;(from factory packing data)</div>
+<div class="section-title">6. CRATE-LEVEL BREAKDOWN &nbsp;(from factory packing data)</div>
 <p class="placeholder-italic" style="font-size:9pt; margin:0 0 3pt;">Filled from the factory packing supervisor's actual measurements. Each row = one physical crate.</p>
 <p style="font-size:9pt; margin:0 0 6pt;"><strong style="color:#17233A;">Marks &amp; Numbers format:</strong> <span style="color:#5B6573;">NEXACREST &nbsp;/&nbsp; {{ buyer.company_legal_name | upper }} &nbsp;/&nbsp; {{ order.port_of_discharge | upper }} &nbsp;/&nbsp; C-NNN/TOTAL &nbsp;/&nbsp; {{ order.pi_ref or 'PI NUMBER' }} &nbsp;/&nbsp; MADE IN INDIA</span></p>
 
@@ -86,7 +78,7 @@
 <p style="font-size:8.7px; color:#5b6774; font-style:italic;">Crate-level breakdown not yet recorded.</p>
 {% endif %}
 
-<div class="section-title">5. DECLARATION</div>
+<div class="section-title">7. DECLARATION</div>
 <table class="kv">
   <tr><td colspan="2" style="font-style:italic; color:#5B6573;">We hereby declare that the particulars given above are true and correct to the best of our knowledge and belief, and that the goods described herein are of Indian origin.
     <br><span style="font-size:9pt;">Fumigation Certificate: A Fumigation Certificate is provided as standard with every NexaCrest shipment and will be included in the final document set couriered to the buyer.</span>

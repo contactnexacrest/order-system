@@ -136,6 +136,10 @@ async function assemble(orderId, documentTypeCode = null) {
     buyer: {
       company_legal_name: order.company_legal_name,
       billing_address: order.billing_address,
+      billing_address_line1: order.billing_address_line1 ?? null,
+      billing_address_line2: order.billing_address_line2 ?? null,
+      billing_city: order.billing_city ?? null,
+      billing_postcode: order.billing_postcode ?? null,
       consignee_name: order.consignee_name,
       consignee_address: order.consignee_address,
       vat_eori_tax_no: order.vat_eori_tax_no,
@@ -146,6 +150,8 @@ async function assemble(orderId, documentTypeCode = null) {
       notify_party: order.notify_party,
       agreement_footer_text: order.agreement_footer_text,
     },
+    consignee: resolveConsignee(order),
+    notify_party_block: resolveNotifyParty(order, resolveConsignee(order)),
     products: products.map((p) => ({
       description: p.description,
       dimensions: p.dimensions,
@@ -166,7 +172,14 @@ async function assemble(orderId, documentTypeCode = null) {
       balance_amount: formatMoney(balanceAmount),
       balance_trigger_option: order.balance_trigger_option,
       balance_days: order.balance_days,
-      balance_terms_text: balanceTriggerSentence(order.balance_trigger_option || null, order.balance_days != null ? parseInt(order.balance_days, 10) : null),
+      balance_terms_text: balanceTriggerSentence(order.balance_trigger_option || null, order.balance_days != null ? parseInt(order.balance_days, 10) : null, order.balance_trigger_wording || null),
+      // Fixed regardless of the order's own preset — see
+      // ci_balance_days_post_bl's seed.sql comment and
+      // NexaCrest_Change_Log.txt Addendum Section 11 item 4: the
+      // Commercial Invoice's own balance clause (Section 7) never
+      // varies by tier/preset, unlike balance_terms_text above (which
+      // QT/PI/BuyerPO use and which DOES vary).
+      ci_balance_days_post_bl: parseInt((await companySettingsRepository.get('ci_balance_days_post_bl')) || '7', 10),
       // freight/insurance are indicative-only, not summed into the binding total for FOB
       total_value: formatMoney(fobValue),
       preset_name: order.preset_name,
@@ -682,12 +695,106 @@ function formatMoney(value) {
  * the raw ENUM code ('A_BEFORE_SHIPMENT') into a buyer- or legally-facing
  * document.
  */
-function balanceTriggerSentence(option, days) {
+function balanceTriggerSentence(option, days, wordingTemplate = null) {
   const d = days ?? 0;
-  if (option === 'A_BEFORE_SHIPMENT') {
-    return `Payable before shipment — within ${d} working days of receiving shipment readiness confirmation from NexaCrest.`;
+  // $wordingTemplate is the preset's own balance_trigger_wording
+  // (admin-editable — see payment_presets CRUD) with the literal token
+  // {days} substituted. Only the two sentences below are a fallback,
+  // for a preset row that predates this column / was left blank, so an
+  // admin never needs to backfill every row.
+  if (wordingTemplate !== null && String(wordingTemplate).trim() !== '') {
+    return String(wordingTemplate).split('{days}').join(String(d));
   }
-  return `Payable against scanned copy of Bill of Lading, within ${d} days of BL date.`;
+  if (option === 'A_BEFORE_SHIPMENT') {
+    return `Payable before shipment — within ${d} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest.`;
+  }
+  return `Payable against scanned copy of Bill of Lading, within ${d} Calendar Days of the date NexaCrest emails the scanned BL copy.`;
+}
+
+/**
+ * Resolves the Consignee Details section (QT/PI/OC/PL/CI — Developer Spec
+ * Section 5) for one order's client. "Same as Buyer?" (default checked)
+ * means every field below is the BUYER's own current value, resolved
+ * fresh here rather than copied once at data-entry time, so a later edit
+ * to the buyer's own details is reflected automatically on every document
+ * generated after it. Unchecked means the client's own stored
+ * consignee_* columns are used instead — consignee_name/consignee_address
+ * stay the Company Legal Name / Address Line 1 equivalents (pre-existing
+ * columns, reused rather than duplicated).
+ */
+function resolveConsignee(order) {
+  const sameAsBuyer = order.consignee_same_as_buyer === undefined || order.consignee_same_as_buyer === null
+    ? true
+    : !!order.consignee_same_as_buyer;
+  if (sameAsBuyer) {
+    return {
+      same_as_buyer: true,
+      company_legal_name: order.company_legal_name,
+      address_line1: order.billing_address_line1 || order.billing_address,
+      address_line2: order.billing_address_line2 ?? null,
+      city: order.billing_city ?? null,
+      postcode: order.billing_postcode ?? null,
+      country: order.country_of_destination ?? null,
+      vat_eori_tax_no: order.vat_eori_tax_no ?? null,
+      contact_person: order.contact_person ?? null,
+      phone: order.client_phone ?? null,
+      email: order.client_email ?? null,
+    };
+  }
+  return {
+    same_as_buyer: false,
+    company_legal_name: order.consignee_name ?? null,
+    address_line1: order.consignee_address_line1 || order.consignee_address,
+    address_line2: order.consignee_address_line2 ?? null,
+    city: order.consignee_city ?? null,
+    postcode: order.consignee_postcode ?? null,
+    country: order.consignee_country ?? null,
+    vat_eori_tax_no: order.consignee_vat_eori_tax_no ?? null,
+    contact_person: order.consignee_contact_person ?? null,
+    phone: order.consignee_phone ?? null,
+    email: order.consignee_email ?? null,
+  };
+}
+
+/**
+ * Resolves the Notify Party section (PI/PL/CI only — Developer Spec
+ * Section 6). "Same as Consignee?" (default checked) resolves from the
+ * ALREADY-RESOLVED Consignee (whatever that computed to — buyer's own
+ * details, or the client's independent consignee data) for the same
+ * always-fresh-not-copied reason as resolveConsignee(). Unchecked uses
+ * the client's own stored notify_party_* columns; notify_party
+ * (pre-existing column) stays the Notify Party Name.
+ */
+function resolveNotifyParty(order, resolvedConsignee) {
+  const sameAsConsignee = order.notify_party_same_as_consignee === undefined || order.notify_party_same_as_consignee === null
+    ? true
+    : !!order.notify_party_same_as_consignee;
+  if (sameAsConsignee) {
+    return {
+      same_as_consignee: true,
+      name: resolvedConsignee.company_legal_name,
+      address_line1: resolvedConsignee.address_line1,
+      address_line2: resolvedConsignee.address_line2,
+      city: resolvedConsignee.city,
+      postcode: resolvedConsignee.postcode,
+      country: resolvedConsignee.country,
+      contact_person: resolvedConsignee.contact_person,
+      phone: resolvedConsignee.phone,
+      email: resolvedConsignee.email,
+    };
+  }
+  return {
+    same_as_consignee: false,
+    name: order.notify_party ?? null,
+    address_line1: order.notify_party_address_line1 ?? null,
+    address_line2: order.notify_party_address_line2 ?? null,
+    city: order.notify_party_city ?? null,
+    postcode: order.notify_party_postcode ?? null,
+    country: order.notify_party_country ?? null,
+    contact_person: order.notify_party_contact_person ?? null,
+    phone: order.notify_party_phone ?? null,
+    email: order.notify_party_email ?? null,
+  };
 }
 
 function formatNumber(value) {
@@ -735,4 +842,6 @@ module.exports = {
   formatNumber,
   formatDate,
   balanceTriggerSentence,
+  resolveConsignee,
+  resolveNotifyParty,
 };

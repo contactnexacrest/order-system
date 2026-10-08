@@ -1,0 +1,24 @@
+{#
+  Consignee Details — Developer Spec Section 5. Shared across QT/PI/OC/
+  PL/CI. `consignee` is the already-resolved block from
+  documentDataAssembler.resolveConsignee() — when same_as_buyer is true
+  every field below IS the buyer's own current value (resolved fresh at
+  generation time, never a stale copy), shown here rather than a bare
+  "SAME" so the document is self-contained and complete on its own.
+#}
+<div class="section-title">{{ section_number }}. CONSIGNEE DETAILS</div>
+<table class="kv">
+  {% if consignee.same_as_buyer %}
+  <tr><td class="k">Same as Buyer?</td><td class="v" style="font-weight:bold; color:#17233A;">Yes — shown below are the Buyer's own details.</td></tr>
+  {% endif %}
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ consignee.company_legal_name }}</td></tr>
+  <tr><td class="k">Address Line 1 *</td><td class="v">{{ consignee.address_line1 }}</td></tr>
+  {% if consignee.address_line2 %}<tr><td class="k">Address Line 2</td><td class="v">{{ consignee.address_line2 }}</td></tr>{% endif %}
+  {% if consignee.city %}<tr><td class="k">City / Town *</td><td class="v">{{ consignee.city }}</td></tr>{% endif %}
+  {% if consignee.postcode %}<tr><td class="k">Postcode *</td><td class="v">{{ consignee.postcode }}</td></tr>{% endif %}
+  <tr><td class="k">Country *</td><td class="v">{{ consignee.country or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. *</td><td class="v">{{ consignee.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ consignee.contact_person or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Phone *</td><td class="v">{{ consignee.phone or '—' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ consignee.email or 'To Be Confirmed' }}</td></tr>
+</table>

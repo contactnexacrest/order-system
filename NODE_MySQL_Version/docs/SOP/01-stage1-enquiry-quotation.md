@@ -53,6 +53,45 @@ Add Client** (`/clients/create`), fill in the same details by hand, save.
 Then from that client's page, **Add Order** to create the order shell
 (buyer inquiry ref, incoterm, payment preset, etc.).
 
+### Buyer / Consignee / Notify Party details (per client)
+
+Every client record carries three separate detail blocks, matching the
+Developer Spec's own document numbering and reflecting how export
+paperwork actually works — the company paying the invoice, the company
+receiving the cargo, and the party to notify on arrival are often three
+different entities:
+
+- **Buyer Details** — the client's own company name, structured billing
+  address (Line 1/2, City, Postcode — kept alongside the older single
+  free-text Billing Address field for backward compatibility), VAT/EORI,
+  and contact details. Always independently entered — there's no "same
+  as" checkbox here.
+- **Consignee Details** — defaults to a checked **Same as Buyer?**
+  checkbox. While checked, the consignee fields are disabled on the form
+  and every Consignee section on every generated document shows the
+  Buyer's own current details, resolved fresh each time a document is
+  generated — never a one-time copy, so a later edit to the Buyer block
+  is reflected automatically on the next document without anyone having
+  to re-enter anything on the Consignee side. Unchecking it enables an
+  independent set of fields (company name, structured address, VAT/EORI,
+  contact person, phone, email) for a client whose goods genuinely ship
+  to a different company than the one paying for them.
+- **Notify Party** — defaults to a checked **Same as Consignee?**
+  checkbox, resolving from whatever the Consignee block *itself* resolved
+  to (so if Consignee is also "same as Buyer", Notify Party shows the
+  Buyer's details too) for the same always-fresh reason. Unchecking it
+  enables independent fields for a freight-forwarder/agent that needs
+  notifying on arrival but isn't the consignee itself. Notify Party only
+  appears on the documents the Developer Spec defines it for (Proforma
+  Invoice, Packing List, Commercial Invoice) — the Quotation, Order
+  Confirmation, and Buyer PO never show a Notify Party section.
+
+**Certificate of Origin Type** is a dropdown (same admin-managed list the
+order-creation form itself uses, e.g. Non-Preferential), not a free-text
+field — this keeps the value consistent with whatever CAPEXIL actually
+issues, rather than depending on each buyer or staff member typing the
+same term the same way.
+
 ### Agreement T&C Footer (per client)
 
 Some buyers negotiate a clause specific to their own commercial agreement

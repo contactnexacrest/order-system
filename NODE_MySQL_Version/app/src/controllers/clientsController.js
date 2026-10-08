@@ -3,6 +3,7 @@
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
 const clientRepository = require('../repositories/clientRepository');
+const lookupRepository = require('../repositories/lookupRepository');
 const orderRepository = require('../repositories/orderRepository');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -31,7 +32,7 @@ async function inactiveIndex(req, res) {
 async function create(req, res) {
   // Batch 3 #4 — if this page is being shown again after a validation failure on submit,
   // re-populate the form from what was typed rather than making the user retype everything.
-  res.renderView('clients/create', { old: flash.pullOld(req) }, 'layout/base');
+  res.renderView('clients/create', { old: flash.pullOld(req), cooTypes: await lookupRepository.dropdownOptions('coo_type') }, 'layout/base');
 }
 
 async function store(req, res) {
@@ -52,15 +53,13 @@ async function store(req, res) {
     {
       company_legal_name: companyLegalName,
       billing_address: billingAddress,
-      consignee_name: String(req.body.consignee_name || '').trim() || null,
-      consignee_address: String(req.body.consignee_address || '').trim() || null,
       vat_eori_tax_no: String(req.body.vat_eori_tax_no || '').trim() || null,
       contact_person: String(req.body.contact_person || '').trim() || null,
       email: String(req.body.email || '').trim() || null,
       phone: String(req.body.phone || '').trim() || null,
       country_of_destination: String(req.body.country_of_destination || '').trim() || null,
       coo_type: String(req.body.coo_type || '').trim() || 'To Be Confirmed',
-      notify_party: String(req.body.notify_party || '').trim() || null,
+      ...collectPartyFields(req),
     },
     user.id,
     clientUniqueNumber
@@ -97,7 +96,7 @@ async function editForm(req, res) {
     res.status(404).send('Client not found.');
     return;
   }
-  res.renderView('clients/edit', { client }, 'layout/base');
+  res.renderView('clients/edit', { client, isSuperAdmin: await superAdminService.isEffective(req.user.id), cooTypes: await lookupRepository.dropdownOptions('coo_type') }, 'layout/base');
 }
 
 /**
@@ -138,15 +137,13 @@ async function update(req, res) {
   const data = {
     company_legal_name: companyLegalName,
     billing_address: billingAddress,
-    consignee_name: String(req.body.consignee_name || '').trim() || null,
-    consignee_address: String(req.body.consignee_address || '').trim() || null,
     vat_eori_tax_no: String(req.body.vat_eori_tax_no || '').trim() || null,
     contact_person: String(req.body.contact_person || '').trim() || null,
     email: String(req.body.email || '').trim() || null,
     phone: String(req.body.phone || '').trim() || null,
     country_of_destination: String(req.body.country_of_destination || '').trim() || null,
     coo_type: String(req.body.coo_type || '').trim() || null,
-    notify_party: String(req.body.notify_party || '').trim() || null,
+    ...collectPartyFields(req),
   };
 
   const user = req.user;
@@ -170,6 +167,76 @@ async function update(req, res) {
 
   flash.set(req, 'success', `${companyLegalName} updated.`);
   res.redirect(`/clients/${clientId}`);
+}
+
+/**
+ * Billing address line fields, plus the Consignee/Notify Party "Same as"
+ * blocks: each one's own fields are read from req.body only when its
+ * checkbox is off, since the checked state leaves them disabled client-
+ * side (so the browser never submits them) — this keeps a stale,
+ * previously-typed value from silently overwriting a flip back to
+ * same-as-buyer/consignee from this same request.
+ */
+function collectPartyFields(req) {
+  const consigneeSameAsBuyer = !!req.body.consignee_same_as_buyer;
+  const notifySameAsConsignee = !!req.body.notify_party_same_as_consignee;
+
+  const fields = {
+    billing_address_line1: String(req.body.billing_address_line1 || '').trim() || null,
+    billing_address_line2: String(req.body.billing_address_line2 || '').trim() || null,
+    billing_city: String(req.body.billing_city || '').trim() || null,
+    billing_postcode: String(req.body.billing_postcode || '').trim() || null,
+    consignee_same_as_buyer: consigneeSameAsBuyer ? 1 : 0,
+    notify_party_same_as_consignee: notifySameAsConsignee ? 1 : 0,
+  };
+
+  if (consigneeSameAsBuyer) {
+    fields.consignee_name = null;
+    fields.consignee_address_line1 = null;
+    fields.consignee_address_line2 = null;
+    fields.consignee_city = null;
+    fields.consignee_postcode = null;
+    fields.consignee_country = null;
+    fields.consignee_vat_eori_tax_no = null;
+    fields.consignee_contact_person = null;
+    fields.consignee_phone = null;
+    fields.consignee_email = null;
+  } else {
+    fields.consignee_name = String(req.body.consignee_name || '').trim() || null;
+    fields.consignee_address_line1 = String(req.body.consignee_address_line1 || '').trim() || null;
+    fields.consignee_address_line2 = String(req.body.consignee_address_line2 || '').trim() || null;
+    fields.consignee_city = String(req.body.consignee_city || '').trim() || null;
+    fields.consignee_postcode = String(req.body.consignee_postcode || '').trim() || null;
+    fields.consignee_country = String(req.body.consignee_country || '').trim() || null;
+    fields.consignee_vat_eori_tax_no = String(req.body.consignee_vat_eori_tax_no || '').trim() || null;
+    fields.consignee_contact_person = String(req.body.consignee_contact_person || '').trim() || null;
+    fields.consignee_phone = String(req.body.consignee_phone || '').trim() || null;
+    fields.consignee_email = String(req.body.consignee_email || '').trim() || null;
+  }
+
+  if (notifySameAsConsignee) {
+    fields.notify_party = null;
+    fields.notify_party_address_line1 = null;
+    fields.notify_party_address_line2 = null;
+    fields.notify_party_city = null;
+    fields.notify_party_postcode = null;
+    fields.notify_party_country = null;
+    fields.notify_party_contact_person = null;
+    fields.notify_party_phone = null;
+    fields.notify_party_email = null;
+  } else {
+    fields.notify_party = String(req.body.notify_party || '').trim() || null;
+    fields.notify_party_address_line1 = String(req.body.notify_party_address_line1 || '').trim() || null;
+    fields.notify_party_address_line2 = String(req.body.notify_party_address_line2 || '').trim() || null;
+    fields.notify_party_city = String(req.body.notify_party_city || '').trim() || null;
+    fields.notify_party_postcode = String(req.body.notify_party_postcode || '').trim() || null;
+    fields.notify_party_country = String(req.body.notify_party_country || '').trim() || null;
+    fields.notify_party_contact_person = String(req.body.notify_party_contact_person || '').trim() || null;
+    fields.notify_party_phone = String(req.body.notify_party_phone || '').trim() || null;
+    fields.notify_party_email = String(req.body.notify_party_email || '').trim() || null;
+  }
+
+  return fields;
 }
 
 /**

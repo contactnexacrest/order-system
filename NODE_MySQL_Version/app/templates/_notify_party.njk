@@ -1,0 +1,25 @@
+{#
+  Notify Party — Developer Spec Section 6. PI/PL/CI only (QT, OC, DN,
+  BuyerPO never carry this section — BLI has its own separate Notify
+  Party, Section 3 of its own structure). `notify_party_block` is the
+  already-resolved block from documentDataAssembler.resolveNotifyParty()
+  — same_as_consignee=true means every field below IS the (already-
+  resolved) Consignee's own current value.
+#}
+<div class="section-title">{{ section_number }}. NOTIFY PARTY</div>
+<table class="kv">
+  {% if notify_party_block.same_as_consignee %}
+  <tr><td class="k">Same as Consignee?</td><td class="v" style="font-weight:bold; color:#17233A;">Yes — shown below are the Consignee's own details.</td></tr>
+  {% else %}
+  <tr><td class="k">Same as Consignee?</td><td class="v">No — freight agent / forwarder details below.</td></tr>
+  {% endif %}
+  <tr><td class="k">Notify Party Name</td><td class="v">{{ notify_party_block.name or 'To Be Confirmed' }}</td></tr>
+  {% if notify_party_block.address_line1 %}<tr><td class="k">Address Line 1</td><td class="v">{{ notify_party_block.address_line1 }}</td></tr>{% endif %}
+  {% if notify_party_block.address_line2 %}<tr><td class="k">Address Line 2</td><td class="v">{{ notify_party_block.address_line2 }}</td></tr>{% endif %}
+  {% if notify_party_block.city %}<tr><td class="k">City / Town</td><td class="v">{{ notify_party_block.city }}</td></tr>{% endif %}
+  {% if notify_party_block.postcode %}<tr><td class="k">Postcode</td><td class="v">{{ notify_party_block.postcode }}</td></tr>{% endif %}
+  {% if notify_party_block.country %}<tr><td class="k">Country</td><td class="v">{{ notify_party_block.country }}</td></tr>{% endif %}
+  <tr><td class="k">Contact Person</td><td class="v">{{ notify_party_block.contact_person or '—' }}</td></tr>
+  <tr><td class="k">Phone</td><td class="v">{{ notify_party_block.phone or '—' }}</td></tr>
+  <tr><td class="k">Email</td><td class="v">{{ notify_party_block.email or '—' }}</td></tr>
+</table>

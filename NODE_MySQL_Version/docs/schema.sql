@@ -102,6 +102,14 @@ CREATE TABLE payment_presets (
   balance_pct             DECIMAL(5,2) NOT NULL DEFAULT 60.00,
   balance_trigger_option  ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NOT NULL DEFAULT 'A_BEFORE_SHIPMENT',
   balance_days            INT NOT NULL DEFAULT 3,    -- 3 for option A, 7 for option B (both configurable)
+  balance_trigger_wording TEXT NULL,                 -- the actual sentence printed as financial.balance_terms_text
+                                                       -- on QT/PI/BUYERPO (the only 3 documents whose balance
+                                                       -- clause the Developer Spec allows to vary by preset).
+                                                       -- Contains the literal token {days}, substituted with
+                                                       -- balance_days at render time. NULL falls back to a
+                                                       -- built-in default sentence for the preset's
+                                                       -- balance_trigger_option (DocumentDataAssembler::
+                                                       -- balanceTriggerSentence()), so older rows need no backfill.
   currency_id             BIGINT UNSIGNED NOT NULL,
   requires_md_approval    TINYINT(1) NOT NULL DEFAULT 0,  -- true for "established buyer" style presets
   is_active               TINYINT(1) NOT NULL DEFAULT 1,
@@ -2883,4 +2891,100 @@ ALTER TABLE file_store
 -- (manage_orders, or view_orders/view_clients per Section AY). The
 -- existing generic /file-store/{id}/download route is widened the same
 -- way so a view-only visitor can open what they can already see listed.
+-- ================================================================
+
+-- ================================================================
+-- SECTION BA — LEGAL TERMS & DEFINITIONS (admin-configurable, same
+-- pattern as tc_clauses) + BUYER/CONSIGNEE/NOTIFY PARTY SPLIT
+-- (added 2026-10-07)
+-- ================================================================
+-- Source: NexaCrest_Developer_Spec.txt (authoritative) + NexaCrest_Change_Log.txt,
+-- reference_templates/ (bundled in-repo, see reference_templates/README.md).
+--
+-- 1. tc_clauses gains two columns so the SAME admin-manageable clause
+--    table (not a new hardcoded Twig partial) can also drive the new
+--    "N. LEGAL TERMS & DEFINITIONS" section's two boxes, and so a
+--    clause's visibility can depend on the order's own payment-preset
+--    trigger rather than always showing:
+--      clause_group:   which part of the document a clause renders in.
+--        'standard'     - the existing numbered T&C body (unchanged
+--                         behaviour for every pre-existing row).
+--        'legal_terms'  - the red "LEGAL TERMS" box in the new section.
+--        'definitions'  - the blue "DEFINITIONS" box in the new section.
+--      visibility_rule: admin-configurable condition, evaluated against
+--        the order's own payment_presets.balance_trigger_option at
+--        generation time (DocumentGenerationService::resolveTerms()).
+--        'always'                         - no condition (default; every
+--                                           pre-existing row keeps this).
+--        'balance_trigger_before_shipment' - only for an order whose
+--                                           preset is A_BEFORE_SHIPMENT.
+--        'balance_trigger_against_bl'      - only for an order whose
+--                                           preset is B_AGAINST_BL.
+--    This is how the Bill of Lading Policy clause is scoped: it only
+--    makes commercial sense once balance is collected against the BL
+--    (Tier 2) — a Tier 1 order (balance before shipment) has no need to
+--    withhold the BL at all, so the clause is hidden for it. Which rule
+--    applies to which clause is itself an ordinary clause edit (status/
+--    visibility_rule), never a code change.
+-- ================================================================
+ALTER TABLE tc_clauses
+  ADD COLUMN clause_group ENUM('standard','legal_terms','definitions') NOT NULL DEFAULT 'standard' AFTER clause_text,
+  ADD COLUMN visibility_rule ENUM('always','balance_trigger_before_shipment','balance_trigger_against_bl') NOT NULL DEFAULT 'always' AFTER clause_group;
+
+-- 2. clients — structured Buyer/Consignee/Notify Party addressing.
+--    Billing address gets an OPTIONAL structured breakdown alongside the
+--    existing flat `billing_address` (never removed — still what every
+--    other screen/report in the app reads); the new line1/2/city/postcode
+--    columns are used by the new split Buyer Details section when
+--    present and fall back to the flat field when blank, so no existing
+--    client record needs migrating.
+--
+--    Consignee gets a real "Same as Buyer?" flag (consignee_same_as_buyer,
+--    default 1/checked) — when set, EVERY consignee field resolves
+--    dynamically from the buyer's own fields at render time (never a
+--    one-time copy, so a later edit to the buyer's details is reflected
+--    automatically); existing consignee_name/consignee_address stay as
+--    the Consignee's "Company Legal Name"/address-line-1 equivalents
+--    when the flag is off, with the remaining consignee_* columns below
+--    genuinely new (no prior equivalent existed — the old combined
+--    Buyer/Consignee block reused the buyer's own contact/phone/email
+--    for both parties).
+--
+--    Notify Party gets the same "Same as Consignee?" pattern
+--    (notify_party_same_as_consignee, default 1/checked), resolving from
+--    the (already-resolved) Consignee when set; existing flat
+--    `notify_party` becomes the Notify Party's own name field when off.
+-- ================================================================
+ALTER TABLE clients
+  ADD COLUMN billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
+  ADD COLUMN billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
+  ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2,
+  ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city,
+  ADD COLUMN consignee_same_as_buyer TINYINT(1) NOT NULL DEFAULT 1 AFTER consignee_address,
+  ADD COLUMN consignee_address_line1 VARCHAR(255) NULL AFTER consignee_same_as_buyer,
+  ADD COLUMN consignee_address_line2 VARCHAR(255) NULL AFTER consignee_address_line1,
+  ADD COLUMN consignee_city VARCHAR(100) NULL AFTER consignee_address_line2,
+  ADD COLUMN consignee_postcode VARCHAR(30) NULL AFTER consignee_city,
+  ADD COLUMN consignee_country VARCHAR(100) NULL AFTER consignee_postcode,
+  ADD COLUMN consignee_vat_eori_tax_no VARCHAR(100) NULL AFTER consignee_country,
+  ADD COLUMN consignee_contact_person VARCHAR(150) NULL AFTER consignee_vat_eori_tax_no,
+  ADD COLUMN consignee_phone VARCHAR(30) NULL AFTER consignee_contact_person,
+  ADD COLUMN consignee_email VARCHAR(190) NULL AFTER consignee_phone,
+  ADD COLUMN notify_party_same_as_consignee TINYINT(1) NOT NULL DEFAULT 1 AFTER notify_party,
+  ADD COLUMN notify_party_address_line1 VARCHAR(255) NULL AFTER notify_party_same_as_consignee,
+  ADD COLUMN notify_party_address_line2 VARCHAR(255) NULL AFTER notify_party_address_line1,
+  ADD COLUMN notify_party_city VARCHAR(100) NULL AFTER notify_party_address_line2,
+  ADD COLUMN notify_party_postcode VARCHAR(30) NULL AFTER notify_party_city,
+  ADD COLUMN notify_party_country VARCHAR(100) NULL AFTER notify_party_postcode,
+  ADD COLUMN notify_party_contact_person VARCHAR(150) NULL AFTER notify_party_country,
+  ADD COLUMN notify_party_phone VARCHAR(30) NULL AFTER notify_party_contact_person,
+  ADD COLUMN notify_party_email VARCHAR(190) NULL AFTER notify_party_phone;
+
+-- 3. Document-type rename: 06_DebitNote (was "Freight Debit Note"/FDN —
+--    see Change_Log.txt "DOCUMENT RENAMED" + Priority 7). The code stays
+--    FDN (every FK, file path, and existing generated-document row keys
+--    on it — renaming the code itself would be a breaking, retroactive
+--    change for no benefit); only the buyer-facing name/prefix/template
+--    text change. See seed.sql for the UPDATE and app/templates/FDN/ for
+--    the title/prefix text changes.
 -- ================================================================

@@ -182,6 +182,24 @@
   .client-agreement-footer { border: 1pt solid #D7DEE6; background: #F7F9FC; padding: 7pt 9pt; margin-top: 6pt; font-size: 9.5pt; color: #17233A; }
   .client-agreement-footer .label { font-weight: bold; margin-bottom: 2pt; display: block; }
 
+  /* --- "N. LEGAL TERMS & DEFINITIONS" — final section before the
+     signature block on every buyer-facing document except BLI. Content
+     is admin-editable (tc_clauses, clause_group legal_terms/definitions
+     — see docs/schema.sql Section BA), never hardcoded here; this is
+     only the box styling. Two bordered boxes (red Legal Terms, blue
+     Definitions) — DOCX builds these as single-row tables (see
+     docxComponents) so the border survives a Word page break; our own
+     PDF path doesn't share that defect, so a styled div is sufficient
+     and reads identically. --- */
+  .terms-reference-line { font-style: italic; font-size: 8.5pt; color: #5B6573; margin-bottom: 6pt; }
+  .legal-terms-box, .definitions-box { border-radius: 2pt; padding: 7pt 9pt; margin-bottom: 8pt; font-size: 9pt; }
+  .legal-terms-box { background: #FFF0F0; border: 1pt solid #C0392B; }
+  .definitions-box { background: #F0F4FF; border: 1pt solid #1A5276; }
+  .legal-terms-box .box-header, .definitions-box .box-header { font-weight: bold; font-size: 10pt; color: #17233A; margin: 0 0 4pt; }
+  .legal-terms-box .box-intro, .definitions-box .box-intro { font-style: italic; font-size: 8.5pt; color: #5B6573; margin: 0 0 6pt; }
+  .legal-terms-box p.clause, .definitions-box p.clause { margin: 0 0 4pt; color: #000000; }
+  .legal-terms-box p.clause .clause-title, .definitions-box p.clause .clause-title { font-weight: bold; color: #17233A; }
+
   {% if watermark.enabled and watermark.show_text %}
   .watermark-text { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
     opacity: {{ watermark.opacity }}; transform: rotate(-{{ watermark.angle }}deg); z-index: 0; }
@@ -215,6 +233,10 @@
 </tr></table>
 
 <div class="mandatory-note">Fields marked <span class="star">*</span> are mandatory and must be completed before this document is issued.</div>
+
+{% if legal_terms_section_number %}
+<div class="terms-reference-line">Terms used in this document are defined in Section {{ legal_terms_section_number }} — Legal Terms &amp; Definitions at the end of this document.</div>
+{% endif %}
 
 {% block meta_table %}{% endblock %}
 
@@ -257,6 +279,30 @@
    footer must still show on its documents regardless. #}
 {% if buyer.agreement_footer_text is defined and buyer.agreement_footer_text %}
 <div class="client-agreement-footer"><span class="label">Special Terms (per Client Agreement)</span><span style="white-space: pre-line;">{{ buyer.agreement_footer_text }}</span></div>
+{% endif %}
+{% endblock %}
+
+{% block legal_terms_definitions %}
+{% if legal_terms_section_number %}
+<div class="section-title">{{ legal_terms_section_number }}.&nbsp;&nbsp;LEGAL TERMS &amp; DEFINITIONS</div>
+{% if legal_terms_clauses is defined and legal_terms_clauses|length > 0 %}
+<div class="legal-terms-box">
+  <p class="box-header">LEGAL TERMS</p>
+  <p class="box-intro">These terms govern all commercial obligations under this document.</p>
+  {% for clause in legal_terms_clauses %}
+  <p class="clause">&#8226; <span class="clause-title">{{ clause.title }}:</span> {{ clause.text }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+{% if definition_clauses is defined and definition_clauses|length > 0 %}
+<div class="definitions-box">
+  <p class="box-header">DEFINITIONS</p>
+  <p class="box-intro">The following terms have the meanings given below wherever they appear in this document.</p>
+  {% for clause in definition_clauses %}
+  <p class="clause">&#8226; <span class="clause-title">{{ clause.title }}:</span> {{ clause.text }}</p>
+  {% endfor %}
+</div>
+{% endif %}
 {% endif %}
 {% endblock %}
 

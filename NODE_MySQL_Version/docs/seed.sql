@@ -78,6 +78,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('respond_to_disputes',         'Respond to disputes',            'Post a reply in a dispute''s reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button.', 'orders'),
   ('manage_order_financials',     'Manage order financials',        'View/add/edit an order''s export benefit claims, other costs, and its profitability summary. Stricter than ca_module_view/inr_actual_edit: not auto-granted to Accounts/CA, only Admin/MD/ED and Super Admin by default.', 'ca'),
   ('manage_logistics_partners',   'Manage logistics partners',      'Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. Same tier as manage_hs_codes: Admin/MD/ED and Super Admin only by default.', 'catalog'),
+  ('manage_payment_presets',      'Manage payment presets',         'Create, edit, deactivate payment presets (advance/balance %, balance-trigger wording). Drives every order''s payment calc. Same tier as manage_logistics_partners. Existing presets ship protected — unlock via Field Protection first.', 'catalog'),
   ('manage_compliance_task_types', 'Manage compliance task types',   'Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). Does not grant the order-page checklist itself - that uses close_orders. Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog'),
   ('override_buyer_acknowledgment', 'Override buyer Order Confirmation acknowledgment', 'Record a buyer''s OC acknowledgment manually (e.g. an email reply). Only consulted when oc_ack_override_restricted is on; off by default, where manage_orders alone is enough.', 'orders'),
   ('impersonate_client', 'Log in as a client', 'Start a staff-initiated client-portal session for a client who can''t use the portal themselves. Requires client_impersonation_enabled (global) and the client''s own allow_staff_impersonation flag both on. Every use is logged.', 'clients'),
@@ -161,15 +162,19 @@ INSERT INTO incoterms (code, label_template, requires_port_role, is_default, is_
 -- found in the source documents (see ARCHITECTURE.md section 4.3).
 -- ================================================================
 INSERT INTO payment_presets
-  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, currency_id, requires_md_approval, is_active)
+  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
 SELECT 'Standard — New Buyer', 1, 40.00, 'against Proforma Invoice before production commences',
-       60.00, 'A_BEFORE_SHIPMENT', 3, c.id, 0, 1
+       60.00, 'A_BEFORE_SHIPMENT', 3,
+       'Payable before shipment — within {days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest.',
+       c.id, 0, 1
 FROM currencies c WHERE c.code = 'USD';
 
 INSERT INTO payment_presets
-  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, currency_id, requires_md_approval, is_active)
+  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
 SELECT 'Established Buyer — Post-BL', 0, 40.00, 'against Proforma Invoice before production commences',
-       60.00, 'B_AGAINST_BL', 7, c.id, 1, 1
+       60.00, 'B_AGAINST_BL', 7,
+       'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
+       c.id, 1, 1
 FROM currencies c WHERE c.code = 'USD';
 
 -- Both presets ship protected by default — they drive where money is
@@ -276,7 +281,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Pricing Currency & Basis' AND dt.code IN ('QT','PI');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (90, 'Shipment Booking (CFR/CIF)', 'Shipment Booking: For CFR/CIF orders, shipment booking will be confirmed only after full freight and insurance payment is received and cleared in NexaCrest''s bank account against the Freight Debit Note. NexaCrest cannot book the container or hand over cargo to the shipping line until freight payment is verified.', 'active', 0);
+  (90, 'Shipment Booking (CFR/CIF)', 'Shipment Booking: For CFR/CIF orders, shipment booking will be confirmed only after full freight and insurance payment is received and cleared in NexaCrest''s bank account against the Debit Note. NexaCrest cannot book the container or hand over cargo to the shipping line until freight payment is verified.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Shipment Booking (CFR/CIF)' AND dt.code IN ('QT','PI','OC');
@@ -288,7 +293,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Quotation Validity' AND dt.code IN ('QT');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (110, 'CFR/CIF Indicative Freight Validity (Quotation)', 'CFR / CIF pricing: if required, indicative freight shown above is valid for 25 days from quotation date. Actual freight will be confirmed once cargo is packed and ready, and recovered IN ADVANCE by separate Freight Debit Note — payable within 3 working days of issue, and must be received BEFORE shipment booking is confirmed. NexaCrest cannot book the container or hand over cargo to the shipping line until freight payment is received and verified.', 'active', 0);
+  (110, 'CFR/CIF Indicative Freight Validity (Quotation)', 'CFR / CIF pricing: if required, indicative freight shown above is valid for 25 days from quotation date. Actual freight will be confirmed once cargo is packed and ready, and recovered IN ADVANCE by separate Debit Note — payable within 3 Calendar Days of issue, and must be received BEFORE shipment booking is confirmed. NexaCrest cannot book the container or hand over cargo to the shipping line until freight payment is received and verified.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'CFR/CIF Indicative Freight Validity (Quotation)' AND dt.code IN ('QT');
@@ -318,7 +323,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Proforma Invoice Validity' AND dt.code IN ('PI');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (110, 'CFR/CIF Indicative Freight Validity (Proforma Invoice)', 'CFR / CIF orders: freight and insurance shown above are indicative at PI stage. Actual freight will be confirmed once cargo is packed and ready, and recovered IN ADVANCE by Freight Debit Note — payable within 3 working days of issue, and must be received BEFORE shipment booking is confirmed. NexaCrest cannot book the container or hand over cargo to the shipping line until freight payment is received. Freight payment may occur before or simultaneously with the {balance_pct}% balance T/T.', 'active', 0);
+  (110, 'CFR/CIF Indicative Freight Validity (Proforma Invoice)', 'CFR / CIF orders: freight and insurance shown above are indicative at PI stage. Actual freight will be confirmed once cargo is packed and ready, and recovered IN ADVANCE by Debit Note — payable within 3 Calendar Days of issue, and must be received BEFORE shipment booking is confirmed. NexaCrest cannot book the container or hand over cargo to the shipping line until freight payment is received. Freight payment may occur before or simultaneously with the {balance_pct}% balance T/T.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'CFR/CIF Indicative Freight Validity (Proforma Invoice)' AND dt.code IN ('PI');
@@ -501,6 +506,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('non_usd_price_buffer_pct', '1.75', 'number', 'tolerances', 'Advisory price buffer shown (not auto-applied) for non-USD quotes, per your instruction.', 0),
   ('quotation_validity_days', '30', 'number', 'documents', 'Days a Quotation stays valid from its issue date (Addition beyond the spec''s named key list — the source Quotation template states "30 days" directly in its T&C text; making it a setting instead of a literal keeps that number DB-driven if it ever changes).', 0),
   ('pi_validity_days',       '15', 'number', 'documents', 'Days a Proforma Invoice stays valid from its issue date. Same addition as quotation_validity_days, for the same reason — the source PI template states "15 days" directly in its T&C text.', 0),
+  ('ci_balance_days_post_bl', '7', 'number', 'documents', 'Calendar Days in the Commercial Invoice''s own "BALANCE DUE NOW" clause (Section 7) — per NexaCrest_Change_Log.txt Addendum Section 11 item 4, the CI''s balance wording is IDENTICAL across every payment preset/tier (unlike QT/PI/BuyerPO, which vary), always stating the against-BL-copy trigger regardless of which preset the order actually uses. Kept here rather than read from the order''s own preset so it stays fixed even when a before-shipment-preset order reaches CI stage (where the balance is normally already cleared anyway).', 0),
   ('revision_start_number', '1', 'number', 'documents', 'Starting revision number for a new document.', 0),
   ('bl_type_instruction', 'ORIGINAL NEGOTIABLE BILL OF LADING — no exceptions. Do not substitute with Sea Waybill or Express BL.', 'string', 'shipping', 'Mandatory BL type instruction printed on every BL Instruction Sheet (Addition beyond the spec''s named key list — this hard rule was previously hardcoded directly in the BLI template, with no governance or audit trail if it ever needed a one-off exception; a Sea Waybill/Express BL lets the buyer collect cargo without surrendering any document, eliminating NexaCrest''s financial leverage over the balance payment).', 0),
   ('bl_consignee_instruction', 'TO ORDER OF {company}', 'string', 'shipping', 'Mandatory BL consignee instruction — ensures the BL is to NexaCrest''s order so the buyer cannot use it until NexaCrest endorses and releases it. {company} is substituted with the company legal name at render time. Same addition/rationale as bl_type_instruction.', 0),
@@ -627,8 +633,8 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
   ('send_ci', 'Commercial Invoice {document_reference} — {company_name}',
    'Dear {buyer_contact_person},\n\nPlease find attached Commercial Invoice {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nKindly review the invoice value and payment settlement details and arrange the balance payment as per the terms stated.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
-  ('send_fdn', 'Freight Debit Note {document_reference} — Payment Required Before Shipment',
-   'Dear {buyer_contact_person},\n\nPlease find attached Freight Debit Note {document_reference} dated {generated_date} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nPayment is required within 3 working days of this Debit Note''s date. We will confirm shipment booking only upon receipt of full freight payment.\n\n{sender_signature}',
+  ('send_fdn', 'Debit Note {document_reference} — Payment Required Before Shipment',
+   'Dear {buyer_contact_person},\n\nPlease find attached Debit Note {document_reference} dated {generated_date} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nPayment is required within 3 Calendar Days of this Debit Note''s date. We will confirm shipment booking only upon receipt of full freight payment.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('payment_followup', 'Payment Follow-Up — Order {order_reference}',
    'Dear {buyer_contact_person},\n\nThis is a follow-up regarding the pending payment on your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). Kindly arrange the payment at your earliest convenience and share the remittance copy so we can proceed.\n\n{sender_signature}',
@@ -1270,6 +1276,88 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- ================================================================
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
   ('client_impersonation_enabled', '0', 'boolean', 'clients', 'Global switch for staff "Log in as this client" (Section AV). Off = the feature is unavailable for every client, regardless of any individual client''s own allow_staff_impersonation flag or who holds the impersonate_client permission.', 0, 0);
+
+-- ================================================================
+-- SECTION BA — LEGAL TERMS & DEFINITIONS clauses (admin-editable via
+-- tc_clauses, same table/CRUD pattern as every other T&C clause — see
+-- docs/schema.sql Section BA for the clause_group/visibility_rule
+-- columns this relies on). Applies to every buyer-facing document that
+-- carries the new "N. LEGAL TERMS & DEFINITIONS" section: QT, PI, OC,
+-- PL, CI, FDN (Debit Note), BUYERPO, ANNEXA — never BLI.
+-- ================================================================
+
+-- --- LEGAL TERMS box (red) — 6 clauses, clause_order 1-6 within the group ---
+INSERT INTO tc_clauses (clause_order, clause_title, clause_text, clause_group, visibility_rule, status, is_protected) VALUES
+  (1, 'Cancellation', 'Orders may not be cancelled after production commences. The Advance Payment is non-refundable once production commences. In the event of cancellation after production commences, NexaCrest''s total recovery shall not exceed the Advance Payment plus 20% of the total FOB Order value. The parties agree this represents a genuine pre-estimate of NexaCrest''s unrecoverable production costs, overhead, opportunity loss, and market price risk.', 'legal_terms', 'always', 'active', 1),
+  (2, 'Limitation of Liability', 'NexaCrest''s maximum liability under this document shall not exceed the total FOB Order value stated herein. NexaCrest is not liable for any indirect, consequential, or punitive damages, or for loss of profit or business.', 'legal_terms', 'always', 'active', 1),
+  (3, 'Production Timeline', 'The estimated shipment timeline stated in this document is indicative only and does not constitute a guaranteed delivery date. NexaCrest will make every effort to meet the estimated timeline. NexaCrest will notify the Buyer in writing within 5 Business Days of becoming aware of any delay to production or shipment, and will provide a revised estimated timeline within 10 Business Days of such notification.', 'legal_terms', 'always', 'active', 1),
+  (4, 'Re-inspection and Loading', 'NexaCrest shall load only the confirmed passed pieces. Confirmed failed pieces shall be excluded from the shipment. The Commercial Invoice and all payment obligations shall be adjusted to reflect only the pieces actually loaded and shipped. Neither Party shall have any further claim in respect of the excluded pieces.', 'legal_terms', 'always', 'active', 1),
+  (5, 'Structural Defect Claims', 'NexaCrest confirms to the best of its knowledge that Products are free from structural defects present at Loading and not detectable at Pre-loading Inspection. No claim accepted for: (a) conditions detectable at Pre-loading Inspection; (b) damage from Buyer''s processing, cutting, handling, or installation; or (c) natural stone characteristics. Any claim must be raised by the Buyer in writing with photographic evidence within 14 Calendar Days of confirmed receipt at Buyer''s premises. No claim accepted after this period.', 'legal_terms', 'always', 'active', 1),
+  (6, 'Governing Law and Dispute Resolution', 'This document is governed by the laws of India. Any dispute shall first be notified in writing by email or WhatsApp. Both parties shall attempt amicable resolution within 45 Calendar Days of written notice. If unresolved, the dispute shall be referred to binding arbitration under the Arbitration and Conciliation Act, 1996. Seat: Bengaluru, Karnataka, India. Language: English. The United Nations Convention on Contracts for the International Sale of Goods is expressly excluded from this Agreement.', 'legal_terms', 'always', 'active', 1);
+INSERT INTO tc_clause_documents (clause_id, document_type_id)
+SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
+WHERE c.clause_group = 'legal_terms' AND dt.code IN ('QT','PI','OC','PL','CI','FDN','BUYERPO','ANNEXA');
+
+-- --- DEFINITIONS box (blue) — 12 entries, clause_order 1-12 within the group ---
+INSERT INTO tc_clauses (clause_order, clause_title, clause_text, clause_group, visibility_rule, status, is_protected) VALUES
+  (1, 'NexaCrest', 'In this document, "NexaCrest International Private Limited" is referred to as "NexaCrest". Both names refer to the same legal entity.', 'definitions', 'always', 'active', 1),
+  (2, 'T/T (Telegraphic Transfer)', 'an electronic bank wire transfer sent directly from the Buyer''s bank to NexaCrest''s designated bank account at State Bank of India as stated in this document.', 'definitions', 'always', 'active', 1),
+  (3, 'Payment Cleared', 'the relevant payment confirmed as actually credited to NexaCrest''s bank account by NexaCrest''s accounts team. A Remittance Copy alone does not constitute Payment Cleared.', 'definitions', 'always', 'active', 1),
+  (4, 'Remittance Copy', 'the bank transfer receipt or SWIFT confirmation sent by the Buyer as evidence of transfer. Receipt of a Remittance Copy by NexaCrest does not constitute Payment Cleared.', 'definitions', 'always', 'active', 1),
+  (5, 'Advance Payment', 'the advance percentage of the FOB Order value paid by T/T before production commences, as stated in this document.', 'definitions', 'always', 'active', 1),
+  (6, 'Balance Payment', 'the remaining FOB Order value after the Advance Payment, paid by T/T as per the payment trigger stated in this document.', 'definitions', 'always', 'active', 1),
+  (7, 'Debit Note', 'a written demand issued by NexaCrest for any agreed cost additional to the FOB Order value, including but not limited to freight, cargo insurance, inspection fees, or certificate fees. Each Debit Note must be confirmed as Payment Cleared before NexaCrest proceeds with the related activity.', 'definitions', 'always', 'active', 1),
+  (8, 'Loading', 'the physical act of stuffing Products into the container at NexaCrest''s designated processing facility. Loading is distinct from Shipment.', 'definitions', 'always', 'active', 1),
+  (9, 'Shipment', 'the departure of the vessel from the port of loading. Shipment is distinct from Loading and from Delivery.', 'definitions', 'always', 'active', 1),
+  (10, 'FCL (Full Container Load)', 'a shipment occupying one complete container, approximately 24-27 MT including packing. Minimum order quantity is 1 FCL.', 'definitions', 'always', 'active', 1),
+  (11, 'Production Commences', 'the point at which NexaCrest begins manufacturing the Products for this Order. Production commences only after the Advance Payment is confirmed as Payment Cleared. The Advance Payment is non-refundable from this point.', 'definitions', 'always', 'active', 1),
+  (12, 'Shipment Readiness Confirmation', 'a written notification from NexaCrest by email or WhatsApp confirming that the Products have passed quality inspection (NexaCrest''s internal quality check, or third-party Pre-loading Inspection where applicable), are fully packed, and are ready for vessel booking.', 'definitions', 'always', 'active', 1);
+INSERT INTO tc_clause_documents (clause_id, document_type_id)
+SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
+WHERE c.clause_group = 'definitions' AND dt.code IN ('QT','PI','OC','PL','CI','FDN','BUYERPO','ANNEXA');
+
+-- --- Bill of Lading Policy — ordinary T&C-body clause (not a Legal
+-- Terms/Definitions box entry), QT/PI/OC/CI only, and ONLY for an order
+-- whose payment preset collects the balance against the scanned BL
+-- (B_AGAINST_BL) — see docs/schema.sql Section BA's note on
+-- visibility_rule. A before-shipment (A_BEFORE_SHIPMENT) order never
+-- shows this clause: nothing about "to order of NexaCrest" matters once
+-- the balance already cleared before the BL exists, and in that case the
+-- BL can be consigned directly to the buyer/consignee. Which clause this
+-- rule applies to is itself just this row's own visibility_rule value —
+-- change it the same way any other clause is edited, never in code. ---
+INSERT INTO tc_clauses (clause_order, clause_title, clause_text, clause_group, visibility_rule, status, is_protected) VALUES
+  (96, 'Bill of Lading Policy', 'NexaCrest issues this shipment''s Bill of Lading consigned "To Order of NexaCrest International Private Limited". This is NexaCrest company policy and cannot be changed under any circumstances. Original BLs are released to the Buyer only after Balance Payment is confirmed as Payment Cleared.', 'standard', 'balance_trigger_against_bl', 'active', 0);
+INSERT INTO tc_clause_documents (clause_id, document_type_id)
+SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
+WHERE c.clause_title = 'Bill of Lading Policy' AND dt.code IN ('QT','PI','OC','CI');
+
+-- --- Natural Stone Characteristics — wording corrected to the
+-- authoritative text (pre-shipment-sample-approval mechanism), replacing
+-- the shorter "no dramatic colour difference" promise that carried no
+-- such mechanism. Same clause_id, same linkage — text only. ---
+UPDATE tc_clauses SET clause_text = 'All granite supplied is Grade A quality, selected for colour consistency. As with all natural stone, minor variation in shade, grain and veining may occur between pieces — however, Natural Variation inherent to natural stone including colour, veining, and texture is not a defect. Any claim of colour non-conformance must be assessed against the agreed pre-shipment sample approved by the Buyer in writing prior to Loading. In the absence of an approved pre-shipment sample, the Buyer accepts all colour variation inherent to natural stone. Products will conform to the agreed specification.'
+WHERE clause_title = 'Natural Stone Characteristics';
+
+-- --- Old flat Cancellation bullet (clause_order 30, QT/PI/OC T&C body) —
+-- deactivated, not deleted. The capped-recovery Cancellation clause now
+-- lives only in the Legal Terms box above; keeping both would duplicate
+-- and contradict each other (this old wording was an unqualified "cannot
+-- be cancelled... for any reason", with no 20%-of-FOB recovery formula).
+-- Unprotected first — it ships is_protected=1 like every other clause,
+-- and a protected row cannot be deactivated without the unlock gesture;
+-- this is the one deliberate exception, made here rather than through
+-- that flow since it is a superseded clause, not a live edit. ---
+UPDATE tc_clauses SET is_protected = 0 WHERE clause_title = 'Cancellation' AND clause_group = 'standard';
+UPDATE tc_clauses SET status = 'inactive' WHERE clause_title = 'Cancellation' AND clause_group = 'standard';
+
+-- --- Document rename: 06_DebitNote (was "Freight Debit Note") — see
+-- NexaCrest_Change_Log.txt "DOCUMENT RENAMED". The document_types.code
+-- stays FDN (every FK and already-generated document keys on the id,
+-- not the code string; renaming the code itself would be a breaking,
+-- retroactive change for no benefit) — only the buyer-facing name and
+-- reference prefix change. ---
+UPDATE document_types SET name = 'Debit Note', ref_format = 'SC/DN/{YYYY}/{DDMM}{NNN}' WHERE code = 'FDN';
 
 SET FOREIGN_KEY_CHECKS = 1;
 
