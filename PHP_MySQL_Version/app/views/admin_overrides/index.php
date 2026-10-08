@@ -26,10 +26,13 @@
   </div>
 
   <div class="section">
-    <h2>Terms &amp; Conditions Clauses</h2>
+    <h2>Terms &amp; Conditions, Legal Terms &amp; Definitions</h2>
+    <p class="muted small">All three groups are saved together below, but shown separately since each prints in a different place on buyer-facing documents: the ordinary numbered Terms &amp; Conditions list, the red Legal Terms box, and the blue Definitions box.</p>
     <form method="post" action="/admin/overrides/tc-clauses" onsubmit="return confirmOverride(this, 'T&amp;C clause text');">
       <?= Csrf::field() ?>
-      <?php foreach ($tcClauses as $c): ?>
+
+      <h3>Terms &amp; Conditions <span class="muted small">(numbered list)</span></h3>
+      <?php foreach ($tcClausesStandard as $c): ?>
         <fieldset class="<?= $c['is_protected'] ? 'protected-row' : '' ?>">
           <legend>
             <?php if ($c['is_protected']): ?><span class="lock-icon" title="Protected — unlock to edit">&#128274;</span><?php endif; ?>
@@ -51,6 +54,57 @@
           <?php endif; ?>
         </fieldset>
       <?php endforeach; ?>
+
+      <h3>Legal Terms</h3>
+      <p class="muted small">Printed in the red Legal Terms box on QT/PI/OC/PL/CI/FDN/BUYERPO/ANNEXA.</p>
+      <?php foreach ($tcClausesLegalTerms as $c): ?>
+        <fieldset class="<?= $c['is_protected'] ? 'protected-row' : '' ?>">
+          <legend>
+            <?php if ($c['is_protected']): ?><span class="lock-icon" title="Protected — unlock to edit">&#128274;</span><?php endif; ?>
+            <?= htmlspecialchars($c['clause_title']) ?>
+            <?= $c['is_locked'] ? '<span class="badge badge-sensitive">mandatory clause</span>' : '' ?>
+            <?php if ($c['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
+          </legend>
+          <div class="field-grid">
+            <label>Title
+              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Force Majeure" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
+            </label>
+            <label class="full">Text
+              <textarea name="clause_text[<?= (int) $c['id'] ?>]" rows="3" placeholder="Full clause wording" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>><?= htmlspecialchars($c['clause_text']) ?></textarea>
+            </label>
+          </div>
+          <?php if ($c['is_protected']): ?>
+            <input type="hidden" name="unlocked_clause[<?= (int) $c['id'] ?>]" value="0" class="unlock-flag">
+            <button type="button" class="btn-sm unlock-btn" onclick="unlockFieldset(this)">Unlock this clause</button>
+          <?php endif; ?>
+        </fieldset>
+      <?php endforeach; ?>
+
+      <h3>Definitions</h3>
+      <p class="muted small">Printed in the blue Definitions box on the same documents.</p>
+      <?php foreach ($tcClausesDefinitions as $c): ?>
+        <fieldset class="<?= $c['is_protected'] ? 'protected-row' : '' ?>">
+          <legend>
+            <?php if ($c['is_protected']): ?><span class="lock-icon" title="Protected — unlock to edit">&#128274;</span><?php endif; ?>
+            <?= htmlspecialchars($c['clause_title']) ?>
+            <?= $c['is_locked'] ? '<span class="badge badge-sensitive">mandatory clause</span>' : '' ?>
+            <?php if ($c['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
+          </legend>
+          <div class="field-grid">
+            <label>Term
+              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Shipment" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
+            </label>
+            <label class="full">Definition
+              <textarea name="clause_text[<?= (int) $c['id'] ?>]" rows="3" placeholder="Full definition wording" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>><?= htmlspecialchars($c['clause_text']) ?></textarea>
+            </label>
+          </div>
+          <?php if ($c['is_protected']): ?>
+            <input type="hidden" name="unlocked_clause[<?= (int) $c['id'] ?>]" value="0" class="unlock-flag">
+            <button type="button" class="btn-sm unlock-btn" onclick="unlockFieldset(this)">Unlock this clause</button>
+          <?php endif; ?>
+        </fieldset>
+      <?php endforeach; ?>
+
       <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save T&amp;C Clause Changes</button>
     </form>

@@ -44,7 +44,7 @@ final class AdminOverrideRepository
     public static function tcClauses(): array
     {
         return Database::connection()->query(
-            'SELECT id, clause_number, clause_order, clause_title, clause_text, status, is_locked, is_protected FROM tc_clauses ORDER BY clause_order'
+            'SELECT id, clause_number, clause_order, clause_title, clause_text, clause_group, status, is_locked, is_protected FROM tc_clauses ORDER BY clause_order'
         )->fetchAll();
     }
 

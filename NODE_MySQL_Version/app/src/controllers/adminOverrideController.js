@@ -26,7 +26,17 @@ async function index(req, res) {
     adminOverrideRepository.tcClauses(),
     adminOverrideRepository.paymentPresets(),
   ]);
-  res.renderView('admin_overrides/index', { documentTypes, tcClauses, paymentPresets }, 'layout/base');
+  const byGroup = { standard: [], legal_terms: [], definitions: [] };
+  for (const c of tcClauses) {
+    (byGroup[c.clause_group || 'standard'] || byGroup.standard).push(c);
+  }
+  res.renderView('admin_overrides/index', {
+    documentTypes,
+    tcClausesStandard: byGroup.standard,
+    tcClausesLegalTerms: byGroup.legal_terms,
+    tcClausesDefinitions: byGroup.definitions,
+    paymentPresets,
+  }, 'layout/base');
 }
 
 async function updateDocumentTypes(req, res) {

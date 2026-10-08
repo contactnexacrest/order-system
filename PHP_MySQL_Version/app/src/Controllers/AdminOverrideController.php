@@ -16,9 +16,17 @@ final class AdminOverrideController
 {
     public function index(array $params): void
     {
+        $tcClauses = AdminOverrideRepository::tcClauses();
+        $byGroup = ['standard' => [], 'legal_terms' => [], 'definitions' => []];
+        foreach ($tcClauses as $c) {
+            $byGroup[$c['clause_group'] ?? 'standard'][] = $c;
+        }
+
         View::render('admin_overrides/index', [
             'documentTypes' => AdminOverrideRepository::documentTypes(),
-            'tcClauses' => AdminOverrideRepository::tcClauses(),
+            'tcClausesStandard' => $byGroup['standard'],
+            'tcClausesLegalTerms' => $byGroup['legal_terms'],
+            'tcClausesDefinitions' => $byGroup['definitions'],
             'paymentPresets' => AdminOverrideRepository::paymentPresets(),
         ], 'layout/base');
     }

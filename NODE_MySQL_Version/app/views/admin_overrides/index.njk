@@ -25,10 +25,13 @@
   </div>
 
   <div class="section">
-    <h2>Terms &amp; Conditions Clauses</h2>
+    <h2>Terms &amp; Conditions, Legal Terms &amp; Definitions</h2>
+    <p class="muted small">All three groups are saved together below, but shown separately since each prints in a different place on buyer-facing documents: the ordinary numbered Terms &amp; Conditions list, the red Legal Terms box, and the blue Definitions box.</p>
     <form method="post" action="/admin/overrides/tc-clauses" onsubmit="return confirmOverride(this, 'T&amp;C clause text');">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      {% for c in tcClauses %}
+
+      <h3>Terms &amp; Conditions <span class="muted small">(numbered list)</span></h3>
+      {% for c in tcClausesStandard %}
         <fieldset class="{{ 'protected-row' if c.is_protected }}">
           <legend>
             {% if c.is_protected %}<span class="lock-icon" title="Protected — unlock to edit">🔒</span>{% endif %}
@@ -50,6 +53,57 @@
           {% endif %}
         </fieldset>
       {% endfor %}
+
+      <h3>Legal Terms</h3>
+      <p class="muted small">Printed in the red Legal Terms box on QT/PI/OC/PL/CI/FDN/BUYERPO/ANNEXA.</p>
+      {% for c in tcClausesLegalTerms %}
+        <fieldset class="{{ 'protected-row' if c.is_protected }}">
+          <legend>
+            {% if c.is_protected %}<span class="lock-icon" title="Protected — unlock to edit">🔒</span>{% endif %}
+            {{ c.clause_title }}
+            {% if c.is_locked %}<span class="badge badge-sensitive">mandatory clause</span>{% endif %}
+            {% if c.is_protected %}<span class="badge badge-protected">protected</span>{% endif %}
+          </legend>
+          <div class="field-grid">
+            <label>Title
+              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Force Majeure" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>
+            </label>
+            <label class="full">Text
+              <textarea name="clause_text[f{{ c.id }}]" rows="3" placeholder="Full clause wording" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>{{ c.clause_text }}</textarea>
+            </label>
+          </div>
+          {% if c.is_protected %}
+            <input type="hidden" name="unlocked_clause[f{{ c.id }}]" value="0" class="unlock-flag">
+            <button type="button" class="btn-sm unlock-btn" onclick="unlockFieldset(this)">Unlock this clause</button>
+          {% endif %}
+        </fieldset>
+      {% endfor %}
+
+      <h3>Definitions</h3>
+      <p class="muted small">Printed in the blue Definitions box on the same documents.</p>
+      {% for c in tcClausesDefinitions %}
+        <fieldset class="{{ 'protected-row' if c.is_protected }}">
+          <legend>
+            {% if c.is_protected %}<span class="lock-icon" title="Protected — unlock to edit">🔒</span>{% endif %}
+            {{ c.clause_title }}
+            {% if c.is_locked %}<span class="badge badge-sensitive">mandatory clause</span>{% endif %}
+            {% if c.is_protected %}<span class="badge badge-protected">protected</span>{% endif %}
+          </legend>
+          <div class="field-grid">
+            <label>Term
+              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Shipment" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>
+            </label>
+            <label class="full">Definition
+              <textarea name="clause_text[f{{ c.id }}]" rows="3" placeholder="Full definition wording" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>{{ c.clause_text }}</textarea>
+            </label>
+          </div>
+          {% if c.is_protected %}
+            <input type="hidden" name="unlocked_clause[f{{ c.id }}]" value="0" class="unlock-flag">
+            <button type="button" class="btn-sm unlock-btn" onclick="unlockFieldset(this)">Unlock this clause</button>
+          {% endif %}
+        </fieldset>
+      {% endfor %}
+
       <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save T&amp;C Clause Changes</button>
     </form>

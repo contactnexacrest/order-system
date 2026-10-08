@@ -170,8 +170,12 @@ mistake (or malice).
   ordinary numbered Terms & Conditions list already uses, just tagged
   with `clause_group` set to `legal_terms` or `definitions` instead of
   the default `standard`. There is no separate admin screen for these:
-  editing one is an ordinary clause edit, exactly as described for the
-  regular T&C list. One further per-clause setting, **visibility_rule**,
+  editing one is an ordinary clause edit on the same **Admin Overrides**
+  screen as the regular T&C list — shown under its own **Legal Terms**
+  and **Definitions** subheadings (below the numbered **Terms &
+  Conditions** list) so the three groups are easy to tell apart, though
+  all three are still saved together in one form.
+  One further per-clause setting, **visibility_rule**,
   can scope a Legal Terms clause to only the orders on a matching
   **Balance Trigger Option** — used for a Bill of Lading Policy clause
   that only makes sense on a "balance against scanned BL copy" preset,
