@@ -23,16 +23,16 @@
           <textarea name="billing_address" placeholder="Full address including postcode — must match PI and BL exactly" required><?= htmlspecialchars($submission['billing_address'] ?? '') ?></textarea>
         </label>
         <label>Contact Person *
-          <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person'] ?? '') ?>" required>
+          <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person'] ?? '') ?>" placeholder="e.g., John Doe" required>
         </label>
         <label>Email *
-          <input type="email" name="email" value="<?= htmlspecialchars($submission['email'] ?? '') ?>" required>
+          <input type="email" name="email" value="<?= htmlspecialchars($submission['email'] ?? '') ?>" placeholder="e.g., name@example.com" required>
         </label>
         <label>Phone *
-          <input type="text" name="phone" value="<?= htmlspecialchars($submission['phone'] ?? '') ?>" required>
+          <input type="text" name="phone" value="<?= htmlspecialchars($submission['phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567" required>
         </label>
         <label>VAT / EORI / Tax Reg. No. *
-          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($submission['vat_eori_tax_no'] ?? '') ?>" required>
+          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($submission['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No." required>
         </label>
       </div>
     </fieldset>
@@ -44,34 +44,34 @@
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" <?= $consigneeSame ? 'checked' : '' ?>> Same as Buyer (my own company above)</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
         <label class="full">Consignee Company Legal Name
-          <input type="text" name="consignee_name" value="<?= htmlspecialchars($submission['consignee_name'] ?? '') ?>">
+          <input type="text" name="consignee_name" value="<?= htmlspecialchars($submission['consignee_name'] ?? '') ?>" placeholder="e.g., ABC Memorial Stones Ltd">
         </label>
         <label class="full">Address Line 1
-          <input type="text" name="consignee_address_line1" value="<?= htmlspecialchars($submission['consignee_address_line1'] ?? '') ?>">
+          <input type="text" name="consignee_address_line1" value="<?= htmlspecialchars($submission['consignee_address_line1'] ?? '') ?>" placeholder="Street number and street name">
         </label>
         <label>Address Line 2
-          <input type="text" name="consignee_address_line2" value="<?= htmlspecialchars($submission['consignee_address_line2'] ?? '') ?>">
+          <input type="text" name="consignee_address_line2" value="<?= htmlspecialchars($submission['consignee_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
         </label>
         <label>City / Town
-          <input type="text" name="consignee_city" value="<?= htmlspecialchars($submission['consignee_city'] ?? '') ?>">
+          <input type="text" name="consignee_city" value="<?= htmlspecialchars($submission['consignee_city'] ?? '') ?>" placeholder="e.g., Rotterdam">
         </label>
         <label>Postcode
-          <input type="text" name="consignee_postcode" value="<?= htmlspecialchars($submission['consignee_postcode'] ?? '') ?>">
+          <input type="text" name="consignee_postcode" value="<?= htmlspecialchars($submission['consignee_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
         </label>
         <label>Country
-          <input type="text" name="consignee_country" value="<?= htmlspecialchars($submission['consignee_country'] ?? '') ?>">
+          <input type="text" name="consignee_country" value="<?= htmlspecialchars($submission['consignee_country'] ?? '') ?>" placeholder="e.g., Netherlands">
         </label>
         <label>VAT / EORI / Tax Reg. No.
-          <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($submission['consignee_vat_eori_tax_no'] ?? '') ?>">
+          <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($submission['consignee_vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>">
+          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
         </label>
         <label>Phone
-          <input type="text" name="consignee_phone" value="<?= htmlspecialchars($submission['consignee_phone'] ?? '') ?>">
+          <input type="text" name="consignee_phone" value="<?= htmlspecialchars($submission['consignee_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
         </label>
         <label>Email
-          <input type="email" name="consignee_email" value="<?= htmlspecialchars($submission['consignee_email'] ?? '') ?>">
+          <input type="email" name="consignee_email" value="<?= htmlspecialchars($submission['consignee_email'] ?? '') ?>" placeholder="e.g., name@example.com">
         </label>
       </div>
     </fieldset>
@@ -83,31 +83,31 @@
       <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" <?= $notifySame ? 'checked' : '' ?>> Same as Consignee</label>
       <div id="notify_party_fields" class="field-grid" style="display:none">
         <label class="full">Notify Party Name
-          <input type="text" name="notify_party" value="<?= htmlspecialchars($submission['notify_party'] ?? '') ?>">
+          <input type="text" name="notify_party" value="<?= htmlspecialchars($submission['notify_party'] ?? '') ?>" placeholder="e.g., ABC Freight Forwarders Ltd">
         </label>
         <label class="full">Address Line 1
-          <input type="text" name="notify_party_address_line1" value="<?= htmlspecialchars($submission['notify_party_address_line1'] ?? '') ?>">
+          <input type="text" name="notify_party_address_line1" value="<?= htmlspecialchars($submission['notify_party_address_line1'] ?? '') ?>" placeholder="Street number and street name">
         </label>
         <label>Address Line 2
-          <input type="text" name="notify_party_address_line2" value="<?= htmlspecialchars($submission['notify_party_address_line2'] ?? '') ?>">
+          <input type="text" name="notify_party_address_line2" value="<?= htmlspecialchars($submission['notify_party_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
         </label>
         <label>City / Town
-          <input type="text" name="notify_party_city" value="<?= htmlspecialchars($submission['notify_party_city'] ?? '') ?>">
+          <input type="text" name="notify_party_city" value="<?= htmlspecialchars($submission['notify_party_city'] ?? '') ?>" placeholder="e.g., Rotterdam">
         </label>
         <label>Postcode
-          <input type="text" name="notify_party_postcode" value="<?= htmlspecialchars($submission['notify_party_postcode'] ?? '') ?>">
+          <input type="text" name="notify_party_postcode" value="<?= htmlspecialchars($submission['notify_party_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
         </label>
         <label>Country
-          <input type="text" name="notify_party_country" value="<?= htmlspecialchars($submission['notify_party_country'] ?? '') ?>">
+          <input type="text" name="notify_party_country" value="<?= htmlspecialchars($submission['notify_party_country'] ?? '') ?>" placeholder="e.g., Netherlands">
         </label>
         <label>Contact Person
-          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($submission['notify_party_contact_person'] ?? '') ?>">
+          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($submission['notify_party_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
         </label>
         <label>Phone
-          <input type="text" name="notify_party_phone" value="<?= htmlspecialchars($submission['notify_party_phone'] ?? '') ?>">
+          <input type="text" name="notify_party_phone" value="<?= htmlspecialchars($submission['notify_party_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
         </label>
         <label>Email
-          <input type="email" name="notify_party_email" value="<?= htmlspecialchars($submission['notify_party_email'] ?? '') ?>">
+          <input type="email" name="notify_party_email" value="<?= htmlspecialchars($submission['notify_party_email'] ?? '') ?>" placeholder="e.g., name@example.com">
         </label>
       </div>
     </fieldset>
@@ -116,13 +116,13 @@
       <legend><span class="intake-step-num">4</span> Shipping Details</legend>
       <div class="field-grid">
         <label>Port of Discharge *
-          <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($submission['port_of_discharge_text'] ?? '') ?>" required>
+          <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($submission['port_of_discharge_text'] ?? '') ?>" placeholder="Buyer's nominated discharge port" required>
         </label>
         <label>Country of Final Destination *
-          <input type="text" name="country_of_destination" value="<?= htmlspecialchars($submission['country_of_destination'] ?? '') ?>" required>
+          <input type="text" name="country_of_destination" value="<?= htmlspecialchars($submission['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France" required>
         </label>
         <label>Incoterm *
-          <input type="text" name="incoterm_confirmed" value="<?= htmlspecialchars($submission['incoterm_confirmed'] ?? '') ?>" required>
+          <input type="text" name="incoterm_confirmed" value="<?= htmlspecialchars($submission['incoterm_confirmed'] ?? '') ?>" placeholder="FOB / CFR / CIF" required>
         </label>
         <label>Container Type
           <input type="text" name="container_type_text" value="<?= htmlspecialchars($submission['container_type_text'] ?? '') ?>" placeholder="Blank = same as quotation">
@@ -174,7 +174,7 @@
     var inputs = container.querySelectorAll('input, textarea, select');
     function apply() {
       var same = checkbox.checked;
-      container.style.display = same ? 'none' : 'block';
+      container.style.display = same ? 'none' : '';
       inputs.forEach(function (el) { el.disabled = same; });
     }
     checkbox.addEventListener('change', apply);

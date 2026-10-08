@@ -22,16 +22,16 @@
           <textarea name="billing_address" placeholder="Full address including postcode — must match PI and BL exactly" required>{{ submission.billing_address or '' }}</textarea>
         </label>
         <label>Contact Person *
-          <input type="text" name="contact_person" value="{{ submission.contact_person or '' }}" required>
+          <input type="text" name="contact_person" value="{{ submission.contact_person or '' }}" placeholder="e.g., John Doe" required>
         </label>
         <label>Email *
-          <input type="email" name="email" value="{{ submission.email or '' }}" required>
+          <input type="email" name="email" value="{{ submission.email or '' }}" placeholder="e.g., name@example.com" required>
         </label>
         <label>Phone *
-          <input type="text" name="phone" value="{{ submission.phone or '' }}" required>
+          <input type="text" name="phone" value="{{ submission.phone or '' }}" placeholder="e.g., +1 555 123 4567" required>
         </label>
         <label>VAT / EORI / Tax Reg. No. *
-          <input type="text" name="vat_eori_tax_no" value="{{ submission.vat_eori_tax_no or '' }}" required>
+          <input type="text" name="vat_eori_tax_no" value="{{ submission.vat_eori_tax_no or '' }}" placeholder="UK: EORI No. | Others: Tax Reg. No." required>
         </label>
       </div>
     </fieldset>
@@ -43,34 +43,34 @@
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" {{ 'checked' if consigneeSame }}> Same as Buyer (my own company above)</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
         <label class="full">Consignee Company Legal Name
-          <input type="text" name="consignee_name" value="{{ submission.consignee_name or '' }}">
+          <input type="text" name="consignee_name" value="{{ submission.consignee_name or '' }}" placeholder="e.g., ABC Memorial Stones Ltd">
         </label>
         <label class="full">Address Line 1
-          <input type="text" name="consignee_address_line1" value="{{ submission.consignee_address_line1 or '' }}">
+          <input type="text" name="consignee_address_line1" value="{{ submission.consignee_address_line1 or '' }}" placeholder="Street number and street name">
         </label>
         <label>Address Line 2
-          <input type="text" name="consignee_address_line2" value="{{ submission.consignee_address_line2 or '' }}">
+          <input type="text" name="consignee_address_line2" value="{{ submission.consignee_address_line2 or '' }}" placeholder="Area / district — if applicable">
         </label>
         <label>City / Town
-          <input type="text" name="consignee_city" value="{{ submission.consignee_city or '' }}">
+          <input type="text" name="consignee_city" value="{{ submission.consignee_city or '' }}" placeholder="e.g., Rotterdam">
         </label>
         <label>Postcode
-          <input type="text" name="consignee_postcode" value="{{ submission.consignee_postcode or '' }}">
+          <input type="text" name="consignee_postcode" value="{{ submission.consignee_postcode or '' }}" placeholder="e.g., 3011 AD">
         </label>
         <label>Country
-          <input type="text" name="consignee_country" value="{{ submission.consignee_country or '' }}">
+          <input type="text" name="consignee_country" value="{{ submission.consignee_country or '' }}" placeholder="e.g., Netherlands">
         </label>
         <label>VAT / EORI / Tax Reg. No.
-          <input type="text" name="consignee_vat_eori_tax_no" value="{{ submission.consignee_vat_eori_tax_no or '' }}">
+          <input type="text" name="consignee_vat_eori_tax_no" value="{{ submission.consignee_vat_eori_tax_no or '' }}" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" value="{{ submission.consignee_contact_person or '' }}">
+          <input type="text" name="consignee_contact_person" value="{{ submission.consignee_contact_person or '' }}" placeholder="e.g., Jane Smith">
         </label>
         <label>Phone
-          <input type="text" name="consignee_phone" value="{{ submission.consignee_phone or '' }}">
+          <input type="text" name="consignee_phone" value="{{ submission.consignee_phone or '' }}" placeholder="e.g., +1 555 123 4567">
         </label>
         <label>Email
-          <input type="email" name="consignee_email" value="{{ submission.consignee_email or '' }}">
+          <input type="email" name="consignee_email" value="{{ submission.consignee_email or '' }}" placeholder="e.g., name@example.com">
         </label>
       </div>
     </fieldset>
@@ -82,31 +82,31 @@
       <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" {{ 'checked' if notifySame }}> Same as Consignee</label>
       <div id="notify_party_fields" class="field-grid" style="display:none">
         <label class="full">Notify Party Name
-          <input type="text" name="notify_party" value="{{ submission.notify_party or '' }}">
+          <input type="text" name="notify_party" value="{{ submission.notify_party or '' }}" placeholder="e.g., ABC Freight Forwarders Ltd">
         </label>
         <label class="full">Address Line 1
-          <input type="text" name="notify_party_address_line1" value="{{ submission.notify_party_address_line1 or '' }}">
+          <input type="text" name="notify_party_address_line1" value="{{ submission.notify_party_address_line1 or '' }}" placeholder="Street number and street name">
         </label>
         <label>Address Line 2
-          <input type="text" name="notify_party_address_line2" value="{{ submission.notify_party_address_line2 or '' }}">
+          <input type="text" name="notify_party_address_line2" value="{{ submission.notify_party_address_line2 or '' }}" placeholder="Area / district — if applicable">
         </label>
         <label>City / Town
-          <input type="text" name="notify_party_city" value="{{ submission.notify_party_city or '' }}">
+          <input type="text" name="notify_party_city" value="{{ submission.notify_party_city or '' }}" placeholder="e.g., Rotterdam">
         </label>
         <label>Postcode
-          <input type="text" name="notify_party_postcode" value="{{ submission.notify_party_postcode or '' }}">
+          <input type="text" name="notify_party_postcode" value="{{ submission.notify_party_postcode or '' }}" placeholder="e.g., 3011 AD">
         </label>
         <label>Country
-          <input type="text" name="notify_party_country" value="{{ submission.notify_party_country or '' }}">
+          <input type="text" name="notify_party_country" value="{{ submission.notify_party_country or '' }}" placeholder="e.g., Netherlands">
         </label>
         <label>Contact Person
-          <input type="text" name="notify_party_contact_person" value="{{ submission.notify_party_contact_person or '' }}">
+          <input type="text" name="notify_party_contact_person" value="{{ submission.notify_party_contact_person or '' }}" placeholder="e.g., Jane Smith">
         </label>
         <label>Phone
-          <input type="text" name="notify_party_phone" value="{{ submission.notify_party_phone or '' }}">
+          <input type="text" name="notify_party_phone" value="{{ submission.notify_party_phone or '' }}" placeholder="e.g., +1 555 123 4567">
         </label>
         <label>Email
-          <input type="email" name="notify_party_email" value="{{ submission.notify_party_email or '' }}">
+          <input type="email" name="notify_party_email" value="{{ submission.notify_party_email or '' }}" placeholder="e.g., name@example.com">
         </label>
       </div>
     </fieldset>
@@ -115,13 +115,13 @@
       <legend><span class="intake-step-num">4</span> Shipping Details</legend>
       <div class="field-grid">
         <label>Port of Discharge *
-          <input type="text" name="port_of_discharge_text" value="{{ submission.port_of_discharge_text or '' }}" required>
+          <input type="text" name="port_of_discharge_text" value="{{ submission.port_of_discharge_text or '' }}" placeholder="Buyer's nominated discharge port" required>
         </label>
         <label>Country of Final Destination *
-          <input type="text" name="country_of_destination" value="{{ submission.country_of_destination or '' }}" required>
+          <input type="text" name="country_of_destination" value="{{ submission.country_of_destination or '' }}" placeholder="e.g., Hungary / UK / France" required>
         </label>
         <label>Incoterm *
-          <input type="text" name="incoterm_confirmed" value="{{ submission.incoterm_confirmed or '' }}" required>
+          <input type="text" name="incoterm_confirmed" value="{{ submission.incoterm_confirmed or '' }}" placeholder="FOB / CFR / CIF" required>
         </label>
         <label>Container Type
           <input type="text" name="container_type_text" value="{{ submission.container_type_text or '' }}" placeholder="Blank = same as quotation">
@@ -173,7 +173,7 @@
     var inputs = container.querySelectorAll('input, textarea, select');
     function apply() {
       var same = checkbox.checked;
-      container.style.display = same ? 'none' : 'block';
+      container.style.display = same ? 'none' : '';
       inputs.forEach(function (el) { el.disabled = same; });
     }
     checkbox.addEventListener('change', apply);

@@ -59,25 +59,25 @@
           <input type="text" name="consignee_address_line2" placeholder="Area / district — if applicable">
         </label>
         <label>City / Town
-          <input type="text" name="consignee_city">
+          <input type="text" name="consignee_city" placeholder="e.g., Rotterdam">
         </label>
         <label>Postcode
-          <input type="text" name="consignee_postcode">
+          <input type="text" name="consignee_postcode" placeholder="e.g., 3011 AD">
         </label>
         <label>Country
-          <input type="text" name="consignee_country">
+          <input type="text" name="consignee_country" placeholder="e.g., Netherlands">
         </label>
         <label>VAT / EORI / Tax Reg. No.
-          <input type="text" name="consignee_vat_eori_tax_no">
+          <input type="text" name="consignee_vat_eori_tax_no" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person">
+          <input type="text" name="consignee_contact_person" placeholder="e.g., Jane Smith">
         </label>
         <label>Phone
-          <input type="text" name="consignee_phone">
+          <input type="text" name="consignee_phone" placeholder="e.g., +1 555 123 4567">
         </label>
         <label>Email
-          <input type="email" name="consignee_email">
+          <input type="email" name="consignee_email" placeholder="e.g., name@example.com">
         </label>
       </div>
     </fieldset>
@@ -111,7 +111,7 @@
   var inputs = container.querySelectorAll('input, textarea, select');
   function apply() {
     var same = checkbox.checked;
-    container.style.display = same ? 'none' : 'block';
+    container.style.display = same ? 'none' : '';
     inputs.forEach(function (el) { el.disabled = same; });
   }
   checkbox.addEventListener('change', apply);

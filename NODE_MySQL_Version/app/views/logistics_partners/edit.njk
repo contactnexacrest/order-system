@@ -3,28 +3,55 @@
   <h1>Edit Logistics Partner — {{ partner.partner_name }}</h1>
   <form method="post" action="/logistics-partners/{{ partner.id }}/update">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <div class="kv-grid">
-      <label>Partner / Company Name * <input type="text" name="partner_name" value="{{ partner.partner_name }}" required></label>
-      <label>Service Type *
-        <select name="service_type" required>
-          {% for key, label in serviceTypes %}
-            <option value="{{ key }}" {% if partner.service_type == key %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Address <input type="text" name="address" value="{{ partner.address or '' }}"></label>
-      <label>City <input type="text" name="city" value="{{ partner.city or '' }}"></label>
-      <label>State <input type="text" name="state" value="{{ partner.state or '' }}"></label>
-      <label>Phone <input type="text" name="phone" value="{{ partner.phone or '' }}"></label>
-      <label>WhatsApp Number <input type="text" name="whatsapp_number" value="{{ partner.whatsapp_number or '' }}"></label>
-      <label>Email <input type="email" name="email" value="{{ partner.email or '' }}"></label>
-      <label>Contact Person — Name <input type="text" name="contact_person_name" value="{{ partner.contact_person_name or '' }}"></label>
-      <label>Contact Person — Phone <input type="text" name="contact_person_phone" value="{{ partner.contact_person_phone or '' }}"></label>
-      <label>Contact Person — WhatsApp <input type="text" name="contact_person_whatsapp" value="{{ partner.contact_person_whatsapp or '' }}"></label>
-      <label>GSTIN <input type="text" name="gstin" value="{{ partner.gstin or '' }}"></label>
-      <label>PAN <input type="text" name="pan" value="{{ partner.pan or '' }}"></label>
-    </div>
-    <label>Notes <textarea name="notes" rows="3">{{ partner.notes or '' }}</textarea></label>
+    <fieldset>
+      <legend>Partner Details</legend>
+      <div class="field-grid">
+        <label class="full">Partner / Company Name *
+          <input type="text" name="partner_name" value="{{ partner.partner_name }}" placeholder="e.g., Swift Cargo Logistics Pvt Ltd" required>
+        </label>
+        <label class="full">Address
+          <input type="text" name="address" value="{{ partner.address or '' }}" placeholder="e.g., 123 Example Street, Test City, Country">
+        </label>
+        <label>Service Type *
+          <select name="service_type" required>
+            {% for key, label in serviceTypes %}
+              <option value="{{ key }}" {% if partner.service_type == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>City
+          <input type="text" name="city" value="{{ partner.city or '' }}" placeholder="e.g., Mumbai">
+        </label>
+        <label>State
+          <input type="text" name="state" value="{{ partner.state or '' }}" placeholder="e.g., Maharashtra">
+        </label>
+        <label>Phone
+          <input type="text" name="phone" value="{{ partner.phone or '' }}" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>WhatsApp Number
+          <input type="text" name="whatsapp_number" value="{{ partner.whatsapp_number or '' }}" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>Email
+          <input type="email" name="email" value="{{ partner.email or '' }}" placeholder="e.g., name@example.com">
+        </label>
+        <label>Contact Person — Name
+          <input type="text" name="contact_person_name" value="{{ partner.contact_person_name or '' }}" placeholder="e.g., John Doe">
+        </label>
+        <label>Contact Person — Phone
+          <input type="text" name="contact_person_phone" value="{{ partner.contact_person_phone or '' }}" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>Contact Person — WhatsApp
+          <input type="text" name="contact_person_whatsapp" value="{{ partner.contact_person_whatsapp or '' }}" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>GSTIN
+          <input type="text" name="gstin" value="{{ partner.gstin or '' }}" placeholder="e.g., 22AAAAA0000A1Z5">
+        </label>
+        <label>PAN
+          <input type="text" name="pan" value="{{ partner.pan or '' }}" placeholder="e.g., AAAAA0000A">
+        </label>
+      </div>
+    </fieldset>
+    <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — service area, rate notes, preferred ports, etc.">{{ partner.notes or '' }}</textarea></label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>
       <a href="/logistics-partners" class="btn-sm btn-secondary">Cancel</a>

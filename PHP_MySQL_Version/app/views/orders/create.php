@@ -86,10 +86,10 @@
     <fieldset>
       <legend>Estimated Weight &amp; Volume <small class="muted">(shown on QT/PI — actuals confirmed later at Packing List)</small></legend>
       <div class="field-grid">
-        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($old['estimated_total_cbm'] ?? '')) ?>"></label>
+        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($old['estimated_total_cbm'] ?? '')) ?>" placeholder="e.g. 12.5"></label>
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($old['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates"></label>
-        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_gross_weight_kg'] ?? '')) ?>"></label>
-        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_net_weight_kg'] ?? '')) ?>"></label>
+        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_gross_weight_kg'] ?? '')) ?>" placeholder="e.g. 2400"></label>
+        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_net_weight_kg'] ?? '')) ?>" placeholder="e.g. 2100"></label>
         <label class="full">Package Type<input type="text" name="estimated_package_type" value="<?= htmlspecialchars((string) ($old['estimated_package_type'] ?? '')) ?>" placeholder="e.g. Wooden Crates"></label>
       </div>
     </fieldset>
@@ -97,9 +97,9 @@
     <fieldset>
       <legend>Indicative Freight / Insurance <small class="muted">(only shown when Incoterm is not FOB)</small></legend>
       <div class="field-grid">
-        <label>Freight — low (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_low" value="<?= htmlspecialchars((string) ($old['indicative_freight_low'] ?? '')) ?>"></label>
-        <label>Freight — high (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_high" value="<?= htmlspecialchars((string) ($old['indicative_freight_high'] ?? '')) ?>"></label>
-        <label class="full">Insurance (indicative, <span class="muted">order currency</span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($old['indicative_insurance_amount'] ?? '')) ?>"></label>
+        <label>Freight — low (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_low" value="<?= htmlspecialchars((string) ($old['indicative_freight_low'] ?? '')) ?>" placeholder="e.g. 850"></label>
+        <label>Freight — high (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_high" value="<?= htmlspecialchars((string) ($old['indicative_freight_high'] ?? '')) ?>" placeholder="e.g. 1100"></label>
+        <label class="full">Insurance (indicative, <span class="muted">order currency</span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($old['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g. 120"></label>
       </div>
       <p class="muted small">Why a range, not one figure: ocean freight isn't booked yet at this stage, so rates can move before the actual booking. This low&ndash;high range is indicative only — the real rate is confirmed and recovered by Freight Debit Note once cargo is packed and ready (Stage 6).</p>
     </fieldset>
@@ -115,12 +115,12 @@
       <div id="product-rows">
         <?php foreach ($__oldDescriptions as $__i => $__desc): ?>
         <div class="product-row">
-          <label>Description *<input type="text" name="product_description[]" value="<?= htmlspecialchars((string) $__desc) ?>"></label>
-          <label>Dimensions<input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>"></label>
-          <label>Finish<input type="text" name="product_finish[]" value="<?= htmlspecialchars((string) ($old['product_finish'][$__i] ?? '')) ?>"></label>
-          <label>Qty<input type="text" name="product_quantity[]" value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>"></label>
+          <label>Description *<input type="text" name="product_description[]" value="<?= htmlspecialchars((string) $__desc) ?>" placeholder="e.g. Granite Memorial Headstone"></label>
+          <label>Dimensions<input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 24x12x3 inches"></label>
+          <label>Finish<input type="text" name="product_finish[]" value="<?= htmlspecialchars((string) ($old['product_finish'][$__i] ?? '')) ?>" placeholder="e.g. Polished"></label>
+          <label>Qty<input type="text" name="product_quantity[]" value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"></label>
           <label>Unit<input type="text" name="product_unit[]" value="<?= htmlspecialchars((string) ($old['product_unit'][$__i] ?? '')) ?>" placeholder="SQM/PCS"></label>
-          <label>Unit Price<input type="text" name="product_unit_price[]" value="<?= htmlspecialchars((string) ($old['product_unit_price'][$__i] ?? '')) ?>"></label>
+          <label>Unit Price<input type="text" name="product_unit_price[]" value="<?= htmlspecialchars((string) ($old['product_unit_price'][$__i] ?? '')) ?>" placeholder="e.g. 45.00"></label>
           <label>HS Code<input type="text" name="product_hs_code[]" value="<?= htmlspecialchars((string) ($old['product_hs_code'][$__i] ?? '')) ?>" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">
             <button type="button" class="btn-sm btn-secondary duplicate-row" title="Clone this line with its values — handy when only the name or dimensions differ">Duplicate</button>
@@ -142,7 +142,7 @@
 
     <fieldset>
       <legend>Special Requirements/Instructions</legend>
-      <textarea name="special_requirements" rows="2"><?= htmlspecialchars((string) ($old['special_requirements'] ?? '')) ?></textarea>
+      <textarea name="special_requirements" rows="2" placeholder="e.g. Fragile items — extra cushioning required in crate"><?= htmlspecialchars((string) ($old['special_requirements'] ?? '')) ?></textarea>
     </fieldset>
 
     <fieldset>

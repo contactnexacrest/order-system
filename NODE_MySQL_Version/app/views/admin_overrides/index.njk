@@ -15,11 +15,11 @@
           <td>{{ dt.code }}</td>
           <td>{{ dt.name }}</td>
           <td><input type="text" name="ref_format[f{{ dt.id }}]" value="{{ dt.ref_format or '' }}" placeholder="(none)"></td>
-          <td><input type="text" name="min_reviewers[f{{ dt.id }}]" value="{{ dt.min_reviewers_default }}" style="width:4rem"></td>
+          <td><input type="text" name="min_reviewers[f{{ dt.id }}]" value="{{ dt.min_reviewers_default }}" placeholder="e.g., 2" style="width:4rem"></td>
         </tr>
         {% endfor %}
       </table>
-      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save Document Type Changes</button>
     </form>
   </div>
@@ -36,15 +36,21 @@
             {% if c.is_locked %}<span class="badge badge-sensitive">mandatory clause</span>{% endif %}
             {% if c.is_protected %}<span class="badge badge-protected">protected</span>{% endif %}
           </legend>
-          <label>Title <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}></label>
-          <label>Text <textarea name="clause_text[f{{ c.id }}]" rows="3" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>{{ c.clause_text }}</textarea></label>
+          <div class="field-grid">
+            <label>Title
+              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Force Majeure" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>
+            </label>
+            <label class="full">Text
+              <textarea name="clause_text[f{{ c.id }}]" rows="3" placeholder="Full clause wording" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>{{ c.clause_text }}</textarea>
+            </label>
+          </div>
           {% if c.is_protected %}
             <input type="hidden" name="unlocked_clause[f{{ c.id }}]" value="0" class="unlock-flag">
             <button type="button" class="btn-sm unlock-btn" onclick="unlockFieldset(this)">Unlock this clause</button>
           {% endif %}
         </fieldset>
       {% endfor %}
-      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save T&amp;C Clause Changes</button>
     </form>
   </div>
@@ -60,17 +66,25 @@
             {{ p.preset_name }} ({{ p.currency_code }})
             {% if p.is_protected %}<span class="badge badge-protected">protected</span>{% endif %}
           </legend>
-          <div class="kv-grid">
-            <label>Advance % <input type="text" name="advance_pct[f{{ p.id }}]" value="{{ p.advance_pct }}" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}></label>
-            <label>Advance Trigger Text <input type="text" name="advance_trigger_text[f{{ p.id }}]" value="{{ p.advance_trigger_text }}" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}></label>
-            <label>Balance % <input type="text" name="balance_pct[f{{ p.id }}]" value="{{ p.balance_pct }}" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}></label>
+          <div class="field-grid">
+            <label>Advance %
+              <input type="text" name="advance_pct[f{{ p.id }}]" value="{{ p.advance_pct }}" placeholder="e.g., 30" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}>
+            </label>
+            <label>Advance Trigger Text
+              <input type="text" name="advance_trigger_text[f{{ p.id }}]" value="{{ p.advance_trigger_text }}" placeholder="e.g., On order confirmation" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}>
+            </label>
+            <label>Balance %
+              <input type="text" name="balance_pct[f{{ p.id }}]" value="{{ p.balance_pct }}" placeholder="e.g., 70" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}>
+            </label>
             <label>Balance Trigger
               <select name="balance_trigger_option[f{{ p.id }}]" {{ 'disabled' if p.is_protected }}>
                 <option value="A_BEFORE_SHIPMENT" {{ 'selected' if p.balance_trigger_option == 'A_BEFORE_SHIPMENT' else '' }}>Before Shipment</option>
                 <option value="B_AGAINST_BL" {{ 'selected' if p.balance_trigger_option == 'B_AGAINST_BL' else '' }}>Against BL</option>
               </select>
             </label>
-            <label>Balance Days <input type="text" name="balance_days[f{{ p.id }}]" value="{{ p.balance_days }}" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}></label>
+            <label>Balance Days
+              <input type="text" name="balance_days[f{{ p.id }}]" value="{{ p.balance_days }}" placeholder="e.g., 30" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}>
+            </label>
           </div>
           {% if p.is_protected %}
             <input type="hidden" name="unlocked_preset[f{{ p.id }}]" value="0" class="unlock-flag">
@@ -79,7 +93,7 @@
         </fieldset>
       {% endfor %}
       <p class="muted small">Warning: every order still pointing at this preset (i.e. with no activated amendment overriding it) reads these values live at document-generation time — editing a preset here changes terms for every one of those orders immediately, not just new ones. To change ONE order's terms without touching this shared preset, use that order's Payment Terms Amendment (SC/AMD) workflow instead.</p>
-      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save Payment Preset Changes</button>
     </form>
   </div>

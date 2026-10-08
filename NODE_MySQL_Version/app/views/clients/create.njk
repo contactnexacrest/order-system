@@ -9,62 +9,126 @@
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <fieldset>
       <legend>Buyer Details</legend>
-      <label>Company Legal Name *<input type="text" name="company_legal_name" value="{{ old.company_legal_name or '' }}" required></label>
-      <label>Billing Address *<textarea name="billing_address" rows="2" required>{{ old.billing_address or '' }}</textarea></label>
-      <label>Billing Address Line 1<input type="text" name="billing_address_line1" value="{{ old.billing_address_line1 or '' }}"></label>
-      <label>Billing Address Line 2<input type="text" name="billing_address_line2" value="{{ old.billing_address_line2 or '' }}"></label>
-      <label>City / Town<input type="text" name="billing_city" value="{{ old.billing_city or '' }}"></label>
-      <label>Postcode<input type="text" name="billing_postcode" value="{{ old.billing_postcode or '' }}"></label>
-      <label>VAT / EORI / Tax Reg. No.<input type="text" name="vat_eori_tax_no" value="{{ old.vat_eori_tax_no or '' }}"></label>
-      <label>Country of Destination<input type="text" name="country_of_destination" value="{{ old.country_of_destination or '' }}"></label>
-      <label>Certificate of Origin Type
-        <select name="coo_type">
-          <option value="">— To Be Confirmed —</option>
-          {% for o in cooTypes %}
-            <option value="{{ o.option_value }}" {{ 'selected' if (old.coo_type or '') == o.option_value }}>{{ o.option_value }}</option>
-          {% endfor %}
-        </select>
-      </label>
+      <div class="field-grid">
+        <label class="full">Company Legal Name *
+          <input type="text" name="company_legal_name" value="{{ old.company_legal_name or '' }}" placeholder="e.g., Test Company Ltd" required>
+        </label>
+        <label class="full">Billing Address *
+          <textarea name="billing_address" rows="2" placeholder="e.g., 123 Example Street, Test City, Country" required>{{ old.billing_address or '' }}</textarea>
+        </label>
+        <label>Billing Address Line 1
+          <input type="text" name="billing_address_line1" value="{{ old.billing_address_line1 or '' }}" placeholder="Street number and street name">
+        </label>
+        <label>Billing Address Line 2
+          <input type="text" name="billing_address_line2" value="{{ old.billing_address_line2 or '' }}" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town
+          <input type="text" name="billing_city" value="{{ old.billing_city or '' }}" placeholder="e.g., Birmingham">
+        </label>
+        <label>Postcode
+          <input type="text" name="billing_postcode" value="{{ old.billing_postcode or '' }}" placeholder="e.g., B1 1AA">
+        </label>
+        <label>VAT / EORI / Tax Reg. No.
+          <input type="text" name="vat_eori_tax_no" value="{{ old.vat_eori_tax_no or '' }}" placeholder="UK: EORI No. | Others: Tax Reg. No.">
+        </label>
+        <label>Country of Destination
+          <input type="text" name="country_of_destination" value="{{ old.country_of_destination or '' }}" placeholder="e.g., Hungary / UK / France">
+        </label>
+        <label>Certificate of Origin Type
+          <select name="coo_type">
+            <option value="">— To Be Confirmed —</option>
+            {% for o in cooTypes %}
+              <option value="{{ o.option_value }}" {{ 'selected' if (old.coo_type or '') == o.option_value }}>{{ o.option_value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
     </fieldset>
 
     <fieldset>
       <legend>Consignee Details</legend>
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" checked> Same as Buyer</label>
-      <div id="consignee_fields" style="display:none">
-        <label>Consignee Company Name<input type="text" name="consignee_name" disabled value="{{ old.consignee_name or '' }}"></label>
-        <label>Address Line 1<input type="text" name="consignee_address_line1" disabled value="{{ old.consignee_address_line1 or '' }}"></label>
-        <label>Address Line 2<input type="text" name="consignee_address_line2" disabled value="{{ old.consignee_address_line2 or '' }}"></label>
-        <label>City / Town<input type="text" name="consignee_city" disabled value="{{ old.consignee_city or '' }}"></label>
-        <label>Postcode<input type="text" name="consignee_postcode" disabled value="{{ old.consignee_postcode or '' }}"></label>
-        <label>Country<input type="text" name="consignee_country" disabled value="{{ old.consignee_country or '' }}"></label>
-        <label>VAT / EORI / Tax Reg. No.<input type="text" name="consignee_vat_eori_tax_no" disabled value="{{ old.consignee_vat_eori_tax_no or '' }}"></label>
-        <label>Contact Person<input type="text" name="consignee_contact_person" disabled value="{{ old.consignee_contact_person or '' }}"></label>
-        <label>Phone<input type="text" name="consignee_phone" disabled value="{{ old.consignee_phone or '' }}"></label>
-        <label>Email<input type="email" name="consignee_email" disabled value="{{ old.consignee_email or '' }}"></label>
+      <div id="consignee_fields" class="field-grid" style="display:none">
+        <label class="full">Consignee Company Name
+          <input type="text" name="consignee_name" disabled value="{{ old.consignee_name or '' }}" placeholder="e.g., ABC Memorial Stones Ltd">
+        </label>
+        <label class="full">Address Line 1
+          <input type="text" name="consignee_address_line1" disabled value="{{ old.consignee_address_line1 or '' }}" placeholder="Street number and street name">
+        </label>
+        <label>Address Line 2
+          <input type="text" name="consignee_address_line2" disabled value="{{ old.consignee_address_line2 or '' }}" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town
+          <input type="text" name="consignee_city" disabled value="{{ old.consignee_city or '' }}" placeholder="e.g., Rotterdam">
+        </label>
+        <label>Postcode
+          <input type="text" name="consignee_postcode" disabled value="{{ old.consignee_postcode or '' }}" placeholder="e.g., 3011 AD">
+        </label>
+        <label>Country
+          <input type="text" name="consignee_country" disabled value="{{ old.consignee_country or '' }}" placeholder="e.g., Netherlands">
+        </label>
+        <label>VAT / EORI / Tax Reg. No.
+          <input type="text" name="consignee_vat_eori_tax_no" disabled value="{{ old.consignee_vat_eori_tax_no or '' }}" placeholder="UK: EORI No. | Others: Tax Reg. No.">
+        </label>
+        <label>Contact Person
+          <input type="text" name="consignee_contact_person" disabled value="{{ old.consignee_contact_person or '' }}" placeholder="e.g., Jane Smith">
+        </label>
+        <label>Phone
+          <input type="text" name="consignee_phone" disabled value="{{ old.consignee_phone or '' }}" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>Email
+          <input type="email" name="consignee_email" disabled value="{{ old.consignee_email or '' }}" placeholder="e.g., name@example.com">
+        </label>
       </div>
     </fieldset>
 
     <fieldset>
       <legend>Notify Party</legend>
       <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" checked> Same as Consignee</label>
-      <div id="notify_party_fields" style="display:none">
-        <label>Notify Party Name<input type="text" name="notify_party" disabled value="{{ old.notify_party or '' }}"></label>
-        <label>Address Line 1<input type="text" name="notify_party_address_line1" disabled value="{{ old.notify_party_address_line1 or '' }}"></label>
-        <label>Address Line 2<input type="text" name="notify_party_address_line2" disabled value="{{ old.notify_party_address_line2 or '' }}"></label>
-        <label>City / Town<input type="text" name="notify_party_city" disabled value="{{ old.notify_party_city or '' }}"></label>
-        <label>Postcode<input type="text" name="notify_party_postcode" disabled value="{{ old.notify_party_postcode or '' }}"></label>
-        <label>Country<input type="text" name="notify_party_country" disabled value="{{ old.notify_party_country or '' }}"></label>
-        <label>Contact Person<input type="text" name="notify_party_contact_person" disabled value="{{ old.notify_party_contact_person or '' }}"></label>
-        <label>Phone<input type="text" name="notify_party_phone" disabled value="{{ old.notify_party_phone or '' }}"></label>
-        <label>Email<input type="email" name="notify_party_email" disabled value="{{ old.notify_party_email or '' }}"></label>
+      <div id="notify_party_fields" class="field-grid" style="display:none">
+        <label class="full">Notify Party Name
+          <input type="text" name="notify_party" disabled value="{{ old.notify_party or '' }}" placeholder="e.g., ABC Freight Forwarders Ltd">
+        </label>
+        <label class="full">Address Line 1
+          <input type="text" name="notify_party_address_line1" disabled value="{{ old.notify_party_address_line1 or '' }}" placeholder="Street number and street name">
+        </label>
+        <label>Address Line 2
+          <input type="text" name="notify_party_address_line2" disabled value="{{ old.notify_party_address_line2 or '' }}" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town
+          <input type="text" name="notify_party_city" disabled value="{{ old.notify_party_city or '' }}" placeholder="e.g., Rotterdam">
+        </label>
+        <label>Postcode
+          <input type="text" name="notify_party_postcode" disabled value="{{ old.notify_party_postcode or '' }}" placeholder="e.g., 3011 AD">
+        </label>
+        <label>Country
+          <input type="text" name="notify_party_country" disabled value="{{ old.notify_party_country or '' }}" placeholder="e.g., Netherlands">
+        </label>
+        <label>Contact Person
+          <input type="text" name="notify_party_contact_person" disabled value="{{ old.notify_party_contact_person or '' }}" placeholder="e.g., Jane Smith">
+        </label>
+        <label>Phone
+          <input type="text" name="notify_party_phone" disabled value="{{ old.notify_party_phone or '' }}" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>Email
+          <input type="email" name="notify_party_email" disabled value="{{ old.notify_party_email or '' }}" placeholder="e.g., name@example.com">
+        </label>
       </div>
     </fieldset>
 
     <fieldset>
       <legend>Contact</legend>
-      <label>Contact Person<input type="text" name="contact_person" value="{{ old.contact_person or '' }}"></label>
-      <label>Email<input type="email" name="email" value="{{ old.email or '' }}"></label>
-      <label>Phone<input type="text" name="phone" value="{{ old.phone or '' }}"></label>
+      <div class="field-grid">
+        <label>Contact Person
+          <input type="text" name="contact_person" value="{{ old.contact_person or '' }}" placeholder="e.g., John Doe">
+        </label>
+        <label>Email
+          <input type="email" name="email" value="{{ old.email or '' }}" placeholder="e.g., name@example.com">
+        </label>
+        <label>Phone
+          <input type="text" name="phone" value="{{ old.phone or '' }}" placeholder="e.g., +1 555 123 4567">
+        </label>
+      </div>
     </fieldset>
     <button type="submit">Create Client</button>
   </form>
@@ -78,7 +142,7 @@
     var inputs = container.querySelectorAll('input, textarea, select');
     function apply() {
       var same = checkbox.checked;
-      container.style.display = same ? 'none' : 'block';
+      container.style.display = same ? 'none' : '';
       inputs.forEach(function (el) { el.disabled = same; });
     }
     checkbox.addEventListener('change', apply);

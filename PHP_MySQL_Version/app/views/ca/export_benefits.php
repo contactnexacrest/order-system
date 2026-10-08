@@ -10,35 +10,37 @@
 
   <div class="section">
     <h2>Record a Claim</h2>
-    <form method="post" action="/ca/export-benefits" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+    <form method="post" action="/ca/export-benefits">
       <?= \App\Helpers\Csrf::field() ?>
-      <label>Scheme<br>
-        <select name="scheme_name" required>
-          <option value="">Select…</option>
-          <?php foreach ($schemeOptions as $opt): ?>
-            <option value="<?= htmlspecialchars($opt['option_value']) ?>" <?= $opt['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($opt['option_value']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <label>Order Reference (optional)<br>
-        <input type="text" name="order_reference" placeholder="e.g. NC/2026/0042">
-      </label>
-      <label>Shipping Bill / Scroll No. (optional)<br>
-        <input type="text" name="reference_number">
-      </label>
-      <label>Claimed Amount<br>
-        <input type="number" step="0.01" min="0.01" name="claimed_amount" required>
-      </label>
-      <label>Currency<br>
-        <input type="text" name="currency_code" value="INR" maxlength="10" style="width:70px;">
-      </label>
-      <label>Claim Date<br>
-        <input type="date" name="claimed_at" required>
-      </label>
-      <label style="flex-basis:100%;">Notes (optional)<br>
-        <input type="text" name="notes" style="width:100%;">
-      </label>
-      <button type="submit" class="btn btn-primary">Record Claim</button>
+      <div class="field-grid">
+        <label>Scheme
+          <select name="scheme_name" required>
+            <option value="">Select…</option>
+            <?php foreach ($schemeOptions as $opt): ?>
+              <option value="<?= htmlspecialchars($opt['option_value']) ?>" <?= $opt['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($opt['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Order Reference (optional)
+          <input type="text" name="order_reference" placeholder="e.g. NC/2026/0042">
+        </label>
+        <label>Shipping Bill / Scroll No. (optional)
+          <input type="text" name="reference_number" placeholder="e.g., SB-2026-00417">
+        </label>
+        <label>Claimed Amount
+          <input type="number" step="0.01" min="0.01" name="claimed_amount" placeholder="e.g., 15000.00" required>
+        </label>
+        <label>Currency
+          <input type="text" name="currency_code" value="INR" maxlength="10" placeholder="e.g., INR" style="width:70px;">
+        </label>
+        <label>Claim Date
+          <input type="date" name="claimed_at" required>
+        </label>
+        <label class="full">Notes (optional)
+          <input type="text" name="notes" placeholder="Any extra context for this claim" style="width:100%;">
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px;">Record Claim</button>
     </form>
   </div>
 

@@ -9,17 +9,25 @@
     <h2>Raise a Dispute</h2>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/disputes">
       <?= Csrf::field() ?>
-      <label>Notice Date *<input type="date" name="notice_date" value="<?= date('Y-m-d') ?>" required></label>
-      <label>From<input type="text" name="from_party" placeholder="e.g. Buyer, via email"></label>
-      <label>Description *<textarea name="description" required rows="3" style="width:100%"></textarea></label>
-      <label>Assign To
-        <select name="assigned_to">
-          <option value="">Unassigned</option>
-          <?php foreach ($users as $u): ?>
-            <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
+      <div class="field-grid">
+        <label>Notice Date *
+          <input type="date" name="notice_date" value="<?= date('Y-m-d') ?>" required>
+        </label>
+        <label>From
+          <input type="text" name="from_party" placeholder="e.g. Buyer, via email">
+        </label>
+        <label class="full">Description *
+          <textarea name="description" required rows="3" placeholder="Describe the dispute, including any correspondence reference" style="width:100%"></textarea>
+        </label>
+        <label>Assign To
+          <select name="assigned_to">
+            <option value="">Unassigned</option>
+            <?php foreach ($users as $u): ?>
+              <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      </div>
       <button type="submit" class="btn-sm">Log Dispute</button>
     </form>
   </div>
@@ -41,21 +49,31 @@
         <?php if ($canManage): ?>
         <form method="post" action="/disputes/<?= (int) $d['id'] ?>/status">
           <?= Csrf::field() ?>
-          <label>Status
-            <select name="status">
-              <?php foreach ($statusOptions as $opt): ?>
-                <option value="<?= htmlspecialchars($opt['option_value']) ?>" <?= $opt['option_value'] === $d['status'] ? 'selected' : '' ?>><?= htmlspecialchars($opt['option_value']) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </label>
-          <label>Resolution Notes<input type="text" name="resolution_notes" style="width:100%"></label>
+          <div class="field-grid">
+            <label>Status
+              <select name="status">
+                <?php foreach ($statusOptions as $opt): ?>
+                  <option value="<?= htmlspecialchars($opt['option_value']) ?>" <?= $opt['option_value'] === $d['status'] ? 'selected' : '' ?>><?= htmlspecialchars($opt['option_value']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label class="full">Resolution Notes
+              <input type="text" name="resolution_notes" placeholder="e.g., Resolved after reissuing corrected invoice" style="width:100%">
+            </label>
+          </div>
           <button type="submit" class="btn-sm">Update</button>
         </form>
 
         <form method="post" action="/disputes/<?= (int) $d['id'] ?>/documents" enctype="multipart/form-data">
           <?= Csrf::field() ?>
-          <input type="file" name="document" required>
-          <input type="text" name="received_from" placeholder="Received from (optional)">
+          <div class="field-grid">
+            <label>Document
+              <input type="file" name="document" required>
+            </label>
+            <label>Received From
+              <input type="text" name="received_from" placeholder="Received from (optional)">
+            </label>
+          </div>
           <button type="submit" class="btn-sm">Attach Document</button>
         </form>
         <?php endif; ?>
@@ -75,7 +93,7 @@
           <?php if ($canRespond): ?>
           <form method="post" action="/disputes/<?= (int) $d['id'] ?>/replies">
             <?= Csrf::field() ?>
-            <label>Reply<textarea name="body" required rows="2" style="width:100%"></textarea></label>
+            <label>Reply<textarea name="body" required rows="2" placeholder="Type your reply…" style="width:100%"></textarea></label>
             <button type="submit" class="btn-sm">Post Reply</button>
           </form>
           <?php endif; ?>

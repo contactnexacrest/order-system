@@ -4,10 +4,16 @@
   <h1>Edit User — <?= htmlspecialchars($target['name']) ?></h1>
   <form method="post" action="/users/<?= (int) $target['id'] ?>/update">
     <?= Csrf::field() ?>
-    <div class="kv-grid">
-      <label>Name * <input type="text" name="name" value="<?= htmlspecialchars($target['name']) ?>" required></label>
-      <label>Email * <input type="email" name="email" value="<?= htmlspecialchars($target['email']) ?>" required></label>
-      <label>Phone <input type="text" name="phone" value="<?= htmlspecialchars($target['phone'] ?? '') ?>"></label>
+    <div class="field-grid">
+      <label>Name *
+        <input type="text" name="name" value="<?= htmlspecialchars($target['name']) ?>" placeholder="e.g., John Doe" required>
+      </label>
+      <label>Email *
+        <input type="email" name="email" value="<?= htmlspecialchars($target['email']) ?>" placeholder="e.g., name@example.com" required>
+      </label>
+      <label>Phone
+        <input type="text" name="phone" value="<?= htmlspecialchars($target['phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+      </label>
       <label>Role
         <select name="role_id">
           <option value="">— none —</option>

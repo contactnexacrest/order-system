@@ -17,10 +17,10 @@
         <?php $rows = !empty($products) ? $products : [['description' => '', 'dimensions' => '', 'finish' => '', 'quantity' => '', 'quantity_is_tbc' => false, 'unit' => '']]; ?>
         <?php foreach ($rows as $idx => $p): ?>
         <div class="product-row">
-          <label>Description *<input type="text" name="product_description[<?= $idx ?>]" value="<?= htmlspecialchars($p['description'] ?? '') ?>"></label>
-          <label>Dimensions<input type="text" name="product_dimensions[<?= $idx ?>]" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
-          <label>Finish<input type="text" name="product_finish[<?= $idx ?>]" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
-          <label>Qty<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
+          <label>Description *<input type="text" name="product_description[<?= $idx ?>]" value="<?= htmlspecialchars($p['description'] ?? '') ?>" placeholder="e.g. Granite Memorial Headstone"></label>
+          <label>Dimensions<input type="text" name="product_dimensions[<?= $idx ?>]" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 24x12x3 inches"></label>
+          <label>Finish<input type="text" name="product_finish[<?= $idx ?>]" value="<?= htmlspecialchars($p['finish'] ?? '') ?>" placeholder="e.g. Polished"></label>
+          <label>Qty<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
           <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
           <label>Unit<input type="text" name="product_unit[<?= $idx ?>]" value="<?= htmlspecialchars($p['unit'] ?? '') ?>" placeholder="SQM/PCS"></label>
           <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>

@@ -30,18 +30,28 @@
 
       <fieldset style="margin-top:8px">
         <legend class="muted small">Text settings (used when mode is Text or Both)</legend>
-        <div class="kv-grid">
-          <label>Text<input type="text" name="text_content" value="<?= htmlspecialchars($w['text_content'] ?? ($which === 'draft' ? 'DRAFT — NOT FOR RELEASE' : '')) ?>" style="width:280px"></label>
-          <label>Color<input type="color" name="color" value="<?= htmlspecialchars($w['color'] ?? '#CCCCCC') ?>"></label>
-          <label>Font size (pt)<input type="number" name="font_size" value="<?= (int) ($w['font_size'] ?? 60) ?>" style="width:80px"></label>
-          <label>Opacity (0–1)<input type="number" step="0.05" min="0" max="1" name="opacity" value="<?= htmlspecialchars((string) ($w['opacity'] ?? 0.3)) ?>" style="width:80px"></label>
-          <label>Angle (degrees)<input type="number" name="angle" value="<?= (int) ($w['angle'] ?? 45) ?>" style="width:80px"></label>
+        <div class="field-grid">
+          <label class="full">Text
+            <input type="text" name="text_content" value="<?= htmlspecialchars($w['text_content'] ?? ($which === 'draft' ? 'DRAFT — NOT FOR RELEASE' : '')) ?>" placeholder="e.g., DRAFT — NOT FOR RELEASE" style="width:280px">
+          </label>
+          <label>Color
+            <input type="color" name="color" value="<?= htmlspecialchars($w['color'] ?? '#CCCCCC') ?>">
+          </label>
+          <label>Font size (pt)
+            <input type="number" name="font_size" value="<?= (int) ($w['font_size'] ?? 60) ?>" placeholder="e.g., 60" style="width:80px">
+          </label>
+          <label>Opacity (0–1)
+            <input type="number" step="0.05" min="0" max="1" name="opacity" value="<?= htmlspecialchars((string) ($w['opacity'] ?? 0.3)) ?>" placeholder="e.g., 0.3" style="width:80px">
+          </label>
+          <label>Angle (degrees)
+            <input type="number" name="angle" value="<?= (int) ($w['angle'] ?? 45) ?>" placeholder="e.g., 45" style="width:80px">
+          </label>
         </div>
       </fieldset>
 
       <fieldset style="margin-top:8px">
         <legend class="muted small">Image settings (used when mode is Image or Both)</legend>
-        <div class="kv-grid">
+        <div class="field-grid">
           <label>Position
             <select name="image_position">
               <?php foreach (['center' => 'Center', 'top-left' => 'Top left', 'top-right' => 'Top right', 'bottom-left' => 'Bottom left', 'bottom-right' => 'Bottom right'] as $val => $label): ?>
@@ -49,7 +59,9 @@
               <?php endforeach; ?>
             </select>
           </label>
-          <label>Opacity (0–1)<input type="number" step="0.05" min="0" max="1" name="image_opacity" value="<?= htmlspecialchars((string) ($w['image_opacity'] ?? 0.15)) ?>" style="width:80px"></label>
+          <label>Opacity (0–1)
+            <input type="number" step="0.05" min="0" max="1" name="image_opacity" value="<?= htmlspecialchars((string) ($w['image_opacity'] ?? 0.15)) ?>" placeholder="e.g., 0.15" style="width:80px">
+          </label>
         </div>
       </fieldset>
 

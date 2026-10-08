@@ -16,10 +16,10 @@
         {% if products and products.length > 0 %}
           {% for p in products %}
           <div class="product-row">
-            <label>Description *<input type="text" name="product_description[{{ loop.index0 }}]" value="{{ p.description }}"></label>
-            <label>Dimensions<input type="text" name="product_dimensions[{{ loop.index0 }}]" value="{{ p.dimensions or '' }}"></label>
-            <label>Finish<input type="text" name="product_finish[{{ loop.index0 }}]" value="{{ p.finish or '' }}"></label>
-            <label>Qty<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}"></label>
+            <label>Description *<input type="text" name="product_description[{{ loop.index0 }}]" value="{{ p.description }}" placeholder="e.g. Granite Memorial Headstone"></label>
+            <label>Dimensions<input type="text" name="product_dimensions[{{ loop.index0 }}]" value="{{ p.dimensions or '' }}" placeholder="e.g. 24x12x3 inches"></label>
+            <label>Finish<input type="text" name="product_finish[{{ loop.index0 }}]" value="{{ p.finish or '' }}" placeholder="e.g. Polished"></label>
+            <label>Qty<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
             <label>Unit<input type="text" name="product_unit[{{ loop.index0 }}]" value="{{ p.unit or '' }}" placeholder="SQM/PCS"></label>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
@@ -27,10 +27,10 @@
           {% endfor %}
         {% else %}
           <div class="product-row">
-            <label>Description *<input type="text" name="product_description[0]"></label>
-            <label>Dimensions<input type="text" name="product_dimensions[0]"></label>
-            <label>Finish<input type="text" name="product_finish[0]"></label>
-            <label>Qty<input type="text" name="product_quantity[0]"></label>
+            <label>Description *<input type="text" name="product_description[0]" placeholder="e.g. Granite Memorial Headstone"></label>
+            <label>Dimensions<input type="text" name="product_dimensions[0]" placeholder="e.g. 24x12x3 inches"></label>
+            <label>Finish<input type="text" name="product_finish[0]" placeholder="e.g. Polished"></label>
+            <label>Qty<input type="text" name="product_quantity[0]" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="product_quantity_tbc[0]" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit<input type="text" name="product_unit[0]" placeholder="SQM/PCS"></label>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>

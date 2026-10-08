@@ -17,14 +17,30 @@
         <h2>Product Lines <small class="muted">(confirm HS code and unit price for each before approving)</small></h2>
         <?php foreach ($lines as $i => $l): ?>
           <div class="card-nested">
-            <label>Description *<input type="text" name="description[<?= $i ?>]" value="<?= htmlspecialchars($l['description']) ?>"></label>
-            <label>Dimensions<input type="text" name="dimensions[<?= $i ?>]" value="<?= htmlspecialchars($l['dimensions'] ?? '') ?>"></label>
-            <label>Finish<input type="text" name="finish[<?= $i ?>]" value="<?= htmlspecialchars($l['finish'] ?? '') ?>"></label>
-            <label>Qty<input type="text" name="quantity[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['quantity'] ?? '')) ?>"></label>
-            <label><input type="checkbox" name="quantity_is_tbc[<?= $i ?>]" value="1" style="display:inline-block;width:auto;" <?= $l['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
-            <label>Unit<input type="text" name="unit[<?= $i ?>]" value="<?= htmlspecialchars($l['unit'] ?? '') ?>"></label>
-            <label>Unit Price *<input type="text" name="unit_price[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['unit_price'] ?? '')) ?>"></label>
-            <label>HS Code *<input type="text" name="hs_code[<?= $i ?>]" value="<?= htmlspecialchars($l['hs_code'] ?? '') ?>" list="hs_code_list" required></label>
+            <div class="field-grid">
+              <label class="full">Description *
+                <input type="text" name="description[<?= $i ?>]" value="<?= htmlspecialchars($l['description']) ?>" placeholder="e.g. Granite Memorial Headstone">
+              </label>
+              <label>Dimensions
+                <input type="text" name="dimensions[<?= $i ?>]" value="<?= htmlspecialchars($l['dimensions'] ?? '') ?>" placeholder="e.g. 24x12x3 inches">
+              </label>
+              <label>Finish
+                <input type="text" name="finish[<?= $i ?>]" value="<?= htmlspecialchars($l['finish'] ?? '') ?>" placeholder="e.g. Polished">
+              </label>
+              <label>Qty
+                <input type="text" name="quantity[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['quantity'] ?? '')) ?>" placeholder="e.g. 100">
+              </label>
+              <label><input type="checkbox" name="quantity_is_tbc[<?= $i ?>]" value="1" style="display:inline-block;width:auto;" <?= $l['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
+              <label>Unit
+                <input type="text" name="unit[<?= $i ?>]" value="<?= htmlspecialchars($l['unit'] ?? '') ?>" placeholder="SQM/PCS">
+              </label>
+              <label>Unit Price *
+                <input type="text" name="unit_price[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00">
+              </label>
+              <label>HS Code *
+                <input type="text" name="hs_code[<?= $i ?>]" value="<?= htmlspecialchars($l['hs_code'] ?? '') ?>" list="hs_code_list" placeholder="Type to search…" required>
+              </label>
+            </div>
           </div>
         <?php endforeach; ?>
         <datalist id="hs_code_list">

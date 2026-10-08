@@ -23,86 +23,94 @@
 
     <fieldset>
       <legend>Commercial Terms</legend>
-      <label>Incoterm *
-        <select name="incoterm_id" required>
-          {% for i in incoterms %}
-            <option value="{{ i.id }}" {{ 'selected' if i.id == order.incoterm_id }}>{{ i.code }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Currency *
-        <select name="currency_id" required>
-          {% for cur in currencies %}
-            <option value="{{ cur.id }}" {{ 'selected' if cur.id == order.currency_id }}>{{ cur.code }} — {{ cur.name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Certificate of Origin Type
-        <select name="coo_type">
-          <option value="">— To Be Confirmed —</option>
-          {% for o in cooTypes %}
-            <option value="{{ o.option_value }}" {{ 'selected' if o.option_value == order.coo_type }}>{{ o.option_value }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Buyer's Own PO Ref <small class="muted">("NIL" if none)</small>
-        <input type="text" name="buyers_po_ref" value="{{ order.buyers_po_ref or '' }}">
-      </label>
+      <div class="field-grid">
+        <label>Incoterm *
+          <select name="incoterm_id" required>
+            {% for i in incoterms %}
+              <option value="{{ i.id }}" {{ 'selected' if i.id == order.incoterm_id }}>{{ i.code }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Currency *
+          <select name="currency_id" required>
+            {% for cur in currencies %}
+              <option value="{{ cur.id }}" {{ 'selected' if cur.id == order.currency_id }}>{{ cur.code }} — {{ cur.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Certificate of Origin Type
+          <select name="coo_type">
+            <option value="">— To Be Confirmed —</option>
+            {% for o in cooTypes %}
+              <option value="{{ o.option_value }}" {{ 'selected' if o.option_value == order.coo_type }}>{{ o.option_value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Buyer's Own PO Ref <small class="muted">("NIL" if none)</small>
+          <input type="text" name="buyers_po_ref" value="{{ order.buyers_po_ref or '' }}" placeholder="Write NIL if none">
+        </label>
+      </div>
     </fieldset>
 
     <fieldset>
       <legend>Shipping</legend>
-      <label>Port of Loading
-        <select name="port_of_loading_id">
-          <option value="">—</option>
-          {% for p in loadingPorts %}
-            <option value="{{ p.id }}" {{ 'selected' if p.id == order.port_of_loading_id }}>{{ p.name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Port of Discharge <small class="muted">(select if it's a repeat port, or type a new one below)</small>
-        <select name="port_of_discharge_id">
-          <option value="">— Type below instead —</option>
-          {% for p in dischargePorts %}
-            <option value="{{ p.id }}" {{ 'selected' if p.id == order.port_of_discharge_id }}>{{ p.name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Port of Discharge (new / not listed)
-        <input type="text" name="port_of_discharge_text" value="{{ order.port_of_discharge_text or '' }}" placeholder="Buyer's nominated discharge port">
-      </label>
-      <label>Container Type
-        <select name="container_type">
-          <option value="">— To Be Confirmed —</option>
-          {% for o in containerTypes %}
-            <option value="{{ o.option_value }}" {{ 'selected' if o.option_value == order.container_type }}>{{ o.option_value }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Est. Lead Time <small class="muted">(free text, shown on the Quotation)</small>
-        <input type="text" name="est_lead_time_text" value="{{ order.est_lead_time_text or '' }}">
-      </label>
+      <div class="field-grid">
+        <label>Port of Loading
+          <select name="port_of_loading_id">
+            <option value="">—</option>
+            {% for p in loadingPorts %}
+              <option value="{{ p.id }}" {{ 'selected' if p.id == order.port_of_loading_id }}>{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Port of Discharge <small class="muted">(select if it's a repeat port, or type a new one below)</small>
+          <select name="port_of_discharge_id">
+            <option value="">— Type below instead —</option>
+            {% for p in dischargePorts %}
+              <option value="{{ p.id }}" {{ 'selected' if p.id == order.port_of_discharge_id }}>{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Port of Discharge (new / not listed)
+          <input type="text" name="port_of_discharge_text" value="{{ order.port_of_discharge_text or '' }}" placeholder="Buyer's nominated discharge port">
+        </label>
+        <label>Container Type
+          <select name="container_type">
+            <option value="">— To Be Confirmed —</option>
+            {% for o in containerTypes %}
+              <option value="{{ o.option_value }}" {{ 'selected' if o.option_value == order.container_type }}>{{ o.option_value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="full">Est. Lead Time <small class="muted">(free text, shown on the Quotation)</small>
+          <input type="text" name="est_lead_time_text" value="{{ order.est_lead_time_text or '' }}" placeholder="e.g. 45-60 days from advance receipt">
+        </label>
+      </div>
     </fieldset>
 
     <fieldset>
       <legend>Estimated Weight &amp; Volume <small class="muted">(shown on QT/PI — actuals confirmed later at Packing List)</small></legend>
-      <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="{{ order.estimated_total_cbm or '' }}"></label>
-      <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="{{ order.estimated_gross_weight_kg or '' }}"></label>
-      <label>Net Weight (kg)<input type="text" name="estimated_net_weight_kg" value="{{ order.estimated_net_weight_kg or '' }}"></label>
-      <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="{{ order.estimated_package_count or '' }}"></label>
-      <label>Package Type<input type="text" name="estimated_package_type" value="{{ order.estimated_package_type or '' }}"></label>
+      <div class="field-grid">
+        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="{{ order.estimated_total_cbm or '' }}" placeholder="e.g., 12.5"></label>
+        <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="{{ order.estimated_package_count or '' }}" placeholder="e.g. 45 crates"></label>
+        <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="{{ order.estimated_gross_weight_kg or '' }}" placeholder="e.g., 1200"></label>
+        <label>Net Weight (kg)<input type="text" name="estimated_net_weight_kg" value="{{ order.estimated_net_weight_kg or '' }}" placeholder="e.g., 1000"></label>
+        <label class="full">Package Type<input type="text" name="estimated_package_type" value="{{ order.estimated_package_type or '' }}" placeholder="e.g. Wooden Crates"></label>
+      </div>
     </fieldset>
 
     <fieldset>
       <legend>Indicative Freight / Insurance <small class="muted">(only relevant when Incoterm is not FOB)</small></legend>
-      <label>Freight — low<input type="text" name="indicative_freight_low" value="{{ order.indicative_freight_low or '' }}"></label>
-      <label>Freight — high<input type="text" name="indicative_freight_high" value="{{ order.indicative_freight_high or '' }}"></label>
-      <label>Insurance (indicative)<input type="text" name="indicative_insurance_amount" value="{{ order.indicative_insurance_amount or '' }}"></label>
+      <div class="field-grid">
+        <label>Freight — low<input type="text" name="indicative_freight_low" value="{{ order.indicative_freight_low or '' }}" placeholder="e.g., 800"></label>
+        <label>Freight — high<input type="text" name="indicative_freight_high" value="{{ order.indicative_freight_high or '' }}" placeholder="e.g., 1200"></label>
+        <label class="full">Insurance (indicative)<input type="text" name="indicative_insurance_amount" value="{{ order.indicative_insurance_amount or '' }}" placeholder="e.g., 150"></label>
+      </div>
     </fieldset>
 
     <fieldset>
       <legend>Special Requirements/Instructions</legend>
-      <textarea name="special_requirements" rows="2">{{ order.special_requirements or '' }}</textarea>
+      <textarea name="special_requirements" rows="2" placeholder="Write NIL if none">{{ order.special_requirements or '' }}</textarea>
     </fieldset>
 
     <p class="muted small">

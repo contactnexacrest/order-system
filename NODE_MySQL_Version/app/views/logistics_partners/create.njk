@@ -3,27 +3,55 @@
   <h1>Add Logistics Partner</h1>
   <form method="post" action="/logistics-partners">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <div class="kv-grid">
-      <label>Partner / Company Name * <input type="text" name="partner_name" required></label>
-      <label>Service Type *
-        <select name="service_type" required>
-          {% for key, label in serviceTypes %}
-            <option value="{{ key }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Address <input type="text" name="address"></label>
-      <label>City <input type="text" name="city"></label>
-      <label>State <input type="text" name="state"></label>
-      <label>Phone <input type="text" name="phone"></label>
-      <label>WhatsApp Number <input type="text" name="whatsapp_number"></label>
-      <label>Email <input type="email" name="email"></label>
-      <label>Contact Person — Name <input type="text" name="contact_person_name"></label>
-      <label>Contact Person — Phone <input type="text" name="contact_person_phone"></label>
-      <label>Contact Person — WhatsApp <input type="text" name="contact_person_whatsapp"></label>
-      <label>GSTIN <input type="text" name="gstin"></label>
-      <label>PAN <input type="text" name="pan"></label>
-    </div>
+    <fieldset>
+      <legend>Partner Details</legend>
+      <div class="field-grid">
+        <label class="full">Partner / Company Name *
+          <input type="text" name="partner_name" placeholder="e.g., Swift Cargo Logistics Pvt Ltd" required>
+        </label>
+        <label class="full">Address
+          <input type="text" name="address" placeholder="e.g., 123 Example Street, Test City, Country">
+        </label>
+        <label>Service Type *
+          <select name="service_type" required>
+            <option value="">— Select —</option>
+            {% for key, label in serviceTypes %}
+              <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>City
+          <input type="text" name="city" placeholder="e.g., Mumbai">
+        </label>
+        <label>State
+          <input type="text" name="state" placeholder="e.g., Maharashtra">
+        </label>
+        <label>Phone
+          <input type="text" name="phone" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>WhatsApp Number
+          <input type="text" name="whatsapp_number" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>Email
+          <input type="email" name="email" placeholder="e.g., name@example.com">
+        </label>
+        <label>Contact Person — Name
+          <input type="text" name="contact_person_name" placeholder="e.g., John Doe">
+        </label>
+        <label>Contact Person — Phone
+          <input type="text" name="contact_person_phone" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>Contact Person — WhatsApp
+          <input type="text" name="contact_person_whatsapp" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>GSTIN
+          <input type="text" name="gstin" placeholder="e.g., 22AAAAA0000A1Z5">
+        </label>
+        <label>PAN
+          <input type="text" name="pan" placeholder="e.g., AAAAA0000A">
+        </label>
+      </div>
+    </fieldset>
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — service area, rate notes, preferred ports, etc."></textarea></label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Add Partner</button>

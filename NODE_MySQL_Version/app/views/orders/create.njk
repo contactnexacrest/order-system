@@ -85,10 +85,10 @@
     <fieldset>
       <legend>Estimated Weight &amp; Volume <small class="muted">(shown on QT/PI — actuals confirmed later at Packing List)</small></legend>
       <div class="field-grid">
-        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="{{ old.estimated_total_cbm or '' }}"></label>
+        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="{{ old.estimated_total_cbm or '' }}" placeholder="e.g. 12.5"></label>
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="{{ old.estimated_package_count or '' }}" placeholder="e.g. 45 crates"></label>
-        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="{{ old.estimated_gross_weight_kg or '' }}"></label>
-        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="{{ old.estimated_net_weight_kg or '' }}"></label>
+        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="{{ old.estimated_gross_weight_kg or '' }}" placeholder="e.g. 2400"></label>
+        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="{{ old.estimated_net_weight_kg or '' }}" placeholder="e.g. 2100"></label>
         <label class="full">Package Type<input type="text" name="estimated_package_type" value="{{ old.estimated_package_type or '' }}" placeholder="e.g. Wooden Crates"></label>
       </div>
     </fieldset>
@@ -96,9 +96,9 @@
     <fieldset>
       <legend>Indicative Freight / Insurance <small class="muted">(only shown when Incoterm is not FOB)</small></legend>
       <div class="field-grid">
-        <label>Freight — low (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_low" value="{{ old.indicative_freight_low or '' }}"></label>
-        <label>Freight — high (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_high" value="{{ old.indicative_freight_high or '' }}"></label>
-        <label class="full">Insurance (indicative, <span class="muted">order currency</span>)<input type="text" name="indicative_insurance_amount" value="{{ old.indicative_insurance_amount or '' }}"></label>
+        <label>Freight — low (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_low" value="{{ old.indicative_freight_low or '' }}" placeholder="e.g. 850"></label>
+        <label>Freight — high (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_high" value="{{ old.indicative_freight_high or '' }}" placeholder="e.g. 1100"></label>
+        <label class="full">Insurance (indicative, <span class="muted">order currency</span>)<input type="text" name="indicative_insurance_amount" value="{{ old.indicative_insurance_amount or '' }}" placeholder="e.g. 120"></label>
       </div>
       <p class="muted small">Why a range, not one figure: ocean freight isn't booked yet at this stage, so rates can move before the actual booking. This low&ndash;high range is indicative only — the real rate is confirmed and recovered by Freight Debit Note once cargo is packed and ready (Stage 6).</p>
     </fieldset>
@@ -113,12 +113,12 @@
       <div id="product-rows">
         {% for desc in oldDescriptionsList %}
         <div class="product-row">
-          <label>Description *<input type="text" name="product_description[]" value="{{ desc or '' }}"></label>
-          <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}"></label>
-          <label>Finish<input type="text" name="product_finish[]" value="{{ old.product_finish[loop.index0] or '' if old.product_finish else '' }}"></label>
-          <label>Qty<input type="text" name="product_quantity[]" value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}"></label>
+          <label>Description *<input type="text" name="product_description[]" value="{{ desc or '' }}" placeholder="e.g. Granite Memorial Headstone"></label>
+          <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}" placeholder="e.g. 24x12x3 inches"></label>
+          <label>Finish<input type="text" name="product_finish[]" value="{{ old.product_finish[loop.index0] or '' if old.product_finish else '' }}" placeholder="e.g. Polished"></label>
+          <label>Qty<input type="text" name="product_quantity[]" value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}" placeholder="e.g. 100"></label>
           <label>Unit<input type="text" name="product_unit[]" value="{{ old.product_unit[loop.index0] or '' if old.product_unit else '' }}" placeholder="SQM/PCS"></label>
-          <label>Unit Price<input type="text" name="product_unit_price[]" value="{{ old.product_unit_price[loop.index0] or '' if old.product_unit_price else '' }}"></label>
+          <label>Unit Price<input type="text" name="product_unit_price[]" value="{{ old.product_unit_price[loop.index0] or '' if old.product_unit_price else '' }}" placeholder="e.g. 45.00"></label>
           <label>HS Code<input type="text" name="product_hs_code[]" value="{{ old.product_hs_code[loop.index0] or '' if old.product_hs_code else '' }}" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">
             <button type="button" class="btn-sm btn-secondary duplicate-row" title="Clone this line with its values — handy when only the name or dimensions differ">Duplicate</button>
@@ -140,7 +140,7 @@
 
     <fieldset>
       <legend>Special Requirements/Instructions</legend>
-      <textarea name="special_requirements" rows="2">{{ old.special_requirements or '' }}</textarea>
+      <textarea name="special_requirements" rows="2" placeholder="e.g. Fragile items — extra cushioning required in crate">{{ old.special_requirements or '' }}</textarea>
     </fieldset>
 
     <fieldset>

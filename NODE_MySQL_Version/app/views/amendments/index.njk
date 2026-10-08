@@ -7,26 +7,42 @@
     <h2>Raise a New Amendment Request</h2>
     <form method="post" action="/orders/{{ order.id }}/amendments">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Reason *<textarea name="reason" required rows="3" style="width:100%"></textarea></label>
-      <label>Requested By *
-        <select name="requested_by">
-          <option value="importer">The Importer</option>
-          <option value="exporter">NexaCrest</option>
-        </select>
-      </label>
-      <label>Amended Advance % (leave blank if unchanged)<input type="text" name="amended_advance_pct"></label>
-      <label>Amended Advance Amount<input type="text" name="amended_advance_amount"></label>
-      <label>Amended Balance Terms — legal document wording (free text, leave blank if unchanged)<input type="text" name="amended_balance_terms" style="width:100%"></label>
-      <label>Amended Balance Trigger (leave blank if unchanged — this is what actually changes future PI/CI documents)
-        <select name="amended_balance_trigger_option">
-          <option value="">— unchanged —</option>
-          <option value="A_BEFORE_SHIPMENT">Before Shipment (against shipment readiness confirmation)</option>
-          <option value="B_AGAINST_BL">Against Bill of Lading</option>
-        </select>
-      </label>
-      <label>Amended Balance Days (leave blank if unchanged)<input type="number" name="amended_balance_days" min="1"></label>
-      <label>Amended Balance Amount<input type="text" name="amended_balance_amount"></label>
-      <label>Effective From<input type="date" name="effective_from"></label>
+      <div class="field-grid">
+        <label class="full">Reason *
+          <textarea name="reason" required rows="3" placeholder="Explain why these payment terms are being amended" style="width:100%"></textarea>
+        </label>
+        <label>Requested By *
+          <select name="requested_by">
+            <option value="importer">The Importer</option>
+            <option value="exporter">NexaCrest</option>
+          </select>
+        </label>
+        <label>Amended Advance % (leave blank if unchanged)
+          <input type="text" name="amended_advance_pct" placeholder="e.g., 30">
+        </label>
+        <label>Amended Advance Amount
+          <input type="text" name="amended_advance_amount" placeholder="e.g., 15000.00">
+        </label>
+        <label class="full">Amended Balance Terms — legal document wording (free text, leave blank if unchanged)
+          <input type="text" name="amended_balance_terms" placeholder="e.g., Balance payable within 30 days of BL date" style="width:100%">
+        </label>
+        <label>Amended Balance Trigger (leave blank if unchanged — this is what actually changes future PI/CI documents)
+          <select name="amended_balance_trigger_option">
+            <option value="">— unchanged —</option>
+            <option value="A_BEFORE_SHIPMENT">Before Shipment (against shipment readiness confirmation)</option>
+            <option value="B_AGAINST_BL">Against Bill of Lading</option>
+          </select>
+        </label>
+        <label>Amended Balance Days (leave blank if unchanged)
+          <input type="number" name="amended_balance_days" min="1" placeholder="e.g., 30">
+        </label>
+        <label>Amended Balance Amount
+          <input type="text" name="amended_balance_amount" placeholder="e.g., 10000.00">
+        </label>
+        <label>Effective From
+          <input type="date" name="effective_from">
+        </label>
+      </div>
       <button type="submit" class="btn-sm">Create Amendment Request</button>
     </form>
   </div>
@@ -77,7 +93,7 @@
               <summary class="muted small">Admin override reference</summary>
               <form method="post" action="/amendments/{{ a.id }}/override-reference" onsubmit="return confirmFieldOverride(this, &quot;this amendment's reference number&quot;);">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <input type="text" name="amendment_reference" value="{{ a.amendment_reference }}">
+                <input type="text" name="amendment_reference" value="{{ a.amendment_reference }}" placeholder="e.g., AMD-2026-0007">
                 <textarea class="override-reason" name="reason" rows="2" placeholder="Reason for this change *" required></textarea>
                 <button type="submit" class="btn-sm btn-danger">Override</button>
               </form>

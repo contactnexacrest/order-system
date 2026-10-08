@@ -8,17 +8,25 @@
     <h2>Raise a Dispute</h2>
     <form method="post" action="/orders/{{ order.id }}/disputes">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Notice Date *<input type="date" name="notice_date" value="{{ today() }}" required></label>
-      <label>From<input type="text" name="from_party" placeholder="e.g. Buyer, via email"></label>
-      <label>Description *<textarea name="description" required rows="3" style="width:100%"></textarea></label>
-      <label>Assign To
-        <select name="assigned_to">
-          <option value="">Unassigned</option>
-          {% for u in users %}
-            <option value="{{ u.id }}">{{ u.name }}</option>
-          {% endfor %}
-        </select>
-      </label>
+      <div class="field-grid">
+        <label>Notice Date *
+          <input type="date" name="notice_date" value="{{ today() }}" required>
+        </label>
+        <label>From
+          <input type="text" name="from_party" placeholder="e.g. Buyer, via email">
+        </label>
+        <label class="full">Description *
+          <textarea name="description" required rows="3" placeholder="Describe the dispute, including any correspondence reference" style="width:100%"></textarea>
+        </label>
+        <label>Assign To
+          <select name="assigned_to">
+            <option value="">Unassigned</option>
+            {% for u in users %}
+              <option value="{{ u.id }}">{{ u.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
       <button type="submit" class="btn-sm">Log Dispute</button>
     </form>
   </div>
@@ -40,21 +48,31 @@
         {% if canManage %}
         <form method="post" action="/disputes/{{ d.id }}/status">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Status
-            <select name="status">
-              {% for opt in statusOptions %}
-                <option value="{{ opt.option_value }}" {{ 'selected' if opt.option_value == d.status else '' }}>{{ opt.option_value }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label>Resolution Notes<input type="text" name="resolution_notes" style="width:100%"></label>
+          <div class="field-grid">
+            <label>Status
+              <select name="status">
+                {% for opt in statusOptions %}
+                  <option value="{{ opt.option_value }}" {{ 'selected' if opt.option_value == d.status else '' }}>{{ opt.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="full">Resolution Notes
+              <input type="text" name="resolution_notes" placeholder="e.g., Resolved after reissuing corrected invoice" style="width:100%">
+            </label>
+          </div>
           <button type="submit" class="btn-sm">Update</button>
         </form>
 
         <form method="post" action="/disputes/{{ d.id }}/documents" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="file" name="document" required>
-          <input type="text" name="received_from" placeholder="Received from (optional)">
+          <div class="field-grid">
+            <label>Document
+              <input type="file" name="document" required>
+            </label>
+            <label>Received From
+              <input type="text" name="received_from" placeholder="Received from (optional)">
+            </label>
+          </div>
           <button type="submit" class="btn-sm">Attach Document</button>
         </form>
         {% endif %}
@@ -74,7 +92,7 @@
           {% if canRespond %}
           <form method="post" action="/disputes/{{ d.id }}/replies">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Reply<textarea name="body" required rows="2" style="width:100%"></textarea></label>
+            <label>Reply<textarea name="body" required rows="2" placeholder="Type your reply…" style="width:100%"></textarea></label>
             <button type="submit" class="btn-sm">Post Reply</button>
           </form>
           {% endif %}

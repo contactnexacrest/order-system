@@ -16,11 +16,11 @@
           <td><?= htmlspecialchars($dt['code']) ?></td>
           <td><?= htmlspecialchars($dt['name']) ?></td>
           <td><input type="text" name="ref_format[<?= (int) $dt['id'] ?>]" value="<?= htmlspecialchars($dt['ref_format'] ?? '') ?>" placeholder="(none)"></td>
-          <td><input type="text" name="min_reviewers[<?= (int) $dt['id'] ?>]" value="<?= (int) $dt['min_reviewers_default'] ?>" style="width:4rem"></td>
+          <td><input type="text" name="min_reviewers[<?= (int) $dt['id'] ?>]" value="<?= (int) $dt['min_reviewers_default'] ?>" placeholder="e.g., 2" style="width:4rem"></td>
         </tr>
         <?php endforeach; ?>
       </table>
-      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save Document Type Changes</button>
     </form>
   </div>
@@ -37,15 +37,21 @@
             <?= $c['is_locked'] ? '<span class="badge badge-sensitive">mandatory clause</span>' : '' ?>
             <?php if ($c['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
           </legend>
-          <label>Title <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>></label>
-          <label>Text <textarea name="clause_text[<?= (int) $c['id'] ?>]" rows="3" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>><?= htmlspecialchars($c['clause_text']) ?></textarea></label>
+          <div class="field-grid">
+            <label>Title
+              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Force Majeure" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
+            </label>
+            <label class="full">Text
+              <textarea name="clause_text[<?= (int) $c['id'] ?>]" rows="3" placeholder="Full clause wording" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>><?= htmlspecialchars($c['clause_text']) ?></textarea>
+            </label>
+          </div>
           <?php if ($c['is_protected']): ?>
             <input type="hidden" name="unlocked_clause[<?= (int) $c['id'] ?>]" value="0" class="unlock-flag">
             <button type="button" class="btn-sm unlock-btn" onclick="unlockFieldset(this)">Unlock this clause</button>
           <?php endif; ?>
         </fieldset>
       <?php endforeach; ?>
-      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save T&amp;C Clause Changes</button>
     </form>
   </div>
@@ -61,17 +67,25 @@
             <?= htmlspecialchars($p['preset_name']) ?> (<?= htmlspecialchars($p['currency_code']) ?>)
             <?php if ($p['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
           </legend>
-          <div class="kv-grid">
-            <label>Advance % <input type="text" name="advance_pct[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['advance_pct']) ?>" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>></label>
-            <label>Advance Trigger Text <input type="text" name="advance_trigger_text[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['advance_trigger_text']) ?>" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>></label>
-            <label>Balance % <input type="text" name="balance_pct[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['balance_pct']) ?>" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>></label>
+          <div class="field-grid">
+            <label>Advance %
+              <input type="text" name="advance_pct[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['advance_pct']) ?>" placeholder="e.g., 30" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>>
+            </label>
+            <label>Advance Trigger Text
+              <input type="text" name="advance_trigger_text[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['advance_trigger_text']) ?>" placeholder="e.g., On order confirmation" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>>
+            </label>
+            <label>Balance %
+              <input type="text" name="balance_pct[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['balance_pct']) ?>" placeholder="e.g., 70" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>>
+            </label>
             <label>Balance Trigger
               <select name="balance_trigger_option[<?= (int) $p['id'] ?>]" <?= $p['is_protected'] ? 'disabled' : '' ?>>
                 <option value="A_BEFORE_SHIPMENT" <?= $p['balance_trigger_option'] === 'A_BEFORE_SHIPMENT' ? 'selected' : '' ?>>Before Shipment</option>
                 <option value="B_AGAINST_BL" <?= $p['balance_trigger_option'] === 'B_AGAINST_BL' ? 'selected' : '' ?>>Against BL</option>
               </select>
             </label>
-            <label>Balance Days <input type="text" name="balance_days[<?= (int) $p['id'] ?>]" value="<?= (int) $p['balance_days'] ?>" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>></label>
+            <label>Balance Days
+              <input type="text" name="balance_days[<?= (int) $p['id'] ?>]" value="<?= (int) $p['balance_days'] ?>" placeholder="e.g., 30" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>>
+            </label>
           </div>
           <?php if ($p['is_protected']): ?>
             <input type="hidden" name="unlocked_preset[<?= (int) $p['id'] ?>]" value="0" class="unlock-flag">
@@ -80,7 +94,7 @@
         </fieldset>
       <?php endforeach; ?>
       <p class="muted small">Warning: every order still pointing at this preset (i.e. with no activated amendment overriding it) reads these values live at document-generation time — editing a preset here changes terms for every one of those orders immediately, not just new ones. To change ONE order's terms without touching this shared preset, use that order's Payment Terms Amendment (SC/AMD) workflow instead.</p>
-      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" required></textarea></label>
+      <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save Payment Preset Changes</button>
     </form>
   </div>

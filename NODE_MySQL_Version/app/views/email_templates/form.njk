@@ -6,17 +6,19 @@
   <form method="post" action="{{ '/email-templates/' ~ template.id ~ '/update' if template else '/email-templates' }}">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
-    {% if template %}
-      <label>Template Key<input type="text" value="{{ template.template_key }}" disabled></label>
-    {% else %}
-      <label>Template Key * <span class="muted small">(lowercase, letters/numbers/underscores only — cannot be changed after creation)</span>
-        <input type="text" name="template_key" placeholder="e.g. payment_followup" pattern="[a-z0-9_]+" required>
-      </label>
-    {% endif %}
+    <div class="field-grid">
+      {% if template %}
+        <label>Template Key<input type="text" value="{{ template.template_key }}" placeholder="e.g. payment_followup" disabled></label>
+      {% else %}
+        <label>Template Key * <span class="muted small">(lowercase, letters/numbers/underscores only — cannot be changed after creation)</span>
+          <input type="text" name="template_key" placeholder="e.g. payment_followup" pattern="[a-z0-9_]+" required>
+        </label>
+      {% endif %}
 
-    <label>Subject *<input type="text" name="subject" value="{{ template.subject or '' }}" required></label>
-    <label>Body *<textarea name="body" rows="10" required>{{ template.body or '' }}</textarea></label>
-    <label>Footer<textarea name="footer" rows="3">{{ template.footer or '' }}</textarea></label>
+      <label>Subject *<input type="text" name="subject" value="{{ template.subject or '' }}" placeholder="e.g., Payment Reminder — {order_reference}" required></label>
+      <label class="full">Body *<textarea name="body" rows="10" placeholder="e.g., Dear {buyer_contact_person}, this is a reminder that payment for {order_reference} is now due..." required>{{ template.body or '' }}</textarea></label>
+      <label class="full">Footer<textarea name="footer" rows="3" placeholder="Optional — appended after the body, e.g. a signature such as {sender_name}, {sender_title}">{{ template.footer or '' }}</textarea></label>
+    </div>
 
     <button type="submit" class="btn-sm btn-accent">{{ 'Save Changes' if template else 'Create Template' }}</button>
     <a class="btn-sm" href="/email-templates">Cancel</a>

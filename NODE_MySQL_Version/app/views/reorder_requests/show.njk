@@ -16,14 +16,30 @@
         <h2>Product Lines <small class="muted">(confirm HS code and unit price for each before approving)</small></h2>
         {% for l in lines %}
           <div class="card-nested">
-            <label>Description *<input type="text" name="description[{{ loop.index0 }}]" value="{{ l.description }}"></label>
-            <label>Dimensions<input type="text" name="dimensions[{{ loop.index0 }}]" value="{{ l.dimensions or '' }}"></label>
-            <label>Finish<input type="text" name="finish[{{ loop.index0 }}]" value="{{ l.finish or '' }}"></label>
-            <label>Qty<input type="text" name="quantity[{{ loop.index0 }}]" value="{{ l.quantity or '' }}"></label>
-            <label><input type="checkbox" name="quantity_is_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if l.quantity_is_tbc }}> Qty To Be Confirmed</label>
-            <label>Unit<input type="text" name="unit[{{ loop.index0 }}]" value="{{ l.unit or '' }}"></label>
-            <label>Unit Price *<input type="text" name="unit_price[{{ loop.index0 }}]" value="{{ l.unit_price or '' }}"></label>
-            <label>HS Code *<input type="text" name="hs_code[{{ loop.index0 }}]" value="{{ l.hs_code or '' }}" list="hs_code_list" required></label>
+            <div class="field-grid">
+              <label class="full">Description *
+                <input type="text" name="description[{{ loop.index0 }}]" value="{{ l.description }}" placeholder="e.g. Granite Memorial Headstone">
+              </label>
+              <label>Dimensions
+                <input type="text" name="dimensions[{{ loop.index0 }}]" value="{{ l.dimensions or '' }}" placeholder="e.g. 24x12x3 inches">
+              </label>
+              <label>Finish
+                <input type="text" name="finish[{{ loop.index0 }}]" value="{{ l.finish or '' }}" placeholder="e.g. Polished">
+              </label>
+              <label>Qty
+                <input type="text" name="quantity[{{ loop.index0 }}]" value="{{ l.quantity or '' }}" placeholder="e.g. 100">
+              </label>
+              <label><input type="checkbox" name="quantity_is_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if l.quantity_is_tbc }}> Qty To Be Confirmed</label>
+              <label>Unit
+                <input type="text" name="unit[{{ loop.index0 }}]" value="{{ l.unit or '' }}" placeholder="SQM/PCS">
+              </label>
+              <label>Unit Price *
+                <input type="text" name="unit_price[{{ loop.index0 }}]" value="{{ l.unit_price or '' }}" placeholder="e.g. 45.00">
+              </label>
+              <label>HS Code *
+                <input type="text" name="hs_code[{{ loop.index0 }}]" value="{{ l.hs_code or '' }}" list="hs_code_list" placeholder="Type to search…" required>
+              </label>
+            </div>
           </div>
         {% endfor %}
         <datalist id="hs_code_list">

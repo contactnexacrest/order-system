@@ -12,27 +12,40 @@
 
     <fieldset>
       <legend>Advance Payment</legend>
-      <label>Advance % *<input type="number" name="advance_pct" step="0.01" min="0.01" max="99.99" required value="40.00"></label>
-      <label>Advance Trigger Text *<input type="text" name="advance_trigger_text" required value="against Proforma Invoice before production commences"
-        placeholder="against Proforma Invoice before production commences"></label>
+      <div class="field-grid">
+        <label class="full">Advance Trigger Text *
+          <input type="text" name="advance_trigger_text" required value="against Proforma Invoice before production commences"
+            placeholder="against Proforma Invoice before production commences">
+        </label>
+        <label>Advance % *
+          <input type="number" name="advance_pct" step="0.01" min="0.01" max="99.99" required value="40.00" placeholder="e.g., 40.00">
+        </label>
+      </div>
       <p class="muted small">Printed as "{advance_pct}% advance T/T on FOB Value {advance_trigger_text}" — this is the second half of that sentence.</p>
     </fieldset>
 
     <fieldset>
       <legend>Balance Payment</legend>
-      <label>Balance % *<input type="number" name="balance_pct" step="0.01" min="0.01" max="99.99" required value="60.00"></label>
+      <div class="field-grid">
+        <label class="full">Balance Trigger Wording
+          <textarea name="balance_trigger_wording" rows="3" placeholder="Payable before shipment — within {days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest."></textarea>
+        </label>
+        <label>Balance % *
+          <input type="number" name="balance_pct" step="0.01" min="0.01" max="99.99" required value="60.00" placeholder="e.g., 60.00">
+        </label>
+        <label>Balance Trigger Option *
+          <select name="balance_trigger_option" required>
+            <option value="">— Select —</option>
+            {% for key, label in triggerOptions %}
+              <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Balance Days *
+          <input type="number" name="balance_days" min="1" required value="3" placeholder="e.g., 3">
+        </label>
+      </div>
       <p class="muted small">Advance % + Balance % must add up to 100.</p>
-      <label>Balance Trigger Option *
-        <select name="balance_trigger_option" required>
-          {% for key, label in triggerOptions %}
-            <option value="{{ key }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Balance Days *<input type="number" name="balance_days" min="1" required value="3"></label>
-      <label>Balance Trigger Wording
-        <textarea name="balance_trigger_wording" rows="3" placeholder="Payable before shipment — within {days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest."></textarea>
-      </label>
       <p class="muted small">Printed as-is on the Quotation, Proforma Invoice, and Buyer PO — the only 3 documents whose balance clause varies by preset. Must include the literal token <code>{days}</code>, substituted with Balance Days above. Leave blank to use the built-in default sentence for the Balance Trigger Option selected.</p>
     </fieldset>
 

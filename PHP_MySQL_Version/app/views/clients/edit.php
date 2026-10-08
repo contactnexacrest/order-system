@@ -26,39 +26,77 @@
     <?php $fieldsetDisabled = $locked && !$isSuperAdmin; ?>
     <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
       <legend>Buyer Details</legend>
-      <label>Company Legal Name *<input type="text" name="company_legal_name" value="<?= htmlspecialchars($client['company_legal_name']) ?>" required></label>
-      <label>Billing Address *<textarea name="billing_address" rows="2" required><?= htmlspecialchars($client['billing_address']) ?></textarea></label>
-      <label>Billing Address Line 1<input type="text" name="billing_address_line1" value="<?= htmlspecialchars($client['billing_address_line1'] ?? '') ?>"></label>
-      <label>Billing Address Line 2<input type="text" name="billing_address_line2" value="<?= htmlspecialchars($client['billing_address_line2'] ?? '') ?>"></label>
-      <label>City / Town<input type="text" name="billing_city" value="<?= htmlspecialchars($client['billing_city'] ?? '') ?>"></label>
-      <label>Postcode<input type="text" name="billing_postcode" value="<?= htmlspecialchars($client['billing_postcode'] ?? '') ?>"></label>
-      <label>VAT / EORI / Tax Reg. No.<input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($client['vat_eori_tax_no'] ?? '') ?>"></label>
-      <label>Country of Destination<input type="text" name="country_of_destination" value="<?= htmlspecialchars($client['country_of_destination'] ?? '') ?>"></label>
-      <label>Certificate of Origin Type
-        <select name="coo_type">
-          <option value="">— To Be Confirmed —</option>
-          <?php foreach ($cooTypes as $o): ?>
-            <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= (($client['coo_type'] ?? '') === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
+      <div class="field-grid">
+        <label class="full">Company Legal Name *
+          <input type="text" name="company_legal_name" value="<?= htmlspecialchars($client['company_legal_name']) ?>" placeholder="e.g., Test Company Ltd" required>
+        </label>
+        <label class="full">Billing Address *
+          <textarea name="billing_address" rows="2" placeholder="e.g., 123 Example Street, Test City, Country" required><?= htmlspecialchars($client['billing_address']) ?></textarea>
+        </label>
+        <label>Billing Address Line 1
+          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($client['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name">
+        </label>
+        <label>Billing Address Line 2
+          <input type="text" name="billing_address_line2" value="<?= htmlspecialchars($client['billing_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town
+          <input type="text" name="billing_city" value="<?= htmlspecialchars($client['billing_city'] ?? '') ?>" placeholder="e.g., Birmingham">
+        </label>
+        <label>Postcode
+          <input type="text" name="billing_postcode" value="<?= htmlspecialchars($client['billing_postcode'] ?? '') ?>" placeholder="e.g., B1 1AA">
+        </label>
+        <label>VAT / EORI / Tax Reg. No.
+          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($client['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
+        </label>
+        <label>Country of Destination
+          <input type="text" name="country_of_destination" value="<?= htmlspecialchars($client['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France">
+        </label>
+        <label>Certificate of Origin Type
+          <select name="coo_type">
+            <option value="">— To Be Confirmed —</option>
+            <?php foreach ($cooTypes as $o): ?>
+              <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= (($client['coo_type'] ?? '') === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      </div>
     </fieldset>
 
     <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
       <legend>Consignee Details</legend>
       <?php $consigneeSame = (int) ($client['consignee_same_as_buyer'] ?? 1) === 1; ?>
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" <?= $consigneeSame ? 'checked' : '' ?>> Same as Buyer</label>
-      <div id="consignee_fields" style="display:none">
-        <label>Consignee Company Name<input type="text" name="consignee_name" value="<?= htmlspecialchars($client['consignee_name'] ?? '') ?>"></label>
-        <label>Address Line 1<input type="text" name="consignee_address_line1" value="<?= htmlspecialchars($client['consignee_address_line1'] ?? '') ?>"></label>
-        <label>Address Line 2<input type="text" name="consignee_address_line2" value="<?= htmlspecialchars($client['consignee_address_line2'] ?? '') ?>"></label>
-        <label>City / Town<input type="text" name="consignee_city" value="<?= htmlspecialchars($client['consignee_city'] ?? '') ?>"></label>
-        <label>Postcode<input type="text" name="consignee_postcode" value="<?= htmlspecialchars($client['consignee_postcode'] ?? '') ?>"></label>
-        <label>Country<input type="text" name="consignee_country" value="<?= htmlspecialchars($client['consignee_country'] ?? '') ?>"></label>
-        <label>VAT / EORI / Tax Reg. No.<input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($client['consignee_vat_eori_tax_no'] ?? '') ?>"></label>
-        <label>Contact Person<input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($client['consignee_contact_person'] ?? '') ?>"></label>
-        <label>Phone<input type="text" name="consignee_phone" value="<?= htmlspecialchars($client['consignee_phone'] ?? '') ?>"></label>
-        <label>Email<input type="email" name="consignee_email" value="<?= htmlspecialchars($client['consignee_email'] ?? '') ?>"></label>
+      <div id="consignee_fields" class="field-grid" style="display:none">
+        <label class="full">Consignee Company Name
+          <input type="text" name="consignee_name" value="<?= htmlspecialchars($client['consignee_name'] ?? '') ?>" placeholder="e.g., ABC Memorial Stones Ltd">
+        </label>
+        <label class="full">Address Line 1
+          <input type="text" name="consignee_address_line1" value="<?= htmlspecialchars($client['consignee_address_line1'] ?? '') ?>" placeholder="Street number and street name">
+        </label>
+        <label>Address Line 2
+          <input type="text" name="consignee_address_line2" value="<?= htmlspecialchars($client['consignee_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town
+          <input type="text" name="consignee_city" value="<?= htmlspecialchars($client['consignee_city'] ?? '') ?>" placeholder="e.g., Rotterdam">
+        </label>
+        <label>Postcode
+          <input type="text" name="consignee_postcode" value="<?= htmlspecialchars($client['consignee_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
+        </label>
+        <label>Country
+          <input type="text" name="consignee_country" value="<?= htmlspecialchars($client['consignee_country'] ?? '') ?>" placeholder="e.g., Netherlands">
+        </label>
+        <label>VAT / EORI / Tax Reg. No.
+          <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($client['consignee_vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
+        </label>
+        <label>Contact Person
+          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($client['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
+        </label>
+        <label>Phone
+          <input type="text" name="consignee_phone" value="<?= htmlspecialchars($client['consignee_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>Email
+          <input type="email" name="consignee_email" value="<?= htmlspecialchars($client['consignee_email'] ?? '') ?>" placeholder="e.g., name@example.com">
+        </label>
       </div>
     </fieldset>
 
@@ -66,31 +104,59 @@
       <legend>Notify Party</legend>
       <?php $notifySame = (int) ($client['notify_party_same_as_consignee'] ?? 1) === 1; ?>
       <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" <?= $notifySame ? 'checked' : '' ?>> Same as Consignee</label>
-      <div id="notify_party_fields" style="display:none">
-        <label>Notify Party Name<input type="text" name="notify_party" value="<?= htmlspecialchars($client['notify_party'] ?? '') ?>"></label>
-        <label>Address Line 1<input type="text" name="notify_party_address_line1" value="<?= htmlspecialchars($client['notify_party_address_line1'] ?? '') ?>"></label>
-        <label>Address Line 2<input type="text" name="notify_party_address_line2" value="<?= htmlspecialchars($client['notify_party_address_line2'] ?? '') ?>"></label>
-        <label>City / Town<input type="text" name="notify_party_city" value="<?= htmlspecialchars($client['notify_party_city'] ?? '') ?>"></label>
-        <label>Postcode<input type="text" name="notify_party_postcode" value="<?= htmlspecialchars($client['notify_party_postcode'] ?? '') ?>"></label>
-        <label>Country<input type="text" name="notify_party_country" value="<?= htmlspecialchars($client['notify_party_country'] ?? '') ?>"></label>
-        <label>Contact Person<input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($client['notify_party_contact_person'] ?? '') ?>"></label>
-        <label>Phone<input type="text" name="notify_party_phone" value="<?= htmlspecialchars($client['notify_party_phone'] ?? '') ?>"></label>
-        <label>Email<input type="email" name="notify_party_email" value="<?= htmlspecialchars($client['notify_party_email'] ?? '') ?>"></label>
+      <div id="notify_party_fields" class="field-grid" style="display:none">
+        <label class="full">Notify Party Name
+          <input type="text" name="notify_party" value="<?= htmlspecialchars($client['notify_party'] ?? '') ?>" placeholder="e.g., ABC Freight Forwarders Ltd">
+        </label>
+        <label class="full">Address Line 1
+          <input type="text" name="notify_party_address_line1" value="<?= htmlspecialchars($client['notify_party_address_line1'] ?? '') ?>" placeholder="Street number and street name">
+        </label>
+        <label>Address Line 2
+          <input type="text" name="notify_party_address_line2" value="<?= htmlspecialchars($client['notify_party_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town
+          <input type="text" name="notify_party_city" value="<?= htmlspecialchars($client['notify_party_city'] ?? '') ?>" placeholder="e.g., Rotterdam">
+        </label>
+        <label>Postcode
+          <input type="text" name="notify_party_postcode" value="<?= htmlspecialchars($client['notify_party_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
+        </label>
+        <label>Country
+          <input type="text" name="notify_party_country" value="<?= htmlspecialchars($client['notify_party_country'] ?? '') ?>" placeholder="e.g., Netherlands">
+        </label>
+        <label>Contact Person
+          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($client['notify_party_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
+        </label>
+        <label>Phone
+          <input type="text" name="notify_party_phone" value="<?= htmlspecialchars($client['notify_party_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+        </label>
+        <label>Email
+          <input type="email" name="notify_party_email" value="<?= htmlspecialchars($client['notify_party_email'] ?? '') ?>" placeholder="e.g., name@example.com">
+        </label>
       </div>
     </fieldset>
 
     <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
       <legend>Contact</legend>
-      <label>Contact Person<input type="text" name="contact_person" value="<?= htmlspecialchars($client['contact_person'] ?? '') ?>"></label>
-      <label>Email<input type="email" name="email" value="<?= htmlspecialchars($client['email'] ?? '') ?>"></label>
-      <label>Phone<input type="text" name="phone" value="<?= htmlspecialchars($client['phone'] ?? '') ?>"></label>
+      <div class="field-grid">
+        <label>Contact Person
+          <input type="text" name="contact_person" value="<?= htmlspecialchars($client['contact_person'] ?? '') ?>" placeholder="e.g., John Doe">
+        </label>
+        <label>Email
+          <input type="email" name="email" value="<?= htmlspecialchars($client['email'] ?? '') ?>" placeholder="e.g., name@example.com">
+        </label>
+        <label>Phone
+          <input type="text" name="phone" value="<?= htmlspecialchars($client['phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+        </label>
+      </div>
     </fieldset>
 
     <?php if ($locked && $isSuperAdmin): ?>
       <fieldset>
         <legend>Super Admin Override</legend>
         <label><input type="checkbox" name="override_lock" value="1"> Override the lock for this save (staff data-entry error only)</label>
-        <label>Reason (required, min. 10 characters)<input type="text" name="override_reason" style="width:400px"></label>
+        <label>Reason (required, min. 10 characters)
+          <input type="text" name="override_reason" style="width:400px" placeholder="e.g., Staff mistyped postcode during intake — correcting to match buyer's PO">
+        </label>
       </fieldset>
     <?php endif; ?>
 
@@ -120,7 +186,7 @@
     var inputs = container.querySelectorAll('input, textarea, select');
     function apply() {
       var same = checkbox.checked;
-      container.style.display = same ? 'none' : 'block';
+      container.style.display = same ? 'none' : '';
       inputs.forEach(function (el) { el.disabled = same; });
     }
     checkbox.addEventListener('change', apply);
