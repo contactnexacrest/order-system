@@ -84,6 +84,7 @@ final class OrderRepository
                     i.code AS incoterm_code, cur.code AS currency_code,
                     pl.name AS port_of_loading_name, pd.name AS port_of_discharge_name,
                     pp.preset_name, pp.advance_trigger_text, pp.requires_md_approval,
+                    pp.balance_trigger_wording,
                     COALESCE(o.advance_pct_override, pp.advance_pct) AS advance_pct,
                     COALESCE(o.balance_pct_override, pp.balance_pct) AS balance_pct,
                     COALESCE(o.balance_trigger_option_override, pp.balance_trigger_option) AS balance_trigger_option,

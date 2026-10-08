@@ -178,7 +178,14 @@ final class DocumentDataAssembler
                 'balance_amount'   => self::formatMoney($balanceAmount),
                 'balance_trigger_option' => $order['balance_trigger_option'],
                 'balance_days'     => $order['balance_days'],
-                'balance_terms_text' => self::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null),
+                'balance_terms_text' => self::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null, $order['balance_trigger_wording'] ?? null),
+                // Fixed regardless of the order's own preset — see
+                // ci_balance_days_post_bl's seed.sql comment and
+                // NexaCrest_Change_Log.txt Addendum Section 11 item 4:
+                // the Commercial Invoice's own balance clause (Section 7)
+                // never varies by tier/preset, unlike balance_terms_text
+                // above (which QT/PI/BuyerPO use and which DOES vary).
+                'ci_balance_days_post_bl' => (int) (CompanySettingsRepository::get('ci_balance_days_post_bl') ?? '7'),
                 'total_value'      => self::formatMoney($fobValue), // freight/insurance are indicative-only, not summed into the binding total for FOB
                 'preset_name'      => $order['preset_name'],
             ],
@@ -714,7 +721,7 @@ final class DocumentDataAssembler
      * another leaking the raw ENUM code ('A_BEFORE_SHIPMENT') into a
      * buyer- or legally-facing document.
      */
-    public static function balanceTriggerSentence(?string $option, ?int $days): string
+    public static function balanceTriggerSentence(?string $option, ?int $days, ?string $wordingTemplate = null): string
     {
         // Calendar Days, not Working Days — NexaCrest_Change_Log.txt's
         // "Calendar Days standardisation" replacement, applied everywhere
@@ -727,6 +734,14 @@ final class DocumentDataAssembler
         // actually hand the scan over, and only the email date is
         // something NexaCrest can evidence.
         $days = $days ?? 0;
+        // $wordingTemplate is the preset's own balance_trigger_wording
+        // (admin-editable — see payment_presets CRUD) with the literal
+        // token {days} substituted. Only the two sentences below are a
+        // fallback, for a preset row that predates this column / was
+        // left blank, so an admin never needs to backfill every row.
+        if ($wordingTemplate !== null && trim($wordingTemplate) !== '') {
+            return str_replace('{days}', (string) $days, $wordingTemplate);
+        }
         if ($option === 'A_BEFORE_SHIPMENT') {
             return "Payable before shipment — within {$days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest.";
         }

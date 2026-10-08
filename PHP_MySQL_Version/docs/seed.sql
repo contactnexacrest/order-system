@@ -78,6 +78,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('respond_to_disputes',         'Respond to disputes',            'Post a reply in a dispute''s reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button.', 'orders'),
   ('manage_order_financials',     'Manage order financials',        'View/add/edit an order''s export benefit claims, other costs, and its profitability summary. Stricter than ca_module_view/inr_actual_edit: not auto-granted to Accounts/CA, only Admin/MD/ED and Super Admin by default.', 'ca'),
   ('manage_logistics_partners',   'Manage logistics partners',      'Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. Same tier as manage_hs_codes: Admin/MD/ED and Super Admin only by default.', 'catalog'),
+  ('manage_payment_presets',      'Manage payment presets',         'Create, edit, deactivate payment presets (advance/balance %, balance-trigger wording). Drives every order''s payment calc. Same tier as manage_logistics_partners. Existing presets ship protected — unlock via Field Protection first.', 'catalog'),
   ('manage_compliance_task_types', 'Manage compliance task types',   'Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). Does not grant the order-page checklist itself - that uses close_orders. Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog'),
   ('override_buyer_acknowledgment', 'Override buyer Order Confirmation acknowledgment', 'Record a buyer''s OC acknowledgment manually (e.g. an email reply). Only consulted when oc_ack_override_restricted is on; off by default, where manage_orders alone is enough.', 'orders'),
   ('impersonate_client', 'Log in as a client', 'Start a staff-initiated client-portal session for a client who can''t use the portal themselves. Requires client_impersonation_enabled (global) and the client''s own allow_staff_impersonation flag both on. Every use is logged.', 'clients'),
@@ -161,15 +162,19 @@ INSERT INTO incoterms (code, label_template, requires_port_role, is_default, is_
 -- found in the source documents (see ARCHITECTURE.md section 4.3).
 -- ================================================================
 INSERT INTO payment_presets
-  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, currency_id, requires_md_approval, is_active)
+  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
 SELECT 'Standard — New Buyer', 1, 40.00, 'against Proforma Invoice before production commences',
-       60.00, 'A_BEFORE_SHIPMENT', 3, c.id, 0, 1
+       60.00, 'A_BEFORE_SHIPMENT', 3,
+       'Payable before shipment — within {days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest.',
+       c.id, 0, 1
 FROM currencies c WHERE c.code = 'USD';
 
 INSERT INTO payment_presets
-  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, currency_id, requires_md_approval, is_active)
+  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
 SELECT 'Established Buyer — Post-BL', 0, 40.00, 'against Proforma Invoice before production commences',
-       60.00, 'B_AGAINST_BL', 7, c.id, 1, 1
+       60.00, 'B_AGAINST_BL', 7,
+       'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
+       c.id, 1, 1
 FROM currencies c WHERE c.code = 'USD';
 
 -- Both presets ship protected by default — they drive where money is
@@ -501,6 +506,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('non_usd_price_buffer_pct', '1.75', 'number', 'tolerances', 'Advisory price buffer shown (not auto-applied) for non-USD quotes, per your instruction.', 0),
   ('quotation_validity_days', '30', 'number', 'documents', 'Days a Quotation stays valid from its issue date (Addition beyond the spec''s named key list — the source Quotation template states "30 days" directly in its T&C text; making it a setting instead of a literal keeps that number DB-driven if it ever changes).', 0),
   ('pi_validity_days',       '15', 'number', 'documents', 'Days a Proforma Invoice stays valid from its issue date. Same addition as quotation_validity_days, for the same reason — the source PI template states "15 days" directly in its T&C text.', 0),
+  ('ci_balance_days_post_bl', '7', 'number', 'documents', 'Calendar Days in the Commercial Invoice''s own "BALANCE DUE NOW" clause (Section 7) — per NexaCrest_Change_Log.txt Addendum Section 11 item 4, the CI''s balance wording is IDENTICAL across every payment preset/tier (unlike QT/PI/BuyerPO, which vary), always stating the against-BL-copy trigger regardless of which preset the order actually uses. Kept here rather than read from the order''s own preset so it stays fixed even when a before-shipment-preset order reaches CI stage (where the balance is normally already cleared anyway).', 0),
   ('revision_start_number', '1', 'number', 'documents', 'Starting revision number for a new document.', 0),
   ('bl_type_instruction', 'ORIGINAL NEGOTIABLE BILL OF LADING — no exceptions. Do not substitute with Sea Waybill or Express BL.', 'string', 'shipping', 'Mandatory BL type instruction printed on every BL Instruction Sheet (Addition beyond the spec''s named key list — this hard rule was previously hardcoded directly in the BLI template, with no governance or audit trail if it ever needed a one-off exception; a Sea Waybill/Express BL lets the buyer collect cargo without surrendering any document, eliminating NexaCrest''s financial leverage over the balance payment).', 0),
   ('bl_consignee_instruction', 'TO ORDER OF {company}', 'string', 'shipping', 'Mandatory BL consignee instruction — ensures the BL is to NexaCrest''s order so the buyer cannot use it until NexaCrest endorses and releases it. {company} is substituted with the company legal name at render time. Same addition/rationale as bl_type_instruction.', 0),

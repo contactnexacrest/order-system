@@ -29,6 +29,7 @@ use App\Controllers\HolidayController;
 use App\Controllers\HsCodeController;
 use App\Controllers\ComplianceTaskTypeController;
 use App\Controllers\LogisticsPartnerController;
+use App\Controllers\PaymentPresetController;
 use App\Controllers\WatermarkController;
 use App\Controllers\ReferenceDocController;
 use App\Controllers\SopController;
@@ -86,6 +87,7 @@ $disputes = new DisputeController();
 $holidays = new HolidayController();
 $hsCodes = new HsCodeController();
 $logisticsPartners = new LogisticsPartnerController();
+$paymentPresets = new PaymentPresetController();
 $complianceTaskTypes = new ComplianceTaskTypeController();
 $watermarks = new WatermarkController();
 $referenceDocs = new ReferenceDocController();
@@ -176,6 +178,13 @@ $router->get('/logistics-partners/{id}/edit', [$logisticsPartners, 'editForm'], 
 $router->post('/logistics-partners/{id}/update', [$logisticsPartners, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/toggle', [$logisticsPartners, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/delete', [$logisticsPartners, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+
+$router->get('/payment-presets', [$paymentPresets, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_payment_presets')]);
+$router->get('/payment-presets/create', [$paymentPresets, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_payment_presets')]);
+$router->post('/payment-presets', [$paymentPresets, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_payment_presets'), CsrfCheck::verify()]);
+$router->get('/payment-presets/{id}/edit', [$paymentPresets, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_payment_presets')]);
+$router->post('/payment-presets/{id}/update', [$paymentPresets, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_payment_presets'), CsrfCheck::verify()]);
+$router->post('/payment-presets/{id}/toggle', [$paymentPresets, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_payment_presets'), CsrfCheck::verify()]);
 
 $router->get('/compliance-task-types', [$complianceTaskTypes, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types')]);
 $router->get('/compliance-task-types/create', [$complianceTaskTypes, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_task_types')]);

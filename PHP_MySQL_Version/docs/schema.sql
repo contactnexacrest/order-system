@@ -102,6 +102,14 @@ CREATE TABLE payment_presets (
   balance_pct             DECIMAL(5,2) NOT NULL DEFAULT 60.00,
   balance_trigger_option  ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NOT NULL DEFAULT 'A_BEFORE_SHIPMENT',
   balance_days            INT NOT NULL DEFAULT 3,    -- 3 for option A, 7 for option B (both configurable)
+  balance_trigger_wording TEXT NULL,                 -- the actual sentence printed as financial.balance_terms_text
+                                                       -- on QT/PI/BUYERPO (the only 3 documents whose balance
+                                                       -- clause the Developer Spec allows to vary by preset).
+                                                       -- Contains the literal token {days}, substituted with
+                                                       -- balance_days at render time. NULL falls back to a
+                                                       -- built-in default sentence for the preset's
+                                                       -- balance_trigger_option (DocumentDataAssembler::
+                                                       -- balanceTriggerSentence()), so older rows need no backfill.
   currency_id             BIGINT UNSIGNED NOT NULL,
   requires_md_approval    TINYINT(1) NOT NULL DEFAULT 0,  -- true for "established buyer" style presets
   is_active               TINYINT(1) NOT NULL DEFAULT 1,
