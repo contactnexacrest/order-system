@@ -9,6 +9,8 @@ const permissionService = require('../services/permissionService');
 const permissionRepository = require('../repositories/permissionRepository');
 const superAdminService = require('../services/superAdminService');
 const notificationRepository = require('../repositories/notificationRepository');
+const clientIntakeRepository = require('../repositories/clientIntakeRepository');
+const piIntakeRepository = require('../repositories/piIntakeRepository');
 
 // Port of App\Middleware\SessionAuth. Redirects to /login if not
 // authenticated; enforces the DB-driven idle session timeout
@@ -92,6 +94,19 @@ function required() {
     }
 
     req.unreadCount = await notificationRepository.unreadCountForUser(user.id);
+
+    // Standing-request nav badges — live, not cached, so the sidebar
+    // always reflects reality: a submission appearing the moment it's
+    // filed, the number dropping the moment it's accepted or rejected.
+    // Both review screens are gated on manage_orders, so only query for
+    // staff who could actually act on one.
+    if (req.permissions.manage_orders) {
+      req.clientIntakePendingCount = await clientIntakeRepository.pendingCount();
+      req.piIntakePendingCount = await piIntakeRepository.pendingReviewCount();
+    } else {
+      req.clientIntakePendingCount = 0;
+      req.piIntakePendingCount = 0;
+    }
 
     next();
   };

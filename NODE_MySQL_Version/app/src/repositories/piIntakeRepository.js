@@ -220,7 +220,14 @@ async function markRejected(id, reviewedBy, reason) {
   );
 }
 
+// Nav-badge count — live, not cached, so it self-decrements the moment a
+// submission is accepted/rejected.
+async function pendingReviewCount() {
+  const row = await db.queryOne("SELECT COUNT(*) AS c FROM pi_intake_submissions WHERE status = 'pending_review'");
+  return row ? parseInt(row.c, 10) : 0;
+}
+
 module.exports = {
   createLink, find, findValidByToken, latestForOrder, submit,
-  pendingReview, recentResolved, markApplied, markRejected,
+  pendingReview, pendingReviewCount, recentResolved, markApplied, markRejected,
 };

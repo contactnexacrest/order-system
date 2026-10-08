@@ -211,6 +211,14 @@ final class PiIntakeRepository
         )->fetchAll();
     }
 
+    /** Nav-badge count — live, not cached, so it self-decrements the moment a submission is accepted/rejected. */
+    public static function pendingReviewCount(): int
+    {
+        return (int) Database::connection()
+            ->query("SELECT COUNT(*) AS c FROM pi_intake_submissions WHERE status = 'pending_review'")
+            ->fetch()['c'];
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function recentResolved(int $limit = 30): array
     {

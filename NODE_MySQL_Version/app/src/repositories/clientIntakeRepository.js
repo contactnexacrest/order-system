@@ -145,6 +145,13 @@ async function pending() {
   return db.query("SELECT * FROM client_intake_submissions WHERE status = 'pending' ORDER BY submitted_at ASC");
 }
 
+// Nav-badge count — live, not cached, so it self-decrements the moment a
+// submission is accepted/rejected.
+async function pendingCount() {
+  const row = await db.queryOne("SELECT COUNT(*) AS c FROM client_intake_submissions WHERE status = 'pending'");
+  return row ? parseInt(row.c, 10) : 0;
+}
+
 async function recentResolved(limit = 30) {
   return db.query(
     `SELECT cis.*, u.name AS reviewed_by_name, c.client_unique_number
@@ -174,4 +181,4 @@ async function markRejected(id, reviewedBy, reason) {
   );
 }
 
-module.exports = { create, find, setAccessToken, findValidByToken, updateFromClient, pending, recentResolved, markConverted, markRejected };
+module.exports = { create, find, setAccessToken, findValidByToken, updateFromClient, pending, pendingCount, recentResolved, markConverted, markRejected };

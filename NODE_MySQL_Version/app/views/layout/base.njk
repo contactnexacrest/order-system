@@ -53,8 +53,8 @@
           <a href="/clients" class="{{ 'active' if (currentPath | startswith('/clients')) else '' }}">Clients</a>
           <a href="/orders" class="{{ 'active' if ordersActive else '' }}">Orders</a>
           {% if permissions.view_archived_orders %}<a href="/orders/archived" class="{{ 'active' if (currentPath | startswith('/orders/archived')) else '' }}">Archived Orders</a>{% endif %}
-          <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Quotation Intake Review</a>
-          <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review</a>
+          <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Quotation Intake Review{% if clientIntakePendingCount > 0 %} <span class="nav-badge">{{ clientIntakePendingCount }}</span>{% endif %}</a>
+          <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review{% if piIntakePendingCount > 0 %} <span class="nav-badge">{{ piIntakePendingCount }}</span>{% endif %}</a>
           <a href="/reorder-requests" class="{{ 'active' if (currentPath | startswith('/reorder-requests')) else '' }}">Reorder Requests</a>
           {% if canDisputes %}<a href="/disputes" class="{{ 'active' if (currentPath | startswith('/disputes')) else '' }}">Disputes</a>{% endif %}
         </div>

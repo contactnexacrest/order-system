@@ -1,4 +1,4 @@
-<?php use App\Helpers\Flash; use App\Repositories\NotificationRepository; use App\Services\AuthService; use App\Services\PermissionService; use App\Services\SuperAdminService; use App\Services\TestModeService;
+<?php use App\Helpers\Flash; use App\Repositories\ClientIntakeRepository; use App\Repositories\NotificationRepository; use App\Repositories\PiIntakeRepository; use App\Services\AuthService; use App\Services\PermissionService; use App\Services\SuperAdminService; use App\Services\TestModeService;
 $current = AuthService::currentUser();
 $testModeEnabled = TestModeService::isEnabled();
 $unreadCount = $current ? NotificationRepository::unreadCountForUser((int) $current['id']) : 0;
@@ -12,6 +12,13 @@ $can = static fn(string $perm): bool => $current && PermissionService::can((int)
 // mobile. A group's <details> only renders once at least one of its links
 // is actually visible to this user's permissions.
 $canOrders = $can('manage_orders');
+// Standing-request badges — a live COUNT on every page load (not cached),
+// so the sidebar always reflects reality: a submission appearing the
+// moment it's filed, the number dropping the moment it's accepted or
+// rejected. Both review screens are gated on manage_orders (index.php),
+// so the badge query only runs for staff who could actually act on it.
+$clientIntakePendingCount = $canOrders ? ClientIntakeRepository::pendingCount() : 0;
+$piIntakePendingCount = $canOrders ? PiIntakeRepository::pendingReviewCount() : 0;
 $canSettings = $can('manage_company_settings');
 $canManageHsCodes = $can('manage_hs_codes');
 $canManageLogisticsPartners = $can('manage_logistics_partners');
@@ -103,8 +110,8 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a>
           <a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a>
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
-          <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review</a>
-          <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review</a>
+          <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review<?= $clientIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $clientIntakePendingCount . '</span>' : '' ?></a>
+          <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review<?= $piIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $piIntakePendingCount . '</span>' : '' ?></a>
           <a href="/reorder-requests" class="<?= $isActive('/reorder-requests') ? 'active' : '' ?>">Reorder Requests</a>
           <?php if ($canDisputes): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
         </div>

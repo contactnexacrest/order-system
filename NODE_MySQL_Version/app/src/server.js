@@ -265,6 +265,8 @@ app.use((req, res, next) => {
       permissions: req.permissions || {},
       isSuperAdmin: req.isSuperAdmin || false,
       unreadCount: req.unreadCount || 0,
+      clientIntakePendingCount: req.clientIntakePendingCount || 0,
+      piIntakePendingCount: req.piIntakePendingCount || 0,
       testModeEnabled: req.testModeEnabled || false,
       devServerEnabled: env.isDevServer(),
       isImpersonating: clientPortalService.isImpersonating(req),

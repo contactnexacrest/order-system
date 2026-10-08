@@ -59,8 +59,9 @@ on the form when they come back — never the original client-record default.
 This step is **entirely optional and never blocks anything** — staff can
 generate the PI without it ever being sent or completed. When a submission
 does come back, it lands in **Operations → PI Intake Review**
-(`/pi-intake-review`), separate from the Quotation-stage queue, where staff
-either:
+(`/pi-intake-review`), separate from the Quotation-stage queue — each has
+its own live count badge on its own sidebar link, so the two never get
+confused with each other — where staff either:
 
 - **Accept** — this is the authoritative correction point for the client's
   identity fields: accepting **overwrites the live client record** with

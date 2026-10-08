@@ -45,7 +45,12 @@ Option Lists, `container_type`), not free text, with a
 know yet — same admin-managed-list mechanism as Certificate of Origin Type.
 
 That submission lands in **Operations → Quotation Intake Review**
-(`/client-intake`) as a pending row. Staff review it here and either:
+(`/client-intake`) as a pending row. The sidebar link itself carries a
+gold count badge (e.g. "Quotation Intake Review **2**") whenever
+something is waiting — a live count, not cached, so it appears the
+moment a buyer submits and disappears the moment staff accept or reject
+it. No badge means the queue is empty; staff don't need to open the
+screen just to check. Staff review it here and either:
 
 - **Accept & Create Client** (with a reason, min. 10 characters) — creates
   the real client record and takes you straight to it, ready to create the
