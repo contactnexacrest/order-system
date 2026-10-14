@@ -526,7 +526,20 @@
           <input type="hidden" name="document_type" value="QT">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'QT') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">{{ 'Regenerate Quotation (new revision)' if hasQt else 'Generate Quotation' }}</button>
+          {{ stepBadge('1a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'QT') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">{{ 'Regenerate Quotation (new revision)' if hasQt else 'Generate Quotation' }}</button>
+        </form>
+      {% endif %}
+
+      {# 90-item backlog #80: this panel's Generate buttons now run in
+         stage order (QT/1, BUYERPO/2, PI/3, OC/4, SUPPO/5, FDN/6, CI/8) to
+         match the stepBadge sequence below each one. #}
+      {% if stage2 and stage2.status != 'locked' %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="BUYERPO">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          {{ stepBadge('2a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'BUYERPO') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Buyer PO</button>
         </form>
       {% endif %}
 
@@ -536,7 +549,7 @@
           <input type="hidden" name="document_type" value="PI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'PI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Proforma Invoice</button>
+          {{ stepBadge('3a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'PI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Proforma Invoice</button>
         </form>
       {% endif %}
 
@@ -546,17 +559,7 @@
           <input type="hidden" name="document_type" value="OC">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'OC') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Order Confirmation</button>
-        </form>
-      {% endif %}
-
-      {% if stage2 and stage2.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="document_type" value="BUYERPO">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'BUYERPO') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Buyer PO</button>
+          {{ stepBadge('4a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'OC') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Order Confirmation</button>
         </form>
       {% endif %}
 
@@ -566,7 +569,7 @@
           <input type="hidden" name="document_type" value="SUPPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'SUPPO') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Supplier PO</button>
+          {{ stepBadge('5b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'SUPPO') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Supplier PO</button>
         </form>
       {% endif %}
 
@@ -576,7 +579,7 @@
           <input type="hidden" name="document_type" value="FDN">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'FDN') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Freight Debit Note</button>
+          {{ stepBadge('6b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'FDN') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Freight Debit Note</button>
         </form>
       {% endif %}
 
@@ -603,7 +606,7 @@
           <input type="hidden" name="document_type" value="CI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>
+          {{ stepBadge('8b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>
         </form>
       {% endif %}
 
@@ -836,7 +839,7 @@
       <form method="post" action="/orders/{{ order.id }}/buyer-po">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-        <button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+        {{ stepBadge('2b') | safe }}<button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
       </form>
     {% else %}
       <p class="muted">Generate the Quotation first to unlock this gate.</p>
@@ -858,7 +861,7 @@
       <form method="post" action="/orders/{{ order.id }}/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="file" name="document" required>
-        <button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+        {{ stepBadge('2c') | safe }}<button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
       </form>
     {% endif %}
   </div>
@@ -903,7 +906,7 @@
     {% if permissions.manage_orders %}
     <form method="post" action="/orders/{{ order.id }}/pi-form-link" style="display:inline">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <button type="submit" class="btn-sm">{{ 'Regenerate PI Form Link' if piIntake else 'Generate PI Form Link' }}</button>
+      {{ stepBadge('3b') | safe }}<button type="submit" class="btn-sm">{{ 'Regenerate PI Form Link' if piIntake else 'Generate PI Form Link' }}</button>
     </form>
     {% endif %}
   </div>
@@ -974,13 +977,13 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Advance Amount Received *<input type="text" name="advance_amount" required></label>
           <label>Received On<input type="date" name="advance_received_at"></label>
-          <button type="submit" class="btn-sm">Record Advance Remittance</button>
+          {{ stepBadge('3c') | safe }}<button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
       {% else %}
         <form method="post" action="/orders/{{ order.id }}/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Cleared On<input type="date" name="advance_cleared_at"></label>
-          <button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
+          {{ stepBadge('3d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
         </form>
       {% endif %}
     {% elif not stage3 or stage3.status == 'locked' %}
@@ -1050,7 +1053,7 @@
         <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
-          <button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Stage 5)</button>
+          {{ stepBadge('4b') | safe }}<button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Stage 5)</button>
         </form>
       {% elif ocDocGenerated %}
         <div class="review-banner info">
@@ -1059,7 +1062,7 @@
         <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
-          <button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Stage 5)</button>
+          {{ stepBadge('4b') | safe }}<button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Stage 5)</button>
         </form>
       {% else %}
         <p class="muted">Generate the Order Confirmation above and send it to the buyer — once sent, they can acknowledge it from their portal (or reply by email, which you can record here), and it auto-confirms after 48 hours with no response.</p>
@@ -1085,7 +1088,7 @@
       {% if canManageOrders %}
       <form method="post" action="/orders/{{ order.id }}/buyer-action-link" style="display:inline">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <button type="submit" class="btn-sm">{{ 'Regenerate Buyer Action Link' if buyerActionLinkValid else 'Generate Buyer Action Link' }}</button>
+        {{ stepBadge('4c') | safe }}<button type="submit" class="btn-sm">{{ 'Regenerate Buyer Action Link' if buyerActionLinkValid else 'Generate Buyer Action Link' }}</button>
       </form>
       {% endif %}
     </div>
@@ -1166,14 +1169,14 @@
           <label>Delivery Location<input type="text" name="delivery_location"></label>
           <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
           <label>Packing Requirement<input type="text" name="packing_requirement"></label>
-          <button type="submit" class="btn-sm">Save Supplier PO Terms</button>
+          {{ stepBadge('5a') | safe }}<button type="submit" class="btn-sm">Save Supplier PO Terms</button>
         </form>
       {% endif %}
 
       {% if supplierPo and supplierPo.status != 'signed' and suppoDocGenerated %}
         <form method="post" action="/orders/{{ order.id }}/supplier-po/signed">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
+          {{ stepBadge('5c') | safe }}<button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
         </form>
       {% elif supplierPo and supplierPo.status != 'signed' %}
         <p class="muted small">Generate the Supplier PO document above before confirming the supplier's signature — they can't have signed and returned a document that was never sent.</p>
@@ -1197,7 +1200,7 @@
         <form method="post" action="/orders/{{ order.id }}/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="file" name="document" required>
-          <button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
+          {{ stepBadge('5d') | safe }}<button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
         </form>
       {% endif %}
     {% endif %}
@@ -1241,7 +1244,7 @@
               <option value="IGST_18">18% IGST</option>
             </select>
           </label>
-          <button type="submit" class="btn-sm">Save Freight Terms</button>
+          {{ stepBadge('6a') | safe }}<button type="submit" class="btn-sm">Save Freight Terms</button>
         </form>
       {% else %}
         <div class="kv-grid">
@@ -1255,13 +1258,13 @@
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <label>Freight Amount Received *<input type="text" name="freight_amount" required></label>
               <label>Received On<input type="date" name="freight_received_at"></label>
-              <button type="submit" class="btn-sm">Record Freight Remittance</button>
+              {{ stepBadge('6c') | safe }}<button type="submit" class="btn-sm">Record Freight Remittance</button>
             </form>
           {% else %}
             <form method="post" action="/orders/{{ order.id }}/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <label>Cleared On<input type="date" name="freight_cleared_at"></label>
-              <button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
+              {{ stepBadge('6d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
             </form>
           {% endif %}
         {% else %}
@@ -1317,7 +1320,7 @@
           </tr>
           {% endfor %}
         </table>
-        <button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
+        {{ stepBadge('7a') | safe }}<button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
       </form>
 
       <h3>Shipping / Vessel Details</h3>
@@ -1341,7 +1344,7 @@
           <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}"></label>
           <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}"></label>
         </div>
-        <button type="submit" class="btn-sm">Save Shipping Details</button>
+        {{ stepBadge('7b') | safe }}<button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
 
       {% if shipping %}
@@ -1352,7 +1355,7 @@
         <input type="hidden" name="document_type" value="BLI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'BLI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
+        {{ stepBadge('7c') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'BLI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
       </form>
       {% endif %}
 
@@ -1361,7 +1364,7 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date"></label>
-          <button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+          {{ stepBadge('7d') | safe }}<button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
       {% else %}
         <p>Bill of Lading recorded: <strong>{{ shipping.bl_number }}</strong> ({{ shipping.bl_date }})</p>
@@ -1383,7 +1386,7 @@
       {% if shipping and not shipping.scanned_bl_sent_to_buyer_at %}
         <form method="post" action="/orders/{{ order.id }}/scanned-bl-sent">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
+          {{ stepBadge('8a') | safe }}<button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
         </form>
       {% elif shipping %}
         <p class="muted small">Scanned BL copy sent to buyer.</p>
@@ -1399,13 +1402,13 @@
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Balance Amount Received *<input type="text" name="balance_amount" required value="{{ payment.balance_amount or '' }}"></label>
             <label>Received On<input type="date" name="balance_received_at"></label>
-            <button type="submit" class="btn-sm">Record Balance Remittance</button>
+            {{ stepBadge('8c') | safe }}<button type="submit" class="btn-sm">Record Balance Remittance</button>
           </form>
         {% else %}
           <form method="post" action="/orders/{{ order.id }}/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Cleared On<input type="date" name="balance_cleared_at"></label>
-            <button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
+            {{ stepBadge('8d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
           </form>
         {% endif %}
       {% else %}
@@ -1594,7 +1597,7 @@
         <input type="hidden" name="document_type" value="COOPREP">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'COOPREP') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate COO Prep Sheet</button>
+        {{ stepBadge('9a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'COOPREP') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate COO Prep Sheet</button>
       </form>
 
       {% if not permissions.manage_shipping %}
@@ -1603,7 +1606,7 @@
         <form method="post" action="/orders/{{ order.id }}/bl-originals-received">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
-          <button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
+          {{ stepBadge('9b') | safe }}<button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
         </form>
       {% else %}
         <p class="muted small">Original BLs received ({{ shipping.bl_originals_received_count }}).</p>
@@ -1612,7 +1615,7 @@
       {% if permissions.manage_shipping and shipping and shipping.bl_originals_received_at and not shipping.bl_endorsed_at %}
         <form method="post" action="/orders/{{ order.id }}/bl-endorsed">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
+          {{ stepBadge('9c') | safe }}<button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
         </form>
       {% elif shipping and shipping.bl_endorsed_at %}
         <p class="muted small">Original BLs endorsed.</p>
@@ -1628,12 +1631,12 @@
         <label>Port of Loading<input type="text" name="port_of_loading" value="{{ blEndorsement.port_of_loading or order.port_of_loading_name or 'Chennai, India' }}"></label>
         <label>Port of Discharge<input type="text" name="port_of_discharge" value="{{ blEndorsement.port_of_discharge or order.port_of_discharge_name or order.port_of_discharge_text or '' }}"></label>
         <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="{{ blEndorsement.date_of_endorsement or today() }}"></label>
-        <button type="submit" class="btn-sm">Save BL Endorsement Details</button>
+        {{ stepBadge('9d') | safe }}<button type="submit" class="btn-sm">Save BL Endorsement Details</button>
       </form>
       {% if blEndorsement %}
       <form method="post" action="/orders/{{ order.id }}/bl-endorsement/generate" style="margin-top:8px;">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
+        {{ stepBadge('9e') | safe }}<button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
       </form>
       {% endif %}
       {% if blEndorsementDoc %}
@@ -1652,7 +1655,7 @@
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
-        <button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
+        {{ stepBadge('9f') | safe }}<button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
       {% else %}
       <p class="muted">Only Export/Logistics can close this order.</p>

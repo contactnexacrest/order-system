@@ -142,6 +142,20 @@ appears one after another on the page, exactly as it did before this
 navigation was added — nothing is ever hidden behind JavaScript that isn't
 there as a backup.
 
+**Each stage's own action buttons now carry a small sub-step badge** (e.g.
+"5a", "5b", "5c") immediately before the button itself, wherever a stage
+involves more than one action a staff member presses in sequence — for
+example Stage 5's "Save Supplier PO Terms" (5a) → "Generate Supplier PO"
+(5b) → "Confirm Supplier Signed & Returned PO" (5c). This shows the literal
+order of operations *within* a stage, not just which of the 9 stages the
+order is on overall (that's still the process stepper above). Two badges —
+**"3b"** (the PI Form Link) and **"4c"** (the Buyer Action Link) — are
+deliberately not tied to their own stage's lock status and appear from the
+very first page load regardless of where the order actually stands: both
+are optional, never-blocking alternate channels, exactly as their own
+chapters already describe them. The badge is purely a labelling aid — it
+changes no permission, no gate, and no button's underlying behaviour.
+
 **"Order Details" is the order's own at-a-glance summary, not just its
 commercial terms.** The first section in the sidebar now opens with a quick
 row of counts before the FOB value/Port of Discharge/Container Type/etc.

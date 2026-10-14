@@ -51,6 +51,11 @@ a.js-slow-download.is-loading{pointer-events:none;opacity:0.7;}
 .nav-ico{display:inline-flex;flex:0 0 auto;width:16px;height:16px;}
 .nav-ico svg{display:block;}
 .nav-badge{display:inline-block;background:var(--gold);color:var(--navy);font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:2px;line-height:1.5;}
+/* 90-item backlog #80: a small sub-step number next to a stage's own primary
+   action buttons — e.g. "5a" before "Confirm Supplier Signed" — so staff see
+   the literal order of operations within a stage, not just which of the 9
+   stages they're on (that's the existing .process-step-dot at the top). */
+.step-badge{display:inline-block;background:var(--navy);color:#fff;font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;margin-right:6px;vertical-align:middle;letter-spacing:.02em;}
 .nav-live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#F04438;margin-left:4px;}
 /* Grouped nav dropdowns (e.g. "Admin ▾") — plain <details>/<summary> so they
    work with no JS at all: native keyboard support, native tap-to-open on

@@ -163,6 +163,13 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
     <?php
 };
 
+// 90-item backlog #80: a small sequential sub-step badge (1a, 1b, 2a...)
+// placed next to each stage's own primary staff actions — the literal
+// order of operations within a stage — so staff can't skip or forget a
+// step. Purely a display label: it carries no gating logic of its own,
+// gating already lives in the controller actions these buttons post to.
+$stepBadge = static fn(string $label): string => '<span class="step-badge" title="Step ' . htmlspecialchars($label) . '">' . htmlspecialchars($label) . '</span> ';
+
 $stage1 = $stageByNumber[1] ?? null;
 $stage2 = $stageByNumber[2] ?? null;
 $stage3 = $stageByNumber[3] ?? null;
@@ -602,7 +609,23 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="QT">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('QT') ?>" data-loading-text="Generating…"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button>
+          <?= $stepBadge('1a') ?><button type="submit" class="<?= $__docBtnClass('QT') ?>" data-loading-text="Generating…"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button>
+        </form>
+      <?php endif; ?>
+
+      <?php
+        // 90-item backlog #80: this panel's Generate buttons now run in
+        // stage order (QT/1, BUYERPO/2, PI/3, OC/4, SUPPO/5, FDN/6, CI/8) to
+        // match the $stepBadge sequence below each one — previously
+        // BUYERPO rendered after PI/OC despite being Stage 2's own action.
+      ?>
+      <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="BUYERPO">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <?= $stepBadge('2a') ?><button type="submit" class="<?= $__docBtnClass('BUYERPO') ?>" data-loading-text="Generating…">Generate Buyer PO</button>
         </form>
       <?php endif; ?>
 
@@ -612,7 +635,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="PI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
+          <?= $stepBadge('3a') ?><button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
         </form>
       <?php endif; ?>
 
@@ -622,17 +645,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="OC">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('OC') ?>" data-loading-text="Generating…">Generate Order Confirmation</button>
-        </form>
-      <?php endif; ?>
-
-      <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="BUYERPO">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('BUYERPO') ?>" data-loading-text="Generating…">Generate Buyer PO</button>
+          <?= $stepBadge('4a') ?><button type="submit" class="<?= $__docBtnClass('OC') ?>" data-loading-text="Generating…">Generate Order Confirmation</button>
         </form>
       <?php endif; ?>
 
@@ -642,7 +655,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="SUPPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('SUPPO') ?>" data-loading-text="Generating…">Generate Supplier PO</button>
+          <?= $stepBadge('5b') ?><button type="submit" class="<?= $__docBtnClass('SUPPO') ?>" data-loading-text="Generating…">Generate Supplier PO</button>
         </form>
       <?php endif; ?>
 
@@ -652,7 +665,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="FDN">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('FDN') ?>" data-loading-text="Generating…">Generate Freight Debit Note</button>
+          <?= $stepBadge('6b') ?><button type="submit" class="<?= $__docBtnClass('FDN') ?>" data-loading-text="Generating…">Generate Freight Debit Note</button>
         </form>
       <?php endif; ?>
 
@@ -679,7 +692,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="CI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button>
+          <?= $stepBadge('8b') ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button>
         </form>
       <?php endif; ?>
 
@@ -924,7 +937,7 @@ foreach ($stages as $s) {
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
         <?= Csrf::field() ?>
         <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-        <button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+        <?= $stepBadge('2b') ?><button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
       </form>
     <?php else: ?>
       <p class="muted">Generate the Quotation first to unlock this gate.</p>
@@ -946,7 +959,7 @@ foreach ($stages as $s) {
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
         <?= Csrf::field() ?>
         <input type="file" name="document" required>
-        <button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+        <?= $stepBadge('2c') ?><button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
       </form>
     <?php endif; ?>
   </div>
@@ -992,7 +1005,7 @@ foreach ($stages as $s) {
     <?php if ($canManageOrders): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/pi-form-link" style="display:inline">
       <?= Csrf::field() ?>
-      <button type="submit" class="btn-sm"><?= $piIntake ? 'Regenerate PI Form Link' : 'Generate PI Form Link' ?></button>
+      <?= $stepBadge('3b') ?><button type="submit" class="btn-sm"><?= $piIntake ? 'Regenerate PI Form Link' : 'Generate PI Form Link' ?></button>
     </form>
     <?php endif; ?>
   </div>
@@ -1063,13 +1076,13 @@ foreach ($stages as $s) {
           <?= Csrf::field() ?>
           <label>Advance Amount Received *<input type="text" name="advance_amount" required></label>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
-          <button type="submit" class="btn-sm">Record Advance Remittance</button>
+          <?= $stepBadge('3c') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
       <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <?= Csrf::field() ?>
           <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-          <button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
+          <?= $stepBadge('3d') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
         </form>
       <?php endif; ?>
     <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
@@ -1139,7 +1152,7 @@ foreach ($stages as $s) {
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
           <?= Csrf::field() ?>
           <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
-          <button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Stage 5)</button>
+          <?= $stepBadge('4b') ?><button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Stage 5)</button>
         </form>
       <?php elseif ($ocDocGenerated): ?>
         <div class="review-banner info">
@@ -1148,7 +1161,7 @@ foreach ($stages as $s) {
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
           <?= Csrf::field() ?>
           <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
-          <button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Stage 5)</button>
+          <?= $stepBadge('4b') ?><button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Stage 5)</button>
         </form>
       <?php else: ?>
         <p class="muted">Generate the Order Confirmation above and send it to the buyer — once sent, they can acknowledge it from their portal (or reply by email, which you can record here), and it auto-confirms after 48 hours with no response.</p>
@@ -1182,7 +1195,7 @@ foreach ($stages as $s) {
       <?php if ($canManageOrders): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-action-link" style="display:inline">
         <?= Csrf::field() ?>
-        <button type="submit" class="btn-sm"><?= $buyerActionLinkValid ? 'Regenerate Buyer Action Link' : 'Generate Buyer Action Link' ?></button>
+        <?= $stepBadge('4c') ?><button type="submit" class="btn-sm"><?= $buyerActionLinkValid ? 'Regenerate Buyer Action Link' : 'Generate Buyer Action Link' ?></button>
       </form>
       <?php endif; ?>
     </div>
@@ -1263,14 +1276,14 @@ foreach ($stages as $s) {
           <label>Delivery Location<input type="text" name="delivery_location"></label>
           <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
           <label>Packing Requirement<input type="text" name="packing_requirement"></label>
-          <button type="submit" class="btn-sm">Save Supplier PO Terms</button>
+          <?= $stepBadge('5a') ?><button type="submit" class="btn-sm">Save Supplier PO Terms</button>
         </form>
       <?php endif; ?>
 
       <?php if ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/signed">
           <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
+          <?= $stepBadge('5c') ?><button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
         </form>
       <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed'): ?>
         <p class="muted small">Generate the Supplier PO document above before confirming the supplier's signature — they can't have signed and returned a document that was never sent.</p>
@@ -1294,7 +1307,7 @@ foreach ($stages as $s) {
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <?= Csrf::field() ?>
           <input type="file" name="document" required>
-          <button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
+          <?= $stepBadge('5d') ?><button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
         </form>
       <?php endif; ?>
     <?php endif; ?>
@@ -1338,7 +1351,7 @@ foreach ($stages as $s) {
               <option value="IGST_18">18% IGST</option>
             </select>
           </label>
-          <button type="submit" class="btn-sm">Save Freight Terms</button>
+          <?= $stepBadge('6a') ?><button type="submit" class="btn-sm">Save Freight Terms</button>
         </form>
       <?php else: ?>
         <div class="kv-grid">
@@ -1352,13 +1365,13 @@ foreach ($stages as $s) {
               <?= Csrf::field() ?>
               <label>Freight Amount Received *<input type="text" name="freight_amount" required></label>
               <label>Received On<input type="date" name="freight_received_at" value="<?= date('Y-m-d') ?>"></label>
-              <button type="submit" class="btn-sm">Record Freight Remittance</button>
+              <?= $stepBadge('6c') ?><button type="submit" class="btn-sm">Record Freight Remittance</button>
             </form>
           <?php else: ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
               <?= Csrf::field() ?>
               <label>Cleared On<input type="date" name="freight_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-              <button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
+              <?= $stepBadge('6d') ?><button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
             </form>
           <?php endif; ?>
         <?php else: ?>
@@ -1417,7 +1430,7 @@ foreach ($stages as $s) {
           </tr>
           <?php endforeach; ?>
         </table>
-        <button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
+        <?= $stepBadge('7a') ?><button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
       </form>
 
       <h3>Shipping / Vessel Details</h3>
@@ -1441,7 +1454,7 @@ foreach ($stages as $s) {
           <label>Container No.<input type="text" name="container_no" value="<?= htmlspecialchars($shipping['container_no'] ?? '') ?>"></label>
           <label>Seal No.<input type="text" name="seal_no" value="<?= htmlspecialchars($shipping['seal_no'] ?? '') ?>"></label>
         </div>
-        <button type="submit" class="btn-sm">Save Shipping Details</button>
+        <?= $stepBadge('7b') ?><button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
 
       <?php if ($shipping): ?>
@@ -1452,7 +1465,7 @@ foreach ($stages as $s) {
         <input type="hidden" name="document_type" value="BLI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
+        <?= $stepBadge('7c') ?><button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
       </form>
       <?php endif; ?>
 
@@ -1461,7 +1474,7 @@ foreach ($stages as $s) {
           <?= Csrf::field() ?>
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date" value="<?= date('Y-m-d') ?>"></label>
-          <button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+          <?= $stepBadge('7d') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
       <?php else: ?>
         <p>Bill of Lading recorded: <strong><?= htmlspecialchars($shipping['bl_number']) ?></strong> (<?= htmlspecialchars($shipping['bl_date']) ?>)</p>
@@ -1486,7 +1499,7 @@ foreach ($stages as $s) {
       <?php if ($shipping && !$shipping['scanned_bl_sent_to_buyer_at']): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/scanned-bl-sent">
           <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
+          <?= $stepBadge('8a') ?><button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
         </form>
       <?php elseif ($shipping): ?>
         <p class="muted small">Scanned BL copy sent to buyer.</p>
@@ -1502,13 +1515,13 @@ foreach ($stages as $s) {
             <?= Csrf::field() ?>
             <label>Balance Amount Received *<input type="text" name="balance_amount" required value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
             <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
-            <button type="submit" class="btn-sm">Record Balance Remittance</button>
+            <?= $stepBadge('8c') ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
           </form>
         <?php else: ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
             <?= Csrf::field() ?>
             <label>Cleared On<input type="date" name="balance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-            <button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
+            <?= $stepBadge('8d') ?><button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
           </form>
         <?php endif; ?>
       <?php else: ?>
@@ -1713,7 +1726,7 @@ foreach ($stages as $s) {
         <input type="hidden" name="document_type" value="COOPREP">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <button type="submit" class="<?= $__docBtnClass('COOPREP') ?>" data-loading-text="Generating…">Generate COO Prep Sheet</button>
+        <?= $stepBadge('9a') ?><button type="submit" class="<?= $__docBtnClass('COOPREP') ?>" data-loading-text="Generating…">Generate COO Prep Sheet</button>
       </form>
 
       <?php if (!$canManageShipping): ?>
@@ -1722,7 +1735,7 @@ foreach ($stages as $s) {
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-originals-received">
           <?= Csrf::field() ?>
           <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
-          <button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
+          <?= $stepBadge('9b') ?><button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
         </form>
       <?php else: ?>
         <p class="muted small">Original BLs received (<?= (int) $shipping['bl_originals_received_count'] ?>).</p>
@@ -1731,7 +1744,7 @@ foreach ($stages as $s) {
       <?php if ($canManageShipping && $shipping && $shipping['bl_originals_received_at'] && !$shipping['bl_endorsed_at']): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsed">
           <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
+          <?= $stepBadge('9c') ?><button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
         </form>
       <?php elseif ($shipping && $shipping['bl_endorsed_at']): ?>
         <p class="muted small">Original BLs endorsed.</p>
@@ -1747,12 +1760,12 @@ foreach ($stages as $s) {
         <label>Port of Loading<input type="text" name="port_of_loading" value="<?= htmlspecialchars($blEndorsement['port_of_loading'] ?? $order['port_of_loading_name'] ?? 'Chennai, India') ?>"></label>
         <label>Port of Discharge<input type="text" name="port_of_discharge" value="<?= htmlspecialchars($blEndorsement['port_of_discharge'] ?? $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '') ?>"></label>
         <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="<?= htmlspecialchars($blEndorsement['date_of_endorsement'] ?? date('Y-m-d')) ?>"></label>
-        <button type="submit" class="btn-sm">Save BL Endorsement Details</button>
+        <?= $stepBadge('9d') ?><button type="submit" class="btn-sm">Save BL Endorsement Details</button>
       </form>
       <?php if ($blEndorsement): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsement/generate" style="margin-top:8px;">
         <?= Csrf::field() ?>
-        <button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
+        <?= $stepBadge('9e') ?><button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
       </form>
       <?php endif; ?>
       <?php if ($blEndorsementDoc): ?>
@@ -1770,7 +1783,7 @@ foreach ($stages as $s) {
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
-        <button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
+        <?= $stepBadge('9f') ?><button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
       <?php else: ?>
       <p class="muted">Only Export/Logistics can close this order.</p>
