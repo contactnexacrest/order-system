@@ -61,6 +61,12 @@ screen just to check. Staff review it here and either:
 
 Accepting **only creates the client** — it does not create an order or a
 Quotation automatically. Staff still do that next, exactly as in Path B.
+When you then open **Add Order** for that client, the Incoterm, Container
+Type and discharge port the buyer gave on the public form are already
+pre-selected — carried over from their submission instead of silently
+sitting on FOB (the form's own fallback default) regardless of what the
+buyer actually asked for. Double-check them against the submission before
+saving; they're a starting point, not locked in.
 
 ### Path B — staff create the client and order directly
 

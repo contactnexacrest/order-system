@@ -15,6 +15,7 @@ use App\Repositories\AuditLogRepository;
 use App\Repositories\CaExpenseRepository;
 use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\ClientPaymentReportRepository;
+use App\Repositories\ClientIntakeRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DisputeRepository;
@@ -178,9 +179,42 @@ final class OrderController
     public function create(array $params): void
     {
         $preselectedClientId = isset($_GET['client_id']) ? (int) $_GET['client_id'] : null;
+        $incoterms = LookupRepository::incoterms();
+
+        // Batch 3 #4 — if we're showing this page again after a validation failure on
+        // submit, re-populate the whole form (including product rows) instead of making
+        // the user retype everything.
+        $old = Flash::pullOld();
+
+        // 90-item backlog #41/#46: the first time staff open this form for
+        // a client just converted from a Quotation-intake submission (no
+        // validation-retry `old` data yet), prefill the commercial terms
+        // the buyer actually asked for — otherwise Incoterm/container type
+        // silently default away from what was requested (e.g. Incoterm
+        // defaulting to FOB when the buyer's intake said CIF).
+        if ($old === [] && $preselectedClientId) {
+            $intake = ClientIntakeRepository::latestConvertedForClient($preselectedClientId);
+            if ($intake) {
+                if ($intake['incoterm_preference']) {
+                    foreach ($incoterms as $i) {
+                        if (strcasecmp(trim((string) $i['code']), trim((string) $intake['incoterm_preference'])) === 0) {
+                            $old['incoterm_id'] = $i['id'];
+                            break;
+                        }
+                    }
+                }
+                if ($intake['container_type_text']) {
+                    $old['container_type'] = $intake['container_type_text'];
+                }
+                if ($intake['port_of_discharge_text']) {
+                    $old['port_of_discharge_text'] = $intake['port_of_discharge_text'];
+                }
+            }
+        }
+
         View::render('orders/create', [
             'clients'         => ClientRepository::all(),
-            'incoterms'       => LookupRepository::incoterms(),
+            'incoterms'       => $incoterms,
             'currencies'      => LookupRepository::currencies(),
             'loadingPorts'    => LookupRepository::ports('loading'),
             'dischargePorts'  => LookupRepository::ports('discharge'),
@@ -189,10 +223,7 @@ final class OrderController
             'containerTypes'  => LookupRepository::dropdownOptions('container_type'),
             'preselectedClientId' => $preselectedClientId,
             'hsCodes'         => HsCodeRepository::active(),
-            // Batch 3 #4 — if we're showing this page again after a validation failure on
-            // submit, re-populate the whole form (including product rows) instead of making
-            // the user retype everything.
-            'old'             => Flash::pullOld(),
+            'old'             => $old,
         ], 'layout/base');
     }
 

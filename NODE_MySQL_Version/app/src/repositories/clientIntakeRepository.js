@@ -181,4 +181,25 @@ async function markRejected(id, reviewedBy, reason) {
   );
 }
 
-module.exports = { create, find, setAccessToken, findValidByToken, updateFromClient, pending, pendingCount, recentResolved, markConverted, markRejected };
+// 90-item backlog #41/#46: the commercial preferences the buyer gave at
+// Quotation-intake (incoterm_preference, container_type_text,
+// port_of_discharge_text) were never carried into the New Order form —
+// staff had to remember to re-enter them from scratch, and usually
+// didn't, so the order silently defaulted away from what the buyer
+// actually asked for (e.g. Incoterm defaulting to FOB when the buyer had
+// written CIF). Used by ordersController.create() to prefill the form the
+// moment staff open it for this client, right after
+// clientIntakeReviewController.accept() converts the submission.
+async function latestConvertedForClient(clientId) {
+  return db.queryOne(
+    `SELECT * FROM client_intake_submissions
+     WHERE converted_client_id = :client_id AND status = 'converted'
+     ORDER BY reviewed_at DESC LIMIT 1`,
+    { client_id: clientId }
+  );
+}
+
+module.exports = {
+  create, find, setAccessToken, findValidByToken, updateFromClient, pending, pendingCount, recentResolved,
+  markConverted, markRejected, latestConvertedForClient,
+};

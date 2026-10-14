@@ -19,6 +19,7 @@ const orderEditGuard = require('../services/orderEditGuard');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderComplianceTaskRepository = require('../repositories/orderComplianceTaskRepository');
+const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const hsCodeRepository = require('../repositories/hsCodeRepository');
@@ -184,11 +185,37 @@ async function duplicateOrder(req, res) {
 
 async function create(req, res) {
   const preselectedClientId = req.query.client_id ? parseInt(req.query.client_id, 10) : null;
+  const incoterms = await lookupRepository.incoterms();
+
+  // Batch 3 #4 — if we're showing this page again after a validation failure on submit,
+  // re-populate the whole form (including product rows) instead of making the user
+  // retype everything.
+  const old = flash.pullOld(req);
+
+  // 90-item backlog #41/#46: the first time staff open this form for a
+  // client just converted from a Quotation-intake submission (no
+  // validation-retry `old` data yet), prefill the commercial terms the
+  // buyer actually asked for — otherwise Incoterm/container type
+  // silently default away from what was requested.
+  if (Object.keys(old).length === 0 && preselectedClientId) {
+    const intake = await clientIntakeRepository.latestConvertedForClient(preselectedClientId);
+    if (intake) {
+      if (intake.incoterm_preference) {
+        const match = incoterms.find(
+          (i) => String(i.code).trim().toLowerCase() === String(intake.incoterm_preference).trim().toLowerCase()
+        );
+        if (match) old.incoterm_id = match.id;
+      }
+      if (intake.container_type_text) old.container_type = intake.container_type_text;
+      if (intake.port_of_discharge_text) old.port_of_discharge_text = intake.port_of_discharge_text;
+    }
+  }
+
   res.renderView(
     'orders/create',
     {
       clients: await clientRepository.all(),
-      incoterms: await lookupRepository.incoterms(),
+      incoterms,
       currencies: await lookupRepository.currencies(),
       loadingPorts: await lookupRepository.ports('loading'),
       dischargePorts: await lookupRepository.ports('discharge'),
@@ -197,10 +224,7 @@ async function create(req, res) {
       containerTypes: await lookupRepository.dropdownOptions('container_type'),
       hsCodes: await hsCodeRepository.active(),
       preselectedClientId,
-      // Batch 3 #4 — if we're showing this page again after a validation failure on submit,
-      // re-populate the whole form (including product rows) instead of making the user
-      // retype everything.
-      old: flash.pullOld(req),
+      old,
     },
     'layout/base'
   );
