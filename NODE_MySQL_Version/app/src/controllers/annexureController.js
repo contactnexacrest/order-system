@@ -7,6 +7,7 @@ const orderRepository = require('../repositories/orderRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const annexureTermsSanitizer = require('../helpers/annexureTermsSanitizer');
 const fileUploadService = require('../services/fileUploadService');
+const documentRepository = require('../repositories/documentRepository');
 
 const VALID_MODES = ['SPEC', 'TERMS', 'BOTH'];
 
@@ -34,6 +35,12 @@ async function index(req, res) {
     order,
     products: await orderAnnexureRepository.forOrder(orderId),
     terms: await orderAnnexureTermsRepository.find(orderId),
+    // 90-item backlog #73/#74: staff editing this screen have no
+    // indication the Annexure was already approved/sent to the buyer —
+    // surfaced as a warning banner + edit confirmation in the view, never
+    // a hard block (consistent with every other staff-trust gate already
+    // documented in this codebase).
+    annexaDocument: await documentRepository.findLatestForOrderAndTypeCode(orderId, 'ANNEXA'),
   }, 'layout/base');
 }
 

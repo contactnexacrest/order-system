@@ -280,6 +280,17 @@ Content is sanitized on save (and again every time a document is generated)
 to a fixed set of safe formatting tags — scripts, event handlers, and
 remote/relative image sources are stripped automatically.
 
+If the order's standalone Annexure A document has already been approved or
+sent to the buyer, this screen shows a warning banner saying so, and every
+Save/Add/Remove button on it asks for confirmation before going ahead —
+editing here never changes what the buyer already received; staff need to
+generate a new revision and get it re-approved for the change to actually
+reach them. This is a reminder only, never a hard block, the same
+"tracking aid, not a lock" treatment used elsewhere in this system (see
+[Chapter 9](./09-stage9-despatch-closure.md)'s Close Order hint). Resending
+an Annexure that was already sent once gets the same treatment on the Send
+to Buyer screen — a warning and a second confirmation, not a block.
+
 ## What the client does (or doesn't)
 
 - **If they came through Path A**, they filled the public form — that's

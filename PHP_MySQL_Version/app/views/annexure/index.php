@@ -1,8 +1,32 @@
-<?php use App\Helpers\Csrf; $annexureMode = $order['annexure_mode'] ?? 'SPEC'; ?>
+<?php
+use App\Helpers\Csrf;
+$annexureMode = $order['annexure_mode'] ?? 'SPEC';
+// 90-item backlog #73/#74: once the Annexure document itself has been
+// approved/sent, editing the content below silently drifts from what the
+// buyer already saw unless the next regeneration+re-approval catches up.
+// Warn, don't block — same "tracking aid, not a lock" treatment as every
+// other staff-trust gate documented in this codebase (see Stage 9's
+// Close Order hint).
+$annexaIsLocked = $annexaDocument && in_array($annexaDocument['status'], ['approved', 'sent'], true);
+$annexaWarnText = $annexaIsLocked
+    ? 'This Annexure was already ' . ($annexaDocument['status'] === 'sent' ? 'sent to the buyer' : 'approved') . '. This change will not update what was already sent — regenerate and get it re-approved first.'
+    : '';
+/** Builds an onsubmit confirm() attribute, prefixing the Annexure-locked warning (if any) onto an optional existing confirm message. */
+$annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaWarnText): string {
+    $message = trim($annexaWarnText . ' ' . $extraMessage) . ($annexaWarnText !== '' ? ' Continue?' : '');
+    return $message === '' ? '' : 'onsubmit="return confirm(' . htmlspecialchars(json_encode($message), ENT_QUOTES) . ');"';
+};
+?>
 <div class="card page-wide">
   <h1>Annexure A — <?= htmlspecialchars($order['order_reference'] ?? ('#' . $order['id'])) ?></h1>
   <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>">&larr; Back to Order</a></p>
   <p class="muted">Product technical specifications (dimensions, finish, components, technical notes) and images, and/or free-form Additional Terms text, referenced from the Quotation/PI/OC/Buyer PO as an attached, integral document whenever "Include Annexure A" is on for this order.</p>
+
+  <?php if ($annexaIsLocked): ?>
+    <div class="alert alert-warning">
+      ⚠ This order's Annexure A document has already been <?= htmlspecialchars($annexaDocument['status']) ?> (ref. <?= htmlspecialchars($annexaDocument['document_reference']) ?>). Editing the Product Entries or Additional Terms below does not change that document — generate a new revision and get it re-approved before sending the Annexure to the buyer again.
+    </div>
+  <?php endif; ?>
 
   <div class="section">
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/toggle">
@@ -30,7 +54,7 @@
     <h2>Product Entries</h2>
     <?php foreach ($products as $p): ?>
       <div class="card-nested">
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>" <?= $annexureConfirmAttr() ?>>
           <?= Csrf::field() ?>
           <label>Name *<input type="text" name="name" value="<?= htmlspecialchars($p['name']) ?>" required></label>
           <label>Description<textarea name="description" rows="2"><?= htmlspecialchars($p['description'] ?? '') ?></textarea></label>
@@ -40,7 +64,7 @@
           <label>Technical Notes<textarea name="technical_notes" rows="2"><?= htmlspecialchars($p['technical_notes'] ?? '') ?></textarea></label>
           <button type="submit" class="btn-sm">Save</button>
         </form>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove this product entry and its images?');">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>/delete" style="display:inline" <?= $annexureConfirmAttr('Remove this product entry and its images?') ?>>
           <?= Csrf::field() ?>
           <button type="submit" class="btn-sm btn-danger">Remove Entry</button>
         </form>
@@ -52,7 +76,7 @@
               <div class="thumb-card">
                 <img src="/file-store/<?= (int) $img['file_id'] ?>/download" alt="<?= htmlspecialchars($img['original_filename']) ?>" class="asset-preview">
                 <span class="muted small"><?= htmlspecialchars($img['original_filename']) ?></span>
-                <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/images/<?= (int) $img['id'] ?>/remove" onsubmit="return confirm('Remove this image from Annexure A?');">
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/images/<?= (int) $img['id'] ?>/remove" <?= $annexureConfirmAttr('Remove this image from Annexure A?') ?>>
                   <?= Csrf::field() ?>
                   <button type="submit" class="btn-sm btn-danger">&times;</button>
                 </form>
@@ -60,7 +84,7 @@
             <?php endforeach; ?>
             <?php if (empty($p['images'])): ?><span class="muted small">No images uploaded yet.</span><?php endif; ?>
           </div>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>/images" enctype="multipart/form-data" style="display:inline">
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>/images" enctype="multipart/form-data" style="display:inline" <?= $annexureConfirmAttr() ?>>
             <?= Csrf::field() ?>
             <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp" required>
             <button type="submit" class="btn-sm">Upload Image</button>
@@ -75,7 +99,7 @@
 
   <div class="section">
     <h2>Add Product Entry</h2>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products">
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products" <?= $annexureConfirmAttr() ?>>
       <?= Csrf::field() ?>
       <label>Name *<input type="text" name="name" required></label>
       <label>Description<textarea name="description" rows="2"></textarea></label>
@@ -91,7 +115,7 @@
   <div id="annexure-terms-section" class="section">
     <h2>Additional Terms</h2>
     <p class="muted small">Free-form text — special terms, clauses, or anything else agreed with the client that doesn't fit the Product Specification table. Supports basic formatting and pasted/inserted images. Video/audio can't be embedded here: a generated PDF or Word document can't play media, so only images are supported.</p>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/terms" id="annexure-terms-form">
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/terms" id="annexure-terms-form" <?= $annexureConfirmAttr() ?>>
       <?= Csrf::field() ?>
       <div class="wysiwyg-toolbar" role="toolbar" aria-label="Text formatting">
         <button type="button" class="wysiwyg-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>

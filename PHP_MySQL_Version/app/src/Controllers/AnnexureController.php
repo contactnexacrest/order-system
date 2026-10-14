@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\DocumentRepository;
 use App\Repositories\OrderAnnexureRepository;
 use App\Repositories\OrderAnnexureTermsRepository;
 use App\Repositories\OrderRepository;
@@ -38,6 +39,12 @@ final class AnnexureController
             'order' => $order,
             'products' => OrderAnnexureRepository::forOrder($orderId),
             'terms' => OrderAnnexureTermsRepository::find($orderId),
+            // 90-item backlog #73/#74: staff editing this screen have no
+            // indication the Annexure was already approved/sent to the
+            // buyer — surfaced as a warning banner + edit confirmation in
+            // the view, never a hard block (consistent with every other
+            // staff-trust gate already documented in this codebase).
+            'annexaDocument' => DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'ANNEXA'),
         ], 'layout/base');
     }
 

@@ -1,7 +1,20 @@
+{# 90-item backlog #73/#74: once the Annexure document itself has been
+   approved/sent, editing the content below silently drifts from what the
+   buyer already saw unless the next regeneration+re-approval catches up.
+   Warn, don't block — same "tracking aid, not a lock" treatment as every
+   other staff-trust gate documented in this codebase (see Stage 9's
+   Close Order hint). #}
+{% set annexaIsLocked = annexaDocument and annexaDocument.status in ['approved', 'sent'] %}
 <div class="card page-wide">
   <h1>Annexure A — {{ order.order_reference or ('#' ~ order.id) }}</h1>
   <p class="muted small"><a href="/orders/{{ order.id }}">&larr; Back to Order</a></p>
   <p class="muted">Product technical specifications (dimensions, finish, components, technical notes) and images, and/or free-form Additional Terms text, referenced from the Quotation/PI/OC/Buyer PO as an attached, integral document whenever "Include Annexure A" is on for this order.</p>
+
+  {% if annexaIsLocked %}
+    <div class="alert alert-warning">
+      ⚠ This order's Annexure A document has already been {{ annexaDocument.status }} (ref. {{ annexaDocument.document_reference }}). Editing the Product Entries or Additional Terms below does not change that document — generate a new revision and get it re-approved before sending the Annexure to the buyer again.
+    </div>
+  {% endif %}
 
   <div class="section">
     <form method="post" action="/orders/{{ order.id }}/annexure/toggle">
@@ -29,7 +42,7 @@
     <h2>Product Entries</h2>
     {% for p in products %}
       <div class="card-nested">
-        <form method="post" action="/orders/{{ order.id }}/annexure/products/{{ p.id }}">
+        <form method="post" action="/orders/{{ order.id }}/annexure/products/{{ p.id }}" {{ annexureConfirmAttr(annexaDocument) | safe }}>
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Name *<input type="text" name="name" value="{{ p.name }}" required></label>
           <label>Description<textarea name="description" rows="2">{{ p.description or '' }}</textarea></label>
@@ -39,7 +52,7 @@
           <label>Technical Notes<textarea name="technical_notes" rows="2">{{ p.technical_notes or '' }}</textarea></label>
           <button type="submit" class="btn-sm">Save</button>
         </form>
-        <form method="post" action="/orders/{{ order.id }}/annexure/products/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Remove this product entry and its images?');">
+        <form method="post" action="/orders/{{ order.id }}/annexure/products/{{ p.id }}/delete" style="display:inline" {{ annexureConfirmAttr(annexaDocument, 'Remove this product entry and its images?') | safe }}>
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <button type="submit" class="btn-sm btn-danger">Remove Entry</button>
         </form>
@@ -51,7 +64,7 @@
               <div class="thumb-card">
                 <img src="/file-store/{{ img.file_id }}/download" alt="{{ img.original_filename }}" class="asset-preview">
                 <span class="muted small">{{ img.original_filename }}</span>
-                <form method="post" action="/orders/{{ order.id }}/annexure/images/{{ img.id }}/remove" onsubmit="return confirm('Remove this image from Annexure A?');">
+                <form method="post" action="/orders/{{ order.id }}/annexure/images/{{ img.id }}/remove" {{ annexureConfirmAttr(annexaDocument, 'Remove this image from Annexure A?') | safe }}>
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                   <button type="submit" class="btn-sm btn-danger">&times;</button>
                 </form>
@@ -60,7 +73,7 @@
               <span class="muted small">No images uploaded yet.</span>
             {% endfor %}
           </div>
-          <form method="post" action="/orders/{{ order.id }}/annexure/products/{{ p.id }}/images" enctype="multipart/form-data" style="display:inline">
+          <form method="post" action="/orders/{{ order.id }}/annexure/products/{{ p.id }}/images" enctype="multipart/form-data" style="display:inline" {{ annexureConfirmAttr(annexaDocument) | safe }}>
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp" required>
             <button type="submit" class="btn-sm">Upload Image</button>
@@ -74,7 +87,7 @@
 
   <div class="section">
     <h2>Add Product Entry</h2>
-    <form method="post" action="/orders/{{ order.id }}/annexure/products">
+    <form method="post" action="/orders/{{ order.id }}/annexure/products" {{ annexureConfirmAttr(annexaDocument) | safe }}>
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label>Name *<input type="text" name="name" required></label>
       <label>Description<textarea name="description" rows="2"></textarea></label>
@@ -90,7 +103,7 @@
   <div id="annexure-terms-section" class="section">
     <h2>Additional Terms</h2>
     <p class="muted small">Free-form text — special terms, clauses, or anything else agreed with the client that doesn't fit the Product Specification table. Supports basic formatting and pasted/inserted images. Video/audio can't be embedded here: a generated PDF or Word document can't play media, so only images are supported.</p>
-    <form method="post" action="/orders/{{ order.id }}/annexure/terms" id="annexure-terms-form">
+    <form method="post" action="/orders/{{ order.id }}/annexure/terms" id="annexure-terms-form" {{ annexureConfirmAttr(annexaDocument) | safe }}>
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="wysiwyg-toolbar" role="toolbar" aria-label="Text formatting">
         <button type="button" class="wysiwyg-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>

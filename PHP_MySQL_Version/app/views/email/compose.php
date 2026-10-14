@@ -1,4 +1,12 @@
-<?php use App\Helpers\Csrf; ?>
+<?php
+use App\Helpers\Csrf;
+// 90-item backlog #73/#74: resending an Annexure that was already sent to
+// the buyer once (possibly after edits to order_annexure_terms/products
+// made since) gets an extra confirmation — the generic Level-1/Level-2
+// approval flow treats a first-time send and a resend identically
+// otherwise. Warn, don't block, same as every other staff-trust gate here.
+$isAnnexureResend = $documentId && ($document['document_type_code'] ?? null) === 'ANNEXA' && ($document['status'] ?? null) === 'sent';
+?>
 <div class="card page-wide">
   <p class="muted small"><a href="/orders/<?= (int) $orderId ?>">&larr; Back to Order</a></p>
   <?php if ($documentId): ?>
@@ -38,7 +46,10 @@
 
       <?php if ($documentId): ?>
         <p class="muted" style="margin-top:0.75rem">Attachment: the final watermarked PDF (never DOCX, never a clean copy).</p>
-        <form method="post" action="/orders/<?= (int) $orderId ?>/documents/<?= (int) $documentId ?>/send">
+        <?php if ($isAnnexureResend): ?>
+          <p class="alert alert-warning">⚠ This Annexure was already sent to the buyer once. If its Product Entries or Additional Terms were edited since, make sure a new revision was generated and re-approved first — this will resend whatever the current approved PDF actually contains.</p>
+        <?php endif; ?>
+        <form method="post" action="/orders/<?= (int) $orderId ?>/documents/<?= (int) $documentId ?>/send" <?= $isAnnexureResend ? "onsubmit=\"return confirm('This Annexure was already sent to the buyer once. Resend it anyway?');\"" : '' ?>>
           <?= Csrf::field() ?>
           <input type="hidden" name="template_key" value="<?= htmlspecialchars($templateKey) ?>">
           <label>Scheduled send time (leave blank for immediate)
