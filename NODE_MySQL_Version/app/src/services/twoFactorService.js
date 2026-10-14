@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const env = require('../config/env');
 const emailService = require('./emailService');
+const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const smsService = require('./smsService');
 
 // Port of App\Services\TwoFactorService. Session-scoped to the in-progress
@@ -26,13 +27,21 @@ async function issueCodeFor(req, userId, method, destination) {
     attempts: 0,
   };
 
-  const subject = 'Your NexaCrest login verification code';
-  const body = `Your verification code is: ${code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator.`;
-
   if (method === 'sms' && smsService.isAvailable()) {
     await smsService.send(destination, `NexaCrest login code: ${code} (expires in 5 min)`);
   } else {
-    await emailService.sendPlainText(destination, subject, body, { isSecurityEmail: true });
+    // 90-item backlog #37: subject/body used to be hardcoded here — now
+    // admin-editable (Admin > Settings > Email Templates), with this
+    // exact original wording as the fallback if the template is ever
+    // missing/deactivated, since a login code must never silently fail
+    // to go out.
+    const rendered = await emailTemplateRepository.renderOrDefault(
+      'two_factor_code',
+      { '{code}': code },
+      'Your NexaCrest login verification code',
+      'Your verification code is: {code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator.'
+    );
+    await emailService.sendPlainText(destination, rendered.subject, rendered.body, { isSecurityEmail: true });
   }
 
   // Local dev only — surfaces the code so the flow can be tested without a

@@ -7,6 +7,7 @@ const authService = require('../services/authService');
 const twoFactorService = require('../services/twoFactorService');
 const userRepository = require('../repositories/userRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const passwordResetTokenRepository = require('../repositories/passwordResetTokenRepository');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const emailService = require('../services/emailService');
@@ -130,12 +131,20 @@ async function forgotPassword(req, res) {
       await passwordResetTokenRepository.create(user.id, tokenHash, expiresAt, ip);
 
       const resetUrl = `${env.get('APP_URL', '').replace(/\/+$/, '')}/reset-password/${rawToken}`;
-      const body = `Hello ${user.name},\n\n`
-        + `A password reset was requested for your NexaCrest Export Operations account (${email}).\n\n`
-        + `To set a new password, open this link within 45 minutes:\n${resetUrl}\n\n`
-        + `If you didn't request this, you can ignore this email — your password will not be changed.`;
 
-      await emailService.sendPlainText(email, 'Reset your NexaCrest password', body, { isSecurityEmail: true });
+      // 90-item backlog #37: admin-editable (Admin > Settings > Email
+      // Templates) — this exact original wording is the fallback.
+      const rendered = await emailTemplateRepository.renderOrDefault(
+        'staff_password_reset',
+        { '{name}': user.name, '{email}': email, '{reset_link}': resetUrl },
+        'Reset your NexaCrest password',
+        'Hello {name},\n\n'
+          + 'A password reset was requested for your NexaCrest Export Operations account ({email}).\n\n'
+          + 'To set a new password, open this link within 45 minutes:\n{reset_link}\n\n'
+          + "If you didn't request this, you can ignore this email — your password will not be changed."
+      );
+
+      await emailService.sendPlainText(email, rendered.subject, rendered.body, { isSecurityEmail: true });
       await auditLogRepository.log(user.id, 'PASSWORD_RESET_REQUESTED', 'users', user.id, null, null, null, `Requested from IP ${ip}`);
     }
   }

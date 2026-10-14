@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Config\Env;
+use App\Repositories\EmailTemplateRepository;
 
 /**
  * Handles the short-lived one-time code for email/SMS 2FA. Deliberately
@@ -31,13 +32,21 @@ final class TwoFactorService
             'attempts'    => 0,
         ];
 
-        $subject = 'Your NexaCrest login verification code';
-        $body    = "Your verification code is: {$code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator.";
-
         if ($method === 'sms' && SmsService::isAvailable()) {
             SmsService::send($destination, "NexaCrest login code: {$code} (expires in 5 min)");
         } else {
-            EmailService::sendPlainText($destination, $subject, $body, true);
+            // 90-item backlog #37: subject/body used to be hardcoded here —
+            // now admin-editable (Admin > Settings > Email Templates), with
+            // this exact original wording as the fallback if the template
+            // is ever missing/deactivated, since a login code must never
+            // silently fail to go out.
+            $rendered = EmailTemplateRepository::renderOrDefault(
+                'two_factor_code',
+                ['{code}' => $code],
+                'Your NexaCrest login verification code',
+                "Your verification code is: {code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator."
+            );
+            EmailService::sendPlainText($destination, $rendered['subject'], $rendered['body'], true);
         }
 
         // In local dev only, surface the code so the flow can be tested without

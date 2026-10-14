@@ -23,7 +23,7 @@ final class EmailTemplateController
     {
         View::render('email_templates/form', [
             'template' => null,
-            'availableTokens' => self::availableTokens(),
+            'availableTokens' => self::availableTokens(null),
         ], 'layout/base');
     }
 
@@ -66,7 +66,7 @@ final class EmailTemplateController
         }
         View::render('email_templates/form', [
             'template' => $template,
-            'availableTokens' => self::availableTokens(),
+            'availableTokens' => self::availableTokens($template['template_key']),
         ], 'layout/base');
     }
 
@@ -110,9 +110,34 @@ final class EmailTemplateController
         header('Location: /email-templates');
     }
 
-    /** @return string[] */
-    private static function availableTokens(): array
+    /**
+     * 90-item backlog #37: the 7 system/transactional templates (2FA code,
+     * both password resets, portal invite, correction/PI-form/Buyer-Action
+     * links — EmailTemplateRepository::renderOrDefault()'s callers) take a
+     * much smaller, unrelated token set from the buyer-document-send ones
+     * below (tokensFor() in EmailDispatchService) — showing the full
+     * buyer-document list on their edit screen would just be wrong. A null
+     * or unrecognized key (the "create new template" screen, or any other
+     * custom key an admin adds) falls back to the buyer-document list,
+     * since that's what every "Send to Buyer" composer actually offers.
+     *
+     * @return string[]
+     */
+    private static function availableTokens(?string $templateKey): array
     {
+        $systemTemplateTokens = [
+            'two_factor_code'              => ['{code}'],
+            'client_portal_invite'         => ['{set_password_link}', '{email}'],
+            'staff_password_reset'         => ['{name}', '{email}', '{reset_link}'],
+            'client_portal_password_reset' => ['{email}', '{reset_link}'],
+            'quotation_correction_link'    => ['{correction_link}'],
+            'pi_form_link'                 => ['{order_reference}', '{pi_form_link}'],
+            'buyer_action_link'            => ['{order_reference}', '{buyer_action_link}'],
+        ];
+        if ($templateKey !== null && isset($systemTemplateTokens[$templateKey])) {
+            return $systemTemplateTokens[$templateKey];
+        }
+
         return [
             '{buyer_contact_person}', '{buyer_company_name}', '{document_reference}', '{generated_date}',
             '{order_reference}', '{buyer_inquiry_ref}', '{quotation_ref}', '{quotation_valid_until}',

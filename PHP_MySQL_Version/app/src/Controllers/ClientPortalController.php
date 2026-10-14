@@ -13,6 +13,7 @@ use App\Repositories\ClientLoginRepository;
 use App\Repositories\ClientPasswordResetTokenRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\DocumentRepository;
+use App\Repositories\EmailTemplateRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\HsCodeRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
@@ -140,12 +141,21 @@ final class ClientPortalController
                 ClientPasswordResetTokenRepository::create((int) $login['client_id'], $tokenHash, $expiresAt, $ip);
 
                 $resetUrl = rtrim(Env::get('APP_URL', ''), '/') . '/client/set-password/' . $rawToken;
-                $body = "Hello,\n\n"
-                    . "A password reset was requested for your NexaCrest order portal account ({$email}).\n\n"
-                    . "To set a new password, open this link within 72 hours:\n{$resetUrl}\n\n"
-                    . "If you didn't request this, you can ignore this email — your password will not be changed.";
 
-                EmailService::sendPlainText($email, 'Reset your NexaCrest order portal password', $body, true);
+                // 90-item backlog #37: admin-editable (Admin > Settings >
+                // Email Templates) — this exact original wording is the
+                // fallback.
+                $rendered = EmailTemplateRepository::renderOrDefault(
+                    'client_portal_password_reset',
+                    ['{email}' => $email, '{reset_link}' => $resetUrl],
+                    'Reset your NexaCrest order portal password',
+                    "Hello,\n\n"
+                        . "A password reset was requested for your NexaCrest order portal account ({email}).\n\n"
+                        . "To set a new password, open this link within 72 hours:\n{reset_link}\n\n"
+                        . "If you didn't request this, you can ignore this email — your password will not be changed."
+                );
+
+                EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], true);
                 AuditLogRepository::log(null, 'CLIENT_PASSWORD_RESET_REQUESTED', 'clients', (int) $login['client_id'], null, null, null, "Requested from IP {$ip}");
             }
         }

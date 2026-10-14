@@ -51,4 +51,40 @@ async function keyExists(templateKey) {
   return !!row;
 }
 
-module.exports = { find, findById, all, create, update, setActive, keyExists };
+/** Port of PHP's strtr() for this file's own token maps — plain, non-regex substring replacement, so a token like '{code}' can never be misread as a regex. */
+function substituteTokens(text, tokens) {
+  let result = text;
+  for (const [token, value] of Object.entries(tokens)) {
+    result = result.split(token).join(value);
+  }
+  return result;
+}
+
+/**
+ * 90-item backlog #37: for the system/transactional emails (2FA code,
+ * password resets, portal invite, correction/intake links — see
+ * seed.sql's own comment block for the full key list) that used to have
+ * their subject/body hardcoded inline rather than pulled from this
+ * table. Unlike buildPreview() in emailDispatchService (which throws on
+ * an unknown/inactive template, since a buyer document-send is always a
+ * deliberate staff action with a visible error path), a template row
+ * going missing or getting deactivated here must never stop a
+ * security-critical email like a password reset from going out — so
+ * this falls back to the exact original hardcoded wording (also
+ * token-substituted, for consistency) instead of throwing.
+ *
+ * @returns {Promise<{subject: string, body: string}>}
+ */
+async function renderOrDefault(templateKey, tokens, defaultSubject, defaultBody) {
+  const template = await find(templateKey);
+  if (template && Number(template.is_active) === 1) {
+    let body = substituteTokens(template.body, tokens);
+    if (template.footer) {
+      body += '\n\n' + substituteTokens(template.footer, tokens);
+    }
+    return { subject: substituteTokens(template.subject, tokens), body };
+  }
+  return { subject: substituteTokens(defaultSubject, tokens), body: substituteTokens(defaultBody, tokens) };
+}
+
+module.exports = { find, findById, all, create, update, setActive, keyExists, renderOrDefault };

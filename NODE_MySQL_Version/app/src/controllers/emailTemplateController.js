@@ -12,12 +12,37 @@ const AVAILABLE_TOKENS = [
   '{sender_name}', '{sender_title}', '{sender_signature}',
 ];
 
+/**
+ * 90-item backlog #37: the 7 system/transactional templates (2FA code,
+ * both password resets, portal invite, correction/PI-form/Buyer-Action
+ * links — emailTemplateRepository.renderOrDefault()'s callers) take a
+ * much smaller, unrelated token set from the buyer-document-send ones
+ * above (tokensFor() in emailDispatchService) — showing the full
+ * buyer-document list on their edit screen would just be wrong. A null
+ * or unrecognized key (the "create new template" screen, or any other
+ * custom key an admin adds) falls back to AVAILABLE_TOKENS, since that's
+ * what every "Send to Buyer" composer actually offers.
+ */
+const SYSTEM_TEMPLATE_TOKENS = {
+  two_factor_code: ['{code}'],
+  client_portal_invite: ['{set_password_link}', '{email}'],
+  staff_password_reset: ['{name}', '{email}', '{reset_link}'],
+  client_portal_password_reset: ['{email}', '{reset_link}'],
+  quotation_correction_link: ['{correction_link}'],
+  pi_form_link: ['{order_reference}', '{pi_form_link}'],
+  buyer_action_link: ['{order_reference}', '{buyer_action_link}'],
+};
+
+function availableTokensFor(templateKey) {
+  return SYSTEM_TEMPLATE_TOKENS[templateKey] || AVAILABLE_TOKENS;
+}
+
 async function index(req, res) {
   res.renderView('email_templates/index', { templates: await emailTemplateRepository.all() }, 'layout/base');
 }
 
 async function create(req, res) {
-  res.renderView('email_templates/form', { template: null, availableTokens: AVAILABLE_TOKENS }, 'layout/base');
+  res.renderView('email_templates/form', { template: null, availableTokens: availableTokensFor(null) }, 'layout/base');
 }
 
 async function store(req, res) {
@@ -53,7 +78,7 @@ async function edit(req, res) {
     res.status(404).send('Template not found.');
     return;
   }
-  res.renderView('email_templates/form', { template, availableTokens: AVAILABLE_TOKENS }, 'layout/base');
+  res.renderView('email_templates/form', { template, availableTokens: availableTokensFor(template.template_key) }, 'layout/base');
 }
 
 async function update(req, res) {

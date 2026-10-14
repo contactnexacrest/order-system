@@ -23,6 +23,7 @@ use App\Repositories\DocumentCrossVerificationRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\DocumentReviewRepository;
 use App\Repositories\EmailLogRepository;
+use App\Repositories\EmailTemplateRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\HsCodeRepository;
 use App\Repositories\LookupRepository;
@@ -827,12 +828,20 @@ final class OrderController
         $link = rtrim(Env::get('APP_URL', ''), '/') . '/pi-details/' . $rawToken;
 
         if (!empty($order['client_email'])) {
-            $body = "Hello,\n\n"
-                . "Thank you for accepting our Quotation for order {$order['order_reference']}.\n\n"
-                . "To issue your Proforma Invoice, please confirm your shipping/consignee details at:\n{$link}\n\n"
-                . "This link works for 30 days.\n\n"
-                . "NexaCrest International Private Limited";
-            EmailService::sendPlainText($order['client_email'], 'NexaCrest — confirm your PI-stage details', $body);
+            // 90-item backlog #37: admin-editable (Admin > Settings >
+            // Email Templates) — this exact original wording is the
+            // fallback.
+            $rendered = EmailTemplateRepository::renderOrDefault(
+                'pi_form_link',
+                ['{order_reference}' => $order['order_reference'], '{pi_form_link}' => $link],
+                'NexaCrest — confirm your PI-stage details',
+                "Hello,\n\n"
+                    . "Thank you for accepting our Quotation for order {order_reference}.\n\n"
+                    . "To issue your Proforma Invoice, please confirm your shipping/consignee details at:\n{pi_form_link}\n\n"
+                    . "This link works for 30 days.\n\n"
+                    . "NexaCrest International Private Limited"
+            );
+            EmailService::sendPlainText($order['client_email'], $rendered['subject'], $rendered['body']);
         }
 
         AuditLogRepository::log((int) $user['id'], 'PI_INTAKE_LINK_GENERATED', 'orders', $orderId, null, null, null, 'PI-stage intake link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
@@ -863,11 +872,19 @@ final class OrderController
         $link = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $rawToken;
 
         if (!empty($order['client_email'])) {
-            $body = "Hello,\n\n"
-                . "To acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order {$order['order_reference']}, please visit:\n{$link}\n\n"
-                . "This link works for 90 days.\n\n"
-                . "NexaCrest International Private Limited";
-            EmailService::sendPlainText($order['client_email'], 'NexaCrest — acknowledge your order / upload your Buyer PO', $body);
+            // 90-item backlog #37: admin-editable (Admin > Settings >
+            // Email Templates) — this exact original wording is the
+            // fallback.
+            $rendered = EmailTemplateRepository::renderOrDefault(
+                'buyer_action_link',
+                ['{order_reference}' => $order['order_reference'], '{buyer_action_link}' => $link],
+                'NexaCrest — acknowledge your order / upload your Buyer PO',
+                "Hello,\n\n"
+                    . "To acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order {order_reference}, please visit:\n{buyer_action_link}\n\n"
+                    . "This link works for 90 days.\n\n"
+                    . "NexaCrest International Private Limited"
+            );
+            EmailService::sendPlainText($order['client_email'], $rendered['subject'], $rendered['body']);
         }
 
         AuditLogRepository::log((int) $user['id'], 'BUYER_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Buyer Action link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));

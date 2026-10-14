@@ -9,6 +9,7 @@ use App\Helpers\Csrf;
 use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\EmailTemplateRepository;
 use App\Repositories\PasswordResetTokenRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
@@ -157,12 +158,21 @@ final class AuthController
                 PasswordResetTokenRepository::create((int) $user['id'], $tokenHash, $expiresAt, $ip);
 
                 $resetUrl = rtrim(Env::get('APP_URL', ''), '/') . '/reset-password/' . $rawToken;
-                $body = "Hello {$user['name']},\n\n"
-                    . "A password reset was requested for your NexaCrest Export Operations account ({$email}).\n\n"
-                    . "To set a new password, open this link within 45 minutes:\n{$resetUrl}\n\n"
-                    . "If you didn't request this, you can ignore this email — your password will not be changed.";
 
-                EmailService::sendPlainText($email, 'Reset your NexaCrest password', $body, true);
+                // 90-item backlog #37: admin-editable (Admin > Settings >
+                // Email Templates) — this exact original wording is the
+                // fallback.
+                $rendered = EmailTemplateRepository::renderOrDefault(
+                    'staff_password_reset',
+                    ['{name}' => $user['name'], '{email}' => $email, '{reset_link}' => $resetUrl],
+                    'Reset your NexaCrest password',
+                    "Hello {name},\n\n"
+                        . "A password reset was requested for your NexaCrest Export Operations account ({email}).\n\n"
+                        . "To set a new password, open this link within 45 minutes:\n{reset_link}\n\n"
+                        . "If you didn't request this, you can ignore this email — your password will not be changed."
+                );
+
+                EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], true);
                 AuditLogRepository::log((int) $user['id'], 'PASSWORD_RESET_REQUESTED', 'users', (int) $user['id'], null, null, null, "Requested from IP {$ip}");
             }
         }

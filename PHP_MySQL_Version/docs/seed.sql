@@ -686,6 +686,39 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
    'Dear {buyer_contact_person},\n\nPlease find attached the Bill of Lading Endorsement {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}');
 
+-- 90-item backlog #37 (email-templates completeness audit): these 7
+-- system/transactional emails (2FA login code, both password resets, the
+-- client-portal invite, and the 3 staff-generated one-time links) used to
+-- have their subject/body hardcoded inline in PHP, bypassing this table
+-- entirely. EmailTemplateRepository::renderOrDefault() now reads from
+-- here first and falls back to the exact original hardcoded wording only
+-- if a row is missing/deactivated — these rows are seeded with that exact
+-- wording, so nothing changes for anyone until an admin actually edits
+-- one. Each one's own token set (different from the buyer-document tokens
+-- above) is listed in EmailTemplateController::availableTokens().
+INSERT INTO email_templates (template_key, subject, body, footer) VALUES
+  ('two_factor_code', 'Your NexaCrest login verification code',
+   'Your verification code is: {code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator.',
+   NULL),
+  ('client_portal_invite', 'Your NexaCrest order portal access',
+   'Hello,\n\nYour advance payment has been received and cleared — thank you.\n\nYou can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\nTo set up your login, open this link within 72 hours:\n{set_password_link}\n\nYour login email will be: {email}\n\nNexaCrest International Private Limited',
+   NULL),
+  ('staff_password_reset', 'Reset your NexaCrest password',
+   'Hello {name},\n\nA password reset was requested for your NexaCrest Export Operations account ({email}).\n\nTo set a new password, open this link within 45 minutes:\n{reset_link}\n\nIf you didn''t request this, you can ignore this email — your password will not be changed.',
+   NULL),
+  ('client_portal_password_reset', 'Reset your NexaCrest order portal password',
+   'Hello,\n\nA password reset was requested for your NexaCrest order portal account ({email}).\n\nTo set a new password, open this link within 72 hours:\n{reset_link}\n\nIf you didn''t request this, you can ignore this email — your password will not be changed.',
+   NULL),
+  ('quotation_correction_link', 'Your NexaCrest quotation request — correction link',
+   'Hello,\n\nThank you for your quotation request. We''ll review it and get back to you within 24 hours.\n\nSpotted a mistake in what you submitted? You can correct it yourself, as long as we haven''t already processed it, at:\n{correction_link}\n\nThis link works for 7 days.\n\nNexaCrest International Private Limited',
+   NULL),
+  ('pi_form_link', 'NexaCrest — confirm your PI-stage details',
+   'Hello,\n\nThank you for accepting our Quotation for order {order_reference}.\n\nTo issue your Proforma Invoice, please confirm your shipping/consignee details at:\n{pi_form_link}\n\nThis link works for 30 days.\n\nNexaCrest International Private Limited',
+   NULL),
+  ('buyer_action_link', 'NexaCrest — acknowledge your order / upload your Buyer PO',
+   'Hello,\n\nTo acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order {order_reference}, please visit:\n{buyer_action_link}\n\nThis link works for 90 days.\n\nNexaCrest International Private Limited',
+   NULL);
+
 -- ================================================================
 -- ASSETS — placeholder images generated for every slot (see /assets
 -- screen). Paths below assume STORAGE_BASE_PATH = <project>/storage;

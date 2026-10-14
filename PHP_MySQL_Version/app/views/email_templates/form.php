@@ -2,7 +2,7 @@
 <div class="card page-wide">
   <p class="muted small"><a href="/email-templates">&larr; Back to Email Templates</a></p>
   <h1><?= $template ? 'Edit Email Template' : 'New Email Template' ?></h1>
-  <p class="muted">Use any of these tokens in the subject/body/footer — they're substituted with the real order/document/sender values when a staff member composes a send: <?= implode(', ', array_map('htmlspecialchars', $availableTokens)) ?></p>
+  <p class="muted">Use any of these tokens in the subject/body/footer — they're substituted with the real values when this email actually goes out (only these tokens apply to this particular template; other templates use a different set): <?= implode(', ', array_map('htmlspecialchars', $availableTokens)) ?></p>
 
   <form method="post" action="<?= $template ? "/email-templates/{$template['id']}/update" : '/email-templates' ?>">
     <?= Csrf::field() ?>

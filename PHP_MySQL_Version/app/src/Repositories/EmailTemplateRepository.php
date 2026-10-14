@@ -82,4 +82,33 @@ final class EmailTemplateRepository
         $stmt->execute(['key' => $templateKey]);
         return (bool) $stmt->fetchColumn();
     }
+
+    /**
+     * 90-item backlog #37: for the system/transactional emails (2FA code,
+     * password resets, portal invite, correction/intake links — see
+     * seed.sql's own comment block for the full key list) that used to
+     * have their subject/body hardcoded inline rather than pulled from
+     * this table. Unlike buildPreview() in EmailDispatchService (which
+     * throws on an unknown/inactive template, since a buyer document-send
+     * is always a deliberate staff action with a visible error path), a
+     * template row going missing or getting deactivated here must never
+     * stop a security-critical email like a password reset from going
+     * out — so this falls back to the exact original hardcoded wording
+     * (also token-substituted, for consistency) instead of throwing.
+     *
+     * @param array<string,string> $tokens
+     * @return array{subject:string, body:string}
+     */
+    public static function renderOrDefault(string $templateKey, array $tokens, string $defaultSubject, string $defaultBody): array
+    {
+        $template = self::find($templateKey);
+        if ($template && (int) $template['is_active'] === 1) {
+            $body = strtr($template['body'], $tokens);
+            if (!empty($template['footer'])) {
+                $body .= "\n\n" . strtr($template['footer'], $tokens);
+            }
+            return ['subject' => strtr($template['subject'], $tokens), 'body' => $body];
+        }
+        return ['subject' => strtr($defaultSubject, $tokens), 'body' => strtr($defaultBody, $tokens)];
+    }
 }

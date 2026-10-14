@@ -50,6 +50,7 @@ const supplierRepository = require('../repositories/supplierRepository');
 const userRepository = require('../repositories/userRepository');
 const env = require('../config/env');
 const emailService = require('../services/emailService');
+const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const stageGateService = require('../services/stageGateService');
 const documentGenerationService = require('../services/documentGenerationService');
@@ -836,12 +837,19 @@ async function generatePiFormLink(req, res) {
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/pi-details/${rawToken}`;
 
   if (order.client_email) {
-    const body = 'Hello,\n\n'
-      + `Thank you for accepting our Quotation for order ${order.order_reference}.\n\n`
-      + `To issue your Proforma Invoice, please confirm your shipping/consignee details at:\n${link}\n\n`
-      + 'This link works for 30 days.\n\n'
-      + 'NexaCrest International Private Limited';
-    await emailService.sendPlainText(order.client_email, 'NexaCrest — confirm your PI-stage details', body);
+    // 90-item backlog #37: admin-editable (Admin > Settings > Email
+    // Templates) — this exact original wording is the fallback.
+    const rendered = await emailTemplateRepository.renderOrDefault(
+      'pi_form_link',
+      { '{order_reference}': order.order_reference, '{pi_form_link}': link },
+      'NexaCrest — confirm your PI-stage details',
+      'Hello,\n\n'
+        + 'Thank you for accepting our Quotation for order {order_reference}.\n\n'
+        + 'To issue your Proforma Invoice, please confirm your shipping/consignee details at:\n{pi_form_link}\n\n'
+        + 'This link works for 30 days.\n\n'
+        + 'NexaCrest International Private Limited'
+    );
+    await emailService.sendPlainText(order.client_email, rendered.subject, rendered.body);
   }
 
   await auditLogRepository.log(user.id, 'PI_INTAKE_LINK_GENERATED', 'orders', orderId, null, null, null, 'PI-stage intake link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
@@ -871,11 +879,18 @@ async function generateBuyerActionLink(req, res) {
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${rawToken}`;
 
   if (order.client_email) {
-    const body = 'Hello,\n\n'
-      + `To acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order ${order.order_reference}, please visit:\n${link}\n\n`
-      + 'This link works for 90 days.\n\n'
-      + 'NexaCrest International Private Limited';
-    await emailService.sendPlainText(order.client_email, 'NexaCrest — acknowledge your order / upload your Buyer PO', body);
+    // 90-item backlog #37: admin-editable (Admin > Settings > Email
+    // Templates) — this exact original wording is the fallback.
+    const rendered = await emailTemplateRepository.renderOrDefault(
+      'buyer_action_link',
+      { '{order_reference}': order.order_reference, '{buyer_action_link}': link },
+      'NexaCrest — acknowledge your order / upload your Buyer PO',
+      'Hello,\n\n'
+        + 'To acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order {order_reference}, please visit:\n{buyer_action_link}\n\n'
+        + 'This link works for 90 days.\n\n'
+        + 'NexaCrest International Private Limited'
+    );
+    await emailService.sendPlainText(order.client_email, rendered.subject, rendered.body);
   }
 
   await auditLogRepository.log(user.id, 'BUYER_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Buyer Action link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));

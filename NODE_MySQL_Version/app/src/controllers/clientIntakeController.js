@@ -6,6 +6,7 @@ const env = require('../config/env');
 const emailService = require('../services/emailService');
 const rateLimiter = require('../helpers/rateLimiter');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
+const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 
 // QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order token
@@ -188,12 +189,20 @@ async function issueCorrectionLink(submissionId, email) {
   await clientIntakeRepository.setAccessToken(submissionId, crypto.createHash('sha256').update(rawToken).digest('hex'), expiresAt);
 
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/quotation-details/edit/${rawToken}`;
-  const body = 'Hello,\n\n'
-    + "Thank you for your quotation request. We'll review it and get back to you within 24 hours.\n\n"
-    + `Spotted a mistake in what you submitted? You can correct it yourself, as long as we haven't already processed it, at:\n${link}\n\n`
-    + 'This link works for 7 days.\n\n'
-    + 'NexaCrest International Private Limited';
-  await emailService.sendPlainText(email, 'Your NexaCrest quotation request — correction link', body);
+
+  // 90-item backlog #37: admin-editable (Admin > Settings > Email
+  // Templates) — this exact original wording is the fallback.
+  const rendered = await emailTemplateRepository.renderOrDefault(
+    'quotation_correction_link',
+    { '{correction_link}': link },
+    'Your NexaCrest quotation request — correction link',
+    'Hello,\n\n'
+      + "Thank you for your quotation request. We'll review it and get back to you within 24 hours.\n\n"
+      + "Spotted a mistake in what you submitted? You can correct it yourself, as long as we haven't already processed it, at:\n{correction_link}\n\n"
+      + 'This link works for 7 days.\n\n'
+      + 'NexaCrest International Private Limited'
+  );
+  await emailService.sendPlainText(email, rendered.subject, rendered.body);
 
   return link;
 }

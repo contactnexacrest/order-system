@@ -105,7 +105,17 @@ mistake (or malice).
   for a fresher who has never had to classify a product before.
 - **Email Templates** — subject/body/footer for every system email, with
   template-key placeholders merged in at send time (see
-  [Document Review & Approval](./13-document-review-approval.md)).
+  [Document Review & Approval](./13-document-review-approval.md)). This
+  also covers 7 system/transactional emails that used to be hardcoded and
+  not admin-editable at all: the 2FA login code, the staff and client
+  portal password-reset emails, the client portal invite, and the
+  quotation-correction/PI-form/Buyer-Action one-time links. Each has its
+  own, much smaller token set than a buyer-document template (shown on
+  that template's own edit screen) — e.g. `{code}` for the 2FA email,
+  `{reset_link}`/`{email}` for a password reset. These are security- or
+  access-critical, so editing or deactivating one never blocks the actual
+  send: if the row is missing or switched off, the original wording goes
+  out instead, exactly as it did before this template existed.
 - **Watermarks** — the draft vs. final watermark text/styling swapped
   automatically when a document is approved. Each of the two (draft/final)
   independently supports Text only, Image only, or Text and image

@@ -9,6 +9,7 @@ use App\Helpers\Flash;
 use App\Helpers\RateLimiter;
 use App\Helpers\View;
 use App\Repositories\ClientIntakeRepository;
+use App\Repositories\EmailTemplateRepository;
 use App\Repositories\LookupRepository;
 use App\Services\EmailService;
 
@@ -201,12 +202,20 @@ final class ClientIntakeController
         ClientIntakeRepository::setAccessToken($submissionId, hash('sha256', $rawToken), $expiresAt);
 
         $link = rtrim(Env::get('APP_URL', ''), '/') . '/quotation-details/edit/' . $rawToken;
-        $body = "Hello,\n\n"
-            . "Thank you for your quotation request. We'll review it and get back to you within 24 hours.\n\n"
-            . "Spotted a mistake in what you submitted? You can correct it yourself, as long as we haven't already processed it, at:\n{$link}\n\n"
-            . "This link works for 7 days.\n\n"
-            . "NexaCrest International Private Limited";
-        EmailService::sendPlainText($email, 'Your NexaCrest quotation request — correction link', $body);
+
+        // 90-item backlog #37: admin-editable (Admin > Settings > Email
+        // Templates) — this exact original wording is the fallback.
+        $rendered = EmailTemplateRepository::renderOrDefault(
+            'quotation_correction_link',
+            ['{correction_link}' => $link],
+            'Your NexaCrest quotation request — correction link',
+            "Hello,\n\n"
+                . "Thank you for your quotation request. We'll review it and get back to you within 24 hours.\n\n"
+                . "Spotted a mistake in what you submitted? You can correct it yourself, as long as we haven't already processed it, at:\n{correction_link}\n\n"
+                . "This link works for 7 days.\n\n"
+                . "NexaCrest International Private Limited"
+        );
+        EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
 
         return $link;
     }

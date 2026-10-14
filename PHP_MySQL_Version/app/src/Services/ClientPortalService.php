@@ -9,6 +9,7 @@ use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientLoginRepository;
 use App\Repositories\ClientPasswordResetTokenRepository;
 use App\Repositories\ClientRepository;
+use App\Repositories\EmailTemplateRepository;
 use App\Repositories\LoginAttemptRepository;
 
 /**
@@ -73,14 +74,22 @@ final class ClientPortalService
         ClientPasswordResetTokenRepository::create($clientId, $tokenHash, $expiresAt, null);
 
         $setUrl = rtrim(Env::get('APP_URL', ''), '/') . '/client/set-password/' . $rawToken;
-        $body = "Hello,\n\n"
-            . "Your advance payment has been received and cleared — thank you.\n\n"
-            . "You can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\n"
-            . "To set up your login, open this link within 72 hours:\n{$setUrl}\n\n"
-            . "Your login email will be: {$email}\n\n"
-            . "NexaCrest International Private Limited";
 
-        EmailService::sendPlainText($email, 'Your NexaCrest order portal access', $body);
+        // 90-item backlog #37: admin-editable (Admin > Settings > Email
+        // Templates) — this exact original wording is the fallback.
+        $rendered = EmailTemplateRepository::renderOrDefault(
+            'client_portal_invite',
+            ['{set_password_link}' => $setUrl, '{email}' => $email],
+            'Your NexaCrest order portal access',
+            "Hello,\n\n"
+                . "Your advance payment has been received and cleared — thank you.\n\n"
+                . "You can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\n"
+                . "To set up your login, open this link within 72 hours:\n{set_password_link}\n\n"
+                . "Your login email will be: {email}\n\n"
+                . "NexaCrest International Private Limited"
+        );
+
+        EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
     }
 
     public static function attemptLogin(string $email, string $password): array
