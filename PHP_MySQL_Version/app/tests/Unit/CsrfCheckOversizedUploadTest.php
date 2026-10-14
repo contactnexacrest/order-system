@@ -104,10 +104,18 @@ final class CsrfCheckOversizedUploadTest extends TestCase
         self::assertStringNotContainsString('Session expired', $output);
     }
 
-    public function testVerifyStillReturnsSessionExpiredForAGenuineCsrfMismatch(): void
+    /**
+     * 90-item backlog #25: a genuine CSRF mismatch no longer echoes a raw
+     * "Session expired" page at all — see CsrfCheckRedirectTest for the
+     * full redirect-to-login coverage. This just re-pins that this branch
+     * (as opposed to the oversized-upload-drop branch above) is still the
+     * one reached for an ordinary mismatch with a real, non-empty $_POST.
+     */
+    public function testAGenuineCsrfMismatchStillRefusesButNoLongerEchoesAnything(): void
     {
         $_SERVER['REQUEST_METHOD'] = 'POST';
         unset($_SERVER['CONTENT_LENGTH']);
+        $_SESSION['_csrf_token'] = 'the-real-token';
         $_POST = ['_csrf' => 'wrong-token'];
 
         $verify = CsrfCheck::verify();
@@ -116,6 +124,6 @@ final class CsrfCheckOversizedUploadTest extends TestCase
         $output = ob_get_clean();
 
         self::assertFalse($result);
-        self::assertStringContainsString('Session expired', $output);
+        self::assertSame('', $output);
     }
 }

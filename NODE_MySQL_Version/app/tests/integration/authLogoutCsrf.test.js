@@ -61,7 +61,8 @@ describe('Logout requires POST + CSRF (QA-5 AUTH-15)', () => {
     await agent.post('/login').type('form').send({ _csrf: csrfToken, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
 
     const forgedLogout = await agent.post('/logout').type('form').send({});
-    expect(forgedLogout.status).toBe(419);
+    expect(forgedLogout.status).toBe(302);
+    expect(forgedLogout.headers.location).toBe('/login');
 
     const dashboard = await agent.get('/');
     expect(dashboard.status).toBe(200);

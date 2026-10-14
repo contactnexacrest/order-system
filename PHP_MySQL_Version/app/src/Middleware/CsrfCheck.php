@@ -23,8 +23,17 @@ final class CsrfCheck
             }
 
             if (!Csrf::verify($_POST['_csrf'] ?? null)) {
-                http_response_code(419);
-                echo '<h1>419 — Session expired</h1><p>Please go back, refresh the page, and try again.</p>';
+                // 90-item backlog #25: this used to echo a bare, unstyled
+                // "419 — Session expired" page with no navigation — a
+                // dead end for a staff/client member whose session had
+                // genuinely timed out while a form sat open, since the
+                // suggested "refresh the page" just re-submits into the
+                // same wall. Redirect to the right login screen instead,
+                // same as every other session-expiry path (SessionAuth's
+                // idle-timeout branch) already does.
+                $requestPath = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/');
+                $loginPath = str_starts_with($requestPath, '/client/') ? '/client/login' : '/login';
+                header('Location: ' . $loginPath);
                 return false;
             }
             return true;
