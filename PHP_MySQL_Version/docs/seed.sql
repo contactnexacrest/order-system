@@ -691,6 +691,18 @@ INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploade
 SELECT 'watermark', 'Watermark — Logo', '__STORAGE_BASE_PATH__/assets/watermarks/watermark_logo.jpg', 'image/jpeg', 1, u.id
 FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
 
+-- 90-item backlog #7: the two watermark_settings rows above are seeded
+-- with mode='both' but this INSERT never set their image_asset_id (it
+-- didn't exist yet at that point in the file) — DocumentGenerationService
+-- ::watermarkFromRow() only shows the image half of "both" when
+-- image_asset_id is actually set, so every document rendered with the
+-- seeded defaults silently dropped the image watermark and showed text
+-- only. Backfill it now that the watermark asset row above exists.
+UPDATE watermark_settings ws
+JOIN assets a ON a.asset_type = 'watermark' AND a.is_active = 1
+SET ws.image_asset_id = a.id
+WHERE ws.mode IN ('image', 'both') AND ws.image_asset_id IS NULL;
+
 -- ================================================================
 -- SIGNATORIES & DESIGNATIONS (Section M, added 2026-09-20)
 -- The company seal above stays the single shared company asset. The two

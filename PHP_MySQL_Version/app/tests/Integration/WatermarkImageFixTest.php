@@ -126,6 +126,38 @@ final class WatermarkImageFixTest extends DbTestCase
         self::assertNull($result['image_data_uri']);
     }
 
+    /**
+     * 90-item backlog #7 (the actual user report, distinct from the
+     * already-fixed Point 8/#220/#283 missing-file case above): seed.sql's
+     * two global watermark_settings rows were inserted with mode='both'
+     * before the watermark `assets` row even existed in the file, so their
+     * image_asset_id was left NULL forever — every fresh environment
+     * rendered text-only despite showing 'both' as the configured mode.
+     * seed.sql now backfills image_asset_id right after inserting the
+     * watermark asset; this guards that backfill actually ran.
+     */
+    public function testSeededGlobalWatermarkSettingsHaveImageAssetIdBackfilled(): void
+    {
+        foreach ([true, false] as $isDraftMode) {
+            $row = WatermarkSettingsRepository::findGlobal($isDraftMode);
+            self::assertNotNull($row);
+            self::assertSame('both', $row['mode'], 'seed.sql defaults both global rows to mode=both');
+            self::assertNotNull(
+                $row['image_asset_id'],
+                'the bug: seed.sql inserted this row with mode=both but never backfilled image_asset_id, so the image layer silently never showed'
+            );
+            // Not asserting a specific asset id here: other test classes in
+            // this same PHPUnit process (DB rebuilt once per process, not
+            // per test) may insert further 'watermark' assets, so the id
+            // this points to depends on test order — what matters is that
+            // it resolves to a real, active watermark-type asset row.
+            $asset = AssetRepository::find((int) $row['image_asset_id']);
+            self::assertNotNull($asset, 'image_asset_id must point to a real assets row');
+            self::assertSame('watermark', $asset['asset_type']);
+            self::assertSame(1, (int) $asset['is_active']);
+        }
+    }
+
     /** @param array<string,mixed> $row */
     private function invokeWatermarkFromRow(array $row): array
     {

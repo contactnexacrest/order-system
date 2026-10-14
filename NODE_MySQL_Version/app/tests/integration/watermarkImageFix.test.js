@@ -125,4 +125,32 @@ describe('Watermark "both" mode missing-image fix (Point 8)', () => {
     expect(result.show_image).toBe(false);
     expect(result.image_data_uri).toBeNull();
   });
+
+  /**
+   * 90-item backlog #7 (the actual user report, distinct from the
+   * already-fixed Point 8/#220/#283 missing-file case above): seed.sql's
+   * two global watermark_settings rows were inserted with mode='both'
+   * before the watermark `assets` row even existed in the file, so their
+   * image_asset_id was left NULL forever — every fresh environment
+   * rendered text-only despite showing 'both' as the configured mode.
+   * seed.sql now backfills image_asset_id right after inserting the
+   * watermark asset; this guards that backfill actually ran.
+   */
+  it('seeded global watermark settings have image_asset_id backfilled', async () => {
+    for (const isDraftMode of [true, false]) {
+      const row = await watermarkSettingsRepository.findGlobal(isDraftMode);
+      expect(row).not.toBeNull();
+      expect(row.mode).toBe('both');
+      expect(row.image_asset_id).not.toBeNull();
+      // Not asserting a specific asset id: other tests in this same Jest
+      // worker's DB (rebuilt once per worker, not per test) may insert
+      // further 'watermark' assets, so the id this points to depends on
+      // test order — what matters is that it resolves to a real, active
+      // watermark-type asset row.
+      const asset = await assetRepository.find(row.image_asset_id);
+      expect(asset).not.toBeNull();
+      expect(asset.asset_type).toBe('watermark');
+      expect(Number(asset.is_active)).toBe(1);
+    }
+  });
 });
