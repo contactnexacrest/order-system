@@ -1389,6 +1389,15 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // 90-item backlog #52: the supplier can't have signed and returned a
+        // document that was never actually generated — require the SUPPO
+        // document to exist (same "generated" bar as recordOcAcknowledgment's
+        // OC check below), not just the internal order_supplier_po terms row.
+        if (!DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'SUPPO')) {
+            Flash::set('error', 'Generate the Supplier PO document for this order before confirming signature.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if (WetSignatureGuardService::supplierPoBlocked((int) $supplierPo['id'])) {
             Flash::set('error', 'Wet-signature required: upload the supplier\'s signed acknowledgment copy before confirming this gate.');
             header("Location: /orders/{$orderId}");
@@ -1645,6 +1654,22 @@ final class OrderController
     public function recordBalancePayment(array $params): void
     {
         $orderId = (int) $params['id'];
+        // 90-item backlog #53: this action had no stage gate at all (unlike
+        // clearBalancePayment just below, which does check Stage 8) and no
+        // check that the Commercial Invoice was ever actually generated —
+        // the buyer can't be remitting against an invoice they were never
+        // sent. Same "generated" bar as confirmSupplierSigned's SUPPO check
+        // and recordOcAcknowledgment's OC check above.
+        if (!StageGateService::isUnlocked($orderId, 8)) {
+            Flash::set('error', 'Stage 8 has not been unlocked for this order yet.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if (!DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CI')) {
+            Flash::set('error', 'Generate the Commercial Invoice for this order before recording the balance remittance.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $amount = (float) ($_POST['balance_amount'] ?? 0);
         $receivedAt = trim((string) ($_POST['balance_received_at'] ?? '')) ?: date('Y-m-d');
         if ($amount <= 0) {

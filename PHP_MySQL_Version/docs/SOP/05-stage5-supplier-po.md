@@ -49,6 +49,14 @@ actions**:
    record-keeping and **does not by itself confirm the signature or pass
    the gate**.
 
+> **Document-generated gate:** "Confirm Supplier Signed & Returned PO" is
+> also refused if the Supplier PO document itself was never generated —
+> the supplier can't have signed and returned a document they were never
+> actually sent. Unlike the wet-signature gate below, this one has no
+> toggle: saving terms alone was never enough for the gate to pass, and
+> now neither is confirming a signature with no SUPPO document on record
+> either.
+
 > **Wet-signature gate:** by default (**Admin & Settings → the
 > `wet_signature_required_supplier_po` toggle**, on unless an Admin has
 > turned it off), clicking "Confirm Supplier Signed & Returned PO" is

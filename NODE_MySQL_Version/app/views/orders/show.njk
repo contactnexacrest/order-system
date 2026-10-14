@@ -1170,11 +1170,13 @@
         </form>
       {% endif %}
 
-      {% if supplierPo and supplierPo.status != 'signed' %}
+      {% if supplierPo and supplierPo.status != 'signed' and suppoDocGenerated %}
         <form method="post" action="/orders/{{ order.id }}/supplier-po/signed">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
         </form>
+      {% elif supplierPo and supplierPo.status != 'signed' %}
+        <p class="muted small">Generate the Supplier PO document above before confirming the supplier's signature — they can't have signed and returned a document that was never sent.</p>
       {% elif supplierPo %}
         <p>Supplier has signed and returned the PO.</p>
       {% endif %}
@@ -1390,6 +1392,8 @@
       {% if not balanceCleared %}
         {% if not permissions.manage_payments %}
           <p class="muted">Only Accounts can record or clear this payment.</p>
+        {% elif (not payment or payment.balance_remittance_received_at == null) and not ciDocGenerated %}
+          <p class="muted small">Generate the Commercial Invoice above before recording the balance remittance — the buyer can't be remitting against an invoice they were never sent.</p>
         {% elif not payment or payment.balance_remittance_received_at == null %}
           <form method="post" action="/orders/{{ order.id }}/payment/balance">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">

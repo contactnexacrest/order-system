@@ -178,6 +178,11 @@ $hasBuyerPo = $stage2 && $stage2['status'] === 'gate_passed';
 $advanceCleared = $stage3 && $stage3['status'] === 'gate_passed';
 $buyerAcknowledged = $stage4 && $stage4['status'] === 'gate_passed';
 $ocDocGenerated = (bool) array_filter($documents, static fn(array $d): bool => $d['document_type_code'] === 'OC');
+// 90-item backlog #52/#53: confirmSupplierSigned()/recordBalancePayment() now
+// require their commercial document to actually exist — these drive the
+// matching UI hints (closest existing precedent: $ocDocGenerated above).
+$suppoDocGenerated = (bool) array_filter($documents, static fn(array $d): bool => $d['document_type_code'] === 'SUPPO');
+$ciDocGenerated = (bool) array_filter($documents, static fn(array $d): bool => $d['document_type_code'] === 'CI');
 $supplierSigned = $stage5 && $stage5['status'] === 'gate_passed';
 $isFob = strtoupper((string) $order['incoterm_code']) === 'FOB';
 $freightSkipped = $stage6 && $stage6['status'] === 'skipped';
@@ -1262,11 +1267,13 @@ foreach ($stages as $s) {
         </form>
       <?php endif; ?>
 
-      <?php if ($supplierPo && $supplierPo['status'] !== 'signed'): ?>
+      <?php if ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/signed">
           <?= Csrf::field() ?>
           <button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
         </form>
+      <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed'): ?>
+        <p class="muted small">Generate the Supplier PO document above before confirming the supplier's signature — they can't have signed and returned a document that was never sent.</p>
       <?php elseif ($supplierPo): ?>
         <p>Supplier has signed and returned the PO.</p>
       <?php endif; ?>
@@ -1488,6 +1495,8 @@ foreach ($stages as $s) {
       <?php if (!$balanceCleared): ?>
         <?php if (!$canManagePayments): ?>
           <p class="muted">Only Accounts can record or clear this payment.</p>
+        <?php elseif ((!$payment || $payment['balance_remittance_received_at'] === null) && !$ciDocGenerated): ?>
+          <p class="muted small">Generate the Commercial Invoice above before recording the balance remittance — the buyer can't be remitting against an invoice they were never sent.</p>
         <?php elseif (!$payment || $payment['balance_remittance_received_at'] === null): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance">
             <?= Csrf::field() ?>

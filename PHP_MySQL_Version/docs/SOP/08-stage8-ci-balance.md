@@ -44,7 +44,10 @@ Recording and clearing the balance payment follows the same two-step
 pattern as every other payment in this pipeline:
 
 1. **Record Balance Remittance** — amount and date once the buyer's payment
-   notification arrives.
+   notification arrives. Refused until the Commercial Invoice above has
+   actually been generated — the buyer can't be remitting against an
+   invoice they were never sent — and, like every stage-gated action,
+   until Stage 8 itself has unlocked.
 
    ![Stage 8 section — balance recorded, awaiting clearance](./images/s8_recorded_awaiting_clear.png)
 

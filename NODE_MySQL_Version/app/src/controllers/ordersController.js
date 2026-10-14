@@ -771,6 +771,11 @@ async function show(req, res) {
       clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
       ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
       ocDocGenerated: documents.some((d) => d.document_type_code === 'OC'),
+      // 90-item backlog #52/#53: confirmSupplierSigned()/recordBalancePayment()
+      // now require their commercial document to actually exist — these
+      // drive the matching UI hints (closest existing precedent: ocDocGenerated above).
+      suppoDocGenerated: documents.some((d) => d.document_type_code === 'SUPPO'),
+      ciDocGenerated: documents.some((d) => d.document_type_code === 'CI'),
       comments: await orderCommentRepository.forOrder(orderId),
       canViewInrActual: !!req.permissions.inr_actual_view,
       canEditInrActual: !!req.permissions.inr_actual_edit,
@@ -1368,6 +1373,15 @@ async function confirmSupplierSigned(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // 90-item backlog #52: the supplier can't have signed and returned a
+  // document that was never actually generated — require the SUPPO
+  // document to exist (same "generated" bar as the OC check above), not
+  // just the internal order_supplier_po terms row.
+  if (!(await documentRepository.findLatestForOrderAndTypeCode(orderId, 'SUPPO'))) {
+    flash.set(req, 'error', 'Generate the Supplier PO document for this order before confirming signature.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (await wetSignatureGuardService.supplierPoBlocked(supplierPo.id)) {
     flash.set(req, 'error', 'Wet-signature required: upload the supplier\'s signed acknowledgment copy before confirming this gate.');
     res.redirect(`/orders/${orderId}`);
@@ -1624,6 +1638,21 @@ async function recordScannedBlSent(req, res) {
 
 async function recordBalancePayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  // 90-item backlog #53: this action had no stage gate at all (unlike
+  // clearBalancePayment just below, which does check Stage 8) and no
+  // check that the Commercial Invoice was ever actually generated — the
+  // buyer can't be remitting against an invoice they were never sent.
+  // Same "generated" bar as confirmSupplierSigned's SUPPO check above.
+  if (!(await stageGateService.isUnlocked(orderId, 8))) {
+    flash.set(req, 'error', 'Stage 8 has not been unlocked for this order yet.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!(await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CI'))) {
+    flash.set(req, 'error', 'Generate the Commercial Invoice for this order before recording the balance remittance.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const amount = parseFloat(req.body.balance_amount || 0);
   const receivedAt = str(req.body.balance_received_at) || todayYmd();
   if (!(amount > 0)) {
