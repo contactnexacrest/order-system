@@ -140,6 +140,22 @@ mistake (or malice).
   paperwork side. This directory is standalone for now — a quick
   "who do we call for this" lookup — not yet wired into a specific order
   or Order Cost Entry.
+- **Ports** (`/ports`) — the Port of Loading / Port of Discharge options
+  offered on the New Order form, gated by its own `manage_ports`
+  permission (same tier as Logistics Partners: Admin/MD/ED and Super
+  Admin by default). 90-item backlog #59: this used to be unreachable —
+  only one loading port (Chennai) was ever seeded and nothing let staff
+  add another, so the Port of Discharge dropdown was always empty and
+  every order fell back to its free-text "not listed" field. Each port
+  carries a **Role** — Loading only, Discharge only, or **Loading &amp;
+  Discharge** — a "both" port appears in whichever dropdown staff open,
+  same pattern as Logistics Partners' Service Type. One port per role (or
+  one "Loading &amp; Discharge" port) can be marked **Default**, which
+  pre-selects it on a fresh New Order form; setting a new default clears
+  the flag from every port that would otherwise appear alongside it in
+  that same dropdown. A port already used on a real order is never
+  deleted outright — deactivate it instead, same convention as every
+  other admin-editable list on this page.
 - **Payment Presets** (`/payment-presets`) — full CRUD for the advance/
   balance split every order picks up, gated by its own
   `manage_payment_presets` permission (same tier as Logistics Partners:

@@ -30,6 +30,7 @@ use App\Controllers\HolidayController;
 use App\Controllers\HsCodeController;
 use App\Controllers\ComplianceTaskTypeController;
 use App\Controllers\LogisticsPartnerController;
+use App\Controllers\PortController;
 use App\Controllers\DropdownOptionController;
 use App\Controllers\PaymentPresetController;
 use App\Controllers\WatermarkController;
@@ -90,6 +91,7 @@ $disputes = new DisputeController();
 $holidays = new HolidayController();
 $hsCodes = new HsCodeController();
 $logisticsPartners = new LogisticsPartnerController();
+$ports = new PortController();
 $dropdownOptions = new DropdownOptionController();
 $paymentPresets = new PaymentPresetController();
 $complianceTaskTypes = new ComplianceTaskTypeController();
@@ -194,6 +196,14 @@ $router->get('/logistics-partners/{id}/edit', [$logisticsPartners, 'editForm'], 
 $router->post('/logistics-partners/{id}/update', [$logisticsPartners, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/toggle', [$logisticsPartners, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/delete', [$logisticsPartners, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+
+$router->get('/ports', [$ports, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_ports')]);
+$router->get('/ports/create', [$ports, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_ports')]);
+$router->post('/ports', [$ports, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_ports'), CsrfCheck::verify()]);
+$router->get('/ports/{id}/edit', [$ports, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_ports')]);
+$router->post('/ports/{id}/update', [$ports, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_ports'), CsrfCheck::verify()]);
+$router->post('/ports/{id}/toggle', [$ports, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_ports'), CsrfCheck::verify()]);
+$router->post('/ports/{id}/set-default', [$ports, 'setDefault'], [SessionAuth::required(), PermissionCheck::requires('manage_ports'), CsrfCheck::verify()]);
 
 $router->get('/admin/dropdown-options', [$dropdownOptions, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_dropdown_options')]);
 $router->post('/admin/dropdown-options/{listKey}/create', [$dropdownOptions, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_dropdown_options'), CsrfCheck::verify()]);

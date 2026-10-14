@@ -75,6 +75,7 @@ const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const logisticsPartnerController = require('./controllers/logisticsPartnerController');
+const portController = require('./controllers/portController');
 const paymentPresetController = require('./controllers/paymentPresetController');
 const dropdownOptionController = require('./controllers/dropdownOptionController');
 const complianceTaskTypeController = require('./controllers/complianceTaskTypeController');
@@ -415,6 +416,14 @@ app.get('/logistics-partners/:id/edit', requireAuth, requirePermission('manage_l
 app.post('/logistics-partners/:id/update', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.update));
 app.post('/logistics-partners/:id/toggle', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.toggleActive));
 app.post('/logistics-partners/:id/delete', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.remove));
+
+app.get('/ports', requireAuth, requirePermission('manage_ports'), asyncHandler(portController.index));
+app.get('/ports/create', requireAuth, requirePermission('manage_ports'), asyncHandler(portController.createForm));
+app.post('/ports', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portController.create));
+app.get('/ports/:id/edit', requireAuth, requirePermission('manage_ports'), asyncHandler(portController.editForm));
+app.post('/ports/:id/update', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portController.update));
+app.post('/ports/:id/toggle', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portController.toggleActive));
+app.post('/ports/:id/set-default', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portController.setDefault));
 
 app.get('/admin/dropdown-options', requireAuth, requirePermission('manage_dropdown_options'), asyncHandler(dropdownOptionController.index));
 app.post('/admin/dropdown-options/:listKey/create', requireAuth, requirePermission('manage_dropdown_options'), verifyCsrf, asyncHandler(dropdownOptionController.create));

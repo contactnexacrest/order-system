@@ -1,0 +1,40 @@
+<div class="card page-wide">
+  <h1>Ports — Loading &amp; Discharge</h1>
+  <p class="muted">The list staff pick from on the New Order form's Port of Loading / Port of Discharge dropdowns. A port tagged "Loading &amp; Discharge" shows up in both lists. One port per role (or marked "Loading &amp; Discharge") can be the default that's pre-selected on a new order.</p>
+
+  <div class="section">
+    <div class="btn-row"><a href="/ports/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Port</a></div>
+
+    <table class="list">
+      <tr><th>Name</th><th>Country</th><th>Role</th><th>Default</th><th>Status</th><th>Actions</th></tr>
+      {% if ports.length == 0 %}
+      <tr><td colspan="6" class="muted">No ports yet — add the first one above.</td></tr>
+      {% endif %}
+      {% for p in ports %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td>{{ p.country or '—' }}</td>
+        <td>{{ roles[p.port_role] or p.port_role }}</td>
+        <td>
+          {% if p.is_default %}
+            <span class="badge badge-active">Default</span>
+          {% else %}
+            <form method="post" action="/ports/{{ p.id }}/set-default" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-secondary">Set default</button>
+            </form>
+          {% endif %}
+        </td>
+        <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
+        <td>
+          <a href="/ports/{{ p.id }}/edit" class="btn-sm btn-secondary">Edit</a>
+          <form method="post" action="/ports/{{ p.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if p.is_active else 'Reactivate' }} {{ p.name }}? {{ 'It will no longer be offered on new orders.' if p.is_active else '' }}');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm {{ 'btn-danger' if p.is_active else 'btn-success' }}">{{ 'Deactivate' if p.is_active else 'Reactivate' }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

@@ -3204,3 +3204,18 @@ ALTER TABLE orders
   ADD COLUMN buyer_action_token_expires_at DATETIME NULL AFTER buyer_action_token_plain;
 
 CREATE INDEX idx_orders_buyer_action_token_hash ON orders(buyer_action_token_hash);
+
+-- ================================================================
+-- SECTION BH — PORTS ADMIN SCREEN (added 2026-10-14)
+-- ================================================================
+-- 90-item backlog #59: `ports` (defined near the top of this file) was
+-- seeded with exactly one row (Chennai, loading) and had no admin screen —
+-- LookupRepository::ports('discharge') always returned empty, making the
+-- New Order form's Port of Discharge dropdown genuinely non-functional
+-- beyond the free-text fallback. This adds the permission only; the
+-- table's DDL is unchanged. Same tier as manage_hs_codes/
+-- manage_logistics_partners/manage_dropdown_options: Admin/MD/ED and
+-- Super Admin only.
+-- ================================================================
+INSERT INTO permissions (permission_key, name, description, category) VALUES
+  ('manage_ports', 'Manage ports', 'Add, edit, and deactivate the Port of Loading / Port of Discharge options offered on the New Order form. Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog');

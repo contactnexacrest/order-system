@@ -22,6 +22,7 @@ $piIntakePendingCount = $canOrders ? PiIntakeRepository::pendingReviewCount() : 
 $canSettings = $can('manage_company_settings');
 $canManageHsCodes = $can('manage_hs_codes');
 $canManageLogisticsPartners = $can('manage_logistics_partners');
+$canManagePorts = $can('manage_ports');
 $canManagePaymentPresets = $can('manage_payment_presets');
 $canManageComplianceTaskTypes = $can('manage_compliance_task_types');
 $canManageDropdownOptions = $can('manage_dropdown_options');
@@ -69,7 +70,7 @@ $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/c
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates')
-    || $isActive('/logistics-partners') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types');
+    || $isActive('/logistics-partners') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -142,6 +143,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>
           <?php if ($canManageHsCodes): ?><a href="/hs-codes" class="<?= $isActive('/hs-codes') ? 'active' : '' ?>">HS Codes</a><?php endif; ?>
           <?php if ($canManageLogisticsPartners): ?><a href="/logistics-partners" class="<?= $isActive('/logistics-partners') ? 'active' : '' ?>">Logistics Partners</a><?php endif; ?>
+          <?php if ($canManagePorts): ?><a href="/ports" class="<?= $isActive('/ports') ? 'active' : '' ?>">Ports</a><?php endif; ?>
           <?php if ($canManagePaymentPresets): ?><a href="/payment-presets" class="<?= $isActive('/payment-presets') ? 'active' : '' ?>">Payment Presets</a><?php endif; ?>
           <?php if ($canManageComplianceTaskTypes): ?><a href="/compliance-task-types" class="<?= $isActive('/compliance-task-types') ? 'active' : '' ?>">Compliance Task Types</a><?php endif; ?>
           <?php if ($canManageDropdownOptions): ?><a href="/admin/dropdown-options" class="<?= $isActive('/admin/dropdown-options') ? 'active' : '' ?>">Dropdown Option Lists</a><?php endif; ?>
