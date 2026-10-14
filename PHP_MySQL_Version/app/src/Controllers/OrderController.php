@@ -799,6 +799,7 @@ final class OrderController
             'additionalDocuments' => FileStoreRepository::additionalDocumentsForOrder($orderId),
             'blEndorsement' => OrderBlEndorsementRepository::find($orderId),
             'blEndorsementDoc' => DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'BLE'),
+            'containerTypes' => LookupRepository::dropdownOptions('container_type'),
         ], 'layout/base');
     }
 

@@ -1395,7 +1395,15 @@ foreach ($stages as $s) {
           <label>Voyage Number<input type="text" name="voyage_number" value="<?= htmlspecialchars($shipping['voyage_number'] ?? '') ?>"></label>
           <label>ETD<input type="date" name="etd" value="<?= htmlspecialchars($shipping['etd'] ?? '') ?>"></label>
           <label>ETA<input type="date" name="eta" value="<?= htmlspecialchars($shipping['eta'] ?? '') ?>"></label>
-          <label>Container Type<input type="text" name="ship_container_type" value="<?= htmlspecialchars($shipping['container_type'] ?? $order['container_type'] ?? '') ?>"></label>
+          <label>Container Type
+            <select name="ship_container_type">
+              <option value="">— To Be Confirmed —</option>
+              <?php $shipContainerType = $shipping['container_type'] ?? $order['container_type'] ?? ''; ?>
+              <?php foreach ($containerTypes as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($shipContainerType === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <label>Container No.<input type="text" name="container_no" value="<?= htmlspecialchars($shipping['container_no'] ?? '') ?>"></label>
           <label>Seal No.<input type="text" name="seal_no" value="<?= htmlspecialchars($shipping['seal_no'] ?? '') ?>"></label>
         </div>

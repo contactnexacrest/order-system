@@ -1308,7 +1308,15 @@
           <label>Voyage Number<input type="text" name="voyage_number" value="{{ shipping.voyage_number or '' }}"></label>
           <label>ETD<input type="date" name="etd" value="{{ shipping.etd or '' }}"></label>
           <label>ETA<input type="date" name="eta" value="{{ shipping.eta or '' }}"></label>
-          <label>Container Type<input type="text" name="ship_container_type" value="{{ shipping.container_type or order.container_type or '' }}"></label>
+          <label>Container Type
+            {% set shipContainerType = shipping.container_type or order.container_type or '' %}
+            <select name="ship_container_type">
+              <option value="">— To Be Confirmed —</option>
+              {% for o in containerTypes %}
+                <option value="{{ o.option_value }}" {{ 'selected' if shipContainerType == o.option_value else '' }}>{{ o.option_value }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}"></label>
           <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}"></label>
         </div>

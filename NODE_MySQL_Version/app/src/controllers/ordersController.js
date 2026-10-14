@@ -791,6 +791,7 @@ async function show(req, res) {
       additionalDocuments: await fileStoreRepository.additionalDocumentsForOrder(orderId),
       blEndorsement: await orderBlEndorsementRepository.find(orderId),
       blEndorsementDoc: await documentRepository.findLatestForOrderAndTypeCode(orderId, 'BLE'),
+      containerTypes: await lookupRepository.dropdownOptions('container_type'),
     },
     'layout/base'
   );
