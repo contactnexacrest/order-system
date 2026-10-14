@@ -658,7 +658,12 @@
       {% else %}
         {% set reviewState = 'under_review' %}
       {% endif %}
-      {% set sendApplies = d.document_type_code != 'AMD' and d.document_type_code != 'SUPPO' and d.document_type_code != 'COOPREP' and d.document_type_code != 'BLI' %}
+      {# 90-item backlog #12: "Send to Buyer" must apply to every document
+         type, generically — driven by document_types.category rather than
+         a hardcoded per-type list, so a type added later (or any existing
+         internal/procurement type not yet on a hand-maintained exclusion
+         list) is correctly included/excluded without a code change here. #}
+      {% set sendApplies = d.document_type_category == 'customer_facing' %}
       {% set emailLogs = emailLogByDocument[d.id] or [] %}
       {% set hasPendingSend = false %}
       {% for log in emailLogs %}

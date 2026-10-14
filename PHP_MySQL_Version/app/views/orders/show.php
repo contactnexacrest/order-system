@@ -737,7 +737,12 @@ foreach ($stages as $s) {
       } else {
           $reviewState = 'under_review';
       }
-      $sendApplies = !in_array($d['document_type_code'], ['AMD', 'SUPPO', 'COOPREP', 'BLI'], true);
+      // 90-item backlog #12: "Send to Buyer" must apply to every document
+      // type, generically — driven by document_types.category rather than
+      // a hardcoded per-type list, so a type added later (or any existing
+      // internal/procurement type not yet on a hand-maintained exclusion
+      // list) is correctly included/excluded without a code change here.
+      $sendApplies = ($d['document_type_category'] ?? null) === 'customer_facing';
       $emailLogs = $emailLogByDocument[(int) $d['id']] ?? [];
       $hasPendingSend = false;
       foreach ($emailLogs as $log) {

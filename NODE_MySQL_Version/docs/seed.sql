@@ -666,6 +666,24 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
    '{company_name} | {company_email} | {company_phone}'),
   ('balance_receipt_confirmation', 'Balance Payment Received — Order {order_reference}',
    'Dear {buyer_contact_person},\n\nWe confirm receipt and clearance of the balance payment for your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). Thank you for your business — we are proceeding with final despatch formalities.\n\n{sender_signature}',
+   '{company_name} | {company_email} | {company_phone}'),
+  -- 90-item backlog #12: "Send to Buyer" is now generalized to every
+  -- customer_facing document type by document_types.category rather than
+  -- a hand-maintained code list (see emailDispatchController.renderCompose()'s
+  -- send_{code} auto-guess) — these 4 close the remaining content gap so
+  -- every customer_facing type lands on a ready preview, not an empty
+  -- "Select a template…" picker, the same as QT/PI/OC/CI/FDN already did.
+  ('send_buyerpo', 'Buyer PO — Order Acceptance {document_reference} — {company_name}',
+   'Dear {buyer_contact_person},\n\nPlease find attached our formal acceptance of your Purchase Order, {document_reference} dated {generated_date}, issued against Order Confirmation {oc_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{sender_signature}',
+   '{company_name} | {company_email} | {company_phone}'),
+  ('send_annexa', 'Annexure A {document_reference} — {company_name}',
+   'Dear {buyer_contact_person},\n\nPlease find attached Annexure A {document_reference} dated {generated_date}, accompanying your order (Buyer Inquiry Ref: {buyer_inquiry_ref}). This annexure must always be read together with its parent document.\n\n{sender_signature}',
+   '{company_name} | {company_email} | {company_phone}'),
+  ('send_pl', 'Packing List {document_reference} — {company_name}',
+   'Dear {buyer_contact_person},\n\nPlease find attached Packing List {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{sender_signature}',
+   '{company_name} | {company_email} | {company_phone}'),
+  ('send_ble', 'Bill of Lading Endorsement {document_reference} — {company_name}',
+   'Dear {buyer_contact_person},\n\nPlease find attached the Bill of Lading Endorsement {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}');
 
 -- ================================================================

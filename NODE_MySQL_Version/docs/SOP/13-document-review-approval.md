@@ -100,6 +100,18 @@ shown immediately, with no extra click needed:
 
 ![Send compose screen — exact preview of subject, body, and recipient](./images/review_send_compose.png)
 
+**Send Document is available for every customer-facing document type** —
+Quotation, Proforma Invoice, Order Confirmation, Buyer PO Acceptance,
+Commercial Invoice, Freight Debit Note, Packing List, Annexure A, and BL
+Endorsement — driven by the document type's own category, not a
+hand-maintained list, so a new document type added later is automatically
+included (or excluded, for an internal/procurement type that must never
+reach a buyer) with no extra configuration step. If a document type's
+template hasn't been set up yet, the compose screen falls back to the
+ordinary manual template picker below the preview instead of a pre-filled
+one — staff can still select any existing template or ask an admin to add
+a dedicated one from Email Templates in Settings.
+
 **Submit for Level-2 Approval** doesn't send anything yet — it's Level 1.
 A separate approver (anyone with the `approve_email_send` permission) has
 to clear it from the **Email Send Approvals** queue before it goes out.

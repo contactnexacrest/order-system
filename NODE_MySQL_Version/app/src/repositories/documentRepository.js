@@ -26,7 +26,7 @@ async function customerFacingForOrder(orderId) {
 
 async function forOrder(orderId) {
   return db.query(
-    `SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default
+    `SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default, dt.category AS document_type_category
      FROM documents d
      JOIN document_types dt ON dt.id = d.document_type_id
      WHERE d.order_id = :order_id

@@ -177,6 +177,7 @@ CREATE TABLE tc_clause_documents (
 CREATE TABLE email_templates (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   template_key  VARCHAR(100) NOT NULL UNIQUE, -- 'send_qt','send_pi','send_oc','send_ci','send_fdn',
+                                               -- 'send_buyerpo','send_annexa','send_pl','send_ble',
                                                -- 'payment_followup','shipment_readiness','bl_copy_sent',
                                                -- 'balance_receipt_confirmation'
   subject       VARCHAR(255) NOT NULL,
