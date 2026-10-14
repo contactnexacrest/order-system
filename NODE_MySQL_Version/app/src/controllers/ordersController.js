@@ -734,6 +734,7 @@ async function show(req, res) {
       piFormFullLink,
       clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
       ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
+      ocDocGenerated: documents.some((d) => d.document_type_code === 'OC'),
       comments: await orderCommentRepository.forOrder(orderId),
       canViewInrActual: !!req.permissions.inr_actual_view,
       canEditInrActual: !!req.permissions.inr_actual_edit,

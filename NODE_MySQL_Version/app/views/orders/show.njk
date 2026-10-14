@@ -1055,6 +1055,15 @@
           <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
           <button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Stage 5)</button>
         </form>
+      {% elif ocDocGenerated %}
+        <div class="review-banner info">
+          ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below — Stage 5 unlocks immediately.</span>
+        </div>
+        <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
+          <button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Stage 5)</button>
+        </form>
       {% else %}
         <p class="muted">Generate the Order Confirmation above and send it to the buyer — once sent, they can acknowledge it from their portal (or reply by email, which you can record here), and it auto-confirms after 48 hours with no response.</p>
       {% endif %}

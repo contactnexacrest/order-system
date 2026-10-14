@@ -177,6 +177,7 @@ $hasQt = $stage1 && $stage1['status'] === 'gate_passed';
 $hasBuyerPo = $stage2 && $stage2['status'] === 'gate_passed';
 $advanceCleared = $stage3 && $stage3['status'] === 'gate_passed';
 $buyerAcknowledged = $stage4 && $stage4['status'] === 'gate_passed';
+$ocDocGenerated = (bool) array_filter($documents, static fn(array $d): bool => $d['document_type_code'] === 'OC');
 $supplierSigned = $stage5 && $stage5['status'] === 'gate_passed';
 $isFob = strtoupper((string) $order['incoterm_code']) === 'FOB';
 $freightSkipped = $stage6 && $stage6['status'] === 'skipped';
@@ -1137,6 +1138,15 @@ foreach ($stages as $s) {
           <?= Csrf::field() ?>
           <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
           <button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Stage 5)</button>
+        </form>
+      <?php elseif ($ocDocGenerated): ?>
+        <div class="review-banner info">
+          ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below — Stage 5 unlocks immediately.</span>
+        </div>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
+          <?= Csrf::field() ?>
+          <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
+          <button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Stage 5)</button>
         </form>
       <?php else: ?>
         <p class="muted">Generate the Order Confirmation above and send it to the buyer — once sent, they can acknowledge it from their portal (or reply by email, which you can record here), and it auto-confirms after 48 hours with no response.</p>
