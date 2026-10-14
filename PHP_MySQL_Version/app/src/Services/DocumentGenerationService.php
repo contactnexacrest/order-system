@@ -136,7 +136,7 @@ final class DocumentGenerationService
                 'revision_number'    => $revisionNumber,
                 'revision_label'     => 'Rev.' . str_pad((string) $revisionNumber, 2, '0', STR_PAD_LEFT),
                 'client_revision_number' => $clientRevisionNumber,
-                'client_revision_label'  => 'Rev.' . str_pad((string) $clientRevisionNumber, 2, '0', STR_PAD_LEFT),
+                'client_revision_label'  => self::clientRevisionLabel($clientRevisionNumber),
                 'generated_date'     => (new \DateTimeImmutable())->format('d F Y'),
             ],
             'watermark' => $watermark,
@@ -478,7 +478,7 @@ final class DocumentGenerationService
                 'revision_number'    => (int) $document['revision_number'],
                 'revision_label'     => 'Rev.' . str_pad((string) $document['revision_number'], 2, '0', STR_PAD_LEFT),
                 'client_revision_number' => (int) $document['client_revision_number'],
-                'client_revision_label'  => 'Rev.' . str_pad((string) $document['client_revision_number'], 2, '0', STR_PAD_LEFT),
+                'client_revision_label'  => self::clientRevisionLabel((int) $document['client_revision_number']),
                 'generated_date'     => (new \DateTimeImmutable($document['generated_at']))->format('d F Y'),
             ],
             'watermark' => self::withRevisionStamp(self::finalWatermark(), (int) $document['client_revision_number'], $document['document_type_category'] ?? null),
@@ -531,7 +531,7 @@ final class DocumentGenerationService
             null,
             $finalPath,
             $finalUuidName,
-            "{$documentTypeCode} {$filenameSafeReference} Rev.{$document['client_revision_number']} (approved).pdf",
+            "{$documentTypeCode} {$filenameSafeReference}" . self::clientRevisionFilenameSuffix((int) $document['client_revision_number']) . '.pdf',
             strlen($pdfBytes),
             'application/pdf',
             null,
@@ -559,6 +559,28 @@ final class DocumentGenerationService
         }
         $watermark['text'] = trim((string) $watermark['text']) . ' — REVISION ' . str_pad((string) $clientRevisionNumber, 2, '0', STR_PAD_LEFT);
         return $watermark;
+    }
+
+    /**
+     * 90-item backlog #44: same "nothing to distinguish it from" reasoning
+     * as withRevisionStamp() above, applied to the on-document meta-table
+     * label (every customer-facing template prints "{{ meta.
+     * document_reference }} {{ meta.client_revision_label }}" in its
+     * header) and to the buyer-visible filename below — a buyer's very
+     * first-ever copy of a document showing "Rev.00" reads as if it's a
+     * revision of something they were never shown, when it's actually the
+     * original. From the second client-facing issue onward this is exactly
+     * the zero-padded label it always was.
+     */
+    private static function clientRevisionLabel(int $clientRevisionNumber): string
+    {
+        return $clientRevisionNumber < 1 ? '' : 'Rev.' . str_pad((string) $clientRevisionNumber, 2, '0', STR_PAD_LEFT);
+    }
+
+    /** Same zero-suppression as clientRevisionLabel(), shaped for splicing into a filename (leading space only when non-empty). */
+    private static function clientRevisionFilenameSuffix(int $clientRevisionNumber): string
+    {
+        return $clientRevisionNumber < 1 ? '' : ' Rev.' . str_pad((string) $clientRevisionNumber, 2, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -625,7 +647,7 @@ final class DocumentGenerationService
                 'revision_number'    => (int) $document['revision_number'],
                 'revision_label'     => 'Rev.' . str_pad((string) $document['revision_number'], 2, '0', STR_PAD_LEFT),
                 'client_revision_number' => (int) $document['client_revision_number'],
-                'client_revision_label'  => 'Rev.' . str_pad((string) $document['client_revision_number'], 2, '0', STR_PAD_LEFT),
+                'client_revision_label'  => self::clientRevisionLabel((int) $document['client_revision_number']),
                 'generated_date'     => (new \DateTimeImmutable($document['generated_at']))->format('d F Y'),
             ],
             'watermark' => self::invalidWatermark(),

@@ -233,7 +233,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
       revision_number: revisionNumber,
       revision_label: `Rev.${String(revisionNumber).padStart(2, '0')}`,
       client_revision_number: clientRevisionNumber,
-      client_revision_label: `Rev.${String(clientRevisionNumber).padStart(2, '0')}`,
+      client_revision_label: clientRevisionLabel(clientRevisionNumber),
       generated_date: formatNow(),
     },
     watermark,
@@ -557,7 +557,7 @@ async function finalizeApproval(documentId) {
       revision_number: document.revision_number,
       revision_label: `Rev.${String(document.revision_number).padStart(2, '0')}`,
       client_revision_number: document.client_revision_number,
-      client_revision_label: `Rev.${String(document.client_revision_number).padStart(2, '0')}`,
+      client_revision_label: clientRevisionLabel(document.client_revision_number),
       generated_date: documentDataAssembler.formatDate(document.generated_at),
     },
     watermark: withRevisionStamp(await finalWatermark(), document.client_revision_number, document.document_type_category),
@@ -605,7 +605,7 @@ async function finalizeApproval(documentId) {
     null,
     finalPath,
     finalUuidName,
-    `${documentTypeCode} ${filenameSafeReference} Rev.${document.client_revision_number} (approved).pdf`,
+    `${documentTypeCode} ${filenameSafeReference}${clientRevisionFilenameSuffix(document.client_revision_number)}.pdf`,
     pdfBytes.length,
     'application/pdf',
     null,
@@ -633,6 +633,26 @@ function withRevisionStamp(watermark, clientRevisionNumber, documentTypeCategory
     ...watermark,
     text: `${String(watermark.text ?? '').trim()} — REVISION ${String(clientRevisionNumber).padStart(2, '0')}`,
   };
+}
+
+/**
+ * 90-item backlog #44: same "nothing to distinguish it from" reasoning as
+ * withRevisionStamp() above, applied to the on-document meta-table label
+ * (every customer-facing template prints "{{ meta.document_reference }}
+ * {{ meta.client_revision_label }}" in its header) and to the buyer-
+ * visible filename below — a buyer's very first-ever copy of a document
+ * showing "Rev.00" reads as if it's a revision of something they were
+ * never shown, when it's actually the original. From the second
+ * client-facing issue onward this is exactly the zero-padded label it
+ * always was.
+ */
+function clientRevisionLabel(clientRevisionNumber) {
+  return clientRevisionNumber < 1 ? '' : `Rev.${String(clientRevisionNumber).padStart(2, '0')}`;
+}
+
+/** Same zero-suppression as clientRevisionLabel(), shaped for splicing into a filename (leading space only when non-empty). */
+function clientRevisionFilenameSuffix(clientRevisionNumber) {
+  return clientRevisionNumber < 1 ? '' : ` Rev.${String(clientRevisionNumber).padStart(2, '0')}`;
 }
 
 /**
@@ -698,7 +718,7 @@ async function markSuperseded(documentId) {
       revision_number: document.revision_number,
       revision_label: `Rev.${String(document.revision_number).padStart(2, '0')}`,
       client_revision_number: document.client_revision_number,
-      client_revision_label: `Rev.${String(document.client_revision_number).padStart(2, '0')}`,
+      client_revision_label: clientRevisionLabel(document.client_revision_number),
       generated_date: documentDataAssembler.formatDate(document.generated_at),
     },
     watermark: invalidWatermark(),
