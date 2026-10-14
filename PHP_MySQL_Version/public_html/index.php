@@ -148,6 +148,8 @@ $router->post('/client/logout', [$clientPortal, 'logout'], [CsrfCheck::verify()]
 $router->post('/client/end-impersonation', [$clientPortal, 'endImpersonation'], [CsrfCheck::verify()]);
 $router->get('/client/set-password/{token}', [$clientPortal, 'showSetPassword']);
 $router->post('/client/set-password/{token}', [$clientPortal, 'setPassword'], [CsrfCheck::verify()]);
+$router->get('/client/forgot-password', [$clientPortal, 'showForgotPassword']);
+$router->post('/client/forgot-password', [$clientPortal, 'forgotPassword'], [CsrfCheck::verify()]);
 
 // --- Authenticated routes ---
 $router->get('/force-password-change', [$auth, 'showForcePasswordChange'], [SessionAuth::required()]);

@@ -12,4 +12,5 @@
     </label>
     <button type="submit">Sign in</button>
   </form>
+  <p class="muted small"><a href="/client/forgot-password">Forgot your password?</a></p>
 </div>

@@ -357,6 +357,8 @@ app.post('/client/logout', verifyCsrf, asyncHandler(clientPortalController.logou
 app.post('/client/end-impersonation', verifyCsrf, asyncHandler(clientPortalController.endImpersonation));
 app.get('/client/set-password/:token', asyncHandler(clientPortalController.showSetPassword));
 app.post('/client/set-password/:token', verifyCsrf, asyncHandler(clientPortalController.setPassword));
+app.get('/client/forgot-password', asyncHandler(clientPortalController.showForgotPassword));
+app.post('/client/forgot-password', verifyCsrf, asyncHandler(clientPortalController.forgotPassword));
 
 // --- Authenticated routes ---
 app.get('/force-password-change', requireAuth, asyncHandler(authController.showForcePasswordChange));

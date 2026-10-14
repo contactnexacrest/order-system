@@ -16,6 +16,17 @@ account page.
   clearing) — see [Chapter 3](./03-stage3-pi-advance.md). Before that point,
   the buyer has no way to log in at all, regardless of what they've done on
   public forms — except via staff impersonation, below.
+- **Forgot password** — the sign-in screen has a "Forgot your password?"
+  link. A buyer who requests a reset is always shown the same generic
+  "if that address matches an account..." message, whether or not the
+  email actually matches a client — the portal never confirms or denies
+  that an address is in use. When it does match an active client with an
+  active portal login, an email goes out with a reset link valid for 72
+  hours, reusing the same one-time link mechanism as the initial "set
+  your password" email. No more than 5 reset requests per client are
+  honored within a rolling hour, to stop the feature being used to mail-bomb
+  a buyer's inbox; further requests in that window still show the same
+  generic message but send nothing.
 - The buyer only ever sees the **final, approved/sent** PDF of a
   customer-facing document — never a draft, never an internal-only file
   type, regardless of what's requested. This is enforced on every single

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Config\Env;
 use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
+use App\Repositories\ClientLoginRepository;
 use App\Repositories\ClientPasswordResetTokenRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\DocumentRepository;
@@ -19,6 +22,7 @@ use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderReorderRequestRepository;
 use App\Services\ClientPortalService;
+use App\Services\EmailService;
 use App\Services\FileUploadService;
 use App\Services\OrderCommentService;
 use App\Services\PasswordPolicyService;
@@ -90,6 +94,63 @@ final class ClientPortalController
     {
         $clientId = ClientPortalService::endImpersonation();
         header('Location: ' . ($clientId ? "/clients/{$clientId}" : '/client/login'));
+    }
+
+    public function showForgotPassword(array $params): void
+    {
+        View::render('client_portal/forgot_password', [], 'layout/bare');
+    }
+
+    /**
+     * 90-item backlog #88: the client portal had no self-service password
+     * recovery at all — client_password_reset_tokens and
+     * ClientPasswordResetTokenRepository already existed (built for the
+     * initial "set your password" email) but nothing ever let a client who
+     * forgot their password request a fresh one; their only option was
+     * asking staff. Mirrors AuthController::forgotPassword() exactly: a
+     * generic "if that address exists..." response regardless of whether
+     * the email matched (CP-07-style anti-enumeration), reusing the same
+     * /client/set-password/{token} flow and token table the original
+     * provisioning email already uses.
+     */
+    public function forgotPassword(array $params): void
+    {
+        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+        $genericMessage = "If {$email} matches an account, a password reset link has been sent to it. The link expires in 72 hours.";
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            Flash::set('success', $genericMessage);
+            header('Location: /client/login');
+            return;
+        }
+
+        $login = ClientLoginRepository::findByEmail($email);
+
+        if ($login && $login['client_is_active'] && $login['is_active']) {
+            // Same 5-per-hour cap as the staff-side flow — a public,
+            // unauthenticated form that triggers an outbound email is a
+            // mail-bombing vector against anyone whose address you know.
+            if (ClientPasswordResetTokenRepository::countRecentForClient((int) $login['client_id'], 60) < 5) {
+                $rawToken = bin2hex(random_bytes(32));
+                $tokenHash = hash('sha256', $rawToken);
+                $expiresAt = date('Y-m-d H:i:s', time() + (72 * 3600));
+                $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+
+                ClientPasswordResetTokenRepository::create((int) $login['client_id'], $tokenHash, $expiresAt, $ip);
+
+                $resetUrl = rtrim(Env::get('APP_URL', ''), '/') . '/client/set-password/' . $rawToken;
+                $body = "Hello,\n\n"
+                    . "A password reset was requested for your NexaCrest order portal account ({$email}).\n\n"
+                    . "To set a new password, open this link within 72 hours:\n{$resetUrl}\n\n"
+                    . "If you didn't request this, you can ignore this email — your password will not be changed.";
+
+                EmailService::sendPlainText($email, 'Reset your NexaCrest order portal password', $body, true);
+                AuditLogRepository::log(null, 'CLIENT_PASSWORD_RESET_REQUESTED', 'clients', (int) $login['client_id'], null, null, null, "Requested from IP {$ip}");
+            }
+        }
+
+        Flash::set('success', $genericMessage);
+        header('Location: /client/login');
     }
 
     public function showSetPassword(array $params): void

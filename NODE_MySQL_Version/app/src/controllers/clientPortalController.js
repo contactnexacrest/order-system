@@ -3,7 +3,9 @@
 const fs = require('fs');
 const crypto = require('crypto');
 
+const env = require('../config/env');
 const flash = require('../helpers/flash');
+const emailService = require('../services/emailService');
 const passwordHash = require('../helpers/passwordHash');
 const reasonValidator = require('../helpers/reasonValidator');
 const clientPasswordResetTokenRepository = require('../repositories/clientPasswordResetTokenRepository');
@@ -98,6 +100,58 @@ async function logout(req, res) {
 async function endImpersonation(req, res) {
   const clientId = await clientPortalService.endImpersonation(req);
   res.redirect(clientId ? `/clients/${clientId}` : '/client/login');
+}
+
+async function showForgotPassword(req, res) {
+  res.renderView('client_portal/forgot_password', {}, 'layout/bare');
+}
+
+/**
+ * Port of ClientPortalController::forgotPassword() (PHP). 90-item backlog
+ * #88: the client portal had no self-service password recovery at all —
+ * client_password_reset_tokens and clientPasswordResetTokenRepository
+ * already existed (built for the initial "set your password" email) but
+ * nothing ever let a client who forgot their password request a fresh
+ * one. Mirrors authController.forgotPassword() exactly: a generic "if
+ * that address exists..." response regardless of whether the email
+ * matched, reusing the same /client/set-password/{token} flow and token
+ * table the original provisioning email already uses.
+ */
+async function forgotPassword(req, res) {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const genericMessage = `If ${email} matches an account, a password reset link has been sent to it. The link expires in 72 hours.`;
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (email === '' || !emailValid) {
+    flash.set(req, 'success', genericMessage);
+    res.redirect('/client/login');
+    return;
+  }
+
+  const login = await clientLoginRepository.findByEmail(email);
+
+  if (login && login.client_is_active && login.is_active) {
+    if ((await clientPasswordResetTokenRepository.countRecentForClient(login.client_id, 60)) < 5) {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + 72 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+      const ip = req.ip || null;
+
+      await clientPasswordResetTokenRepository.create(login.client_id, tokenHash, expiresAt, ip);
+
+      const resetUrl = `${env.get('APP_URL', '').replace(/\/+$/, '')}/client/set-password/${rawToken}`;
+      const body = 'Hello,\n\n'
+        + `A password reset was requested for your NexaCrest order portal account (${email}).\n\n`
+        + `To set a new password, open this link within 72 hours:\n${resetUrl}\n\n`
+        + "If you didn't request this, you can ignore this email — your password will not be changed.";
+
+      await emailService.sendPlainText(email, 'Reset your NexaCrest order portal password', body, { isSecurityEmail: true });
+      await auditLogRepository.log(null, 'CLIENT_PASSWORD_RESET_REQUESTED', 'clients', login.client_id, null, null, null, `Requested from IP ${ip}`);
+    }
+  }
+
+  flash.set(req, 'success', genericMessage);
+  res.redirect('/client/login');
 }
 
 async function showSetPassword(req, res) {
@@ -579,7 +633,7 @@ async function changePassword(req, res) {
 }
 
 module.exports = {
-  showLogin, login, logout, endImpersonation, showSetPassword, setPassword, dashboard, showOrder,
+  showLogin, login, logout, endImpersonation, showForgotPassword, forgotPassword, showSetPassword, setPassword, dashboard, showOrder,
   showReorderForm, submitReorder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
   postComment, downloadCommentAttachment, downloadPaymentScreenshot, uploadBuyerPo,
