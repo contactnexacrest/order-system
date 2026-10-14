@@ -45,8 +45,16 @@ $canDisputes = $can('manage_disputes') || $can('respond_to_disputes');
 
 $opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes;
 $insightsGroupVisible = $canReports || $canAudit;
+// 90-item backlog #34: $canManageHsCodes/$canManageComplianceTaskTypes/
+// $canManageDropdownOptions/$canManageEmailTemplates each gate their own
+// link inside this dropdown but were never added to the group's own
+// visibility check — a role whose ONLY Admin-section permission was one
+// of these four saw no "Admin" dropdown at all (it never rendered, so
+// there was nothing to open), even though the route itself worked fine
+// if they knew the direct URL.
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
-    || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners || $canManagePaymentPresets;
+    || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners || $canManagePaymentPresets
+    || $canManageHsCodes || $canManageComplianceTaskTypes || $canManageDropdownOptions || $canManageEmailTemplates;
 
 // Sidebar redesign (2026-09-23, "cover all" UI pass) — highlights the
 // current section so a fresher can see at a glance where they are, and
@@ -61,7 +69,7 @@ $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/c
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates')
-    || $isActive('/logistics-partners') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options');
+    || $isActive('/logistics-partners') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types');
 ?>
 <!DOCTYPE html>
 <html lang="en">
