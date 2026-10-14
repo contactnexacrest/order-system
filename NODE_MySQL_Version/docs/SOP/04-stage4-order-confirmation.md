@@ -85,11 +85,16 @@ back to staff to copy and hand over directly. The link works for 90 days,
 and generating a new one immediately invalidates whichever one came
 before it — there is only ever one live link per order. Opening it needs
 no login at all: the buyer sees exactly the acknowledge button (if
-something is awaiting it) and the Buyer PO upload form, nothing else —
-no documents, payment figures, or chat, which stay portal-login-only.
-Acknowledging or uploading through this link goes through the exact same
-checks and writes as the portal path above, so it counts identically
-toward Stage 4's gate.
+something is awaiting it), the Buyer PO upload form, and — while the
+advance payment hasn't cleared yet — an Advance Payment self-report form
+(90-item backlog #48; see [Chapter 3](./03-stage3-pi-advance.md)) — nothing
+else; no documents, other payment figures, or chat, which stay
+portal-login-only. Acknowledging or uploading through this link goes
+through the exact same checks and writes as the portal path above, so it
+counts identically toward Stage 4's gate. The Buyer PO upload form itself
+(on this link and on the portal alike) disappears once the advance clears
+— 90-item backlog #19, see [Chapter 2](./02-stage2-buyer-po.md) — since by
+then there's nothing left for a further self-upload to usefully change.
 
 ## What the client does (or doesn't)
 

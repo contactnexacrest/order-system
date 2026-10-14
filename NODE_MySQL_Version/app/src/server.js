@@ -360,6 +360,7 @@ app.post('/pi-details/:token', verifyCsrf, asyncHandler(piIntakeController.submi
 app.get('/buyer-action/:token', asyncHandler(buyerActionController.show));
 app.post('/buyer-action/:token/acknowledge-oc', verifyCsrf, asyncHandler(buyerActionController.acknowledgeOc));
 app.post('/buyer-action/:token/buyer-po', uploadLarge.single('document'), verifyCsrf, asyncHandler(buyerActionController.uploadBuyerPo));
+app.post('/buyer-action/:token/report-payment', uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(buyerActionController.reportPayment));
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3

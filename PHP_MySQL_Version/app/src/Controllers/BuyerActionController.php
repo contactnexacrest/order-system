@@ -8,6 +8,7 @@ use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
+use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Services\BuyerActionService;
@@ -25,9 +26,12 @@ use App\Services\BuyerActionService;
  * never drift apart.
  *
  * Deliberately narrower than the full client-portal order page: no
- * document downloads, payment reports, or chat — those stay
- * portal-login-only. This page exists to unblock exactly the two actions
- * the backlog item named.
+ * document downloads or chat — those stay portal-login-only. 90-item
+ * backlog #48 added one narrow exception to "no payment reports": the
+ * advance-payment self-report below, since that's the one payment leg the
+ * portal itself can never reach (its login isn't provisioned until the
+ * advance clears — see BuyerActionService::reportAdvancePayment()).
+ * Freight/balance self-reports stay portal-only, as before.
  */
 final class BuyerActionController
 {
@@ -54,6 +58,8 @@ final class BuyerActionController
         }
         $orderId = (int) $order['id'];
 
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+
         View::render('buyer_action/show', [
             'token' => $params['token'],
             'order' => $order,
@@ -61,6 +67,7 @@ final class BuyerActionController
             'totalFobValue' => OrderProductRepository::totalFobValue($orderId),
             'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
+            'advanceCleared' => $paymentStatus !== null && $paymentStatus['advance_cleared_at'] !== null,
         ], 'layout/bare');
     }
 
@@ -86,6 +93,19 @@ final class BuyerActionController
         }
 
         $result = BuyerActionService::uploadBuyerPo($order);
+        Flash::set($result['ok'] ? 'success' : 'error', $result['message']);
+        header("Location: /buyer-action/{$token}");
+    }
+
+    public function reportPayment(array $params): void
+    {
+        $token = (string) ($params['token'] ?? '');
+        $order = $this->orderOrExpired($token);
+        if (!$order) {
+            return;
+        }
+
+        $result = BuyerActionService::reportAdvancePayment($order);
         Flash::set($result['ok'] ? 'success' : 'error', $result['message']);
         header("Location: /buyer-action/{$token}");
     }

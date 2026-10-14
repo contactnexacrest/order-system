@@ -43,12 +43,32 @@
     <?php else: ?>
       <p class="muted">No Buyer PO copy on file yet.</p>
     <?php endif; ?>
-    <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/buyer-po" enctype="multipart/form-data">
+    <?php if ($advanceCleared): ?>
+      <p class="muted small">The advance payment has already cleared, so self-service upload is now closed here. Contact your NexaCrest representative if you need to submit an updated copy.</p>
+    <?php else: ?>
+      <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/buyer-po" enctype="multipart/form-data">
+        <?= Csrf::field() ?>
+        <label>Upload Buyer PO (signed) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
+        <button type="submit" class="btn-sm">Upload</button>
+      </form>
+    <?php endif; ?>
+  </div>
+
+  <?php if (!$advanceCleared): ?>
+  <div class="section">
+    <h2>Advance Payment</h2>
+    <p class="muted">Made your advance payment on this order? Let us know the transaction details below — our team will verify it against our bank statement before updating your order. (Once your advance clears, you'll also get full client portal access to report any later payment the same way.)</p>
+    <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/report-payment" enctype="multipart/form-data">
       <?= Csrf::field() ?>
-      <label>Upload Buyer PO (signed) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
-      <button type="submit" class="btn-sm">Upload</button>
+      <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required></label>
+      <label>Amount Paid<input type="text" name="amount" placeholder="e.g. 12500.00"></label>
+      <label>Date Paid<input type="date" name="payment_date"></label>
+      <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+      <label>Payment Screenshot (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
+      <button type="submit" class="btn-sm">Submit Payment Details</button>
     </form>
   </div>
+  <?php endif; ?>
 
   <p class="muted small">Need to see your full order, documents, or message our team? <a href="/client/login">Log in to your client portal</a> (set up automatically once your advance payment clears).</p>
 </div>

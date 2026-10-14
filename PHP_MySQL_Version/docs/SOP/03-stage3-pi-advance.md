@@ -156,12 +156,22 @@ to see the needed things."
   buyer wires the funds by whatever channel their bank uses. Nothing in the
   system notifies them to pay or tracks whether they have; staff learn about
   it only from the actual bank statement or T/T notification.
-- **Self-reporting a payment** (optional, portal-only): once their portal
-  login exists, the buyer *could* submit a payment report themselves — but
-  at this exact point in Stage 3 they don't have a portal login yet, since
-  it's only created once the advance is cleared. In practice, the very
-  first payment a buyer could self-report through the portal is a later
-  one (e.g. the balance payment at Stage 8), not this one.
+- **Self-reporting a payment** (optional): once their portal login exists,
+  the buyer can submit a payment report themselves — but at this exact
+  point in Stage 3 they don't have a portal login yet, since it's only
+  created once the advance is cleared. The portal's own self-report screen
+  therefore only ever actually gets used for a *later* leg (freight at
+  Stage 6, balance at Stage 8). For the advance payment specifically
+  (90-item backlog #48), the buyer instead gets a narrow self-report option
+  on their Buyer Action Link page (see [Chapter 2](./02-stage2-buyer-po.md)
+  and [Chapter 4](./04-stage4-order-confirmation.md)) — transaction ID/UTR,
+  amount, date, and an optional screenshot, writing to the same
+  `client_payment_reports` table the portal uses. Like the portal's own
+  version, this is purely an informational note to staff, never a stage
+  gate or a payment record by itself; staff still verify the real bank
+  statement by hand before marking the advance cleared above. This option
+  on the Buyer Action Link disappears once the advance is marked cleared —
+  there's nothing left to report by then.
 
 ## What happens next
 

@@ -5,6 +5,7 @@ const orderRepository = require('../repositories/orderRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
+const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const buyerActionService = require('../services/buyerActionService');
 
 /**
@@ -21,9 +22,12 @@ const buyerActionService = require('../services/buyerActionService');
  * never drift apart.
  *
  * Deliberately narrower than the full client-portal order page: no
- * document downloads, payment reports, or chat — those stay
- * portal-login-only. This page exists to unblock exactly the two actions
- * the backlog item named.
+ * document downloads or chat — those stay portal-login-only. 90-item
+ * backlog #48 added one narrow exception to "no payment reports": the
+ * advance-payment self-report below, since that's the one payment leg
+ * the portal itself can never reach (its login isn't provisioned until
+ * the advance clears — see buyerActionService.reportAdvancePayment()).
+ * Freight/balance self-reports stay portal-only, as before.
  */
 
 /**
@@ -46,6 +50,8 @@ async function show(req, res) {
     return;
   }
 
+  const paymentStatus = await orderPaymentStatusRepository.find(order.id);
+
   res.renderView('buyer_action/show', {
     token: req.params.token,
     order,
@@ -53,6 +59,7 @@ async function show(req, res) {
     totalFobValue: await orderProductRepository.totalFobValue(order.id),
     ocAcknowledgment: await orderOcAcknowledgmentRepository.find(order.id),
     buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(order.id),
+    advanceCleared: !!paymentStatus && paymentStatus.advance_cleared_at !== null,
   }, 'layout/bare');
 }
 
@@ -80,4 +87,16 @@ async function uploadBuyerPo(req, res) {
   res.redirect(`/buyer-action/${token}`);
 }
 
-module.exports = { show, acknowledgeOc, uploadBuyerPo };
+async function reportPayment(req, res) {
+  const token = req.params.token;
+  const order = await orderOrExpired(req, res, token);
+  if (!order) {
+    return;
+  }
+
+  const result = await buyerActionService.reportAdvancePayment(req, order);
+  flash.set(req, result.ok ? 'success' : 'error', result.message);
+  res.redirect(`/buyer-action/${token}`);
+}
+
+module.exports = { show, acknowledgeOc, uploadBuyerPo, reportPayment };

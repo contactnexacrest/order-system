@@ -74,11 +74,19 @@ early point, before any portal account exists.
 Once the client does get portal access (from Stage 3 onward, once a PI-stage
 or OC-stage link has been generated — see [Chapter 12](./12-client-portal.md)),
 a **"Buyer PO" section on their order page** lets them upload a scanned copy
-of their own signed PO themselves at any time, rather than relying solely on
-emailing it to staff and waiting for a staff member to attach it internally.
-This writes to the exact same `order_buyer_po_documents` table the internal
-upload uses, so every copy — staff- or client-uploaded — shows up together
-with full version history (an upload never overwrites an earlier one).
+of their own signed PO themselves, rather than relying solely on emailing it
+to staff and waiting for a staff member to attach it internally. This writes
+to the exact same `order_buyer_po_documents` table the internal upload uses,
+so every copy — staff- or client-uploaded — shows up together with full
+version history (an upload never overwrites an earlier one).
+
+**This self-upload option — on both the Buyer Action Link and the portal —
+closes once the advance payment is marked cleared** (90-item backlog #19):
+by then the Buyer PO has already done its job and staff have already built
+later documents against the copy on file, so a further self-upload is
+refused, with a message pointing the buyer to their NexaCrest representative
+if they genuinely need to submit an updated copy. Before that point, it's
+available "at any time" as described above.
 
 ## What happens next
 

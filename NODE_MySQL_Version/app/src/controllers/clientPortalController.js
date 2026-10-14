@@ -18,6 +18,7 @@ const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
+const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderReorderRequestRepository = require('../repositories/orderReorderRequestRepository');
@@ -218,6 +219,8 @@ async function showOrder(req, res) {
     return;
   }
 
+  const paymentStatus = await orderPaymentStatusRepository.find(orderId);
+
   res.renderView('client_portal/order_show', {
     client: await clientPortalService.currentClient(req),
     order,
@@ -228,6 +231,10 @@ async function showOrder(req, res) {
     ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
     comments: await orderCommentRepository.forOrder(orderId),
     buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(orderId),
+    // 90-item backlog #19: gates the self-upload form below once the
+    // advance has cleared — see buyerActionService.uploadBuyerPo(), which
+    // this page's own form submits to.
+    advanceCleared: !!paymentStatus && paymentStatus.advance_cleared_at !== null,
   }, 'layout/client');
 }
 

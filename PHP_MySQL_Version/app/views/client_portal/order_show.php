@@ -62,11 +62,15 @@
     <?php else: ?>
       <p class="muted">No Buyer PO copy on file yet.</p>
     <?php endif; ?>
-    <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/buyer-po" enctype="multipart/form-data">
-      <?= Csrf::field() ?>
-      <label>Upload Buyer PO (signed) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
-      <button type="submit" class="btn-sm">Upload</button>
-    </form>
+    <?php if ($advanceCleared): ?>
+      <p class="muted small">The advance payment has already cleared, so self-service upload is now closed here. Contact your NexaCrest representative if you need to submit an updated copy.</p>
+    <?php else: ?>
+      <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/buyer-po" enctype="multipart/form-data">
+        <?= Csrf::field() ?>
+        <label>Upload Buyer PO (signed) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
+        <button type="submit" class="btn-sm">Upload</button>
+      </form>
+    <?php endif; ?>
   </div>
 
   <div class="section" id="order-updates">

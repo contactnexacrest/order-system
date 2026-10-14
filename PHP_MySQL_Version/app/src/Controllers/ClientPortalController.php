@@ -18,6 +18,7 @@ use App\Repositories\HsCodeRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
+use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderReorderRequestRepository;
@@ -222,6 +223,8 @@ final class ClientPortalController
             return;
         }
 
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+
         View::render('client_portal/order_show', [
             'client' => ClientPortalService::currentClient(),
             'order' => $order,
@@ -232,6 +235,10 @@ final class ClientPortalController
             'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
             'comments' => OrderCommentRepository::forOrder($orderId),
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
+            // 90-item backlog #19: gates the self-upload form below once
+            // the advance has cleared — see BuyerActionService::uploadBuyerPo(),
+            // which this page's own form submits to.
+            'advanceCleared' => $paymentStatus !== null && $paymentStatus['advance_cleared_at'] !== null,
         ], 'layout/client');
     }
 

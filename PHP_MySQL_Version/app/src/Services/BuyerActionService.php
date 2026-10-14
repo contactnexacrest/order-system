@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Repositories\AuditLogRepository;
+use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
+use App\Repositories\OrderPaymentStatusRepository;
 
 /**
  * 90-item backlog #75: the OC-acknowledgment and Buyer-PO-upload write
@@ -17,6 +19,14 @@ use App\Repositories\OrderOcAcknowledgmentRepository;
  * (ClientPortalController::acknowledgeOc()/uploadBuyerPo()) and the new
  * no-login, tokenized BuyerActionController route can call the exact same
  * logic rather than maintaining two copies of it.
+ *
+ * 90-item backlog #19/#48 added two more pieces here: uploadBuyerPo() now
+ * refuses once the advance payment has cleared (the Buyer PO's job is done
+ * by then, on either channel — see the method's own comment), and
+ * reportAdvancePayment() gives the no-login channel a narrow self-report
+ * option for the one payment leg the client-portal's own reportPayment()
+ * can never actually reach — the advance itself, since the portal login
+ * isn't provisioned until that very payment clears.
  */
 final class BuyerActionService
 {
@@ -41,10 +51,34 @@ final class BuyerActionService
         return ['ok' => true, 'message' => 'Thank you — your acknowledgement has been recorded and your order is moving to production.'];
     }
 
+    /**
+     * Whether the advance payment has already been marked cleared on this
+     * order — the point past which both uploadBuyerPo() and
+     * reportAdvancePayment() refuse to act, since each one's whole purpose
+     * (getting the signed PO on file / getting the advance itself noted)
+     * is already done by then.
+     */
+    private static function advanceAlreadyCleared(int $orderId): bool
+    {
+        $status = OrderPaymentStatusRepository::find($orderId);
+        return $status !== null && $status['advance_cleared_at'] !== null;
+    }
+
     /** @return array{ok: bool, message: string} */
     public static function uploadBuyerPo(array $order): array
     {
         $orderId = (int) $order['id'];
+
+        // 90-item backlog #19: this used to be callable "at any time" on
+        // both the client-portal and no-login channels — real-world use is
+        // always around Stage 2, well before the advance clears, so once
+        // it has, a further self-upload serves no purpose and risks the
+        // buyer silently replacing the copy staff already confirmed and
+        // built later documents against.
+        if (self::advanceAlreadyCleared($orderId)) {
+            return ['ok' => false, 'message' => 'The advance payment has already cleared, so self-service Buyer PO upload is now closed. Contact your NexaCrest representative if you need to submit an updated copy.'];
+        }
+
         try {
             $fileId = FileUploadService::handleUpload(
                 'document',
@@ -63,5 +97,68 @@ final class BuyerActionService
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * 90-item backlog #48: ClientPortalController::reportPayment() lets a
+     * logged-in buyer self-report any payment leg, but the portal login
+     * itself isn't provisioned until the advance payment is marked cleared
+     * (docs/SOP/12-client-portal.md) — so the advance leg is the one
+     * payment a buyer could never actually self-report through it ("the
+     * very first payment a buyer could self-report through the portal is
+     * a later one... not this one" per that same SOP page). This gives the
+     * no-login Buyer Action Link a narrow equivalent, scoped to the
+     * advance leg only — freight/balance already have a working
+     * self-report channel once the portal exists from Stage 4 onward, so
+     * they don't need a second one here. Reads $_POST/$_FILES directly,
+     * matching uploadBuyerPo()'s own style in this class.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public static function reportAdvancePayment(array $order): array
+    {
+        $orderId = (int) $order['id'];
+
+        if (self::advanceAlreadyCleared($orderId)) {
+            return ['ok' => false, 'message' => 'The advance payment has already been marked cleared on this order — no further report is needed.'];
+        }
+
+        $transactionRef = trim((string) ($_POST['transaction_ref'] ?? ''));
+        if ($transactionRef === '') {
+            return ['ok' => false, 'message' => 'Enter the transaction ID/UTR for your advance payment.'];
+        }
+
+        $screenshotFileId = null;
+        if (!empty($_FILES['screenshot']['name'])) {
+            try {
+                $screenshotFileId = FileUploadService::handleUpload(
+                    'screenshot',
+                    'received_remittance',
+                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/client_payment_reports',
+                    (int) $order['client_id'],
+                    $orderId,
+                    null,
+                    null,
+                    'Client (self-reported)',
+                    'Client payment self-report screenshot'
+                );
+            } catch (\Throwable $e) {
+                return ['ok' => false, 'message' => $e->getMessage()];
+            }
+        }
+
+        $amount = trim((string) ($_POST['amount'] ?? ''));
+        $paymentDate = trim((string) ($_POST['payment_date'] ?? ''));
+        ClientPaymentReportRepository::create(
+            $orderId,
+            'advance',
+            $transactionRef,
+            trim((string) ($_POST['payer_bank_details'] ?? '')) ?: null,
+            $amount !== '' ? (float) $amount : null,
+            $paymentDate !== '' ? $paymentDate : null,
+            $screenshotFileId
+        );
+
+        return ['ok' => true, 'message' => 'Thank you — we have noted your advance payment details. Our team will verify this against our bank statement and update your order.'];
     }
 }

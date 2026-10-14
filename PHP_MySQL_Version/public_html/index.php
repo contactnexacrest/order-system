@@ -149,6 +149,7 @@ $router->post('/pi-details/{token}', [$piIntake, 'submit'], [CsrfCheck::verify()
 $router->get('/buyer-action/{token}', [$buyerAction, 'show']);
 $router->post('/buyer-action/{token}/acknowledge-oc', [$buyerAction, 'acknowledgeOc'], [CsrfCheck::verify()]);
 $router->post('/buyer-action/{token}/buyer-po', [$buyerAction, 'uploadBuyerPo'], [CsrfCheck::verify()]);
+$router->post('/buyer-action/{token}/report-payment', [$buyerAction, 'reportPayment'], [CsrfCheck::verify()]);
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
