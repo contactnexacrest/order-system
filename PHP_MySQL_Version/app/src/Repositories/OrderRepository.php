@@ -411,4 +411,43 @@ final class OrderRepository
             ->prepare('UPDATE orders SET annexure_mode = :mode WHERE id = :id')
             ->execute(['mode' => $mode, 'id' => $orderId]);
     }
+
+    /**
+     * 90-item backlog #75 (docs/schema.sql Section BG): generates (or
+     * regenerates, overwriting any prior link) the public, no-login token
+     * for this order's Buyer Action page (OC acknowledgment + Buyer PO
+     * upload) — same hash/plain/expiry convention as
+     * PiIntakeRepository::createLink(), stored directly on the order row
+     * since this is a 1:1-with-the-order fact, not a per-submission one.
+     */
+    public static function generateBuyerActionToken(int $orderId, int $ttlDays = 90): string
+    {
+        $rawToken = bin2hex(random_bytes(32));
+        Database::connection()
+            ->prepare('UPDATE orders SET buyer_action_token_hash = :hash, buyer_action_token_plain = :plain, buyer_action_token_expires_at = :expires WHERE id = :id')
+            ->execute([
+                'hash'    => hash('sha256', $rawToken),
+                'plain'   => $rawToken,
+                'expires' => date('Y-m-d H:i:s', time() + ($ttlDays * 86400)),
+                'id'      => $orderId,
+            ]);
+        return $rawToken;
+    }
+
+    /**
+     * Public /buyer-action/{token} route's sole authorization check — no
+     * session involved. Deliberately minimal (just orders.id, to confirm
+     * the token resolves to a real, unexpired order); BuyerActionController
+     * re-loads the full row via find() for everything the page/upload
+     * actually needs (client_unique_number, incoterm/currency/port names,
+     * etc.) rather than duplicating find()'s whole JOIN here.
+     */
+    public static function findByValidBuyerActionToken(string $rawToken): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM orders WHERE buyer_action_token_hash = :hash AND buyer_action_token_expires_at > NOW()'
+        );
+        $stmt->execute(['hash' => hash('sha256', $rawToken)]);
+        return $stmt->fetch() ?: null;
+    }
 }

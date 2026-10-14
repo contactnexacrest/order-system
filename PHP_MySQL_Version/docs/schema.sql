@@ -3166,3 +3166,41 @@ ALTER TABLE client_intake_submissions
 
 ALTER TABLE clients
   ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode;
+
+-- ================================================================
+-- SECTION BG — BUYER ACTION LINK: OC ACKNOWLEDGMENT + BUYER PO UPLOAD
+-- WITHOUT A PORTAL ACCOUNT (added 2026-10-14)
+-- ================================================================
+-- 90-item backlog #75: acknowledging the Order Confirmation and uploading
+-- a signed Buyer PO copy (ClientPortalController::acknowledgeOc() /
+-- uploadBuyerPo()) were only ever reachable by logging into the client
+-- portal — but portal access is only provisioned once the advance payment
+-- clears (Stage 3 -> 4, see ClientPortalService), and even then requires
+-- the buyer to first consume a one-time set-password link. There was no
+-- equivalent of the existing /quotation-details or /pi-details public,
+-- tokenized links (client_intake_submissions.access_token_*,
+-- pi_intake_submissions.access_token_*) for these two specific actions.
+--
+-- Unlike those two tables, this needs no separate submission-row model —
+-- OC-ack and Buyer-PO-upload already write directly to
+-- order_oc_acknowledgments / order_buyer_po_documents, so the token only
+-- has to answer "is this request allowed to act on this one order,"
+-- which is a 1:1-with-the-order fact, not a per-submission one. Storing
+-- it directly on `orders` (rather than a new table) reflects that.
+--
+-- access_token_plain (unlike the hash) is for staff-facing display/copy
+-- only, same convention as pi_intake_submissions.access_token_plain —
+-- the public /buyer-action/{token} route always validates against the
+-- hash. Generating a new link (OrderController::generateBuyerActionLink,
+-- mirroring generatePiFormLink) overwrites all three columns, so only the
+-- most recently generated link ever works — unlike PI-intake's
+-- per-submission tokens, which can be regenerated without invalidating a
+-- copy already in the client's hands, this is a single durable link meant
+-- to be regenerated only if actually compromised or lost.
+-- ================================================================
+ALTER TABLE orders
+  ADD COLUMN buyer_action_token_hash VARCHAR(64) NULL AFTER pi_valid_until,
+  ADD COLUMN buyer_action_token_plain VARCHAR(64) NULL AFTER buyer_action_token_hash,
+  ADD COLUMN buyer_action_token_expires_at DATETIME NULL AFTER buyer_action_token_plain;
+
+CREATE INDEX idx_orders_buyer_action_token_hash ON orders(buyer_action_token_hash);

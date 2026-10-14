@@ -47,6 +47,7 @@ const clientsController = require('./controllers/clientsController');
 const clientIntakeController = require('./controllers/clientIntakeController');
 const clientIntakeReviewController = require('./controllers/clientIntakeReviewController');
 const piIntakeController = require('./controllers/piIntakeController');
+const buyerActionController = require('./controllers/buyerActionController');
 const piIntakeReviewController = require('./controllers/piIntakeReviewController');
 const reorderRequestController = require('./controllers/reorderRequestController');
 const clientPortalController = require('./controllers/clientPortalController');
@@ -349,6 +350,15 @@ app.post('/quotation-details/edit/:token', verifyCsrf, asyncHandler(clientIntake
 // generatePiFormLink); the client never reaches this without one.
 app.get('/pi-details/:token', asyncHandler(piIntakeController.show));
 app.post('/pi-details/:token', verifyCsrf, asyncHandler(piIntakeController.submit));
+
+// 90-item backlog #75 — public, no-login counterpart to the client-portal
+// OC-acknowledgment and Buyer-PO-upload actions. Staff generate the
+// per-order link (see ordersController.generateBuyerActionLink()); the
+// buyer never reaches this without one. See buyerActionController's
+// docblock and docs/schema.sql Section BG.
+app.get('/buyer-action/:token', asyncHandler(buyerActionController.show));
+app.post('/buyer-action/:token/acknowledge-oc', verifyCsrf, asyncHandler(buyerActionController.acknowledgeOc));
+app.post('/buyer-action/:token/buyer-po', uploadLarge.single('document'), verifyCsrf, asyncHandler(buyerActionController.uploadBuyerPo));
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -718,6 +728,7 @@ app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHan
 app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));
 app.get('/orders/:id/dossier', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.downloadDossier));
 app.post('/orders/:id/pi-form-link', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.generatePiFormLink));
+app.post('/orders/:id/buyer-action-link', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.generateBuyerActionLink));
 
 app.get('/notifications', requireAuth, asyncHandler(notificationController.index));
 

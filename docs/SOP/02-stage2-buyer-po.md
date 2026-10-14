@@ -65,7 +65,11 @@ the Buyer PO document (however staff send it), sign the "Buyer Acceptance"
 section by hand, and return it. There's no client-portal screen for this at
 this exact moment — they have no portal login yet at all at this point.
 Getting their signed PO back to staff (email, courier, whatever channel) is
-on them, but nothing in the system tracks or reminds them to do it.
+on them, but nothing in the system tracks or reminds them to do it — unless
+staff generate a **Buyer Action Link** for the order (see
+[Chapter 4](./04-stage4-order-confirmation.md)), which gives the buyer a
+public, no-login page to upload the signed copy themselves even at this
+early point, before any portal account exists.
 
 Once the client does get portal access (from Stage 3 onward, once a PI-stage
 or OC-stage link has been generated — see [Chapter 12](./12-client-portal.md)),

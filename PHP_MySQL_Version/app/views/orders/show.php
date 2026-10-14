@@ -1151,6 +1151,36 @@ foreach ($stages as $s) {
     <?php else: ?>
       <p class="muted">Clear the advance payment first to unlock this gate.</p>
     <?php endif; ?>
+
+    <?php
+      // 90-item backlog #75: a public, no-login link covering both this
+      // stage's OC acknowledgement and the client-portal Buyer PO upload
+      // — for a buyer who hasn't been provisioned a portal account yet
+      // (or doesn't want to log in just for these two actions).
+      $buyerActionLinkValid = !empty($order['buyer_action_token_plain']) && !empty($order['buyer_action_token_expires_at']) && strtotime((string) $order['buyer_action_token_expires_at']) > time();
+    ?>
+    <div class="section" style="margin-top:14px;">
+      <h3 style="font-size:0.95em; margin-top:0;">Buyer Action Link (no portal login required)</h3>
+      <p class="muted small">A direct link the buyer can use to acknowledge the Order Confirmation and/or upload their signed Buyer PO — without needing a client-portal account. Useful before portal access is provisioned (Stage 3 → 4), or for a buyer who'd rather not log in at all.</p>
+      <?php if ($buyerActionLinkValid): ?>
+        <?php $buyerActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $order['buyer_action_token_plain']; ?>
+        <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
+          <span>Current link (valid until <?= htmlspecialchars(Dates::human($order['buyer_action_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" readonly value="<?= htmlspecialchars($buyerActionFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($buyerActionFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+          </div>
+        </div>
+      <?php else: ?>
+        <p class="muted small">No active link — generate one below.</p>
+      <?php endif; ?>
+      <?php if ($canManageOrders): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-action-link" style="display:inline">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn-sm"><?= $buyerActionLinkValid ? 'Regenerate Buyer Action Link' : 'Generate Buyer Action Link' ?></button>
+      </form>
+      <?php endif; ?>
+    </div>
   </div>
 
   <div class="section" data-stage="5">

@@ -67,6 +67,30 @@ when:
 
 ![Stage 4 section — acknowledgement confirmed](./images/s4_staff_ack_confirmed.png)
 
+### Buyer Action Link — a fourth path, with no portal login at all
+
+The buyer's own portal acknowledgement above only becomes available once
+their portal account exists (Stage 3 onward), and even then requires them
+to have already consumed their one-time set-password link. For a buyer
+who isn't comfortable logging into a portal at all, or whose portal access
+simply isn't set up yet, the order page offers a **Buyer Action Link**
+widget (just below this section) — a single public, no-login link covering
+both this stage's acknowledgement and Stage 2's Buyer PO upload in one
+place.
+
+Click **Generate Buyer Action Link** (or **Regenerate...** once one
+already exists) to create it; if the client's email is on file it's
+emailed to them automatically, and either way the link is also flashed
+back to staff to copy and hand over directly. The link works for 90 days,
+and generating a new one immediately invalidates whichever one came
+before it — there is only ever one live link per order. Opening it needs
+no login at all: the buyer sees exactly the acknowledge button (if
+something is awaiting it) and the Buyer PO upload form, nothing else —
+no documents, payment figures, or chat, which stay portal-login-only.
+Acknowledging or uploading through this link goes through the exact same
+checks and writes as the portal path above, so it counts identically
+toward Stage 4's gate.
+
 ## What the client does (or doesn't)
 
 This is the first stage where the buyer has real work to do **inside the

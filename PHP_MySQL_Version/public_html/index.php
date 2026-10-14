@@ -10,6 +10,7 @@ use App\Controllers\AnnexureController;
 use App\Controllers\AssetController;
 use App\Controllers\AuditLogController;
 use App\Controllers\AuthController;
+use App\Controllers\BuyerActionController;
 use App\Controllers\CaController;
 use App\Controllers\OrderFinancialsController;
 use App\Controllers\ClientController;
@@ -72,6 +73,7 @@ $clientIntake = new ClientIntakeController();
 $clientIntakeReview = new ClientIntakeReviewController();
 $piIntake = new PiIntakeController();
 $piIntakeReview = new PiIntakeReviewController();
+$buyerAction = new BuyerActionController();
 $reorderRequests = new ReorderRequestController();
 $clientPortal = new ClientPortalController();
 $orders = new OrderController();
@@ -138,6 +140,15 @@ $router->post('/quotation-details/edit/{token}', [$clientIntake, 'updateSubmissi
 // generatePiFormLink); the client never reaches this without one.
 $router->get('/pi-details/{token}', [$piIntake, 'show']);
 $router->post('/pi-details/{token}', [$piIntake, 'submit'], [CsrfCheck::verify()]);
+
+// 90-item backlog #75 — public, no-login counterpart to the client-portal
+// OC-acknowledgment and Buyer-PO-upload actions. Staff generate the
+// per-order link (see OrderController::generateBuyerActionLink()); the
+// buyer never reaches this without one. See BuyerActionController's
+// docblock and docs/schema.sql Section BG.
+$router->get('/buyer-action/{token}', [$buyerAction, 'show']);
+$router->post('/buyer-action/{token}/acknowledge-oc', [$buyerAction, 'acknowledgeOc'], [CsrfCheck::verify()]);
+$router->post('/buyer-action/{token}/buyer-po', [$buyerAction, 'uploadBuyerPo'], [CsrfCheck::verify()]);
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -496,6 +507,7 @@ $router->get('/audit-log', [$auditLog, 'index'], [SessionAuth::required(), Permi
 $router->get('/orders/{id}/audit-log', [$auditLog, 'forOrder'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
 $router->get('/orders/{id}/dossier', [$orders, 'downloadDossier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/pi-form-link', [$orders, 'generatePiFormLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-action-link', [$orders, 'generateBuyerActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 // Notifications bell.
 $router->get('/notifications', [$notifications, 'index'], [SessionAuth::required()]);

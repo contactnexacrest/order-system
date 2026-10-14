@@ -254,24 +254,10 @@ final class ClientPortalController
             return;
         }
 
-        try {
-            $fileId = FileUploadService::handleUpload(
-                'document',
-                'buyer_po_copy',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/buyer_po',
-                $clientId,
-                $orderId,
-                null,
-                null,
-                'Client (self-uploaded)',
-                'Buyer PO copy (client-uploaded)'
-            );
-            OrderBuyerPoDocumentRepository::attach($orderId, $fileId);
-            \App\Repositories\AuditLogRepository::log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', $orderId, null, null, null, 'Buyer PO copy uploaded by the client via the client portal.');
-            Flash::set('success', 'Your Buyer PO copy has been uploaded.');
-        } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
-        }
+        // 90-item backlog #75: shared with the no-login
+        // BuyerActionController route — see BuyerActionService's docblock.
+        $result = \App\Services\BuyerActionService::uploadBuyerPo($order);
+        Flash::set($result['ok'] ? 'success' : 'error', $result['message']);
         header("Location: /client/orders/{$orderId}");
     }
 
@@ -466,28 +452,10 @@ final class ClientPortalController
             return;
         }
 
-        $ack = OrderOcAcknowledgmentRepository::find($orderId);
-        if (!$ack || $ack['acknowledged_at'] !== null) {
-            Flash::set('error', 'There is nothing awaiting your acknowledgement on this order.');
-            header("Location: /client/orders/{$orderId}");
-            return;
-        }
-        if (!\App\Services\StageGateService::isUnlocked($orderId, 4)) {
-            Flash::set('error', 'This order is not currently awaiting acknowledgement.');
-            header("Location: /client/orders/{$orderId}");
-            return;
-        }
-
-        if (!OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'client_portal', null, null)) {
-            // QA-5 EML-06: lost the race to another acknowledgment path
-            // (staff-recorded, or the 48h auto-confirm cron) between this
-            // action's own pre-check above and this write.
-            Flash::set('success', 'This order has already been acknowledged and is moving to production.');
-            header("Location: /client/orders/{$orderId}");
-            return;
-        }
-        \App\Services\StageGateService::passAndUnlockNext($orderId, 4, null);
-        Flash::set('success', 'Thank you — your acknowledgement has been recorded and your order is moving to production.');
+        // 90-item backlog #75: shared with the no-login
+        // BuyerActionController route — see BuyerActionService's docblock.
+        $result = \App\Services\BuyerActionService::acknowledgeOc($orderId);
+        Flash::set($result['ok'] ? 'success' : 'error', $result['message']);
         header("Location: /client/orders/{$orderId}");
     }
 

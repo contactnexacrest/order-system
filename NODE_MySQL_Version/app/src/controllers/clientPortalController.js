@@ -23,10 +23,10 @@ const orderRepository = require('../repositories/orderRepository');
 const orderReorderRequestRepository = require('../repositories/orderReorderRequestRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const clientPortalService = require('../services/clientPortalService');
+const buyerActionService = require('../services/buyerActionService');
 const orderCommentService = require('../services/orderCommentService');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const fileUploadService = require('../services/fileUploadService');
-const stageGateService = require('../services/stageGateService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
 
 function todayYmd() {
@@ -248,25 +248,10 @@ async function uploadBuyerPo(req, res) {
     return;
   }
 
-  try {
-    const fileId = await fileUploadService.handleUpload(
-      req,
-      'document',
-      'buyer_po_copy',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/buyer_po`,
-      clientId,
-      orderId,
-      null,
-      null,
-      'Client (self-uploaded)',
-      'Buyer PO copy (client-uploaded)'
-    );
-    await orderBuyerPoDocumentRepository.attach(orderId, fileId);
-    await auditLogRepository.log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', orderId, null, null, null, 'Buyer PO copy uploaded by the client via the client portal.');
-    flash.set(req, 'success', 'Your Buyer PO copy has been uploaded.');
-  } catch (e) {
-    flash.set(req, 'error', e.message);
-  }
+  // 90-item backlog #75: shared with the no-login buyerActionController
+  // route — see buyerActionService's docblock.
+  const result = await buyerActionService.uploadBuyerPo(req, order);
+  flash.set(req, result.ok ? 'success' : 'error', result.message);
   res.redirect(`/client/orders/${orderId}`);
 }
 
@@ -496,28 +481,10 @@ async function acknowledgeOc(req, res) {
     return;
   }
 
-  const ack = await orderOcAcknowledgmentRepository.find(orderId);
-  if (!ack || ack.acknowledged_at !== null) {
-    flash.set(req, 'error', 'There is nothing awaiting your acknowledgement on this order.');
-    res.redirect(`/client/orders/${orderId}`);
-    return;
-  }
-  if (!(await stageGateService.isUnlocked(orderId, 4))) {
-    flash.set(req, 'error', 'This order is not currently awaiting acknowledgement.');
-    res.redirect(`/client/orders/${orderId}`);
-    return;
-  }
-
-  if (!(await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'client_portal', null, null))) {
-    // QA-5 EML-06: lost the race to another acknowledgment path
-    // (staff-recorded, or the 48h auto-confirm job) between this action's
-    // own pre-check above and this write.
-    flash.set(req, 'success', 'This order has already been acknowledged and is moving to production.');
-    res.redirect(`/client/orders/${orderId}`);
-    return;
-  }
-  await stageGateService.passAndUnlockNext(orderId, 4, null);
-  flash.set(req, 'success', 'Thank you — your acknowledgement has been recorded and your order is moving to production.');
+  // 90-item backlog #75: shared with the no-login buyerActionController
+  // route — see buyerActionService's docblock.
+  const result = await buyerActionService.acknowledgeOc(orderId);
+  flash.set(req, result.ok ? 'success' : 'error', result.message);
   res.redirect(`/client/orders/${orderId}`);
 }
 

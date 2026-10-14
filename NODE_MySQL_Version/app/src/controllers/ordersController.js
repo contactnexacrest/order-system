@@ -720,6 +720,16 @@ async function show(req, res) {
     piFormFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/pi-details/${piIntake.access_token_plain}`;
   }
 
+  // 90-item backlog #75: a public, no-login link covering both this
+  // stage's OC acknowledgement and the client-portal Buyer PO upload.
+  let buyerActionFullLink = null;
+  const buyerActionLinkValid = !!order.buyer_action_token_plain
+    && !!order.buyer_action_token_expires_at
+    && parseDbDateTime(order.buyer_action_token_expires_at).getTime() > Date.now();
+  if (buyerActionLinkValid) {
+    buyerActionFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${order.buyer_action_token_plain}`;
+  }
+
   res.renderView(
     'orders/show',
     {
@@ -756,6 +766,8 @@ async function show(req, res) {
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
       piIntake,
       piFormFullLink,
+      buyerActionLinkValid,
+      buyerActionFullLink,
       clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
       ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
       ocDocGenerated: documents.some((d) => d.document_type_code === 'OC'),
@@ -829,6 +841,40 @@ async function generatePiFormLink(req, res) {
 
   await auditLogRepository.log(user.id, 'PI_INTAKE_LINK_GENERATED', 'orders', orderId, null, null, null, 'PI-stage intake link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
   flash.set(req, 'success', `PI-stage form link${order.client_email ? ` emailed to ${order.client_email}` : ' generated'}: ${link}`);
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Port of App\Controllers\OrderController::generateBuyerActionLink.
+ * 90-item backlog #75: generates (or regenerates) the public, no-login
+ * Buyer Action link — lets the buyer acknowledge their Order Confirmation
+ * and upload their signed Buyer PO copy without logging into the client
+ * portal. Same staff-initiated, flash-back-the-link pattern as
+ * generatePiFormLink() above; see docs/schema.sql Section BG and
+ * buyerActionController's docblock.
+ */
+async function generateBuyerActionLink(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const user = req.user;
+  const rawToken = await orderRepository.generateBuyerActionToken(orderId);
+  const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${rawToken}`;
+
+  if (order.client_email) {
+    const body = 'Hello,\n\n'
+      + `To acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order ${order.order_reference}, please visit:\n${link}\n\n`
+      + 'This link works for 90 days.\n\n'
+      + 'NexaCrest International Private Limited';
+    await emailService.sendPlainText(order.client_email, 'NexaCrest — acknowledge your order / upload your Buyer PO', body);
+  }
+
+  await auditLogRepository.log(user.id, 'BUYER_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Buyer Action link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
+  flash.set(req, 'success', `Buyer Action link${order.client_email ? ` emailed to ${order.client_email}` : ' generated'}: ${link}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -2020,7 +2066,7 @@ async function markLost(req, res) {
 }
 
 module.exports = {
-  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, downloadDossier, generatePiFormLink,
+  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, downloadDossier, generatePiFormLink, generateBuyerActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment, updateProductionStatus,
   recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,

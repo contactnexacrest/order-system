@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const db = require('../config/db');
 const referenceNumberService = require('../services/referenceNumberService');
 
@@ -355,8 +356,45 @@ async function setAnnexureMode(orderId, mode) {
   await db.execute('UPDATE orders SET annexure_mode = :mode WHERE id = :id', { mode, id: orderId });
 }
 
+/**
+ * 90-item backlog #75 (docs/schema.sql Section BG): generates (or
+ * regenerates, overwriting any prior link) the public, no-login token for
+ * this order's Buyer Action page (OC acknowledgment + Buyer PO upload) —
+ * same hash/plain/expiry convention as piIntakeRepository.createLink(),
+ * stored directly on the order row since this is a 1:1-with-the-order
+ * fact, not a per-submission one.
+ */
+async function generateBuyerActionToken(orderId, ttlDays = 90) {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  await db.execute(
+    'UPDATE orders SET buyer_action_token_hash = :hash, buyer_action_token_plain = :plain, buyer_action_token_expires_at = :expires WHERE id = :id',
+    {
+      hash: crypto.createHash('sha256').update(rawToken).digest('hex'),
+      plain: rawToken,
+      expires: new Date(Date.now() + ttlDays * 86400000).toISOString().slice(0, 19).replace('T', ' '),
+      id: orderId,
+    }
+  );
+  return rawToken;
+}
+
+/**
+ * Public /buyer-action/{token} route's sole authorization check — no
+ * session involved. Deliberately minimal (just confirms the token
+ * resolves to a real, unexpired order); buyerActionController re-loads
+ * the full row via find() for everything the page/upload actually needs.
+ */
+async function findByValidBuyerActionToken(rawToken) {
+  const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  return db.queryOne(
+    'SELECT * FROM orders WHERE buyer_action_token_hash = :hash AND buyer_action_token_expires_at > NOW()',
+    { hash }
+  );
+}
+
 module.exports = {
   all, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
+  generateBuyerActionToken, findByValidBuyerActionToken,
 };

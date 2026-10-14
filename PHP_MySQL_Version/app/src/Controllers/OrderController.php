@@ -841,6 +841,41 @@ final class OrderController
     }
 
     /**
+     * 90-item backlog #75: generates (or regenerates) the public, no-login
+     * Buyer Action link — lets the buyer acknowledge their Order
+     * Confirmation and upload their signed Buyer PO copy without logging
+     * into the client portal. Same staff-initiated, flash-back-the-link
+     * pattern as generatePiFormLink() above; see docs/schema.sql Section
+     * BG and BuyerActionController's docblock.
+     */
+    public function generateBuyerActionLink(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $rawToken = OrderRepository::generateBuyerActionToken($orderId);
+        $link = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $rawToken;
+
+        if (!empty($order['client_email'])) {
+            $body = "Hello,\n\n"
+                . "To acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order {$order['order_reference']}, please visit:\n{$link}\n\n"
+                . "This link works for 90 days.\n\n"
+                . "NexaCrest International Private Limited";
+            EmailService::sendPlainText($order['client_email'], 'NexaCrest — acknowledge your order / upload your Buyer PO', $body);
+        }
+
+        AuditLogRepository::log((int) $user['id'], 'BUYER_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Buyer Action link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
+        Flash::set('success', "Buyer Action link" . (!empty($order['client_email']) ? " emailed to {$order['client_email']}" : ' generated') . ": {$link}");
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
      * Real gap this closes: no way existed to hand over (or archive)
      * everything on file for one order in a single action — every
      * generated document and every received/uploaded file (dispute
