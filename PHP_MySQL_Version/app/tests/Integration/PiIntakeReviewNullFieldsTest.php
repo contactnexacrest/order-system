@@ -64,6 +64,11 @@ final class PiIntakeReviewNullFieldsTest extends DbTestCase
         restore_error_handler();
 
         self::assertSame([], $warnings, 'rendering a pending row with null optional fields must not raise any PHP warning/deprecation/notice');
-        self::assertStringContainsString('Pending (1)', $output);
+        // Not asserting an exact "Pending (N)" count: other test classes in
+        // this same PHPUnit process (the DB is rebuilt once per process,
+        // not per test) may leave their own pending_review rows behind, so
+        // the real count here is "at least this one", not necessarily 1.
+        self::assertStringContainsString($submission['company_legal_name'], $output);
+        self::assertStringNotContainsString('No pending submissions.', $output);
     }
 }

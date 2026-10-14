@@ -104,6 +104,45 @@ final class DocumentSupersedeTest extends DbTestCase
         self::assertSame('approved', DocumentRepository::find($documentId)['status']);
     }
 
+    /**
+     * 90-item backlog #47: confirmed via screenshots — Rev.0 sitting
+     * 'in_review' (its reviewer never got to it) and Rev.1 'approved'
+     * visibly coexisted in the Review & Approval list. Approving Rev.1
+     * blocks Rev.0 from ever being approved (the test above), but never
+     * actually changed Rev.0's own status or removed it from the
+     * reviewer's queue — a dead-end review sitting there indefinitely
+     * with nothing telling the reviewer it was already moot.
+     */
+    public function testApprovingANewerRevisionAlsoSupersedesAnOlderRevisionStillInReview(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+
+        $staleDocumentId = $this->createTestDocumentWithRevision($orderId, 'QT', 'draft', 0);
+        $reviewer = $this->createTestUser('Export Executive');
+        $this->setMinReviewers($staleDocumentId, 1);
+        ReviewWorkflowService::assignReviewers($staleDocumentId, [$reviewer], 1);
+        self::assertSame('in_review', DocumentRepository::find($staleDocumentId)['status']);
+
+        $newDocumentId = $this->createTestDocumentWithRevision($orderId, 'QT', 'draft', 1);
+        $this->setMinReviewers($newDocumentId, 1);
+        ReviewWorkflowService::assignReviewers($newDocumentId, [$reviewer], 1);
+        $newReview = DocumentReviewRepository::forDocument($newDocumentId)[0];
+
+        $pendingBefore = DocumentReviewRepository::pendingForReviewer($reviewer);
+        self::assertCount(2, $pendingBefore, 'both the stale and the new review should still be visible before the new one is approved');
+
+        ReviewWorkflowService::approve((int) $newReview['id'], $reviewer, null);
+
+        self::assertSame(
+            'superseded',
+            DocumentRepository::find($staleDocumentId)['status'],
+            'the older revision stuck in_review must be superseded too, not just blocked from being approved'
+        );
+
+        $pendingAfter = DocumentReviewRepository::pendingForReviewer($reviewer);
+        self::assertCount(0, $pendingAfter, 'the stale review must disappear from the reviewer\'s queue once its document is superseded');
+    }
+
     public function testMarkSupersededDirectlyFlipsStatusAndRepointsThePdf(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());

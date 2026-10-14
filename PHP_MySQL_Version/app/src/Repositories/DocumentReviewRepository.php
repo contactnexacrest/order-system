@@ -44,7 +44,13 @@ final class DocumentReviewRepository
         return $stmt->fetch() ?: null;
     }
 
-    /** Reviews still awaiting action by a specific reviewer, across all orders. */
+    /**
+     * Reviews still awaiting action by a specific reviewer, across all
+     * orders. 90-item backlog #47: excludes a document a newer revision
+     * has since superseded — ReviewWorkflowService::approve() already
+     * refuses to approve one, so leaving it here just kept a dead-end
+     * entry sitting in the reviewer's queue indefinitely.
+     */
     public static function pendingForReviewer(int $reviewerId): array
     {
         $stmt = Database::connection()->prepare(
@@ -52,7 +58,7 @@ final class DocumentReviewRepository
              FROM document_reviews dr
              JOIN documents d ON d.id = dr.document_id
              JOIN document_types dt ON dt.id = d.document_type_id
-             WHERE dr.reviewer_id = :reviewer_id AND dr.status = \'pending\'
+             WHERE dr.reviewer_id = :reviewer_id AND dr.status = \'pending\' AND d.status != \'superseded\'
              ORDER BY dr.assigned_at'
         );
         $stmt->execute(['reviewer_id' => $reviewerId]);

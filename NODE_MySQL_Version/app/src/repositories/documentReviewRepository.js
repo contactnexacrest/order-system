@@ -24,13 +24,20 @@ async function find(id) {
   return db.queryOne('SELECT * FROM document_reviews WHERE id = :id', { id });
 }
 
+/**
+ * Reviews still awaiting action by a specific reviewer, across all
+ * orders. 90-item backlog #47: excludes a document a newer revision has
+ * since superseded — reviewWorkflowService.approve() already refuses to
+ * approve one, so leaving it here just kept a dead-end entry sitting in
+ * the reviewer's queue indefinitely.
+ */
 async function pendingForReviewer(reviewerId) {
   return db.query(
     `SELECT dr.*, d.order_id, d.document_reference, d.revision_number, dt.code AS document_type_code, dt.name AS document_type_name
      FROM document_reviews dr
      JOIN documents d ON d.id = dr.document_id
      JOIN document_types dt ON dt.id = d.document_type_id
-     WHERE dr.reviewer_id = :reviewer_id AND dr.status = 'pending'
+     WHERE dr.reviewer_id = :reviewer_id AND dr.status = 'pending' AND d.status != 'superseded'
      ORDER BY dr.assigned_at`,
     { reviewer_id: reviewerId }
   );

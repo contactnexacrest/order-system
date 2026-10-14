@@ -35,10 +35,15 @@ async function activeOrderCount() {
  * they're different workflows with different approvers, not one list.
  */
 async function pendingReviewCount(reviewerId = null) {
-  let sql = "SELECT COUNT(*) AS c FROM document_reviews WHERE status = 'pending'";
+  // 90-item backlog #47: exclude a review whose document a newer revision
+  // has since superseded — otherwise this badge kept counting a dead-end
+  // review nobody could actually act on.
+  let sql = `SELECT COUNT(*) AS c FROM document_reviews dr
+             JOIN documents d ON d.id = dr.document_id
+             WHERE dr.status = 'pending' AND d.status != 'superseded'`;
   const params = {};
   if (reviewerId !== null) {
-    sql += ' AND reviewer_id = :reviewer_id';
+    sql += ' AND dr.reviewer_id = :reviewer_id';
     params.reviewer_id = reviewerId;
   }
   const row = await db.queryOne(sql, params);

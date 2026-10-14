@@ -34,15 +34,20 @@ while the order moves several stages ahead — that's expected, not broken.
   it. This closes the gap where a slow reviewer could approve a copy that
   was already out of date.
 - **Approving a revision automatically invalidates every other revision of
-  the same document that was still marked approved or sent.** The moment
-  one revision finishes approval, any sibling revision of that same
-  document type for that same order — including one already sent to the
-  buyer — flips to **superseded** and is re-rendered with a bright red
-  **"INVALID DOCUMENT — SUPERSEDED"** watermark in place of its old final
-  one. Only one revision of a document type can ever be the valid one at a
-  time; the superseded copy is never deleted (same soft-delete-only rule
-  as every other generated file) but is unmistakable the moment anyone
-  opens it.
+  the same document, whatever that other revision's own status is.** The
+  moment one revision finishes approval, every sibling revision of that
+  same document type for that same order — approved, sent, still in draft,
+  or still sitting with a reviewer who never got to it — flips to
+  **superseded**. One already approved or sent is re-rendered with a
+  bright red **"INVALID DOCUMENT — SUPERSEDED"** watermark in place of its
+  old final one; a draft or still-under-review sibling is superseded the
+  lighter way (status only, since nobody outside the company ever saw a
+  "valid" copy of it to begin with) and simply disappears from its
+  reviewer's **My Review Queue** — there's nothing left for them to act
+  on, so it no longer sits there looking actionable when it isn't. Only
+  one revision of a document type can ever be the valid one at a time; a
+  superseded copy is never deleted (same soft-delete-only rule as every
+  other generated file) but is unmistakable the moment anyone opens it.
 - **A buyer-facing document past its first issue is stamped with its own
   revision number.** From the second time a document type is actually sent
   to a buyer onward, its watermark carries "— REVISION 02" (etc.) alongside

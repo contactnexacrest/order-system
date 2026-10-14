@@ -142,6 +142,40 @@ describe('Document supersede/invalidation cascade', () => {
     expect((await documentRepository.find(documentId)).status).toBe('approved');
   });
 
+  /**
+   * 90-item backlog #47: confirmed via screenshots — Rev.0 sitting
+   * 'in_review' (its reviewer never got to it) and Rev.1 'approved'
+   * visibly coexisted in the Review & Approval list. Approving Rev.1
+   * blocks Rev.0 from ever being approved (the test above), but never
+   * actually changed Rev.0's own status or removed it from the
+   * reviewer's queue — a dead-end review sitting there indefinitely with
+   * nothing telling the reviewer it was already moot.
+   */
+  it('approving a newer revision also supersedes an older revision still in review', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+
+    const staleDocumentId = await createTestDocumentWithRevision(orderId, 'QT', 'draft', 0);
+    const reviewer = await createTestUser('Export Executive');
+    await setMinReviewers(staleDocumentId, 1);
+    await reviewWorkflowService.assignReviewers(staleDocumentId, [reviewer], 1);
+    expect((await documentRepository.find(staleDocumentId)).status).toBe('in_review');
+
+    const newDocumentId = await createTestDocumentWithRevision(orderId, 'QT', 'draft', 1);
+    await setMinReviewers(newDocumentId, 1);
+    await reviewWorkflowService.assignReviewers(newDocumentId, [reviewer], 1);
+    const [newReview] = await documentReviewRepository.forDocument(newDocumentId);
+
+    const pendingBefore = await documentReviewRepository.pendingForReviewer(reviewer);
+    expect(pendingBefore).toHaveLength(2);
+
+    await reviewWorkflowService.approve(newReview.id, reviewer, null);
+
+    expect((await documentRepository.find(staleDocumentId)).status).toBe('superseded');
+
+    const pendingAfter = await documentReviewRepository.pendingForReviewer(reviewer);
+    expect(pendingAfter).toHaveLength(0);
+  });
+
   it('markSuperseded directly flips status and repoints the pdf', async () => {
     const orderId = await createTestOrder(await createTestClient());
     const originalFileId = await createTestFile(orderId);

@@ -678,13 +678,24 @@ final class DocumentGenerationService
 
     /**
      * Called right after a document is fully approved (finalizeApproval()
-     * above) — every OTHER document of the same (order, type) that's
-     * still sitting as 'approved' or 'sent' is now stale: only the
-     * revision that was just approved may legitimately be sent to or
-     * relied on by the buyer going forward. Finds every sibling revision
-     * via DocumentRepository::allForOrderAndType() and invalidates each
-     * one still in 'approved'/'sent' status (a 'draft'/'in_review'/
-     * already-'superseded' sibling is left alone — nothing to invalidate).
+     * above) — every OTHER document of the same (order, type) is now
+     * stale: only the revision that was just approved may legitimately be
+     * sent to or relied on by the buyer going forward. Finds every
+     * sibling revision via DocumentRepository::allForOrderAndType() and
+     * invalidates each one not already 'superseded'.
+     *
+     * 90-item backlog #47: this used to only catch siblings already
+     * 'approved'/'sent', leaving a sibling still sitting in 'draft' or
+     * 'in_review' — e.g. a slower-moving earlier revision whose reviewer
+     * hadn't acted yet when a later regeneration got approved first —
+     * stuck visibly in "My Review Queue" and the order's own document
+     * list forever, with no way for anyone to tell it was already moot
+     * (ReviewWorkflowService::approve() refuses to let it actually be
+     * approved, but never says so until someone tries). Superseding it
+     * too, the same way, closes that gap — the reviewer simply stops
+     * seeing it (DocumentReviewRepository::pendingForReviewer() excludes
+     * superseded documents) instead of discovering the hard way that
+     * their pending review was already dead.
      */
     public static function supersedeOtherApprovedRevisions(int $documentId): void
     {
@@ -698,7 +709,7 @@ final class DocumentGenerationService
             if ((int) $sibling['id'] === $documentId) {
                 continue;
             }
-            if (in_array($sibling['status'], ['approved', 'sent'], true)) {
+            if ($sibling['status'] !== 'superseded') {
                 self::markSuperseded((int) $sibling['id']);
             }
         }
