@@ -38,9 +38,15 @@ Three things happen in this section, each building toward the BL:
 
    ![Shipping / Vessel Details form](./images/s7_shipping_bl_before.png)
 
-   Once saved, **Generate BL Instruction Sheet** produces the instruction
-   document sent to the shipping line/forwarder telling them exactly how to
-   issue the Bill of Lading.
+   Right below this form, its own labeled **"BL Instruction Sheet"**
+   section explains what the sheet covers and where each field on it comes
+   from (shipper/consignee/notify party, shipment and container details
+   from above, cargo description from the order's products, and the
+   mandatory BL-type instruction from Settings) before offering **Generate
+   BL Instruction Sheet**, which produces the instruction document sent to
+   the shipping line/forwarder telling them exactly how to issue the Bill
+   of Lading. Anything left blank in Shipping/Packing above shows as "To Be
+   Confirmed" on the generated sheet.
 3. **Confirm BL Issued** — once the shipping line actually issues the BL,
    staff type its number in here. **This is the action that passes Stage
    7's gate.**

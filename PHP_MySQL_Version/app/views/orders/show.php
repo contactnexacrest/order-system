@@ -661,15 +661,12 @@ foreach ($stages as $s) {
         </form>
       <?php endif; ?>
 
-      <?php if ($stage7 && $stage7['status'] !== 'locked' && $shipping): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="BLI">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
-        </form>
-      <?php endif; ?>
+      <?php // 90-item backlog #38/#55: BL Instruction Sheet's trigger used to
+             // live here, indistinguishable from every other generic
+             // "Generate X" button, with no indication of where its data
+             // comes from. Moved to its own explained section under Stage 7
+             // — Packing & BL Instruction — right next to the Shipping/
+             // Packing data it actually reads (see below). ?>
 
       <?php if ($stage8 && $stage8['status'] !== 'locked'): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
@@ -681,15 +678,10 @@ foreach ($stages as $s) {
         </form>
       <?php endif; ?>
 
-      <?php if ($stage9 && $stage9['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="COOPREP">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('COOPREP') ?>" data-loading-text="Generating…">Generate COO Prep Sheet (internal)</button>
-        </form>
-      <?php endif; ?>
+      <?php // 90-item backlog #38/#55: COO Prep Sheet's trigger moved for the
+             // same reason as BL Instruction Sheet above — its own explained
+             // section now lives under Stage 9, Document Despatch & Closure,
+             // where staff actually prepare the Chamber of Commerce filing. ?>
 
       <?php if ($order['include_annexure_a']): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
@@ -1415,6 +1407,18 @@ foreach ($stages as $s) {
         <button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
 
+      <?php if ($shipping): ?>
+      <h3 style="font-size:0.95em; margin-top:14px;">BL Instruction Sheet (for your CHA / shipping line)</h3>
+      <p class="muted small">Generates the shipping-booking worksheet your CHA or shipping line needs before confirming the BL booking — shipper, consignee/notify party, shipment and container details from above, cargo description from the order's products, and the mandatory BL-type instruction from Settings. Review the Shipping and Packing details above first; anything left blank there shows as "To Be Confirmed" on the sheet.</p>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="document_type" value="BLI">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        <button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
+      </form>
+      <?php endif; ?>
+
       <?php if (!$blIssued): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-issued">
           <?= Csrf::field() ?>
@@ -1647,6 +1651,16 @@ foreach ($stages as $s) {
     <?php elseif (!$stage9 || $stage9['status'] === 'locked'): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php else: ?>
+      <h3 style="font-size:0.95em; margin-top:0;">COO Prep Sheet (internal — for the Chamber of Commerce application)</h3>
+      <p class="muted small">Generates an internal worksheet summarizing everything needed to apply for the Certificate of Origin with the Chamber of Commerce — shipper, consignee, shipment, and cargo details, the same source data as the BL Instruction Sheet. Never shown to the client.</p>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline; margin-bottom:14px;">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="document_type" value="COOPREP">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        <button type="submit" class="<?= $__docBtnClass('COOPREP') ?>" data-loading-text="Generating…">Generate COO Prep Sheet</button>
+      </form>
+
       <?php if (!$canManageShipping): ?>
         <p class="muted">Only Logistics can record the original BLs.</p>
       <?php elseif (!$shipping || !$shipping['bl_originals_received_at']): ?>

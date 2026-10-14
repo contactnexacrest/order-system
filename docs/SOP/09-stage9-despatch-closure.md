@@ -80,6 +80,19 @@ those same values adds no real check. Each regeneration (editing the form
 and generating again) bumps the document's revision number on the same
 reference rather than starting a new one.
 
+## COO Prep Sheet document
+
+Also on this stage's section, above the Original-BL record-keeping steps,
+is a **"COO Prep Sheet"** panel with its own explanation and a single
+**Generate COO Prep Sheet** button. It produces an internal worksheet
+(never shown to the client) summarizing everything needed to apply for the
+Certificate of Origin with the Chamber of Commerce — shipper, consignee,
+shipment, and cargo details, reading the exact same order/shipping/
+packing/product data the BL Instruction Sheet in
+[Stage 7](./07-stage7-packing-bl.md) already draws from, so nothing here
+needs re-entering. Like every other document type, it can be regenerated
+as many times as needed if the underlying order data changes.
+
 ## Compliance Checklist
 
 A separate "Compliance Checklist" panel sits on every order's own page
