@@ -116,6 +116,20 @@ final class ClientPortalService
 
         ClientLoginRepository::resetFailedLogins((int) $login['client_id']);
         session_regenerate_id(true);
+        // 90-item backlog #6: session_regenerate_id() only rotates the
+        // session ID — unlike Node's req.session.regenerate(), it leaves
+        // every other $_SESSION key completely untouched. A staff member
+        // who started impersonating a client and never clicked "End
+        // impersonation" (stale tab/cookie) left SESSION_IMPERSONATED_BY
+        // set; if that same session then completed a genuine password
+        // login, isImpersonating() would wrongly keep reporting true for
+        // what is now a real client session — showing the impersonation
+        // banner to the actual client, skipping ClientAuth's normal
+        // is_active re-check on every request (that check is bypassed
+        // while "impersonating"), and routing "End impersonation" into a
+        // staff-only admin URL the client can't reach. A real login must
+        // always start a clean, non-impersonated identity.
+        unset($_SESSION[self::SESSION_IMPERSONATED_BY]);
         $_SESSION[self::SESSION_CLIENT_ID] = (int) $login['client_id'];
         ClientLoginRepository::updateLastLogin((int) $login['client_id']);
         AuditLogRepository::log(null, 'CLIENT_LOGIN_SUCCESS', 'clients', (int) $login['client_id']);

@@ -194,6 +194,42 @@ final class ClientImpersonationTest extends DbTestCase
         self::assertNull($result);
     }
 
+    /**
+     * 90-item backlog #6: session_regenerate_id(true) (used by
+     * attemptLogin(), unlike Node's req.session.regenerate()) only rotates
+     * the session ID — it leaves every other $_SESSION key untouched. A
+     * staff member who started impersonating a client and never clicked
+     * "End impersonation" (stale tab/cookie) left the impersonation flag
+     * set; if that same session then completed a genuine password login,
+     * isImpersonating() wrongly kept reporting true for what is now a real,
+     * password-authenticated client session.
+     */
+    public function testARealPasswordLoginClearsAnyStaleImpersonationFlagLeftFromBefore(): void
+    {
+        $clientId = $this->createTestClient();
+        $staffId = $this->createTestUser('Admin');
+        $this->enableGlobally();
+        ClientRepository::setAllowStaffImpersonation($clientId, true);
+        ClientPortalService::startImpersonation($staffId, $clientId);
+        self::assertTrue(ClientPortalService::isImpersonating(), 'sanity check: impersonation must actually be active before the login');
+
+        $email = 'real-login-' . bin2hex(random_bytes(4)) . '@nexacrest.test';
+        $password = 'Real-Client-Password-1!';
+        Database::connection()->prepare('UPDATE clients SET email = :email WHERE id = :id')
+            ->execute(['email' => $email, 'id' => $clientId]);
+        Database::connection()->prepare('INSERT INTO client_logins (client_id, password_hash, force_password_change) VALUES (:cid, :hash, 0)')
+            ->execute(['cid' => $clientId, 'hash' => password_hash($password, PASSWORD_DEFAULT)]);
+
+        $result = ClientPortalService::attemptLogin($email, $password);
+
+        self::assertSame('ok', $result['status']);
+        self::assertSame($clientId, ClientPortalService::currentClientId());
+        self::assertFalse(
+            ClientPortalService::isImpersonating(),
+            'the bug: a genuine password login must never be mistaken for a staff impersonation session'
+        );
+    }
+
     // --- Per-client toggle ---
 
     public function testSetImpersonationAllowedTogglesTheFlagAndLogsIt(): void

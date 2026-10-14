@@ -8,6 +8,7 @@ const clientsController = require('../../src/controllers/clientsController');
 const clientPortalController = require('../../src/controllers/clientPortalController');
 const clientAuth = require('../../src/middleware/clientAuth');
 const flash = require('../../src/helpers/flash');
+const passwordHash = require('../../src/helpers/passwordHash');
 const { createTestClient } = require('../support/fixtures');
 
 /**
@@ -220,6 +221,44 @@ describe('Client impersonation (Section AV)', () => {
     const result = await clientPortalService.endImpersonation(req);
 
     expect(result).toBeNull();
+  });
+
+  /**
+   * Port of ClientImpersonationTest::testARealPasswordLoginClearsAnyStale
+   * ImpersonationFlagLeftFromBefore. 90-item backlog #6: PHP's
+   * attemptLogin() had this bug because session_regenerate_id() only
+   * rotates the session ID and leaves other keys untouched — Node's
+   * attemptLogin() uses regeneratePreserving(req, [STAFF_SESSION_KEY], …),
+   * which wipes the ENTIRE session (via the real req.session.regenerate())
+   * and only restores the explicitly-listed staff key, so any stale
+   * impersonation flag is destroyed as a side effect before the real
+   * client id is even set. This pins that Node really is immune, not just
+   * accidentally passing today.
+   */
+  it('a real password login clears any stale impersonation flag left from before (Node is immune by design)', async () => {
+    await enableGlobally();
+    const clientId = await createTestClient();
+    await clientRepository.setAllowStaffImpersonation(clientId, true);
+    const staffId = await createTestStaffUser();
+    const req = fakeReq(staffId);
+    req.params.id = String(clientId);
+    await clientsController.impersonate(req, fakeRes());
+    expect(clientPortalService.isImpersonating(req)).toBe(true);
+
+    const email = `real-login-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
+    const password = 'Real-Client-Password-1!';
+    await db.execute('UPDATE clients SET email = :email WHERE id = :id', { email, id: clientId });
+    const hash = await passwordHash.hash(password);
+    await db.execute(
+      'INSERT INTO client_logins (client_id, password_hash, force_password_change) VALUES (:cid, :hash, 0)',
+      { cid: clientId, hash }
+    );
+
+    const result = await clientPortalService.attemptLogin(req, email, password);
+
+    expect(result.status).toBe('ok');
+    expect(clientPortalService.currentClientId(req)).toBe(clientId);
+    expect(clientPortalService.isImpersonating(req)).toBe(false);
   });
 
   // --- Per-client toggle ---
