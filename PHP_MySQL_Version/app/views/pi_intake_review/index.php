@@ -11,14 +11,14 @@
       <tr>
         <td><a href="/orders/<?= (int) $s['order_id'] ?>"><?= htmlspecialchars($s['order_reference']) ?></a></td>
         <td><?= htmlspecialchars($s['company_legal_name']) ?><br><span class="muted small"><?= htmlspecialchars($s['contact_person']) ?> · <?= htmlspecialchars($s['email']) ?></span></td>
-        <td><?= htmlspecialchars($s['consignee_name']) ?><br><span class="muted small">Notify: <?= htmlspecialchars($s['notify_party'] ?: '—') ?></span></td>
+        <td><?= htmlspecialchars((string) $s['consignee_name']) ?><br><span class="muted small">Notify: <?= htmlspecialchars((string) ($s['notify_party'] ?: '—')) ?></span></td>
         <td>
-          <span class="muted small">Incoterm: <?= htmlspecialchars($s['incoterm_confirmed']) ?></span><br>
-          <span class="muted small">Port: <?= htmlspecialchars($s['port_of_discharge_text']) ?></span><br>
-          <span class="muted small"><?= htmlspecialchars($s['quotation_acceptance_reference']) ?></span><br>
-          <span class="muted small"><?= htmlspecialchars($s['payment_terms_confirmation']) ?></span>
-          <?php if ($s['changes_from_quotation']): ?><br><span class="muted small">Changes: <?= htmlspecialchars($s['changes_from_quotation']) ?></span><?php endif; ?>
-          <?php if ($s['buyer_po_ref']): ?><br><span class="muted small">Buyer PO: <?= htmlspecialchars($s['buyer_po_ref']) ?></span><?php endif; ?>
+          <span class="muted small">Incoterm: <?= htmlspecialchars((string) $s['incoterm_confirmed']) ?></span><br>
+          <span class="muted small">Port: <?= htmlspecialchars((string) $s['port_of_discharge_text']) ?></span><br>
+          <span class="muted small"><?= htmlspecialchars((string) $s['quotation_acceptance_reference']) ?></span><br>
+          <span class="muted small"><?= htmlspecialchars((string) $s['payment_terms_confirmation']) ?></span>
+          <?php if ($s['changes_from_quotation']): ?><br><span class="muted small">Changes: <?= htmlspecialchars((string) $s['changes_from_quotation']) ?></span><?php endif; ?>
+          <?php if ($s['buyer_po_ref']): ?><br><span class="muted small">Buyer PO: <?= htmlspecialchars((string) $s['buyer_po_ref']) ?></span><?php endif; ?>
         </td>
         <td><?= htmlspecialchars((string) $s['submitted_at']) ?></td>
         <td>
