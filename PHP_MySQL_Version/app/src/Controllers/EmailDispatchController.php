@@ -115,8 +115,15 @@ final class EmailDispatchController
     /** Level 2 — approval queue. Shows both awaiting-approval and already-approved-but-not-yet-sent rows, since both are still cancellable. */
     public function approvalQueue(array $params): void
     {
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+
         View::render('email/approvals', [
-            'pending' => EmailLogRepository::awaitingDispatch(),
+            'pending'      => EmailLogRepository::awaitingDispatch(),
+            // An approver needs to see the exact PDF going out, not just
+            // trust the subject/body text — the "View attachment" link
+            // only renders when they could actually open it.
+            'canDownload'  => PermissionService::can((int) $user['id'], $roleId, 'download_pdf'),
         ], 'layout/base');
     }
 

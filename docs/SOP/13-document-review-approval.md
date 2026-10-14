@@ -100,9 +100,15 @@ A separate approver (anyone with the `approve_email_send` permission) has
 to clear it from the **Email Send Approvals** queue before it goes out.
 That queue has its own item in the sidebar (next to **My Reviews** — not
 tucked under Insights), and a notification telling an approver a send is
-waiting links straight there:
+waiting links straight there. The screen shows each pending send as its
+own card with the **exact** subject and body text that will go out
+(`email_log.body_snapshot`, captured at Level 1 — never re-composed at
+send time) plus a **View attachment** link that opens the real,
+already-approved PDF the send will carry — the same file
+`dispatch()` itself attaches, not a placeholder. An approver is never
+asked to clear a send blind:
 
-![Email Send Approvals — Level 2, with Approve/Reject/Cancel actions](./images/review_email_approvals.png)
+![Email Send Approvals — Level 2, with full preview + attachment link and Approve/Reject/Cancel actions](./images/review_email_approvals.png)
 
 Even after Level-2 approval, the send can still be **cancelled** right up
 until it actually goes out — this whole span (submitted → approved →

@@ -99,9 +99,16 @@ final class EmailLogRepository
      */
     public static function awaitingDispatch(): array
     {
+        // d.document_reference/document_type_code label the attachment link
+        // in the approvals screen — an approver needs to see exactly what
+        // they're sending (body_snapshot, already on el.*) and exactly what
+        // PDF goes out with it before they can meaningfully decide.
         $stmt = Database::connection()->query(
-            "SELECT el.*, o.order_reference
-             FROM email_log el LEFT JOIN orders o ON o.id = el.order_id
+            "SELECT el.*, o.order_reference, d.document_reference, dt.code AS document_type_code
+             FROM email_log el
+             LEFT JOIN orders o ON o.id = el.order_id
+             LEFT JOIN documents d ON d.id = el.document_id
+             LEFT JOIN document_types dt ON dt.id = d.document_type_id
              WHERE el.status IN ('pending_approval', 'approved')
              ORDER BY el.created_at"
         );

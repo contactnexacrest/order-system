@@ -1,38 +1,55 @@
 <div class="card page-wide">
   <h1>Email Send Approvals (Level 2)</h1>
-  <p class="muted small">Includes anything still in its deferred window — awaiting your approval, or already approved but not yet dispatched. Cancel stops either one before it goes out.</p>
-  <table class="list">
-    <tr><th>Order</th><th>To</th><th>Subject</th><th>Status</th><th>Scheduled</th><th>Requested</th><th>Action</th></tr>
-    {% for row in pending %}
-    <tr>
-      <td>{{ row.order_reference or '—' }}</td>
-      <td>{{ row.recipient_email }}</td>
-      <td>{{ row.subject }}</td>
-      <td>{{ row.status | replace('_', ' ') }}</td>
-      <td>{{ row.scheduled_at or 'Immediate' }}</td>
-      <td>{{ row.created_at }}</td>
-      <td>
-        {% if row.status == 'pending_approval' %}
-        <form method="post" action="/email-log/{{ row.id }}/approve" style="display:inline">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <button type="submit" class="btn-sm btn-success">Approve</button>
-        </form>
-        <form method="post" action="/email-log/{{ row.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this send?');">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:160px">
-          <button type="submit" class="btn-sm btn-danger">Reject</button>
-        </form>
-        {% endif %}
-        <form method="post" action="/email-log/{{ row.id }}/cancel" style="display:inline" onsubmit="return confirm('Cancel this send? It will never go out.');">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:160px">
-          <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-    {% if not pending or pending.length == 0 %}
-      <tr><td colspan="7" class="muted">Nothing awaiting approval or dispatch.</td></tr>
-    {% endif %}
-  </table>
+  <p class="muted small">Includes anything still in its deferred window — awaiting your approval, or already approved but not yet dispatched. Cancel stops either one before it goes out. The exact subject, body, and attachment below are exactly what will be sent — nothing is re-composed at dispatch time.</p>
+
+  {% if not pending or pending.length == 0 %}
+    <p class="muted">Nothing awaiting approval or dispatch.</p>
+  {% endif %}
+
+  {% for row in pending %}
+  <div class="section" style="border:1px solid #dcd6c9; border-radius:4px; padding:12px; margin-bottom:12px;">
+    <div class="kv-grid">
+      <div><span class="k">Order</span><span class="v">{{ row.order_reference or '—' }}</span></div>
+      <div><span class="k">To</span><span class="v">{{ row.recipient_email }}</span></div>
+      <div><span class="k">Status</span><span class="v">{{ row.status | replace('_', ' ') }}</span></div>
+      <div><span class="k">Scheduled</span><span class="v">{{ row.scheduled_at or 'Immediate' }}</span></div>
+      <div><span class="k">Requested</span><span class="v">{{ row.created_at }}</span></div>
+    </div>
+
+    <h2 style="margin-top:0.75rem">Exact Preview</h2>
+    <p class="muted small" style="margin:0 0 4px"><strong>Subject:</strong> {{ row.subject }}</p>
+    <pre style="white-space:pre-wrap; border:1px solid #dcd6c9; padding:8px; font-size:9px; background:#fff;">{{ row.body_snapshot }}</pre>
+
+    <p class="muted small" style="margin-top:0.5rem">
+      <strong>Attachment:</strong>
+      {% if row.document_id and permissions.download_pdf %}
+        {{ row.document_type_code or '' }} {{ row.document_reference or '' }}.pdf
+        &nbsp;·&nbsp; <a href="/documents/{{ row.document_id }}/download" target="_blank" rel="noopener">View attachment (opens the exact PDF that will be sent)</a>
+      {% elif row.document_id %}
+        {{ row.document_type_code or '' }} {{ row.document_reference or '' }}.pdf (you don't have permission to open it)
+      {% else %}
+        none
+      {% endif %}
+    </p>
+
+    <div style="margin-top:0.75rem">
+      {% if row.status == 'pending_approval' %}
+      <form method="post" action="/email-log/{{ row.id }}/approve" style="display:inline">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <button type="submit" class="btn-sm btn-success">Approve</button>
+      </form>
+      <form method="post" action="/email-log/{{ row.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this send?');">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:160px">
+        <button type="submit" class="btn-sm btn-danger">Reject</button>
+      </form>
+      {% endif %}
+      <form method="post" action="/email-log/{{ row.id }}/cancel" style="display:inline" onsubmit="return confirm('Cancel this send? It will never go out.');">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:160px">
+        <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
 </div>
