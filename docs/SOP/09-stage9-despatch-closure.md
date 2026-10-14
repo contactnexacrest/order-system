@@ -45,6 +45,15 @@ Stage 9's gate and marks the order complete.**
 
 ![Stage 9 section — order closed](./images/s9_closed.png)
 
+If the **BL Instruction Sheet** (Stage 7) or **COO Prep Sheet** (below)
+hasn't been generated and approved yet, a small note appears just above the
+Close Order form naming which one is still outstanding. Like the
+Compliance Checklist below, this is a reminder only — it never disables or
+hides the form. Close Order remains available throughout this stage
+regardless of either document's state, for the same reason the two
+record-keeping steps above aren't enforced either: the system trusts staff
+to follow the real-world process rather than hard-coding it as a rule here.
+
 ## BL Endorsement document
 
 Once **Record Original BLs Received from CHA** has been ticked, a **BL

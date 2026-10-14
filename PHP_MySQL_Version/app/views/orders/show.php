@@ -1651,6 +1651,22 @@ foreach ($stages as $s) {
     <?php elseif (!$stage9 || $stage9['status'] === 'locked'): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php else: ?>
+      <?php
+        // 90-item backlog #57: computed once here and reused below to warn
+        // staff before they try to close, rather than letting them fill in
+        // the tracking number and only find out from the resulting error.
+        $__closeRequiredTypes = ['BLI' => 'BL Instruction Sheet', 'COOPREP' => 'COO Prep Sheet'];
+        $__closeBlockedBy = [];
+        foreach ($__closeRequiredTypes as $__closeCode => $__closeLabel) {
+          $__closeLatest = null;
+          foreach ($documents as $__closeDoc) {
+            if ($__closeDoc['document_type_code'] === $__closeCode) { $__closeLatest = $__closeDoc; break; }
+          }
+          if (!$__closeLatest || !in_array($__closeLatest['status'], ['approved', 'sent'], true)) {
+            $__closeBlockedBy[] = $__closeLabel;
+          }
+        }
+      ?>
       <h3 style="font-size:0.95em; margin-top:0;">COO Prep Sheet (internal — for the Chamber of Commerce application)</h3>
       <p class="muted small">Generates an internal worksheet summarizing everything needed to apply for the Certificate of Origin with the Chamber of Commerce — shipper, consignee, shipment, and cargo details, the same source data as the BL Instruction Sheet. Never shown to the client.</p>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline; margin-bottom:14px;">
@@ -1709,6 +1725,9 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if ($canCloseOrders): ?>
+      <?php if (!empty($__closeBlockedBy)): ?>
+        <p class="muted small">⚠ Before closing: generate and get approval for <?= htmlspecialchars(implode(' and ', $__closeBlockedBy)) ?> above.</p>
+      <?php endif; ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>

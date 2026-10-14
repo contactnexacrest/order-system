@@ -1619,6 +1619,10 @@
       {% endif %}
 
       {% if permissions.close_orders %}
+      {% set closeBlockedBy = closeOrderBlockedBy(documents) %}
+      {% if closeBlockedBy.length %}
+        <p class="muted small">⚠ Before closing: generate and get approval for {{ closeBlockedBy | join(' and ') }} above.</p>
+      {% endif %}
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
