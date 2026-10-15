@@ -64,7 +64,7 @@
       <label>Amount Paid<input type="text" name="amount" placeholder="e.g. 12500.00"></label>
       <label>Date Paid<input type="date" name="payment_date"></label>
       <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
-      <label>Payment Screenshot (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
+      <label>Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
       <button type="submit" class="btn-sm">Submit Payment Details</button>
     </form>
   </div>

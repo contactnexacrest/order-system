@@ -1395,8 +1395,8 @@
           <label>Shipping Line<input type="text" name="shipping_line" value="{{ shipping.shipping_line or '' }}"></label>
           <label>Vessel Name<input type="text" name="vessel_name" value="{{ shipping.vessel_name or '' }}"></label>
           <label>Voyage Number<input type="text" name="voyage_number" value="{{ shipping.voyage_number or '' }}"></label>
-          <label>ETD<input type="date" name="etd" value="{{ shipping.etd or '' }}"></label>
-          <label>ETA<input type="date" name="eta" value="{{ shipping.eta or '' }}"></label>
+          <label>ETD <small class="muted">(Estimated Time of Departure)</small><input type="date" name="etd" value="{{ shipping.etd or '' }}"></label>
+          <label>ETA <small class="muted">(Estimated Time of Arrival)</small><input type="date" name="eta" value="{{ shipping.eta or '' }}"></label>
           <label>Container Type
             {% set shipContainerType = shipping.container_type or order.container_type or '' %}
             <select name="ship_container_type">

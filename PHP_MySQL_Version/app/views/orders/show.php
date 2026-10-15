@@ -1506,8 +1506,8 @@ foreach ($stages as $s) {
           <label>Shipping Line<input type="text" name="shipping_line" value="<?= htmlspecialchars($shipping['shipping_line'] ?? '') ?>"></label>
           <label>Vessel Name<input type="text" name="vessel_name" value="<?= htmlspecialchars($shipping['vessel_name'] ?? '') ?>"></label>
           <label>Voyage Number<input type="text" name="voyage_number" value="<?= htmlspecialchars($shipping['voyage_number'] ?? '') ?>"></label>
-          <label>ETD<input type="date" name="etd" value="<?= htmlspecialchars($shipping['etd'] ?? '') ?>"></label>
-          <label>ETA<input type="date" name="eta" value="<?= htmlspecialchars($shipping['eta'] ?? '') ?>"></label>
+          <label>ETD <small class="muted">(Estimated Time of Departure)</small><input type="date" name="etd" value="<?= htmlspecialchars($shipping['etd'] ?? '') ?>"></label>
+          <label>ETA <small class="muted">(Estimated Time of Arrival)</small><input type="date" name="eta" value="<?= htmlspecialchars($shipping['eta'] ?? '') ?>"></label>
           <label>Container Type
             <select name="ship_container_type">
               <option value="">— To Be Confirmed —</option>

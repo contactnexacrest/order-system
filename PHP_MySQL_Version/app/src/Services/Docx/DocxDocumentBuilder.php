@@ -1227,8 +1227,8 @@ final class DocxDocumentBuilder
             ['label' => 'Place of Delivery', 'value' => 'Same as Port of Discharge unless buyer has an inland delivery arrangement'],
             ['label' => 'Vessel Name *', 'value' => self::g($shipping, 'vessel_name', 'TBC — to be confirmed by shipping line at time of booking')],
             ['label' => 'Voyage Number *', 'value' => self::g($shipping, 'voyage_number', 'To Be Confirmed')],
-            ['label' => 'ETD (Est. Departure) *', 'value' => self::g($shipping, 'etd', 'To Be Confirmed')],
-            ['label' => 'ETA (Est. Arrival) *', 'value' => self::g($shipping, 'eta', 'To Be Confirmed')],
+            ['label' => 'ETD (Estimated Time of Departure) *', 'value' => self::g($shipping, 'etd', 'To Be Confirmed')],
+            ['label' => 'ETA (Estimated Time of Arrival) *', 'value' => self::g($shipping, 'eta', 'To Be Confirmed')],
         ], true);
 
         $containerType = (string) self::g($order, 'container_type', '');
