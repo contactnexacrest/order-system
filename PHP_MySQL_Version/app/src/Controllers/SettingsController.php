@@ -10,6 +10,7 @@ use App\Helpers\SettingValueValidator;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
+use App\Repositories\LookupRepository;
 use App\Services\AuthService;
 use App\Services\EmailService;
 use App\Services\SuperAdminService;
@@ -28,6 +29,14 @@ final class SettingsController
         View::render('settings/index', [
             'grouped' => $grouped,
             'isSuperAdmin' => SuperAdminService::isEffective((int) $user['id']),
+            // 90-item backlog #31: rbi_purpose_code_advance/balance/freight
+            // were plain free-text settings with no standard list — same
+            // dropdown treatment as #43/#66/#51a, special-cased in the view
+            // by setting_key since company_settings.value_type has no
+            // 'select' variant (see the view's own comment for why this
+            // was scoped as a 3-key special case rather than a new generic
+            // settings field type).
+            'rbiPurposeCodes' => LookupRepository::dropdownOptions('rbi_purpose_code'),
         ], 'layout/base');
     }
 

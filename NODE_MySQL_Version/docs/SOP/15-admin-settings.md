@@ -88,7 +88,16 @@ mistake (or malice).
   one for Zoho Mail if it's enabled — send one real email straight through
   that transport only, bypassing Test Mode, Mail Redirect, and each
   other's fallback, so a connection/credential problem shows up as an
-  actual error on screen instead of a silent log line.
+  actual error on screen instead of a silent log line. The three **RBI
+  Purpose Code** fields (advance/balance/freight payment wires) are
+  **dropdowns, not free text** — fed from the same `dropdown_options`
+  admin list used elsewhere on this page (`list_key = 'rbi_purpose_code'`),
+  so a code can't be mistyped on a document that a bank actually reads.
+  If the current value isn't on the seeded list (e.g. it was set before
+  this change, or a bank has since asked for a different code), the
+  dropdown still shows it as a selectable option labeled "(not in admin
+  list)" rather than silently discarding it — add the real code to the
+  admin list first, then switch to it properly.
 - **Holiday Calendar** — the dates the Working Days Calculator (used for
   dispute response deadlines, see [Disputes](./11-disputes.md)) excludes.
 - **HS Codes** — the master list product HS codes must come from; an order

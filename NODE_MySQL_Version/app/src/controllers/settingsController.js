@@ -5,6 +5,7 @@ const reasonValidator = require('../helpers/reasonValidator');
 const settingValueValidator = require('../helpers/settingValueValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
+const lookupRepository = require('../repositories/lookupRepository');
 const zohoMailService = require('../services/zohoMailService');
 const emailService = require('../services/emailService');
 const superAdminService = require('../services/superAdminService');
@@ -18,7 +19,24 @@ async function index(req, res) {
     (grouped[row.category] ||= []).push(row);
   }
   const isSuperAdmin = await superAdminService.isEffective(req.user.id);
-  res.renderView('settings/index', { grouped, isSuperAdmin }, 'layout/base');
+  // 90-item backlog #31: rbi_purpose_code_advance/balance/freight were
+  // plain free-text settings with no standard list — same dropdown
+  // treatment as #43/#66/#51a, special-cased in the view by setting_key
+  // since company_settings.value_type has no 'select' variant (see the
+  // view's own comment for why this was scoped as a 3-key special case
+  // rather than a new generic settings field type). rbiPurposeCodeValues
+  // is the same list flattened to plain strings, used by the view's
+  // "is the current value already in the admin list" check — Nunjucks
+  // has no mutable loop-scoped variable (no namespace() like Jinja2), so
+  // that check is done with the `in` operator against a plain array
+  // instead of a loop-tracked boolean.
+  const rbiPurposeCodes = await lookupRepository.dropdownOptions('rbi_purpose_code');
+  res.renderView('settings/index', {
+    grouped,
+    isSuperAdmin,
+    rbiPurposeCodes,
+    rbiPurposeCodeValues: rbiPurposeCodes.map((o) => o.option_value),
+  }, 'layout/base');
 }
 
 async function update(req, res) {

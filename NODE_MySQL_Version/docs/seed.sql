@@ -480,7 +480,19 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
   ('gst_rate', '5', 2, 0, 1),
   ('gst_rate', '12', 3, 0, 1),
   ('gst_rate', '18', 4, 1, 1),
-  ('gst_rate', '28', 5, 0, 1);
+  ('gst_rate', '28', 5, 0, 1),
+  -- 90-item backlog #31: rbi_purpose_code_advance/balance/freight
+  -- (company_settings, seeded further below) were plain free text with
+  -- no standard list. These 3 values are exactly the codes already in
+  -- use as each setting's own default (P0103/P0102/P0602) — deliberately
+  -- not inventing additional RBI/FEMA purpose codes here, since getting
+  -- one wrong would misdescribe a real bank wire's purpose on an actual
+  -- compliance document (Commercial Invoice/Freight Debit Note/Payment
+  -- Terms Amendment). An admin can add further codes later via this same
+  -- /admin/dropdown-options screen once confirmed with their bank/CA.
+  ('rbi_purpose_code', 'P0102', 1, 0, 1),
+  ('rbi_purpose_code', 'P0103', 2, 0, 1),
+  ('rbi_purpose_code', 'P0602', 3, 0, 1);
 
 -- ================================================================
 -- FILE_UPLOAD_CONTEXTS — Phase D wires up the first two of these

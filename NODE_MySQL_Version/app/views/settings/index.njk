@@ -21,7 +21,29 @@
               {% if row.requires_super_admin %}<span class="badge badge-superadmin" title="Only a Super Admin can change this">Super Admin only</span>{% endif %}
               {% if row.description %}<small class="muted">{{ row.description }}</small>{% endif %}
             </span>
-            {% if row.value_type == 'boolean' %}
+            {# 90-item backlog #31: special-cased by setting_key rather than
+               adding a generic value_type='select' — company_settings.value_type
+               has no dropdown variant today and nothing else needs one yet, so a
+               new generic field type would be speculative generalization for a
+               fix that only ever applies to these 3 keys. #}
+            {% if row.setting_key in ['rbi_purpose_code_advance', 'rbi_purpose_code_balance', 'rbi_purpose_code_freight'] %}
+              <input type="hidden" name="settings[{{ row.setting_key }}]" value="{{ row.setting_value or '' }}">
+              <select
+                data-key="{{ row.setting_key }}"
+                data-initial-value="{{ row.setting_value or '' }}"
+                data-sensitive="{{ '1' if row.is_sensitive else '0' }}"
+                data-protected="{{ '1' if row.is_protected else '0' }}"
+                {{ 'disabled' if row.is_protected or lockedToSuperAdmin }}
+                onchange="this.previousElementSibling.value = this.value;"
+              >
+                {% for opt in rbiPurposeCodes %}
+                  <option value="{{ opt.option_value }}" {{ 'selected' if opt.option_value == row.setting_value }}>{{ opt.option_value }}</option>
+                {% endfor %}
+                {% if row.setting_value and not (row.setting_value in rbiPurposeCodeValues) %}
+                  <option value="{{ row.setting_value }}" selected>{{ row.setting_value }} (not in admin list)</option>
+                {% endif %}
+              </select>
+            {% elif row.value_type == 'boolean' %}
               <input type="hidden" name="settings[{{ row.setting_key }}]" value="{{ '1' if row.setting_value == '1' else '0' }}">
               <input
                 type="checkbox"
@@ -92,11 +114,11 @@
 <script>
 function unlockRow(btn) {
   var label = btn.closest('.setting-row');
-  var field = label.querySelector('input[type=text][data-key], input[type=checkbox][data-key], textarea[data-key]');
+  var field = label.querySelector('input[type=text][data-key], input[type=checkbox][data-key], textarea[data-key], select[data-key]');
   var flag = label.querySelector('.unlock-flag');
   var reason = prompt('Why are you unlocking this protected field? (required)');
   if (!reason || !reason.trim()) { return; }
-  if (field.type === 'checkbox') { field.disabled = false; } else { field.removeAttribute('readonly'); }
+  if (field.type === 'checkbox' || field.tagName === 'SELECT') { field.disabled = false; } else { field.removeAttribute('readonly'); }
   field.focus();
   flag.value = '1';
   var icon = label.querySelector('.lock-icon');
@@ -109,8 +131,10 @@ function confirmSettingsSave(form) {
   var changedSensitive = false;
   var changedProtected = 0;
   var blockedProtected = [];
-  form.querySelectorAll('input[data-key], textarea[data-key]').forEach(function (el) {
-    var isChanged = el.type === 'checkbox' ? (el.checked !== el.defaultChecked) : (el.value !== el.defaultValue);
+  form.querySelectorAll('input[data-key], textarea[data-key], select[data-key]').forEach(function (el) {
+    var isChanged = el.type === 'checkbox'
+      ? (el.checked !== el.defaultChecked)
+      : (el.tagName === 'SELECT' ? (el.value !== el.dataset.initialValue) : (el.value !== el.defaultValue));
     if (isChanged) {
       changedAny = true;
       if (el.dataset.sensitive === '1') changedSensitive = true;

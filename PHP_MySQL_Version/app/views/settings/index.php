@@ -22,7 +22,31 @@
               <?php if ($row['requires_super_admin']): ?><span class="badge badge-superadmin" title="Only a Super Admin can change this">Super Admin only</span><?php endif; ?>
               <?php if ($row['description']): ?><small class="muted"><?= htmlspecialchars($row['description']) ?></small><?php endif; ?>
             </span>
-            <?php if ($row['value_type'] === 'boolean'): ?>
+            <?php /* 90-item backlog #31: special-cased by setting_key rather than
+               adding a generic value_type='select' — company_settings.value_type
+               has no dropdown variant today and nothing else needs one yet, so a
+               new generic field type would be speculative generalization for a
+               fix that only ever applies to these 3 keys. */ ?>
+            <?php if (in_array($row['setting_key'], ['rbi_purpose_code_advance', 'rbi_purpose_code_balance', 'rbi_purpose_code_freight'], true)): ?>
+              <?php $currentValue = (string) ($row['setting_value'] ?? ''); $seenCurrent = false; ?>
+              <input type="hidden" name="settings[<?= htmlspecialchars($row['setting_key']) ?>]" value="<?= htmlspecialchars($currentValue) ?>">
+              <select
+                data-key="<?= htmlspecialchars($row['setting_key']) ?>"
+                data-initial-value="<?= htmlspecialchars($currentValue) ?>"
+                data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
+                data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
+                <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'disabled' : '' ?>
+                onchange="this.previousElementSibling.value = this.value;"
+              >
+                <?php foreach ($rbiPurposeCodes as $opt): ?>
+                  <?php if ($opt['option_value'] === $currentValue) { $seenCurrent = true; } ?>
+                  <option value="<?= htmlspecialchars($opt['option_value']) ?>" <?= $opt['option_value'] === $currentValue ? 'selected' : '' ?>><?= htmlspecialchars($opt['option_value']) ?></option>
+                <?php endforeach; ?>
+                <?php if (!$seenCurrent && $currentValue !== ''): ?>
+                  <option value="<?= htmlspecialchars($currentValue) ?>" selected><?= htmlspecialchars($currentValue) ?> (not in admin list)</option>
+                <?php endif; ?>
+              </select>
+            <?php elseif ($row['value_type'] === 'boolean'): ?>
               <input type="hidden" name="settings[<?= htmlspecialchars($row['setting_key']) ?>]" value="<?= $row['setting_value'] === '1' ? '1' : '0' ?>">
               <input
                 type="checkbox"
@@ -93,11 +117,11 @@
 <script>
 function unlockRow(btn) {
   var label = btn.closest('.setting-row');
-  var field = label.querySelector('input[type=text][data-key], input[type=checkbox][data-key], textarea[data-key]');
+  var field = label.querySelector('input[type=text][data-key], input[type=checkbox][data-key], textarea[data-key], select[data-key]');
   var flag = label.querySelector('.unlock-flag');
   var reason = prompt('Why are you unlocking this protected field? (required)');
   if (!reason || !reason.trim()) { return; }
-  if (field.type === 'checkbox') { field.disabled = false; } else { field.removeAttribute('readonly'); }
+  if (field.type === 'checkbox' || field.tagName === 'SELECT') { field.disabled = false; } else { field.removeAttribute('readonly'); }
   field.focus();
   flag.value = '1';
   var icon = label.querySelector('.lock-icon');
@@ -110,8 +134,10 @@ function confirmSettingsSave(form) {
   var changedSensitive = false;
   var changedProtected = 0;
   var blockedProtected = [];
-  form.querySelectorAll('input[data-key], textarea[data-key]').forEach(function (el) {
-    var isChanged = el.type === 'checkbox' ? (el.checked !== el.defaultChecked) : (el.value !== el.defaultValue);
+  form.querySelectorAll('input[data-key], textarea[data-key], select[data-key]').forEach(function (el) {
+    var isChanged = el.type === 'checkbox'
+      ? (el.checked !== el.defaultChecked)
+      : (el.tagName === 'SELECT' ? (el.value !== el.dataset.initialValue) : (el.value !== el.defaultValue));
     if (isChanged) {
       changedAny = true;
       if (el.dataset.sensitive === '1') changedSensitive = true;
