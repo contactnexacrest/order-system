@@ -396,6 +396,7 @@ app.post('/email-templates/:id/toggle-active', requireAuth, requirePermission('m
 
 app.get('/account', requireAuth, asyncHandler(accountController.edit));
 app.post('/account/signature', requireAuth, verifyCsrf, asyncHandler(accountController.updateSignature));
+app.post('/account/password', requireAuth, verifyCsrf, asyncHandler(accountController.updatePassword));
 app.get('/holidays', requireAuth, requirePermission('manage_company_settings'), asyncHandler(holidayController.index));
 app.post('/holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.create));
 app.post('/holidays/:id/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.update));

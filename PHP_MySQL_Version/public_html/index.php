@@ -234,6 +234,7 @@ $router->post('/email-templates/{id}/toggle-active', [$emailTemplates, 'toggleAc
 
 $router->get('/account', [$account, 'edit'], [SessionAuth::required()]);
 $router->post('/account/signature', [$account, 'updateSignature'], [SessionAuth::required(), CsrfCheck::verify()]);
+$router->post('/account/password', [$account, 'updatePassword'], [SessionAuth::required(), CsrfCheck::verify()]);
 
 $router->get('/watermarks', [$watermarks, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/watermarks/{which}', [$watermarks, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);

@@ -2,8 +2,11 @@
 
 const flash = require('../helpers/flash');
 const userRepository = require('../repositories/userRepository');
+const passwordHash = require('../helpers/passwordHash');
+const passwordPolicyService = require('../services/passwordPolicyService');
+const authService = require('../services/authService');
 
-/** docs/schema.sql Section AI — self-service staff account page (email signature today; a natural home for other self-service settings later). */
+/** docs/schema.sql Section AI — self-service staff account page (email signature, self-service password change — a natural home for other self-service settings later). */
 
 async function edit(req, res) {
   const user = await userRepository.findById(req.user.id);
@@ -17,4 +20,42 @@ async function updateSignature(req, res) {
   res.redirect('/account');
 }
 
-module.exports = { edit, updateSignature };
+/**
+ * 90-item backlog #26: a voluntary, logged-in self-service password
+ * change — previously the only ways a staff user's password could
+ * change were the forced-at-first-login flow and the logged-out
+ * forgot-password email flow, with no option for an already-logged-in
+ * user who simply wants to change it. Mirrors
+ * clientPortalController.changePassword()'s exact pattern (current
+ * password re-verified, then passwordPolicyService, then match check).
+ */
+async function updatePassword(req, res) {
+  const userId = req.user.id;
+  const current = String(req.body.current_password || '');
+  const newPassword = String(req.body.new_password || '');
+  const confirm = String(req.body.confirm_password || '');
+
+  const user = await userRepository.findById(userId);
+  if (!user || !(await passwordHash.verify(current, user.password_hash))) {
+    flash.set(req, 'error', 'Current password is incorrect.');
+    res.redirect('/account');
+    return;
+  }
+  const policyError = await passwordPolicyService.validate(newPassword);
+  if (policyError !== null) {
+    flash.set(req, 'error', policyError);
+    res.redirect('/account');
+    return;
+  }
+  if (newPassword !== confirm) {
+    flash.set(req, 'error', 'New passwords do not match.');
+    res.redirect('/account');
+    return;
+  }
+
+  await authService.changePassword(userId, newPassword);
+  flash.set(req, 'success', 'Password updated.');
+  res.redirect('/account');
+}
+
+module.exports = { edit, updateSignature, updatePassword };

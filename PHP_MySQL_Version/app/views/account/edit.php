@@ -12,4 +12,21 @@
       <button type="submit" class="btn-sm btn-accent">Save Signature</button>
     </form>
   </div>
+
+  <div class="section">
+    <h2>Change Password</h2>
+    <form method="post" action="/account/password">
+      <?= Csrf::field() ?>
+      <label>Current Password
+        <input type="password" name="current_password" required>
+      </label>
+      <label>New Password
+        <input type="password" name="new_password" required>
+      </label>
+      <label>Confirm New Password
+        <input type="password" name="confirm_password" required>
+      </label>
+      <button type="submit" class="btn-sm btn-accent">Update Password</button>
+    </form>
+  </div>
 </div>

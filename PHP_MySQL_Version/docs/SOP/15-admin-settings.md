@@ -65,6 +65,14 @@ else at all, even an Admin — they can only recover their own login via
 people who set the company up can never be locked out by another admin's
 mistake (or malice).
 
+Any logged-in staff user — admin-reset, forced-first-login, or neither —
+can also change their own password voluntarily at any time from **My
+Account** (90-item backlog #26), without needing an admin to force a reset
+first. It asks for the current password (re-verified before anything
+changes) plus the new password twice, enforces the same DB-driven password
+policy (`password_min_length`/`password_complexity_json`) as every other
+password-change path, and is audited the same way (`PASSWORD_CHANGED`).
+
 ### The rest of Admin
 
 - **Company Settings** — legal name, registered/corporate office, GSTIN/IEC,
