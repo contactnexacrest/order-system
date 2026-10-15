@@ -1509,6 +1509,15 @@ UPDATE tc_clauses SET status = 'inactive' WHERE clause_title = 'Cancellation' AN
 -- reference prefix change. ---
 UPDATE document_types SET name = 'Debit Note', ref_format = 'SC/DN/{YYYY}/{DDMM}{NNN}' WHERE code = 'FDN';
 
+-- --- 90-item backlog #71: ANNEXA was seeded with ref_format = NULL,
+-- the same NULL used for genuinely internal/non-generated document types
+-- (CHECKLIST, SOP_*, STAGEGATE, WALLREF) — but ANNEXA is
+-- 'customer_facing' and goes through the exact same generate/approve/
+-- send lifecycle as QT/PI/OC, so it never got a real reference to print
+-- on its own meta bar. Gives it the same numbering convention as every
+-- other customer-facing document type. ---
+UPDATE document_types SET ref_format = 'SC/ANX/{YYYY}/{DDMM}{NNN}' WHERE code = 'ANNEXA';
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ================================================================

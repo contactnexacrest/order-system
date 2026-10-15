@@ -705,6 +705,7 @@ function renderAnnexa(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
+      { label: 'ANNEXURE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
       { label: 'ANNEXURE TO', value: g(order, 'quotation_ref') !== '—' ? g(order, 'quotation_ref') : g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : g(order, 'buyer_inquiry_ref') },
       { label: 'DATE', value: g(meta, 'generated_date', '') },
       { label: 'BUYER INQUIRY REF', value: g(order, 'buyer_inquiry_ref', '') },

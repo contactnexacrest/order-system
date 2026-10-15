@@ -582,6 +582,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('ANNEXA'), null);
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
+            ['label' => 'ANNEXURE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
             ['label' => 'ANNEXURE TO', 'value' => self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'buyer_inquiry_ref'))],
             ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
