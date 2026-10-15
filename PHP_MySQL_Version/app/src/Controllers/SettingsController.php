@@ -105,6 +105,19 @@ final class SettingsController
             return;
         }
 
+        // 90-item backlog #33: storage_base_path is rendered readonly in
+        // the view (see settings/index.php) since changing it has zero
+        // effect on the app — the real path only ever comes from .env.
+        // Enforced here too, same fail-closed contract as the checks
+        // below, so a crafted POST can't bypass the client-side readonly
+        // and write a value into company_settings that looks live but
+        // silently isn't.
+        if (isset($toApply['storage_base_path'])) {
+            Flash::set('error', 'storage_base_path is read-only here and has no effect on the app — change STORAGE_BASE_PATH in .env instead. Nothing was saved.');
+            header('Location: /settings');
+            return;
+        }
+
         // Server-side enforcement of the unlock gesture — independent of
         // the client-side UI, which can be bypassed. A protected field
         // changed without its unlock flag present fails the whole

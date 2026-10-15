@@ -97,7 +97,14 @@ mistake (or malice).
   this change, or a bank has since asked for a different code), the
   dropdown still shows it as a selectable option labeled "(not in admin
   list)" rather than silently discarding it — add the real code to the
-  admin list first, then switch to it properly.
+  admin list first, then switch to it properly. **`storage_base_path`**
+  is shown marked **read-only** for a different reason: it was never
+  actually wired to anything — the app always reads the real file
+  storage path from `STORAGE_BASE_PATH` in `.env`, never from this row —
+  so an edit here silently had zero effect. It's now genuinely
+  read-only (enforced both in the form and server-side, so a crafted
+  request can't bypass it either); to actually change where files are
+  stored, edit `.env` directly and restart the app.
 - **Holiday Calendar** — the dates the Working Days Calculator (used for
   dispute response deadlines, see [Disputes](./11-disputes.md)) excludes.
 - **HS Codes** — the master list product HS codes must come from; an order

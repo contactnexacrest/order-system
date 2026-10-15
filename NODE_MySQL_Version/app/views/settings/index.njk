@@ -16,6 +16,7 @@
             <span class="setting-label">
               {% if row.is_protected %}<span class="lock-icon" title="Protected — unlock to edit">🔒</span>{% endif %}
               {{ row.setting_key }}
+              {% if row.setting_key == 'storage_base_path' %}<span class="badge badge-superadmin" title="Editing this has no effect on the app — it always reads STORAGE_BASE_PATH from .env, not from this row">read-only</span>{% endif %}
               {% if row.is_sensitive %}<span class="badge badge-sensitive">sensitive</span>{% endif %}
               {% if row.is_protected %}<span class="badge badge-protected">protected</span>{% endif %}
               {% if row.requires_super_admin %}<span class="badge badge-superadmin" title="Only a Super Admin can change this">Super Admin only</span>{% endif %}
@@ -72,7 +73,12 @@
                 value="{{ row.setting_value or '' }}"
                 data-sensitive="{{ '1' if row.is_sensitive else '0' }}"
                 data-protected="{{ '1' if row.is_protected else '0' }}"
-                {{ 'readonly' if row.is_protected or lockedToSuperAdmin }}
+                {# 90-item backlog #33: storage_base_path is forced readonly here
+                   regardless of is_protected/unlock — unlike a genuinely protected field,
+                   there is no state in which saving a new value here would have any
+                   effect (the app only ever reads STORAGE_BASE_PATH from .env), so
+                   offering an Unlock button would be actively misleading. #}
+                {{ 'readonly' if row.is_protected or lockedToSuperAdmin or row.setting_key == 'storage_base_path' }}
               >
             {% endif %}
             {% if row.is_protected %}

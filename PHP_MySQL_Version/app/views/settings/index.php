@@ -17,6 +17,7 @@
             <span class="setting-label">
               <?php if ($row['is_protected']): ?><span class="lock-icon" title="Protected — unlock to edit">&#128274;</span><?php endif; ?>
               <?= htmlspecialchars($row['setting_key']) ?>
+              <?php if ($row['setting_key'] === 'storage_base_path'): ?><span class="badge badge-superadmin" title="Editing this has no effect on the app — it always reads STORAGE_BASE_PATH from .env, not from this row">read-only</span><?php endif; ?>
               <?php if ($row['is_sensitive']): ?><span class="badge badge-sensitive">sensitive</span><?php endif; ?>
               <?php if ($row['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
               <?php if ($row['requires_super_admin']): ?><span class="badge badge-superadmin" title="Only a Super Admin can change this">Super Admin only</span><?php endif; ?>
@@ -75,7 +76,12 @@
                 value="<?= htmlspecialchars($row['setting_value'] ?? '') ?>"
                 data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
                 data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
-                <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'readonly' : '' ?>
+                <?php /* 90-item backlog #33: storage_base_path is forced readonly here
+                   regardless of is_protected/unlock — unlike a genuinely protected field,
+                   there is no state in which saving a new value here would have any
+                   effect (the app only ever reads STORAGE_BASE_PATH from .env), so
+                   offering an Unlock button would be actively misleading. */ ?>
+                <?= ($row['is_protected'] || $lockedToSuperAdmin || $row['setting_key'] === 'storage_base_path') ? 'readonly' : '' ?>
               >
             <?php endif; ?>
             <?php if ($row['is_protected']): ?>
