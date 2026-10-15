@@ -149,8 +149,19 @@ final class DocumentDataAssembler
                 'billing_city'           => $order['billing_city'] ?? null,
                 'billing_postcode'       => $order['billing_postcode'] ?? null,
                 'billing_country'        => $order['billing_country'] ?? null,
-                'consignee_name'         => $order['consignee_name'],
-                'consignee_address'      => $order['consignee_address'],
+                // 90-item backlog #11: these two used to read the raw,
+                // frequently-NULL order.consignee_name/
+                // order.consignee_address columns directly — wrong
+                // whenever consignee_same_as_buyer is set (the common
+                // case), since that flag means the consignee is the
+                // buyer's OWN current details, not whatever (if
+                // anything) was once typed into those two columns.
+                // $resolvedConsignee (computed above) is the single
+                // source of truth every other consignee-aware field on
+                // this array already defers to; wire these two into it
+                // as well.
+                'consignee_name'         => $resolvedConsignee['company_legal_name'],
+                'consignee_address'      => $resolvedConsignee['address_line1'],
                 'vat_eori_tax_no'        => $order['vat_eori_tax_no'],
                 'contact_person'         => $order['contact_person'],
                 'email'                  => $order['client_email'],

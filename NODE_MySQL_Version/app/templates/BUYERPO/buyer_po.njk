@@ -24,8 +24,8 @@
 <table class="kv">
   <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
   <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name }}</td></tr>
-  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address }}</td></tr>
+  <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name or buyer.company_legal_name or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address or buyer.billing_address or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">VAT / EORI / Tax Reg. *</td><td class="v">{{ buyer.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Phone *</td><td class="v">{{ buyer.phone or '—' }}</td></tr>
