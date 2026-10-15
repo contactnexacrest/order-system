@@ -24,6 +24,17 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
  *     any leg not yet cleared. Never partly-real, partly-estimated
  *     without saying so — revenueIsEstimated tells the view which case
  *     applies.
+ *     90-item backlog #83: on CFR/CIF orders, order_payment_status's
+ *     freight_amount leg is itself revenue (the buyer reimburses the
+ *     freight NexaCrest pays the shipping line via a separate Debit
+ *     Note, docs/SOP/06-stage6-freight.md) — so it's folded into
+ *     revenue here too, using the same actual-vs-estimated convention
+ *     as the advance/balance legs. Without this, the freight cost
+ *     below is deducted but its matching reimbursement never
+ *     counted, understating profit on every CFR/CIF order by the
+ *     freight amount recovered. On an FOB order freight_amount is
+ *     never recorded, so this leg contributes nothing and never
+ *     marks the figure estimated on its account.
  *   - Supplier cost: order_supplier_po.total_payable_inr (already INR).
  *   - Freight/insurance cost: order_freight.confirmed_freight_rate +
  *     insurance_amount. ASSUMPTION (documented, not verified against a
@@ -153,10 +164,18 @@ function revenueInInr(fobValue, payment) {
     ? Number(payment.balance_exchange_rate)
     : null;
 
+  const [freightPortion, freightIsEstimated] = freightLegInInr(
+    payment.freight_amount !== null && payment.freight_amount !== undefined ? Number(payment.freight_amount) : null,
+    payment.freight_inr_actual !== null && payment.freight_inr_actual !== undefined ? Number(payment.freight_inr_actual) : null,
+    payment.freight_exchange_rate !== null && payment.freight_exchange_rate !== undefined ? Number(payment.freight_exchange_rate) : null
+  );
+
   // Both legs cleared with a real INR actual recorded — the exact, fully-
-  // realized figure, no estimate involved.
+  // realized figure, no estimate involved (plus the freight reimbursement
+  // leg, #83, which may still be its own estimate on a CFR/CIF order
+  // whose freight hasn't cleared yet).
   if (advanceInrActual !== null && balanceInrActual !== null) {
-    return [advanceInrActual + balanceInrActual, false];
+    return [advanceInrActual + balanceInrActual + freightPortion, freightIsEstimated];
   }
 
   // Pre-PI order: advance/balance amounts haven't even been split out
@@ -177,11 +196,35 @@ function revenueInInr(fobValue, payment) {
   const balancePortion = balanceInrActual ?? ((balanceAmount !== null && balanceRate !== null) ? balanceAmount * balanceRate : null);
 
   if (advancePortion === null && balancePortion === null) {
-    return [0, true];
+    return [freightPortion, freightPortion > 0 ? freightIsEstimated : true];
   }
 
-  const isEstimated = advanceInrActual === null || balanceInrActual === null;
-  return [(advancePortion ?? 0) + (balancePortion ?? 0), isEstimated];
+  const isEstimated = advanceInrActual === null || balanceInrActual === null || freightIsEstimated;
+  return [(advancePortion ?? 0) + (balancePortion ?? 0) + freightPortion, isEstimated];
+}
+
+/**
+ * 90-item backlog #83: the freight reimbursement leg (CFR/CIF orders only
+ * — see computeForOrder()'s doc comment above). Mirrors the same
+ * actual-vs-estimated rule the advance/balance legs use, with one
+ * addition: a leg that was never recorded at all (an FOB order, where
+ * Stage 6 auto-skips and freight_amount stays null forever) contributes
+ * nothing AND never marks the figure estimated on its account — distinct
+ * from a CFR/CIF leg that's merely still outstanding, which does.
+ *
+ * @returns {[number, boolean]} [freightPortionInr, isEstimated]
+ */
+function freightLegInInr(amount, inrActual, rate) {
+  if (amount === null) {
+    return [0, false];
+  }
+  if (inrActual !== null) {
+    return [inrActual, false];
+  }
+  if (rate !== null) {
+    return [amount * rate, true];
+  }
+  return [0, true];
 }
 
 function round2(value) {

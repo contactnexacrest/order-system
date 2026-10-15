@@ -213,6 +213,82 @@ final class OrderFinancialsTest extends DbTestCase
     }
 
     // ---------------------------------------------------------------
+    // 90-item backlog #83: freight reimbursement leg folded into revenue
+    // ---------------------------------------------------------------
+
+    public function testProfitabilityIncludesTheFreightReimbursementLegOnACifOrder(): void
+    {
+        // Root cause this guards: order_payment_status.freight_amount is
+        // the buyer's reimbursement for the freight NexaCrest pays the
+        // shipping line (docs/SOP/06-stage6-freight.md) — real revenue —
+        // but the freight COST (order_freight.confirmed_freight_rate) was
+        // always deducted below without this matching leg ever being
+        // added above, understating profit by the exact amount recovered.
+        // Mid-order state: advance already settled (actual) by the time
+        // Stage 6 (freight) is reached — balance isn't due until Stage 8,
+        // so it's deliberately left unrecorded here, same as a real order
+        // sitting between those two stages.
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'CIF');
+        OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 500.0, '2026-01-10');
+        OrderPaymentStatusRepository::setAdvanceInrActual($orderId, 42500.0, $userId);
+        OrderPaymentStatusRepository::recordFreightReceived($orderId, 200.0, '2026-06-10');
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'freight', 85.0, $userId);
+        OrderFreightRepository::upsert($orderId, ['confirmed_freight_rate' => '17000', 'insurance_amount' => null]);
+
+        $p = OrderProfitabilityService::computeForOrder($orderId);
+
+        // Revenue: advance actual 42500 + freight estimate 200*85 = 17000 -> 59500 (balance not due yet).
+        self::assertSame(59500.0, $p['revenue_inr']);
+        self::assertTrue($p['revenue_is_estimated'], 'balance leg not yet recorded, and freight is still only a rate-based estimate');
+        self::assertSame(17000.0, $p['freight_cost_inr']);
+        // Freight revenue (17000) exactly offsets freight cost (17000) below — the bug this fixes made profit 17000 too LOW.
+        self::assertSame(42500.0, $p['profit_inr']);
+    }
+
+    public function testProfitabilityUsesTheRealFreightInrActualOnceClearedAndIsNoLongerEstimatedOnItsAccount(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'CIF');
+        OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 500.0, '2026-01-10');
+        OrderPaymentStatusRepository::setAdvanceInrActual($orderId, 42500.0, $userId);
+        OrderPaymentStatusRepository::recordBalanceReceived($orderId, 500.0, '2026-04-10');
+        OrderPaymentStatusRepository::setBalanceInrActual($orderId, 42500.0, $userId);
+        OrderPaymentStatusRepository::recordFreightReceived($orderId, 200.0, '2026-06-10');
+        OrderPaymentStatusRepository::setFreightInrActual($orderId, 17300.0, $userId);
+
+        $p = OrderProfitabilityService::computeForOrder($orderId);
+
+        self::assertSame(102300.0, $p['revenue_inr'], '42500 + 42500 advance/balance actuals + 17300 real freight actual');
+        self::assertFalse($p['revenue_is_estimated'], 'every leg, freight included, is now a real settled actual');
+    }
+
+    public function testProfitabilityOnAnFobOrderIsUnaffectedByTheMissingFreightLeg(): void
+    {
+        // Regression guard: an FOB order never records freight_amount at
+        // all (Stage 6 auto-skips) — this must contribute zero AND must
+        // never flag the figure "estimated" purely for not having a
+        // freight leg, same as the export-benefits "none recorded" guard.
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 500.0, '2026-01-10');
+        OrderPaymentStatusRepository::setAdvanceInrActual($orderId, 42500.0, $userId);
+        OrderPaymentStatusRepository::recordBalanceReceived($orderId, 500.0, '2026-04-10');
+        OrderPaymentStatusRepository::setBalanceInrActual($orderId, 42500.0, $userId);
+
+        $p = OrderProfitabilityService::computeForOrder($orderId);
+
+        self::assertSame(85000.0, $p['revenue_inr']);
+        self::assertFalse($p['revenue_is_estimated'], 'no freight leg on this FOB order — must not be flagged estimated on its account');
+    }
+
+    // ---------------------------------------------------------------
     // OrderFinancialsController — order-page-embedded actions
     // ---------------------------------------------------------------
 

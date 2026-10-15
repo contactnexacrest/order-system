@@ -125,6 +125,18 @@ tracks** rather than asking staff to re-enter them:
      estimated, using its own rate, not the other leg's.
   4. If nothing exists yet for either leg, revenue is shown as zero, also
      flagged estimated.
+  5. On a **CFR/CIF order**, the freight remittance leg (Stage 6 —
+     [Freight Payment](./06-stage6-freight.md)) is folded into revenue
+     too, using the same rule: a cleared leg contributes its real INR
+     actual, an outstanding one contributes its own amount × its own
+     rate as an estimate. This is the buyer's reimbursement for the
+     freight NexaCrest pays the shipping line, and it was previously
+     missing from this total even though the matching freight cost
+     below was always deducted — understating profit on every CFR/CIF
+     order by the exact freight amount recovered. On an **FOB** order
+     this leg is never recorded at all (Stage 6 auto-skips), so it
+     contributes nothing and never marks revenue estimated on its own
+     account.
 - **Government export benefits.** Every claim linked to this order (see
   "Government Export Benefits Claimed" above). A claim already marked
   **received** contributes its real `received_amount`; one still only

@@ -214,6 +214,75 @@ describe('Order Financials (Section AP)', () => {
   });
 
   // ---------------------------------------------------------------
+  // 90-item backlog #83: freight reimbursement leg folded into revenue
+  // ---------------------------------------------------------------
+
+  it('profitability includes the freight reimbursement leg on a CIF order', async () => {
+    // Root cause this guards: order_payment_status.freight_amount is the
+    // buyer's reimbursement for the freight NexaCrest pays the shipping
+    // line (docs/SOP/06-stage6-freight.md) — real revenue — but the
+    // freight COST (order_freight.confirmed_freight_rate) was always
+    // deducted below without this matching leg ever being added above,
+    // understating profit by the exact amount recovered.
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient(), 'CIF');
+    await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 500.0, '2026-01-10');
+    await orderPaymentStatusRepository.setAdvanceInrActual(orderId, 42500.0, userId);
+    await orderPaymentStatusRepository.recordFreightReceived(orderId, 200.0, '2026-06-10');
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'freight', 85.0, userId);
+    await orderFreightRepository.upsert(orderId, { confirmed_freight_rate: '17000', insurance_amount: null });
+
+    const p = await orderProfitabilityService.computeForOrder(orderId);
+
+    // Revenue: advance actual 42500 + freight estimate 200*85 = 17000 -> 59500 (balance not due yet).
+    expect(p.revenue_inr).toBe(59500);
+    expect(p.revenue_is_estimated).toBe(true);
+    expect(p.freight_cost_inr).toBe(17000);
+    // Freight revenue (17000) exactly offsets freight cost (17000) below — the bug this fixes made profit 17000 too LOW.
+    expect(p.profit_inr).toBe(42500);
+  });
+
+  it('profitability uses the real freight INR actual once cleared and is no longer estimated on its account', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient(), 'CIF');
+    await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 500.0, '2026-01-10');
+    await orderPaymentStatusRepository.setAdvanceInrActual(orderId, 42500.0, userId);
+    await orderPaymentStatusRepository.recordBalanceReceived(orderId, 500.0, '2026-04-10');
+    await orderPaymentStatusRepository.setBalanceInrActual(orderId, 42500.0, userId);
+    await orderPaymentStatusRepository.recordFreightReceived(orderId, 200.0, '2026-06-10');
+    await orderPaymentStatusRepository.setFreightInrActual(orderId, 17300.0, userId);
+
+    const p = await orderProfitabilityService.computeForOrder(orderId);
+
+    expect(p.revenue_inr).toBe(102300);
+    expect(p.revenue_is_estimated).toBe(false);
+  });
+
+  it('profitability on an FOB order is unaffected by the missing freight leg', async () => {
+    // Regression guard: an FOB order never records freight_amount at all
+    // (Stage 6 auto-skips) — this must contribute zero AND must never
+    // flag the figure "estimated" purely for not having a freight leg,
+    // same as the export-benefits "none recorded" guard.
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 500.0, '2026-01-10');
+    await orderPaymentStatusRepository.setAdvanceInrActual(orderId, 42500.0, userId);
+    await orderPaymentStatusRepository.recordBalanceReceived(orderId, 500.0, '2026-04-10');
+    await orderPaymentStatusRepository.setBalanceInrActual(orderId, 42500.0, userId);
+
+    const p = await orderProfitabilityService.computeForOrder(orderId);
+
+    expect(p.revenue_inr).toBe(85000);
+    expect(p.revenue_is_estimated).toBe(false);
+  });
+
+  // ---------------------------------------------------------------
   // orderFinancialsController — order-page-embedded actions
   // ---------------------------------------------------------------
 

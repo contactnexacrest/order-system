@@ -29,6 +29,17 @@ use App\Repositories\OrderSupplierPoRepository;
  *     any leg not yet cleared. Never partly-real, partly-estimated
  *     without saying so — the 'revenue_is_estimated' flag tells the view
  *     which case applies.
+ *     90-item backlog #83: on CFR/CIF orders, order_payment_status's
+ *     freight_amount leg is itself revenue (the buyer reimburses the
+ *     freight NexaCrest pays the shipping line via a separate Debit
+ *     Note, docs/SOP/06-stage6-freight.md) — so it's folded into
+ *     revenue here too, using the same actual-vs-estimated convention
+ *     as the advance/balance legs. Without this, the freight cost
+ *     below is deducted but its matching reimbursement never
+ *     counted, understating profit on every CFR/CIF order by the
+ *     freight amount recovered. On an FOB order freight_amount is
+ *     never recorded, so this leg contributes nothing and never
+ *     marks the figure estimated on its account.
  *   - Supplier cost: order_supplier_po.total_payable_inr (already INR).
  *   - Freight/insurance cost: order_freight.confirmed_freight_rate +
  *     insurance_amount. ASSUMPTION (documented, not verified against a
@@ -147,10 +158,18 @@ final class OrderProfitabilityService
         $advanceRate = $payment['advance_exchange_rate'] !== null ? (float) $payment['advance_exchange_rate'] : null;
         $balanceRate = $payment['balance_exchange_rate'] !== null ? (float) $payment['balance_exchange_rate'] : null;
 
+        [$freightPortion, $freightIsEstimated] = self::freightLegInInr(
+            $payment['freight_amount'] !== null ? (float) $payment['freight_amount'] : null,
+            $payment['freight_inr_actual'] !== null ? (float) $payment['freight_inr_actual'] : null,
+            $payment['freight_exchange_rate'] !== null ? (float) $payment['freight_exchange_rate'] : null
+        );
+
         // Both legs cleared with a real INR actual recorded — the exact,
-        // fully-realized figure, no estimate involved.
+        // fully-realized figure, no estimate involved (plus the freight
+        // reimbursement leg, #83, which may still be its own estimate on
+        // a CFR/CIF order whose freight hasn't cleared yet).
         if ($advanceInrActual !== null && $balanceInrActual !== null) {
-            return [$advanceInrActual + $balanceInrActual, false];
+            return [$advanceInrActual + $balanceInrActual + $freightPortion, $freightIsEstimated];
         }
 
         // Pre-PI order: advance/balance amounts haven't even been split
@@ -173,10 +192,36 @@ final class OrderProfitabilityService
 
         if ($advancePortion === null && $balancePortion === null) {
             // Nothing to convert with for either leg yet.
-            return [0.0, true];
+            return [$freightPortion, $freightPortion > 0.0 ? $freightIsEstimated : true];
         }
 
-        $isEstimated = $advanceInrActual === null || $balanceInrActual === null;
-        return [($advancePortion ?? 0.0) + ($balancePortion ?? 0.0), $isEstimated];
+        $isEstimated = $advanceInrActual === null || $balanceInrActual === null || $freightIsEstimated;
+        return [($advancePortion ?? 0.0) + ($balancePortion ?? 0.0) + $freightPortion, $isEstimated];
+    }
+
+    /**
+     * 90-item backlog #83: the freight reimbursement leg (CFR/CIF orders
+     * only — see revenueInInr()'s caller-facing doc comment above).
+     * Mirrors the same actual-vs-estimated rule the advance/balance legs
+     * use, with one addition: a leg that was never recorded at all (an
+     * FOB order, where Stage 6 auto-skips and freight_amount stays null
+     * forever) contributes nothing AND never marks the figure estimated
+     * on its account — distinct from a CFR/CIF leg that's merely still
+     * outstanding, which does.
+     *
+     * @return array{0: float, 1: bool} [freightPortionInr, isEstimated]
+     */
+    private static function freightLegInInr(?float $amount, ?float $inrActual, ?float $rate): array
+    {
+        if ($amount === null) {
+            return [0.0, false];
+        }
+        if ($inrActual !== null) {
+            return [$inrActual, false];
+        }
+        if ($rate !== null) {
+            return [$amount * $rate, true];
+        }
+        return [0.0, true];
     }
 }
