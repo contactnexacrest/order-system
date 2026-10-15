@@ -76,8 +76,9 @@ describe('Report gap-analysis additions', () => {
     );
 
     const report = await reportRepository.productSalesReport(null, null);
-    expect(report.by_hs_code['9999.98']).toBeDefined();
-    expect(report.by_hs_code['9999.98'].by_currency.USD.total_fob_value).toBe(1000);
+    const entry = report.by_hs_code.find((e) => e.hs_code === '9999.98');
+    expect(entry).toBeDefined();
+    expect(entry.by_currency.USD.total_fob_value).toBe(1000);
   });
 
   it('supplierPerformanceReport computes the on-time delivery rate', async () => {

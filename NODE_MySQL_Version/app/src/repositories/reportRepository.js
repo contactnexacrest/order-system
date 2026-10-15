@@ -1116,7 +1116,7 @@ async function freightCostReport(dateFrom, dateTo) {
 // per-order line items.
 // ================================================================
 
-/** @returns {Promise<{rows: Array<object>, by_hs_code: object}>} */
+/** @returns {Promise<{rows: Array<object>, by_hs_code: Array<object>}>} */
 async function productSalesReport(dateFrom, dateTo) {
   const isTestMode = await isTestModeFlag();
   const where = ['o.is_test_data = :is_test_data', 'p.is_active = 1'];
@@ -1154,13 +1154,21 @@ async function productSalesReport(dateFrom, dateTo) {
     byHsCode[hs].by_currency[cc].total_quantity += parseFloat(r.total_quantity);
     byHsCode[hs].by_currency[cc].total_fob_value += parseFloat(r.total_fob_value);
   }
+  // 90-item backlog "sort order": JS objects always list integer-like
+  // keys (every real HS code is plain digits — schema.sql Section AB) in
+  // ascending numeric order, regardless of insertion order — unlike a PHP
+  // associative array, which keeps whatever order it's given. Returning
+  // `Object.fromEntries(sortedEntries)` here silently threw away the
+  // FOB-descending sort immediately above it. An array of entries has no
+  // such reordering, so it's returned as one instead, mirroring what the
+  // view can already iterate most-FOB-first, matching PHP.
   const sortedEntries = Object.entries(byHsCode).sort(([, a], [, b]) => {
     const aTotal = Object.values(a.by_currency).reduce((sum, c) => sum + c.total_fob_value, 0);
     const bTotal = Object.values(b.by_currency).reduce((sum, c) => sum + c.total_fob_value, 0);
     return bTotal - aTotal;
   });
 
-  return { rows, by_hs_code: Object.fromEntries(sortedEntries) };
+  return { rows, by_hs_code: sortedEntries.map(([hs_code, entry]) => ({ hs_code, ...entry })) };
 }
 
 // ================================================================

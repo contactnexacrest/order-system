@@ -17,10 +17,10 @@
   <div class="section">
     <table class="list">
       <tr><th>HS Code</th><th>Description</th><th>Currency</th><th>Orders</th><th>Total Quantity</th><th>Total FOB Value</th></tr>
-      {% for hs, entry in byHsCode %}
+      {% for entry in byHsCode %}
         {% for cc, b in entry.by_currency %}
         <tr>
-          <td>{{ hs }}</td>
+          <td>{{ entry.hs_code }}</td>
           <td>{{ entry.description }}</td>
           <td>{{ cc }}</td>
           <td>{{ b.order_count }}</td>
