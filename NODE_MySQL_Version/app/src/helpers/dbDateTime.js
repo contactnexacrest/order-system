@@ -24,4 +24,23 @@ function parseDbDateTime(value) {
   return new Date(`${String(value).replace(' ', 'T')}Z`);
 }
 
-module.exports = { parseDbDateTime };
+/**
+ * 90-item backlog "timezone": today's CALENDAR date in this process's
+ * configured timezone (Asia/Kolkata — see config/env.js), as 'YYYY-MM-DD'.
+ * `new Date().toISOString().slice(0, 10)` — used all over this codebase
+ * before this helper existed — is NOT the same thing: toISOString()
+ * always formats in UTC regardless of process.env.TZ, so between 00:00
+ * and 05:29 IST it returns YESTERDAY's date, a full calendar day behind
+ * what date_default_timezone_set('Asia/Kolkata') gives PHP's date('Y-m-d')
+ * at the same instant. getFullYear()/getMonth()/getDate() are LOCAL-time
+ * getters, so they correctly follow process.env.TZ.
+ */
+function todayIst() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+module.exports = { parseDbDateTime, todayIst };

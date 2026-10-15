@@ -1,5 +1,7 @@
 'use strict';
 
+const { todayIst } = require('./dbDateTime');
+
 // Port of App\Helpers\FinancialYear. India's financial year (1 April - 31
 // March), as a small shared utility — NOT a shared reporting engine. Both
 // the order-pipeline Reports module and the CA / Accounting module's own
@@ -18,7 +20,10 @@ function label(date) {
 }
 
 function current() {
-  return label(new Date().toISOString().slice(0, 10));
+  // 90-item backlog "timezone": toISOString() is always UTC — between
+  // 00:00 and 05:29 IST this returned yesterday's date, putting the FY
+  // boundary a day off right around the 1 April rollover.
+  return label(todayIst());
 }
 
 /** '2026-27' -> { start: '2026-04-01', end: '2027-03-31' }. */

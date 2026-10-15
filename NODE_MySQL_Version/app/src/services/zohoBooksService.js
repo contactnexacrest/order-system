@@ -2,6 +2,7 @@
 
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const clientRepository = require('../repositories/clientRepository');
+const { todayIst } = require('../helpers/dbDateTime');
 
 /**
  * CA / Accounting module — the Zoho Books connection. Phase 3 pushes a
@@ -98,7 +99,7 @@ async function listExpenses() {
         vendorName: row.vendor_name || null,
         amount: parseFloat(row.total || 0),
         currencyCode: row.currency_code || 'INR',
-        expenseDate: row.date || new Date().toISOString().slice(0, 10),
+        expenseDate: row.date || todayIst(),
       });
     }
 

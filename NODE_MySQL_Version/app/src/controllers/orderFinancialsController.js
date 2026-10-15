@@ -7,6 +7,7 @@ const orderCostEntryRepository = require('../repositories/orderCostEntryReposito
 const orderRepository = require('../repositories/orderRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
+const { todayIst } = require('../helpers/dbDateTime');
 
 /**
  * Port of App\Controllers\OrderFinancialsController (docs/schema.sql
@@ -123,7 +124,7 @@ async function addCostEntry(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const incurredAt = String(req.body.incurred_at || '').trim() || new Date().toISOString().slice(0, 10);
+  const incurredAt = String(req.body.incurred_at || '').trim() || todayIst();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(incurredAt)) {
     flash.set(req, 'error', 'Enter a valid date.');
     res.redirect(`/orders/${orderId}`);

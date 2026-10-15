@@ -10,6 +10,7 @@ const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const referenceNumberService = require('./referenceNumberService');
 const testModeService = require('../services/testModeService');
+const { todayIst } = require('../helpers/dbDateTime');
 
 /**
  * Port of App\Services\OrderDuplicationService — creates a brand-new order
@@ -48,8 +49,15 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
   const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/OC/{YYYY}/{NNN}';
   const testModeEnabled = await testModeService.isEnabled();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
-  const todayYmd = new Date().toISOString().slice(0, 10);
-  const validUntilYmd = new Date(Date.now() + quotationValidityDays * 86400000).toISOString().slice(0, 10);
+  // 90-item backlog "timezone": todayIst() replaces the old
+  // new Date().toISOString() (always UTC) "today"; validUntilYmd is then
+  // derived from that corrected date via date-pure UTC-midnight
+  // arithmetic, not by adding days' worth of ms to the current instant
+  // (Date.now()), which carried the exact same UTC-vs-IST bug forward.
+  const todayYmd = todayIst();
+  const validUntilDate = new Date(`${todayYmd}T00:00:00Z`);
+  validUntilDate.setUTCDate(validUntilDate.getUTCDate() + quotationValidityDays);
+  const validUntilYmd = validUntilDate.toISOString().slice(0, 10);
 
   // QA-5 CONC-03: see orderRepository.createWithNextSequence()'s docblock.
   const { orderId: newOrderId } = await orderRepository.createWithNextSequence(

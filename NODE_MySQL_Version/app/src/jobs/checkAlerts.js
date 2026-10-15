@@ -9,6 +9,7 @@ const emailService = require('../services/emailService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
 const db = require('../config/db');
 const logger = require('../helpers/logger');
+const { todayIst } = require('../helpers/dbDateTime');
 
 /**
  * Port of app/cron/check_alerts.php. Spec Section 10 — "AUTO-NOTIFICATIONS"
@@ -55,7 +56,12 @@ async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null, u
 }
 
 async function run() {
-  const today = new Date(`${new Date().toISOString().substring(0, 10)}T00:00:00Z`);
+  // 90-item backlog "timezone": todayIst(), not new Date().toISOString()
+  // (always UTC) — this "today" drives every escalation threshold and
+  // overdue check below, and was a full calendar day behind the IST date
+  // between 00:00 and 05:29 IST, exactly when this cron's own daily run
+  // (local-time scheduled, i.e. 02:00 IST) fires.
+  const today = new Date(`${todayIst()}T00:00:00Z`);
   let created = 0;
 
   const activeUsers = await userRepository.listActive();

@@ -59,11 +59,12 @@ const clientPortalService = require('../services/clientPortalService');
 const fileUploadService = require('../services/fileUploadService');
 const testModeService = require('../services/testModeService');
 const wetSignatureGuardService = require('../services/wetSignatureGuardService');
+const { todayIst } = require('../helpers/dbDateTime');
 
 // Port of App\Controllers\OrderController.
 
 function todayYmd() {
-  return new Date().toISOString().slice(0, 10);
+  return todayIst();
 }
 
 function addDaysYmd(fromYmd, days) {

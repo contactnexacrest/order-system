@@ -20,6 +20,7 @@ const orderAnnexureTermsRepository = require('../repositories/orderAnnexureTerms
 const annexureTermsSanitizer = require('../helpers/annexureTermsSanitizer');
 const amendmentRepository = require('../repositories/amendmentRepository');
 const { addWorkingDays } = require('./workingDaysCalculator');
+const { todayIst } = require('../helpers/dbDateTime');
 
 /**
  * Pulls every field a QT/PI/OC template needs from the DB and assembles a
@@ -376,7 +377,7 @@ async function freightBlock(orderId) {
     // FDN's own "Payment Due: ... by [date]" line — 3 working days from
     // today (the date this debit note is being generated), per the same
     // hard rule stated in the banner above it.
-    payment_due_date: formatDate(await addWorkingDays(new Date().toISOString().slice(0, 10), 3)),
+    payment_due_date: formatDate(await addWorkingDays(todayIst(), 3)),
   };
 }
 
@@ -753,7 +754,7 @@ function resolveAgreementFooter(order) {
   const expiryDate = order.agreement_expiry_date;
   if (expiryDate) {
     const expiryStr = expiryDate instanceof Date ? expiryDate.toISOString().slice(0, 10) : String(expiryDate).slice(0, 10);
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = todayIst();
     if (expiryStr < todayStr) {
       return null;
     }

@@ -7,6 +7,7 @@ const amendmentRepository = require('./amendmentRepository');
 const disputeRepository = require('./disputeRepository');
 const testModeService = require('../services/testModeService');
 const orderProfitabilityService = require('../services/orderProfitabilityService');
+const { todayIst } = require('../helpers/dbDateTime');
 
 /**
  * Test Mode (docs/schema.sql Section V) — reports must never mix test and
@@ -1011,7 +1012,7 @@ async function ageingReport() {
     { is_test_data: isTestMode }
   );
 
-  const today = new Date(new Date().toISOString().slice(0, 10));
+  const today = new Date(`${todayIst()}T00:00:00Z`);
   const rows = [];
   const byBucket = {};
   const legs = { advance: 'Advance', balance: 'Balance', freight: 'Freight' };

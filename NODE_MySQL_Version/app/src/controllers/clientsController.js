@@ -17,6 +17,7 @@ const superAdminService = require('../services/superAdminService');
 const clientPortalService = require('../services/clientPortalService');
 const fileUploadService = require('../services/fileUploadService');
 const env = require('../config/env');
+const { todayIst } = require('../helpers/dbDateTime');
 
 // Port of App\Controllers\ClientController.
 
@@ -96,7 +97,7 @@ async function show(req, res) {
   // not a security gate.
   const agreementForceExpired = !!client.agreement_force_expired;
   const agreementExpiryDate = client.agreement_expiry_date || null;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayIst();
   const agreementExpired = !!(agreementExpiryDate && agreementExpiryDate < todayStr);
   const agreementActive = !agreementForceExpired && !agreementExpired;
   const agreementRenewEligible = !!(agreementExpiryDate && new Date(agreementExpiryDate).getTime() <= Date.now() + 30 * 86400000);

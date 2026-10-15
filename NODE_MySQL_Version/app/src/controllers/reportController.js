@@ -8,6 +8,7 @@ const clientRepository = require('../repositories/clientRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const reportDefinitionRepository = require('../repositories/reportDefinitionRepository');
 const reportRepository = require('../repositories/reportRepository');
+const { todayIst } = require('../helpers/dbDateTime');
 
 // Port of App\Controllers\ReportController. Spec Section 16 — REPORTS:
 // per-client, per-order, aggregate, CSV export, saved report definitions.
@@ -340,13 +341,17 @@ async function payments(req, res) {
 }
 
 function defaultDateFrom() {
-  const d = new Date();
-  d.setDate(d.getDate() - 7);
+  // 90-item backlog "timezone": date-pure arithmetic on todayIst(), not
+  // local-getter mutation (setDate/getDate) formatted back via
+  // toISOString() — that mix shifts the result by a day near midnight IST,
+  // the same root bug todayIst() itself fixes.
+  const d = new Date(`${todayIst()}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 7);
   return d.toISOString().slice(0, 10);
 }
 
 function defaultDateTo() {
-  return new Date().toISOString().slice(0, 10);
+  return todayIst();
 }
 
 async function saveDefinition(req, res) {

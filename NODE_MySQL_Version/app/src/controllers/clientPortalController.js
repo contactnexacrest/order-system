@@ -31,9 +31,10 @@ const orderCommentService = require('../services/orderCommentService');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const fileUploadService = require('../services/fileUploadService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
+const { todayIst } = require('../helpers/dbDateTime');
 
 function todayYmd() {
-  return new Date().toISOString().slice(0, 10);
+  return todayIst();
 }
 
 function sanitizePathSegment(value) {
