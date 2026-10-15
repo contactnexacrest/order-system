@@ -47,12 +47,17 @@ VAT/EORI/tax no., contact person, email, phone) and the Incoterm/port of
 discharge/container type fields in Shipping Details arrive **pre-filled**
 from the client record and the order itself — the buyer already gave this
 information at the Quotation stage, so they only need to review it and
-correct anything that's changed, not retype it from scratch. Only the
-genuinely new fields (payment-terms confirmation, acceptance-of-quotation
-reference, buyer PO/reference no., changes from quotation, special document
-requirements) start blank. If the buyer edits a pre-filled value and the
-submission is later rejected, their own corrected answer is what reappears
-on the form when they come back — never the original client-record default.
+correct anything that's changed, not retype it from scratch. Of the
+genuinely new fields, acceptance-of-quotation reference, buyer PO/reference
+no., changes from quotation, and special document requirements start
+blank — but Payment Terms Confirmation does not: it arrives **pre-filled**
+with this order's own exact payment-terms sentence (advance %, trigger
+condition, balance %, balance-trigger wording), computed the same way the
+PI document itself prints it, so the buyer reviews and confirms real terms
+rather than typing an answer to a vanishing example. If the buyer edits a
+pre-filled value and the submission is later rejected, their own corrected
+answer is what reappears on the form when they come back — never the
+original client-record default.
 
 The Billing Address field here is structured the same way as the
 Quotation-stage form (Chapter 1) — Line 1 (required), Line 2, City

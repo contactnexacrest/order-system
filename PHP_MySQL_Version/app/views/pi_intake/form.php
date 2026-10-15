@@ -146,7 +146,7 @@
       <legend><span class="intake-step-num">5</span> Payment Terms &amp; Order Confirmation</legend>
       <div class="field-grid">
         <label class="full">Payment Terms Confirmation as per quotation *
-          <textarea name="payment_terms_confirmation" placeholder="<?= htmlspecialchars($paymentTermsPlaceholder) ?>" required><?= htmlspecialchars($submission['payment_terms_confirmation'] ?? '') ?></textarea>
+          <textarea name="payment_terms_confirmation" placeholder="<?= htmlspecialchars($paymentTermsPlaceholder) ?>" required><?= htmlspecialchars($submission['payment_terms_confirmation'] ?? $paymentTermsPlaceholder) ?></textarea>
         </label>
         <label class="full">Acceptance of Quotation No. *
           <textarea name="quotation_acceptance_reference" placeholder="e.g. We accept Quotation SC/QT/2026/MMNNN dated DD Month YYYY" required><?= htmlspecialchars($submission['quotation_acceptance_reference'] ?? '') ?></textarea>
