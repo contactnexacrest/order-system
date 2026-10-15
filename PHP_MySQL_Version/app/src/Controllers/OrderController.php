@@ -779,6 +779,8 @@ final class OrderController
             'production' => OrderProductionRepository::find($orderId),
             'supplierTypes' => LookupRepository::dropdownOptions('supplier_type'),
             'units' => LookupRepository::dropdownOptions('unit'),
+            'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
+            'gstRates' => LookupRepository::dropdownOptions('gst_rate'),
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
             'complianceTasks' => OrderComplianceTaskRepository::forOrder($orderId),
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),

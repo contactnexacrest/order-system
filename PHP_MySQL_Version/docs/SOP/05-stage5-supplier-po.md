@@ -27,6 +27,24 @@ specification and commercial terms in the same section:
 
 ![Stage 5 section — add supplier and fill in Supplier PO terms](./images/s5_before_supplier.png)
 
+**Supplier Type**, **Surface Finish**, **Unit**, and **GST Rate** are all
+admin-editable dropdowns (same `manage_dropdown_options` screen as
+Container Type/COO Type — see
+[Chapter 15](./15-admin-settings.md#admin--settings)), not free text.
+Supplier Type offers **Quarry Owner**, **Processor (Job-Work Basis)**
+(a unit that processes material supplied by/on behalf of someone else, not
+one that owns the quarry or the factory itself), **Trader**, and
+**Factory Owner** — four genuinely distinct roles, not overlapping labels.
+
+**Basic Value, GST Amount, Total Payable, Advance Amount, and Balance
+Amount auto-calculate** as Quantity, Unit Price, GST Rate, and Advance %
+are filled in (Basic Value = Unit Price × Quantity; GST Amount = Basic
+Value × GST Rate; Total Payable = Basic Value + GST Amount; Advance/Balance
+split Total Payable by Advance %). This is a convenience, not a lock — every
+auto-filled figure stays a plain, directly-editable field, so a genuine
+exception (a negotiated lump-sum total that doesn't follow the formula, for
+instance) can still be typed in by hand after the fact.
+
 **Save Supplier PO Terms** creates the internal procurement record (and
 generates the Supplier PO reference) — it does **not** generate the document
 or pass any gate by itself. From **Documents**, **Generate Supplier PO**

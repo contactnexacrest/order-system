@@ -427,8 +427,14 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
   ('received_from', 'Supplier', 2, 0, 1),
   ('received_from', 'CHA / Shipping Line', 3, 0, 1),
   ('supplier_type', 'Quarry Owner', 1, 1, 1),
-  ('supplier_type', 'Processor', 2, 0, 1),
+  -- 90-item backlog #51a: "Processor" alone was ambiguous against the new
+  -- "Factory Owner" option below (both could be read as "owns the
+  -- processing facility") — renamed to make clear this is specifically
+  -- the job-work case: a unit that processes material supplied by/on
+  -- behalf of someone else, not one that owns the quarry or the factory.
+  ('supplier_type', 'Processor (Job-Work Basis)', 2, 0, 1),
   ('supplier_type', 'Trader', 3, 0, 1),
+  ('supplier_type', 'Factory Owner', 4, 0, 1),
   ('export_benefit_scheme', 'RODTEP', 1, 1, 1),
   ('export_benefit_scheme', 'Duty Drawback', 2, 0, 1),
   ('export_benefit_scheme', 'RoSCTL', 3, 0, 1),
@@ -455,7 +461,26 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
   ('package_type', 'Wooden Pallets', 2, 0, 1),
   ('package_type', 'Cartons', 3, 0, 1),
   ('package_type', 'Bundles', 4, 0, 1),
-  ('package_type', 'Loose (Break Bulk)', 5, 0, 1);
+  ('package_type', 'Loose (Break Bulk)', 5, 0, 1),
+  -- 90-item backlog #51a: Supplier PO's Surface Finish field was plain
+  -- free text with no standard list — same dropdown_options treatment,
+  -- same manage_dropdown_options admin screen.
+  ('surface_finish', 'Polished', 1, 1, 1),
+  ('surface_finish', 'Honed', 2, 0, 1),
+  ('surface_finish', 'Flamed', 3, 0, 1),
+  ('surface_finish', 'Natural/Sandblasted', 4, 0, 1),
+  ('surface_finish', 'Rock-Pitched', 5, 0, 1),
+  ('surface_finish', 'Bush-Hammered', 6, 0, 1),
+  ('surface_finish', 'Leather/Satin', 7, 0, 1),
+  -- 90-item backlog #51a: Supplier PO's GST Rate field was plain free
+  -- text — standard Indian GST slabs as a dropdown instead. 18% is the
+  -- default to match the rate every existing sample Supplier PO already
+  -- used (it was a hand-typed literal, not read from this table).
+  ('gst_rate', '0', 1, 0, 1),
+  ('gst_rate', '5', 2, 0, 1),
+  ('gst_rate', '12', 3, 0, 1),
+  ('gst_rate', '18', 4, 1, 1),
+  ('gst_rate', '28', 5, 0, 1);
 
 -- ================================================================
 -- FILE_UPLOAD_CONTEXTS — Phase D wires up the first two of these

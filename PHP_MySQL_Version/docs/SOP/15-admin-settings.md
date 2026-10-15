@@ -227,14 +227,18 @@ mistake (or malice).
 - **Dropdown Option Lists** (`/admin/dropdown-options`) — the admin screen
   for `dropdown_options`, the generic small-option-list table several
   dropdowns elsewhere in the app already read from (Container Type,
-  Certificate of Origin Type, Unit, Package Type, and others) but that,
-  until now, could only be edited by hand-editing `seed.sql`. Unit
-  (`list_key = 'unit'`) feeds every product-line Unit field across New
-  Order, Order Detail, Reorder Request review, and the client portal's own
-  reorder form; Package Type (`list_key = 'package_type'`) feeds the
-  Estimated Package Type field on New Order and Edit Order Details — both
-  were previously free-text inputs with no validation against the values
-  actually used elsewhere on the order. Gated by `manage_dropdown_options`,
+  Certificate of Origin Type, Unit, Package Type, Supplier Type, Surface
+  Finish, GST Rate, and others) but that, until now, could only be edited
+  by hand-editing `seed.sql`. Unit (`list_key = 'unit'`) feeds every
+  product-line Unit field across New Order, Order Detail, Reorder Request
+  review, and the client portal's own reorder form; Package Type
+  (`list_key = 'package_type'`) feeds the Estimated Package Type field on
+  New Order and Edit Order Details; Surface Finish (`list_key =
+  'surface_finish'`) and GST Rate (`list_key = 'gst_rate'`) feed the
+  matching fields on the Supplier PO form (see [Chapter
+  5](./05-stage5-supplier-po.md)) — all four were previously free-text
+  inputs with no validation against the values actually used elsewhere on
+  the order. Gated by `manage_dropdown_options`,
   same tier as HS Codes/Logistics Partners/Compliance Task Types (Admin/MD/
   ED and Super Admin by default). One group per `list_key`, each with its
   own bulk-save form (Value/Sort Order/Default radio/Active checkbox per

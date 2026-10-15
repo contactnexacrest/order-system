@@ -765,6 +765,8 @@ async function show(req, res) {
       production: await orderProductionRepository.find(orderId),
       supplierTypes: await lookupRepository.dropdownOptions('supplier_type'),
       units: await lookupRepository.dropdownOptions('unit'),
+      surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
+      gstRates: await lookupRepository.dropdownOptions('gst_rate'),
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
       complianceTasks: await orderComplianceTaskRepository.forOrder(orderId),
       complianceStatuses: orderComplianceTaskRepository.STATUSES,

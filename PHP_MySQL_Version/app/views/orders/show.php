@@ -1259,7 +1259,7 @@ foreach ($stages as $s) {
           </form>
         </details>
 
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po" id="supplier-po-form">
           <?= Csrf::field() ?>
           <label>Supplier *
             <select name="supplier_id" required>
@@ -1271,10 +1271,17 @@ foreach ($stages as $s) {
           </label>
           <label>Material / Stone Type<input type="text" name="material_stone_type"></label>
           <label>Grade<input type="text" name="grade" value="Grade A"></label>
-          <label>Surface Finish<input type="text" name="surface_finish"></label>
+          <label>Surface Finish
+            <select name="surface_finish">
+              <option value="">—</option>
+              <?php foreach ($surfaceFinishes as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <label>Dimensions<input type="text" name="dimensions"></label>
           <label>Dimensional Tolerance<input type="text" name="dimensional_tolerance"></label>
-          <label>Quantity<input type="text" name="quantity"></label>
+          <label>Quantity<input type="text" name="quantity" data-spo-calc="quantity"></label>
           <label>Unit
             <select name="unit">
               <?php foreach ($units as $o): ?>
@@ -1284,19 +1291,59 @@ foreach ($stages as $s) {
           </label>
           <label>Colour Reference<input type="text" name="colour_reference"></label>
           <label>Special Requirements/Instructions<input type="text" name="special_requirements"></label>
-          <label>Unit Price (INR)<input type="text" name="unit_price_inr"></label>
-          <label>Basic Value (INR)<input type="text" name="basic_value_inr"></label>
-          <label>GST Rate (%)<input type="text" name="gst_rate_pct"></label>
-          <label>GST Amount (INR)<input type="text" name="gst_amount_inr"></label>
-          <label>Total Payable (INR)<input type="text" name="total_payable_inr"></label>
-          <label>Advance (%)<input type="text" name="advance_pct"></label>
-          <label>Advance Amount (INR)<input type="text" name="advance_amount_inr"></label>
-          <label>Balance Amount (INR)<input type="text" name="balance_amount_inr"></label>
+          <label>Unit Price (INR)<input type="text" name="unit_price_inr" data-spo-calc="unit_price_inr"></label>
+          <label>Basic Value (INR) <small class="muted">(auto: Unit Price &times; Quantity)</small><input type="text" name="basic_value_inr" data-spo-calc="basic_value_inr"></label>
+          <label>GST Rate (%)
+            <select name="gst_rate_pct" data-spo-calc="gst_rate_pct">
+              <option value="">—</option>
+              <?php foreach ($gstRates as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?>%</option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <label>GST Amount (INR) <small class="muted">(auto: Basic Value &times; GST Rate)</small><input type="text" name="gst_amount_inr" data-spo-calc="gst_amount_inr"></label>
+          <label>Total Payable (INR) <small class="muted">(auto: Basic Value + GST Amount)</small><input type="text" name="total_payable_inr" data-spo-calc="total_payable_inr"></label>
+          <label>Advance (%)<input type="text" name="advance_pct" data-spo-calc="advance_pct"></label>
+          <label>Advance Amount (INR) <small class="muted">(auto: Total Payable &times; Advance %)</small><input type="text" name="advance_amount_inr" data-spo-calc="advance_amount_inr"></label>
+          <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr"></label>
           <label>Delivery Location<input type="text" name="delivery_location"></label>
           <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
           <label>Packing Requirement<input type="text" name="packing_requirement"></label>
           <?= $stepBadge('5a') ?><button type="submit" class="btn-sm">Save Supplier PO Terms</button>
         </form>
+        <script>
+        (function () {
+          var form = document.getElementById('supplier-po-form');
+          if (!form) { return; }
+          var f = function (name) { return form.querySelector('[data-spo-calc="' + name + '"]'); };
+          var num = function (el) { var v = parseFloat(el && el.value); return isNaN(v) ? 0 : v; };
+          function recalc() {
+            var unitPrice = num(f('unit_price_inr'));
+            var quantity = num(f('quantity'));
+            var basicValue = unitPrice * quantity;
+            f('basic_value_inr').value = basicValue ? basicValue.toFixed(2) : '';
+
+            var gstRatePct = num(f('gst_rate_pct'));
+            var gstAmount = basicValue * (gstRatePct / 100);
+            f('gst_amount_inr').value = basicValue ? gstAmount.toFixed(2) : '';
+
+            var totalPayable = basicValue + gstAmount;
+            f('total_payable_inr').value = basicValue ? totalPayable.toFixed(2) : '';
+
+            var advancePct = num(f('advance_pct'));
+            var advanceAmount = totalPayable * (advancePct / 100);
+            f('advance_amount_inr').value = totalPayable && advancePct ? advanceAmount.toFixed(2) : '';
+            f('balance_amount_inr').value = totalPayable && advancePct ? (totalPayable - advanceAmount).toFixed(2) : '';
+          }
+          ['quantity', 'unit_price_inr', 'gst_rate_pct', 'advance_pct'].forEach(function (name) {
+            var el = f(name);
+            if (el) {
+              el.addEventListener('input', recalc);
+              el.addEventListener('change', recalc);
+            }
+          });
+        })();
+        </script>
       <?php endif; ?>
 
       <?php if ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated): ?>
