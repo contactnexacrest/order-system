@@ -542,7 +542,10 @@ async function finalizeApproval(documentId) {
   const documentTypeCode = document.document_type_code;
 
   const data = await documentDataAssembler.assemble(orderId, documentTypeCode);
-  const terms = await resolveTerms(documentTypeCode, data);
+  const balanceTriggerOption = order.balance_trigger_option ?? null;
+  const terms = await resolveTerms(documentTypeCode, data, balanceTriggerOption);
+  const legalTerms = await resolveClauseGroup(documentTypeCode, 'legal_terms', data, balanceTriggerOption);
+  const definitions = await resolveClauseGroup(documentTypeCode, 'definitions', data, balanceTriggerOption);
   const sectionNumbers = sectionNumbersFor(
     documentTypeCode,
     data.show_consignee_section ?? true,
@@ -567,6 +570,9 @@ async function finalizeApproval(documentId) {
     terms,
     terms_section_number: sectionNumbers.terms,
     terms_section_title: termsSectionTitleFor(documentTypeCode),
+    legal_terms_clauses: legalTerms,
+    definition_clauses: definitions,
+    legal_terms_section_number: sectionNumbers.legal_terms,
     // Re-rendering the SAME document (draft -> final watermark swap) must
     // keep showing the same signatory it was originally generated with —
     // read from the row's own snapshot, never re-resolved from current
@@ -703,7 +709,10 @@ async function markSuperseded(documentId) {
   const documentTypeCode = document.document_type_code;
 
   const data = await documentDataAssembler.assemble(orderId, documentTypeCode);
-  const terms = await resolveTerms(documentTypeCode, data);
+  const balanceTriggerOption = order.balance_trigger_option ?? null;
+  const terms = await resolveTerms(documentTypeCode, data, balanceTriggerOption);
+  const legalTerms = await resolveClauseGroup(documentTypeCode, 'legal_terms', data, balanceTriggerOption);
+  const definitions = await resolveClauseGroup(documentTypeCode, 'definitions', data, balanceTriggerOption);
   const sectionNumbers = sectionNumbersFor(
     documentTypeCode,
     data.show_consignee_section ?? true,
@@ -728,6 +737,9 @@ async function markSuperseded(documentId) {
     terms,
     terms_section_number: sectionNumbers.terms,
     terms_section_title: termsSectionTitleFor(documentTypeCode),
+    legal_terms_clauses: legalTerms,
+    definition_clauses: definitions,
+    legal_terms_section_number: sectionNumbers.legal_terms,
     signatory: await documentDataAssembler.signatoryFromSnapshot(document),
     company: await documentDataAssembler.companyFromSnapshot(document),
   };

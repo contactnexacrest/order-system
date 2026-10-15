@@ -465,7 +465,10 @@ final class DocumentGenerationService
         $documentTypeCode = $document['document_type_code'];
 
         $data = DocumentDataAssembler::assemble($orderId, $documentTypeCode);
-        $terms = self::resolveTerms($documentTypeCode, $data);
+        $balanceTriggerOption = $order['balance_trigger_option'] ?? null;
+        $terms = self::resolveTerms($documentTypeCode, $data, $balanceTriggerOption);
+        $legalTerms = self::resolveClauseGroup($documentTypeCode, 'legal_terms', $data, $balanceTriggerOption);
+        $definitions = self::resolveClauseGroup($documentTypeCode, 'definitions', $data, $balanceTriggerOption);
         $sectionNumbers = self::sectionNumbers(
             $documentTypeCode,
             (bool) ($data['show_consignee_section'] ?? true),
@@ -488,6 +491,9 @@ final class DocumentGenerationService
             'terms' => $terms,
             'terms_section_number' => $sectionNumbers['terms'],
             'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
+            'legal_terms_clauses' => $legalTerms,
+            'definition_clauses' => $definitions,
+            'legal_terms_section_number' => $sectionNumbers['legal_terms'],
             // Re-rendering the SAME document (draft -> final watermark
             // swap) must keep showing the same signatory it was originally
             // generated with — read from the row's own snapshot, never
@@ -634,7 +640,10 @@ final class DocumentGenerationService
         $documentTypeCode = $document['document_type_code'];
 
         $data = DocumentDataAssembler::assemble($orderId, $documentTypeCode);
-        $terms = self::resolveTerms($documentTypeCode, $data);
+        $balanceTriggerOption = $order['balance_trigger_option'] ?? null;
+        $terms = self::resolveTerms($documentTypeCode, $data, $balanceTriggerOption);
+        $legalTerms = self::resolveClauseGroup($documentTypeCode, 'legal_terms', $data, $balanceTriggerOption);
+        $definitions = self::resolveClauseGroup($documentTypeCode, 'definitions', $data, $balanceTriggerOption);
         $sectionNumbers = self::sectionNumbers(
             $documentTypeCode,
             (bool) ($data['show_consignee_section'] ?? true),
@@ -657,6 +666,9 @@ final class DocumentGenerationService
             'terms' => $terms,
             'terms_section_number' => $sectionNumbers['terms'],
             'terms_section_title'  => self::termsSectionTitleFor($documentTypeCode),
+            'legal_terms_clauses' => $legalTerms,
+            'definition_clauses' => $definitions,
+            'legal_terms_section_number' => $sectionNumbers['legal_terms'],
             'signatory' => DocumentDataAssembler::signatoryFromSnapshot($document),
             'company' => DocumentDataAssembler::companyFromSnapshot($document),
         ]);
