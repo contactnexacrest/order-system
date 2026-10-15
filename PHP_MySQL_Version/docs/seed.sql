@@ -613,7 +613,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- here (not hardcoded in the templates) so the text can be revised at any
 -- time without a code change — e.g. once a physical company seal exists.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('show_generated_document_disclaimer', '1', 'boolean', 'documents', 'Show the "system-generated document" disclaimer under the signature block on any generated document that carries a signature/seal image. Set to 0 to hide it everywhere.', 0),
+  ('show_generated_document_disclaimer', '0', 'boolean', 'documents', 'Show the "system-generated document" disclaimer under the signature block on any generated document that carries a signature/seal image. Defaults to OFF (90-item backlog #21) — set to 1 to show it everywhere.', 0),
   ('generated_document_disclaimer_text', 'This is a system-generated document. The signature and company seal shown are NexaCrest''s authorised electronic signature and digital company seal, applied automatically by the order management system under internal document-authorisation controls.', 'string', 'documents', 'Exact wording shown under the signature block when the disclaimer above is enabled. Edit freely — no code change needed.', 0);
 
 -- Consignee/Notify Party section visibility on buyer-facing documents
