@@ -51,9 +51,9 @@
   <tr><td><strong>Exporter — Registered Address *</strong></td><td>{{ company.registered_office }}</td><td class="placeholder-italic">Hardcoded — never changes</td></tr>
   <tr><td><strong>Exporter — GSTIN *</strong></td><td>{{ company.gstin }}</td><td class="placeholder-italic">Hardcoded — never changes</td></tr>
   <tr><td><strong>Exporter — IEC *</strong></td><td>{{ company.iec_pan }}</td><td class="placeholder-italic">Hardcoded — never changes</td></tr>
-  <tr><td><strong>Consignee — Legal Name *</strong></td><td>{{ buyer.company_legal_name }}</td><td class="placeholder-italic">Commercial Invoice Section 2</td></tr>
-  <tr><td><strong>Consignee — Address *</strong></td><td>{{ buyer.consignee_address ?: buyer.billing_address }}</td><td class="placeholder-italic">Commercial Invoice Section 2</td></tr>
-  <tr><td><strong>Consignee — Country *</strong></td><td>{{ buyer.country_of_destination ?: 'To Be Confirmed' }}</td><td class="placeholder-italic">Commercial Invoice Section 2</td></tr>
+  <tr><td><strong>Consignee — Legal Name *</strong></td><td>{{ consignee.company_legal_name }}</td><td class="placeholder-italic">Commercial Invoice Section 2</td></tr>
+  <tr><td><strong>Consignee — Address *</strong></td><td>{{ consignee.address_line1 ?: 'To Be Confirmed' }}</td><td class="placeholder-italic">Commercial Invoice Section 2</td></tr>
+  <tr><td><strong>Consignee — Country *</strong></td><td>{{ consignee.country ?: 'To Be Confirmed' }}</td><td class="placeholder-italic">Commercial Invoice Section 2</td></tr>
   <tr><td><strong>Vessel Name &amp; Voyage No. *</strong></td><td>{{ shipping.vessel_name ?: 'To Be Confirmed' }}{{ shipping.voyage_number ? ' / V.' ~ shipping.voyage_number : '' }}</td><td class="placeholder-italic">Bill of Lading</td></tr>
   <tr><td><strong>Port of Loading *</strong></td><td>{{ order.port_of_loading }}</td><td class="placeholder-italic">Hardcoded — never changes</td></tr>
   <tr><td><strong>Port of Discharge *</strong></td><td>{{ order.port_of_discharge }}</td><td class="placeholder-italic">Bill of Lading / Commercial Invoice Section 3</td></tr>

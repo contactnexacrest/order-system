@@ -30,10 +30,10 @@
 
 <div class="section-title">2. CONSIGNEE &nbsp;(buyer — appears on BL exactly as written)</div>
 <table class="kv kv-solid">
-  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
-  <tr><td class="k">Full Address *</td><td class="v">{{ buyer.consignee_address or buyer.billing_address }}</td></tr>
-  <tr><td class="k">Country *</td><td class="v">{{ buyer.country_of_destination or 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Ref *</td><td class="v">{{ buyer.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Company Legal Name *</td><td class="v">{{ consignee.company_legal_name }}</td></tr>
+  <tr><td class="k">Full Address *</td><td class="v">{{ consignee.address_line1 or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Country *</td><td class="v">{{ consignee.country or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Ref *</td><td class="v">{{ consignee.vat_eori_tax_no or 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">3. NOTIFY PARTY</div>

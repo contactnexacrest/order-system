@@ -185,6 +185,7 @@ function renderQt(context) {
   const order = context.order || {};
   const meta = context.meta || {};
   const buyer = context.buyer || {};
+  const consignee = context.consignee || {};
   const financial = context.financial || {};
   const currency = g(order, 'currency_code', '');
   const children = [];
@@ -218,12 +219,12 @@ function renderQt(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
-      { label: 'Country of Destination *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
+      { label: 'VAT / EORI / Tax Reg. No. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
+      { label: 'Country of Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
       { label: 'Certificate of Origin Type', value: g(order, 'coo_type') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
-      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
-      { label: 'Phone', value: g(buyer, 'phone', '—') },
+      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
+      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
+      { label: 'Phone', value: g(consignee, 'phone', '—') },
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
     ])
   );
@@ -295,6 +296,7 @@ function renderPi(context) {
   const order = context.order || {};
   const meta = context.meta || {};
   const buyer = context.buyer || {};
+  const consignee = context.consignee || {};
   const financial = context.financial || {};
   const company = context.company || {};
   const currency = g(order, 'currency_code', '');
@@ -340,13 +342,13 @@ function renderPi(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
-      { label: 'Country of Final Destination *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
+      { label: 'VAT / EORI / Tax Reg. No. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
+      { label: 'Country of Final Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
       { label: 'Certificate of Origin Type', value: g(order, 'coo_type') },
       { label: "Buyer's PO / Ref No.", value: g(order, 'buyers_po_ref') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
-      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
-      { label: 'Phone', value: g(buyer, 'phone', '—') },
+      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
+      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
+      { label: 'Phone', value: g(consignee, 'phone', '—') },
       { label: 'Notify Party', value: g(buyer, 'notify_party', 'SAME as buyer') },
     ])
   );
@@ -455,6 +457,7 @@ function renderOc(context) {
   const order = context.order || {};
   const meta = context.meta || {};
   const buyer = context.buyer || {};
+  const consignee = context.consignee || {};
   const financial = context.financial || {};
   const payment = context.payment_status || {};
   const currency = g(order, 'currency_code', '');
@@ -486,9 +489,9 @@ function renderOc(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
-      { label: 'Phone *', value: g(buyer, 'phone', '—') },
-      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
+      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
+      { label: 'Phone *', value: g(consignee, 'phone', '—') },
+      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
     ])
   );
 
@@ -723,6 +726,7 @@ function renderBuyerPo(context) {
   const order = context.order || {};
   const meta = context.meta || {};
   const buyer = context.buyer || {};
+  const consignee = context.consignee || {};
   const financial = context.financial || {};
   const signatory = context.signatory || {};
   const company = context.company || {};
@@ -759,11 +763,11 @@ function renderBuyerPo(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
-      { label: 'Phone *', value: g(buyer, 'phone', '—') },
-      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
-      { label: 'Country of Destination *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
+      { label: 'VAT / EORI / Tax Reg. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
+      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
+      { label: 'Phone *', value: g(consignee, 'phone', '—') },
+      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
+      { label: 'Country of Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
     ])
   );
@@ -1104,6 +1108,7 @@ function renderPl(context) {
   const order = context.order || {};
   const meta = context.meta || {};
   const buyer = context.buyer || {};
+  const consignee = context.consignee || {};
   const packing = context.packing || {};
   const crates = context.crates || [];
   const products = context.products || [];
@@ -1124,16 +1129,16 @@ function renderPl(context) {
 
   children.push(...C.sectionTitle('2. CONSIGNEE / BUYER'));
   const leftPara = [
-    ['Company Legal Name *', 'company_legal_name'],
-    ['Consignee Name *', 'consignee_name'],
-    ['Consignee Address *', 'consignee_address'],
-    ['VAT / EORI / Tax Reg. No. *', 'vat_eori_tax_no'],
-  ].map(([label, key]) => C.rich([[`${label}\n`, { bold: true, color: C.NAVY }], [String(g(buyer, key, 'To Be Confirmed')), {}]]));
+    ['Company Legal Name *', buyer, 'company_legal_name'],
+    ['Consignee Name *', buyer, 'consignee_name'],
+    ['Consignee Address *', buyer, 'consignee_address'],
+    ['VAT / EORI / Tax Reg. No. *', consignee, 'vat_eori_tax_no'],
+  ].map(([label, src, key]) => C.rich([[`${label}\n`, { bold: true, color: C.NAVY }], [String(g(src, key, 'To Be Confirmed')), {}]]));
   const rightPara = [
     ['Incoterm *', g(order, 'incoterm_label')],
     ['Port of Loading *', g(order, 'port_of_loading')],
     ['Port of Discharge *', g(order, 'port_of_discharge')],
-    ['Country of Final Destination *', g(buyer, 'country_of_destination', 'To Be Confirmed')],
+    ['Country of Final Destination *', g(consignee, 'country', 'To Be Confirmed')],
     ['Notify Party', g(buyer, 'notify_party', 'Same as consignee')],
   ].map(([label, val]) => C.rich([[`${label}\n`, { bold: true, color: C.NAVY }], [String(val), {}]]));
   children.push(
@@ -1230,6 +1235,7 @@ function renderBli(context) {
   const order = context.order || {};
   const meta = context.meta || {};
   const buyer = context.buyer || {};
+  const consignee = context.consignee || {};
   const company = context.company || {};
   const shipping = context.shipping || {};
   const packing = context.packing || {};
@@ -1276,10 +1282,10 @@ function renderBli(context) {
   children.push(
     ...C.kvTable(
       [
-        { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
-        { label: 'Full Address *', value: g(buyer, 'consignee_address') !== '—' ? g(buyer, 'consignee_address') : g(buyer, 'billing_address') },
-        { label: 'Country *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
-        { label: 'VAT / EORI / Tax Ref *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
+        { label: 'Company Legal Name *', value: g(consignee, 'company_legal_name') },
+        { label: 'Full Address *', value: g(consignee, 'address_line1', 'To Be Confirmed') },
+        { label: 'Country *', value: g(consignee, 'country', 'To Be Confirmed') },
+        { label: 'VAT / EORI / Tax Ref *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
       ],
       true
     )
@@ -1417,6 +1423,7 @@ function renderCi(context) {
   const order = context.order || {};
   const meta = context.meta || {};
   const buyer = context.buyer || {};
+  const consignee = context.consignee || {};
   const financial = context.financial || {};
   const payment = context.payment_status || {};
   const company = context.company || {};
@@ -1457,11 +1464,11 @@ function renderCi(context) {
       { label: 'Billing Address *', value: g(buyer, 'billing_address') },
       { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(buyer, 'vat_eori_tax_no', 'To Be Confirmed') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
-      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
+      { label: 'VAT / EORI / Tax Reg. No. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
+      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
+      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
       { label: 'Notify Party', value: g(buyer, 'notify_party', 'SAME as consignee') },
-      { label: 'Country of Final Destination *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
+      { label: 'Country of Final Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
     ])
   );
 
@@ -1581,6 +1588,7 @@ function renderCooprep(context) {
   const order = context.order || {};
   const meta = context.meta || {};
   const buyer = context.buyer || {};
+  const consignee = context.consignee || {};
   const company = context.company || {};
   const shipping = context.shipping || {};
   const packing = context.packing || {};
@@ -1637,9 +1645,9 @@ function renderCooprep(context) {
     ['Exporter — Registered Address *', g(company, 'registered_office'), hardcoded],
     ['Exporter — GSTIN *', g(company, 'gstin'), hardcoded],
     ['Exporter — IEC *', g(company, 'iec_pan'), hardcoded],
-    ['Consignee — Legal Name *', g(buyer, 'company_legal_name'), 'Commercial Invoice Section 2'],
-    ['Consignee — Address *', g(buyer, 'consignee_address') !== '—' ? g(buyer, 'consignee_address') : g(buyer, 'billing_address'), 'Commercial Invoice Section 2'],
-    ['Consignee — Country *', g(buyer, 'country_of_destination', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
+    ['Consignee — Legal Name *', g(consignee, 'company_legal_name'), 'Commercial Invoice Section 2'],
+    ['Consignee — Address *', g(consignee, 'address_line1', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
+    ['Consignee — Country *', g(consignee, 'country', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
     ['Vessel Name & Voyage No. *', `${g(shipping, 'vessel_name', 'To Be Confirmed')}${g(shipping, 'voyage_number') !== '—' ? ` / V.${g(shipping, 'voyage_number')}` : ''}`, 'Bill of Lading'],
     ['Port of Loading *', g(order, 'port_of_loading'), hardcoded],
     ['Port of Discharge *', g(order, 'port_of_discharge'), 'Bill of Lading / Commercial Invoice Section 3'],

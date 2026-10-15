@@ -26,11 +26,11 @@
   <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
   <tr><td class="k">Consignee Name *</td><td class="v">{{ buyer.consignee_name ?: (buyer.company_legal_name ?: 'To Be Confirmed') }}</td></tr>
   <tr><td class="k">Consignee Address *</td><td class="v">{{ buyer.consignee_address ?: (buyer.billing_address ?: 'To Be Confirmed') }}</td></tr>
-  <tr><td class="k">VAT / EORI / Tax Reg. *</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Phone *</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Country of Destination *</td><td class="v">{{ buyer.country_of_destination ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">VAT / EORI / Tax Reg. *</td><td class="v">{{ consignee.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Contact Person *</td><td class="v">{{ consignee.contact_person ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Phone *</td><td class="v">{{ consignee.phone ?: '—' }}</td></tr>
+  <tr><td class="k">Email *</td><td class="v">{{ consignee.email ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Country of Destination *</td><td class="v">{{ consignee.country ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
 </table>
 

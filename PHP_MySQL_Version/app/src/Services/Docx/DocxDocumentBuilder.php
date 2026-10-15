@@ -240,6 +240,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $buyer = $context['buyer'] ?? [];
+        $consignee = $context['consignee'] ?? [];
         $financial = $context['financial'] ?? [];
         $currency = self::g($order, 'currency_code', '');
 
@@ -266,12 +267,12 @@ final class DocxDocumentBuilder
             ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
             ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
             ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($buyer, 'vat_eori_tax_no', 'To Be Confirmed')],
-            ['label' => 'Country of Destination *', 'value' => self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
+            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
+            ['label' => 'Country of Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
             ['label' => 'Certificate of Origin Type', 'value' => self::g($order, 'coo_type')],
-            ['label' => 'Contact Person *', 'value' => self::g($buyer, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Email *', 'value' => self::g($buyer, 'email', 'To Be Confirmed')],
-            ['label' => 'Phone', 'value' => self::g($buyer, 'phone', '—')],
+            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
+            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
+            ['label' => 'Phone', 'value' => self::g($consignee, 'phone', '—')],
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
         ]);
 
@@ -339,6 +340,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $buyer = $context['buyer'] ?? [];
+        $consignee = $context['consignee'] ?? [];
         $financial = $context['financial'] ?? [];
         $company = $context['company'] ?? [];
         $currency = self::g($order, 'currency_code', '');
@@ -374,13 +376,13 @@ final class DocxDocumentBuilder
             ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
             ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
             ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($buyer, 'vat_eori_tax_no', 'To Be Confirmed')],
-            ['label' => 'Country of Final Destination *', 'value' => self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
+            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
+            ['label' => 'Country of Final Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
             ['label' => 'Certificate of Origin Type', 'value' => self::g($order, 'coo_type')],
             ['label' => "Buyer's PO / Ref No.", 'value' => self::g($order, 'buyers_po_ref')],
-            ['label' => 'Contact Person *', 'value' => self::g($buyer, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Email *', 'value' => self::g($buyer, 'email', 'To Be Confirmed')],
-            ['label' => 'Phone', 'value' => self::g($buyer, 'phone', '—')],
+            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
+            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
+            ['label' => 'Phone', 'value' => self::g($consignee, 'phone', '—')],
             ['label' => 'Notify Party', 'value' => self::g($buyer, 'notify_party', 'SAME as buyer')],
         ]);
 
@@ -474,6 +476,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $buyer = $context['buyer'] ?? [];
+        $consignee = $context['consignee'] ?? [];
         $financial = $context['financial'] ?? [];
         $payment = $context['payment_status'] ?? [];
         $currency = self::g($order, 'currency_code', '');
@@ -499,9 +502,9 @@ final class DocxDocumentBuilder
             ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
             ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
             ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'Contact Person *', 'value' => self::g($buyer, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Phone *', 'value' => self::g($buyer, 'phone', '—')],
-            ['label' => 'Email *', 'value' => self::g($buyer, 'email', 'To Be Confirmed')],
+            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
+            ['label' => 'Phone *', 'value' => self::g($consignee, 'phone', '—')],
+            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
         ]);
 
         $productList = array_map(static fn(array $p) => ($p['description'] ?? '') . ' (Qty: ' . ($p['quantity'] ?? '') . ' ' . ($p['unit'] ?? '') . ')', $context['products'] ?? []);
@@ -728,6 +731,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $buyer = $context['buyer'] ?? [];
+        $consignee = $context['consignee'] ?? [];
         $financial = $context['financial'] ?? [];
         $signatory = $context['signatory'] ?? [];
         $company = $context['company'] ?? [];
@@ -757,11 +761,11 @@ final class DocxDocumentBuilder
             ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
             ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
             ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'VAT / EORI / Tax Reg. *', 'value' => self::g($buyer, 'vat_eori_tax_no', 'To Be Confirmed')],
-            ['label' => 'Contact Person *', 'value' => self::g($buyer, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Phone *', 'value' => self::g($buyer, 'phone', '—')],
-            ['label' => 'Email *', 'value' => self::g($buyer, 'email', 'To Be Confirmed')],
-            ['label' => 'Country of Destination *', 'value' => self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
+            ['label' => 'VAT / EORI / Tax Reg. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
+            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
+            ['label' => 'Phone *', 'value' => self::g($consignee, 'phone', '—')],
+            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
+            ['label' => 'Country of Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
         ]);
 
@@ -1069,6 +1073,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $buyer = $context['buyer'] ?? [];
+        $consignee = $context['consignee'] ?? [];
         $packing = $context['packing'] ?? [];
         $crates = $context['crates'] ?? [];
         $products = $context['products'] ?? [];
@@ -1088,17 +1093,17 @@ final class DocxDocumentBuilder
         $table = $section->addTable(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 5000]);
         $table->addRow();
         $leftCell = $table->addCell(2500, ['valign' => 'top', 'borderSize' => 4, 'borderColor' => DocxComponents::BORDER_GRAY]);
-        foreach ([['Company Legal Name *', 'company_legal_name'], ['Consignee Name *', 'consignee_name'], ['Consignee Address *', 'consignee_address'], ['VAT / EORI / Tax Reg. No. *', 'vat_eori_tax_no']] as [$label, $key]) {
+        foreach ([['Company Legal Name *', $buyer, 'company_legal_name'], ['Consignee Name *', $buyer, 'consignee_name'], ['Consignee Address *', $buyer, 'consignee_address'], ['VAT / EORI / Tax Reg. No. *', $consignee, 'vat_eori_tax_no']] as [$label, $src, $key]) {
             $run = $leftCell->addTextRun();
             $run->addText($label . "\n", ['bold' => true, 'color' => DocxComponents::NAVY]);
-            $run->addText((string) self::g($buyer, $key, 'To Be Confirmed'));
+            $run->addText((string) self::g($src, $key, 'To Be Confirmed'));
         }
         $rightCell = $table->addCell(2500, ['valign' => 'top', 'bgColor' => DocxComponents::GRAY_LIGHT, 'borderSize' => 4, 'borderColor' => DocxComponents::BORDER_GRAY]);
         $rightVals = [
             ['Incoterm *', self::g($order, 'incoterm_label')],
             ['Port of Loading *', self::g($order, 'port_of_loading')],
             ['Port of Discharge *', self::g($order, 'port_of_discharge')],
-            ['Country of Final Destination *', self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
+            ['Country of Final Destination *', self::g($consignee, 'country', 'To Be Confirmed')],
             ['Notify Party', self::g($buyer, 'notify_party', 'Same as consignee')],
         ];
         foreach ($rightVals as [$label, $val]) {
@@ -1177,6 +1182,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $buyer = $context['buyer'] ?? [];
+        $consignee = $context['consignee'] ?? [];
         $company = $context['company'] ?? [];
         $shipping = $context['shipping'] ?? [];
         $packing = $context['packing'] ?? [];
@@ -1210,10 +1216,10 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '2. CONSIGNEE  (buyer — appears on BL exactly as written)');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Full Address *', 'value' => self::g($buyer, 'consignee_address') !== '—' ? self::g($buyer, 'consignee_address') : self::g($buyer, 'billing_address')],
-            ['label' => 'Country *', 'value' => self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
-            ['label' => 'VAT / EORI / Tax Ref *', 'value' => self::g($buyer, 'vat_eori_tax_no', 'To Be Confirmed')],
+            ['label' => 'Company Legal Name *', 'value' => self::g($consignee, 'company_legal_name')],
+            ['label' => 'Full Address *', 'value' => self::g($consignee, 'address_line1', 'To Be Confirmed')],
+            ['label' => 'Country *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
+            ['label' => 'VAT / EORI / Tax Ref *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
         ], true);
 
         DocxComponents::addSectionTitle($section, '3. NOTIFY PARTY');
@@ -1315,6 +1321,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $buyer = $context['buyer'] ?? [];
+        $consignee = $context['consignee'] ?? [];
         $financial = $context['financial'] ?? [];
         $payment = $context['payment_status'] ?? [];
         $company = $context['company'] ?? [];
@@ -1348,11 +1355,11 @@ final class DocxDocumentBuilder
             ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
             ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
             ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($buyer, 'vat_eori_tax_no', 'To Be Confirmed')],
-            ['label' => 'Contact Person *', 'value' => self::g($buyer, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Email *', 'value' => self::g($buyer, 'email', 'To Be Confirmed')],
+            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
+            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
+            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
             ['label' => 'Notify Party', 'value' => self::g($buyer, 'notify_party', 'SAME as consignee')],
-            ['label' => 'Country of Final Destination *', 'value' => self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
+            ['label' => 'Country of Final Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
         ]);
 
         DocxComponents::addSectionTitle($section, '3. SHIPPING DETAILS');
@@ -1451,6 +1458,7 @@ final class DocxDocumentBuilder
         $order = $context['order'] ?? [];
         $meta = $context['meta'] ?? [];
         $buyer = $context['buyer'] ?? [];
+        $consignee = $context['consignee'] ?? [];
         $company = $context['company'] ?? [];
         $shipping = $context['shipping'] ?? [];
         $packing = $context['packing'] ?? [];
@@ -1499,9 +1507,9 @@ final class DocxDocumentBuilder
             ['Exporter — Registered Address *', self::g($company, 'registered_office'), $hardcoded],
             ['Exporter — GSTIN *', self::g($company, 'gstin'), $hardcoded],
             ['Exporter — IEC *', self::g($company, 'iec_pan'), $hardcoded],
-            ['Consignee — Legal Name *', self::g($buyer, 'company_legal_name'), 'Commercial Invoice Section 2'],
-            ['Consignee — Address *', self::g($buyer, 'consignee_address') !== '—' ? self::g($buyer, 'consignee_address') : self::g($buyer, 'billing_address'), 'Commercial Invoice Section 2'],
-            ['Consignee — Country *', self::g($buyer, 'country_of_destination', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
+            ['Consignee — Legal Name *', self::g($consignee, 'company_legal_name'), 'Commercial Invoice Section 2'],
+            ['Consignee — Address *', self::g($consignee, 'address_line1', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
+            ['Consignee — Country *', self::g($consignee, 'country', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
             ['Vessel Name & Voyage No. *', self::g($shipping, 'vessel_name', 'To Be Confirmed') . (self::g($shipping, 'voyage_number') !== '—' ? ' / V.' . self::g($shipping, 'voyage_number') : ''), 'Bill of Lading'],
             ['Port of Loading *', self::g($order, 'port_of_loading'), $hardcoded],
             ['Port of Discharge *', self::g($order, 'port_of_discharge'), 'Bill of Lading / Commercial Invoice Section 3'],
