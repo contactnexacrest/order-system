@@ -18,8 +18,20 @@
         <label class="full">Company Legal Name *
           <input type="text" name="company_legal_name" value="{{ submission.company_legal_name or '' }}" placeholder="Exact legal name, no abbreviations" required>
         </label>
-        <label class="full">Billing Address *
-          <textarea name="billing_address" placeholder="Full address including postcode — must match PI and BL exactly" required>{{ submission.billing_address or '' }}</textarea>
+        <label class="full">Billing Address Line 1 *
+          <input type="text" name="billing_address_line1" value="{{ submission.billing_address_line1 or '' }}" placeholder="Street number and street name" required>
+        </label>
+        <label>Address Line 2
+          <input type="text" name="billing_address_line2" value="{{ submission.billing_address_line2 or '' }}" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town *
+          <input type="text" name="billing_city" value="{{ submission.billing_city or '' }}" placeholder="e.g., Rotterdam" required>
+        </label>
+        <label>Postcode
+          <input type="text" name="billing_postcode" value="{{ submission.billing_postcode or '' }}" placeholder="e.g., 3011 AD">
+        </label>
+        <label>Country *
+          <input type="text" name="billing_country" value="{{ submission.billing_country or '' }}" placeholder="e.g., Netherlands" required>
         </label>
         <label>Contact Person *
           <input type="text" name="contact_person" value="{{ submission.contact_person or '' }}" placeholder="e.g., John Doe" required>

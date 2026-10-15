@@ -132,6 +132,8 @@ final class PiIntakeRepository
         Database::connection()->prepare(
             'UPDATE pi_intake_submissions SET
                 company_legal_name = :company_legal_name, billing_address = :billing_address,
+                billing_address_line1 = :billing_address_line1, billing_address_line2 = :billing_address_line2,
+                billing_city = :billing_city, billing_postcode = :billing_postcode, billing_country = :billing_country,
                 vat_eori_tax_no = :vat_eori_tax_no, contact_person = :contact_person, email = :email,
                 phone = :phone,
                 port_of_discharge_text = :port_of_discharge_text, country_of_destination = :country_of_destination,
@@ -158,6 +160,11 @@ final class PiIntakeRepository
         )->execute([
             'company_legal_name'             => $data['company_legal_name'],
             'billing_address'                => $data['billing_address'],
+            'billing_address_line1'          => $data['billing_address_line1'] ?: null,
+            'billing_address_line2'          => $data['billing_address_line2'] ?? null,
+            'billing_city'                   => $data['billing_city'] ?: null,
+            'billing_postcode'               => $data['billing_postcode'] ?? null,
+            'billing_country'                => $data['billing_country'] ?: null,
             'vat_eori_tax_no'                => $data['vat_eori_tax_no'],
             'contact_person'                 => $data['contact_person'],
             'email'                          => $data['email'],

@@ -53,9 +53,31 @@ async function submit(req, res) {
     return;
   }
 
+  // Point 8 / 90-item backlog #45 — Billing Address used to be one
+  // free-text box; it's now structured (Line 1/Line 2/City/Postcode/
+  // Country), same pattern already applied to the Quotation-stage form
+  // (clientIntakeController) and to this same form's Consignee/Notify
+  // Party sections. The flat billing_address column stays NOT NULL
+  // (older consumers — reports, the review screen fallback — still read
+  // it), so it's composed here from the structured parts rather than
+  // collected directly.
+  const billingAddressLine1 = String(req.body.billing_address_line1 || '').trim();
+  const billingAddressLine2 = String(req.body.billing_address_line2 || '').trim();
+  const billingCity = String(req.body.billing_city || '').trim();
+  const billingPostcode = String(req.body.billing_postcode || '').trim();
+  const billingCountry = String(req.body.billing_country || '').trim();
+  const composedBillingAddress = [billingAddressLine1, billingAddressLine2, billingCity, billingPostcode, billingCountry]
+    .filter((part) => part !== '')
+    .join(', ');
+
   const data = Object.assign({
     company_legal_name: String(req.body.company_legal_name || '').trim(),
-    billing_address: String(req.body.billing_address || '').trim(),
+    billing_address: composedBillingAddress,
+    billing_address_line1: billingAddressLine1,
+    billing_address_line2: billingAddressLine2,
+    billing_city: billingCity,
+    billing_postcode: billingPostcode,
+    billing_country: billingCountry,
     vat_eori_tax_no: String(req.body.vat_eori_tax_no || '').trim(),
     contact_person: String(req.body.contact_person || '').trim(),
     email: String(req.body.email || '').trim(),
@@ -77,7 +99,7 @@ async function submit(req, res) {
   // structured fields gated by their own "Same as X?" checkbox (see
   // collectPartyFields()), not free-text requireds.
   const required = [
-    'company_legal_name', 'billing_address',
+    'company_legal_name', 'billing_address_line1', 'billing_city', 'billing_country',
     'vat_eori_tax_no', 'contact_person', 'email', 'phone',
     'port_of_discharge_text', 'country_of_destination', 'incoterm_confirmed',
     'payment_terms_confirmation', 'quotation_acceptance_reference',

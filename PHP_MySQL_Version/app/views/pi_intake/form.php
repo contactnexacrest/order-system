@@ -19,8 +19,20 @@
         <label class="full">Company Legal Name *
           <input type="text" name="company_legal_name" value="<?= htmlspecialchars($submission['company_legal_name'] ?? '') ?>" placeholder="Exact legal name, no abbreviations" required>
         </label>
-        <label class="full">Billing Address *
-          <textarea name="billing_address" placeholder="Full address including postcode — must match PI and BL exactly" required><?= htmlspecialchars($submission['billing_address'] ?? '') ?></textarea>
+        <label class="full">Billing Address Line 1 *
+          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($submission['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name" required>
+        </label>
+        <label>Address Line 2
+          <input type="text" name="billing_address_line2" value="<?= htmlspecialchars($submission['billing_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
+        </label>
+        <label>City / Town *
+          <input type="text" name="billing_city" value="<?= htmlspecialchars($submission['billing_city'] ?? '') ?>" placeholder="e.g., Rotterdam" required>
+        </label>
+        <label>Postcode
+          <input type="text" name="billing_postcode" value="<?= htmlspecialchars($submission['billing_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
+        </label>
+        <label>Country *
+          <input type="text" name="billing_country" value="<?= htmlspecialchars($submission['billing_country'] ?? '') ?>" placeholder="e.g., Netherlands" required>
         </label>
         <label>Contact Person *
           <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person'] ?? '') ?>" placeholder="e.g., John Doe" required>

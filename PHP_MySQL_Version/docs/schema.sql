@@ -3229,3 +3229,24 @@ CREATE INDEX idx_orders_buyer_action_token_hash ON orders(buyer_action_token_has
 -- ================================================================
 INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('manage_ports', 'Manage ports', 'Add, edit, and deactivate the Port of Loading / Port of Discharge options offered on the New Order form. Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog');
+
+-- ================================================================
+-- SECTION BI — PI INTAKE: STRUCTURED BILLING ADDRESS (90-item backlog
+-- #45, added 2026-10-15)
+-- ================================================================
+-- Section BF did this for client_intake_submissions (the QT-stage public
+-- form); pi_intake_submissions' own buyer billing_address was left behind
+-- as the one remaining flat free-text box on either public intake
+-- form — its Consignee and Notify Party sections were already fully
+-- structured (Section BB), but the buyer's OWN address on the very same
+-- form was not. Same pattern, same column names, same fallback
+-- convention: billing_address stays (never removed — still what a
+-- pre-this-change row has, and what the review screen falls back to),
+-- the new structured columns are used when present.
+-- ================================================================
+ALTER TABLE pi_intake_submissions
+  ADD COLUMN billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
+  ADD COLUMN billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
+  ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2,
+  ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city,
+  ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode;

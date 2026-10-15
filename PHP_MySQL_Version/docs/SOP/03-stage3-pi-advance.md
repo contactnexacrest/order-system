@@ -54,6 +54,13 @@ requirements) start blank. If the buyer edits a pre-filled value and the
 submission is later rejected, their own corrected answer is what reappears
 on the form when they come back — never the original client-record default.
 
+The Billing Address field here is structured the same way as the
+Quotation-stage form (Chapter 1) — Line 1 (required), Line 2, City
+(required), Postcode, Country (required) — rather than one free-text
+blob, since documents need these as discrete fields. The older
+single-field Billing Address column is composed automatically from these
+parts behind the scenes.
+
 ![PI-Stage Intake section, link generated, awaiting the client](./images/s3_pi_intake_section.png)
 
 This step is **entirely optional and never blocks anything** — staff can

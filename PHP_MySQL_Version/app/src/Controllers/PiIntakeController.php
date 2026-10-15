@@ -64,9 +64,31 @@ final class PiIntakeController
             return;
         }
 
+        // Point 8 / 90-item backlog #45 — Billing Address used to be one
+        // free-text box; it's now structured (Line 1/Line 2/City/
+        // Postcode/Country), same pattern already applied to the
+        // Quotation-stage form (ClientIntakeController) and to this same
+        // form's Consignee/Notify Party sections. The flat billing_address
+        // column stays NOT NULL (older consumers — reports, the review
+        // screen fallback — still read it), so it's composed here from
+        // the structured parts rather than collected directly.
+        $billingAddressLine1 = trim((string) ($_POST['billing_address_line1'] ?? ''));
+        $billingAddressLine2 = trim((string) ($_POST['billing_address_line2'] ?? ''));
+        $billingCity = trim((string) ($_POST['billing_city'] ?? ''));
+        $billingPostcode = trim((string) ($_POST['billing_postcode'] ?? ''));
+        $billingCountry = trim((string) ($_POST['billing_country'] ?? ''));
+        $composedBillingAddress = implode(', ', array_filter([
+            $billingAddressLine1, $billingAddressLine2, $billingCity, $billingPostcode, $billingCountry,
+        ], static fn ($part) => $part !== ''));
+
         $data = array_merge([
             'company_legal_name'             => trim((string) ($_POST['company_legal_name'] ?? '')),
-            'billing_address'                => trim((string) ($_POST['billing_address'] ?? '')),
+            'billing_address'                => $composedBillingAddress,
+            'billing_address_line1'          => $billingAddressLine1,
+            'billing_address_line2'          => $billingAddressLine2 ?: null,
+            'billing_city'                   => $billingCity,
+            'billing_postcode'               => $billingPostcode ?: null,
+            'billing_country'                => $billingCountry,
             'vat_eori_tax_no'                => trim((string) ($_POST['vat_eori_tax_no'] ?? '')),
             'contact_person'                 => trim((string) ($_POST['contact_person'] ?? '')),
             'email'                          => trim((string) ($_POST['email'] ?? '')),
@@ -88,7 +110,7 @@ final class PiIntakeController
         // self-service structured fields gated by their own "Same as X?"
         // checkbox (see collectPartyFields()), not free-text requireds.
         $required = [
-            'company_legal_name', 'billing_address',
+            'company_legal_name', 'billing_address_line1', 'billing_city', 'billing_country',
             'vat_eori_tax_no', 'contact_person', 'email', 'phone',
             'port_of_discharge_text', 'country_of_destination', 'incoterm_confirmed',
             'payment_terms_confirmation', 'quotation_acceptance_reference',
