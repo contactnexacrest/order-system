@@ -987,7 +987,7 @@
       {% elif not payment or payment.advance_remittance_received_at == null %}
         <form method="post" action="/orders/{{ order.id }}/payment/advance">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Advance Amount Received *<input type="text" name="advance_amount" required></label>
+          <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required></label>
           <label>Received On<input type="date" name="advance_received_at"></label>
           {{ stepBadge('3c') | safe }}<button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
@@ -1321,7 +1321,7 @@
           {% if not payment or payment.freight_remittance_received_at == null %}
             <form method="post" action="/orders/{{ order.id }}/payment/freight">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <label>Freight Amount Received *<input type="text" name="freight_amount" required></label>
+              <label>Freight Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="freight_amount" required></label>
               <label>Received On<input type="date" name="freight_received_at"></label>
               {{ stepBadge('6c') | safe }}<button type="submit" class="btn-sm">Record Freight Remittance</button>
             </form>
@@ -1465,7 +1465,7 @@
         {% elif not payment or payment.balance_remittance_received_at == null %}
           <form method="post" action="/orders/{{ order.id }}/payment/balance">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Balance Amount Received *<input type="text" name="balance_amount" required value="{{ payment.balance_amount or '' }}"></label>
+            <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required value="{{ payment.balance_amount or '' }}"></label>
             <label>Received On<input type="date" name="balance_received_at"></label>
             {{ stepBadge('8c') | safe }}<button type="submit" class="btn-sm">Record Balance Remittance</button>
           </form>

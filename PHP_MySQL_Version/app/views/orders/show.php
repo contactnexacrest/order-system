@@ -1087,7 +1087,7 @@ foreach ($stages as $s) {
       <?php elseif (!$payment || $payment['advance_remittance_received_at'] === null): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance">
           <?= Csrf::field() ?>
-          <label>Advance Amount Received *<input type="text" name="advance_amount" required></label>
+          <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required></label>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <?= $stepBadge('3c') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
@@ -1429,7 +1429,7 @@ foreach ($stages as $s) {
           <?php if (!$payment || $payment['freight_remittance_received_at'] === null): ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight">
               <?= Csrf::field() ?>
-              <label>Freight Amount Received *<input type="text" name="freight_amount" required></label>
+              <label>Freight Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="freight_amount" required></label>
               <label>Received On<input type="date" name="freight_received_at" value="<?= date('Y-m-d') ?>"></label>
               <?= $stepBadge('6c') ?><button type="submit" class="btn-sm">Record Freight Remittance</button>
             </form>
@@ -1579,7 +1579,7 @@ foreach ($stages as $s) {
         <?php elseif (!$payment || $payment['balance_remittance_received_at'] === null): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance">
             <?= Csrf::field() ?>
-            <label>Balance Amount Received *<input type="text" name="balance_amount" required value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
+            <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
             <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
             <?= $stepBadge('8c') ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
           </form>
