@@ -5,9 +5,12 @@ const path = require('path');
 
 /**
  * 90-item backlog P5 content/copy polish — items #20 (payment-screenshot
- * upload label wording) and #79 (spell out ETD/ETA in full rather than
- * the bare abbreviation). Pure copy guards: no behavior to exercise,
- * just pinning the wording so a future edit doesn't silently revert it.
+ * upload label wording), #79 (spell out ETD/ETA in full rather than
+ * the bare abbreviation), and #78 (Supplier PO form field clarification:
+ * placeholder hints on free-text fields that had none, plus a reciprocal
+ * auto-calc hint on Unit Price mirroring the one Basic Value already had).
+ * Pure copy guards: no behavior to exercise, just pinning the wording so
+ * a future edit doesn't silently revert it.
  */
 describe('P5 copy wording (backlog #20, #79)', () => {
   function read(relativePath) {
@@ -42,5 +45,21 @@ describe('P5 copy wording (backlog #20, #79)', () => {
     const js = read('src/services/docx/docxDocumentBuilder.js');
     expect(js).toContain('ETD (Estimated Time of Departure) *');
     expect(js).toContain('ETA (Estimated Time of Arrival) *');
+  });
+
+  it('Supplier PO free-text fields have placeholder hints', () => {
+    const html = read('views/orders/show.njk');
+    expect(html).toContain('name="material_stone_type" placeholder="e.g., Black Granite"');
+    expect(html).toContain('name="dimensions" placeholder="e.g., 600 x 600 x 20 mm"');
+    expect(html).toContain('name="dimensional_tolerance" placeholder="e.g., &plusmn;1 mm"');
+    expect(html).toContain('name="colour_reference" placeholder="e.g., Jet Black"');
+    expect(html).toContain('name="special_requirements" placeholder="e.g., Polished finish, edge chamfer"');
+    expect(html).toContain('name="delivery_location" placeholder="e.g., Factory warehouse, Udaipur"');
+    expect(html).toContain('name="packing_requirement" placeholder="e.g., Wooden crates, export packing"');
+  });
+
+  it('Supplier PO Unit Price has a reciprocal auto-calc hint', () => {
+    const html = read('views/orders/show.njk');
+    expect(html).toContain('Unit Price (INR) <small class="muted">(auto-calculates Basic Value when multiplied by Quantity)</small>');
   });
 });

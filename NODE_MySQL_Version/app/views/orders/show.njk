@@ -1161,7 +1161,7 @@
               {% endfor %}
             </select>
           </label>
-          <label>Material / Stone Type<input type="text" name="material_stone_type"></label>
+          <label>Material / Stone Type<input type="text" name="material_stone_type" placeholder="e.g., Black Granite"></label>
           <label>Grade<input type="text" name="grade" value="Grade A"></label>
           <label>Surface Finish
             <select name="surface_finish">
@@ -1171,9 +1171,9 @@
               {% endfor %}
             </select>
           </label>
-          <label>Dimensions<input type="text" name="dimensions"></label>
-          <label>Dimensional Tolerance<input type="text" name="dimensional_tolerance"></label>
-          <label>Quantity<input type="text" name="quantity" data-spo-calc="quantity"></label>
+          <label>Dimensions<input type="text" name="dimensions" placeholder="e.g., 600 x 600 x 20 mm"></label>
+          <label>Dimensional Tolerance<input type="text" name="dimensional_tolerance" placeholder="e.g., &plusmn;1 mm"></label>
+          <label>Quantity<input type="text" name="quantity" data-spo-calc="quantity" placeholder="e.g., 500"></label>
           <label>Unit
             <select name="unit">
               {% for o in units %}
@@ -1181,9 +1181,9 @@
               {% endfor %}
             </select>
           </label>
-          <label>Colour Reference<input type="text" name="colour_reference"></label>
-          <label>Special Requirements/Instructions<input type="text" name="special_requirements"></label>
-          <label>Unit Price (INR)<input type="text" name="unit_price_inr" data-spo-calc="unit_price_inr"></label>
+          <label>Colour Reference<input type="text" name="colour_reference" placeholder="e.g., Jet Black"></label>
+          <label>Special Requirements/Instructions<input type="text" name="special_requirements" placeholder="e.g., Polished finish, edge chamfer"></label>
+          <label>Unit Price (INR) <small class="muted">(auto-calculates Basic Value when multiplied by Quantity)</small><input type="text" name="unit_price_inr" data-spo-calc="unit_price_inr" placeholder="e.g., 450.00"></label>
           <label>Basic Value (INR) <small class="muted">(auto: Unit Price &times; Quantity)</small><input type="text" name="basic_value_inr" data-spo-calc="basic_value_inr"></label>
           <label>GST Rate (%)
             <select name="gst_rate_pct" data-spo-calc="gst_rate_pct">
@@ -1195,12 +1195,12 @@
           </label>
           <label>GST Amount (INR) <small class="muted">(auto: Basic Value &times; GST Rate)</small><input type="text" name="gst_amount_inr" data-spo-calc="gst_amount_inr"></label>
           <label>Total Payable (INR) <small class="muted">(auto: Basic Value + GST Amount)</small><input type="text" name="total_payable_inr" data-spo-calc="total_payable_inr"></label>
-          <label>Advance (%)<input type="text" name="advance_pct" data-spo-calc="advance_pct"></label>
+          <label>Advance (%)<input type="text" name="advance_pct" data-spo-calc="advance_pct" placeholder="e.g., 30"></label>
           <label>Advance Amount (INR) <small class="muted">(auto: Total Payable &times; Advance %)</small><input type="text" name="advance_amount_inr" data-spo-calc="advance_amount_inr"></label>
           <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr"></label>
-          <label>Delivery Location<input type="text" name="delivery_location"></label>
+          <label>Delivery Location<input type="text" name="delivery_location" placeholder="e.g., Factory warehouse, Udaipur"></label>
           <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
-          <label>Packing Requirement<input type="text" name="packing_requirement"></label>
+          <label>Packing Requirement<input type="text" name="packing_requirement" placeholder="e.g., Wooden crates, export packing"></label>
           {{ stepBadge('5a') | safe }}<button type="submit" class="btn-sm">Save Supplier PO Terms</button>
         </form>
         <script>

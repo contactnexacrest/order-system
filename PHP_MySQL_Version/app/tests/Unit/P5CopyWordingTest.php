@@ -8,9 +8,12 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * 90-item backlog P5 content/copy polish — items #20 (payment-screenshot
- * upload label wording) and #79 (spell out ETD/ETA in full rather than
- * the bare abbreviation). Pure copy guards: no behavior to exercise,
- * just pinning the wording so a future edit doesn't silently revert it.
+ * upload label wording), #79 (spell out ETD/ETA in full rather than
+ * the bare abbreviation), and #78 (Supplier PO form field clarification:
+ * placeholder hints on free-text fields that had none, plus a reciprocal
+ * auto-calc hint on Unit Price mirroring the one Basic Value already had).
+ * Pure copy guards: no behavior to exercise, just pinning the wording so
+ * a future edit doesn't silently revert it.
  */
 final class P5CopyWordingTest extends TestCase
 {
@@ -52,5 +55,23 @@ final class P5CopyWordingTest extends TestCase
         $php = $this->read('src/Services/Docx/DocxDocumentBuilder.php');
         self::assertStringContainsString('ETD (Estimated Time of Departure) *', $php);
         self::assertStringContainsString('ETA (Estimated Time of Arrival) *', $php);
+    }
+
+    public function testSupplierPoFreeTextFieldsHavePlaceholderHints(): void
+    {
+        $html = $this->read('views/orders/show.php');
+        self::assertStringContainsString('name="material_stone_type" placeholder="e.g., Black Granite"', $html);
+        self::assertStringContainsString('name="dimensions" placeholder="e.g., 600 x 600 x 20 mm"', $html);
+        self::assertStringContainsString('name="dimensional_tolerance" placeholder="e.g., &plusmn;1 mm"', $html);
+        self::assertStringContainsString('name="colour_reference" placeholder="e.g., Jet Black"', $html);
+        self::assertStringContainsString('name="special_requirements" placeholder="e.g., Polished finish, edge chamfer"', $html);
+        self::assertStringContainsString('name="delivery_location" placeholder="e.g., Factory warehouse, Udaipur"', $html);
+        self::assertStringContainsString('name="packing_requirement" placeholder="e.g., Wooden crates, export packing"', $html);
+    }
+
+    public function testSupplierPoUnitPriceHasReciprocalAutoCalcHint(): void
+    {
+        $html = $this->read('views/orders/show.php');
+        self::assertStringContainsString('Unit Price (INR) <small class="muted">(auto-calculates Basic Value when multiplied by Quantity)</small>', $html);
     }
 }
