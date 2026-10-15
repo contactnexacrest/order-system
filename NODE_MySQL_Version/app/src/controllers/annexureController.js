@@ -86,7 +86,7 @@ async function createProduct(req, res) {
     return;
   }
 
-  await orderAnnexureRepository.createProduct(orderId, {
+  const productId = await orderAnnexureRepository.createProduct(orderId, {
     name,
     description: String(req.body.description || '').trim(),
     dimensions: String(req.body.dimensions || '').trim(),
@@ -94,6 +94,27 @@ async function createProduct(req, res) {
     components: String(req.body.components || '').trim(),
     technical_notes: String(req.body.technical_notes || '').trim(),
   });
+
+  if (req.file) {
+    const order = await orderRepository.find(orderId);
+    try {
+      const fileId = await fileUploadService.handleUpload(
+        req,
+        'image',
+        'product_image',
+        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/annexure`,
+        null,
+        orderId,
+        req.user.id
+      );
+      await orderAnnexureRepository.addImage(productId, fileId);
+    } catch (e) {
+      flash.set(req, 'error', `Product entry added, but the image failed to upload: ${e.message}`);
+      res.redirect(`/orders/${orderId}/annexure`);
+      return;
+    }
+  }
+
   flash.set(req, 'success', 'Product entry added.');
   res.redirect(`/orders/${orderId}/annexure`);
 }

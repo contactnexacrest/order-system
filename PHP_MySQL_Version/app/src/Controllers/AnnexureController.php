@@ -97,7 +97,7 @@ final class AnnexureController
             return;
         }
 
-        OrderAnnexureRepository::createProduct($orderId, [
+        $productId = OrderAnnexureRepository::createProduct($orderId, [
             'name' => $name,
             'description' => trim((string) ($_POST['description'] ?? '')),
             'dimensions' => trim((string) ($_POST['dimensions'] ?? '')),
@@ -105,6 +105,26 @@ final class AnnexureController
             'components' => trim((string) ($_POST['components'] ?? '')),
             'technical_notes' => trim((string) ($_POST['technical_notes'] ?? '')),
         ]);
+
+        if (!empty($_FILES['image']['name'])) {
+            $order = OrderRepository::find($orderId);
+            try {
+                $fileId = FileUploadService::handleUpload(
+                    'image',
+                    'product_image',
+                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/annexure',
+                    null,
+                    $orderId,
+                    (int) AuthService::currentUser()['id']
+                );
+                OrderAnnexureRepository::addImage($productId, $fileId);
+            } catch (\Throwable $e) {
+                Flash::set('error', "Product entry added, but the image failed to upload: {$e->getMessage()}");
+                header("Location: /orders/{$orderId}/annexure");
+                return;
+            }
+        }
+
         Flash::set('success', 'Product entry added.');
         header("Location: /orders/{$orderId}/annexure");
     }

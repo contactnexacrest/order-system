@@ -258,7 +258,10 @@ mode** dropdown decides what Annexure A actually shows:
 - **Product Specification (current view)** — the structured per-product
   table (dimensions, finish, components, technical notes, photos) staff fill
   in below the dropdown. This is the original, only mode Annexure A used to
-  have.
+  have. A photo can be attached right away on the "Add Product Entry" form
+  itself, or added afterward (and more added later) from the saved entry's
+  own Images section — either way works, and nothing is required to be
+  uploaded at either point.
 - **Additional Terms** — a free-form rich-text block, entered through a
   small on-screen WYSIWYG editor (bold/italic/underline/strikethrough,
   headings, quote, bullet/numbered lists, inserted images, links). Use this

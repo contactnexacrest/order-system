@@ -627,7 +627,7 @@ app.get('/orders/:id/annexure', requireAuth, requirePermission('manage_orders'),
 app.post('/orders/:id/annexure/toggle', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.toggleInclude));
 app.post('/orders/:id/annexure/mode', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateMode));
 app.post('/orders/:id/annexure/terms', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateTerms));
-app.post('/orders/:id/annexure/products', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.createProduct));
+app.post('/orders/:id/annexure/products', requireAuth, requirePermission('manage_orders'), upload.single('image'), verifyCsrf, asyncHandler(annexureController.createProduct));
 app.post('/orders/:id/annexure/products/:productId', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateProduct));
 app.post('/orders/:id/annexure/products/:productId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.deleteProduct));
 app.post('/orders/:id/annexure/products/:productId/images', requireAuth, requirePermission('manage_orders'), upload.single('image'), verifyCsrf, asyncHandler(annexureController.uploadImage));
