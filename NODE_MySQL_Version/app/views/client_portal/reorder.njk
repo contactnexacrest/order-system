@@ -21,7 +21,13 @@
             <label>Finish<input type="text" name="product_finish[{{ loop.index0 }}]" value="{{ p.finish or '' }}" placeholder="e.g. Polished"></label>
             <label>Qty<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
-            <label>Unit<input type="text" name="product_unit[{{ loop.index0 }}]" value="{{ p.unit or '' }}" placeholder="SQM/PCS"></label>
+            <label>Unit
+              <select name="product_unit[{{ loop.index0 }}]">
+                {% for o in units %}
+                  <option value="{{ o.option_value }}" {% if p.unit == o.option_value or (not p.unit and o.is_default) %}selected{% endif %}>{{ o.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
           </div>
           {% endfor %}
@@ -32,7 +38,13 @@
             <label>Finish<input type="text" name="product_finish[0]" placeholder="e.g. Polished"></label>
             <label>Qty<input type="text" name="product_quantity[0]" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="product_quantity_tbc[0]" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
-            <label>Unit<input type="text" name="product_unit[0]" placeholder="SQM/PCS"></label>
+            <label>Unit
+              <select name="product_unit[0]">
+                {% for o in units %}
+                  <option value="{{ o.option_value }}" {% if o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
           </div>
         {% endif %}

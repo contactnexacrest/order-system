@@ -22,7 +22,14 @@
           <label>Finish<input type="text" name="product_finish[<?= $idx ?>]" value="<?= htmlspecialchars($p['finish'] ?? '') ?>" placeholder="e.g. Polished"></label>
           <label>Qty<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
           <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
-          <label>Unit<input type="text" name="product_unit[<?= $idx ?>]" value="<?= htmlspecialchars($p['unit'] ?? '') ?>" placeholder="SQM/PCS"></label>
+          <label>Unit
+            <select name="product_unit[<?= $idx ?>]">
+              <?php $__unitVal = (string) ($p['unit'] ?? ''); ?>
+              <?php foreach ($units as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitVal === $o['option_value'] || ($__unitVal === '' && $o['is_default'])) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
         </div>
         <?php endforeach; ?>

@@ -8,6 +8,7 @@ use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
 use App\Helpers\View;
 use App\Repositories\HsCodeRepository;
+use App\Repositories\LookupRepository;
 use App\Repositories\OrderReorderRequestRepository;
 use App\Services\AuthService;
 use App\Services\OrderDuplicationService;
@@ -47,6 +48,7 @@ final class ReorderRequestController
             'request'  => $request,
             'lines'    => OrderReorderRequestRepository::productLines($id),
             'hsCodes'  => HsCodeRepository::active(),
+            'units'    => LookupRepository::dropdownOptions('unit'),
         ], 'layout/base');
     }
 

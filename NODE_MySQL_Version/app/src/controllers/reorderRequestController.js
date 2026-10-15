@@ -3,6 +3,7 @@
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
 const hsCodeRepository = require('../repositories/hsCodeRepository');
+const lookupRepository = require('../repositories/lookupRepository');
 const orderReorderRequestRepository = require('../repositories/orderReorderRequestRepository');
 const orderDuplicationService = require('../services/orderDuplicationService');
 
@@ -32,6 +33,7 @@ async function show(req, res) {
     request,
     lines: await orderReorderRequestRepository.productLines(id),
     hsCodes: await hsCodeRepository.active(),
+    units: await lookupRepository.dropdownOptions('unit'),
   }, 'layout/base');
 }
 

@@ -32,7 +32,12 @@
               </label>
               <label><input type="checkbox" name="quantity_is_tbc[<?= $i ?>]" value="1" style="display:inline-block;width:auto;" <?= $l['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
               <label>Unit
-                <input type="text" name="unit[<?= $i ?>]" value="<?= htmlspecialchars($l['unit'] ?? '') ?>" placeholder="SQM/PCS">
+                <select name="unit[<?= $i ?>]">
+                  <?php $__unitVal = (string) ($l['unit'] ?? ''); ?>
+                  <?php foreach ($units as $o): ?>
+                    <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+                  <?php endforeach; ?>
+                </select>
               </label>
               <label>Unit Price *
                 <input type="text" name="unit_price[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00">

@@ -90,7 +90,13 @@
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($old['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates"></label>
         <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_gross_weight_kg'] ?? '')) ?>" placeholder="e.g. 2400"></label>
         <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_net_weight_kg'] ?? '')) ?>" placeholder="e.g. 2100"></label>
-        <label class="full">Package Type<input type="text" name="estimated_package_type" value="<?= htmlspecialchars((string) ($old['estimated_package_type'] ?? '')) ?>" placeholder="e.g. Wooden Crates"></label>
+        <label class="full">Package Type
+          <select name="estimated_package_type">
+            <?php foreach ($packageTypes as $o): ?>
+              <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= (($old['estimated_package_type'] ?? '') === $o['option_value']) ? 'selected' : ((($old['estimated_package_type'] ?? '') === '' && $o['is_default']) ? 'selected' : '') ?>><?= htmlspecialchars($o['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
       </div>
     </fieldset>
 
@@ -119,7 +125,14 @@
           <label>Dimensions<input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish<input type="text" name="product_finish[]" value="<?= htmlspecialchars((string) ($old['product_finish'][$__i] ?? '')) ?>" placeholder="e.g. Polished"></label>
           <label>Qty<input type="text" name="product_quantity[]" value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"></label>
-          <label>Unit<input type="text" name="product_unit[]" value="<?= htmlspecialchars((string) ($old['product_unit'][$__i] ?? '')) ?>" placeholder="SQM/PCS"></label>
+          <label>Unit
+            <select name="product_unit[]">
+              <?php $__unitVal = (string) ($old['product_unit'][$__i] ?? ''); ?>
+              <?php foreach ($units as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitVal === $o['option_value'] || ($__unitVal === '' && $o['is_default'])) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <label>Unit Price<input type="text" name="product_unit_price[]" value="<?= htmlspecialchars((string) ($old['product_unit_price'][$__i] ?? '')) ?>" placeholder="e.g. 45.00"></label>
           <label>HS Code<input type="text" name="product_hs_code[]" value="<?= htmlspecialchars((string) ($old['product_hs_code'][$__i] ?? '')) ?>" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">

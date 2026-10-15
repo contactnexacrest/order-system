@@ -16,6 +16,7 @@ const disputeRepository = require('../repositories/disputeRepository');
 const documentRepository = require('../repositories/documentRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const lookupRepository = require('../repositories/lookupRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
@@ -292,6 +293,7 @@ async function showReorderForm(req, res) {
     client: await clientPortalService.currentClient(req),
     order,
     products: await orderProductRepository.forOrder(orderId),
+    units: await lookupRepository.dropdownOptions('unit'),
   }, 'layout/client');
 }
 

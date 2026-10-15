@@ -432,7 +432,30 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
   ('export_benefit_scheme', 'RODTEP', 1, 1, 1),
   ('export_benefit_scheme', 'Duty Drawback', 2, 0, 1),
   ('export_benefit_scheme', 'RoSCTL', 3, 0, 1),
-  ('export_benefit_scheme', 'Other', 4, 0, 1);
+  ('export_benefit_scheme', 'Other', 4, 0, 1),
+  -- 90-item backlog #43: the product-line/Supplier-PO Unit field was
+  -- plain free text ("SQM/PCS" was only ever a placeholder hint) — this
+  -- gives it the same admin-editable dropdown treatment as every other
+  -- list on this page, still writing the same plain string into the
+  -- existing unit VARCHAR column (no schema change).
+  ('unit', 'PCS', 1, 1, 1),
+  ('unit', 'SQM', 2, 0, 1),
+  ('unit', 'SET', 3, 0, 1),
+  ('unit', 'BOX', 4, 0, 1),
+  ('unit', 'SQFT', 5, 0, 1),
+  ('unit', 'MT', 6, 0, 1),
+  ('unit', 'KG', 7, 0, 1),
+  ('unit', 'NOS', 8, 0, 1),
+  ('unit', 'CBM', 9, 0, 1),
+  -- 90-item backlog #66: Package Type was plain free text defaulting to
+  -- the literal hardcoded string 'Wooden Crates' — this is default=1 for
+  -- the exact same reason, so an order's package type is byte-identical
+  -- to before this change until an admin actually edits the list.
+  ('package_type', 'Wooden Crates', 1, 1, 1),
+  ('package_type', 'Wooden Pallets', 2, 0, 1),
+  ('package_type', 'Cartons', 3, 0, 1),
+  ('package_type', 'Bundles', 4, 0, 1),
+  ('package_type', 'Loose (Break Bulk)', 5, 0, 1);
 
 -- ================================================================
 -- FILE_UPLOAD_CONTEXTS — Phase D wires up the first two of these

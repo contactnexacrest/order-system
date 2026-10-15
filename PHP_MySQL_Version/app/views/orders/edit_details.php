@@ -96,7 +96,13 @@
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($order['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates"></label>
         <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_gross_weight_kg'] ?? '')) ?>" placeholder="e.g., 1200"></label>
         <label>Net Weight (kg)<input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_net_weight_kg'] ?? '')) ?>" placeholder="e.g., 1000"></label>
-        <label class="full">Package Type<input type="text" name="estimated_package_type" value="<?= htmlspecialchars((string) ($order['estimated_package_type'] ?? '')) ?>" placeholder="e.g. Wooden Crates"></label>
+        <label class="full">Package Type
+          <select name="estimated_package_type">
+            <?php foreach ($packageTypes as $o): ?>
+              <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ((string) ($order['estimated_package_type'] ?? '') === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
       </div>
     </fieldset>
 

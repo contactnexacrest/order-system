@@ -16,6 +16,7 @@ use App\Repositories\DocumentRepository;
 use App\Repositories\EmailTemplateRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\HsCodeRepository;
+use App\Repositories\LookupRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
@@ -301,6 +302,7 @@ final class ClientPortalController
             'client' => ClientPortalService::currentClient(),
             'order' => $order,
             'products' => OrderProductRepository::forOrder($orderId),
+            'units' => LookupRepository::dropdownOptions('unit'),
         ], 'layout/client');
     }
 

@@ -95,7 +95,13 @@
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="{{ order.estimated_package_count or '' }}" placeholder="e.g. 45 crates"></label>
         <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="{{ order.estimated_gross_weight_kg or '' }}" placeholder="e.g., 1200"></label>
         <label>Net Weight (kg)<input type="text" name="estimated_net_weight_kg" value="{{ order.estimated_net_weight_kg or '' }}" placeholder="e.g., 1000"></label>
-        <label class="full">Package Type<input type="text" name="estimated_package_type" value="{{ order.estimated_package_type or '' }}" placeholder="e.g. Wooden Crates"></label>
+        <label class="full">Package Type
+          <select name="estimated_package_type">
+            {% for o in packageTypes %}
+              <option value="{{ o.option_value }}" {% if order.estimated_package_type == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
+            {% endfor %}
+          </select>
+        </label>
       </div>
     </fieldset>
 

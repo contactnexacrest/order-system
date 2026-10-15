@@ -338,7 +338,13 @@
               <label>Finish<input type="text" name="finish" value="{{ p.finish or '' }}"></label>
               <label>Qty<input type="text" name="quantity" value="{{ p.quantity or '' }}"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
-              <label>Unit<input type="text" name="unit" value="{{ p.unit or '' }}"></label>
+              <label>Unit
+                <select name="unit">
+                  {% for o in units %}
+                    <option value="{{ o.option_value }}" {% if p.unit == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
               <label>Unit Price<input type="text" name="unit_price" value="{{ p.unit_price or '' }}"></label>
               <label>HS Code<input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" required></label>
             </div>
@@ -371,7 +377,13 @@
             <label>Finish<input type="text" name="finish"></label>
             <label>Qty<input type="text" name="quantity"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
-            <label>Unit<input type="text" name="unit"></label>
+            <label>Unit
+              <select name="unit">
+                {% for o in units %}
+                  <option value="{{ o.option_value }}" {% if o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
             <label>Unit Price<input type="text" name="unit_price"></label>
             <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
           </div>
@@ -1155,7 +1167,13 @@
           <label>Dimensions<input type="text" name="dimensions"></label>
           <label>Dimensional Tolerance<input type="text" name="dimensional_tolerance"></label>
           <label>Quantity<input type="text" name="quantity"></label>
-          <label>Unit<input type="text" name="unit"></label>
+          <label>Unit
+            <select name="unit">
+              {% for o in units %}
+                <option value="{{ o.option_value }}" {% if o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label>Colour Reference<input type="text" name="colour_reference"></label>
           <label>Special Requirements/Instructions<input type="text" name="special_requirements"></label>
           <label>Unit Price (INR)<input type="text" name="unit_price_inr"></label>

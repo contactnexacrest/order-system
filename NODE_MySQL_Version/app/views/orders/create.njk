@@ -89,7 +89,13 @@
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="{{ old.estimated_package_count or '' }}" placeholder="e.g. 45 crates"></label>
         <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="{{ old.estimated_gross_weight_kg or '' }}" placeholder="e.g. 2400"></label>
         <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="{{ old.estimated_net_weight_kg or '' }}" placeholder="e.g. 2100"></label>
-        <label class="full">Package Type<input type="text" name="estimated_package_type" value="{{ old.estimated_package_type or '' }}" placeholder="e.g. Wooden Crates"></label>
+        <label class="full">Package Type
+          <select name="estimated_package_type">
+            {% for o in packageTypes %}
+              <option value="{{ o.option_value }}" {% if old.estimated_package_type %}{% if old.estimated_package_type == o.option_value %}selected{% endif %}{% elif o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
+            {% endfor %}
+          </select>
+        </label>
       </div>
     </fieldset>
 
@@ -117,7 +123,14 @@
           <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish<input type="text" name="product_finish[]" value="{{ old.product_finish[loop.index0] or '' if old.product_finish else '' }}" placeholder="e.g. Polished"></label>
           <label>Qty<input type="text" name="product_quantity[]" value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}" placeholder="e.g. 100"></label>
-          <label>Unit<input type="text" name="product_unit[]" value="{{ old.product_unit[loop.index0] or '' if old.product_unit else '' }}" placeholder="SQM/PCS"></label>
+          <label>Unit
+            {% set unitVal = (old.product_unit[loop.index0] or '') if old.product_unit else '' %}
+            <select name="product_unit[]">
+              {% for o in units %}
+                <option value="{{ o.option_value }}" {% if unitVal == o.option_value or (unitVal == '' and o.is_default) %}selected{% endif %}>{{ o.option_value }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label>Unit Price<input type="text" name="product_unit_price[]" value="{{ old.product_unit_price[loop.index0] or '' if old.product_unit_price else '' }}" placeholder="e.g. 45.00"></label>
           <label>HS Code<input type="text" name="product_hs_code[]" value="{{ old.product_hs_code[loop.index0] or '' if old.product_hs_code else '' }}" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">

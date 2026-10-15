@@ -412,7 +412,14 @@ foreach ($stages as $s) {
               <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
               <label>Qty<input type="text" name="quantity" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
-              <label>Unit<input type="text" name="unit" value="<?= htmlspecialchars($p['unit'] ?? '') ?>"></label>
+              <label>Unit
+                <select name="unit">
+                  <?php $__unitVal = (string) ($p['unit'] ?? ''); ?>
+                  <?php foreach ($units as $o): ?>
+                    <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </label>
               <label>Unit Price<input type="text" name="unit_price" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
               <label>HS Code<input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" required></label>
             </div>
@@ -445,7 +452,13 @@ foreach ($stages as $s) {
             <label>Finish<input type="text" name="finish"></label>
             <label>Qty<input type="text" name="quantity"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
-            <label>Unit<input type="text" name="unit"></label>
+            <label>Unit
+              <select name="unit">
+                <?php foreach ($units as $o): ?>
+                  <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
             <label>Unit Price<input type="text" name="unit_price"></label>
             <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
           </div>
@@ -1262,7 +1275,13 @@ foreach ($stages as $s) {
           <label>Dimensions<input type="text" name="dimensions"></label>
           <label>Dimensional Tolerance<input type="text" name="dimensional_tolerance"></label>
           <label>Quantity<input type="text" name="quantity"></label>
-          <label>Unit<input type="text" name="unit"></label>
+          <label>Unit
+            <select name="unit">
+              <?php foreach ($units as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <label>Colour Reference<input type="text" name="colour_reference"></label>
           <label>Special Requirements/Instructions<input type="text" name="special_requirements"></label>
           <label>Unit Price (INR)<input type="text" name="unit_price_inr"></label>
