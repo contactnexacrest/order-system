@@ -47,7 +47,7 @@
       <p class="muted">No settlement legs have been cleared yet.</p>
     <?php else: ?>
       <table class="list">
-        <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th><th>Zoho Books</th></tr>
+        <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Exchange Rate</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th><th>Zoho Books</th></tr>
         <?php foreach ($settlements as $s): ?>
         <tr>
           <td><a href="/orders/<?= (int) $s['order_id'] ?>"><?= htmlspecialchars($s['buyer_inquiry_ref']) ?></a></td>
@@ -55,6 +55,7 @@
           <td><?= htmlspecialchars(ucfirst($s['leg'])) ?></td>
           <td><?= $s['foreign_amount'] !== null ? number_format((float) $s['foreign_amount'], 2) : '—' ?></td>
           <td><?= htmlspecialchars($s['currency_code']) ?></td>
+          <td><?= $s['exchange_rate'] !== null ? number_format((float) $s['exchange_rate'], 4) : '—' ?></td>
           <td><?= htmlspecialchars((string) $s['cleared_at']) ?></td>
           <td>
             <?php if ($s['inr_actual'] !== null): ?>

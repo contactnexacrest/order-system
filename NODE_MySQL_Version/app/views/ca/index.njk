@@ -47,7 +47,7 @@
       <p class="muted">No settlement legs have been cleared yet.</p>
     {% else %}
       <table class="list">
-        <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th><th>Zoho Books</th></tr>
+        <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Exchange Rate</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th><th>Zoho Books</th></tr>
         {% for s in settlements %}
         <tr>
           <td><a href="/orders/{{ s.order_id }}">{{ s.buyer_inquiry_ref }}</a></td>
@@ -55,6 +55,7 @@
           <td>{{ s.leg | capitalize }}</td>
           <td>{{ (s.foreign_amount | money) if s.foreign_amount != null else '—' }}</td>
           <td>{{ s.currency_code }}</td>
+          <td>{{ (s.exchange_rate | rate4) if s.exchange_rate != null else '—' }}</td>
           <td>{{ s.cleared_at }}</td>
           <td>
             {% if s.inr_actual != null %}
