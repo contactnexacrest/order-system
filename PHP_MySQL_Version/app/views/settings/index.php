@@ -8,9 +8,14 @@
 
   <form method="post" action="/settings/update" onsubmit="return confirmSettingsSave(this);">
     <?= Csrf::field() ?>
+    <div class="settings-toolbar">
+      <button type="button" class="btn-sm" onclick="toggleAllSettingsSections(true)">Expand all</button>
+      <button type="button" class="btn-sm" onclick="toggleAllSettingsSections(false)">Collapse all</button>
+    </div>
     <?php foreach ($grouped as $category => $rows): ?>
+      <details class="settings-section" data-category="<?= htmlspecialchars($category) ?>" open>
+      <summary><?= htmlspecialchars(ucfirst($category)) ?> <span class="muted small settings-section-count">(<?= count($rows) ?>)</span></summary>
       <fieldset>
-        <legend><?= htmlspecialchars(ucfirst($category)) ?></legend>
         <?php foreach ($rows as $row): ?>
           <?php $lockedToSuperAdmin = $row['requires_super_admin'] && !$isSuperAdmin; ?>
           <label class="setting-row<?= $row['is_protected'] ? ' protected-row' : '' ?>">
@@ -91,6 +96,7 @@
           </label>
         <?php endforeach; ?>
       </fieldset>
+      </details>
     <?php endforeach; ?>
     <label>Reason for this change * <small class="muted">(mandatory — recorded in the audit log against every field you change below)</small>
       <textarea name="reason" id="settings-reason" rows="2" required></textarea>
@@ -121,6 +127,28 @@
   <?php endif; ?>
 </div>
 <script>
+/* 90-item backlog #27: ~20 settings categories as plain <details>/<summary>
+   sections (no library) so each one is collapsible independently; open/closed
+   state is remembered per category (and per browser) via localStorage so a
+   staff member who collapses the sections they never touch doesn't have to
+   redo that every time they open this page. Inputs inside a closed <details>
+   still submit normally, so collapsing a section never drops its values. */
+document.querySelectorAll('.settings-section[data-category]').forEach(function (details) {
+  var storageKey = 'settings-section-open:' + details.dataset.category;
+  try {
+    var stored = localStorage.getItem(storageKey);
+    if (stored !== null) { details.open = stored === '1'; }
+  } catch (e) { /* ignore — storage unavailable, keep the default open state */ }
+  details.addEventListener('toggle', function () {
+    try { localStorage.setItem(storageKey, details.open ? '1' : '0'); } catch (e) { /* ignore */ }
+  });
+});
+function toggleAllSettingsSections(open) {
+  document.querySelectorAll('.settings-section[data-category]').forEach(function (details) {
+    details.open = open;
+    try { localStorage.setItem('settings-section-open:' + details.dataset.category, open ? '1' : '0'); } catch (e) { /* ignore */ }
+  });
+}
 function unlockRow(btn) {
   var label = btn.closest('.setting-row');
   var field = label.querySelector('input[type=text][data-key], input[type=checkbox][data-key], textarea[data-key], select[data-key]');

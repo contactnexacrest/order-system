@@ -175,6 +175,17 @@ button:hover{background:var(--navy-strong);}
 .field-invalid{border-color:var(--danger) !important;}
 fieldset{border:1px solid var(--line);border-radius:10px;margin-bottom:1.25rem;padding:1rem 1.25rem;}
 legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capitalize;}
+/* 90-item backlog #27: ~20 Settings categories as plain <details>/<summary>
+   sections — same no-JS-required pattern as .nav-group above — so each one
+   collapses independently instead of being one long unbroken scroll. */
+.settings-toolbar{display:flex;gap:0.6rem;margin-bottom:0.75rem;}
+.settings-section{border:1px solid var(--line);border-radius:10px;margin-bottom:1rem;}
+.settings-section summary{cursor:pointer;padding:0.75rem 1.25rem;font-weight:700;color:var(--navy);text-transform:capitalize;list-style:none;display:flex;align-items:center;gap:0.5rem;}
+.settings-section summary::-webkit-details-marker{display:none;}
+.settings-section summary::after{content:"\25BE";margin-left:auto;opacity:0.6;font-size:0.8em;}
+.settings-section[open]>summary::after{content:"\25B4";}
+.settings-section-count{font-weight:400;text-transform:none;}
+.settings-section fieldset{border:none;border-top:1px solid var(--line);border-radius:0;margin:0;padding:1rem 1.25rem;}
 .setting-row{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--line);padding:0.5rem 0;margin-bottom:0;}
 .setting-label{flex:0 0 45%;min-width:0;overflow-wrap:break-word;font-size:0.85rem;color:var(--ink);}
 .setting-row input{flex:1;margin-top:0;}

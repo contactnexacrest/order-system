@@ -1,0 +1,60 @@
+'use strict';
+
+const request = require('supertest');
+const app = require('../../src/server');
+const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
+const db = require('../../src/config/db');
+
+function extractCsrf(html) {
+  const m = html.match(/name="_csrf"\s+value="([^"]+)"/);
+  if (!m) throw new Error('CSRF token not found in response HTML');
+  return m[1];
+}
+
+/**
+ * Port of SettingsCollapsibleSectionsTest.php. 90-item backlog #27: the
+ * Settings screen renders ~20 <fieldset> categories as one long unbroken
+ * scroll with no way to collapse a category you don't need right now.
+ * Fixed by wrapping each category's fieldset in a plain <details>/<summary>
+ * section plus Expand all/Collapse all buttons. Inputs inside a closed
+ * <details> still submit normally, so this is a pure presentation change
+ * with no effect on what gets saved.
+ */
+describe('Settings collapsible sections (90-item backlog #27)', () => {
+  let agent;
+
+  beforeAll(async () => {
+    agent = request.agent(app);
+    const loginPage = await agent.get('/login');
+    const loginCsrf = extractCsrf(loginPage.text);
+    const loginRes = await agent.post('/login').type('form').send({ _csrf: loginCsrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
+    expect(loginRes.status).toBe(302);
+    expect(loginRes.headers.location).not.toBe('/login');
+  });
+
+  afterAll(async () => {
+    await db.pool.end();
+  });
+
+  it('each settings category is wrapped in a collapsible details section', async () => {
+    const res = await agent.get('/settings');
+    expect(res.status).toBe(200);
+
+    expect(res.text).toMatch(/<details class="settings-section" data-category="company"[^>]*>\s*<summary>Company/s);
+    expect(res.text).toContain('<div class="settings-toolbar">');
+    expect(res.text).toContain('toggleAllSettingsSections(true)');
+    expect(res.text).toContain('toggleAllSettingsSections(false)');
+  });
+
+  it('fields remain inside the fieldset nested within the details section', async () => {
+    const res = await agent.get('/settings');
+
+    expect(res.text).toMatch(/<details class="settings-section" data-category="company"[^>]*>[\s\S]*?<fieldset>[\s\S]*?name="settings\[/);
+  });
+
+  it('details sections default to open so no field is hidden on first load', async () => {
+    const res = await agent.get('/settings');
+
+    expect(res.text).toMatch(/<details class="settings-section" data-category="[^"]+"\s+open>/);
+  });
+});
