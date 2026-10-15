@@ -9,6 +9,7 @@
       <label>Preset Name *<input type="text" name="preset_name" required placeholder="e.g. Trial Order — 20% Advance"></label>
       <label><input type="checkbox" name="is_default" value="1"> Default preset (pre-selected on the order-creation form)</label>
       <label><input type="checkbox" name="requires_md_approval" value="1"> Requires MD approval before an order can use this preset</label>
+      <label><input type="checkbox" name="show_bl_instructions" value="1" checked> Include BL Type / BL Consignee Instruction on the generated BL Instruction Sheet <small class="muted">(uncheck for payment terms that don't need NexaCrest to retain the BL as leverage, e.g. balance paid before shipment)</small></label>
     </fieldset>
 
     <fieldset>

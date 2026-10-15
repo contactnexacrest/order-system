@@ -61,11 +61,11 @@ final class PaymentPresetRepository
             'INSERT INTO payment_presets
                 (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct,
                  balance_trigger_option, balance_days, balance_trigger_wording, currency_id,
-                 requires_md_approval, is_active, created_by)
+                 requires_md_approval, show_bl_instructions, is_active, created_by)
              VALUES
                 (:preset_name, :is_default, :advance_pct, :advance_trigger_text, :balance_pct,
                  :balance_trigger_option, :balance_days, :balance_trigger_wording, :currency_id,
-                 :requires_md_approval, 1, :created_by)'
+                 :requires_md_approval, :show_bl_instructions, 1, :created_by)'
         );
         $stmt->execute(self::bindData($data) + ['created_by' => $createdBy]);
         $id = (int) $pdo->lastInsertId();
@@ -84,7 +84,7 @@ final class PaymentPresetRepository
                 advance_trigger_text = :advance_trigger_text, balance_pct = :balance_pct,
                 balance_trigger_option = :balance_trigger_option, balance_days = :balance_days,
                 balance_trigger_wording = :balance_trigger_wording, currency_id = :currency_id,
-                requires_md_approval = :requires_md_approval
+                requires_md_approval = :requires_md_approval, show_bl_instructions = :show_bl_instructions
              WHERE id = :id'
         )->execute(self::bindData($data) + ['id' => $id]);
 
@@ -128,6 +128,7 @@ final class PaymentPresetRepository
             'balance_trigger_wording' => $data['balance_trigger_wording'] ?? null,
             'currency_id'             => $data['currency_id'],
             'requires_md_approval'    => !empty($data['requires_md_approval']) ? 1 : 0,
+            'show_bl_instructions'    => !empty($data['show_bl_instructions']) ? 1 : 0,
         ];
     }
 }

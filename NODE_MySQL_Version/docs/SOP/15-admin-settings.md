@@ -181,7 +181,14 @@ mistake (or malice).
   Option** (Before Shipment vs. Against Scanned BL Copy), **Balance
   Days**, a **Currency**, a **Default** flag (exactly one preset may be
   default — saving one as default silently clears the flag on every
-  other preset), and whether it **Requires MD Approval**. Creating a new
+  other preset), whether it **Requires MD Approval**, and whether it
+  **Includes BL Type / BL Consignee Instruction** on the generated BL
+  Instruction Sheet (90-item backlog #32) — unchecking this on a preset
+  omits both rows from every Stage 7 BL Instruction Sheet generated for
+  orders on it, for payment terms (e.g. balance paid before shipment)
+  that don't need NexaCrest to retain the BL as leverage; both seeded
+  presets ship with it checked, reproducing the sheet's content exactly
+  as before this field existed. Creating a new
   preset — say a 20% advance / 80% balance trial-order preset — needs no
   further code change anywhere: every order on that preset calculates
   its advance/balance amounts and prints the right percentages

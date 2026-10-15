@@ -178,6 +178,7 @@ final class PaymentPresetController
             'balance_trigger_wording' => $balanceTriggerWording ?: null,
             'currency_id'             => $currencyId,
             'requires_md_approval'    => !empty($_POST['requires_md_approval']),
+            'show_bl_instructions'    => !empty($_POST['show_bl_instructions']),
         ];
     }
 }

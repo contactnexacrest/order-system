@@ -1284,12 +1284,16 @@ final class DocxDocumentBuilder
             $run2->addText('Reason: ', ['bold' => true, 'color' => DocxComponents::RED_TEXT]);
             $run2->addText('NexaCrest payment terms are ' . self::g($context['financial'] ?? [], 'advance_pct') . '% advance + ' . self::g($context['financial'] ?? [], 'balance_pct') . '% balance payable against the original BL. NexaCrest retains all 3 original BLs and only releases them to the buyer AFTER the balance T/T is received and cleared in the NexaCrest bank account. Under a Sea Waybill or Express BL, the buyer can collect the cargo without surrendering any document — NexaCrest would lose all financial leverage and may not receive the balance. A Sea Waybill must NEVER be issued for NexaCrest shipments.', ['color' => DocxComponents::RED_SUB]);
         });
-        DocxComponents::addKvTable($section, [
-            ['label' => 'BL Type *', 'value' => self::g($bl, 'type_instruction')],
-            ['label' => 'No. of Original Copies *', 'value' => '3 (three originals) — NexaCrest will hold all 3 originals until balance payment is received.'],
-            ['label' => 'No. of Non-Negotiable Copies', 'value' => '3 — for buyer records and NexaCrest file; released freely.'],
-            ['label' => 'BL Consignee Instruction *', 'value' => self::g($bl, 'consignee_instruction') . ' — ensures the BL is to NexaCrest\'s order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.'],
-        ], true);
+        $blRows = [];
+        if (($bl['type_instruction'] ?? null) !== null) {
+            $blRows[] = ['label' => 'BL Type *', 'value' => self::g($bl, 'type_instruction')];
+        }
+        $blRows[] = ['label' => 'No. of Original Copies *', 'value' => '3 (three originals) — NexaCrest will hold all 3 originals until balance payment is received.'];
+        $blRows[] = ['label' => 'No. of Non-Negotiable Copies', 'value' => '3 — for buyer records and NexaCrest file; released freely.'];
+        if (($bl['consignee_instruction'] ?? null) !== null) {
+            $blRows[] = ['label' => 'BL Consignee Instruction *', 'value' => self::g($bl, 'consignee_instruction') . ' — ensures the BL is to NexaCrest\'s order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.'];
+        }
+        DocxComponents::addKvTable($section, $blRows, true);
         DocxComponents::addColorBox($section, DocxComponents::BLUE_BG, '042C53', function (AbstractContainer $cell) {
             $run = $cell->addTextRun();
             $run->addText('Original BL release process: ', ['bold' => true]);

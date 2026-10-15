@@ -33,6 +33,7 @@ function bindData(data) {
     balance_trigger_wording: data.balance_trigger_wording ?? null,
     currency_id: data.currency_id,
     requires_md_approval: data.requires_md_approval ? 1 : 0,
+    show_bl_instructions: data.show_bl_instructions ? 1 : 0,
   };
 }
 
@@ -64,11 +65,11 @@ async function create(data, createdBy) {
     `INSERT INTO payment_presets
         (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct,
          balance_trigger_option, balance_days, balance_trigger_wording, currency_id,
-         requires_md_approval, is_active, created_by)
+         requires_md_approval, show_bl_instructions, is_active, created_by)
      VALUES
         (:preset_name, :is_default, :advance_pct, :advance_trigger_text, :balance_pct,
          :balance_trigger_option, :balance_days, :balance_trigger_wording, :currency_id,
-         :requires_md_approval, 1, :created_by)`,
+         :requires_md_approval, :show_bl_instructions, 1, :created_by)`,
     { ...bindData(data), created_by: createdBy }
   );
   const id = result.insertId;
@@ -86,7 +87,7 @@ async function update(id, data) {
         advance_trigger_text = :advance_trigger_text, balance_pct = :balance_pct,
         balance_trigger_option = :balance_trigger_option, balance_days = :balance_days,
         balance_trigger_wording = :balance_trigger_wording, currency_id = :currency_id,
-        requires_md_approval = :requires_md_approval
+        requires_md_approval = :requires_md_approval, show_bl_instructions = :show_bl_instructions
      WHERE id = :id`,
     { ...bindData(data), id }
   );

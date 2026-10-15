@@ -79,6 +79,7 @@ function collectFormData(req) {
       balance_trigger_wording: balanceTriggerWording || null,
       currency_id: currencyId,
       requires_md_approval: !!req.body.requires_md_approval,
+      show_bl_instructions: !!req.body.show_bl_instructions,
     },
   };
 }

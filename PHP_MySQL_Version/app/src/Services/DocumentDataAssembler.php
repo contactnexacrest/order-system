@@ -217,7 +217,7 @@ final class DocumentDataAssembler
             'shipping'    => self::shippingBlock($orderId),
             'production'  => self::productionBlock($orderId),
             'annexure_products' => $annexureProducts,
-            'bl'          => self::blBlock($company['legal_name']),
+            'bl'          => self::blBlock($company['legal_name'], (bool) ($order['show_bl_instructions'] ?? true)),
         ] + $annexureFlags;
     }
 
@@ -228,9 +228,21 @@ final class DocumentDataAssembler
      * one-off exception goes through the existing unlock-request +
      * mandatory-reason + audit-log workflow instead of a source-code edit
      * that leaves no trail at all.
+     *
+     * 90-item backlog #32: $showBlInstructions is the order's resolved
+     * payment_presets.show_bl_instructions (via OrderRepository::find()'s
+     * pp.* join — no per-order override, this is a preset-level setting
+     * only). Some payment terms (e.g. balance paid before shipment) don't
+     * need NexaCrest to retain the BL as leverage, so both fields come
+     * back null rather than the actual instruction text — the BLI
+     * template/DOCX builder omit each row entirely when its value is
+     * null, rather than printing an empty "BL Type *" row.
      */
-    private static function blBlock(string $companyLegalName): array
+    private static function blBlock(string $companyLegalName, bool $showBlInstructions): array
     {
+        if (!$showBlInstructions) {
+            return ['type_instruction' => null, 'consignee_instruction' => null];
+        }
         $consigneeTemplate = CompanySettingsRepository::get('bl_consignee_instruction') ?? 'TO ORDER OF {company}';
         return [
             'type_instruction' => CompanySettingsRepository::get('bl_type_instruction'),

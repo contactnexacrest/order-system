@@ -112,6 +112,16 @@ CREATE TABLE payment_presets (
                                                        -- balanceTriggerSentence()), so older rows need no backfill.
   currency_id             BIGINT UNSIGNED NOT NULL,
   requires_md_approval    TINYINT(1) NOT NULL DEFAULT 0,  -- true for "established buyer" style presets
+  show_bl_instructions    TINYINT(1) NOT NULL DEFAULT 1,  -- 90-item backlog #32: whether the generated
+                                                           -- BL Instruction Sheet includes the BL Type and
+                                                           -- BL Consignee Instruction rows (company_settings
+                                                           -- bl_type_instruction/bl_consignee_instruction) for
+                                                           -- orders on this preset — some payment terms (e.g.
+                                                           -- balance paid before shipment, no BL leverage
+                                                           -- needed) don't need NexaCrest's BL-retention
+                                                           -- instruction. Defaults to 1 (include) so existing
+                                                           -- presets/orders render identically to before this
+                                                           -- column existed.
   is_active               TINYINT(1) NOT NULL DEFAULT 1,
   is_protected            TINYINT(1) NOT NULL DEFAULT 0,  -- true = cannot be edited/deactivated without
                                                            -- the unlock gesture; flag itself needs a

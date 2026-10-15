@@ -1382,17 +1382,16 @@ function renderBli(context) {
       ]),
     ])
   );
-  children.push(
-    ...C.kvTable(
-      [
-        { label: 'BL Type *', value: g(bl, 'type_instruction') },
-        { label: 'No. of Original Copies *', value: '3 (three originals) — NexaCrest will hold all 3 originals until balance payment is received.' },
-        { label: 'No. of Non-Negotiable Copies', value: '3 — for buyer records and NexaCrest file; released freely.' },
-        { label: 'BL Consignee Instruction *', value: `${g(bl, 'consignee_instruction')} — ensures the BL is to NexaCrest's order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.` },
-      ],
-      true
-    )
-  );
+  const blRows = [];
+  if ((bl.type_instruction ?? null) !== null) {
+    blRows.push({ label: 'BL Type *', value: g(bl, 'type_instruction') });
+  }
+  blRows.push({ label: 'No. of Original Copies *', value: '3 (three originals) — NexaCrest will hold all 3 originals until balance payment is received.' });
+  blRows.push({ label: 'No. of Non-Negotiable Copies', value: '3 — for buyer records and NexaCrest file; released freely.' });
+  if ((bl.consignee_instruction ?? null) !== null) {
+    blRows.push({ label: 'BL Consignee Instruction *', value: `${g(bl, 'consignee_instruction')} — ensures the BL is to NexaCrest's order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.` });
+  }
+  children.push(...C.kvTable(blRows, true));
   children.push(
     ...C.colorBox(C.BLUE_BG, '042C53', [
       C.rich([

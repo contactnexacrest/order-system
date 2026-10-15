@@ -214,7 +214,7 @@ async function assemble(orderId, documentTypeCode = null) {
     shipping: await shippingBlock(orderId),
     production: await productionBlock(orderId),
     annexure_products: annexureProducts,
-    bl: await blBlock(company.legal_name),
+    bl: await blBlock(company.legal_name, !!(order.show_bl_instructions ?? true)),
     ...annexureFlags,
   };
 }
@@ -225,8 +225,17 @@ async function assemble(orderId, documentTypeCode = null) {
  * governed, protected company_settings so a legitimate one-off exception
  * goes through the existing unlock-request + mandatory-reason + audit-log
  * workflow instead of a source-code edit that leaves no trail at all.
+ *
+ * showBlInstructions comes from the order's payment_presets.show_bl_instructions
+ * (90-item backlog #32) — some payment terms (e.g. balance paid before
+ * shipment, no BL leverage needed) don't need either row, and the admin
+ * controls that per-preset from the Payment Presets screen rather than a
+ * code change.
  */
-async function blBlock(companyLegalName) {
+async function blBlock(companyLegalName, showBlInstructions) {
+  if (!showBlInstructions) {
+    return { type_instruction: null, consignee_instruction: null };
+  }
   const consigneeTemplate = (await companySettingsRepository.get('bl_consignee_instruction')) || 'TO ORDER OF {company}';
   return {
     type_instruction: await companySettingsRepository.get('bl_type_instruction'),

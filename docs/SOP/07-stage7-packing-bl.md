@@ -47,6 +47,14 @@ Three things happen in this section, each building toward the BL:
    the shipping line/forwarder telling them exactly how to issue the Bill
    of Lading. Anything left blank in Shipping/Packing above shows as "To Be
    Confirmed" on the generated sheet.
+
+   The BL Type and BL Consignee Instruction rows only appear when the
+   order's payment preset has **"Include BL Type / BL Consignee
+   Instruction"** checked (Payment Presets, under Admin & Settings) — some
+   payment terms (e.g. balance paid before shipment) don't need NexaCrest
+   to retain the BL as leverage, so that preset can have the checkbox
+   unchecked and the sheet simply omits both rows for every order on it.
+   Both seeded presets ship with it checked (unchanged behavior).
 3. **Confirm BL Issued** — once the shipping line actually issues the BL,
    staff type its number in here. **This is the action that passes Stage
    7's gate.**
