@@ -46,10 +46,15 @@ describe('Order screen redesign (Point 2/4)', () => {
     expect(html).toContain('tag-hint">product only<');
   });
 
-  it('freight section explains why it is a range', () => {
+  // 90-item backlog #67 superseded this field's original behavior: the
+  // low/high range this test used to pin became a single indicative
+  // figure, and the literal "order currency" placeholder text became a
+  // live label reflecting the currency actually selected above — see
+  // freightInsuranceSingleValue.test.js for the full coverage of that change.
+  it('freight section explains the single indicative figure', () => {
     const html = createNjk();
-    expect(html).toContain('Why a range, not one figure');
-    expect(html).toContain('order currency');
+    expect(html).toContain('current indicative rate only');
+    expect(html).toContain('id="freight-currency-unit"');
   });
 
   it('order show page wraps all sections in the Concept C sidebar layout', () => {

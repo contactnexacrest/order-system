@@ -33,9 +33,9 @@
           </select>
         </label>
         <label>Currency *
-          <select name="currency_id" required>
+          <select name="currency_id" id="order-currency-select" required onchange="updateFreightCurrencyLabels(this)">
             <?php foreach ($currencies as $cur): ?>
-              <option value="<?= (int) $cur['id'] ?>" <?= (int) $cur['id'] === (int) $order['currency_id'] ? 'selected' : '' ?>><?= htmlspecialchars($cur['code']) ?> — <?= htmlspecialchars($cur['name']) ?></option>
+              <option value="<?= (int) $cur['id'] ?>" data-code="<?= htmlspecialchars($cur['code']) ?>" <?= (int) $cur['id'] === (int) $order['currency_id'] ? 'selected' : '' ?>><?= htmlspecialchars($cur['code']) ?> — <?= htmlspecialchars($cur['name']) ?></option>
             <?php endforeach; ?>
           </select>
         </label>
@@ -109,9 +109,8 @@
     <fieldset>
       <legend>Indicative Freight / Insurance <small class="muted">(only relevant when Incoterm is not FOB)</small></legend>
       <div class="field-grid">
-        <label>Freight — low<input type="text" name="indicative_freight_low" value="<?= htmlspecialchars((string) ($order['indicative_freight_low'] ?? '')) ?>" placeholder="e.g., 800"></label>
-        <label>Freight — high<input type="text" name="indicative_freight_high" value="<?= htmlspecialchars((string) ($order['indicative_freight_high'] ?? '')) ?>" placeholder="e.g., 1200"></label>
-        <label class="full">Insurance (indicative)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($order['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g., 150"></label>
+        <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit"><?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?></span></span>)<input type="text" name="indicative_freight_amount" value="<?= htmlspecialchars((string) ($order['indicative_freight_amount'] ?? '')) ?>" placeholder="e.g., 950"></label>
+        <label class="full">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit"><?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?></span></span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($order['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g., 150"></label>
       </div>
     </fieldset>
 
@@ -136,3 +135,17 @@
   </form>
   <?php endif; ?>
 </div>
+<script>
+// 90-item backlog #67: reflect the currently-selected currency live next to
+// Freight/Insurance, same as the New Order creation screen — this order
+// already has a saved currency, so the labels start correct on load, but
+// a staff member can still change the Currency dropdown here before saving.
+function updateFreightCurrencyLabels(selectEl) {
+  var opt = selectEl.options[selectEl.selectedIndex];
+  var code = (opt && opt.getAttribute('data-code')) || 'order currency';
+  var freightLabel = document.getElementById('freight-currency-unit');
+  var insuranceLabel = document.getElementById('insurance-currency-unit');
+  if (freightLabel) { freightLabel.textContent = code; }
+  if (insuranceLabel) { insuranceLabel.textContent = code; }
+}
+</script>

@@ -164,7 +164,7 @@ final class OrderRepository
                  port_of_loading_id, port_of_discharge_id, port_of_discharge_text, currency_id, coo_type,
                  include_annexure_a, special_requirements, container_type, estimated_total_cbm,
                  estimated_gross_weight_kg, estimated_net_weight_kg, estimated_package_count,
-                 estimated_package_type, est_lead_time_text, indicative_freight_low, indicative_freight_high,
+                 estimated_package_type, est_lead_time_text, indicative_freight_amount,
                  indicative_insurance_amount, buyers_po_ref, quotation_date, quotation_valid_until,
                  status, created_by, duplicated_from_order_id)
              VALUES
@@ -172,7 +172,7 @@ final class OrderRepository
                  :port_of_loading_id, :port_of_discharge_id, :port_of_discharge_text, :currency_id, :coo_type,
                  :include_annexure_a, :special_requirements, :container_type, :estimated_total_cbm,
                  :estimated_gross_weight_kg, :estimated_net_weight_kg, :estimated_package_count,
-                 :estimated_package_type, :est_lead_time_text, :indicative_freight_low, :indicative_freight_high,
+                 :estimated_package_type, :est_lead_time_text, :indicative_freight_amount,
                  :indicative_insurance_amount, :buyers_po_ref, :quotation_date, :quotation_valid_until,
                  \'active\', :created_by, :duplicated_from_order_id)'
         );
@@ -197,8 +197,7 @@ final class OrderRepository
             'estimated_package_count'     => $data['estimated_package_count'] ?? 'TBD at packing',
             'estimated_package_type'      => $data['estimated_package_type'] ?? 'Wooden Crates',
             'est_lead_time_text'          => $data['est_lead_time_text'] ?? null,
-            'indicative_freight_low'      => $data['indicative_freight_low'] ?: null,
-            'indicative_freight_high'     => $data['indicative_freight_high'] ?: null,
+            'indicative_freight_amount'   => $data['indicative_freight_amount'] ?: null,
             'indicative_insurance_amount' => $data['indicative_insurance_amount'] ?: null,
             'buyers_po_ref'               => $data['buyers_po_ref'] ?? 'NIL',
             'quotation_date'              => $data['quotation_date'],
@@ -247,8 +246,7 @@ final class OrderRepository
                 estimated_net_weight_kg = :estimated_net_weight_kg,
                 estimated_package_count = :estimated_package_count,
                 estimated_package_type = :estimated_package_type,
-                indicative_freight_low = :indicative_freight_low,
-                indicative_freight_high = :indicative_freight_high,
+                indicative_freight_amount = :indicative_freight_amount,
                 indicative_insurance_amount = :indicative_insurance_amount
              WHERE id = :id'
         )->execute([
@@ -267,8 +265,7 @@ final class OrderRepository
             'estimated_net_weight_kg'     => $data['estimated_net_weight_kg'] ?: null,
             'estimated_package_count'     => $data['estimated_package_count'] ?: null,
             'estimated_package_type'      => $data['estimated_package_type'] ?: null,
-            'indicative_freight_low'      => $data['indicative_freight_low'] ?: null,
-            'indicative_freight_high'     => $data['indicative_freight_high'] ?: null,
+            'indicative_freight_amount'   => $data['indicative_freight_amount'] ?: null,
             'indicative_insurance_amount' => $data['indicative_insurance_amount'] ?: null,
             'id'                          => $orderId,
         ]);

@@ -79,8 +79,7 @@ final class OrderDuplicationService
                 'estimated_package_count'   => $source['estimated_package_count'],
                 'estimated_package_type'    => $source['estimated_package_type'],
                 'est_lead_time_text'    => $source['est_lead_time_text'],
-                'indicative_freight_low'  => $source['indicative_freight_low'],
-                'indicative_freight_high' => $source['indicative_freight_high'],
+                'indicative_freight_amount' => $source['indicative_freight_amount'],
                 'indicative_insurance_amount' => $source['indicative_insurance_amount'],
                 'buyers_po_ref'         => 'NIL', // the buyer's own ref is specific to each order — staff records the new one
                 'quotation_date'        => date('Y-m-d'),

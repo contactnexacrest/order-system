@@ -374,8 +374,7 @@ async function store(req, res) {
         estimated_package_count: str(body.estimated_package_count) || null,
         estimated_package_type: str(body.estimated_package_type) || null,
         est_lead_time_text: str(body.est_lead_time_text) || null,
-        indicative_freight_low: str(body.indicative_freight_low),
-        indicative_freight_high: str(body.indicative_freight_high),
+        indicative_freight_amount: str(body.indicative_freight_amount),
         indicative_insurance_amount: str(body.indicative_insurance_amount),
         buyers_po_ref: 'NIL',
         quotation_date: todayYmd(),
@@ -502,8 +501,7 @@ async function updateDetails(req, res) {
     estimated_net_weight_kg: str(body.estimated_net_weight_kg),
     estimated_package_count: str(body.estimated_package_count) || null,
     estimated_package_type: str(body.estimated_package_type) || null,
-    indicative_freight_low: str(body.indicative_freight_low),
-    indicative_freight_high: str(body.indicative_freight_high),
+    indicative_freight_amount: str(body.indicative_freight_amount),
     indicative_insurance_amount: str(body.indicative_insurance_amount),
   });
 

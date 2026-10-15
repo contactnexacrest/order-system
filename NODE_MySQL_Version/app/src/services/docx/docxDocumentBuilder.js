@@ -233,7 +233,7 @@ function renderQt(context) {
 
   const freightText = order.is_fob
     ? 'NIL — freight arranged by buyer.'
-    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_low', 'XXX')}–${g(order, 'indicative_freight_high', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Subject to confirmation at time of booking. Actual freight confirmed and recovered IN ADVANCE by Freight Debit Note when cargo is packed and ready — payment required within 3 working days, and must be received BEFORE shipment booking is confirmed.`;
+    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.`;
   const insuranceText = order.is_fob ? "NIL — buyer's responsibility." : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
   children.push(
     ...C.totalsTable([
@@ -367,7 +367,7 @@ function renderPi(context) {
 
   const freightText = order.is_fob
     ? 'NIL — freight arranged by buyer.'
-    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_low', 'XXX')}–${g(order, 'indicative_freight_high', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Subject to confirmation at time of booking. Actual freight confirmed and recovered IN ADVANCE by separate Freight Debit Note when cargo is packed and ready — payment required within 3 working days, and must be received BEFORE shipment booking is confirmed.`;
+    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.`;
   const insuranceText = order.is_fob ? "NIL — buyer's responsibility." : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
   children.push(
     ...C.totalsTable([

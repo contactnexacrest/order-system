@@ -380,8 +380,7 @@ final class OrderController
                     'estimated_package_count'   => trim((string) ($_POST['estimated_package_count'] ?? '')) ?: null,
                     'estimated_package_type'    => trim((string) ($_POST['estimated_package_type'] ?? '')) ?: null,
                     'est_lead_time_text'    => trim((string) ($_POST['est_lead_time_text'] ?? '')) ?: null,
-                    'indicative_freight_low'  => trim((string) ($_POST['indicative_freight_low'] ?? '')),
-                    'indicative_freight_high' => trim((string) ($_POST['indicative_freight_high'] ?? '')),
+                    'indicative_freight_amount' => trim((string) ($_POST['indicative_freight_amount'] ?? '')),
                     'indicative_insurance_amount' => trim((string) ($_POST['indicative_insurance_amount'] ?? '')),
                     'buyers_po_ref'         => 'NIL',
                     'quotation_date'        => date('Y-m-d'),
@@ -508,8 +507,7 @@ final class OrderController
             'estimated_net_weight_kg'     => trim((string) ($_POST['estimated_net_weight_kg'] ?? '')),
             'estimated_package_count'     => trim((string) ($_POST['estimated_package_count'] ?? '')) ?: null,
             'estimated_package_type'      => trim((string) ($_POST['estimated_package_type'] ?? '')) ?: null,
-            'indicative_freight_low'      => trim((string) ($_POST['indicative_freight_low'] ?? '')),
-            'indicative_freight_high'     => trim((string) ($_POST['indicative_freight_high'] ?? '')),
+            'indicative_freight_amount'   => trim((string) ($_POST['indicative_freight_amount'] ?? '')),
             'indicative_insurance_amount' => trim((string) ($_POST['indicative_insurance_amount'] ?? '')),
         ]);
 

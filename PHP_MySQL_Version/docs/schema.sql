@@ -3250,3 +3250,22 @@ ALTER TABLE pi_intake_submissions
   ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2,
   ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city,
   ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode;
+
+-- ================================================================
+-- SECTION BJ — INDICATIVE FREIGHT: SINGLE VALUE, NOT A RANGE (90-item
+-- backlog #67, added 2026-10-15)
+-- ================================================================
+-- indicative_freight_low/high asked staff for a two-figure range at New
+-- Order creation, before freight is ever actually booked — but nothing
+-- downstream (the QT/PI wording, the Freight Debit Note) ever used both
+-- ends independently; only ONE "indicative, subject to confirmation at
+-- booking" figure is ever shown either way, so the range read as asking
+-- for two real quotes rather than one placeholder estimate. Consolidated
+-- to a single indicative_freight_amount column. Existing
+-- indicative_freight_low values are preserved as the new single figure
+-- (the one every pre-existing order had populated first, and the more
+-- conservative of the two); indicative_freight_high is dropped.
+-- ================================================================
+ALTER TABLE orders
+  CHANGE COLUMN indicative_freight_low indicative_freight_amount DECIMAL(14,2) NULL,
+  DROP COLUMN indicative_freight_high;

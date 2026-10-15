@@ -37,9 +37,9 @@
           </select>
         </label>
         <label>Currency *<small class="muted">(this order's foreign trade currency — everything priced below is in this currency unless marked INR)</small>
-          <select name="currency_id" required>
+          <select name="currency_id" id="order-currency-select" required onchange="updateFreightCurrencyLabels(this)">
             <?php foreach ($currencies as $cur): ?>
-              <option value="<?= (int) $cur['id'] ?>" <?= isset($old['currency_id']) ? ((int) $cur['id'] === (int) $old['currency_id'] ? 'selected' : '') : ($cur['is_default'] ? 'selected' : '') ?>><?= htmlspecialchars($cur['code']) ?> — <?= htmlspecialchars($cur['name']) ?></option>
+              <option value="<?= (int) $cur['id'] ?>" data-code="<?= htmlspecialchars($cur['code']) ?>" <?= isset($old['currency_id']) ? ((int) $cur['id'] === (int) $old['currency_id'] ? 'selected' : '') : ($cur['is_default'] ? 'selected' : '') ?>><?= htmlspecialchars($cur['code']) ?> — <?= htmlspecialchars($cur['name']) ?></option>
             <?php endforeach; ?>
           </select>
         </label>
@@ -103,11 +103,10 @@
     <fieldset>
       <legend>Indicative Freight / Insurance <small class="muted">(only shown when Incoterm is not FOB)</small></legend>
       <div class="field-grid">
-        <label>Freight — low (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_low" value="<?= htmlspecialchars((string) ($old['indicative_freight_low'] ?? '')) ?>" placeholder="e.g. 850"></label>
-        <label>Freight — high (<span class="muted">order currency</span>)<input type="text" name="indicative_freight_high" value="<?= htmlspecialchars((string) ($old['indicative_freight_high'] ?? '')) ?>" placeholder="e.g. 1100"></label>
-        <label class="full">Insurance (indicative, <span class="muted">order currency</span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($old['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g. 120"></label>
+        <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">order currency</span></span>)<input type="text" name="indicative_freight_amount" value="<?= htmlspecialchars((string) ($old['indicative_freight_amount'] ?? '')) ?>" placeholder="e.g. 950"></label>
+        <label class="full">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($old['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g. 120"></label>
       </div>
-      <p class="muted small">Why a range, not one figure: ocean freight isn't booked yet at this stage, so rates can move before the actual booking. This low&ndash;high range is indicative only — the real rate is confirmed and recovered by Freight Debit Note once cargo is packed and ready (Stage 6).</p>
+      <p class="muted small">Ocean freight isn't booked yet at this stage, so rates can move before the actual booking. This is the current indicative rate only — the real rate is confirmed by Debit Note once cargo is packed and ready (Stage 6). Ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against the Debit Note, before the vessel is booked.</p>
     </fieldset>
 
     <fieldset>
@@ -169,6 +168,20 @@
   </form>
 </div>
 <script>
+// 90-item backlog #67: the Freight/Insurance hints used to say the literal
+// placeholder text "order currency" instead of the actual currency the
+// staff member just picked above — reflect the selected <option>'s
+// data-code live, since the order hasn't been saved yet at this screen.
+function updateFreightCurrencyLabels(selectEl) {
+  var opt = selectEl.options[selectEl.selectedIndex];
+  var code = (opt && opt.getAttribute('data-code')) || 'order currency';
+  var freightLabel = document.getElementById('freight-currency-unit');
+  var insuranceLabel = document.getElementById('insurance-currency-unit');
+  if (freightLabel) { freightLabel.textContent = code; }
+  if (insuranceLabel) { insuranceLabel.textContent = code; }
+}
+updateFreightCurrencyLabels(document.getElementById('order-currency-select'));
+
 document.getElementById('add-product-row').addEventListener('click', function () {
   var rows = document.getElementById('product-rows');
   var clone = rows.firstElementChild.cloneNode(true);

@@ -55,11 +55,18 @@ final class OrderScreenRedesignTest extends TestCase
         $this->assertStringContainsString('tag-hint">product only<', $html);
     }
 
-    public function testFreightSectionExplainsWhyItsARange(): void
+    /**
+     * 90-item backlog #67 superseded this field's original behavior: the
+     * low/high range this test used to pin became a single indicative
+     * figure, and the literal "order currency" placeholder text became a
+     * live label reflecting the currency actually selected above — see
+     * FreightInsuranceSingleValueTest for the full coverage of that change.
+     */
+    public function testFreightSectionExplainsTheSingleIndicativeFigure(): void
     {
         $html = $this->createPhp();
-        $this->assertStringContainsString('Why a range, not one figure', $html);
-        $this->assertStringContainsString('order currency', $html);
+        $this->assertStringContainsString('current indicative rate only', $html);
+        $this->assertStringContainsString('id="freight-currency-unit"', $html);
     }
 
     public function testOrderShowPageWrapsAllSectionsInConceptCSidebarLayout(): void

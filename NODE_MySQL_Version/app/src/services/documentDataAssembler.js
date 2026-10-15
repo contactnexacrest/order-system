@@ -133,8 +133,7 @@ async function assemble(orderId, documentTypeCode = null) {
       estimated_net_weight_kg: order.estimated_net_weight_kg,
       estimated_package_count: order.estimated_package_count,
       estimated_package_type: order.estimated_package_type,
-      indicative_freight_low: order.indicative_freight_low,
-      indicative_freight_high: order.indicative_freight_high,
+      indicative_freight_amount: order.indicative_freight_amount,
       indicative_insurance_amount: order.indicative_insurance_amount,
     },
     buyer: {
