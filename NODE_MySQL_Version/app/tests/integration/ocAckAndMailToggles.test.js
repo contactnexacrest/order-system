@@ -8,6 +8,8 @@ const emailDispatchService = require('../../src/services/emailDispatchService');
 const mailSenderService = require('../../src/services/mailSenderService');
 const stageGateService = require('../../src/services/stageGateService');
 const flash = require('../../src/helpers/flash');
+const permissionRepository = require('../../src/repositories/permissionRepository');
+const superAdminService = require('../../src/services/superAdminService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 /**
@@ -95,7 +97,19 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
 
   async function reqForUser(userId, orderId, body) {
     const user = await db.queryOne('SELECT * FROM users WHERE id = :id', { id: userId });
-    return { params: { id: String(orderId) }, body: body || {}, user, session: {}, permissions: await permissionsFor(userId, user.role_id) };
+    const permissions = await permissionsFor(userId, user.role_id);
+
+    // sessionAuth.js's required() middleware applies this same Super Admin
+    // short-circuit to req.permissions on every real request (every key
+    // forced true) — reproduced here so this helper doesn't under-grant
+    // relative to production for a Super Admin test user.
+    if (await superAdminService.isEffective(userId)) {
+      for (const key of await permissionRepository.allKeys()) {
+        permissions[key] = true;
+      }
+    }
+
+    return { params: { id: String(orderId) }, body: body || {}, user, session: {}, permissions };
   }
 
   async function unlockStage4(orderId) {
@@ -183,6 +197,33 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
     await ordersController.recordOcAcknowledgment(req, fakeRes());
 
     expect(await stageGateService.isUnlocked(orderId, 5)).toBe(true);
+  });
+
+  /**
+   * 90-item backlog #30: a Super Admin reported being unable to record a
+   * manual OC acknowledgment even with oc_ack_override_restricted=1 —
+   * reproduced here with a user that has is_super_admin=1 and NO role at
+   * all (so there is no role_permissions row to grant
+   * override_buyer_acknowledgment — the only way this can pass is via the
+   * same Super Admin short-circuit sessionAuth.js applies to req.permissions
+   * on every real request). Mirrors PHP's
+   * testOverrideRestrictedStillAllowsASuperAdminWithNoRoleAtAll.
+   */
+  it('override restricted still allows a Super Admin with no role at all', async () => {
+    await companySettingsRepository.set('oc_ack_override_restricted', '1');
+    const orderId = await createTestOrder(await createTestClient());
+    await unlockStage4(orderId);
+    await createTestDocument(orderId, 'OC', 'draft');
+    const userId = await createTestUser('Export Executive');
+    await db.execute('UPDATE users SET is_super_admin = 1, role_id = NULL WHERE id = :id', { id: userId });
+
+    const req = await reqForUser(userId, orderId, { acknowledged_note: 'Buyer confirmed by phone — Super Admin recording manually.' });
+    await ordersController.recordOcAcknowledgment(req, fakeRes());
+
+    expect(await stageGateService.isUnlocked(orderId, 5)).toBe(true);
+    const ack = await orderOcAcknowledgmentRepository.find(orderId);
+    expect(ack).not.toBeNull();
+    expect(ack.acknowledged_at).not.toBeNull();
   });
 
   // --- mail_sending_enabled: global kill switch ---

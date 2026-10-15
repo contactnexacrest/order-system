@@ -166,6 +166,44 @@ final class OcAckAndMailTogglesTest extends DbTestCase
         self::assertTrue(StageGateService::isUnlocked($orderId, 5));
     }
 
+    /**
+     * 90-item backlog #30: a Super Admin reported being unable to record a
+     * manual OC acknowledgment even with oc_ack_override_restricted=1 —
+     * reproduced here with a user that has is_super_admin=1 and NO role at
+     * all (so there is no role_permissions row to grant
+     * override_buyer_acknowledgment — the only way this could pass is via
+     * SuperAdminService::isEffective() short-circuiting both the route's
+     * PermissionCheck::requires('manage_orders') gate and the controller's
+     * inner override_buyer_acknowledgment check). Investigation found the
+     * permission logic itself is correct; this test pins that down as a
+     * permanent regression guard, since the symptom the user saw is most
+     * likely the OC document never having been generated yet for that
+     * specific order (see the adjacent test for that distinct failure
+     * mode) rather than a Super Admin permission bug.
+     */
+    public function testOverrideRestrictedStillAllowsASuperAdminWithNoRoleAtAll(): void
+    {
+        CompanySettingsRepository::set('oc_ack_override_restricted', '1');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockStage4($orderId);
+        $this->createTestDocument($orderId, 'OC', 'draft');
+        $userId = $this->createTestUser('Export Executive');
+        Database::connection()
+            ->prepare('UPDATE users SET is_super_admin = 1, role_id = NULL WHERE id = :id')
+            ->execute(['id' => $userId]);
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST['acknowledged_note'] = 'Buyer confirmed by phone — Super Admin recording manually.';
+
+        ob_start();
+        (new OrderController())->recordOcAcknowledgment(['id' => $orderId]);
+        ob_end_clean();
+
+        self::assertTrue(StageGateService::isUnlocked($orderId, 5), 'a Super Admin must never be blocked by override_buyer_acknowledgment, with or without a role');
+        $ack = OrderOcAcknowledgmentRepository::find($orderId);
+        self::assertNotNull($ack);
+        self::assertNotNull($ack['acknowledged_at']);
+    }
+
     // --- mail_sending_enabled: global kill switch ---
 
     public function testMailSendingDisabledBlocksANonSecurityEmail(): void
