@@ -1,5 +1,6 @@
 'use strict';
 
+const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
@@ -69,8 +70,10 @@ async function computeForOrder(orderId) {
     byCategory[cat] = (byCategory[cat] || 0) + Number(entry.amount_inr);
   }
 
+  const [exportBenefitsInr, exportBenefitsIsEstimated] = await exportBenefitsInInr(orderId);
+
   const totalCostInr = supplierCostInr + freightCostInr + insuranceCostInr + otherCostsInr;
-  const profitInr = revenueInr - totalCostInr;
+  const profitInr = revenueInr + exportBenefitsInr - totalCostInr;
   const marginPct = revenueInr > 0 ? round2(profitInr / revenueInr * 100) : null;
 
   return {
@@ -78,6 +81,8 @@ async function computeForOrder(orderId) {
     fob_value_foreign: fobValue,
     revenue_inr: round2(revenueInr),
     revenue_is_estimated: revenueIsEstimated,
+    export_benefits_inr: round2(exportBenefitsInr),
+    export_benefits_is_estimated: exportBenefitsIsEstimated,
     supplier_cost_inr: round2(supplierCostInr),
     freight_cost_inr: round2(freightCostInr),
     insurance_cost_inr: round2(insuranceCostInr),
@@ -87,6 +92,38 @@ async function computeForOrder(orderId) {
     profit_inr: round2(profitInr),
     margin_pct: marginPct,
   };
+}
+
+/**
+ * 90-item backlog #54/#85: government export benefit claims (RODTEP and
+ * any other dropdown_options('export_benefit_scheme') entry) linked to
+ * this order were tracked and displayed on the order page, but never
+ * actually added into the profit figure immediately below them.
+ * ca_export_benefits has no exchange-rate column of its own — schema.sql
+ * defaults currency_code to 'INR' and the scheme amounts in practice
+ * always are, the same INR assumption order_freight/order_supplier_po
+ * already make — so these are summed directly, no conversion. Mirrors
+ * the claimed-vs-received / estimated-vs-actual convention revenueInInr()
+ * already uses: a claim already marked received contributes its real
+ * received_amount; one still pending contributes its claimed_amount as
+ * an estimate, and the whole figure is flagged estimated if ANY
+ * contributing claim hasn't been received yet.
+ *
+ * @returns {Promise<[number, boolean]>} [exportBenefitsInr, isEstimated]
+ */
+async function exportBenefitsInInr(orderId) {
+  const benefits = await caExportBenefitRepository.forOrder(orderId);
+  let total = 0;
+  let isEstimated = false;
+  for (const benefit of benefits) {
+    if (benefit.received_amount !== null) {
+      total += Number(benefit.received_amount);
+    } else {
+      total += Number(benefit.claimed_amount);
+      isEstimated = true;
+    }
+  }
+  return [total, isEstimated];
 }
 
 /**

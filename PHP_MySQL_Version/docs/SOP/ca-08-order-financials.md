@@ -125,6 +125,14 @@ tracks** rather than asking staff to re-enter them:
      estimated, using its own rate, not the other leg's.
   4. If nothing exists yet for either leg, revenue is shown as zero, also
      flagged estimated.
+- **Government export benefits.** Every claim linked to this order (see
+  "Government Export Benefits Claimed" above). A claim already marked
+  **received** contributes its real `received_amount`; one still only
+  **claimed** contributes its `claimed_amount` as an estimate, flagging
+  the figure estimated — the same settled-vs-estimated convention
+  revenue itself uses. Like freight/insurance, these are summed as INR
+  directly: `ca_export_benefits` has no exchange-rate column of its own,
+  and in practice every scheme (RODTEP and similar) pays out in INR.
 - **Supplier cost** — `order_supplier_po.total_payable_inr`, already in
   INR, pulled automatically. Nothing to enter here.
 - **Ocean freight and insurance** — `order_freight.confirmed_freight_rate`
@@ -139,7 +147,8 @@ tracks** rather than asking staff to re-enter them:
 - **Other order costs** — the sum of every Order Cost Entry above.
 - **Total order cost** = supplier cost + freight + insurance + other
   costs.
-- **Order profit** = revenue − total order cost.
+- **Order profit** = revenue + government export benefits − total order
+  cost.
 - **Order margin %** = profit ÷ revenue × 100, shown as "—" (not 0%)
   when revenue is zero, since a margin percentage is meaningless without
   a revenue base to divide by.

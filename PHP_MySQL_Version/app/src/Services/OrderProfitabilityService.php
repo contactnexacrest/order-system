@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\OrderCostEntryRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPaymentStatusRepository;
@@ -68,8 +69,10 @@ final class OrderProfitabilityService
             $byCategory[$cat] = ($byCategory[$cat] ?? 0.0) + (float) $entry['amount_inr'];
         }
 
+        [$exportBenefitsInr, $exportBenefitsIsEstimated] = self::exportBenefitsInInr($orderId);
+
         $totalCostInr = $supplierCostInr + $freightCostInr + $insuranceCostInr + $otherCostsInr;
-        $profitInr = $revenueInr - $totalCostInr;
+        $profitInr = $revenueInr + $exportBenefitsInr - $totalCostInr;
         $marginPct = $revenueInr > 0 ? round($profitInr / $revenueInr * 100, 2) : null;
 
         return [
@@ -77,6 +80,8 @@ final class OrderProfitabilityService
             'fob_value_foreign'    => $fobValue,
             'revenue_inr'          => round($revenueInr, 2),
             'revenue_is_estimated' => $isEstimated,
+            'export_benefits_inr'  => round($exportBenefitsInr, 2),
+            'export_benefits_is_estimated' => $exportBenefitsIsEstimated,
             'supplier_cost_inr'    => round($supplierCostInr, 2),
             'freight_cost_inr'     => round($freightCostInr, 2),
             'insurance_cost_inr'   => round($insuranceCostInr, 2),
@@ -86,6 +91,43 @@ final class OrderProfitabilityService
             'profit_inr'           => round($profitInr, 2),
             'margin_pct'           => $marginPct,
         ];
+    }
+
+    /**
+     * 90-item backlog #54/#85: government export benefit claims (RODTEP
+     * and any other dropdown_options('export_benefit_scheme') entry)
+     * linked to this order were tracked and displayed on the order page,
+     * but never actually added into the profit figure immediately below
+     * them — a shipment's real government incentive was invisible to the
+     * one number ("is this order actually worth doing") the whole
+     * Profitability Sheet exists to answer. ca_export_benefits has no
+     * exchange-rate column of its own — schema.sql defaults currency_code
+     * to 'INR' and the scheme amounts in practice always are, the same
+     * INR assumption order_freight/order_supplier_po already make — so
+     * these are summed directly, no conversion. Mirrors the
+     * claimed-vs-received / estimated-vs-actual convention revenueInInr()
+     * already uses: a claim already marked received contributes its real
+     * received_amount; one still pending contributes its claimed_amount
+     * as an estimate (the government has already acknowledged the
+     * entitlement; it just hasn't paid out yet), and the whole figure is
+     * flagged estimated if ANY contributing claim hasn't yet.
+     *
+     * @return array{0: float, 1: bool} [exportBenefitsInr, isEstimated]
+     */
+    private static function exportBenefitsInInr(int $orderId): array
+    {
+        $benefits = CaExportBenefitRepository::forOrder($orderId);
+        $total = 0.0;
+        $isEstimated = false;
+        foreach ($benefits as $benefit) {
+            if ($benefit['received_amount'] !== null) {
+                $total += (float) $benefit['received_amount'];
+            } else {
+                $total += (float) $benefit['claimed_amount'];
+                $isEstimated = true;
+            }
+        }
+        return [$total, $isEstimated];
     }
 
     /**

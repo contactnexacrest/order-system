@@ -143,9 +143,10 @@
 
 <div class="section-title">ORDER PROFITABILITY SUMMARY</div>
 <table class="data">
-  <tr><th>Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</th><th>Supplier Cost</th><th>Ocean Freight</th><th>Insurance</th><th>Other Costs</th><th>Total Cost</th><th>Profit</th><th>Margin %</th></tr>
+  <tr><th>Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</th><th>Govt. Export Benefits{% if profitability.export_benefits_is_estimated %} — claimed{% endif %}</th><th>Supplier Cost</th><th>Ocean Freight</th><th>Insurance</th><th>Other Costs</th><th>Total Cost</th><th>Profit</th><th>Margin %</th></tr>
   <tr>
     <td>{{ '%.2f'|format(profitability.revenue_inr) }}</td>
+    <td>{{ '%.2f'|format(profitability.export_benefits_inr) }}</td>
     <td>{{ '%.2f'|format(profitability.supplier_cost_inr) }}</td>
     <td>{{ '%.2f'|format(profitability.freight_cost_inr) }}</td>
     <td>{{ '%.2f'|format(profitability.insurance_cost_inr) }}</td>

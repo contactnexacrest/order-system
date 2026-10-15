@@ -1607,6 +1607,7 @@
       <h3 style="font-size:0.95em; margin-top:14px;">Profitability Summary</h3>
       <div class="kv-grid">
         <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | money }}</span></div>
+        <div><span class="k">Govt. Export Benefits (INR){% if profitability.export_benefits_is_estimated %} — claimed, not yet received{% endif %}</span><span class="v">{{ profitability.export_benefits_inr | money }}</span></div>
         <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | money }}</span></div>
         <div><span class="k">Ocean Freight (INR)</span><span class="v">{{ profitability.freight_cost_inr | money }}</span></div>
         <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}</span></div>

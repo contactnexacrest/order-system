@@ -152,6 +152,66 @@ final class OrderFinancialsTest extends DbTestCase
         self::assertSame(round(46500 / 85000 * 100, 2), $p['margin_pct']);
     }
 
+    /**
+     * 90-item backlog #54/#85: government export benefit claims (Section
+     * 1 of the order page's "Order Financials" box) were tracked and
+     * displayed, but never actually folded into the Profitability
+     * Summary immediately below them — a real government incentive on
+     * the shipment was invisible to the one figure the whole sheet
+     * exists to answer. A received claim contributes its real
+     * received_amount (settled, like a cleared payment leg); a claim
+     * still only "claimed" contributes its claimed_amount as an
+     * estimate and flags the figure estimated, mirroring how revenue
+     * itself distinguishes a settled INR actual from an estimate.
+     */
+    public function testProfitabilityIncludesGovernmentExportBenefits(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $userId); // revenue 85000
+
+        CaExportBenefitRepository::record($orderId, 'RODTEP', 'SB-001', 3000.0, '2026-06-01', 'INR', null, $userId);
+
+        $p = OrderProfitabilityService::computeForOrder($orderId);
+
+        self::assertSame(3000.0, $p['export_benefits_inr']);
+        self::assertTrue($p['export_benefits_is_estimated'], 'not yet received — still a claimed-only estimate');
+        self::assertSame(88000.0, $p['profit_inr'], 'revenue 85000 + export benefits 3000, no other costs');
+    }
+
+    public function testProfitabilityUsesTheReceivedAmountOnceAClaimIsSettledAndIsNoLongerEstimated(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $userId); // revenue 85000
+
+        $benefitId = CaExportBenefitRepository::record($orderId, 'RODTEP', 'SB-002', 3000.0, '2026-06-01', 'INR', null, $userId);
+        CaExportBenefitRepository::markReceived($benefitId, 3200.0, '2026-07-01'); // actually received slightly more than claimed
+
+        $p = OrderProfitabilityService::computeForOrder($orderId);
+
+        self::assertSame(3200.0, $p['export_benefits_inr'], 'the real received_amount, not the original claimed_amount');
+        self::assertFalse($p['export_benefits_is_estimated']);
+        self::assertSame(88200.0, $p['profit_inr']);
+    }
+
+    public function testProfitabilityWithNothingRecordedHasZeroExportBenefitsAndIsNotFlaggedEstimated(): void
+    {
+        // Regression guard: an order with NO export benefit claims at all
+        // must not be flagged "estimated" purely for having none — that
+        // flag means "a claim exists but hasn't been received yet," not
+        // "there might be an unrecorded one."
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $p = OrderProfitabilityService::computeForOrder($orderId);
+
+        self::assertSame(0.0, $p['export_benefits_inr']);
+        self::assertFalse($p['export_benefits_is_estimated']);
+    }
+
     // ---------------------------------------------------------------
     // OrderFinancialsController — order-page-embedded actions
     // ---------------------------------------------------------------

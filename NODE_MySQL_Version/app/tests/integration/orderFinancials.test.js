@@ -164,6 +164,55 @@ describe('Order Financials (Section AP)', () => {
     expect(p.margin_pct).toBeCloseTo(Math.round((46500 / 85000) * 100 * 100) / 100, 2);
   });
 
+  /**
+   * 90-item backlog #54/#85: government export benefit claims were
+   * tracked and displayed on the order page, but never actually folded
+   * into the Profitability Summary immediately below them. A received
+   * claim contributes its real received_amount (settled); a claim still
+   * only "claimed" contributes its claimed_amount as an estimate and
+   * flags the figure estimated.
+   */
+  it('profitability includes government export benefits', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId); // revenue 85000
+
+    await caExportBenefitRepository.record(orderId, 'RODTEP', 'SB-001', 3000.0, '2026-06-01', 'INR', null, userId);
+
+    const p = await orderProfitabilityService.computeForOrder(orderId);
+
+    expect(p.export_benefits_inr).toBe(3000);
+    expect(p.export_benefits_is_estimated).toBe(true);
+    expect(p.profit_inr).toBe(88000);
+  });
+
+  it('profitability uses the received amount once a claim is settled and is no longer estimated', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId); // revenue 85000
+
+    const benefitId = await caExportBenefitRepository.record(orderId, 'RODTEP', 'SB-002', 3000.0, '2026-06-01', 'INR', null, userId);
+    await caExportBenefitRepository.markReceived(benefitId, 3200.0, '2026-07-01');
+
+    const p = await orderProfitabilityService.computeForOrder(orderId);
+
+    expect(p.export_benefits_inr).toBe(3200);
+    expect(p.export_benefits_is_estimated).toBe(false);
+    expect(p.profit_inr).toBe(88200);
+  });
+
+  it('profitability with nothing recorded has zero export benefits and is not flagged estimated', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const p = await orderProfitabilityService.computeForOrder(orderId);
+
+    expect(p.export_benefits_inr).toBe(0);
+    expect(p.export_benefits_is_estimated).toBe(false);
+  });
+
   // ---------------------------------------------------------------
   // orderFinancialsController — order-page-embedded actions
   // ---------------------------------------------------------------
