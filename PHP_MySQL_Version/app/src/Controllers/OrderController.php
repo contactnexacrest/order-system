@@ -225,6 +225,17 @@ final class OrderController
             }
         }
 
+        // 90-item backlog "default weight/volume values": Total CBM/Gross
+        // Weight/Net Weight used to start every New Order form blank, same
+        // as a brand-new Package Type/Package Count did before those
+        // gained a configurable default — staff typed the same typical
+        // figure on nearly every order anyway. Only fills a gap; never
+        // overwrites a value already in $old (a validation retry, or the
+        // intake-prefill block above, both win as-is).
+        $old['estimated_total_cbm'] ??= CompanySettingsRepository::get('default_estimated_total_cbm');
+        $old['estimated_gross_weight_kg'] ??= CompanySettingsRepository::get('default_estimated_gross_weight_kg');
+        $old['estimated_net_weight_kg'] ??= CompanySettingsRepository::get('default_estimated_net_weight_kg');
+
         View::render('orders/create', [
             'clients'         => ClientRepository::all(),
             'incoterms'       => $incoterms,

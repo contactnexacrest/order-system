@@ -603,7 +603,16 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('zoho_account_id',     '', 'string',  'zoho', 'Zoho Mail account ID (from Zoho Mail API''s accounts endpoint) that mail is sent from.', 1),
   ('zoho_from_address',   '', 'string',  'zoho', 'The Zoho mailbox address mail is sent from — must be one of the Zoho account''s own verified addresses.', 0),
   ('zoho_accounts_domain', 'accounts.zoho.com', 'string', 'zoho', 'Zoho OAuth token endpoint domain — Zoho is region-specific (accounts.zoho.com / .eu / .in / .com.cn / .com.au, matching whichever data center the Zoho One account lives in).', 0),
-  ('zoho_api_domain',      'mail.zoho.com', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0);
+  ('zoho_api_domain',      'mail.zoho.com', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0),
+  -- 90-item backlog "default weight/volume values": New Order's Estimated
+  -- Weight & Volume fieldset used to start every order blank, unlike
+  -- Package Type/Package Count which already had a configured/hardcoded
+  -- default — staff pre-fill these on the create form and edit per order
+  -- as always; a blank setting value (cleared via Settings) falls back to
+  -- leaving the field blank, same as before this existed.
+  ('default_estimated_total_cbm',        '12.5', 'number', 'order_defaults', 'Pre-fills Total CBM (m³) on the New Order form — staff edit per order as always.', 0),
+  ('default_estimated_gross_weight_kg',  '2400', 'number', 'order_defaults', 'Pre-fills Gross Weight (kg) on the New Order form — staff edit per order as always.', 0),
+  ('default_estimated_net_weight_kg',    '2100', 'number', 'order_defaults', 'Pre-fills Net Weight (kg) on the New Order form — staff edit per order as always.', 0);
 
 -- CA / Accounting module (Phase 3) — Zoho Books sync. A separate OAuth
 -- self-client registration from zoho_client_id/etc. above (Zoho Mail and

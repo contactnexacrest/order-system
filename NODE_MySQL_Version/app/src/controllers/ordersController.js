@@ -227,6 +227,17 @@ async function create(req, res) {
     }
   }
 
+  // 90-item backlog "default weight/volume values": Total CBM/Gross
+  // Weight/Net Weight used to start every New Order form blank, same as a
+  // brand-new Package Type/Package Count did before those gained a
+  // configurable default — staff typed the same typical figure on nearly
+  // every order anyway. Only fills a gap; never overwrites a value
+  // already in `old` (a validation retry, or the intake-prefill block
+  // above, both win as-is).
+  if (old.estimated_total_cbm === undefined) old.estimated_total_cbm = await companySettingsRepository.get('default_estimated_total_cbm');
+  if (old.estimated_gross_weight_kg === undefined) old.estimated_gross_weight_kg = await companySettingsRepository.get('default_estimated_gross_weight_kg');
+  if (old.estimated_net_weight_kg === undefined) old.estimated_net_weight_kg = await companySettingsRepository.get('default_estimated_net_weight_kg');
+
   res.renderView(
     'orders/create',
     {
