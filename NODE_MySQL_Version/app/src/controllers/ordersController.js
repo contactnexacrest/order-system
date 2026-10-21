@@ -226,6 +226,7 @@ async function create(req, res) {
       containerTypes: await lookupRepository.dropdownOptions('container_type'),
       units: await lookupRepository.dropdownOptions('unit'),
       packageTypes: await lookupRepository.dropdownOptions('package_type'),
+      surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
       hsCodes: await hsCodeRepository.active(),
       preselectedClientId,
       old,

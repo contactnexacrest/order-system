@@ -224,6 +224,7 @@ final class OrderController
             'containerTypes'  => LookupRepository::dropdownOptions('container_type'),
             'units'           => LookupRepository::dropdownOptions('unit'),
             'packageTypes'    => LookupRepository::dropdownOptions('package_type'),
+            'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
             'preselectedClientId' => $preselectedClientId,
             'hsCodes'         => HsCodeRepository::active(),
             'old'             => $old,

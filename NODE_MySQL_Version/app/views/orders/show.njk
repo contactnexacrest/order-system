@@ -335,7 +335,14 @@
             <div class="kv-grid">
               <label>Description *<input type="text" name="description" value="{{ p.description }}" required></label>
               <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}"></label>
-              <label>Finish<input type="text" name="finish" value="{{ p.finish or '' }}"></label>
+              <label>Finish
+                <select name="finish">
+                  <option value="">—</option>
+                  {% for o in surfaceFinishes %}
+                    <option value="{{ o.option_value }}" {% if p.finish == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
               <label>Qty<input type="text" name="quantity" value="{{ p.quantity or '' }}"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
               <label>Unit
@@ -374,7 +381,14 @@
           <div class="kv-grid">
             <label>Description *<input type="text" name="description" required></label>
             <label>Dimensions<input type="text" name="dimensions"></label>
-            <label>Finish<input type="text" name="finish"></label>
+            <label>Finish
+              <select name="finish">
+                <option value="">—</option>
+                {% for o in surfaceFinishes %}
+                  <option value="{{ o.option_value }}" {% if o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
             <label>Qty<input type="text" name="quantity"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit

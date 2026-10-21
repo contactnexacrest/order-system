@@ -18,7 +18,14 @@
           <div class="product-row">
             <label>Description *<input type="text" name="product_description[{{ loop.index0 }}]" value="{{ p.description }}" placeholder="e.g. Granite Memorial Headstone"></label>
             <label>Dimensions<input type="text" name="product_dimensions[{{ loop.index0 }}]" value="{{ p.dimensions or '' }}" placeholder="e.g. 24x12x3 inches"></label>
-            <label>Finish<input type="text" name="product_finish[{{ loop.index0 }}]" value="{{ p.finish or '' }}" placeholder="e.g. Polished"></label>
+            <label>Finish
+              <select name="product_finish[{{ loop.index0 }}]">
+                <option value="">—</option>
+                {% for o in surfaceFinishes %}
+                  <option value="{{ o.option_value }}" {% if p.finish == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
             <label>Qty<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
             <label>Unit
@@ -35,7 +42,14 @@
           <div class="product-row">
             <label>Description *<input type="text" name="product_description[0]" placeholder="e.g. Granite Memorial Headstone"></label>
             <label>Dimensions<input type="text" name="product_dimensions[0]" placeholder="e.g. 24x12x3 inches"></label>
-            <label>Finish<input type="text" name="product_finish[0]" placeholder="e.g. Polished"></label>
+            <label>Finish
+              <select name="product_finish[0]">
+                <option value="">—</option>
+                {% for o in surfaceFinishes %}
+                  <option value="{{ o.option_value }}" {% if o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
             <label>Qty<input type="text" name="product_quantity[0]" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="product_quantity_tbc[0]" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit
@@ -73,6 +87,14 @@
     });
     clone.querySelectorAll('input[type=checkbox]').forEach(function (el) {
       el.checked = false;
+      el.name = el.name.replace(/\[\d+\]/, '[' + nextIndex + ']');
+    });
+    // 90-item backlog "product Finish dropdown": adding the Finish select
+    // surfaced a pre-existing gap here — only input elements were
+    // re-indexed, so a cloned row's <select> (Unit, and now Finish) kept
+    // the first row's array index and collided with it in req.body
+    // instead of submitting as its own product line.
+    clone.querySelectorAll('select').forEach(function (el) {
       el.name = el.name.replace(/\[\d+\]/, '[' + nextIndex + ']');
     });
     nextIndex++;

@@ -295,6 +295,7 @@ async function showReorderForm(req, res) {
     order,
     products: await orderProductRepository.forOrder(orderId),
     units: await lookupRepository.dropdownOptions('unit'),
+    surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
   }, 'layout/client');
 }
 

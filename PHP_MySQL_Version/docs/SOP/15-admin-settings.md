@@ -265,11 +265,15 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   review, and the client portal's own reorder form; Package Type
   (`list_key = 'package_type'`) feeds the Estimated Package Type field on
   New Order and Edit Order Details; Surface Finish (`list_key =
-  'surface_finish'`) and GST Rate (`list_key = 'gst_rate'`) feed the
-  matching fields on the Supplier PO form (see [Chapter
-  5](./05-stage5-supplier-po.md)) — all four were previously free-text
-  inputs with no validation against the values actually used elsewhere on
-  the order. Gated by `manage_dropdown_options`,
+  'surface_finish'`) feeds the Supplier PO form's own Surface Finish field
+  (see [Chapter 5](./05-stage5-supplier-po.md)) **and** the product-line
+  Finish field across New Order, Order Detail, and the client portal's own
+  reorder form — the same physical attribute viewed from the procurement
+  side and the sale side of the same order, so editing this one list keeps
+  every Finish field in sync; GST Rate (`list_key = 'gst_rate'`) feeds the
+  matching field on the Supplier PO form — all five were previously
+  free-text inputs with no validation against the values actually used
+  elsewhere on the order. Gated by `manage_dropdown_options`,
   same tier as HS Codes/Logistics Partners/Compliance Task Types (Admin/MD/
   ED and Super Admin by default). One group per `list_key`, each with its
   own bulk-save form (Value/Sort Order/Default radio/Active checkbox per

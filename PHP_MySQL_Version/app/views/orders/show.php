@@ -409,7 +409,15 @@ foreach ($stages as $s) {
             <div class="kv-grid">
               <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required></label>
               <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
-              <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
+              <label>Finish
+                <select name="finish">
+                  <?php $__finishVal = (string) ($p['finish'] ?? ''); ?>
+                  <option value="">—</option>
+                  <?php foreach ($surfaceFinishes as $o): ?>
+                    <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__finishVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </label>
               <label>Qty<input type="text" name="quantity" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
               <label>Unit
@@ -449,7 +457,14 @@ foreach ($stages as $s) {
           <div class="kv-grid">
             <label>Description *<input type="text" name="description" required></label>
             <label>Dimensions<input type="text" name="dimensions"></label>
-            <label>Finish<input type="text" name="finish"></label>
+            <label>Finish
+              <select name="finish">
+                <option value="">—</option>
+                <?php foreach ($surfaceFinishes as $o): ?>
+                  <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
             <label>Qty<input type="text" name="quantity"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit

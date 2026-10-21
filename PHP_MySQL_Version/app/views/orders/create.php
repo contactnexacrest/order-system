@@ -122,7 +122,15 @@
         <div class="product-row">
           <label>Description *<input type="text" name="product_description[]" value="<?= htmlspecialchars((string) $__desc) ?>" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 24x12x3 inches"></label>
-          <label>Finish<input type="text" name="product_finish[]" value="<?= htmlspecialchars((string) ($old['product_finish'][$__i] ?? '')) ?>" placeholder="e.g. Polished"></label>
+          <label>Finish
+            <select name="product_finish[]">
+              <?php $__finishVal = (string) ($old['product_finish'][$__i] ?? ''); ?>
+              <option value="">—</option>
+              <?php foreach ($surfaceFinishes as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__finishVal === $o['option_value'] || ($__finishVal === '' && $o['is_default'])) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <label>Qty<input type="text" name="product_quantity[]" value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"></label>
           <label>Unit
             <select name="product_unit[]">

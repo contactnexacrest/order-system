@@ -303,6 +303,7 @@ final class ClientPortalController
             'order' => $order,
             'products' => OrderProductRepository::forOrder($orderId),
             'units' => LookupRepository::dropdownOptions('unit'),
+            'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
         ], 'layout/client');
     }
 

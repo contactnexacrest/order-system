@@ -19,7 +19,15 @@
         <div class="product-row">
           <label>Description *<input type="text" name="product_description[<?= $idx ?>]" value="<?= htmlspecialchars($p['description'] ?? '') ?>" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[<?= $idx ?>]" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 24x12x3 inches"></label>
-          <label>Finish<input type="text" name="product_finish[<?= $idx ?>]" value="<?= htmlspecialchars($p['finish'] ?? '') ?>" placeholder="e.g. Polished"></label>
+          <label>Finish
+            <select name="product_finish[<?= $idx ?>]">
+              <?php $__finishVal = (string) ($p['finish'] ?? ''); ?>
+              <option value="">—</option>
+              <?php foreach ($surfaceFinishes as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__finishVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <label>Qty<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
           <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
           <label>Unit
@@ -58,6 +66,14 @@
     });
     clone.querySelectorAll('input[type=checkbox]').forEach(function (el) {
       el.checked = false;
+      el.name = el.name.replace(/\[\d+\]/, '[' + nextIndex + ']');
+    });
+    // 90-item backlog "product Finish dropdown": adding the Finish select
+    // surfaced a pre-existing gap here — only input elements were
+    // re-indexed, so a cloned row's <select> (Unit, and now Finish) kept
+    // the first row's array index and collided with it in $_POST instead
+    // of submitting as its own product line.
+    clone.querySelectorAll('select').forEach(function (el) {
       el.name = el.name.replace(/\[\d+\]/, '[' + nextIndex + ']');
     });
     nextIndex++;

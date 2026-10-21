@@ -120,7 +120,15 @@
         <div class="product-row">
           <label>Description *<input type="text" name="product_description[]" value="{{ desc or '' }}" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}" placeholder="e.g. 24x12x3 inches"></label>
-          <label>Finish<input type="text" name="product_finish[]" value="{{ old.product_finish[loop.index0] or '' if old.product_finish else '' }}" placeholder="e.g. Polished"></label>
+          <label>Finish
+            {% set finishVal = (old.product_finish[loop.index0] or '') if old.product_finish else '' %}
+            <select name="product_finish[]">
+              <option value="">—</option>
+              {% for o in surfaceFinishes %}
+                <option value="{{ o.option_value }}" {% if finishVal == o.option_value or (finishVal == '' and o.is_default) %}selected{% endif %}>{{ o.option_value }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label>Qty<input type="text" name="product_quantity[]" value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}" placeholder="e.g. 100"></label>
           <label>Unit
             {% set unitVal = (old.product_unit[loop.index0] or '') if old.product_unit else '' %}
