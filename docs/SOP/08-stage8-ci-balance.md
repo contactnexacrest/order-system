@@ -29,6 +29,22 @@ From **Documents**, **Generate Commercial Invoice** produces the CI —
 pre-filled with the actual shipped quantities and final figures rather than
 the estimates the PI was built on.
 
+The CI's own Section A keeps **FOB Value** as its own separate line
+regardless of Incoterm — required for the Indian Shipping Bill and IGST
+refund — but on a non-FOB order (CFR/CIF/etc.), **TOTAL COMMERCIAL
+INVOICE VALUE** is FOB Value *plus* Freight & Insurance, not FOB Value
+alone: the buyer-country customs/import-duty authority assesses duty
+against the full CFR/CIF value, and a Commercial Invoice that understates
+it risks customs delay or a penalty for the buyer. The Freight & Insurance
+figure itself is whichever is on file — the actually-recorded Freight
+Debit Note payment if it's cleared, otherwise the Stage 6 confirmed
+freight+insurance figure. This only changes the CI; the Quotation,
+Proforma Invoice, and Order Confirmation's own "Total ... Value" fields,
+and Section B's advance/balance payment math on this same CI, are
+unaffected — freight is still paid separately via its own Debit Note, not
+folded into the advance/balance schedule. On an FOB order, Total
+Commercial Invoice Value is simply the FOB Value, same as before.
+
 The CI's own Section 7 "Balance Due Now" clause always states payment is
 due within a fixed number of **Calendar Days of the date NexaCrest emails
 the scanned BL copy** — this is deliberately **not** the order's own

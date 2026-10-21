@@ -61,6 +61,30 @@ async function assemble(orderId, documentTypeCode = null) {
   const balanceAmount = round2(fobValue - advanceAmount);
 
   const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
+
+  // 90-item backlog item #18 (BLOCKER): for a non-FOB order, the
+  // Commercial Invoice's own TOTAL COMMERCIAL INVOICE VALUE must
+  // include Freight & Insurance, not just the FOB goods value — the
+  // buyer-country customs/import-duty authority assesses import duty
+  // against the full CFR/CIF value, and a Commercial Invoice that
+  // understates it (goods value only) risks customs delay or a penalty
+  // for the buyer. FOB Value itself is kept completely unchanged
+  // everywhere else (QT/PI/OC's own "Total ... Value" fields, Section
+  // A's own FOB Value row, Section B's advance/balance payment math) —
+  // those remain exactly as before; this ONLY affects the new,
+  // additional "total commercial invoice value" figure. Prefers the
+  // actually-recorded/cleared FDN payment amount (what Section B
+  // already shows); falls back to Stage 6's confirmed freight+
+  // insurance figure when the FDN hasn't cleared yet.
+  let freightForTotal = payment && payment.freight_amount !== null ? parseFloat(payment.freight_amount) : null;
+  if (freightForTotal === null) {
+    const freightRow = await orderFreightRepository.find(orderId);
+    if (freightRow && freightRow.confirmed_freight_rate !== null) {
+      freightForTotal = parseFloat(freightRow.confirmed_freight_rate) + parseFloat(freightRow.insurance_amount ?? 0);
+    }
+  }
+  const totalCommercialInvoiceValue = (!isFob && freightForTotal !== null) ? fobValue + freightForTotal : fobValue;
+
   // 90-item backlog "ports city field": Incoterms convention prints the
   // CITY alone (e.g. "FOB Mumbai"), never the formal terminal name
   // (e.g. "FOB Nhava Sheva (JNPT)") — ports.city now carries that,
@@ -209,8 +233,14 @@ async function assemble(orderId, documentTypeCode = null) {
       // varies by tier/preset, unlike balance_terms_text above (which
       // QT/PI/BuyerPO use and which DOES vary).
       ci_balance_days_post_bl: parseInt((await companySettingsRepository.get('ci_balance_days_post_bl')) || '7', 10),
-      // freight/insurance are indicative-only, not summed into the binding total for FOB
+      // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
       total_value: formatMoney(fobValue),
+      // 90-item backlog item #18 (BLOCKER) — see this function's own
+      // freightForTotal/totalCommercialInvoiceValue computation above
+      // for the full rationale. CI-only; every other document keeps
+      // using total_value above.
+      total_commercial_invoice_value: formatMoney(totalCommercialInvoiceValue),
+      freight_insurance_amount: freightForTotal !== null ? formatMoney(freightForTotal) : null,
       preset_name: order.preset_name,
     },
     payment_status: payment

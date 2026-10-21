@@ -253,7 +253,7 @@ final class DocxDocumentBuilder
         ]);
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order) {
             $run = $cell->addTextRun();
-            $run->addText("\u{23F1}  ", ['size' => 9.5]);
+            $run->addText("", ['size' => 9.5]);
             $run->addText('VALID UNTIL * ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
             $run->addText(' ' . self::g($order, 'quotation_valid_until', 'To Be Confirmed') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
             $run->addText('Prices and terms are not valid after this date.', ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
@@ -355,7 +355,7 @@ final class DocxDocumentBuilder
         ]);
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order) {
             $run = $cell->addTextRun();
-            $run->addText("\u{23F1}  ", ['size' => 9.5]);
+            $run->addText("", ['size' => 9.5]);
             $run->addText('VALID UNTIL * ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
             $run->addText(' ' . self::g($order, 'pi_valid_until', 'To Be Confirmed') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
             $run->addText('Payment must be received before this date for prices and terms to remain valid.', ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
@@ -490,7 +490,7 @@ final class DocxDocumentBuilder
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::GREEN_BG, DocxComponents::GREEN_BORDER, function (AbstractContainer $cell) use ($financial) {
-            $cell->addText("\u{2713}  ORDER CONFIRMED", ['bold' => true, 'size' => 13, 'color' => DocxComponents::GREEN_BORDER]);
+            $cell->addText("\u{221A}  ORDER CONFIRMED", ['bold' => true, 'size' => 13, 'color' => DocxComponents::GREEN_BORDER]);
             $cell->addText('This order is confirmed upon receipt and clearance of ' . self::g($financial, 'advance_pct') . '% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.', ['italic' => true, 'size' => 9.5, 'color' => DocxComponents::GREEN_VALUE]);
         });
 
@@ -756,7 +756,7 @@ final class DocxDocumentBuilder
         ]);
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order) {
             $run = $cell->addTextRun();
-            $run->addText("\u{23F1}  VALID UNTIL * ", ['bold' => true, 'color' => DocxComponents::AMBER_LABEL]);
+            $run->addText("VALID UNTIL * ", ['bold' => true, 'color' => DocxComponents::AMBER_LABEL]);
             $run->addText(' ' . self::g($order, 'quotation_valid_until', 'To Be Confirmed') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
             $run->addText('This Purchase Order must be signed and returned before the Quotation validity expires.', ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
         });
@@ -880,7 +880,7 @@ final class DocxDocumentBuilder
         DocxComponents::addSectionTitle($section, '3. MATERIAL SPECIFICATIONS  (All fields mandatory — no exceptions)', $green);
         DocxComponents::addColorBox($section, DocxComponents::RED_BG, DocxComponents::RED_BORDER, function (AbstractContainer $cell) {
             $run = $cell->addTextRun();
-            $run->addText("\u{26A0}  All specifications below are binding. ", ['bold' => true, 'color' => DocxComponents::RED_TEXT, 'size' => 9]);
+            $run->addText("\u{203C}  All specifications below are binding. ", ['bold' => true, 'color' => DocxComponents::RED_TEXT, 'size' => 9]);
             $run->addText("Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.", ['color' => DocxComponents::RED_SUB, 'size' => 9]);
         });
         DocxComponents::addKvTable($section, [
@@ -1004,7 +1004,7 @@ final class DocxDocumentBuilder
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::RED_BG, DocxComponents::RED_BORDER, function (AbstractContainer $cell) {
-            $cell->addText("\u{23F1}  PAYMENT REQUIRED BEFORE SHIPMENT", ['bold' => true, 'size' => 10, 'color' => DocxComponents::RED_TEXT], ['alignment' => Jc::CENTER]);
+            $cell->addText("PAYMENT REQUIRED BEFORE SHIPMENT", ['bold' => true, 'size' => 10, 'color' => DocxComponents::RED_TEXT], ['alignment' => Jc::CENTER]);
             $run = $cell->addTextRun(['alignment' => Jc::CENTER]);
             $run->addText('Payment of this Freight Debit Note is required within ', ['size' => 9.5, 'color' => DocxComponents::RED_SUB]);
             $run->addText('3 working days', ['bold' => true, 'size' => 9.5, 'color' => DocxComponents::RED_TEXT]);
@@ -1057,7 +1057,7 @@ final class DocxDocumentBuilder
             $r3->addText('Reference: ', ['bold' => true]);
             $r3->addText('Quote Debit Note No. ' . self::g($meta, 'document_reference') . ' and PI No. ' . self::g($order, 'pi_ref', '—') . ' in the remittance', ['color' => DocxComponents::RED_SUB]);
             $r4 = $cell->addTextRun();
-            $r4->addText("\u{26A0} Critical: ", ['bold' => true]);
+            $r4->addText("\u{203C} Critical: ", ['bold' => true]);
             $r4->addText('Share bank remittance copy as per Section 1 contact details above immediately after payment. Shipment booking will be confirmed only upon verification of freight receipt.', ['color' => DocxComponents::RED_SUB]);
         });
 
@@ -1285,7 +1285,7 @@ final class DocxDocumentBuilder
         ], true);
 
         DocxComponents::addColorBox($section, DocxComponents::RED_BG, DocxComponents::RED_BORDER, function (AbstractContainer $cell) {
-            $cell->addText("\u{26A0}  MANDATORY — DRAFT BL APPROVAL REQUIRED BEFORE ORIGINALS ARE ISSUED", ['bold' => true, 'size' => 10, 'color' => DocxComponents::RED_TEXT]);
+            $cell->addText("\u{203C}  MANDATORY — DRAFT BL APPROVAL REQUIRED BEFORE ORIGINALS ARE ISSUED", ['bold' => true, 'size' => 10, 'color' => DocxComponents::RED_TEXT]);
             $cell->addText('CHA / Shipping Line must send the complete draft Bill of Lading to NexaCrest for written approval before issuing any original BL. No original BL may be issued without NexaCrest\'s prior written approval. Send draft BL to NexaCrest at contact details in Section 1 above.', ['size' => 9.5, 'color' => DocxComponents::RED_SUB]);
         });
 
@@ -1394,18 +1394,27 @@ final class DocxDocumentBuilder
         DocxComponents::addPlainParagraph($section, $plRefLine . '.', ['size' => 9, 'color' => DocxComponents::MUTED]);
 
         DocxComponents::addSectionTitle($section, '5. INVOICE VALUE & PAYMENT SETTLEMENT');
-        DocxComponents::addColorBox($section, 'E8F1FB', DocxComponents::BLUE_TEXT, function (AbstractContainer $cell) {
-            $cell->addText('FOB Value is the basis for all payments and required for Indian Shipping Bill & IGST refund. Freight & Insurance (if applicable) are recovered separately via Freight Debit Note and are not included in this Commercial Invoice value.', ['color' => DocxComponents::BLUE_TEXT]);
+        $isFob = !empty($order['is_fob']);
+        DocxComponents::addColorBox($section, 'E8F1FB', DocxComponents::BLUE_TEXT, function (AbstractContainer $cell) use ($isFob) {
+            $text = 'FOB Value is the basis for all payments and required for Indian Shipping Bill & IGST refund — shown separately below regardless of Incoterm. '
+                . ($isFob
+                    ? 'Freight & Insurance is not applicable — buyer arranges, FOB.'
+                    : 'Freight & Insurance is recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.');
+            $cell->addText($text, ['color' => DocxComponents::BLUE_TEXT]);
         }, 0);
 
-        $isFob = !empty($order['is_fob']);
+        // 90-item backlog item #18 (BLOCKER) — see
+        // DocumentDataAssembler::assemble()'s freightForTotal/
+        // totalCommercialInvoiceValue computation for the full
+        // rationale. CI-only; financial.total_value (QT/PI/OC's own
+        // "Total ... Value") is untouched.
         $freightRemark = $isFob
             ? 'FOB: buyer arranges — write NIL'
-            : 'Paid separately via Freight Debit Note No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed') . '. Not included in CI value.';
+            : 'Paid separately via Freight Debit Note No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed') . '. Included in the Total Commercial Invoice Value below.';
         $sectionARows = [
-            ['FOB Value (goods)', $currency . ' ' . self::g($financial, 'fob_value') . ' *', 'Sum of all product lines above — basis for all payments'],
-            ['Freight & Insurance', ($isFob ? 'NIL — FOB order' : 'Paid via FDN') . ' *', $freightRemark],
-            ['TOTAL COMMERCIAL INVOICE VALUE', $currency . ' ' . self::g($financial, 'fob_value') . ' *', 'Currency: ' . $currency],
+            ['FOB Value (goods)', $currency . ' ' . self::g($financial, 'fob_value') . ' *', 'Sum of all product lines above — basis for all payments; required for Indian Shipping Bill & IGST refund'],
+            ['Freight & Insurance', ($isFob ? 'NIL — FOB order' : ($currency . ' ' . self::g($financial, 'freight_insurance_amount', 'To Be Confirmed'))) . ' *', $freightRemark],
+            ['TOTAL COMMERCIAL INVOICE VALUE', $currency . ' ' . self::g($financial, 'total_commercial_invoice_value') . ' *', ($isFob ? '= FOB Value (no freight/insurance on an FOB order)' : '= FOB Value + Freight & Insurance') . ' · Currency: ' . $currency],
         ];
         self::threeColFinanceTable($section, 'SECTION A — INVOICE VALUE', $sectionARows, DocxComponents::NAVY_MID);
 
@@ -1416,11 +1425,11 @@ final class DocxDocumentBuilder
         $freightRemark2 = $isFob ? 'FOB: buyer arranges — write NIL' : ('CFR/CIF: Against FDN No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed'));
         $subtotalPaid = $currency . ' ' . $advanceAmt . (!$isFob && self::g($payment, 'freight_amount', null) !== '—' && self::g($payment, 'freight_amount', null) !== 'To Be Confirmed' ? ' + ' . self::g($payment, 'freight_amount') . ' (freight)' : '');
         $sectionBRows = [
-            ["\u{2713}  " . self::g($financial, 'advance_pct') . '% Advance — ' . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
-            ["\u{2713}  Freight & Insurance — {$freightStatus}", $freightAmtCell, $freightRemark2],
+            ["\u{221A}  " . self::g($financial, 'advance_pct') . '% Advance — ' . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
+            ["\u{221A}  Freight & Insurance — {$freightStatus}", $freightAmtCell, $freightRemark2],
             ['SUBTOTAL ALREADY PAID', $subtotalPaid, self::g($financial, 'advance_pct') . '% Advance' . (!$isFob ? ' + FDN (if applicable)' : '')],
-            ["\u{21D2}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', '= FOB Value minus ' . self::g($financial, 'advance_pct') . "% advance received\nPayable by T/T (Telegraphic Transfer) within " . self::g($financial, 'balance_days') . " days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
-            ['VERIFICATION', "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = " . self::g($financial, 'fob_value') . " \u{2713}", 'Freight & Insurance paid separately via FDN — not included in CI value or this verification.'],
+            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', '= FOB Value minus ' . self::g($financial, 'advance_pct') . "% advance received\nPayable by T/T (Telegraphic Transfer) within " . self::g($financial, 'balance_days') . " days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
+            ['VERIFICATION', "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = " . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : 'Freight & Insurance is paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
         ];
         self::threeColFinanceTable($section, 'SECTION B — PAYMENT SETTLEMENT', $sectionBRows, DocxComponents::NAVY_MID);
 
@@ -1500,7 +1509,7 @@ final class DocxDocumentBuilder
             ['IEC Certificate (copy)', 'NexaCrest IEC — ' . self::g($company, 'iec_pan') . ' — already obtained.', 'Already obtained'],
             ['GSP Declaration (if GSP Form A)', 'Self-declaration of origin criteria — required for GSP Form A only. CHA will advise the format.', 'Required for GSP Form A only'],
         ];
-        DocxComponents::addChecklistTable($section, ["\u{2713}", 'Document', 'What to check before submitting', 'Where it comes from'], [6, 24, 45, 25], array_map(
+        DocxComponents::addChecklistTable($section, ["\u{221A}", 'Document', 'What to check before submitting', 'Where it comes from'], [6, 24, 45, 25], array_map(
             static fn(array $r) => ['cells' => ['[ ]', static function (AbstractContainer $c) use ($r) { $c->addText($r[0], ['bold' => true]); }, $r[1], $r[2]]],
             $docItems
         ));
@@ -1569,7 +1578,7 @@ final class DocxDocumentBuilder
         ]);
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG2, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) {
             $run = $cell->addTextRun();
-            $run->addText("\u{26A0} Annual renewal: ", ['bold' => true, 'color' => DocxComponents::AMBER_TEXT2]);
+            $run->addText("\u{203C} Annual renewal: ", ['bold' => true, 'color' => DocxComponents::AMBER_TEXT2]);
             $run->addText('RCMC must be renewed annually. If RCMC expires, CAPEXIL cannot issue a COO — your shipment documents will be incomplete and customs clearance will fail. Set a reminder 60 days before expiry.', ['color' => DocxComponents::AMBER_TEXT2]);
         }, 4);
     }

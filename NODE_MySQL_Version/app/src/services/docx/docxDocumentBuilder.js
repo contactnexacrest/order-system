@@ -202,7 +202,7 @@ function renderQt(context) {
   children.push(
     ...C.colorBox(C.AMBER_BG, C.AMBER_BORDER, [
       C.rich([
-        ['⏱  ', { size: 19 }],
+        ['', { size: 19 }],
         ['VALID UNTIL * ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
         [` ${g(order, 'quotation_valid_until', 'To Be Confirmed')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
         ['Prices and terms are not valid after this date.', { italics: true, size: 17, color: C.AMBER_NOTE }],
@@ -315,7 +315,7 @@ function renderPi(context) {
   children.push(
     ...C.colorBox(C.AMBER_BG, C.AMBER_BORDER, [
       C.rich([
-        ['⏱  ', { size: 19 }],
+        ['', { size: 19 }],
         ['VALID UNTIL * ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
         [` ${g(order, 'pi_valid_until', 'To Be Confirmed')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
         ['Payment must be received before this date for prices and terms to remain valid.', { italics: true, size: 17, color: C.AMBER_NOTE }],
@@ -475,7 +475,7 @@ function renderOc(context) {
   );
   children.push(
     ...C.colorBox(C.GREEN_BG, C.GREEN_BORDER, [
-      C.plain('✓  ORDER CONFIRMED', { bold: true, size: 26, color: C.GREEN_BORDER }),
+      C.plain('√  ORDER CONFIRMED', { bold: true, size: 26, color: C.GREEN_BORDER }),
       C.plain(`This order is confirmed upon receipt and clearance of ${g(financial, 'advance_pct')}% advance T/T payment against the referenced Proforma Invoice.`, { italics: true, size: 19, color: C.GREEN_VALUE }),
     ])
   );
@@ -753,7 +753,7 @@ function renderBuyerPo(context) {
   children.push(
     ...C.colorBox(C.AMBER_BG, C.AMBER_BORDER, [
       C.rich([
-        ['⏱  VALID UNTIL * ', { bold: true, color: C.AMBER_LABEL }],
+        ['VALID UNTIL * ', { bold: true, color: C.AMBER_LABEL }],
         [` ${g(order, 'quotation_valid_until', 'To Be Confirmed')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
         ['This Purchase Order must be signed and returned before the Quotation validity expires.', { italics: true, size: 17, color: C.AMBER_NOTE }],
       ]),
@@ -908,7 +908,7 @@ function renderSupPo(context) {
   children.push(
     ...C.colorBox(C.RED_BG, C.RED_BORDER, [
       C.rich([
-        ['⚠  All specifications below are binding. ', { bold: true, color: C.RED_TEXT, size: 18 }],
+        ['‼  All specifications below are binding. ', { bold: true, color: C.RED_TEXT, size: 18 }],
         ["Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.", { color: C.RED_SUB, size: 18 }],
       ]),
     ])
@@ -1029,7 +1029,7 @@ function renderFdn(context) {
   );
   children.push(
     ...C.colorBox(C.RED_BG, C.RED_BORDER, [
-      C.plain('⏱  PAYMENT REQUIRED BEFORE SHIPMENT', { bold: true, size: 20, color: C.RED_TEXT }, { alignment: AlignmentType.CENTER }),
+      C.plain('PAYMENT REQUIRED BEFORE SHIPMENT', { bold: true, size: 20, color: C.RED_TEXT }, { alignment: AlignmentType.CENTER }),
       C.rich(
         [
           ['Payment of this Freight Debit Note is required within ', { size: 19, color: C.RED_SUB }],
@@ -1086,7 +1086,7 @@ function renderFdn(context) {
       C.rich([['Payment Method: ', { bold: true }], ['T/T (Telegraphic Transfer) to the NexaCrest bank account below', { color: C.RED_SUB }]]),
       C.rich([['Reference: ', { bold: true }], [`Quote Debit Note No. ${g(meta, 'document_reference')} and PI No. ${g(order, 'pi_ref', '—')} in the remittance`, { color: C.RED_SUB }]]),
       C.rich([
-        ['⚠ Critical: ', { bold: true }],
+        ['‼ Critical: ', { bold: true }],
         ['Share bank remittance copy as per Section 1 contact details above immediately after payment. Shipment booking will be confirmed only upon verification of freight receipt.', { color: C.RED_SUB }],
       ]),
     ])
@@ -1373,7 +1373,7 @@ function renderBli(context) {
 
   children.push(
     ...C.colorBox(C.RED_BG, C.RED_BORDER, [
-      C.plain('⚠  MANDATORY — DRAFT BL APPROVAL REQUIRED BEFORE ORIGINALS ARE ISSUED', { bold: true, size: 20, color: C.RED_TEXT }),
+      C.plain('‼  MANDATORY — DRAFT BL APPROVAL REQUIRED BEFORE ORIGINALS ARE ISSUED', { bold: true, size: 20, color: C.RED_TEXT }),
       C.plain(
         "CHA / Shipping Line must send the complete draft Bill of Lading to NexaCrest for written approval before issuing any original BL. No original BL may be issued without NexaCrest's prior written approval. Send draft BL to NexaCrest at contact details in Section 1 above.",
         { size: 19, color: C.RED_SUB }
@@ -1502,18 +1502,28 @@ function renderCi(context) {
   children.push(C.plain(`${plRefLine}.`, { size: 17, color: C.MUTED }));
 
   children.push(...C.sectionTitle('5. INVOICE VALUE & PAYMENT SETTLEMENT'));
+  const isFob = !!order.is_fob;
+  // 90-item backlog item #18 (BLOCKER) — see documentDataAssembler's
+  // freightForTotal/totalCommercialInvoiceValue computation for the
+  // full rationale. CI-only; financial.total_value (QT/PI/OC's own
+  // "Total ... Value") is untouched.
   children.push(
     ...C.colorBox('E8F1FB', C.BLUE_TEXT, [
-      C.plain('FOB Value is the basis for all payments and required for Indian Shipping Bill & IGST refund. Freight & Insurance (if applicable) are recovered separately via Freight Debit Note and are not included in this Commercial Invoice value.', { color: C.BLUE_TEXT }),
+      C.plain(
+        'FOB Value is the basis for all payments and required for Indian Shipping Bill & IGST refund — shown separately below regardless of Incoterm. '
+          + (isFob
+            ? 'Freight & Insurance is not applicable — buyer arranges, FOB.'
+            : 'Freight & Insurance is recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.'),
+        { color: C.BLUE_TEXT }
+      ),
     ], 0)
   );
 
-  const isFob = !!order.is_fob;
-  const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Freight Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}. Not included in CI value.`;
+  const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Freight Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}. Included in the Total Commercial Invoice Value below.`;
   const sectionARows = [
-    ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')} *`, 'Sum of all product lines above — basis for all payments'],
-    ['Freight & Insurance', `${isFob ? 'NIL — FOB order' : 'Paid via FDN'} *`, freightRemark],
-    ['TOTAL COMMERCIAL INVOICE VALUE', `${currency} ${g(financial, 'fob_value')} *`, `Currency: ${currency}`],
+    ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')} *`, 'Sum of all product lines above — basis for all payments; required for Indian Shipping Bill & IGST refund'],
+    ['Freight & Insurance', `${isFob ? 'NIL — FOB order' : `${currency} ${g(financial, 'freight_insurance_amount', 'To Be Confirmed')}`} *`, freightRemark],
+    ['TOTAL COMMERCIAL INVOICE VALUE', `${currency} ${g(financial, 'total_commercial_invoice_value')} *`, `${isFob ? '= FOB Value (no freight/insurance on an FOB order)' : '= FOB Value + Freight & Insurance'} · Currency: ${currency}`],
   ];
   children.push(...C.threeColFinanceTable('SECTION A — INVOICE VALUE', sectionARows, C.NAVY_MID));
 
@@ -1526,22 +1536,24 @@ function renderCi(context) {
   const subtotalPaid = `${currency} ${advanceAmt}${!isFob && freightAmtVal !== '—' && freightAmtVal !== 'To Be Confirmed' ? ` + ${g(payment, 'freight_amount')} (freight)` : ''}`;
   const sectionBRows = [
     [
-      `✓  ${g(financial, 'advance_pct')}% Advance — ${g(payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'}`,
+      `√  ${g(financial, 'advance_pct')}% Advance — ${g(payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'}`,
       `${currency} ${advanceAmt} *`,
       `Received: ${g(payment, 'advance_cleared_at', 'To Be Confirmed')}\nAgainst: PI No. ${g(order, 'pi_ref', 'To Be Confirmed')}`,
     ],
-    [`✓  Freight & Insurance — ${freightStatus}`, freightAmtCell, freightRemark2],
+    [`√  Freight & Insurance — ${freightStatus}`, freightAmtCell, freightRemark2],
     ['SUBTOTAL ALREADY PAID', subtotalPaid, `${g(financial, 'advance_pct')}% Advance${!isFob ? ' + FDN (if applicable)' : ''}`],
     [
-      '⇒  BALANCE DUE NOW',
+      '→  BALANCE DUE NOW',
       `${currency} ${balanceAmt} *`,
       `= FOB Value minus ${g(financial, 'advance_pct')}% advance received\nPayable by T/T within ${g(financial, 'balance_days')} days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. ${g(meta, 'document_reference')}`,
       true,
     ],
     [
       'VERIFICATION',
-      `Advance + Balance = FOB Value\n${advanceAmt} + ${balanceAmt} = ${g(financial, 'fob_value')} ✓`,
-      'Freight & Insurance paid separately via FDN — not included in CI value or this verification.',
+      `Advance + Balance = FOB Value\n${advanceAmt} + ${balanceAmt} = ${g(financial, 'fob_value')} √`,
+      isFob
+        ? 'Freight & Insurance not applicable on an FOB order.'
+        : 'Freight & Insurance is paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.',
     ],
   ];
   children.push(...C.threeColFinanceTable('SECTION B — PAYMENT SETTLEMENT', sectionBRows, C.NAVY_MID));
@@ -1635,7 +1647,7 @@ function renderCooprep(context) {
   ];
   children.push(
     ...C.checklistTable(
-      ['✓', 'Document', 'What to check before submitting', 'Where it comes from'],
+      ['√', 'Document', 'What to check before submitting', 'Where it comes from'],
       [6, 24, 45, 25],
       docItems.map((r) => ({ cells: ['[ ]', C.plain(r[0], { bold: true }), r[1], r[2]] }))
     )
@@ -1709,7 +1721,7 @@ function renderCooprep(context) {
   children.push(
     ...C.colorBox(C.AMBER_BG2, C.AMBER_BORDER, [
       C.rich([
-        ['⚠ Annual renewal: ', { bold: true, color: C.AMBER_TEXT2 }],
+        ['‼ Annual renewal: ', { bold: true, color: C.AMBER_TEXT2 }],
         ['RCMC must be renewed annually. If RCMC expires, CAPEXIL cannot issue a COO — your shipment documents will be incomplete and customs clearance will fail. Set a reminder 60 days before expiry.', { color: C.AMBER_TEXT2 }],
       ]),
     ], 4)
