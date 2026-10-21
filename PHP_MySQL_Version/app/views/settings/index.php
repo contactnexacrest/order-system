@@ -52,6 +52,23 @@
                   <option value="<?= htmlspecialchars($currentValue) ?>" selected><?= htmlspecialchars($currentValue) ?> (not in admin list)</option>
                 <?php endif; ?>
               </select>
+            <?php elseif ($row['setting_key'] === 'lead_time_display_unit'): ?>
+              <?php /* 90-item backlog item 16: a fixed, non-admin-configurable 2-option
+                 choice — special-cased by key, same reasoning as the RBI purpose
+                 code block above, rather than a generic value_type='select'. */ ?>
+              <?php $currentValue = (string) ($row['setting_value'] ?? 'days'); ?>
+              <input type="hidden" name="settings[<?= htmlspecialchars($row['setting_key']) ?>]" value="<?= htmlspecialchars($currentValue) ?>">
+              <select
+                data-key="<?= htmlspecialchars($row['setting_key']) ?>"
+                data-initial-value="<?= htmlspecialchars($currentValue) ?>"
+                data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
+                data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
+                <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'disabled' : '' ?>
+                onchange="this.previousElementSibling.value = this.value;"
+              >
+                <option value="days" <?= $currentValue === 'days' ? 'selected' : '' ?>>Days</option>
+                <option value="weeks" <?= $currentValue === 'weeks' ? 'selected' : '' ?>>Weeks</option>
+              </select>
             <?php elseif ($row['value_type'] === 'boolean'): ?>
               <input type="hidden" name="settings[<?= htmlspecialchars($row['setting_key']) ?>]" value="<?= $row['setting_value'] === '1' ? '1' : '0' ?>">
               <input

@@ -2,6 +2,7 @@
 use App\Config\Env;
 use App\Helpers\Csrf;
 use App\Helpers\Dates;
+use App\Helpers\LeadTimeDisplay;
 use App\Repositories\CaFyLockRepository;
 use App\Services\AuthService;
 use App\Services\OrderEditGuard;
@@ -376,8 +377,8 @@ foreach ($stages as $s) {
       <div><span class="k">FOB Value</span><span class="v"><?= htmlspecialchars($order['currency_code']) ?> <?= number_format((float) $fobTotal, 2) ?></span></div>
       <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed') ?></span></div>
       <div><span class="k">Container Type</span><span class="v"><?= htmlspecialchars($order['container_type'] ?? '—') ?></span></div>
-      <div><span class="k">Production Lead Time (days)</span><span class="v"><?= (isset($order['lead_time_min_days']) || isset($order['lead_time_max_days'])) ? htmlspecialchars((string) ($order['lead_time_min_days'] ?? '?')) . '–' . htmlspecialchars((string) ($order['lead_time_max_days'] ?? '?')) : '—' ?></span></div>
-      <div><span class="k">Sailing Lead Time (days)</span><span class="v"><?= (isset($order['sailing_lead_time_min_days']) || isset($order['sailing_lead_time_max_days'])) ? htmlspecialchars((string) ($order['sailing_lead_time_min_days'] ?? '?')) . '–' . htmlspecialchars((string) ($order['sailing_lead_time_max_days'] ?? '?')) : '—' ?></span></div>
+      <div><span class="k">Production Lead Time (<?= htmlspecialchars($leadTimeDisplayUnit) ?>)</span><span class="v"><?= htmlspecialchars(LeadTimeDisplay::formatRange($order['lead_time_min_days'] !== null ? (int) $order['lead_time_min_days'] : null, $order['lead_time_max_days'] !== null ? (int) $order['lead_time_max_days'] : null, $leadTimeDisplayUnit)) ?></span></div>
+      <div><span class="k">Sailing Lead Time (<?= htmlspecialchars($leadTimeDisplayUnit) ?>)</span><span class="v"><?= htmlspecialchars(LeadTimeDisplay::formatRange($order['sailing_lead_time_min_days'] !== null ? (int) $order['sailing_lead_time_min_days'] : null, $order['sailing_lead_time_max_days'] !== null ? (int) $order['sailing_lead_time_max_days'] : null, $leadTimeDisplayUnit)) ?></span></div>
       <div><span class="k">Payment Preset</span><span class="v"><?= htmlspecialchars($order['preset_name']) ?></span></div>
       <div><span class="k">Buyer's PO Ref</span><span class="v">
         <?php if (!empty($order['buyers_po_ref']) && $order['buyers_po_ref'] !== 'NIL'): ?>

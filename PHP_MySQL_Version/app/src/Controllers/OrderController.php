@@ -788,6 +788,7 @@ final class OrderController
 
         View::render('orders/show', [
             'order'    => $order,
+            'leadTimeDisplayUnit' => CompanySettingsRepository::get('lead_time_display_unit') ?: 'days',
             'products' => OrderProductRepository::forOrder($orderId),
             'hsCodes'  => HsCodeRepository::active(),
             'stages'   => $stages,

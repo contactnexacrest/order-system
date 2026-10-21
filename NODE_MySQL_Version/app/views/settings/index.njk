@@ -49,6 +49,22 @@
                   <option value="{{ row.setting_value }}" selected>{{ row.setting_value }} (not in admin list)</option>
                 {% endif %}
               </select>
+            {% elif row.setting_key == 'lead_time_display_unit' %}
+              {# 90-item backlog item 16: a fixed, non-admin-configurable 2-option
+                 choice — special-cased by key, same reasoning as the RBI purpose
+                 code block above, rather than a generic value_type='select'. #}
+              <input type="hidden" name="settings[{{ row.setting_key }}]" value="{{ row.setting_value or 'days' }}">
+              <select
+                data-key="{{ row.setting_key }}"
+                data-initial-value="{{ row.setting_value or 'days' }}"
+                data-sensitive="{{ '1' if row.is_sensitive else '0' }}"
+                data-protected="{{ '1' if row.is_protected else '0' }}"
+                {{ 'disabled' if row.is_protected or lockedToSuperAdmin }}
+                onchange="this.previousElementSibling.value = this.value;"
+              >
+                <option value="days" {{ 'selected' if (row.setting_value or 'days') == 'days' }}>Days</option>
+                <option value="weeks" {{ 'selected' if row.setting_value == 'weeks' }}>Weeks</option>
+              </select>
             {% elif row.value_type == 'boolean' %}
               <input type="hidden" name="settings[{{ row.setting_key }}]" value="{{ '1' if row.setting_value == '1' else '0' }}">
               <input

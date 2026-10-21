@@ -782,6 +782,7 @@ async function show(req, res) {
     'orders/show',
     {
       order,
+      leadTimeDisplayUnit: (await companySettingsRepository.get('lead_time_display_unit')) || 'days',
       products: await orderProductRepository.forOrder(orderId),
       hsCodes: await hsCodeRepository.active(),
       isPostConfirmationOrder: orderEditGuard.isPostConfirmation(order.current_stage_number),

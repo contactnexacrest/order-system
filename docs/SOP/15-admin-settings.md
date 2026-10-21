@@ -244,6 +244,14 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   Min/Max (days)** fields (see below) — a suggestion only: it never
   overwrites a value staff already typed, and staff can always change it
   afterward.
+- **Lead Time Display Unit** — a single Company Settings field
+  (`lead_time_display_unit`, in the Orders category, Days by default)
+  controlling whether the Order Detail page's Production Lead Time and
+  Sailing Lead Time rows show in days or weeks. 90-item backlog item 16:
+  display only — the stored figures and every order form's input field
+  always stay in days regardless of this setting; only the label and the
+  rendered range on the Order Detail page change (e.g. "45–60" days vs.
+  "6.4–8.6" weeks).
 - **Payment Presets** (`/payment-presets`) — full CRUD for the advance/
   balance split every order picks up, gated by its own
   `manage_payment_presets` permission (same tier as Logistics Partners:

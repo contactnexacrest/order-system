@@ -166,6 +166,7 @@ njkEnv.addGlobal('docGenerated', (documents, code) => (documents || []).some((d)
 njkEnv.addGlobal('closeOrderBlockedBy', require('./helpers/closeOrderBlockedBy').closeOrderBlockedBy);
 njkEnv.addGlobal('annexureConfirmAttr', require('./helpers/annexureConfirmAttr').annexureConfirmAttr);
 njkEnv.addGlobal('stepBadge', require('./helpers/stepBadge').stepBadge);
+njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').formatRange);
 
 // --- Session store (MySQL-backed via knex, not PHP's file-session
 // equivalent — Node is a long-running multi-connection process, so a
