@@ -97,6 +97,22 @@ final class EmailLogRepository
      * the cron job hasn't ticked yet). This is everything a "Cancel" action
      * can still stop before it becomes 'sent'.
      */
+    /**
+     * User-reported batch item 16: the Email Approvals sidebar link had
+     * no pending-count badge, unlike Quotation Intake Review/PI Intake
+     * Review/Notifications. Counts the exact same rows
+     * awaitingDispatch() lists (pending_approval + approved-but-not-yet-
+     * dispatched), so the badge number always matches what staff see
+     * when they click through.
+     */
+    public static function awaitingDispatchCount(): int
+    {
+        $stmt = Database::connection()->query(
+            "SELECT COUNT(*) AS c FROM email_log WHERE status IN ('pending_approval', 'approved')"
+        );
+        return (int) $stmt->fetch()['c'];
+    }
+
     public static function awaitingDispatch(): array
     {
         // d.document_reference/document_type_code label the attachment link

@@ -116,8 +116,13 @@ a dedicated one from Email Templates in Settings.
 A separate approver (anyone with the `approve_email_send` permission) has
 to clear it from the **Email Send Approvals** queue before it goes out.
 That queue has its own item in the sidebar (next to **My Reviews** — not
-tucked under Insights), and a notification telling an approver a send is
-waiting links straight there. The screen shows each pending send as its
+tucked under Insights), carrying a live count badge whenever something is
+waiting — same pattern as Quotation Intake Review/PI Intake Review's own
+badges, counting everything still in the deferred window (awaiting
+approval, or already approved but not yet dispatched) so the number always
+matches what's on the screen behind it. No badge means the queue is
+genuinely empty; staff don't need to open the screen just to check. A
+notification telling an approver a send is waiting links straight there. The screen shows each pending send as its
 own card with the **exact** subject and body text that will go out
 (`email_log.body_snapshot`, captured at Level 1 — never re-composed at
 send time) plus a **View attachment** link that opens the real,

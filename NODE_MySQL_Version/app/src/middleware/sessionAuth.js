@@ -11,6 +11,7 @@ const superAdminService = require('../services/superAdminService');
 const notificationRepository = require('../repositories/notificationRepository');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
+const emailLogRepository = require('../repositories/emailLogRepository');
 
 // Port of App\Middleware\SessionAuth. Redirects to /login if not
 // authenticated; enforces the DB-driven idle session timeout
@@ -107,6 +108,13 @@ function required() {
       req.clientIntakePendingCount = 0;
       req.piIntakePendingCount = 0;
     }
+
+    // User-reported batch item 16: same live-COUNT badge pattern as the
+    // Quotation/PI Intake Review links above — only queried for staff
+    // who could actually act on it.
+    req.emailApprovalsPendingCount = req.permissions.approve_email_send
+      ? await emailLogRepository.awaitingDispatchCount()
+      : 0;
 
     next();
   };

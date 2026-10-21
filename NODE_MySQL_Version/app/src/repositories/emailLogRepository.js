@@ -59,6 +59,18 @@ async function pendingApproval() {
 }
 
 /**
+ * User-reported batch item 16: the Email Approvals sidebar link had no
+ * pending-count badge, unlike Quotation Intake Review/PI Intake
+ * Review/Notifications. Counts the exact same rows awaitingDispatch()
+ * lists (pending_approval + approved-but-not-yet-dispatched), so the
+ * badge number always matches what staff see when they click through.
+ */
+async function awaitingDispatchCount() {
+  const row = await db.queryOne("SELECT COUNT(*) AS c FROM email_log WHERE status IN ('pending_approval', 'approved')");
+  return parseInt(row.c, 10);
+}
+
+/**
  * The full deferred window — awaiting Level-2 approval, or already approved
  * but not yet dispatched (scheduled_at still in the future or the
  * background job hasn't ticked yet). This is everything a "Cancel" action
@@ -147,6 +159,7 @@ module.exports = {
   hasActiveSendFor,
   pendingApproval,
   awaitingDispatch,
+  awaitingDispatchCount,
   approve,
   reject,
   cancel,
