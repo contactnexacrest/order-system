@@ -88,7 +88,7 @@ async function awaitingDispatch() {
      LEFT JOIN documents d ON d.id = el.document_id
      LEFT JOIN document_types dt ON dt.id = d.document_type_id
      WHERE el.status IN ('pending_approval', 'approved')
-     ORDER BY el.created_at`
+     ORDER BY el.created_at DESC`
   );
 }
 

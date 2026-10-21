@@ -138,6 +138,17 @@ dispatched) is the "deferred send" window, giving staff a chance to catch a
 mistake before it reaches the buyer. Once it's actually dispatched, nothing
 here can pull it back.
 
+Approving a send never makes it go out immediately by itself — it still
+waits for its own `scheduled_at` time (or the next run of the dispatch
+cron/background job, if scheduled for "now"). An already-approved row
+still waiting in that window carries its own **Send Now** button, for
+when staff genuinely want it out right away rather than waiting for
+`scheduled_at` or the next job tick — it skips only the remaining TIME,
+never the Level-2 approval step itself (a still-`pending_approval` row
+has no Send Now button; it must be approved first). The queue itself
+lists everything most-recently-requested first, so a fresh submission
+never gets buried below older rows still waiting out their own schedule.
+
 ### Admin-configurable: turning sending off, or skipping Level 2
 
 Two independent switches in Company Settings, both off by default (meaning:

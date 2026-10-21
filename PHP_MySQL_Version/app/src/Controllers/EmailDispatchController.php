@@ -139,6 +139,19 @@ final class EmailDispatchController
         header('Location: /email-approvals');
     }
 
+    /** 90-item backlog Phase 4: force an already-approved deferred send out now, instead of waiting for scheduled_at + the next cron tick. */
+    public function sendNow(array $params): void
+    {
+        $id = (int) $params['emailLogId'];
+        try {
+            $sent = EmailDispatchService::sendNowOverride($id, (int) AuthService::currentUser()['id']);
+            Flash::set($sent ? 'success' : 'error', $sent ? 'Sent.' : 'Send attempted now but it failed — check the mail configuration in Settings.');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header('Location: /email-approvals');
+    }
+
     public function reject(array $params): void
     {
         $id = (int) $params['emailLogId'];

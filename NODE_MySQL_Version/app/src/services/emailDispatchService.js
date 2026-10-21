@@ -251,8 +251,30 @@ async function cancelSend(emailLogId, userId, reason, isApprover) {
 }
 
 /**
- * The actual send — called only by the deferred-email-dispatch background
- * job, never synchronously from a web request (see that job's docblock).
+ * 90-item backlog Phase 4: the "future 'send now' button" the deferred-
+ * dispatch job's own docblock anticipated — an approver who approves a
+ * deferred send before its scheduled_at window used to have no way to
+ * actually make it go out immediately; it still sat waiting for the next
+ * job tick (or for scheduled_at itself to pass). Only usable on a row
+ * already 'approved' (not 'pending_approval') — forcing dispatch skips
+ * nothing but the TIME it waits, never the Level-2 approval step itself.
+ * Shares dispatch()'s exact code path, so a forced send can never
+ * diverge from what the job would have done at the scheduled time.
+ */
+async function sendNowOverride(emailLogId, userId) {
+  const row = await emailLogRepository.find(emailLogId);
+  if (!row || row.status !== 'approved') {
+    throw new Error('Only an already-approved send still waiting to go out can be sent now.');
+  }
+
+  await auditLogRepository.log(userId, 'EMAIL_SEND_FORCED_NOW', 'email_log', emailLogId, 'scheduled_at', row.scheduled_at, null);
+  return dispatch(row);
+}
+
+/**
+ * The actual send — called by the deferred-email-dispatch background job
+ * on its own schedule, or synchronously from sendNowOverride() above
+ * when an approver explicitly chooses to skip the remaining wait.
  * Returns true on send success.
  */
 async function dispatch(emailLogRow) {
@@ -325,4 +347,4 @@ async function dispatch(emailLogRow) {
   return sent;
 }
 
-module.exports = { buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch };
+module.exports = { buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride };

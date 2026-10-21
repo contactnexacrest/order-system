@@ -16,8 +16,9 @@ declare(strict_types=1);
  *
  * Deliberately a thin loop — all the actual logic (which file to attach,
  * marking documents 'sent', audit logging) lives in EmailDispatchService,
- * so this script and a future "send now" button (if ever added) share
- * one code path instead of two.
+ * so this script and the "Send Now" override on the approval queue
+ * (EmailDispatchService::sendNowOverride()) share one code path instead
+ * of two.
  *
  * Usage: php /path/to/app/cron/dispatch_deferred_emails.php
  */

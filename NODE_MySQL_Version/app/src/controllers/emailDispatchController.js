@@ -121,6 +121,18 @@ async function approve(req, res) {
   res.redirect('/email-approvals');
 }
 
+/** 90-item backlog Phase 4: force an already-approved deferred send out now, instead of waiting for scheduled_at + the next job tick. */
+async function sendNow(req, res) {
+  const id = parseInt(req.params.emailLogId, 10);
+  try {
+    const sent = await emailDispatchService.sendNowOverride(id, req.user.id);
+    flash.set(req, sent ? 'success' : 'error', sent ? 'Sent.' : 'Send attempted now but it failed — check the mail configuration in Settings.');
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect('/email-approvals');
+}
+
 async function reject(req, res) {
   const id = parseInt(req.params.emailLogId, 10);
   try {
@@ -161,4 +173,4 @@ async function cancel(req, res) {
   res.redirect(redirectTo);
 }
 
-module.exports = { compose, composeGeneric, requestSend, approvalQueue, approve, reject, cancel };
+module.exports = { compose, composeGeneric, requestSend, approvalQueue, approve, sendNow, reject, cancel };

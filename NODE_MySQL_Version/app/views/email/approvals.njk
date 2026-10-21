@@ -44,6 +44,12 @@
         <button type="submit" class="btn-sm btn-danger">Reject</button>
       </form>
       {% endif %}
+      {% if row.status == 'approved' %}
+      <form method="post" action="/email-log/{{ row.id }}/send-now" style="display:inline" onsubmit="return confirm('Send this now instead of waiting for its scheduled time?');">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <button type="submit" class="btn-sm btn-accent">Send Now</button>
+      </form>
+      {% endif %}
       <form method="post" action="/email-log/{{ row.id }}/cancel" style="display:inline" onsubmit="return confirm('Cancel this send? It will never go out.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:160px">

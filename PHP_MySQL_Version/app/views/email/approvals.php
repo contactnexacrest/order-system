@@ -45,6 +45,12 @@
         <button type="submit" class="btn-sm btn-danger">Reject</button>
       </form>
       <?php endif; ?>
+      <?php if ($row['status'] === 'approved'): ?>
+      <form method="post" action="/email-log/<?= (int) $row['id'] ?>/send-now" style="display:inline" onsubmit="return confirm('Send this now instead of waiting for its scheduled time?');">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn-sm btn-accent">Send Now</button>
+      </form>
+      <?php endif; ?>
       <form method="post" action="/email-log/<?= (int) $row['id'] ?>/cancel" style="display:inline" onsubmit="return confirm('Cancel this send? It will never go out.');">
         <?= Csrf::field() ?>
         <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:160px">

@@ -24,8 +24,9 @@ const logger = require('../helpers/logger');
  *
  * Deliberately a thin loop — all the actual logic (which file to attach,
  * marking documents 'sent', audit logging) lives in emailDispatchService,
- * so this script and a future "send now" button (if ever added) share one
- * code path instead of two.
+ * so this script and the "Send Now" override on the approval queue
+ * (emailDispatchService.sendNowOverride()) share one code path instead
+ * of two.
  */
 
 async function run() {

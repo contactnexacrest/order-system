@@ -204,9 +204,33 @@ final class EmailDispatchService
     }
 
     /**
-     * The actual send — called only by app/cron/dispatch_deferred_emails.php,
-     * never synchronously from a web request (see that script's docblock).
-     * Returns true on send success.
+     * 90-item backlog Phase 4: the "future 'send now' button" the cron
+     * script's own docblock anticipated — an approver who approves a
+     * deferred send before its scheduled_at window used to have no way
+     * to actually make it go out immediately; it still sat waiting for
+     * the next cron tick (or for scheduled_at itself to pass). Only
+     * usable on a row already 'approved' (not 'pending_approval') —
+     * forcing dispatch skips nothing but the TIME it waits, never the
+     * Level-2 approval step itself. Shares dispatch()'s exact code path,
+     * so a forced send can never diverge from what the cron would have
+     * done at the scheduled time.
+     */
+    public static function sendNowOverride(int $emailLogId, int $userId): bool
+    {
+        $row = EmailLogRepository::find($emailLogId);
+        if (!$row || $row['status'] !== 'approved') {
+            throw new \RuntimeException('Only an already-approved send still waiting to go out can be sent now.');
+        }
+
+        AuditLogRepository::log($userId, 'EMAIL_SEND_FORCED_NOW', 'email_log', $emailLogId, 'scheduled_at', $row['scheduled_at'], null);
+        return self::dispatch($row);
+    }
+
+    /**
+     * The actual send — called by app/cron/dispatch_deferred_emails.php on
+     * its own schedule, or synchronously from sendNowOverride() above when
+     * an approver explicitly chooses to skip the remaining wait. Returns
+     * true on send success.
      */
     public static function dispatch(array $emailLogRow): bool
     {
