@@ -17,7 +17,15 @@ const { marked } = require('marked');
  *
  * Every route here is read-only and requires nothing more than being
  * logged in (see server.js) — same visibility as the Reference Library,
- * since any staff member should be able to look this up.
+ * since any staff member should be able to look this up — EXCEPT the
+ * CA / Accounting chapters (the 'ca-' prefix chapters() already splits
+ * out as category 'ca'), which document the same supplier-cost/
+ * profitability/government-benefit detail the live CA module itself
+ * gates behind ca_module_view. Reading the live screens already needs
+ * that permission; reading the SOP chapter describing them didn't —
+ * the same class of gap the Reference Library's own category-level
+ * required_permission already closes for its own content
+ * (referenceDocController's index()/canViewCustomDoc() mirrored here).
  */
 
 const DOCS_DIR = path.join(__dirname, '..', '..', '..', 'docs', 'SOP');
@@ -58,22 +66,30 @@ function extractTitle(filePath) {
  * the standing rule in this repo's history: every new module ships with
  * its own SOP chapter(s), grouped under their own heading.
  */
-function chapters() {
+function canViewCaChapters(req) {
+  return !!(req.permissions || {}).ca_module_view;
+}
+
+function chapters(req) {
+  const canViewCa = canViewCaChapters(req);
   const files = fs.readdirSync(DOCS_DIR)
     .filter((f) => f.endsWith('.md') && f !== 'README.md')
     .sort();
-  return files.map((f) => {
-    const slug = f.slice(0, -3);
-    const title = extractTitle(path.join(DOCS_DIR, f)) || slug;
-    const category = slug.startsWith('ca-') ? 'ca' : 'main';
-    return { slug, title, category };
-  });
+  return files
+    .map((f) => {
+      const slug = f.slice(0, -3);
+      const title = extractTitle(path.join(DOCS_DIR, f)) || slug;
+      const category = slug.startsWith('ca-') ? 'ca' : 'main';
+      return { slug, title, category };
+    })
+    // same gap Reference Library's index() already closes for its own content
+    .filter((ch) => ch.category !== 'ca' || canViewCa);
 }
 
 async function index(req, res) {
   const readmePath = path.join(DOCS_DIR, 'README.md');
   const contentHtml = fs.existsSync(readmePath) ? renderMarkdownFile(readmePath) : null;
-  res.renderView('sop/index', { contentHtml, chapters: chapters() }, 'layout/base');
+  res.renderView('sop/index', { contentHtml, chapters: chapters(req) }, 'layout/base');
 }
 
 async function show(req, res) {
@@ -89,10 +105,14 @@ async function show(req, res) {
     res.status(404).send('SOP chapter not found.');
     return;
   }
+  if (slug.startsWith('ca-') && !canViewCaChapters(req)) {
+    res.status(403).send('<h1>403 — Not permitted</h1><p>You do not have access to CA / Accounting module chapters.</p><p><a href="/sop">Back to SOP</a></p>');
+    return;
+  }
 
   res.renderView('sop/show', {
     contentHtml: renderMarkdownFile(filePath),
-    chapters: chapters(),
+    chapters: chapters(req),
     currentSlug: slug,
   }, 'layout/base');
 }

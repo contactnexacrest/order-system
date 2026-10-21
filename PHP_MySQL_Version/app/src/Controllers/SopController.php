@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\View;
+use App\Services\AuthService;
+use App\Services\PermissionService;
 use League\CommonMark\GithubFlavoredMarkdownConverter;
 
 /**
@@ -19,10 +21,29 @@ use League\CommonMark\GithubFlavoredMarkdownConverter;
  *
  * Every route in this controller is read-only and requires nothing more
  * than being logged in (see index.php) — same visibility as the Reference
- * Library, since any staff member should be able to look this up.
+ * Library, since any staff member should be able to look this up — EXCEPT
+ * the CA / Accounting chapters (the 'ca-' prefix chapters() already
+ * splits out as category 'ca'), which document the same supplier-cost/
+ * profitability/government-benefit detail the live CA module itself
+ * gates behind ca_module_view (see ca-01-overview.md's own "stricter
+ * permission" sections). Reading the live screens already needs that
+ * permission; reading the SOP chapter describing them didn't, which is
+ * the same class of gap the Reference Library's own category-level
+ * required_permission already closes for its own content —
+ * ReferenceDocController::index()/canViewCustomDoc() mirrored here.
  */
 final class SopController
 {
+    private function canViewCaChapters(): bool
+    {
+        $user = AuthService::currentUser();
+        return $user !== null && PermissionService::can(
+            (int) $user['id'],
+            $user['role_id'] !== null ? (int) $user['role_id'] : null,
+            'ca_module_view'
+        );
+    }
+
     private function docsDir(): string
     {
         return dirname(__DIR__, 3) . '/docs/SOP';
@@ -54,16 +75,21 @@ final class SopController
         $files = glob($dir . '/*.md') ?: [];
         sort($files, SORT_STRING);
 
+        $canViewCa = $this->canViewCaChapters();
         $chapters = [];
         foreach ($files as $path) {
             $slug = basename($path, '.md');
             if ($slug === 'README') {
                 continue;
             }
+            $category = str_starts_with($slug, 'ca-') ? 'ca' : 'main';
+            if ($category === 'ca' && !$canViewCa) {
+                continue; // same gap Reference Library's index() already closes for its own content
+            }
             $chapters[] = [
                 'slug'     => $slug,
                 'title'    => $this->extractTitle($path) ?? $slug,
-                'category' => str_starts_with($slug, 'ca-') ? 'ca' : 'main',
+                'category' => $category,
             ];
         }
         return $chapters;
@@ -127,6 +153,11 @@ final class SopController
         if ($slug === '' || $slug === 'README' || !is_file($path) || dirname(realpath($path)) !== realpath($this->docsDir())) {
             http_response_code(404);
             echo 'SOP chapter not found.';
+            return;
+        }
+        if (str_starts_with($slug, 'ca-') && !$this->canViewCaChapters()) {
+            http_response_code(403);
+            echo '<h1>403 — Not permitted</h1><p>You do not have access to CA / Accounting module chapters.</p><p><a href="/sop">Back to SOP</a></p>';
             return;
         }
 

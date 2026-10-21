@@ -46,7 +46,7 @@ order-management access, or vice versa.
 
 | Permission | What it allows |
 |---|---|
-| `ca_module_view` | See the CA / Accounting module at all (the "CA / Accounting" link in the sidebar, and the `/ca` page). |
+| `ca_module_view` | See the CA / Accounting module at all (the "CA / Accounting" link in the sidebar, and the `/ca` page) — and, 90-item backlog "SOP/Reference-Library RBAC", every CA / Accounting chapter of this very SOP (the `ca-` prefixed ones): without it, they're left out of the chapter list entirely, and a direct link to one is refused. |
 | `inr_actual_view` | See the actual INR amount recorded against a cleared advance/balance/freight payment. |
 | `inr_actual_edit` | Record or correct the INR actual amount for a cleared payment. |
 | `inr_actual_delete` | Remove a recorded INR actual amount (a destructive correction — kept separate from edit). |
