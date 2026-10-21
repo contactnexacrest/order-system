@@ -2,7 +2,10 @@
   <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Order Report — <?= htmlspecialchars($order['order_reference']) ?></h1>
   <p class="muted"><?= htmlspecialchars($order['company_legal_name']) ?> · <?= htmlspecialchars(ucfirst($order['status'])) ?></p>
-  <div class="btn-row"><a class="btn-sm btn-secondary" href="/orders/<?= (int) $order['id'] ?>">View Order</a></div>
+  <div class="btn-row">
+    <a class="btn-sm btn-secondary" href="/orders/<?= (int) $order['id'] ?>">View Order</a>
+    <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/order/<?= (int) $order['id'] ?>?format=csv">Export Audit Trail CSV</a>
+  </div>
 
   <div class="section">
     <h2>Stage Data</h2>

@@ -32,7 +32,10 @@
         <label>Date From<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
         <label>Date To<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
       </div>
-      <div class="btn-row"><button type="submit" class="btn-sm">Run Custom Range</button></div>
+      <div class="btn-row">
+        <button type="submit" class="btn-sm">Run Custom Range</button>
+        <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/performance?date_from={{ filters.dateFrom or '' }}&date_to={{ filters.dateTo or '' }}&preset={{ filters.preset or '' }}&format=csv">Export CSV (Lost Orders)</a>
+      </div>
     </form>
     {% if prev != null %}
       <p class="muted small">Compared against {{ report.previous_range[0] }} to {{ report.previous_range[1] }} (same number of days, immediately before).</p>

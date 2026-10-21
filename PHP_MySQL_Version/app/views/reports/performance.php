@@ -35,7 +35,10 @@ $presets = [
         <label>Date From<input type="date" name="date_from" value="<?= htmlspecialchars($filters['dateFrom'] ?? '') ?>"></label>
         <label>Date To<input type="date" name="date_to" value="<?= htmlspecialchars($filters['dateTo'] ?? '') ?>"></label>
       </div>
-      <div class="btn-row"><button type="submit" class="btn-sm">Run Custom Range</button></div>
+      <div class="btn-row">
+        <button type="submit" class="btn-sm">Run Custom Range</button>
+        <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/performance?<?= htmlspecialchars(http_build_query(array_filter(['date_from' => $filters['dateFrom'] ?? null, 'date_to' => $filters['dateTo'] ?? null, 'preset' => $filters['preset'] ?? null]))) ?>&format=csv">Export CSV (Lost Orders)</a>
+      </div>
     </form>
     <?php if ($prev !== null): ?>
       <p class="muted small">Compared against <?= htmlspecialchars($report['previous_range'][0]) ?> to <?= htmlspecialchars($report['previous_range'][1]) ?> (same number of days, immediately before).</p>

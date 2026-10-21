@@ -10,6 +10,7 @@
     </div>
     <div class="btn-row">
       <button type="submit" class="btn-sm">Run</button>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/staff?<?= htmlspecialchars(http_build_query(array_filter(['date_from' => $filters['dateFrom'] ?? null, 'date_to' => $filters['dateTo'] ?? null]))) ?>&format=csv">Export CSV</a>
     </div>
   </form>
 

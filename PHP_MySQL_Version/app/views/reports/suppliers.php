@@ -2,6 +2,7 @@
   <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Supplier Performance Report</h1>
   <p class="muted">All-time, per supplier. "Avg Signing Days" is PO creation to signature confirmation. "On-Time %" compares the packing date against the PO's required delivery date — the closest available proxy for "material received on time," since the schema has no separate goods-receipt timestamp.</p>
+  <div class="btn-row"><a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/suppliers?format=csv">Export CSV</a></div>
 
   <div class="section">
     <table class="list">

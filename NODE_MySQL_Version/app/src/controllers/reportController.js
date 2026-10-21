@@ -68,6 +68,26 @@ async function client(req, res) {
   res.renderView('reports/client', Object.assign({}, data, { canViewFullEmail }), 'layout/base');
 }
 
+/**
+ * Exports the page's "Full Audit Trail" section — the one of this
+ * report's 3 sections (Stage Data, Documents, Full Audit Trail) that
+ * can genuinely run long and is worth pulling into a spreadsheet;
+ * Stage Data/Documents are both small, fixed-size tables already
+ * visible at a glance on the page itself.
+ */
+function orderAuditCsvRows(audit) {
+  const rows = audit.map((a) => ({
+    When: a.created_at,
+    User: a.user_name ?? 'System',
+    Action: a.action_type,
+    Field: a.field_name ?? '—',
+    'Old -> New': (a.old_value !== null || a.new_value !== null) ? `${a.old_value ?? '—'} -> ${a.new_value ?? '—'}` : '—',
+    Reason: a.reason ?? '—',
+  }));
+
+  return { headers: ['When', 'User', 'Action', 'Field', 'Old -> New', 'Reason'], rows };
+}
+
 async function order(req, res) {
   const orderId = parseInt(req.params.orderId, 10);
   const data = await reportRepository.perOrder(orderId);
@@ -75,6 +95,13 @@ async function order(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
+
+  if (req.query.format === 'csv') {
+    const { headers, rows } = orderAuditCsvRows(data.audit);
+    csv.stream(res, `order_${String(data.order.order_reference).replace(/[^A-Za-z0-9_-]+/g, '-')}_audit_trail.csv`, headers, rows);
+    return;
+  }
+
   res.renderView('reports/order', data, 'layout/base');
 }
 
@@ -277,20 +304,76 @@ async function amendments(req, res) {
   );
 }
 
+/**
+ * 90-item backlog "CSV export for the 6 non-CA reports": Trends, Staff
+ * Productivity, Supplier Performance, Conversion Rate, Sales
+ * Performance, and the per-Order report were the 6 reports in the
+ * non-CA Reports module with no CSV export at all, unlike every other
+ * report here. Extracted as its own function (same for the other 5
+ * below) purely to mirror the PHP side's testable-without-exit()
+ * structure 1:1, even though csv.stream() here uses res.send(), not
+ * process.exit(), so Node's own version has no such constraint.
+ */
+function trendsCsvRows(months) {
+  const rows = months.map((m) => {
+    const entries = Object.entries(m.fob_by_currency || {});
+    const fobByCurrency = entries.length === 0
+      ? '—'
+      : entries.map(([cc, amt]) => `${cc} ${Number(amt).toFixed(2)}`).join('; ');
+    return {
+      Month: m.month,
+      'Orders Created': m.orders_created,
+      'Quotations Sent': m.quotations_sent,
+      'PI Sent': m.pi_sent,
+      Lost: m.lost,
+      'Total FOB Value': fobByCurrency,
+    };
+  });
+
+  return { headers: ['Month', 'Orders Created', 'Quotations Sent', 'PI Sent', 'Lost', 'Total FOB Value'], rows };
+}
+
 /** Month-over-month trend view — everything else in this module is either a snapshot or a single flat total. */
 async function trends(req, res) {
-  res.renderView('reports/trends', { months: await reportRepository.monthlyTrends(12) }, 'layout/base');
+  const months = await reportRepository.monthlyTrends(12);
+
+  if (req.query.format === 'csv') {
+    const { headers, rows } = trendsCsvRows(months);
+    csv.stream(res, 'trends_report.csv', headers, rows);
+    return;
+  }
+
+  res.renderView('reports/trends', { months }, 'layout/base');
+}
+
+function staffCsvRows(rows) {
+  const csvRows = rows.map((r) => {
+    const entries = Object.entries(r.by_type || {});
+    const byType = entries.length === 0 ? '—' : entries.map(([type, n]) => `${type}: ${n}`).join('; ');
+    return {
+      User: r.user_name,
+      'Documents Generated (by type)': byType,
+      'Documents Total': r.documents_total,
+      'Audit Log Actions': r.audit_actions,
+    };
+  });
+
+  return { headers: ['User', 'Documents Generated (by type)', 'Documents Total', 'Audit Log Actions'], rows: csvRows };
 }
 
 /** Staff productivity report — gated on view_staff_reports, not view_reports, since it shows individual activity. */
 async function staff(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
-  res.renderView(
-    'reports/staff',
-    { rows: await reportRepository.staffProductivity(dateFrom, dateTo), filters: { dateFrom, dateTo } },
-    'layout/base'
-  );
+  const rows = await reportRepository.staffProductivity(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const { headers, rows: csvRows } = staffCsvRows(rows);
+    csv.stream(res, 'staff_productivity_report.csv', headers, csvRows);
+    return;
+  }
+
+  res.renderView('reports/staff', { rows, filters: { dateFrom, dateTo } }, 'layout/base');
 }
 
 /**
@@ -511,9 +594,30 @@ async function products(req, res) {
   res.renderView('reports/products', { byHsCode: data.by_hs_code, filters: { dateFrom, dateTo } }, 'layout/base');
 }
 
+function suppliersCsvRows(rows) {
+  const csvRows = rows.map((s) => ({
+    Supplier: s.supplier_name,
+    POs: s.po_count,
+    Signed: s.signed_count,
+    'Avg Signing Days': s.avg_signing_days ?? '—',
+    'Delivery Tracked': s.delivery_tracked_count,
+    'On-Time %': s.on_time_pct !== null ? `${s.on_time_pct}%` : '—',
+  }));
+
+  return { headers: ['Supplier', 'POs', 'Signed', 'Avg Signing Days', 'Delivery Tracked', 'On-Time %'], rows: csvRows };
+}
+
 /** Supplier performance report — closes a real gap: supplier POs were tracked per order but never rolled up. */
 async function suppliers(req, res) {
-  res.renderView('reports/suppliers', { rows: await reportRepository.supplierPerformanceReport() }, 'layout/base');
+  const rows = await reportRepository.supplierPerformanceReport();
+
+  if (req.query.format === 'csv') {
+    const { headers, rows: csvRows } = suppliersCsvRows(rows);
+    csv.stream(res, 'supplier_performance_report.csv', headers, csvRows);
+    return;
+  }
+
+  res.renderView('reports/suppliers', { rows }, 'layout/base');
 }
 
 /**
@@ -545,15 +649,39 @@ async function profitability(req, res) {
   res.renderView('reports/profitability', { rows: data.rows, totals: data.totals, filters: { dateFrom, dateTo } }, 'layout/base');
 }
 
+/**
+ * A Metric/Value pair table, same shape as queues()'s own
+ * funnel_activity CSV, since this report (like that funnel section) is
+ * one row per metric rather than one row per record.
+ */
+function conversionCsvRows(conversion) {
+  const pct = (v) => (v !== null ? `${v}%` : '—');
+  const rows = [
+    { Metric: 'Quotations sent', Value: conversion.quotations_sent },
+    { Metric: 'Quotation -> PI conversion', Value: pct(conversion.quotation_to_pi_pct) },
+    { Metric: 'Quotation lost rate', Value: pct(conversion.quotation_lost_pct) },
+    { Metric: 'PI sent', Value: conversion.pi_sent },
+    { Metric: 'PI -> Confirmed Order conversion', Value: pct(conversion.pi_to_confirmed_pct) },
+    { Metric: 'PI lost rate', Value: pct(conversion.pi_lost_pct) },
+    { Metric: 'Overall Quotation -> Confirmed Order', Value: pct(conversion.overall_quotation_to_confirmed_pct) },
+  ];
+
+  return { headers: ['Metric', 'Value'], rows };
+}
+
 /** Conversion-rate report — closes a real gap: the funnel showed raw counts, never the actual conversion percentage. */
 async function conversion(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
-  res.renderView(
-    'reports/conversion',
-    { conversion: await reportRepository.conversionRateReport(dateFrom, dateTo), filters: { dateFrom, dateTo } },
-    'layout/base'
-  );
+  const conversionData = await reportRepository.conversionRateReport(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const { headers, rows } = conversionCsvRows(conversionData);
+    csv.stream(res, 'conversion_report.csv', headers, rows);
+    return;
+  }
+
+  res.renderView('reports/conversion', { conversion: conversionData, filters: { dateFrom, dateTo } }, 'layout/base');
 }
 
 /** @returns {[string,string]|null} [dateFrom, dateTo] for a named preset, calendar-based (not fiscal year) */
@@ -599,6 +727,23 @@ function presetRange(preset) {
  * date_from/date_to for the common cases without a separate UI per
  * period — the underlying report is always just a date range.
  */
+/**
+ * Exports the page's "Lost Orders — Detail" table — the one genuinely
+ * per-record section on this report; Key Metrics/FOB Value Won are both
+ * single-row-per-period summaries already visible at a glance.
+ */
+function performanceCsvRows(report) {
+  const rows = report.lost_orders.map((lo) => ({
+    Order: lo.order_reference,
+    Client: lo.company_legal_name,
+    'Lost On': String(lo.lost_at),
+    'Stage Reached': lo.reached_pi ? 'PI' : 'Quotation',
+    Reason: lo.lost_reason ?? '—',
+  }));
+
+  return { headers: ['Order', 'Client', 'Lost On', 'Stage Reached', 'Reason'], rows };
+}
+
 async function performance(req, res) {
   const preset = str(req.query.preset);
   const preRange = preset !== '' ? presetRange(preset) : null;
@@ -606,15 +751,20 @@ async function performance(req, res) {
   const dateFrom = preRange ? preRange[0] : (str(req.query.date_from) || null);
   const dateTo = preRange ? preRange[1] : (str(req.query.date_to) || null);
 
-  res.renderView(
-    'reports/performance',
-    { report: await reportRepository.salesPerformanceReport(dateFrom, dateTo), filters: { dateFrom, dateTo, preset } },
-    'layout/base'
-  );
+  const report = await reportRepository.salesPerformanceReport(dateFrom, dateTo);
+
+  if (req.query.format === 'csv') {
+    const { headers, rows } = performanceCsvRows(report);
+    csv.stream(res, 'sales_performance_report.csv', headers, rows);
+    return;
+  }
+
+  res.renderView('reports/performance', { report, filters: { dateFrom, dateTo, preset } }, 'layout/base');
 }
 
 module.exports = {
   index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
   payments, disputes, amendments, trends, staff, ageing, freightCost, products, suppliers, conversion,
   profitability, performance, presetRange,
+  trendsCsvRows, staffCsvRows, suppliersCsvRows, conversionCsvRows, performanceCsvRows, orderAuditCsvRows,
 };

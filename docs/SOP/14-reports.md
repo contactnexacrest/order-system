@@ -68,9 +68,14 @@ Everything starts from the **Reports** hub:
   visibility (private or shared with other staff), then re-run it later
   without re-entering the filters.
 
-Most report screens with a date range also offer **Export CSV** — a
+Every report screen in this module (CA/Accounting reports are their own
+separate module — see that chapter) offers **Export CSV** — a
 spreadsheet-ready download of exactly what's on screen, for anything that
 needs to leave the system (board reporting, external accounting, etc.).
+A report built around a single metrics table rather than a per-record
+list (Conversion Rate) exports as a Metric/Value pair per row instead;
+the Per-Order Report exports its own Full Audit Trail section, the one
+of its three sections genuinely worth pulling into a spreadsheet.
 
 ## What the client does (or doesn't)
 

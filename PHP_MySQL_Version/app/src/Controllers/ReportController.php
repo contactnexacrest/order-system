@@ -75,7 +75,36 @@ final class ReportController
             echo 'Order not found.';
             return;
         }
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $csvRows] = self::orderAuditCsvRows($data['audit']);
+            Csv::stream('order_' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $data['order']['order_reference']) . '_audit_trail.csv', $headers, $csvRows);
+        }
+
         View::render('reports/order', $data, 'layout/base');
+    }
+
+    /**
+     * Exports the page's "Full Audit Trail" section — the one of this
+     * report's 3 sections (Stage Data, Documents, Full Audit Trail) that
+     * can genuinely run long and is worth pulling into a spreadsheet;
+     * Stage Data/Documents are both small, fixed-size tables already
+     * visible at a glance on the page itself.
+     *
+     * @return array{headers: string[], rows: array<int, array<string, mixed>>}
+     */
+    public static function orderAuditCsvRows(array $audit): array
+    {
+        $rows = array_map(static fn (array $a): array => [
+            'When' => $a['created_at'],
+            'User' => $a['user_name'] ?? 'System',
+            'Action' => $a['action_type'],
+            'Field' => $a['field_name'] ?? '—',
+            'Old -> New' => ($a['old_value'] !== null || $a['new_value'] !== null) ? ($a['old_value'] ?? '—') . ' -> ' . ($a['new_value'] ?? '—') : '—',
+            'Reason' => $a['reason'] ?? '—',
+        ], $audit);
+
+        return ['headers' => ['When', 'User', 'Action', 'Field', 'Old -> New', 'Reason'], 'rows' => $rows];
     }
 
     public function aggregate(array $params): void
@@ -382,9 +411,48 @@ final class ReportController
     /** Month-over-month trend view — everything else in this module is either a snapshot or a single flat total. */
     public function trends(array $params): void
     {
+        $months = ReportRepository::monthlyTrends(12);
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $rows] = self::trendsCsvRows($months);
+            Csv::stream('trends_report.csv', $headers, $rows);
+        }
+
         View::render('reports/trends', [
-            'months' => ReportRepository::monthlyTrends(12),
+            'months' => $months,
         ], 'layout/base');
+    }
+
+    /**
+     * 90-item backlog "CSV export for the 6 non-CA reports": Trends,
+     * Staff Productivity, Supplier Performance, Conversion Rate, Sales
+     * Performance, and the per-Order report were the 6 reports in the
+     * non-CA Reports module with no CSV export at all, unlike every
+     * other report here. Extracted as its own public static method (same
+     * for the other 5 below) purely so this can be unit-tested without
+     * exercising Csv::stream()'s exit() call.
+     *
+     * @return array{headers: string[], rows: array<int, array<string, mixed>>}
+     */
+    public static function trendsCsvRows(array $months): array
+    {
+        $rows = array_map(static function (array $m): array {
+            $fobByCurrency = empty($m['fob_by_currency']) ? '—' : implode('; ', array_map(
+                static fn ($cc, $amt) => "{$cc} " . number_format((float) $amt, 2),
+                array_keys($m['fob_by_currency']),
+                array_values($m['fob_by_currency'])
+            ));
+            return [
+                'Month' => $m['month'],
+                'Orders Created' => $m['orders_created'],
+                'Quotations Sent' => $m['quotations_sent'],
+                'PI Sent' => $m['pi_sent'],
+                'Lost' => $m['lost'],
+                'Total FOB Value' => $fobByCurrency,
+            ];
+        }, $months);
+
+        return ['headers' => ['Month', 'Orders Created', 'Quotations Sent', 'PI Sent', 'Lost', 'Total FOB Value'], 'rows' => $rows];
     }
 
     /** Staff productivity report — gated on view_staff_reports, not view_reports, since it shows individual activity. */
@@ -393,10 +461,37 @@ final class ReportController
         $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
         $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
 
+        $rows = ReportRepository::staffProductivity($dateFrom, $dateTo);
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $csvRows] = self::staffCsvRows($rows);
+            Csv::stream('staff_productivity_report.csv', $headers, $csvRows);
+        }
+
         View::render('reports/staff', [
-            'rows' => ReportRepository::staffProductivity($dateFrom, $dateTo),
+            'rows' => $rows,
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
         ], 'layout/base');
+    }
+
+    /** @return array{headers: string[], rows: array<int, array<string, mixed>>} */
+    public static function staffCsvRows(array $rows): array
+    {
+        $csvRows = array_map(static function (array $r): array {
+            $byType = empty($r['by_type']) ? '—' : implode('; ', array_map(
+                static fn ($type, $n) => "{$type}: {$n}",
+                array_keys($r['by_type']),
+                array_values($r['by_type'])
+            ));
+            return [
+                'User' => $r['user_name'],
+                'Documents Generated (by type)' => $byType,
+                'Documents Total' => $r['documents_total'],
+                'Audit Log Actions' => $r['audit_actions'],
+            ];
+        }, $rows);
+
+        return ['headers' => ['User', 'Documents Generated (by type)', 'Documents Total', 'Audit Log Actions'], 'rows' => $csvRows];
     }
 
     /** Debtors/receivables ageing report — closes a real gap flagged in the CA/Reports review: outstanding amounts existed, "how overdue" did not. */
@@ -481,9 +576,31 @@ final class ReportController
     /** Supplier performance report — closes a real gap: supplier POs were tracked per order but never rolled up. */
     public function suppliers(array $params): void
     {
+        $rows = ReportRepository::supplierPerformanceReport();
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $csvRows] = self::suppliersCsvRows($rows);
+            Csv::stream('supplier_performance_report.csv', $headers, $csvRows);
+        }
+
         View::render('reports/suppliers', [
-            'rows' => ReportRepository::supplierPerformanceReport(),
+            'rows' => $rows,
         ], 'layout/base');
+    }
+
+    /** @return array{headers: string[], rows: array<int, array<string, mixed>>} */
+    public static function suppliersCsvRows(array $rows): array
+    {
+        $csvRows = array_map(static fn (array $s): array => [
+            'Supplier' => $s['supplier_name'],
+            'POs' => $s['po_count'],
+            'Signed' => $s['signed_count'],
+            'Avg Signing Days' => $s['avg_signing_days'] ?? '—',
+            'Delivery Tracked' => $s['delivery_tracked_count'],
+            'On-Time %' => $s['on_time_pct'] !== null ? $s['on_time_pct'] . '%' : '—',
+        ], $rows);
+
+        return ['headers' => ['Supplier', 'POs', 'Signed', 'Avg Signing Days', 'Delivery Tracked', 'On-Time %'], 'rows' => $csvRows];
     }
 
     /**
@@ -536,10 +653,40 @@ final class ReportController
         $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
         $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
 
+        $conversion = ReportRepository::conversionRateReport($dateFrom, $dateTo);
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $csvRows] = self::conversionCsvRows($conversion);
+            Csv::stream('conversion_report.csv', $headers, $csvRows);
+        }
+
         View::render('reports/conversion', [
-            'conversion' => ReportRepository::conversionRateReport($dateFrom, $dateTo),
+            'conversion' => $conversion,
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
         ], 'layout/base');
+    }
+
+    /**
+     * A Metric/Value pair table, same shape as queues()'s own
+     * funnel_activity CSV, since this report (like that funnel section)
+     * is one row per metric rather than one row per record.
+     *
+     * @return array{headers: string[], rows: array<int, array<string, mixed>>}
+     */
+    public static function conversionCsvRows(array $conversion): array
+    {
+        $pct = static fn ($v) => $v !== null ? $v . '%' : '—';
+        $rows = [
+            ['Metric' => 'Quotations sent', 'Value' => $conversion['quotations_sent']],
+            ['Metric' => 'Quotation -> PI conversion', 'Value' => $pct($conversion['quotation_to_pi_pct'])],
+            ['Metric' => 'Quotation lost rate', 'Value' => $pct($conversion['quotation_lost_pct'])],
+            ['Metric' => 'PI sent', 'Value' => $conversion['pi_sent']],
+            ['Metric' => 'PI -> Confirmed Order conversion', 'Value' => $pct($conversion['pi_to_confirmed_pct'])],
+            ['Metric' => 'PI lost rate', 'Value' => $pct($conversion['pi_lost_pct'])],
+            ['Metric' => 'Overall Quotation -> Confirmed Order', 'Value' => $pct($conversion['overall_quotation_to_confirmed_pct'])],
+        ];
+
+        return ['headers' => ['Metric', 'Value'], 'rows' => $rows];
     }
 
     /**
@@ -559,10 +706,37 @@ final class ReportController
         $dateFrom = $presetRange[0] ?? (trim((string) ($_GET['date_from'] ?? '')) ?: null);
         $dateTo = $presetRange[1] ?? (trim((string) ($_GET['date_to'] ?? '')) ?: null);
 
+        $report = ReportRepository::salesPerformanceReport($dateFrom, $dateTo);
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $csvRows] = self::performanceCsvRows($report);
+            Csv::stream('sales_performance_report.csv', $headers, $csvRows);
+        }
+
         View::render('reports/performance', [
-            'report' => ReportRepository::salesPerformanceReport($dateFrom, $dateTo),
+            'report' => $report,
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'preset' => $preset],
         ], 'layout/base');
+    }
+
+    /**
+     * Exports the page's "Lost Orders — Detail" table — the one genuinely
+     * per-record section on this report; Key Metrics/FOB Value Won are
+     * both single-row-per-period summaries already visible at a glance.
+     *
+     * @return array{headers: string[], rows: array<int, array<string, mixed>>}
+     */
+    public static function performanceCsvRows(array $report): array
+    {
+        $rows = array_map(static fn (array $lo): array => [
+            'Order' => $lo['order_reference'],
+            'Client' => $lo['company_legal_name'],
+            'Lost On' => (string) $lo['lost_at'],
+            'Stage Reached' => $lo['reached_pi'] ? 'PI' : 'Quotation',
+            'Reason' => $lo['lost_reason'] ?? '—',
+        ], $report['lost_orders']);
+
+        return ['headers' => ['Order', 'Client', 'Lost On', 'Stage Reached', 'Reason'], 'rows' => $rows];
     }
 
     /** @return array{0:string,1:string}|null [dateFrom, dateTo] for a named preset, calendar-based (not fiscal year) */

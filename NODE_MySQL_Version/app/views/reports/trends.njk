@@ -2,6 +2,7 @@
   <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Trends — Last 12 Months</h1>
   <p class="muted">Month-over-month activity. Months with no activity still appear as a zero row, so gaps in the business are as visible as growth.</p>
+  <div class="btn-row"><a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/trends?format=csv">Export CSV</a></div>
 
   <div class="section">
     <table class="list">
