@@ -100,6 +100,40 @@ final class MailRedirectCcTest extends DbTestCase
         self::assertSame([], MailRedirectService::ccList(false));
     }
 
+    public function testCcListFallsBackToEnvDefaultCcWhenDbSettingIsBlank(): void
+    {
+        CompanySettingsRepository::set('mail_cc_emails', '');
+        CompanySettingsRepository::set('mail_default_cc_email', '');
+        putenv('MAIL_DEFAULT_CC_EMAIL=env-default@example.com');
+        $_ENV['MAIL_DEFAULT_CC_EMAIL'] = 'env-default@example.com';
+
+        try {
+            $result = MailRedirectService::ccList(false);
+        } finally {
+            putenv('MAIL_DEFAULT_CC_EMAIL');
+            unset($_ENV['MAIL_DEFAULT_CC_EMAIL']);
+        }
+
+        self::assertSame(['env-default@example.com'], $result, 'a fresh install with no Company Settings default CC yet must fall back to .env');
+    }
+
+    public function testCcListPrefersTheDbDefaultCcOverEnvWhenBothAreSet(): void
+    {
+        CompanySettingsRepository::set('mail_cc_emails', '');
+        CompanySettingsRepository::set('mail_default_cc_email', 'db-default@example.com');
+        putenv('MAIL_DEFAULT_CC_EMAIL=env-default@example.com');
+        $_ENV['MAIL_DEFAULT_CC_EMAIL'] = 'env-default@example.com';
+
+        try {
+            $result = MailRedirectService::ccList(false);
+        } finally {
+            putenv('MAIL_DEFAULT_CC_EMAIL');
+            unset($_ENV['MAIL_DEFAULT_CC_EMAIL']);
+        }
+
+        self::assertSame(['db-default@example.com'], $result, 'Company Settings must win once it is actually configured');
+    }
+
     public function testCcListIsEmptyForASecurityEmailRegardlessOfConfiguredAddresses(): void
     {
         CompanySettingsRepository::set('mail_cc_emails', 'a@example.com');

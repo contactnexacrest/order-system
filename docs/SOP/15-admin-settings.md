@@ -108,10 +108,16 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   rehearsing real mail without touching Test Mode at all — and a **CC
   emails** list (comma-separated) plus a single **Default CC email**,
   both applied to every non-security outbound email regardless of whether
-  redirect is on. Staff 2FA codes and password-reset links are never
-  redirected or CC'd, the same carve-out Test Mode uses, so a lockout can
-  never happen because of either switch. The CC list and default CC are
-  marked **Super Admin only** right on the screen — anyone else sees them
+  redirect is on. If **Default CC email** is left blank here, it falls
+  back to `MAIL_DEFAULT_CC_EMAIL` in `.env` — the same "this screen's
+  value wins once set, .env only covers a fresh install" precedence as
+  every other optional setting with an `.env` counterpart — so a new
+  deployment doesn't go without a default CC just because nobody has
+  opened this screen yet. Staff 2FA codes and password-reset links are
+  never redirected or CC'd, the same carve-out Test Mode uses, so a
+  lockout can never happen because of either switch. The CC list and
+  default CC are marked **Super Admin only** right on the screen — anyone
+  else sees them
   read-only, with no unlock option, since a standing CC address silently
   sees every client email that goes out. Below the main form, two **Send
   Test Email** buttons — one for the SMTP server configured in `.env`,

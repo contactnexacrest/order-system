@@ -108,6 +108,36 @@ describe('Mail redirect & CC (docs/schema.sql Section AS)', () => {
     expect(await mailRedirectService.ccList(false)).toEqual([]);
   });
 
+  it('ccList falls back to the env default CC when the DB setting is blank', async () => {
+    await companySettingsRepository.set('mail_cc_emails', '');
+    await companySettingsRepository.set('mail_default_cc_email', '');
+    process.env.MAIL_DEFAULT_CC_EMAIL = 'env-default@example.com';
+
+    let result;
+    try {
+      result = await mailRedirectService.ccList(false);
+    } finally {
+      delete process.env.MAIL_DEFAULT_CC_EMAIL;
+    }
+
+    expect(result).toEqual(['env-default@example.com']);
+  });
+
+  it('ccList prefers the DB default CC over env when both are set', async () => {
+    await companySettingsRepository.set('mail_cc_emails', '');
+    await companySettingsRepository.set('mail_default_cc_email', 'db-default@example.com');
+    process.env.MAIL_DEFAULT_CC_EMAIL = 'env-default@example.com';
+
+    let result;
+    try {
+      result = await mailRedirectService.ccList(false);
+    } finally {
+      delete process.env.MAIL_DEFAULT_CC_EMAIL;
+    }
+
+    expect(result).toEqual(['db-default@example.com']);
+  });
+
   it('ccList is empty for a security email regardless of configured addresses', async () => {
     await companySettingsRepository.set('mail_cc_emails', 'a@example.com');
     await companySettingsRepository.set('mail_default_cc_email', 'default@example.com');
