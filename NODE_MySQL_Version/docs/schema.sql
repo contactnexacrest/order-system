@@ -3352,3 +3352,22 @@ ALTER TABLE order_supplier_po
   ADD COLUMN balance_paid_by BIGINT UNSIGNED NULL,
   ADD CONSTRAINT fk_spo_advance_paid_by FOREIGN KEY (advance_paid_by) REFERENCES users(id),
   ADD CONSTRAINT fk_spo_balance_paid_by FOREIGN KEY (balance_paid_by) REFERENCES users(id);
+
+-- ================================================================
+-- SECTION BN — USER 3-WAY STATUS (user-reported batch item 10)
+-- ================================================================
+-- "3-way user status filter (active/inactive/archive) + delete-if-
+-- unreferenced (only a 2-way active/inactive toggle exists)". Archive
+-- is a third, distinct state from a merely deactivated account — it
+-- marks someone who has genuinely left, kept filterable apart from a
+-- temporarily-suspended login, same is_archived/archived_at pattern
+-- already used for orders (see the ALTER TABLE orders ADD COLUMN
+-- is_archived/archived_at above). An archived user is always also
+-- is_active = 0 (enforced in usersController's archive logic, not
+-- here) — archiving is a stronger state, not an independent axis.
+-- ================================================================
+ALTER TABLE users
+  ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN archived_at TIMESTAMP NULL,
+  ADD COLUMN archived_by BIGINT UNSIGNED NULL,
+  ADD CONSTRAINT fk_users_archived_by FOREIGN KEY (archived_by) REFERENCES users(id);

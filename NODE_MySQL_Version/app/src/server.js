@@ -800,6 +800,9 @@ app.post('/users/create', requireAuth, requirePermission('manage_users'), verify
 app.get('/users/:id/edit', requireAuth, requirePermission('manage_users'), asyncHandler(userController.editForm));
 app.post('/users/:id/update', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.update));
 app.post('/users/:id/toggle-active', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.toggleActive));
+app.post('/users/:id/archive', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.archive));
+app.post('/users/:id/unarchive', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.unarchive));
+app.post('/users/:id/delete', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.deleteUser));
 app.post('/users/:id/force-reset-password', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.forceResetPassword));
 
 app.get('/sample-data', requireAuth, requirePermission('manage_sample_data'), asyncHandler(sampleDataController.index));

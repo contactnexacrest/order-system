@@ -21,11 +21,13 @@ const userRepository = require('../repositories/userRepository');
  */
 
 async function index(req, res) {
-  const [users, roles] = await Promise.all([
-    userRepository.listAllForAdmin(),
+  const status = ['active', 'inactive', 'archived'].includes(req.query.status) ? req.query.status : 'active';
+  const [users, statusCounts, roles] = await Promise.all([
+    userRepository.listAllForAdmin(status),
+    userRepository.statusCounts(),
     lookupRepository.roles(),
   ]);
-  res.renderView('users/index', { users, roles }, 'layout/base');
+  res.renderView('users/index', { users, statusCounts, currentStatus: status, roles }, 'layout/base');
 }
 
 async function create(req, res) {
@@ -179,6 +181,80 @@ async function toggleActive(req, res) {
   res.redirect('/users');
 }
 
+/** Returns [target, errorMessage] — the three guards archive/unarchive/delete all share with toggleActive. */
+async function guardedTarget(req, userId) {
+  const target = await userRepository.findById(userId);
+  if (!target) {
+    return [null, 'User not found.'];
+  }
+  if (userId === req.user.id) {
+    return [null, "You can't do this to your own account."];
+  }
+  if (parseInt(target.is_super_admin, 10) === 1) {
+    return [null, 'A Super Admin account can never be archived or deleted.'];
+  }
+  if (parseInt(target.is_protected_account, 10) === 1) {
+    return [null, 'This is a protected founder account and can never be archived or deleted through the application.'];
+  }
+  return [target, null];
+}
+
+async function archive(req, res) {
+  const userId = parseInt(req.params.id, 10);
+  const [target, error] = await guardedTarget(req, userId);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect('/users');
+    return;
+  }
+  await userRepository.archive(userId, req.user.id);
+  await auditLogRepository.log(req.user.id, 'USER_ARCHIVED', 'users', userId, 'is_archived', '0', '1');
+  flash.set(req, 'success', `${target.name} archived — they can no longer log in, and no longer appear in the Active or Inactive lists.`);
+  res.redirect('/users?status=archived');
+}
+
+async function unarchive(req, res) {
+  const userId = parseInt(req.params.id, 10);
+  const [target, error] = await guardedTarget(req, userId);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect('/users');
+    return;
+  }
+  await userRepository.unarchive(userId);
+  await auditLogRepository.log(req.user.id, 'USER_UNARCHIVED', 'users', userId, 'is_archived', '1', '0');
+  flash.set(req, 'success', `${target.name} unarchived — still deactivated; reactivate separately to let them log in again.`);
+  res.redirect('/users?status=inactive');
+}
+
+/**
+ * A real DELETE, not a soft-delete — see userRepository.deleteUser()'s
+ * own docblock for why "is this user referenced anywhere" is left to
+ * MySQL's own FK constraints rather than hand-checked here.
+ */
+async function deleteUser(req, res) {
+  const userId = parseInt(req.params.id, 10);
+  const [target, error] = await guardedTarget(req, userId);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect('/users');
+    return;
+  }
+  try {
+    await userRepository.deleteUser(userId);
+  } catch (err) {
+    if (err && err.code === 'ER_ROW_IS_REFERENCED_2') {
+      flash.set(req, 'error', `${target.name} can't be deleted — they have order, document, or audit history on file. Archive them instead.`);
+      res.redirect('/users');
+      return;
+    }
+    throw err;
+  }
+  await auditLogRepository.log(req.user.id, 'USER_DELETED', 'users', userId, null, null, null, `Deleted ${target.name} (${target.email}) — had no referencing history.`);
+  flash.set(req, 'success', `${target.name} permanently deleted.`);
+  res.redirect('/users');
+}
+
 async function forceResetPassword(req, res) {
   const userId = parseInt(req.params.id, 10);
   const target = await userRepository.findById(userId);
@@ -219,4 +295,4 @@ function generateTempPassword() {
   return crypto.randomBytes(12).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-module.exports = { index, create, editForm, update, toggleActive, forceResetPassword };
+module.exports = { index, create, editForm, update, toggleActive, archive, unarchive, deleteUser, forceResetPassword };

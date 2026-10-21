@@ -119,16 +119,77 @@ final class UserRepository
      *
      * @return array<int, array<string,mixed>>
      */
-    public static function listAllForAdmin(): array
+    /**
+     * 90-item backlog item #10: a 3-way status filter (active/inactive/
+     * archived), not just the one all-users list this always was.
+     * $status defaults to 'active' — archived (and, previously,
+     * deactivated) users mixed into the default view is exactly the
+     * clutter this item asked to fix.
+     */
+    public static function listAllForAdmin(string $status = 'active'): array
     {
+        $where = match ($status) {
+            'inactive' => 'u.is_active = 0 AND u.is_archived = 0',
+            'archived' => 'u.is_archived = 1',
+            default => 'u.is_active = 1 AND u.is_archived = 0',
+        };
         return Database::connection()->query(
             "SELECT u.id, u.name, u.email, u.phone, u.is_active, u.force_password_change,
                     u.two_fa_enabled, u.last_login_at, u.locked_until, u.created_at, u.is_super_admin,
-                    u.is_protected_account,
+                    u.is_protected_account, u.is_archived, u.archived_at,
                     r.id AS role_id, r.name AS role_name
              FROM users u LEFT JOIN roles r ON r.id = u.role_id
+             WHERE {$where}
              ORDER BY u.is_active DESC, u.name"
         )->fetchAll();
+    }
+
+    /** @return array<string,int> counts for each of the 3 status tabs, so a tab's own count never requires switching to it first. */
+    public static function statusCounts(): array
+    {
+        $row = Database::connection()->query(
+            "SELECT
+                SUM(CASE WHEN is_active = 1 AND is_archived = 0 THEN 1 ELSE 0 END) AS active,
+                SUM(CASE WHEN is_active = 0 AND is_archived = 0 THEN 1 ELSE 0 END) AS inactive,
+                SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) AS archived
+             FROM users"
+        )->fetch();
+        return [
+            'active' => (int) ($row['active'] ?? 0),
+            'inactive' => (int) ($row['inactive'] ?? 0),
+            'archived' => (int) ($row['archived'] ?? 0),
+        ];
+    }
+
+    public static function archive(int $userId, int $archivedBy): void
+    {
+        Database::connection()->prepare(
+            'UPDATE users SET is_archived = 1, archived_at = NOW(), archived_by = :archived_by, is_active = 0 WHERE id = :id'
+        )->execute(['archived_by' => $archivedBy, 'id' => $userId]);
+    }
+
+    public static function unarchive(int $userId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE users SET is_archived = 0, archived_at = NULL, archived_by = NULL WHERE id = :id'
+        )->execute(['id' => $userId]);
+    }
+
+    /**
+     * Real DELETE, deliberately with no manual "is this user referenced
+     * anywhere" check first — users.id is a FK target from 57+ tables
+     * (audit_log, documents.generated_by, every reviewer/approver
+     * column, ...), all left at MySQL's default ON DELETE RESTRICT, so
+     * the database itself is already the single, always-up-to-date
+     * source of truth for "is this user referenced anywhere." Letting
+     * the constraint violation happen and translating it into a clean
+     * error (see UserController::delete()) avoids hand-maintaining a
+     * table list that would silently go stale the moment a new FK to
+     * users is added anywhere else in this schema.
+     */
+    public static function delete(int $userId): void
+    {
+        Database::connection()->prepare('DELETE FROM users WHERE id = :id')->execute(['id' => $userId]);
     }
 
     /**

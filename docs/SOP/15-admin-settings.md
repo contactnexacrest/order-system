@@ -51,17 +51,34 @@ of only reports and the audit log.
 
 ### Users
 
-Create logins, edit an existing one, deactivate one, or force a password
-reset. A temporary password is shown **once**, at creation or reset — staff
-hand it to the person directly, since it's never emailed and they're forced
-to set their own on first login regardless:
+Create logins, edit an existing one, deactivate one, archive one, delete
+one, or force a password reset. A temporary password is shown **once**, at
+creation or reset — staff hand it to the person directly, since it's never
+emailed and they're forced to set their own on first login regardless:
 
 ![Users screen — existing users and Create User form](./images/admin_users.png)
 
+The list is a 3-way filter — **Active / Inactive / Archived** tabs, each
+showing its own count — rather than one unfiltered list of everyone.
+**Archive** is a separate, stronger state than **Deactivate**: it marks
+someone who has genuinely left (not just temporarily suspended), moves
+them out of both the Active and Inactive tabs into their own, and always
+forces the account inactive too. An archived account can be **Unarchive**d
+back to Inactive, then separately **Reactivate**d if they ever return.
+
+**Delete** is a real, permanent delete — it only succeeds for a user with
+no order, document, or audit-log history on file anywhere (the database's
+own referential-integrity rules decide this, not a hand-picked checklist),
+so it only ever actually removes an account created by mistake with zero
+real activity. Any user who has done anything at all — even just logged in
+once — can only be archived, never deleted; trying anyway shows a clear
+"archive them instead" message rather than failing silently.
+
 Notice the **"Protected — founder"** tag on certain accounts: these
-specific users can't be edited, deactivated, or password-reset by anyone
-else at all, even an Admin — they can only recover their own login via
-"Forgot password" on the login screen themselves. This exists so the
+specific users can't be edited, deactivated, archived, deleted, or
+password-reset by anyone else at all, even an Admin — they can only
+recover their own login via "Forgot password" on the login screen
+themselves. This exists so the
 people who set the company up can never be locked out by another admin's
 mistake (or malice).
 

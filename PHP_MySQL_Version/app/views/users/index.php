@@ -5,6 +5,11 @@
 
   <div class="section">
     <h2>Existing Users</h2>
+    <div class="btn-row" style="margin-bottom:0.6rem;">
+      <a class="btn-sm <?= $currentStatus === 'active' ? '' : 'btn-secondary' ?>" href="/users?status=active">Active (<?= (int) $statusCounts['active'] ?>)</a>
+      <a class="btn-sm <?= $currentStatus === 'inactive' ? '' : 'btn-secondary' ?>" href="/users?status=inactive">Inactive (<?= (int) $statusCounts['inactive'] ?>)</a>
+      <a class="btn-sm <?= $currentStatus === 'archived' ? '' : 'btn-secondary' ?>" href="/users?status=archived">Archived (<?= (int) $statusCounts['archived'] ?>)</a>
+    </div>
     <table class="list">
       <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>2FA</th><th>Last Login</th><th>Actions</th></tr>
       <?php foreach ($users as $u): ?>
@@ -13,7 +18,9 @@
         <td><?= htmlspecialchars($u['email']) ?></td>
         <td><?= htmlspecialchars($u['role_name'] ?? '—') ?></td>
         <td>
-          <?php if ($u['is_active']): ?>
+          <?php if ((int) $u['is_archived'] === 1): ?>
+            <span class="badge badge-inactive">Archived</span><br><small class="muted">Since <?= htmlspecialchars((string) $u['archived_at']) ?></small>
+          <?php elseif ($u['is_active']): ?>
             <span class="badge badge-active">Active</span>
           <?php else: ?>
             <span class="badge badge-inactive">Deactivated</span>
@@ -25,12 +32,25 @@
         <td><?= htmlspecialchars($u['last_login_at'] ?? 'Never') ?></td>
         <td>
           <?php if ((int) $u['is_protected_account'] === 1): ?>
-            <span class="muted small">Protected — cannot be edited, deactivated, or password-reset by anyone else. They can recover their own login via "Forgot password" on the login screen.</span>
+            <span class="muted small">Protected — cannot be edited, deactivated, archived, deleted, or password-reset by anyone else. They can recover their own login via "Forgot password" on the login screen.</span>
+          <?php elseif ((int) $u['is_archived'] === 1): ?>
+            <form method="post" action="/users/<?= (int) $u['id'] ?>/unarchive" style="display:inline" onsubmit="return confirm('Unarchive <?= htmlspecialchars(addslashes($u['name'])) ?>? They will still need to be separately reactivated to log in again.');">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm btn-secondary">Unarchive</button>
+            </form>
+            <form method="post" action="/users/<?= (int) $u['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Permanently delete <?= htmlspecialchars(addslashes($u['name'])) ?>? This cannot be undone, and only succeeds if they have no order/document/audit history on file.');">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
           <?php else: ?>
           <a href="/users/<?= (int) $u['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
           <form method="post" action="/users/<?= (int) $u['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($u['name'])) ?>?');">
             <?= Csrf::field() ?>
             <button type="submit" class="btn-sm <?= $u['is_active'] ? 'btn-danger' : 'btn-success' ?>"><?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?></button>
+          </form>
+          <form method="post" action="/users/<?= (int) $u['id'] ?>/archive" style="display:inline" onsubmit="return confirm('Archive <?= htmlspecialchars(addslashes($u['name'])) ?>? They will no longer be able to log in, and will move out of the Active/Inactive lists into Archived.');">
+            <?= Csrf::field() ?>
+            <button type="submit" class="btn-sm btn-secondary">Archive</button>
           </form>
           <details style="margin-top:0.4rem;">
             <summary class="muted small">Force password reset</summary>
@@ -44,6 +64,7 @@
         </td>
       </tr>
       <?php endforeach; ?>
+      <?php if (empty($users)): ?><tr><td colspan="7" class="muted">No users in this view.</td></tr><?php endif; ?>
     </table>
   </div>
 

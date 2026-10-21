@@ -582,6 +582,9 @@ $router->post('/users/create', [$users, 'create'], [SessionAuth::required(), Per
 $router->get('/users/{id}/edit', [$users, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_users')]);
 $router->post('/users/{id}/update', [$users, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/toggle-active', [$users, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+$router->post('/users/{id}/archive', [$users, 'archive'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+$router->post('/users/{id}/unarchive', [$users, 'unarchive'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+$router->post('/users/{id}/delete', [$users, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/force-reset-password', [$users, 'forceResetPassword'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 
 // --- Client portal (authenticated, structurally separate from staff /

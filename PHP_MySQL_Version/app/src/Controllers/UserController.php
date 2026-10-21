@@ -28,8 +28,11 @@ final class UserController
 {
     public function index(array $params): void
     {
+        $status = in_array($_GET['status'] ?? '', ['active', 'inactive', 'archived'], true) ? $_GET['status'] : 'active';
         View::render('users/index', [
-            'users' => UserRepository::listAllForAdmin(),
+            'users' => UserRepository::listAllForAdmin($status),
+            'statusCounts' => UserRepository::statusCounts(),
+            'currentStatus' => $status,
             'roles' => LookupRepository::roles(),
         ], 'layout/base');
     }
@@ -196,6 +199,85 @@ final class UserController
         );
 
         Flash::set('success', $newState ? "{$target['name']} reactivated." : "{$target['name']} deactivated — they can no longer log in.");
+        header('Location: /users');
+    }
+
+    /** @return array{0:?array,1:?string} [$target, $errorMessage] — the three guards archive/unarchive/delete all share with toggleActive(). */
+    private function guardedTarget(int $userId): array
+    {
+        $target = UserRepository::findById($userId);
+        if (!$target) {
+            return [null, 'User not found.'];
+        }
+        $actor = AuthService::currentUser();
+        if ($userId === (int) $actor['id']) {
+            return [null, "You can't do this to your own account."];
+        }
+        if ((int) $target['is_super_admin'] === 1) {
+            return [null, 'A Super Admin account can never be archived or deleted.'];
+        }
+        if ((int) $target['is_protected_account'] === 1) {
+            return [null, 'This is a protected founder account and can never be archived or deleted through the application.'];
+        }
+        return [$target, null];
+    }
+
+    public function archive(array $params): void
+    {
+        $userId = (int) $params['id'];
+        [$target, $error] = $this->guardedTarget($userId);
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header('Location: /users');
+            return;
+        }
+        $actor = AuthService::currentUser();
+        UserRepository::archive($userId, (int) $actor['id']);
+        AuditLogRepository::log((int) $actor['id'], 'USER_ARCHIVED', 'users', $userId, 'is_archived', '0', '1');
+        Flash::set('success', "{$target['name']} archived — they can no longer log in, and no longer appear in the Active or Inactive lists.");
+        header('Location: /users?status=archived');
+    }
+
+    public function unarchive(array $params): void
+    {
+        $userId = (int) $params['id'];
+        [$target, $error] = $this->guardedTarget($userId);
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header('Location: /users');
+            return;
+        }
+        $actor = AuthService::currentUser();
+        UserRepository::unarchive($userId);
+        AuditLogRepository::log((int) $actor['id'], 'USER_UNARCHIVED', 'users', $userId, 'is_archived', '1', '0');
+        Flash::set('success', "{$target['name']} unarchived — still deactivated; reactivate separately to let them log in again.");
+        header('Location: /users?status=inactive');
+    }
+
+    /**
+     * A real DELETE, not a soft-delete — see UserRepository::delete()'s
+     * own docblock for why "is this user referenced anywhere" is left to
+     * MySQL's own FK constraints rather than hand-checked here.
+     */
+    public function delete(array $params): void
+    {
+        $userId = (int) $params['id'];
+        [$target, $error] = $this->guardedTarget($userId);
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header('Location: /users');
+            return;
+        }
+        $actor = AuthService::currentUser();
+        try {
+            UserRepository::delete($userId);
+        } catch (\PDOException $e) {
+            Flash::set('error', "{$target['name']} can't be deleted — they have order, document, or audit history on file. Archive them instead.");
+            header('Location: /users');
+            return;
+        }
+        AuditLogRepository::log((int) $actor['id'], 'USER_DELETED', 'users', $userId, null, null, null, "Deleted {$target['name']} ({$target['email']}) — had no referencing history.");
+        Flash::set('success', "{$target['name']} permanently deleted.");
         header('Location: /users');
     }
 

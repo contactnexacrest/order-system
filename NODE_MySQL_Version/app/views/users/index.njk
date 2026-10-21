@@ -4,6 +4,11 @@
 
   <div class="section">
     <h2>Existing Users</h2>
+    <div class="btn-row" style="margin-bottom:0.6rem;">
+      <a class="btn-sm {{ '' if currentStatus == 'active' else 'btn-secondary' }}" href="/users?status=active">Active ({{ statusCounts.active }})</a>
+      <a class="btn-sm {{ '' if currentStatus == 'inactive' else 'btn-secondary' }}" href="/users?status=inactive">Inactive ({{ statusCounts.inactive }})</a>
+      <a class="btn-sm {{ '' if currentStatus == 'archived' else 'btn-secondary' }}" href="/users?status=archived">Archived ({{ statusCounts.archived }})</a>
+    </div>
     <table class="list">
       <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>2FA</th><th>Last Login</th><th>Actions</th></tr>
       {% for u in users %}
@@ -12,7 +17,9 @@
         <td>{{ u.email }}</td>
         <td>{{ u.role_name or '—' }}</td>
         <td>
-          {% if u.is_active %}
+          {% if u.is_archived %}
+            <span class="badge badge-inactive">Archived</span><br><small class="muted">Since {{ u.archived_at }}</small>
+          {% elif u.is_active %}
             <span class="badge badge-active">Active</span>
           {% else %}
             <span class="badge badge-inactive">Deactivated</span>
@@ -24,12 +31,25 @@
         <td>{{ u.last_login_at or 'Never' }}</td>
         <td>
           {% if u.is_protected_account %}
-            <span class="muted small">Protected — cannot be edited, deactivated, or password-reset by anyone else. They can recover their own login via "Forgot password" on the login screen.</span>
+            <span class="muted small">Protected — cannot be edited, deactivated, archived, deleted, or password-reset by anyone else. They can recover their own login via "Forgot password" on the login screen.</span>
+          {% elif u.is_archived %}
+            <form method="post" action="/users/{{ u.id }}/unarchive" style="display:inline" onsubmit="return confirm('Unarchive {{ u.name }}? They will still need to be separately reactivated to log in again.');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-secondary">Unarchive</button>
+            </form>
+            <form method="post" action="/users/{{ u.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete {{ u.name }}? This cannot be undone, and only succeeds if they have no order/document/audit history on file.');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm btn-danger">Delete</button>
+            </form>
           {% else %}
           <a href="/users/{{ u.id }}/edit" class="btn-sm btn-secondary">Edit</a>
           <form method="post" action="/users/{{ u.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if u.is_active else 'Reactivate' }} {{ u.name }}?');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm {{ 'btn-danger' if u.is_active else 'btn-success' }}">{{ 'Deactivate' if u.is_active else 'Reactivate' }}</button>
+          </form>
+          <form method="post" action="/users/{{ u.id }}/archive" style="display:inline" onsubmit="return confirm('Archive {{ u.name }}? They will no longer be able to log in, and will move out of the Active/Inactive lists into Archived.');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-secondary">Archive</button>
           </form>
           <details style="margin-top:0.4rem;">
             <summary class="muted small">Force password reset</summary>
@@ -43,6 +63,7 @@
         </td>
       </tr>
       {% endfor %}
+      {% if (users | length) == 0 %}<tr><td colspan="7" class="muted">No users in this view.</td></tr>{% endif %}
     </table>
   </div>
 
