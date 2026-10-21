@@ -138,7 +138,7 @@ final class FileUploadService
             throw new \RuntimeException("File \"{$originalName}\" is too large — maximum is {$maxMb} MB for this upload.");
         }
 
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $targetDir = "{$storageBase}/{$subPath}";
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);

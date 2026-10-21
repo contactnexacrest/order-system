@@ -152,7 +152,7 @@ async function uploadUserAsset(req, res) {
 
   const ext = ALLOWED_MIME[mime];
   const folder = kind === 'signature' ? 'signatures' : 'designation_seals';
-  const storageBase = env.get('STORAGE_BASE_PATH', path.join(__dirname, '..', '..', 'storage'));
+  const storageBase = env.storageBasePath();
   const targetDir = path.join(storageBase, 'assets', folder);
   fs.mkdirSync(targetDir, { recursive: true });
 

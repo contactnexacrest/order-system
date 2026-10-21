@@ -88,7 +88,7 @@ async function replace(req, res) {
 
   const ext = ALLOWED_MIME[mime];
   const folder = folderFor(assetType);
-  const storageBase = env.get('STORAGE_BASE_PATH', path.join(__dirname, '..', '..', 'storage'));
+  const storageBase = env.storageBasePath();
   const targetDir = path.join(storageBase, 'assets', folder);
   fs.mkdirSync(targetDir, { recursive: true });
 

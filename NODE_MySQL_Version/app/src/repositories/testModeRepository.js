@@ -226,7 +226,7 @@ async function testClientStorageDirs(clientIds) {
     return [];
   }
   const rows = await db.query(`SELECT client_unique_number FROM clients WHERE id IN (${clientIds.join(',')})`);
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   return rows.map((row) => {
     const safe = String(row.client_unique_number ?? '').replace(/[^A-Za-z0-9_-]+/g, '-');
     return `${storageBase}/clients/${safe}`;

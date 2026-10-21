@@ -924,7 +924,7 @@ async function pickReviewerUserId(fallbackUserId) {
  * path individually.
  */
 async function attachSamplePlaceholderFile(clientId, orderId, subPath, originalFilename, receivedFrom, documentTypeLabel, uploadedBy) {
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const targetDir = `${storageBase}/${subPath}`;
   fs.mkdirSync(targetDir, { recursive: true });
   const uuidFilename = `${crypto.randomBytes(16).toString('hex')}.pdf`;
@@ -960,7 +960,7 @@ async function attachSampleAnnexureImage(orderId, annexureProductId, subPath, or
 
 /** A minimal but genuinely valid 1x1 PNG, saved under subPath and registered in file_store. */
 async function attachSamplePngFile(orderId, subPath, originalFilename, uploadedBy, documentTypeLabel) {
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const targetDir = `${storageBase}/${subPath}`;
   fs.mkdirSync(targetDir, { recursive: true });
   const uuidFilename = `${crypto.randomBytes(16).toString('hex')}.png`;

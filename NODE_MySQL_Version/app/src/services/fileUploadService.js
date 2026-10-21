@@ -122,7 +122,7 @@ async function storeOne(buffer, originalName, mimeType, contextKey, subPath, cli
     throw new Error(`File "${originalName}" is too large — maximum is ${maxMb} MB for this upload.`);
   }
 
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const targetDir = path.join(storageBase, subPath);
   fs.mkdirSync(targetDir, { recursive: true });
 

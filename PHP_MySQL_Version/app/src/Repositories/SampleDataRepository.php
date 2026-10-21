@@ -248,7 +248,7 @@ final class SampleDataRepository
         $pdo = Database::connection();
         $numbers = $pdo->query('SELECT client_unique_number FROM clients WHERE id IN (' . implode(',', $clientIds) . ')')
             ->fetchAll(PDO::FETCH_COLUMN);
-        $storageBase = rtrim(\App\Config\Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(\App\Config\Env::storageBasePath(), '/');
         $dirs = [];
         foreach ($numbers as $number) {
             $safe = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $number);

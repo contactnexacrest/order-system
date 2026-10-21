@@ -156,7 +156,7 @@ final class DocumentGenerationService
         $templateFile = self::templateFileFor($documentTypeCode);
         $html = $twig->render($templateFile, $context);
 
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
         $orderRef = self::sanitizePathSegment($order['order_reference']);
         $stageSlug = self::sanitizePathSegment($order['current_stage_slug'] ?? 'stage');
@@ -515,7 +515,7 @@ final class DocumentGenerationService
         $html = $twig->render(self::templateFileFor($documentTypeCode), $context);
         $pdfBytes = self::renderPdf($html);
 
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
         $orderRef = self::sanitizePathSegment($order['order_reference']);
         $stageSlug = self::sanitizePathSegment($order['current_stage_slug'] ?? 'stage');
@@ -677,7 +677,7 @@ final class DocumentGenerationService
         $html = $twig->render(self::templateFileFor($documentTypeCode), $context);
         $pdfBytes = self::renderPdf($html);
 
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
         $orderRef = self::sanitizePathSegment($order['order_reference']);
         $stageSlug = self::sanitizePathSegment($order['current_stage_slug'] ?? 'stage');
@@ -858,7 +858,7 @@ final class DocumentGenerationService
         $html = $twig->render('AMD/payment_terms_amendment.html.twig', $context);
         $pdfBytes = self::renderPdf($html);
 
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
         $orderRef = self::sanitizePathSegment($order['order_reference']);
         $amdRefSafe = self::sanitizePathSegment($amendment['amendment_reference']);
@@ -990,7 +990,7 @@ final class DocumentGenerationService
         $html = $twig->render('CAFIN/ca_financial_annexure.html.twig', $context);
         $pdfBytes = self::renderPdf($html);
 
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
         $orderRef = self::sanitizePathSegment($order['order_reference']);
         $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/internal-ca/generated";
@@ -1110,7 +1110,7 @@ final class DocumentGenerationService
         $html = $twig->render('BLE/bl_endorsement.html.twig', $context);
         $pdfBytes = self::renderPdf($html);
 
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
         $orderRef = self::sanitizePathSegment($order['order_reference']);
         $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/bl-endorsement/generated";
@@ -1238,7 +1238,7 @@ final class DocumentGenerationService
         // guaranteed-writable directory (STORAGE_BASE_PATH), so the cache
         // goes there instead — same reasoning as every generated PDF/DOCX
         // already living under storage/, not under app/.
-        $fontCacheDir = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/') . '/font_cache';
+        $fontCacheDir = rtrim(Env::storageBasePath(), '/') . '/font_cache';
         if (!is_dir($fontCacheDir)) {
             mkdir($fontCacheDir, 0755, true);
         }

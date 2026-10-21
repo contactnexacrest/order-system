@@ -173,7 +173,7 @@ final class SignatoryController
 
         $ext = self::ALLOWED_MIME[$mime];
         $folder = $kind === 'signature' ? 'signatures' : 'designation_seals';
-        $storageBase = Env::get('STORAGE_BASE_PATH', dirname(__DIR__, 3) . '/storage');
+        $storageBase = Env::storageBasePath();
         $targetDir = $storageBase . '/assets/' . $folder;
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);

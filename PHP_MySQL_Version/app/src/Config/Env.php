@@ -104,4 +104,25 @@ final class Env
     {
         return self::getBool('DEV_SERVER', false);
     }
+
+    /**
+     * 90-item backlog "storage_base_path precedence": every controller/
+     * service/repository that reads STORAGE_BASE_PATH used to inline its
+     * own fallback for when .env doesn't define it, and the fallbacks had
+     * drifted: the four Controllers using this (Signatory/ReferenceDoc/
+     * Asset/Product) correctly computed dirname(__DIR__, 3) . '/storage',
+     * but everywhere else (DocumentGenerationService, SampleDataService,
+     * FileUploadService, TestModeRepository, SampleDataRepository) fell
+     * back to '' instead, so a missing STORAGE_BASE_PATH there silently
+     * resolved paths against the filesystem root ("/documents/...")
+     * rather than any real directory. Centralizing the computation here
+     * — dirname(__DIR__, 3) from src/Config/ lands on the same
+     * PHP_MySQL_Version/storage as from src/Controllers/, src/Services/,
+     * or src/Repositories/ — gives every call site the same, correct
+     * default, so this can't drift apart again the way it just did.
+     */
+    public static function storageBasePath(): string
+    {
+        return self::get('STORAGE_BASE_PATH', dirname(__DIR__, 3) . '/storage') ?? '';
+    }
 }

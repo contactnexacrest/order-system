@@ -253,7 +253,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   const templateFile = templateFileFor(documentTypeCode);
   const html = twig.render(templateFile, context);
 
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
   const orderRef = sanitizePathSegment(order.order_reference);
   const stageSlug = sanitizePathSegment(order.current_stage_slug || 'stage');
@@ -593,7 +593,7 @@ async function finalizeApproval(documentId) {
   const html = twig.render(templateFileFor(documentTypeCode), context);
   const pdfBytes = await renderPdfFromHtml(html);
 
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
   const orderRef = sanitizePathSegment(order.order_reference);
   const stageSlug = sanitizePathSegment(order.current_stage_slug || 'stage');
@@ -748,7 +748,7 @@ async function markSuperseded(documentId) {
   const html = twig.render(templateFileFor(documentTypeCode), context);
   const pdfBytes = await renderPdfFromHtml(html);
 
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
   const orderRef = sanitizePathSegment(order.order_reference);
   const stageSlug = sanitizePathSegment(order.current_stage_slug || 'stage');
@@ -923,7 +923,7 @@ async function generateAmendment(amendmentId, generatedByUserId) {
   const html = twig.render('AMD/payment_terms_amendment.njk', context);
   const pdfBytes = await renderPdfFromHtml(html);
 
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
   const orderRef = sanitizePathSegment(order.order_reference);
   const amdRefSafe = sanitizePathSegment(amendment.amendment_reference);
@@ -1060,7 +1060,7 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
   const html = twig.render('CAFIN/ca_financial_annexure.njk', context);
   const pdfBytes = await renderPdfFromHtml(html);
 
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
   const orderRef = sanitizePathSegment(order.order_reference);
   const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, 'internal-ca', 'generated');
@@ -1168,7 +1168,7 @@ async function generateBlEndorsement(orderId, generatedByUserId) {
   const html = twig.render('BLE/bl_endorsement.njk', context);
   const pdfBytes = await renderPdfFromHtml(html);
 
-  const storageBase = (env.get('STORAGE_BASE_PATH', '') || '').replace(/\/+$/, '');
+  const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
   const orderRef = sanitizePathSegment(order.order_reference);
   const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, 'bl-endorsement', 'generated');

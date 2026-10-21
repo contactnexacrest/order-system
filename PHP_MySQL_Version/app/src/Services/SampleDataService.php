@@ -980,7 +980,7 @@ final class SampleDataService
         string $documentTypeLabel,
         int $uploadedBy
     ): int {
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $targetDir = "{$storageBase}/{$subPath}";
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);
@@ -1020,7 +1020,7 @@ final class SampleDataService
     /** A minimal but genuinely valid 1x1 PNG, saved under $subPath and registered in file_store. */
     private static function attachSamplePngFile(int $orderId, string $subPath, string $originalFilename, int $uploadedBy, string $documentTypeLabel): int
     {
-        $storageBase = rtrim(Env::get('STORAGE_BASE_PATH', ''), '/');
+        $storageBase = rtrim(Env::storageBasePath(), '/');
         $targetDir = "{$storageBase}/{$subPath}";
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);

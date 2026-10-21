@@ -80,4 +80,23 @@ function sessionSecret() {
   return 'change-this-in-.env';
 }
 
-module.exports = { get, getBool, getInt, isLocal, isDevServer, sessionSecret };
+// 90-item backlog "storage_base_path precedence": every controller/
+// service/repository that reads STORAGE_BASE_PATH used to inline its own
+// fallback for when .env doesn't define it, and the fallbacks had drifted
+// in two different ways. Four controllers (signatory/referenceDoc/asset/
+// products) computed `path.join(__dirname, '..', '..', 'storage')` — only
+// two levels up from src/controllers/, landing on app/storage (which
+// doesn't exist) instead of the real storage/ sibling of app/. Everywhere
+// else (documentGenerationService, sampleDataService, fileUploadService,
+// testModeRepository, sampleDataRepository) fell back to '' instead, so a
+// missing STORAGE_BASE_PATH there silently resolved paths against the
+// filesystem root ("/documents/...") rather than any real directory.
+// Centralizing the computation here — three levels up from
+// src/config/, src/controllers/, src/services/, and src/repositories/ all
+// alike — gives every call site the same, correct default, so this can't
+// drift apart again the way it just did.
+function storageBasePath() {
+  return get('STORAGE_BASE_PATH', path.join(__dirname, '..', '..', '..', 'storage'));
+}
+
+module.exports = { get, getBool, getInt, isLocal, isDevServer, sessionSecret, storageBasePath };

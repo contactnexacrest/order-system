@@ -221,7 +221,7 @@ async function uploadImage(req, res) {
   }
 
   const ext = ALLOWED_MIME[mime];
-  const storageBase = env.get('STORAGE_BASE_PATH', path.join(__dirname, '..', '..', 'storage'));
+  const storageBase = env.storageBasePath();
   const targetDir = path.join(storageBase, 'products', String(productId), 'images');
   fs.mkdirSync(targetDir, { recursive: true });
 

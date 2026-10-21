@@ -116,7 +116,7 @@ function saveUploadedFile(file) {
     throw new Error('File is too large — maximum is 15 MB.');
   }
 
-  const storageBase = env.get('STORAGE_BASE_PATH', path.join(__dirname, '..', '..', 'storage'));
+  const storageBase = env.storageBasePath();
   const targetDir = path.join(storageBase, 'internal', 'reference_library');
   fs.mkdirSync(targetDir, { recursive: true });
 

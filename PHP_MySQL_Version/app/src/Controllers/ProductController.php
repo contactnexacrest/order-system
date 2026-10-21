@@ -245,7 +245,7 @@ final class ProductController
         }
 
         $ext = self::ALLOWED_MIME[$mime];
-        $storageBase = Env::get('STORAGE_BASE_PATH', dirname(__DIR__, 3) . '/storage');
+        $storageBase = Env::storageBasePath();
         $targetDir = $storageBase . '/products/' . $productId . '/images';
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);
