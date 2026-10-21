@@ -81,6 +81,23 @@ Add Client** (`/clients/create`), fill in the same details by hand, save.
 Then from that client's page, **Add Order** to create the order shell
 (buyer inquiry ref, incoterm, payment preset, etc.).
 
+### Duplicating a client
+
+A client's page has a **Duplicate** button (same permission as Add Client).
+Use it to re-onboard a near-identical but genuinely distinct entity under
+its own Buyer Inquiry Ref — a sister company, a corrected legal entity, or
+a buyer that re-registered under new billing details — without re-typing
+every field by hand. It opens the same Add Client form, pre-filled from the
+source client's details, but posts to a separate duplicate-save endpoint
+instead of the ordinary create: the new record always gets its own
+brand-new Buyer Inquiry Ref and is never confused with the source.
+
+The save is refused if nothing was changed — an exact copy with zero
+differences from the source serves no purpose the original record doesn't
+already serve, so change at least one field before saving. The client's
+page also shows which client it was duplicated from, and which duplicates
+were made from it, so the relationship stays visible later.
+
 ### Buyer / Consignee / Notify Party details (per client)
 
 Every client record carries three separate detail blocks, matching the

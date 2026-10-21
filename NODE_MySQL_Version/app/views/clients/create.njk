@@ -1,11 +1,17 @@
 <div class="card">
   <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
-  <h1>New Client</h1>
+  <h1>{{ 'Duplicate Client' if duplicateOf else 'New Client' }}</h1>
+  {% if duplicateOf %}
+  <div class="review-banner warn" style="margin-bottom:14px">
+    ℹ <span>Duplicating "{{ duplicateOf.company_legal_name }}" (Buyer Inquiry Ref {{ duplicateOf.client_unique_number }}) — this will get its own, brand-new Buyer Inquiry Ref. Change at least one detail below before saving; an exact copy with nothing different is refused.</span>
+  </div>
+  {% else %}
   <p class="muted">A Buyer Inquiry Ref is generated automatically and reused on every order and document for this client.</p>
+  {% endif %}
   <div class="review-banner warn" style="margin-bottom:14px">
     ℹ <span>Once this client confirms their details (PI-details form) or an order's advance payment is recorded, whichever happens first, these details lock permanently — no further edits, by anyone but a Super Admin fixing a genuine mistake. Get everything right before that point.</span>
   </div>
-  <form method="post" action="/clients">
+  <form method="post" action="{{ '/clients/' + duplicateOf.id + '/duplicate' if duplicateOf else '/clients' }}">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <fieldset>
       <legend>Buyer Details</legend>
@@ -50,7 +56,7 @@
 
     <fieldset>
       <legend>Consignee Details</legend>
-      <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" checked> Same as Buyer</label>
+      <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" {{ 'checked' if (old.consignee_same_as_buyer is not defined or old.consignee_same_as_buyer) }}> Same as Buyer</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
         <label class="full">Consignee Company Name
           <input type="text" name="consignee_name" disabled value="{{ old.consignee_name or '' }}" placeholder="e.g., ABC Memorial Stones Ltd">
@@ -87,7 +93,7 @@
 
     <fieldset>
       <legend>Notify Party</legend>
-      <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" checked> Same as Consignee</label>
+      <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" {{ 'checked' if (old.notify_party_same_as_consignee is not defined or old.notify_party_same_as_consignee) }}> Same as Consignee</label>
       <div id="notify_party_fields" class="field-grid" style="display:none">
         <label class="full">Notify Party Name
           <input type="text" name="notify_party" disabled value="{{ old.notify_party or '' }}" placeholder="e.g., ABC Freight Forwarders Ltd">
@@ -133,7 +139,7 @@
         </label>
       </div>
     </fieldset>
-    <button type="submit">Create Client</button>
+    <button type="submit">{{ 'Create Duplicate' if duplicateOf else 'Create Client' }}</button>
   </form>
 </div>
 <script>

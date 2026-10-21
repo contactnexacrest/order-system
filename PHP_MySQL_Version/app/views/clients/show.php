@@ -27,9 +27,18 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
   <?php if ((int) $client['is_active'] === 0): ?>
     <p class="muted small">Deactivated — hidden from the main Clients list. Nothing was deleted.</p>
   <?php endif; ?>
+  <?php if (!empty($client['duplicate_of_client_id'])): ?>
+    <p class="muted small">Duplicated from <a href="/clients/<?= (int) $client['duplicate_of_client_id'] ?>"><?= htmlspecialchars($duplicateOfClient['company_legal_name'] ?? ('client #' . (int) $client['duplicate_of_client_id'])) ?></a>.</p>
+  <?php endif; ?>
+  <?php if (!empty($duplicatedInto)): ?>
+    <p class="muted small">Duplicated into:
+      <?php foreach ($duplicatedInto as $i => $d): ?><?= $i > 0 ? ', ' : '' ?><a href="/clients/<?= (int) $d['id'] ?>"><?= htmlspecialchars($d['company_legal_name']) ?></a><?php endforeach; ?>.
+    </p>
+  <?php endif; ?>
   <?php if ($canManageOrders): ?>
   <div class="btn-row">
     <a class="btn-sm btn-secondary" href="/clients/<?= (int) $client['id'] ?>/edit">Edit</a>
+    <a class="btn-sm btn-secondary" href="/clients/<?= (int) $client['id'] ?>/duplicate" title="Re-onboard a near-identical but distinct entity (e.g. a sister company) under a brand-new Buyer Inquiry Ref">Duplicate</a>
     <form method="post" action="/clients/<?= (int) $client['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('<?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>?<?= (int) $client['is_active'] === 1 ? ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' : '' ?>');">
       <?= Csrf::field() ?>
       <button type="submit" class="btn-sm <?= (int) $client['is_active'] === 1 ? 'btn-danger' : 'btn-success' ?>"><?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?></button>

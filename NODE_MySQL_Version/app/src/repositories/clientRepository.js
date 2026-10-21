@@ -19,6 +19,16 @@ async function setZohoContactId(id, zohoContactId) {
   await db.execute('UPDATE clients SET zoho_contact_id = :zoho_contact_id WHERE id = :id', { zoho_contact_id: zohoContactId, id });
 }
 
+/** 90-item backlog Phase 6: records that clientId was created as a "Duplicate" of sourceClientId — see clientsController.duplicateStore(). */
+async function markDuplicateOf(clientId, sourceClientId) {
+  await db.execute('UPDATE clients SET duplicate_of_client_id = :source WHERE id = :id', { source: sourceClientId, id: clientId });
+}
+
+/** @returns {Promise<Array>} every client created as a "Duplicate" of this one, newest first. */
+async function findDuplicatesOf(clientId) {
+  return db.query('SELECT * FROM clients WHERE duplicate_of_client_id = :id ORDER BY created_at DESC', { id: clientId });
+}
+
 async function allInactive() {
   return db.query('SELECT * FROM clients WHERE is_active = 0 ORDER BY company_legal_name');
 }
@@ -254,4 +264,5 @@ async function lockData(id, reason) {
 module.exports = {
   all, find, allInactive, create, update, setActive, setAllowStaffImpersonation, markSample, markTest, lockData, setZohoContactId,
   updateAgreementFooterText, setAgreementFile, setAgreementForceExpired, renewAgreement,
+  markDuplicateOf, findDuplicatesOf,
 };

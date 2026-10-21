@@ -1,12 +1,18 @@
-<?php use App\Helpers\Csrf; $old = $old ?? []; $cooTypes = $cooTypes ?? []; ?>
+<?php use App\Helpers\Csrf; $old = $old ?? []; $cooTypes = $cooTypes ?? []; $duplicateOf = $duplicateOf ?? null; ?>
 <div class="card">
   <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
-  <h1>New Client</h1>
+  <h1><?= $duplicateOf ? 'Duplicate Client' : 'New Client' ?></h1>
+  <?php if ($duplicateOf): ?>
+  <div class="review-banner warn" style="margin-bottom:14px">
+    ℹ <span>Duplicating "<?= htmlspecialchars($duplicateOf['company_legal_name']) ?>" (Buyer Inquiry Ref <?= htmlspecialchars($duplicateOf['client_unique_number']) ?>) — this will get its own, brand-new Buyer Inquiry Ref. Change at least one detail below before saving; an exact copy with nothing different is refused.</span>
+  </div>
+  <?php else: ?>
   <p class="muted">A Buyer Inquiry Ref is generated automatically and reused on every order and document for this client.</p>
+  <?php endif; ?>
   <div class="review-banner warn" style="margin-bottom:14px">
     ℹ <span>Once this client confirms their details (PI-details form) or an order's advance payment is recorded, whichever happens first, these details lock permanently — no further edits, by anyone but a Super Admin fixing a genuine mistake. Get everything right before that point.</span>
   </div>
-  <form method="post" action="/clients">
+  <form method="post" action="<?= $duplicateOf ? '/clients/' . (int) $duplicateOf['id'] . '/duplicate' : '/clients' ?>">
     <?= Csrf::field() ?>
     <fieldset>
       <legend>Buyer Details</legend>
@@ -51,7 +57,7 @@
 
     <fieldset>
       <legend>Consignee Details</legend>
-      <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" checked> Same as Buyer</label>
+      <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" <?= (!array_key_exists('consignee_same_as_buyer', $old) || $old['consignee_same_as_buyer']) ? 'checked' : '' ?>> Same as Buyer</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
         <label class="full">Consignee Company Name
           <input type="text" name="consignee_name" disabled value="<?= htmlspecialchars((string) ($old['consignee_name'] ?? '')) ?>" placeholder="e.g., ABC Memorial Stones Ltd">
@@ -88,7 +94,7 @@
 
     <fieldset>
       <legend>Notify Party</legend>
-      <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" checked> Same as Consignee</label>
+      <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" <?= (!array_key_exists('notify_party_same_as_consignee', $old) || $old['notify_party_same_as_consignee']) ? 'checked' : '' ?>> Same as Consignee</label>
       <div id="notify_party_fields" class="field-grid" style="display:none">
         <label class="full">Notify Party Name
           <input type="text" name="notify_party" disabled value="<?= htmlspecialchars((string) ($old['notify_party'] ?? '')) ?>" placeholder="e.g., ABC Freight Forwarders Ltd">
@@ -134,7 +140,7 @@
         </label>
       </div>
     </fieldset>
-    <button type="submit">Create Client</button>
+    <button type="submit"><?= $duplicateOf ? 'Create Duplicate' : 'Create Client' ?></button>
   </form>
 </div>
 <script>

@@ -51,28 +51,104 @@ async function store(req, res) {
     return;
   }
 
+  const data = collectClientFields(req, companyLegalName, billingAddress);
   const clientUniqueNumber = await referenceNumberService.generateClientUniqueNumber();
-  const clientId = await clientRepository.create(
-    {
-      company_legal_name: companyLegalName,
-      billing_address: billingAddress,
-      vat_eori_tax_no: String(req.body.vat_eori_tax_no || '').trim() || null,
-      contact_person: String(req.body.contact_person || '').trim() || null,
-      email: String(req.body.email || '').trim() || null,
-      phone: String(req.body.phone || '').trim() || null,
-      country_of_destination: String(req.body.country_of_destination || '').trim() || null,
-      coo_type: String(req.body.coo_type || '').trim() || 'To Be Confirmed',
-      ...collectPartyFields(req),
-    },
-    user.id,
-    clientUniqueNumber
-  );
+  const clientId = await clientRepository.create(data, user.id, clientUniqueNumber);
   if (await testModeService.isEnabled()) {
     await clientRepository.markTest(clientId);
   }
 
   flash.set(req, 'success', `Client created — Buyer Inquiry Ref ${clientUniqueNumber}.`);
   res.redirect(`/clients/${clientId}`);
+}
+
+/**
+ * 90-item backlog Phase 6: "Duplicate" a client — re-onboard a
+ * near-identical but genuinely distinct entity (a sister company, a
+ * corrected re-entry) under a brand-new Buyer Inquiry Ref, never the
+ * source's own. Pre-fills the ordinary New Client form from the source
+ * client's current field values; duplicateStore() below refuses to save
+ * unless at least one of those values was actually changed, since an
+ * exact duplicate serves no purpose the original record doesn't already.
+ */
+async function duplicateForm(req, res) {
+  const source = await clientRepository.find(parseInt(req.params.id, 10));
+  if (!source) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const pulledOld = flash.pullOld(req);
+  res.renderView('clients/create', {
+    old: Object.keys(pulledOld).length > 0 ? pulledOld : source,
+    cooTypes: await lookupRepository.dropdownOptions('coo_type'),
+    duplicateOf: source,
+  }, 'layout/base');
+}
+
+async function duplicateStore(req, res) {
+  const source = await clientRepository.find(parseInt(req.params.id, 10));
+  if (!source) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+  const user = req.user;
+
+  const companyLegalName = String(req.body.company_legal_name || '').trim();
+  const billingAddress = String(req.body.billing_address || '').trim();
+
+  if (companyLegalName === '' || billingAddress === '') {
+    flash.set(req, 'error', 'Company legal name and billing address are required.');
+    flash.setOld(req, req.body);
+    res.redirect(`/clients/${source.id}/duplicate`);
+    return;
+  }
+
+  const data = collectClientFields(req, companyLegalName, billingAddress);
+
+  if (isIdenticalToSource(data, source)) {
+    flash.set(req, 'error', 'Change at least one detail before saving a duplicate — if nothing is different, there is no need for a new client record.');
+    flash.setOld(req, req.body);
+    res.redirect(`/clients/${source.id}/duplicate`);
+    return;
+  }
+
+  const clientUniqueNumber = await referenceNumberService.generateClientUniqueNumber();
+  const clientId = await clientRepository.create(data, user.id, clientUniqueNumber);
+  await clientRepository.markDuplicateOf(clientId, source.id);
+  if (await testModeService.isEnabled()) {
+    await clientRepository.markTest(clientId);
+  }
+  await auditLogRepository.log(user.id, 'CLIENT_DUPLICATED', 'clients', clientId, 'duplicate_of_client_id', null, String(source.id));
+
+  flash.set(req, 'success', `Client created as a duplicate of "${source.company_legal_name}" — Buyer Inquiry Ref ${clientUniqueNumber}.`);
+  res.redirect(`/clients/${clientId}`);
+}
+
+/** Every field store()/duplicateStore() can set, shared so both build it identically. */
+function collectClientFields(req, companyLegalName, billingAddress) {
+  return {
+    company_legal_name: companyLegalName,
+    billing_address: billingAddress,
+    vat_eori_tax_no: String(req.body.vat_eori_tax_no || '').trim() || null,
+    contact_person: String(req.body.contact_person || '').trim() || null,
+    email: String(req.body.email || '').trim() || null,
+    phone: String(req.body.phone || '').trim() || null,
+    country_of_destination: String(req.body.country_of_destination || '').trim() || null,
+    coo_type: String(req.body.coo_type || '').trim() || 'To Be Confirmed',
+    ...collectPartyFields(req),
+  };
+}
+
+/** True only if every field in data (that also exists on source) matches source's current value — loose/string comparison so null vs. '' never counts as a difference. */
+function isIdenticalToSource(data, source) {
+  for (const [key, value] of Object.entries(data)) {
+    if (!(key in source)) continue;
+    const a = value === null || value === undefined ? '' : String(value);
+    const b = source[key] === null || source[key] === undefined ? '' : String(source[key]);
+    if (a !== b) return false;
+  }
+  return true;
 }
 
 async function show(req, res) {
@@ -105,6 +181,8 @@ async function show(req, res) {
   res.renderView('clients/show', {
     client, orders, impersonationGloballyEnabled, impersonationUnavailableReason, additionalDocuments,
     agreementForceExpired, agreementExpiryDate, agreementExpired, agreementActive, agreementRenewEligible,
+    duplicateOfClient: client.duplicate_of_client_id ? await clientRepository.find(client.duplicate_of_client_id) : null,
+    duplicatedInto: await clientRepository.findDuplicatesOf(client.id),
   }, 'layout/base');
 }
 
@@ -593,4 +671,5 @@ module.exports = {
   index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
   setImpersonationAllowed, impersonate, uploadAdditionalDocument, deleteAdditionalDocument,
   uploadAgreement, forceExpireAgreement, renewAgreement, downloadAgreement,
+  duplicateForm, duplicateStore,
 };

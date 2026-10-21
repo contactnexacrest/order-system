@@ -57,8 +57,88 @@ final class ClientController
             return;
         }
 
+        $data = self::collectClientFields($companyLegalName, $billingAddress);
         $clientUniqueNumber = ReferenceNumberService::generateClientUniqueNumber();
-        $clientId = ClientRepository::create(array_merge([
+        $clientId = ClientRepository::create($data, (int) $user['id'], $clientUniqueNumber);
+        if (TestModeService::isEnabled()) {
+            ClientRepository::markTest($clientId);
+        }
+
+        Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}.");
+        header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * 90-item backlog Phase 6: "Duplicate" a client — re-onboard a
+     * near-identical but genuinely distinct entity (a sister company, a
+     * corrected re-entry) under a brand-new Buyer Inquiry Ref, never the
+     * source's own. Pre-fills the ordinary New Client form from the
+     * source client's current field values; duplicateStore() below
+     * refuses to save unless at least one of those values was actually
+     * changed, since an exact duplicate serves no purpose the original
+     * record doesn't already serve.
+     */
+    public function duplicateForm(array $params): void
+    {
+        $source = ClientRepository::find((int) $params['id']);
+        if (!$source) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        View::render('clients/create', [
+            'old' => Flash::pullOld() ?: $source,
+            'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
+            'duplicateOf' => $source,
+        ], 'layout/base');
+    }
+
+    public function duplicateStore(array $params): void
+    {
+        $source = ClientRepository::find((int) $params['id']);
+        if (!$source) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+
+        $companyLegalName = trim((string) ($_POST['company_legal_name'] ?? ''));
+        $billingAddress = trim((string) ($_POST['billing_address'] ?? ''));
+
+        if ($companyLegalName === '' || $billingAddress === '') {
+            Flash::set('error', 'Company legal name and billing address are required.');
+            Flash::setOld($_POST);
+            header("Location: /clients/{$source['id']}/duplicate");
+            return;
+        }
+
+        $data = self::collectClientFields($companyLegalName, $billingAddress);
+
+        if (self::isIdenticalToSource($data, $source)) {
+            Flash::set('error', 'Change at least one detail before saving a duplicate — if nothing is different, there is no need for a new client record.');
+            Flash::setOld($_POST);
+            header("Location: /clients/{$source['id']}/duplicate");
+            return;
+        }
+
+        $clientUniqueNumber = ReferenceNumberService::generateClientUniqueNumber();
+        $clientId = ClientRepository::create($data, (int) $user['id'], $clientUniqueNumber);
+        ClientRepository::markDuplicateOf($clientId, (int) $source['id']);
+        if (TestModeService::isEnabled()) {
+            ClientRepository::markTest($clientId);
+        }
+        AuditLogRepository::log((int) $user['id'], 'CLIENT_DUPLICATED', 'clients', $clientId, 'duplicate_of_client_id', null, (string) $source['id']);
+
+        Flash::set('success', "Client created as a duplicate of \"{$source['company_legal_name']}\" — Buyer Inquiry Ref {$clientUniqueNumber}.");
+        header("Location: /clients/{$clientId}");
+    }
+
+    /** @return array<string,mixed> every field store()/duplicateStore() can set, shared so both build it identically. */
+    private static function collectClientFields(string $companyLegalName, string $billingAddress): array
+    {
+        return array_merge([
             'company_legal_name'    => $companyLegalName,
             'billing_address'       => $billingAddress,
             'vat_eori_tax_no'       => trim((string) ($_POST['vat_eori_tax_no'] ?? '')) ?: null,
@@ -67,13 +147,23 @@ final class ClientController
             'phone'                 => trim((string) ($_POST['phone'] ?? '')) ?: null,
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
             'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: 'To Be Confirmed',
-        ], self::collectPartyFields()), (int) $user['id'], $clientUniqueNumber);
-        if (TestModeService::isEnabled()) {
-            ClientRepository::markTest($clientId);
-        }
+        ], self::collectPartyFields());
+    }
 
-        Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}.");
-        header("Location: /clients/{$clientId}");
+    /** True only if every field in $data (that also exists on $source) matches $source's current value — loose/string comparison so null vs. '' never counts as a difference. */
+    private static function isIdenticalToSource(array $data, array $source): bool
+    {
+        foreach ($data as $key => $value) {
+            if (!array_key_exists($key, $source)) {
+                continue;
+            }
+            $a = $value === null ? '' : (string) $value;
+            $b = $source[$key] === null ? '' : (string) $source[$key];
+            if ($a !== $b) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public function show(array $params): void
@@ -86,7 +176,13 @@ final class ClientController
         }
         $orders = OrderRepository::forClient((int) $client['id']);
         $additionalDocuments = FileStoreRepository::additionalDocumentsForClient((int) $client['id']);
-        View::render('clients/show', ['client' => $client, 'orders' => $orders, 'additionalDocuments' => $additionalDocuments], 'layout/base');
+        View::render('clients/show', [
+            'client' => $client,
+            'orders' => $orders,
+            'additionalDocuments' => $additionalDocuments,
+            'duplicateOfClient' => $client['duplicate_of_client_id'] ? ClientRepository::find((int) $client['duplicate_of_client_id']) : null,
+            'duplicatedInto' => ClientRepository::findDuplicatesOf((int) $client['id']),
+        ], 'layout/base');
     }
 
     public function editForm(array $params): void

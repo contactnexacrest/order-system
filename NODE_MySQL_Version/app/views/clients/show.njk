@@ -10,9 +10,18 @@
   {% if not client.is_active %}
     <p class="muted small">Deactivated — hidden from the main Clients list. Nothing was deleted.</p>
   {% endif %}
+  {% if client.duplicate_of_client_id %}
+    <p class="muted small">Duplicated from <a href="/clients/{{ client.duplicate_of_client_id }}">{{ duplicateOfClient.company_legal_name if duplicateOfClient else ('client #' + client.duplicate_of_client_id) }}</a>.</p>
+  {% endif %}
+  {% if duplicatedInto and duplicatedInto.length > 0 %}
+    <p class="muted small">Duplicated into:
+      {% for d in duplicatedInto %}{{ ', ' if not loop.first }}<a href="/clients/{{ d.id }}">{{ d.company_legal_name }}</a>{% endfor %}.
+    </p>
+  {% endif %}
   {% if permissions.manage_orders %}
   <div class="btn-row">
     <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/edit">Edit</a>
+    <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/duplicate" title="Re-onboard a near-identical but distinct entity (e.g. a sister company) under a brand-new Buyer Inquiry Ref">Duplicate</a>
     <form method="post" action="/clients/{{ client.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if client.is_active else 'Reactivate' }} {{ client.company_legal_name }}?{{ ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' if client.is_active else '' }}');">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm {{ 'btn-danger' if client.is_active else 'btn-success' }}">{{ 'Deactivate' if client.is_active else 'Reactivate' }}</button>

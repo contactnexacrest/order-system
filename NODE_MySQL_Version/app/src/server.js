@@ -539,6 +539,8 @@ app.get('/clients', requireAuth, requirePermissionAny(['manage_orders', 'view_cl
 app.get('/clients/inactive', requireAuth, requirePermissionAny(['manage_orders', 'view_clients']), asyncHandler(clientsController.inactiveIndex));
 app.get('/clients/create', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.create));
 app.post('/clients', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.store));
+app.get('/clients/:id/duplicate', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.duplicateForm));
+app.post('/clients/:id/duplicate', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.duplicateStore));
 app.get('/clients/:id', requireAuth, requirePermissionAny(['manage_orders', 'view_clients']), asyncHandler(clientsController.show));
 app.get('/clients/:id/edit', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.editForm));
 app.post('/clients/:id/update', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.update));

@@ -327,6 +327,8 @@ $router->get('/clients', [$clients, 'index'], [SessionAuth::required(), Permissi
 $router->get('/clients/inactive', [$clients, 'inactiveIndex'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_clients'])]);
 $router->get('/clients/create', [$clients, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients', [$clients, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->get('/clients/{id}/duplicate', [$clients, 'duplicateForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/clients/{id}/duplicate', [$clients, 'duplicateStore'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/clients/{id}', [$clients, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_clients'])]);
 $router->get('/clients/{id}/edit', [$clients, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients/{id}/update', [$clients, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

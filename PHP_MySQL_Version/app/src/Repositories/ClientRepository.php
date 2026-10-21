@@ -35,6 +35,24 @@ final class ClientRepository
         )->execute(['zoho_contact_id' => $zohoContactId, 'id' => $id]);
     }
 
+    /** 90-item backlog Phase 6: records that $clientId was created as a "Duplicate" of $sourceClientId — see ClientController::duplicateStore(). */
+    public static function markDuplicateOf(int $clientId, int $sourceClientId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE clients SET duplicate_of_client_id = :source WHERE id = :id'
+        )->execute(['source' => $sourceClientId, 'id' => $clientId]);
+    }
+
+    /** @return array<int, array<string,mixed>> every client created as a "Duplicate" of this one, newest first. */
+    public static function findDuplicatesOf(int $clientId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM clients WHERE duplicate_of_client_id = :id ORDER BY created_at DESC'
+        );
+        $stmt->execute(['id' => $clientId]);
+        return $stmt->fetchAll();
+    }
+
     /** @return array<int, array<string,mixed>> deactivated clients — never shown in all(), still directly viewable */
     public static function allInactive(): array
     {
