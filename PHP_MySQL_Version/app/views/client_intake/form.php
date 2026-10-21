@@ -1,4 +1,4 @@
-<?php use App\Helpers\Csrf; $containerTypes = $containerTypes ?? []; ?>
+<?php use App\Helpers\Csrf; $containerTypes = $containerTypes ?? []; $incoterms = $incoterms ?? []; ?>
 <div class="card">
   <h1>Quotation Details Form</h1>
   <p class="muted">Just your company and shipping details — no product information needed here. We'll review and send your Quotation within 24 hours.</p>
@@ -98,7 +98,14 @@
       <legend><span class="intake-step-num">3</span> Shipping Preference</legend>
       <div class="field-grid">
         <label>Incoterm *
-          <input type="text" name="incoterm_preference" placeholder="FOB / CFR / CIF — if unsure, write FOB" required>
+          <select id="incoterm_select">
+            <option value="">— Select —</option>
+            <?php foreach ($incoterms as $i): ?>
+              <option value="<?= htmlspecialchars($i['code']) ?>"><?= htmlspecialchars($i['code']) ?></option>
+            <?php endforeach; ?>
+            <option value="__other__">Other (not listed) — specify</option>
+          </select>
+          <input type="text" id="incoterm_preference_input" name="incoterm_preference" placeholder="Type the Incoterm" style="display:none" readonly>
         </label>
         <label>Container Type
           <select name="container_type_text">
@@ -132,6 +139,19 @@
     inputs.forEach(function (el) { el.disabled = same; });
   }
   checkbox.addEventListener('change', apply);
+  apply();
+})();
+(function () {
+  var select = document.getElementById('incoterm_select');
+  var input = document.getElementById('incoterm_preference_input');
+  if (!select || !input) { return; }
+  function apply() {
+    var isOther = select.value === '__other__';
+    input.style.display = isOther ? '' : 'none';
+    input.readOnly = !isOther;
+    if (!isOther) { input.value = select.value; }
+  }
+  select.addEventListener('change', apply);
   apply();
 })();
 </script>

@@ -31,6 +31,7 @@ async function show(req, res) {
   res.renderView('client_intake/form', {
     wrapClass: 'intake-wrap',
     containerTypes: await lookupRepository.dropdownOptions('container_type'),
+    incoterms: await lookupRepository.incoterms(),
   }, 'layout/bare');
 }
 
@@ -59,11 +60,15 @@ async function showEdit(req, res) {
     res.renderView('client_intake/link_expired', {}, 'layout/bare');
     return;
   }
+  const incoterms = await lookupRepository.incoterms();
+  const incotermValue = submission.incoterm_preference || '';
   res.renderView('client_intake/edit_form', {
     submission,
     token: req.params.token,
     wrapClass: 'intake-wrap',
     containerTypes: await lookupRepository.dropdownOptions('container_type'),
+    incoterms,
+    incotermIsOther: incotermValue !== '' && !incoterms.some((i) => i.code === incotermValue),
   }, 'layout/bare');
 }
 

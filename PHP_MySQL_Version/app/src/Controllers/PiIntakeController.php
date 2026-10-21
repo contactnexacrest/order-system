@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\LookupRepository;
 use App\Repositories\PiIntakeRepository;
 use App\Services\DocumentDataAssembler;
 
@@ -33,6 +34,7 @@ final class PiIntakeController
             'token' => $params['token'],
             'wrapClass' => 'intake-wrap',
             'paymentTermsPlaceholder' => self::buildPaymentTermsPlaceholder($submission),
+            'incoterms' => LookupRepository::incoterms(),
         ], 'layout/bare');
     }
 

@@ -2,6 +2,7 @@
 
 const flash = require('../helpers/flash');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
+const lookupRepository = require('../repositories/lookupRepository');
 const { balanceTriggerSentence } = require('../services/documentDataAssembler');
 
 /**
@@ -37,11 +38,15 @@ async function show(req, res) {
     res.renderView('pi_intake/link_expired', {}, 'layout/bare');
     return;
   }
+  const incoterms = await lookupRepository.incoterms();
+  const incotermValue = submission.incoterm_confirmed || '';
   res.renderView('pi_intake/form', {
     submission,
     token: req.params.token,
     wrapClass: 'intake-wrap',
     paymentTermsPlaceholder: buildPaymentTermsPlaceholder(submission),
+    incoterms,
+    incotermIsOther: incotermValue !== '' && !incoterms.some((i) => i.code === incotermValue),
   }, 'layout/bare');
 }
 

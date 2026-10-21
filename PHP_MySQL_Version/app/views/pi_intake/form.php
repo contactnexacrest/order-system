@@ -1,4 +1,9 @@
-<?php use App\Helpers\Csrf; ?>
+<?php
+use App\Helpers\Csrf;
+$incoterms = $incoterms ?? [];
+$incotermValue = $submission['incoterm_confirmed'] ?? '';
+$incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_column($incoterms, 'code'), true);
+?>
 <div class="card">
   <h1>Proforma Invoice Details Form</h1>
   <p class="muted">Order <?= htmlspecialchars($submission['order_reference']) ?> — <?= htmlspecialchars($submission['client_company_legal_name']) ?></p>
@@ -134,7 +139,14 @@
           <input type="text" name="country_of_destination" value="<?= htmlspecialchars($submission['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France" required>
         </label>
         <label>Incoterm *
-          <input type="text" name="incoterm_confirmed" value="<?= htmlspecialchars($submission['incoterm_confirmed'] ?? '') ?>" placeholder="FOB / CFR / CIF" required>
+          <select id="incoterm_select">
+            <option value="">— Select —</option>
+            <?php foreach ($incoterms as $i): ?>
+              <option value="<?= htmlspecialchars($i['code']) ?>" <?= $incotermValue === $i['code'] ? 'selected' : '' ?>><?= htmlspecialchars($i['code']) ?></option>
+            <?php endforeach; ?>
+            <option value="__other__" <?= $incotermIsOther ? 'selected' : '' ?>>Other (not listed) — specify</option>
+          </select>
+          <input type="text" id="incoterm_confirmed_input" name="incoterm_confirmed" value="<?= htmlspecialchars($incotermValue) ?>" placeholder="Type the Incoterm" style="<?= $incotermIsOther ? '' : 'display:none' ?>" <?= $incotermIsOther ? '' : 'readonly' ?>>
         </label>
         <label>Container Type
           <input type="text" name="container_type_text" value="<?= htmlspecialchars($submission['container_type_text'] ?? '') ?>" placeholder="Blank = same as quotation">
@@ -191,5 +203,18 @@
   }
   wireSameAs('consignee_same_as_buyer', 'consignee_fields');
   wireSameAs('notify_party_same_as_consignee', 'notify_party_fields');
+
+  var incotermSelect = document.getElementById('incoterm_select');
+  var incotermInput = document.getElementById('incoterm_confirmed_input');
+  if (incotermSelect && incotermInput) {
+    var applyIncoterm = function () {
+      var isOther = incotermSelect.value === '__other__';
+      incotermInput.style.display = isOther ? '' : 'none';
+      incotermInput.readOnly = !isOther;
+      if (!isOther) { incotermInput.value = incotermSelect.value; }
+    };
+    incotermSelect.addEventListener('change', applyIncoterm);
+    applyIncoterm();
+  }
 })();
 </script>
