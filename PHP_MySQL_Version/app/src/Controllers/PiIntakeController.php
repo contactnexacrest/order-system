@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\DocumentRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\PiIntakeRepository;
 use App\Services\DocumentDataAssembler;
@@ -34,6 +35,7 @@ final class PiIntakeController
             'token' => $params['token'],
             'wrapClass' => 'intake-wrap',
             'paymentTermsPlaceholder' => self::buildPaymentTermsPlaceholder($submission),
+            'quotationAcceptancePlaceholder' => self::buildQuotationAcceptancePlaceholder($submission),
             'incoterms' => LookupRepository::incoterms(),
         ], 'layout/bare');
     }
@@ -55,6 +57,23 @@ final class PiIntakeController
             $submission['order_balance_trigger_wording'] ?? null
         );
         return "CONFIRMED — {$advancePct}% advance T/T on FOB Value {$submission['order_advance_trigger_text']} + {$balancePct}% balance {$balanceTerms}";
+    }
+
+    /**
+     * User-reported batch item 8 — "Acceptance of Quotation No. *" used to
+     * show only a vanishing placeholder, identical to the payment-terms
+     * field's own bug fixed above (90-item backlog #16): the required
+     * field was empty on a fresh submission, forcing the client to retype
+     * exactly what the placeholder already told them. Prefills the real
+     * Quotation reference/date this order's own Quotation document was
+     * actually issued with, so the client reviews/confirms real data.
+     */
+    private static function buildQuotationAcceptancePlaceholder(array $submission): string
+    {
+        $qtDoc = DocumentRepository::findLatestForOrderAndTypeCode((int) $submission['order_id'], 'QT');
+        $ref = $qtDoc['document_reference'] ?? $submission['order_reference'];
+        $date = DocumentDataAssembler::formatDate($submission['order_quotation_date'] ?? null) ?? 'the date shown on your Quotation';
+        return "We accept Quotation {$ref} dated {$date}";
     }
 
     public function submit(array $params): void

@@ -161,7 +161,7 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
           <textarea name="payment_terms_confirmation" placeholder="<?= htmlspecialchars($paymentTermsPlaceholder) ?>" required><?= htmlspecialchars($submission['payment_terms_confirmation'] ?? $paymentTermsPlaceholder) ?></textarea>
         </label>
         <label class="full">Acceptance of Quotation No. *
-          <textarea name="quotation_acceptance_reference" placeholder="e.g. We accept Quotation SC/QT/2026/MMNNN dated DD Month YYYY" required><?= htmlspecialchars($submission['quotation_acceptance_reference'] ?? '') ?></textarea>
+          <textarea name="quotation_acceptance_reference" placeholder="<?= htmlspecialchars($quotationAcceptancePlaceholder) ?>" required><?= htmlspecialchars($submission['quotation_acceptance_reference'] ?? $quotationAcceptancePlaceholder) ?></textarea>
         </label>
         <label>Certificate of Origin Type <span class="info-bubble" tabindex="0" title="A certificate confirming the goods' country of manufacture, often required for customs/preferential duty. GSP Form A = preferential rate under a trade scheme (if your country qualifies); Non-preferential = standard certificate of origin. Leave blank if you're not sure — we'll confirm with you.">&#9432;</span>
           <input type="text" name="coo_type" value="<?= htmlspecialchars($submission['coo_type'] ?? '') ?>" placeholder="GSP Form A / Non-preferential — leave blank if unsure">

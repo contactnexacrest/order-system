@@ -3,7 +3,8 @@
 const flash = require('../helpers/flash');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
 const lookupRepository = require('../repositories/lookupRepository');
-const { balanceTriggerSentence } = require('../services/documentDataAssembler');
+const documentRepository = require('../repositories/documentRepository');
+const { balanceTriggerSentence, formatDate } = require('../services/documentDataAssembler');
 
 /**
  * Port of App\Controllers\PiIntakeController. Public, unauthenticated
@@ -32,6 +33,20 @@ function buildPaymentTermsPlaceholder(submission) {
   return `CONFIRMED — ${advancePct}% advance T/T on FOB Value ${submission.order_advance_trigger_text} + ${balancePct}% balance ${balanceTerms}`;
 }
 
+// User-reported batch item 8 — "Acceptance of Quotation No. *" used to show
+// only a vanishing placeholder, identical to the payment-terms field's own
+// bug fixed above (90-item backlog #16): the required field was empty on a
+// fresh submission, forcing the client to retype exactly what the
+// placeholder already told them. Prefills the real Quotation reference/date
+// this order's own Quotation document was actually issued with, so the
+// client reviews/confirms real data.
+async function buildQuotationAcceptancePlaceholder(submission) {
+  const qtDoc = await documentRepository.findLatestForOrderAndTypeCode(submission.order_id, 'QT');
+  const ref = (qtDoc && qtDoc.document_reference) || submission.order_reference;
+  const date = formatDate(submission.order_quotation_date || null) || 'the date shown on your Quotation';
+  return `We accept Quotation ${ref} dated ${date}`;
+}
+
 async function show(req, res) {
   const submission = await piIntakeRepository.findValidByToken(req.params.token || '');
   if (!submission) {
@@ -45,6 +60,7 @@ async function show(req, res) {
     token: req.params.token,
     wrapClass: 'intake-wrap',
     paymentTermsPlaceholder: buildPaymentTermsPlaceholder(submission),
+    quotationAcceptancePlaceholder: await buildQuotationAcceptancePlaceholder(submission),
     incoterms,
     incotermIsOther: incotermValue !== '' && !incoterms.some((i) => i.code === incotermValue),
   }, 'layout/bare');

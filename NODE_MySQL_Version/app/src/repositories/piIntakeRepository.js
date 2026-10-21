@@ -37,7 +37,8 @@ async function find(id) {
 async function findValidByToken(rawToken) {
   const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
   const row = await db.queryOne(
-    `SELECT pis.*, o.order_reference, c.company_legal_name AS client_company_legal_name,
+    `SELECT pis.*, o.order_reference, o.quotation_date AS order_quotation_date,
+            c.company_legal_name AS client_company_legal_name,
             c.billing_address AS client_billing_address,
             c.consignee_name AS client_consignee_name,
             c.consignee_address AS client_consignee_address,
