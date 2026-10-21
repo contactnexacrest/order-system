@@ -106,6 +106,54 @@ several stages ahead of a document that's still sitting in "draft" or
 "in review" — that's normal, not a bug, though it's worth keeping an eye on
 so nothing old goes out to a buyer unreviewed.
 
+## How files are named and stored on disk
+
+A question that comes up often enough to answer here once: every file this
+system stores — a generated document, an uploaded dispute document, an
+Annexure product photo — ends up on disk nested under two reference
+numbers, never under the human-readable name you'd expect:
+
+```
+{STORAGE_BASE_PATH}/clients/{client_unique_number}/{order_reference}/{purpose}/{random-id}.{ext}
+```
+
+- **`client_unique_number`** (shown on screen as **"Buyer Inquiry Ref"**)
+  is generated **once**, when the client is first created, and reused on
+  every order and document for that client afterward. It identifies the
+  original enquiry/relationship, not any one order — a repeat buyer placing
+  their fifth order still carries the same Buyer Inquiry Ref as their first.
+- **`order_reference`** is generated **once per order** instead, and is
+  what actually distinguishes one order from another for the same client.
+- **`{purpose}`** is a short, fixed subfolder naming what the file actually
+  is — `{stage_slug}/generated` for a system-generated document (QT, PI,
+  BL Instruction Sheet, …, nested one level deeper under whichever stage
+  generated it), `annexure` for an Annexure product photo, `disputes/{id}`
+  for a dispute's supporting document, and so on for every other upload
+  context.
+- **`{random-id}.{ext}`** — the actual filename on disk is always a random
+  identifier, generated fresh for that one file, never the document's own
+  reference number (e.g. `SC/QT/2026/1809001`) and never the name the file
+  was uploaded with. Two reasons: a real document reference contains `/`
+  characters a filename can't hold, and giving every file an unpredictable
+  name means nothing about what a file is, or which order it belongs to,
+  can be guessed from its name alone if a path ever leaked. The
+  human-readable identity — the document reference, the original upload
+  filename — lives only in the database (`file_store`/`documents`
+  tables), looked up at download time; the filename on disk is never
+  meant to be read by a person.
+- Both `client_unique_number` and `order_reference` naturally contain `/`
+  characters of their own (they're reference numbers, not folder names),
+  so each is run through the same sanitizer before being used as a path
+  segment: anything that isn't a letter, digit, underscore, or hyphen
+  becomes a hyphen. `SC/ORD/2026/003-42` on screen becomes
+  `SC-ORD-2026-003-42` as a folder name — same identity, just filesystem-safe.
+
+This whole structure sits under whatever `STORAGE_BASE_PATH` is configured
+to (see [Admin & Company Settings](./15-admin-settings.md) and the
+deployment guide) — always outside the public web root, so none of it is
+reachable by a direct URL; every download goes through the application,
+which checks permissions before handing back the file.
+
 ## Conventions used across every screen
 
 **"To Be Confirmed" is always spelled out, never abbreviated.** Any field
