@@ -95,7 +95,12 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
 - **Company Settings** — legal name, registered/corporate office, GSTIN/IEC,
   bank details, LUT number — the exact fields snapshotted onto every
   generated document (see the note in [Chapter 1](./01-stage1-enquiry-quotation.md)
-  about data integrity). The same screen's **Mail Redirect** section holds
+  about data integrity). The LUT expiry date and RCMC validity date each
+  carry their own alert-days setting; once either is within that many
+  days of expiring (or already past it), a warning shows on the
+  Dashboard **and** a count badge appears on the sidebar's **Company
+  Settings** link itself — visible from every page, not just the
+  Dashboard. The same screen's **Mail Redirect** section holds
   four settings, independent of [Test Mode](./16-test-mode.md)'s own email
   redirect: a **Redirect all mail** toggle plus address — when on, every
   non-security outbound email (order updates, document sends, and so on)

@@ -278,6 +278,7 @@ app.use((req, res, next) => {
       clientIntakePendingCount: req.clientIntakePendingCount || 0,
       piIntakePendingCount: req.piIntakePendingCount || 0,
       emailApprovalsPendingCount: req.emailApprovalsPendingCount || 0,
+      settingsExpiryWarningCount: req.settingsExpiryWarningCount || 0,
       testModeEnabled: req.testModeEnabled || false,
       devServerEnabled: env.isDevServer(),
       isImpersonating: clientPortalService.isImpersonating(req),

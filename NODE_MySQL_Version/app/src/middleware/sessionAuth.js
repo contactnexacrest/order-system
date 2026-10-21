@@ -12,6 +12,7 @@ const notificationRepository = require('../repositories/notificationRepository')
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
 const emailLogRepository = require('../repositories/emailLogRepository');
+const dashboardRepository = require('../repositories/dashboardRepository');
 
 // Port of App\Middleware\SessionAuth. Redirects to /login if not
 // authenticated; enforces the DB-driven idle session timeout
@@ -115,6 +116,20 @@ function required() {
     req.emailApprovalsPendingCount = req.permissions.approve_email_send
       ? await emailLogRepository.awaitingDispatchCount()
       : 0;
+
+    // 90-item backlog item #11: a per-field lock badge + save-time
+    // warning already existed on the Settings page itself
+    // (dashboardRepository.complianceExpiryWarnings() already computed
+    // this, shown only on the Dashboard body) — but nothing surfaced it
+    // from every other page the way the other standing-request badges
+    // above do. Reuses the exact same computation, just counted and
+    // attached to the Settings link instead of rendered inline.
+    if (req.permissions.manage_company_settings) {
+      const warnings = await dashboardRepository.complianceExpiryWarnings();
+      req.settingsExpiryWarningCount = (warnings.lut ? 1 : 0) + (warnings.rcmc ? 1 : 0);
+    } else {
+      req.settingsExpiryWarningCount = 0;
+    }
 
     next();
   };
