@@ -77,6 +77,23 @@ panel below) has been automatically replaced by a newer approved revision
 watermark. Work from whichever revision of that type is still showing
 **approved** or **sent** instead.
 
+**Regenerating an earlier-stage document warns about downstream drift.**
+Every document type's data is always a live read of the order at the
+moment it's generated — nothing propagates automatically from an
+earlier-stage document to a later one beyond a plain cross-reference
+number (the PI cites the QT's reference, the OC cites the PI's). So if,
+say, the Quotation (Stage 1) is regenerated after the Commercial Invoice
+(Stage 8) already exists, the CI's already-rendered PDF still reflects
+whatever was live when it was made — it does not silently pick up
+whatever just changed on the QT. Nothing technically breaks, but the two
+documents can now quietly disagree if a reviewer or the buyer compares
+them. To flag this, regenerating (not first-generating) a document type
+while a later-stage type already exists for the same order shows a
+warning banner naming which later document(s) were built from the
+older data, so staff know to check whether they need regenerating too.
+This only fires on an actual revision — the first-ever generation of a
+type, normal forward progress through the stages, never triggers it.
+
 ### Assigning reviewers
 
 From the order page, staff assign one or more reviewers to a generated
