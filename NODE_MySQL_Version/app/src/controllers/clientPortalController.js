@@ -11,6 +11,7 @@ const reasonValidator = require('../helpers/reasonValidator');
 const clientPasswordResetTokenRepository = require('../repositories/clientPasswordResetTokenRepository');
 const clientLoginRepository = require('../repositories/clientLoginRepository');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
+const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const disputeRepository = require('../repositories/disputeRepository');
 const documentRepository = require('../repositories/documentRepository');
@@ -210,9 +211,12 @@ async function setPassword(req, res) {
 
 async function dashboard(req, res) {
   const clientId = clientPortalService.currentClientId(req);
+  const client = await clientPortalService.currentClient(req);
+  const historyHidden = !(await clientRepository.orderHistoryVisible(client));
   res.renderView('client_portal/dashboard', {
-    client: await clientPortalService.currentClient(req),
-    orders: await orderRepository.forClient(clientId),
+    client,
+    orders: await orderRepository.forClient(clientId, historyHidden),
+    historyHidden,
   }, 'layout/client');
 }
 

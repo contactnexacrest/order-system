@@ -559,6 +559,7 @@ app.post('/clients/:id/additional-documents/:fileId/delete', requireAuth, requir
 // global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch
 // inside clientsController.impersonate(), on top of its own impersonate_client permission gate here.
 app.post('/clients/:id/impersonation-allowed', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(clientsController.setImpersonationAllowed));
+app.post('/clients/:id/order-history-visibility', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(clientsController.setOrderHistoryVisibilityOverride));
 app.post('/clients/:id/impersonate', requireAuth, requirePermission('impersonate_client'), verifyCsrf, asyncHandler(clientsController.impersonate));
 
 // Staff review queue for public quotation-details submissions.

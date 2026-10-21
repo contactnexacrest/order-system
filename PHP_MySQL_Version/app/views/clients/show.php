@@ -11,6 +11,8 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
 $__canManageSettings = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_company_settings');
 $__canImpersonate = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'impersonate_client');
 $__impersonationGloballyEnabled = CompanySettingsRepository::get('client_impersonation_enabled') === '1';
+// 90-item backlog Phase 6 Item B
+$__orderHistoryGlobalDefault = CompanySettingsRepository::get('client_portal_show_order_history') !== '0';
 // docs/schema.sql Section AY — view_clients admits a read-only visitor to this page; only
 // manage_orders may actually edit/deactivate the client or create a new order for them.
 $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_orders');
@@ -174,6 +176,17 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
         Global switch is currently <strong><?= $__impersonationGloballyEnabled ? 'ON' : 'OFF' ?></strong> (<a href="/settings">Settings</a>).
         <?php if (!$__impersonationGloballyEnabled): ?>Turning this on alone won't allow impersonation until the global switch is also on.<?php endif; ?>
       </p>
+      <form method="post" action="/clients/<?= (int) $client['id'] ?>/order-history-visibility" style="margin-top:10px">
+        <?= Csrf::field() ?>
+        <label>Order history visible to this client in the portal
+          <select name="order_history_visibility_override" onchange="this.form.submit()">
+            <option value="" <?= $client['order_history_visibility_override'] === null ? 'selected' : '' ?>>Inherit global default (currently <?= $__orderHistoryGlobalDefault ? 'full history' : 'active orders only' ?>)</option>
+            <option value="1" <?= $client['order_history_visibility_override'] !== null && (int) $client['order_history_visibility_override'] === 1 ? 'selected' : '' ?>>Always show full history (including completed/lost orders)</option>
+            <option value="0" <?= $client['order_history_visibility_override'] !== null && (int) $client['order_history_visibility_override'] === 0 ? 'selected' : '' ?>>Always show active orders only (hide completed/lost)</option>
+          </select>
+        </label>
+      </form>
+      <p class="muted small">Controls what this client sees on their own "My Orders" dashboard — never affects staff's own view of their orders.</p>
     <?php endif; ?>
     <?php if ($__canImpersonate): ?>
       <?php if ($__impersonationGloballyEnabled && !empty($client['allow_staff_impersonation']) && (int) $client['is_active'] === 1): ?>

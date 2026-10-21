@@ -281,6 +281,28 @@ final class ClientRepository
     }
 
     /**
+     * 90-item backlog Phase 6 Item B: resolves whether $client's full
+     * order history (including completed/lost orders) shows in the
+     * client portal, vs. active/disputed orders only. A NULL override on
+     * the client's own row means "inherit the global default"
+     * (company_settings client_portal_show_order_history).
+     */
+    public static function orderHistoryVisible(array $client): bool
+    {
+        if ($client['order_history_visibility_override'] !== null) {
+            return (bool) $client['order_history_visibility_override'];
+        }
+        return CompanySettingsRepository::get('client_portal_show_order_history') !== '0';
+    }
+
+    /** NULL = inherit the global switch; true/false = force this client's own setting regardless of the global one. */
+    public static function setOrderHistoryVisibilityOverride(int $id, ?bool $value): void
+    {
+        Database::connection()->prepare('UPDATE clients SET order_history_visibility_override = :value WHERE id = :id')
+            ->execute(['value' => $value === null ? null : ($value ? 1 : 0), 'id' => $id]);
+    }
+
+    /**
      * Permanent — nothing in this app ever sets is_data_locked back to 0.
      * Called once, from whichever of the two trigger points happens first:
      * the client's own PI-details consent, or staff recording the advance

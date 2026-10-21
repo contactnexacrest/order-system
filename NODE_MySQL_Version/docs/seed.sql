@@ -1477,6 +1477,17 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('client_impersonation_enabled', '0', 'boolean', 'clients', 'Global switch for staff "Log in as this client" (Section AV). Off = the feature is unavailable for every client, regardless of any individual client''s own allow_staff_impersonation flag or who holds the impersonate_client permission.', 0, 0);
 
 -- ================================================================
+-- 90-item backlog Phase 6 Item B — global default for whether a client's
+-- own "My Orders" portal dashboard shows their full order history
+-- (including completed/lost orders) or active orders only. On by default
+-- to preserve existing behavior (the portal has always shown everything).
+-- Any individual client's own order_history_visibility_override (clients
+-- table) takes precedence over this when set.
+-- ================================================================
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
+  ('client_portal_show_order_history', '1', 'boolean', 'clients', 'On (default) = every client sees their full order history, including completed/lost orders, on their portal dashboard. Off = clients see active/disputed orders only, unless an individual client''s own override says otherwise.', 0, 0);
+
+-- ================================================================
 -- SECTION BA — LEGAL TERMS & DEFINITIONS clauses (admin-editable via
 -- tc_clauses, same table/CRUD pattern as every other T&C clause — see
 -- docs/schema.sql Section BA for the clause_group/visibility_rule

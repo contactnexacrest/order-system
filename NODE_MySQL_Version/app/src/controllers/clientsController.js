@@ -165,6 +165,8 @@ async function show(req, res) {
   if (!client.allow_staff_impersonation) impersonationReasons.push('it is not enabled for this client');
   if (!client.is_active) impersonationReasons.push('this client is deactivated');
   const impersonationUnavailableReason = impersonationReasons.join(', ');
+  // 90-item backlog Phase 6 Item B
+  const orderHistoryGlobalDefault = (await companySettingsRepository.get('client_portal_show_order_history')) !== '0';
   const additionalDocuments = await fileStoreRepository.additionalDocumentsForClient(client.id);
 
   // Item 2 — agreement status: never once force-expired, and (when an
@@ -179,7 +181,7 @@ async function show(req, res) {
   const agreementRenewEligible = !!(agreementExpiryDate && new Date(agreementExpiryDate).getTime() <= Date.now() + 30 * 86400000);
 
   res.renderView('clients/show', {
-    client, orders, impersonationGloballyEnabled, impersonationUnavailableReason, additionalDocuments,
+    client, orders, impersonationGloballyEnabled, orderHistoryGlobalDefault, impersonationUnavailableReason, additionalDocuments,
     agreementForceExpired, agreementExpiryDate, agreementExpired, agreementActive, agreementRenewEligible,
     duplicateOfClient: client.duplicate_of_client_id ? await clientRepository.find(client.duplicate_of_client_id) : null,
     duplicatedInto: await clientRepository.findDuplicatesOf(client.id),
@@ -572,6 +574,36 @@ async function setImpersonationAllowed(req, res) {
 }
 
 /**
+ * 90-item backlog Phase 6 Item B — per-client override of whether this
+ * client's own "My Orders" portal dashboard shows their full order
+ * history (completed/lost orders included) or active orders only. ''
+ * posted = clear the override back to null (inherit the global
+ * client_portal_show_order_history switch).
+ */
+async function setOrderHistoryVisibilityOverride(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const raw = req.body.order_history_visibility_override ?? '';
+  const newValue = raw === '' ? null : raw === '1';
+  await clientRepository.setOrderHistoryVisibilityOverride(clientId, newValue);
+  const user = req.user;
+  const oldOverride = client.order_history_visibility_override;
+  await auditLogRepository.log(
+    user.id, 'CLIENT_ORDER_HISTORY_VISIBILITY_CHANGED', 'clients', clientId,
+    'order_history_visibility_override',
+    oldOverride === null || oldOverride === undefined ? null : String(Number(oldOverride)),
+    newValue === null ? null : String(Number(newValue))
+  );
+  flash.set(req, 'success', `Order history visibility for ${client.company_legal_name} updated.`);
+  res.redirect(`/clients/${clientId}`);
+}
+
+/**
  * docs/schema.sql Section AV — re-checks all three gates itself (global
  * switch, per-client flag, client active state) rather than relying
  * solely on the route-level impersonate_client permission check, matching
@@ -669,7 +701,7 @@ async function deleteAdditionalDocument(req, res) {
 
 module.exports = {
   index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
-  setImpersonationAllowed, impersonate, uploadAdditionalDocument, deleteAdditionalDocument,
+  setImpersonationAllowed, setOrderHistoryVisibilityOverride, impersonate, uploadAdditionalDocument, deleteAdditionalDocument,
   uploadAgreement, forceExpireAgreement, renewAgreement, downloadAgreement,
   duplicateForm, duplicateStore,
 };

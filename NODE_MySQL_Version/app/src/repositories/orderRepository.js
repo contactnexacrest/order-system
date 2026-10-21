@@ -349,12 +349,19 @@ async function applyAmendmentOverride(orderId, advancePct, balancePct, balanceTr
   );
 }
 
-async function forClient(clientId) {
+/**
+ * 90-item backlog Phase 6 Item B: activeOnly=true restricts to
+ * in-progress orders (active/disputed), hiding finished ones
+ * (complete/lost) — used for the client portal dashboard when this
+ * client's order history is not visible to them.
+ */
+async function forClient(clientId, activeOnly = false) {
+  const statusFilter = activeOnly ? " AND o.status IN ('active','disputed')" : '';
   return db.query(
     `SELECT o.*, sm.stage_name AS current_stage_name
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     WHERE o.client_id = :client_id
+     WHERE o.client_id = :client_id${statusFilter}
      ORDER BY o.created_at DESC`,
     { client_id: clientId }
   );

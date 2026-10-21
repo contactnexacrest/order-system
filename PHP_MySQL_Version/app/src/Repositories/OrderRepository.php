@@ -396,14 +396,21 @@ final class OrderRepository
         )->execute(['reason' => $reason, 'user_id' => $userId, 'id' => $orderId]);
     }
 
-    /** @return array<int, array<string,mixed>> orders for one client, most recent first */
-    public static function forClient(int $clientId): array
+    /**
+     * @return array<int, array<string,mixed>> orders for one client, most recent first
+     * 90-item backlog Phase 6 Item B: $activeOnly=true restricts to
+     * in-progress orders (active/disputed), hiding finished ones
+     * (complete/lost) — used for the client portal dashboard when this
+     * client's order history is not visible to them.
+     */
+    public static function forClient(int $clientId, bool $activeOnly = false): array
     {
+        $statusFilter = $activeOnly ? " AND o.status IN ('active','disputed')" : '';
         $stmt = Database::connection()->prepare(
             'SELECT o.*, sm.stage_name AS current_stage_name
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             WHERE o.client_id = :client_id
+             WHERE o.client_id = :client_id' . $statusFilter . '
              ORDER BY o.created_at DESC'
         );
         $stmt->execute(['client_id' => $clientId]);

@@ -1,7 +1,11 @@
 <?php use App\Helpers\Dates; ?>
 <div class="card page-wide">
   <h1>My Orders</h1>
-  <p class="muted">Welcome, <?= htmlspecialchars($client['company_legal_name']) ?>. Below are all your orders with NexaCrest.</p>
+  <?php if ($historyHidden): ?>
+    <p class="muted">Welcome, <?= htmlspecialchars($client['company_legal_name']) ?>. Below are your current orders with NexaCrest.</p>
+  <?php else: ?>
+    <p class="muted">Welcome, <?= htmlspecialchars($client['company_legal_name']) ?>. Below are all your orders with NexaCrest.</p>
+  <?php endif; ?>
   <table class="list">
     <tr><th>Order Ref</th><th>Stage</th><th>Status</th><th>Created</th><th></th></tr>
     <?php foreach ($orders as $o): ?>

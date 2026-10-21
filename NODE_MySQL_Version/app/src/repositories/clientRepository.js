@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const companySettingsRepository = require('./companySettingsRepository');
 
 /** Also carries order_count — the card-grid list view (clients/index.njk) shows it per client. */
 async function all() {
@@ -237,6 +238,26 @@ async function setAllowStaffImpersonation(id, allow) {
   await db.execute('UPDATE clients SET allow_staff_impersonation = :allow WHERE id = :id', { allow: allow ? 1 : 0, id });
 }
 
+/**
+ * 90-item backlog Phase 6 Item B: resolves whether $client's full order
+ * history (including completed/lost orders) shows in the client portal,
+ * vs. active/disputed orders only. A null override on the client's own
+ * row means "inherit the global default" (company_settings
+ * client_portal_show_order_history).
+ */
+async function orderHistoryVisible(client) {
+  if (client.order_history_visibility_override !== null && client.order_history_visibility_override !== undefined) {
+    return Boolean(client.order_history_visibility_override);
+  }
+  return (await companySettingsRepository.get('client_portal_show_order_history')) !== '0';
+}
+
+/** null = inherit the global switch; true/false = force this client's own setting regardless of the global one. */
+async function setOrderHistoryVisibilityOverride(id, value) {
+  const dbValue = value === null || value === undefined ? null : (value ? 1 : 0);
+  await db.execute('UPDATE clients SET order_history_visibility_override = :value WHERE id = :id', { value: dbValue, id });
+}
+
 async function markSample(id) {
   await db.execute('UPDATE clients SET is_sample_data = 1 WHERE id = :id', { id });
 }
@@ -265,4 +286,5 @@ module.exports = {
   all, find, allInactive, create, update, setActive, setAllowStaffImpersonation, markSample, markTest, lockData, setZohoContactId,
   updateAgreementFooterText, setAgreementFile, setAgreementForceExpired, renewAgreement,
   markDuplicateOf, findDuplicatesOf,
+  orderHistoryVisible, setOrderHistoryVisibilityOverride,
 };

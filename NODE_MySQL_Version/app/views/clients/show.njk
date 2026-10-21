@@ -149,6 +149,17 @@
         Global switch is currently <strong>{{ 'ON' if impersonationGloballyEnabled else 'OFF' }}</strong> (<a href="/settings">Settings</a>).
         {% if not impersonationGloballyEnabled %}Turning this on alone won't allow impersonation until the global switch is also on.{% endif %}
       </p>
+      <form method="post" action="/clients/{{ client.id }}/order-history-visibility" style="margin-top:10px">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Order history visible to this client in the portal
+          <select name="order_history_visibility_override" onchange="this.form.submit()">
+            <option value="" {{ 'selected' if client.order_history_visibility_override == null }}>Inherit global default (currently {{ 'full history' if orderHistoryGlobalDefault else 'active orders only' }})</option>
+            <option value="1" {{ 'selected' if client.order_history_visibility_override == 1 }}>Always show full history (including completed/lost orders)</option>
+            <option value="0" {{ 'selected' if client.order_history_visibility_override == 0 }}>Always show active orders only (hide completed/lost)</option>
+          </select>
+        </label>
+      </form>
+      <p class="muted small">Controls what this client sees on their own "My Orders" dashboard — never affects staff's own view of their orders.</p>
     {% endif %}
     {% if permissions.impersonate_client %}
       {% if impersonationGloballyEnabled and client.allow_staff_impersonation and client.is_active %}

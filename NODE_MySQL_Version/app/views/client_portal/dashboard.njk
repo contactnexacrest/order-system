@@ -1,6 +1,10 @@
 <div class="card page-wide">
   <h1>My Orders</h1>
-  <p class="muted">Welcome, {{ client.company_legal_name }}. Below are all your orders with NexaCrest.</p>
+  {% if historyHidden %}
+    <p class="muted">Welcome, {{ client.company_legal_name }}. Below are your current orders with NexaCrest.</p>
+  {% else %}
+    <p class="muted">Welcome, {{ client.company_legal_name }}. Below are all your orders with NexaCrest.</p>
+  {% endif %}
   <table class="list">
     <tr><th>Order Ref</th><th>Stage</th><th>Status</th><th>Created</th><th></th></tr>
     {% for o in orders %}

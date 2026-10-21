@@ -82,12 +82,37 @@ the client's own portal password still requires their current password,
 so impersonation cannot be used to take over or lock out a real client
 login.
 
+## Order history visibility
+
+By default every client sees every order they've ever had on their "My
+Orders" dashboard, including ones marked complete or lost — the portal
+has always shown the full history. This is configurable with the same
+two-level pattern as "Log in as this client" above, just without a
+permission gate, since it isn't a security-sensitive action:
+
+1. **A global default** (Settings → `client_portal_show_order_history`)
+   — on by default. Off = every client's dashboard shows active/disputed
+   orders only, unless overridden per client (below).
+2. **A per-client override**, set on that client's own staff-side page
+   ("Client Portal Access" section) — a three-way choice: *Inherit
+   global default*, *Always show full history*, or *Always show active
+   orders only*. Whichever of the latter two is picked wins over the
+   global default for that client specifically, in either direction.
+
+Changing either one only affects what that client sees on their own
+dashboard — it never hides, archives, or otherwise changes the orders
+themselves, and has no effect on what staff see in the staff-side Orders
+list or on that client's own page. Every change to a client's own
+override is logged (`CLIENT_ORDER_HISTORY_VISIBILITY_CHANGED`).
+
 ## What the client sees and does
 
 ### My Orders (the dashboard)
 
 The landing page after login — every order this client has, its current
-stage name, status, and a link into each:
+stage name, status, and a link into each (or, when their order history is
+not visible to them, their active/disputed orders only — see
+[Order history visibility](#order-history-visibility) above):
 
 ![Client dashboard — My Orders](./images/portal_dashboard.png)
 

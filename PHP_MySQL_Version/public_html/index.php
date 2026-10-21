@@ -347,6 +347,7 @@ $router->post('/clients/{id}/additional-documents/{fileId}/delete', [$clients, '
 // global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch
 // inside ClientController::impersonate(), on top of its own impersonate_client permission gate here.
 $router->post('/clients/{id}/impersonation-allowed', [$clients, 'setImpersonationAllowed'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/order-history-visibility', [$clients, 'setOrderHistoryVisibilityOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/impersonate', [$clients, 'impersonate'], [SessionAuth::required(), PermissionCheck::requires('impersonate_client'), CsrfCheck::verify()]);
 
 // Staff review queue for public quotation-details submissions.

@@ -12,6 +12,7 @@ use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientLoginRepository;
 use App\Repositories\ClientPasswordResetTokenRepository;
 use App\Repositories\ClientPaymentReportRepository;
+use App\Repositories\ClientRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\EmailTemplateRepository;
 use App\Repositories\FileStoreRepository;
@@ -212,9 +213,12 @@ final class ClientPortalController
     public function dashboard(array $params): void
     {
         $clientId = (int) ClientPortalService::currentClientId();
+        $client = ClientPortalService::currentClient();
+        $historyHidden = !ClientRepository::orderHistoryVisible($client);
         View::render('client_portal/dashboard', [
-            'client' => ClientPortalService::currentClient(),
-            'orders' => OrderRepository::forClient($clientId),
+            'client' => $client,
+            'orders' => OrderRepository::forClient($clientId, $historyHidden),
+            'historyHidden' => $historyHidden,
         ], 'layout/client');
     }
 
