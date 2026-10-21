@@ -130,5 +130,29 @@
   </main>
 </div>
 </div>
+<script>
+/* 90-item backlog "sitewide collapsible sections beyond Settings": the
+   independently-collapsible, per-browser-remembered <details> pattern
+   90-item backlog #27 built for Company Settings (originally inline in
+   views/settings/index.njk, class="settings-section") is now sitewide —
+   any page's <details class="collapsible-section" data-category="X">
+   gets the same open/closed persistence, keyed on its own data-category
+   so a staff member's preference for one section never leaks into
+   another's. The storage key keeps the original "settings-section-open:"
+   prefix (an internal namespace, invisible to users) rather than
+   resetting a Settings user's stored preference for a rename with no
+   visible benefit. Inputs inside a closed <details> still submit
+   normally, so collapsing a section never drops its values. */
+document.querySelectorAll('.collapsible-section[data-category]').forEach(function (details) {
+  var storageKey = 'settings-section-open:' + details.dataset.category;
+  try {
+    var stored = localStorage.getItem(storageKey);
+    if (stored !== null) { details.open = stored === '1'; }
+  } catch (e) { /* ignore — storage unavailable, keep the default open state */ }
+  details.addEventListener('toggle', function () {
+    try { localStorage.setItem(storageKey, details.open ? '1' : '0'); } catch (e) { /* ignore */ }
+  });
+});
+</script>
 </body>
 </html>

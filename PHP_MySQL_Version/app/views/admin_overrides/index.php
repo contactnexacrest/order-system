@@ -4,8 +4,8 @@
   <p class="muted">Spec Section 13 — every edit below requires a reason and a confirmation click, and is logged (who, when, field, old value, new value, reason). Nothing here can be undone through this screen — only a further edit changes a value back.</p>
   <p class="muted small">&#128274; <strong>Protected</strong> items are locked against accidental edits — click <em>Unlock</em> before changing them. Protecting or unprotecting an item is a separate, peer-approved request: see <a href="/admin/field-protection">Field Protection</a>.</p>
 
-  <div class="section">
-    <h2>Document Reference Formats</h2>
+  <details class="collapsible-section" data-category="admin-overrides-document-types" open>
+    <summary><h2>Document Reference Formats</h2></summary>
     <p class="muted small">Changing a format only affects references minted <em>after</em> the change — already-generated documents keep the reference they were given.</p>
     <form method="post" action="/admin/overrides/document-types" onsubmit="return confirmOverride(this, 'document reference formats');">
       <?= Csrf::field() ?>
@@ -23,10 +23,10 @@
       <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save Document Type Changes</button>
     </form>
-  </div>
+  </details>
 
-  <div class="section">
-    <h2>Terms &amp; Conditions, Legal Terms &amp; Definitions</h2>
+  <details class="collapsible-section" data-category="admin-overrides-tc-clauses" open>
+    <summary><h2>Terms &amp; Conditions, Legal Terms &amp; Definitions</h2></summary>
     <p class="muted small">All three groups are saved together below, but shown separately since each prints in a different place on buyer-facing documents: the ordinary numbered Terms &amp; Conditions list, the red Legal Terms box, and the blue Definitions box.</p>
     <form method="post" action="/admin/overrides/tc-clauses" onsubmit="return confirmOverride(this, 'T&amp;C clause text');">
       <?= Csrf::field() ?>
@@ -117,10 +117,10 @@
       <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save T&amp;C Clause Changes</button>
     </form>
-  </div>
+  </details>
 
-  <div class="section">
-    <h2>Payment Presets</h2>
+  <details class="collapsible-section" data-category="admin-overrides-payment-presets" open>
+    <summary><h2>Payment Presets</h2></summary>
     <form method="post" action="/admin/overrides/payment-presets" onsubmit="return confirmOverride(this, 'payment preset values');">
       <?= Csrf::field() ?>
       <?php foreach ($paymentPresets as $p): ?>
@@ -160,7 +160,7 @@
       <label>Reason for this change * <textarea name="reason" class="override-reason" rows="2" placeholder="e.g., Correcting a data-entry typo" required></textarea></label>
       <button type="submit" class="btn-sm">Save Payment Preset Changes</button>
     </form>
-  </div>
+  </details>
 </div>
 <script>
 function unlockFieldset(btn) {

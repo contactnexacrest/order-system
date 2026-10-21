@@ -16,6 +16,13 @@ use App\Tests\Support\DbTestCase;
  * .nav-group dropdowns) plus Expand all/Collapse all buttons. Inputs inside
  * a closed <details> still submit normally, so this is a pure presentation
  * change with no effect on what gets saved.
+ *
+ * 90-item backlog "sitewide collapsible sections beyond Settings": each
+ * section now also carries the sitewide "collapsible-section" class
+ * (the open/closed-per-browser persistence itself moved to layout/base.php
+ * so every page gets it, not just this one) — "settings-section" stays
+ * alongside it unchanged, since toggleAllSettingsSections() and this
+ * test's own selectors still key off it.
  */
 final class SettingsCollapsibleSectionsTest extends DbTestCase
 {
@@ -33,9 +40,9 @@ final class SettingsCollapsibleSectionsTest extends DbTestCase
         $html = $this->renderSettingsPage();
 
         self::assertMatchesRegularExpression(
-            '/<details class="settings-section" data-category="company"[^>]*>\s*<summary>Company/s',
+            '/<details class="collapsible-section settings-section" data-category="company"[^>]*>\s*<summary>Company/s',
             $html,
-            'each settings category must be wrapped in a <details class="settings-section"> with a matching <summary>'
+            'each settings category must be wrapped in a <details class="collapsible-section settings-section"> with a matching <summary>'
         );
         self::assertStringContainsString('<div class="settings-toolbar">', $html);
         self::assertStringContainsString('toggleAllSettingsSections(true)', $html);
@@ -47,7 +54,7 @@ final class SettingsCollapsibleSectionsTest extends DbTestCase
         $html = $this->renderSettingsPage();
 
         self::assertMatchesRegularExpression(
-            '/<details class="settings-section" data-category="company"[^>]*>.*?<fieldset>.*?name="settings\[/s',
+            '/<details class="collapsible-section settings-section" data-category="company"[^>]*>.*?<fieldset>.*?name="settings\[/s',
             $html,
             'the regression: fields must still render inside <fieldset> nested inside the new <details> wrapper, not be lost'
         );
@@ -58,7 +65,7 @@ final class SettingsCollapsibleSectionsTest extends DbTestCase
         $html = $this->renderSettingsPage();
 
         self::assertMatchesRegularExpression(
-            '/<details class="settings-section" data-category="[^"]+"\s+open>/',
+            '/<details class="collapsible-section settings-section" data-category="[^"]+"\s+open>/',
             $html,
             'sections must default to open — collapsing is an opt-in the user chooses, not a default that hides fields on first load'
         );

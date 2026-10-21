@@ -13,7 +13,7 @@
       <button type="button" class="btn-sm" onclick="toggleAllSettingsSections(false)">Collapse all</button>
     </div>
     <?php foreach ($grouped as $category => $rows): ?>
-      <details class="settings-section" data-category="<?= htmlspecialchars($category) ?>" open>
+      <details class="collapsible-section settings-section" data-category="<?= htmlspecialchars($category) ?>" open>
       <summary><?= htmlspecialchars(ucfirst($category)) ?> <span class="muted small settings-section-count">(<?= count($rows) ?>)</span></summary>
       <fieldset>
         <?php foreach ($rows as $row): ?>
@@ -132,17 +132,13 @@
    state is remembered per category (and per browser) via localStorage so a
    staff member who collapses the sections they never touch doesn't have to
    redo that every time they open this page. Inputs inside a closed <details>
-   still submit normally, so collapsing a section never drops its values. */
-document.querySelectorAll('.settings-section[data-category]').forEach(function (details) {
-  var storageKey = 'settings-section-open:' + details.dataset.category;
-  try {
-    var stored = localStorage.getItem(storageKey);
-    if (stored !== null) { details.open = stored === '1'; }
-  } catch (e) { /* ignore — storage unavailable, keep the default open state */ }
-  details.addEventListener('toggle', function () {
-    try { localStorage.setItem(storageKey, details.open ? '1' : '0'); } catch (e) { /* ignore */ }
-  });
-});
+   still submit normally, so collapsing a section never drops its values.
+   The actual open/closed persistence now lives in layout/base.php's own
+   sitewide script (90-item backlog "sitewide collapsible sections beyond
+   Settings") — every .collapsible-section on every page gets it, this
+   page's sections included, since they carry that class too alongside
+   their original .settings-section. Only this page's own "Expand/Collapse
+   all" toolbar helper stays here, since no other page has that toolbar. */
 function toggleAllSettingsSections(open) {
   document.querySelectorAll('.settings-section[data-category]').forEach(function (details) {
     details.open = open;
