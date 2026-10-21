@@ -8,9 +8,6 @@
 #}
 <div class="section-title">{{ section_number }}. CONSIGNEE DETAILS</div>
 <table class="kv">
-  {% if consignee.same_as_buyer %}
-  <tr><td class="k">Same as Buyer?</td><td class="v" style="font-weight:bold; color:#17233A;">Yes — shown below are the Buyer's own details.</td></tr>
-  {% endif %}
   <tr><td class="k">Company Legal Name *</td><td class="v">{{ consignee.company_legal_name }}</td></tr>
   <tr><td class="k">Address Line 1 *</td><td class="v">{{ consignee.address_line1 }}</td></tr>
   {% if consignee.address_line2 %}<tr><td class="k">Address Line 2</td><td class="v">{{ consignee.address_line2 }}</td></tr>{% endif %}
