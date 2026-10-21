@@ -256,7 +256,9 @@ Annexure A is an optional attachment staff can turn on for an order
 (**Enable / manage Annexure A** link on the order page). Once enabled, it's
 appended to every buyer-facing document that supports it (QT, PI, OC, Buyer
 PO, Packing List, Commercial Invoice) as a guaranteed, never-skippable
-appendix, and can also be generated as its own standalone document.
+appendix, and can also be generated as its own standalone document, whose
+own meta table prints the order's own Order Ref alongside the Quotation/PI
+reference it's attached to.
 
 From the Annexure A management screen (`/orders/{id}/annexure`), a **content
 mode** dropdown decides what Annexure A actually shows:
@@ -267,7 +269,11 @@ mode** dropdown decides what Annexure A actually shows:
   have. A photo can be attached right away on the "Add Product Entry" form
   itself, or added afterward (and more added later) from the saved entry's
   own Images section — either way works, and nothing is required to be
-  uploaded at either point.
+  uploaded at either point. Above the product table, a fixed amber "Note:"
+  banner (default wording: product images/drawings are for reference only
+  and may show optional accessories not included in the quoted price) is
+  admin-editable — Admin → Settings → `annexure_product_note` — same
+  governed-text pattern as the BL type/consignee instructions.
 - **Additional Terms** — a free-form rich-text block, entered through a
   small on-screen WYSIWYG editor (bold/italic/underline/strikethrough,
   headings, quote, bullet/numbered lists, inserted images, links). Use this

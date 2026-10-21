@@ -105,6 +105,13 @@ final class DocumentDataAssembler
             'company' => $company,
             'assets' => $assets,
             'order' => [
+                // 90-item backlog "order_reference display": the order's
+                // own internal reference was never exposed to any
+                // document template via this assembler at all (QT/PI/OC/
+                // etc. never needed it; the Annexure specifically does —
+                // see its own meta table). Purely additive — every
+                // existing template keeps rendering exactly as before.
+                'order_reference'      => $order['order_reference'],
                 'buyer_inquiry_ref'    => $order['buyer_inquiry_ref'],
                 'incoterm_code'        => $order['incoterm_code'],
                 // Incoterms® 2020: FOB names the port of LOADING; CFR/CIF name the
@@ -326,6 +333,14 @@ final class DocumentDataAssembler
             'annexure_show_spec' => $showSpec,
             'annexure_show_terms' => $showTerms,
             'annexure_has_content' => ($showSpec && !empty($annexureProducts)) || ($showTerms && $termsHtml !== ''),
+            // 90-item backlog "Annexure note configurability": the Product
+            // Specification section's "Note:" banner was hardcoded
+            // straight into the template, unlike bl_type_instruction/
+            // bl_consignee_instruction's own admin-editable pattern. The
+            // original wording is the fallback, so a database with no
+            // row yet renders identically to before this setting existed.
+            'annexure_product_note' => CompanySettingsRepository::get('annexure_product_note')
+                ?? 'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.',
         ];
     }
 

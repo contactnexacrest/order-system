@@ -585,7 +585,7 @@ function annexureBody(context) {
   const children = [];
 
   if (showSpec) {
-    children.push(...annexureSpecBody(context.annexure_products || []));
+    children.push(...annexureSpecBody(context.annexure_products || [], context.annexure_product_note || ''));
   }
 
   if (showTerms) {
@@ -624,8 +624,13 @@ function annexureBody(context) {
   return children;
 }
 
-function annexureSpecBody(products) {
+// 90-item backlog "Annexure note configurability" — `note` comes from
+// documentDataAssembler's annexure_product_note (admin-editable via
+// company_settings, falling back to this exact original wording), same
+// source the Nunjucks path reads.
+function annexureSpecBody(products, note) {
   const children = [];
+  const noteText = note || 'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.';
 
   children.push(
     ...C.colorBox(
@@ -635,7 +640,7 @@ function annexureSpecBody(products) {
         C.rich([
           ['Note: ', { bold: true, color: C.AMBER_BORDER, size: 18 }],
           [
-            'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.',
+            noteText,
             { italics: true, color: C.AMBER_TEXT2, size: 18 },
           ],
         ]),
@@ -710,6 +715,7 @@ function renderAnnexa(context) {
     ...C.metaBar([
       { label: 'ANNEXURE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
       { label: 'ANNEXURE TO', value: g(order, 'quotation_ref') !== '—' ? g(order, 'quotation_ref') : g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : g(order, 'buyer_inquiry_ref') },
+      { label: 'ORDER REF', value: g(order, 'order_reference', '') },
       { label: 'DATE', value: g(meta, 'generated_date', '') },
       { label: 'BUYER INQUIRY REF', value: g(order, 'buyer_inquiry_ref', '') },
     ])

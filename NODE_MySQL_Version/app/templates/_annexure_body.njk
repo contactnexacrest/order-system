@@ -17,7 +17,7 @@
   Product Specification prints first and Additional Terms second.
 #}
 {% if annexure_show_spec %}
-<div class="banner" style="background:#FAEEDA; color:#633806; text-align:left; font-weight:normal;"><strong style="color:#8A6D1D;">Note:</strong> <em>Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.</em></div>
+<div class="banner" style="background:#FAEEDA; color:#633806; text-align:left; font-weight:normal;"><strong style="color:#8A6D1D;">Note:</strong> <em>{{ annexure_product_note }}</em></div>
 
 {% for p in annexure_products %}
 <div class="section-title">PRODUCT {{ loop.index }} &nbsp;— &nbsp;{{ p.name }}</div>

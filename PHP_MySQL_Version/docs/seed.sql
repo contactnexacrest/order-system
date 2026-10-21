@@ -591,6 +591,11 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('revision_start_number', '1', 'number', 'documents', 'Starting revision number for a new document.', 0),
   ('bl_type_instruction', 'ORIGINAL NEGOTIABLE BILL OF LADING — no exceptions. Do not substitute with Sea Waybill or Express BL.', 'string', 'shipping', 'Mandatory BL type instruction printed on every BL Instruction Sheet (Addition beyond the spec''s named key list — this hard rule was previously hardcoded directly in the BLI template, with no governance or audit trail if it ever needed a one-off exception; a Sea Waybill/Express BL lets the buyer collect cargo without surrendering any document, eliminating NexaCrest''s financial leverage over the balance payment).', 0),
   ('bl_consignee_instruction', 'TO ORDER OF {company}', 'string', 'shipping', 'Mandatory BL consignee instruction — ensures the BL is to NexaCrest''s order so the buyer cannot use it until NexaCrest endorses and releases it. {company} is substituted with the company legal name at render time. Same addition/rationale as bl_type_instruction.', 0),
+  -- 90-item backlog "Annexure note configurability" — same addition/
+  -- rationale as bl_type_instruction/bl_consignee_instruction above:
+  -- this exact wording was previously hardcoded straight into the
+  -- Annexure A template with no governance or audit trail.
+  ('annexure_product_note', 'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.', 'string', 'documents', 'Printed in the amber "Note:" banner above every Annexure A''s Product Specification section.', 0),
   ('master_tracking_ref_format', 'NC/SC/{YYYY}/{DDMM}{NNN}', 'string', 'formats', 'Buyer inquiry reference format — matches the format already in use on your existing documents.', 0),
   ('client_number_format',  'SC-CL-{NNNN}', 'string', 'formats', 'Placeholder client numbering format — confirm against your actual convention.', 0),
   ('order_ref_format',      'SC/ORD/{YYYY}/{NNN}', 'string', 'formats', 'Placeholder order reference format — confirm against your actual convention.', 0),

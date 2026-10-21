@@ -587,6 +587,7 @@ final class DocxDocumentBuilder
         DocxComponents::addMetaBar($section, [
             ['label' => 'ANNEXURE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
             ['label' => 'ANNEXURE TO', 'value' => self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'buyer_inquiry_ref'))],
+            ['label' => 'ORDER REF', 'value' => self::g($order, 'order_reference', '')],
             ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
@@ -607,7 +608,7 @@ final class DocxDocumentBuilder
         $showTerms = !empty($context['annexure_show_terms']);
 
         if ($showSpec) {
-            self::addAnnexureSpecBody($section, $products);
+            self::addAnnexureSpecBody($section, $products, (string) ($context['annexure_product_note'] ?? ''));
         }
 
         if ($showTerms) {
@@ -641,12 +642,19 @@ final class DocxDocumentBuilder
         }, 0);
     }
 
-    private static function addAnnexureSpecBody(Section $section, array $products): void
+    private static function addAnnexureSpecBody(Section $section, array $products, string $note = ''): void
     {
-        DocxComponents::addColorBox($section, DocxComponents::AMBER_BG2, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) {
+        // 90-item backlog "Annexure note configurability" — $note comes
+        // from DocumentDataAssembler's annexure_product_note (admin-
+        // editable via company_settings, falling back to this exact
+        // original wording), same source the Twig path reads.
+        if ($note === '') {
+            $note = 'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.';
+        }
+        DocxComponents::addColorBox($section, DocxComponents::AMBER_BG2, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($note) {
             $run = $cell->addTextRun();
             $run->addText('Note: ', ['bold' => true, 'color' => DocxComponents::AMBER_BORDER, 'size' => 9]);
-            $run->addText('Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.', ['italic' => true, 'color' => DocxComponents::AMBER_TEXT2, 'size' => 9]);
+            $run->addText($note, ['italic' => true, 'color' => DocxComponents::AMBER_TEXT2, 'size' => 9]);
         }, 0);
 
         if (empty($products)) {
