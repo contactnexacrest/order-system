@@ -1321,6 +1321,7 @@ function renderBli(context) {
   children.push(
     ...C.kvTable(
       [
+        { label: 'Number of Containers', value: g(shipping, 'container_count', 'To Be Confirmed') },
         { label: 'Container Load Type *', value: `${checkbox(true, 'FCL (Full Container Load)')}    ${checkbox(false, 'LCL (Less than Container Load)')}` },
         {
           label: 'Container Size *',
@@ -1484,6 +1485,7 @@ function renderCi(context) {
       { label: 'Incoterm *', value: g(order, 'incoterm_label') },
       { label: 'Port of Loading *', value: g(order, 'port_of_loading') },
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
+      { label: 'Number of Containers', value: g(shipping, 'container_count', 'To Be Confirmed') },
       { label: 'Container No. *', value: g(shipping, 'container_no', 'To Be Confirmed') },
       { label: 'Bill of Lading No. *', value: g(shipping, 'bl_number', 'To Be Confirmed') },
       { label: 'Bill of Lading Date *', value: g(shipping, 'bl_date', 'TBC — must match this invoice date') },

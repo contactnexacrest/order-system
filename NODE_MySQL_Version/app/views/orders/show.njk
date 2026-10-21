@@ -1518,6 +1518,7 @@
               {% endfor %}
             </select>
           </label>
+          <label>Number of Containers<input type="number" name="container_count" min="1" step="1" value="{{ shipping.container_count or '' }}"></label>
           <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}"></label>
           <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}"></label>
         </div>

@@ -5,12 +5,13 @@ const db = require('../config/db');
 async function upsert(orderId, data) {
   await db.execute(
     `INSERT INTO order_shipping
-        (order_id, shipping_line, vessel_name, voyage_number, etd, eta, container_type, container_no, seal_no)
-     VALUES (:order_id, :shipping_line, :vessel, :voyage, :etd, :eta, :container_type, :container_no, :seal_no)
+        (order_id, shipping_line, vessel_name, voyage_number, etd, eta, container_type, container_count, container_no, seal_no)
+     VALUES (:order_id, :shipping_line, :vessel, :voyage, :etd, :eta, :container_type, :container_count, :container_no, :seal_no)
      ON DUPLICATE KEY UPDATE
         shipping_line = VALUES(shipping_line), vessel_name = VALUES(vessel_name),
         voyage_number = VALUES(voyage_number), etd = VALUES(etd), eta = VALUES(eta),
-        container_type = VALUES(container_type), container_no = VALUES(container_no), seal_no = VALUES(seal_no)`,
+        container_type = VALUES(container_type), container_count = VALUES(container_count),
+        container_no = VALUES(container_no), seal_no = VALUES(seal_no)`,
     {
       order_id: orderId,
       shipping_line: data.shipping_line ?? null,
@@ -19,6 +20,7 @@ async function upsert(orderId, data) {
       etd: data.etd || null,
       eta: data.eta || null,
       container_type: data.container_type ?? null,
+      container_count: data.container_count || null,
       container_no: data.container_no ?? null,
       seal_no: data.seal_no ?? null,
     }

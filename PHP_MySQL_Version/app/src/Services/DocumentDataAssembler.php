@@ -512,6 +512,7 @@ final class DocumentDataAssembler
             'etd'               => self::formatDate($row['etd']),
             'eta'               => self::formatDate($row['eta']),
             'container_type'    => $row['container_type'],
+            'container_count'   => $row['container_count'],
             'container_no'      => $row['container_no'],
             'seal_no'           => $row['seal_no'],
             'bl_number'         => $row['bl_number'],

@@ -759,6 +759,7 @@ CREATE TABLE order_shipping (
   etd                       DATE NULL,
   eta                       DATE NULL,
   container_type            VARCHAR(50) NULL,
+  container_count           INT UNSIGNED NULL,   -- how many containers this shipment uses — distinct from container_no, which may list more than one
   container_no              VARCHAR(50) NULL,
   seal_no                   VARCHAR(50) NULL,
   bl_number                 VARCHAR(60) NULL,

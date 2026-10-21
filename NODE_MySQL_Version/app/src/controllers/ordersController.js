@@ -1696,6 +1696,7 @@ async function saveShipping(req, res) {
     etd: str(body.etd) || null,
     eta: str(body.eta) || null,
     container_type: str(body.ship_container_type) || null,
+    container_count: str(body.container_count) || null,
     container_no: str(body.container_no) || null,
     seal_no: str(body.seal_no) || null,
   });

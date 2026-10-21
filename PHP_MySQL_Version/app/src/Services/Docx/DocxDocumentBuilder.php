@@ -1249,6 +1249,7 @@ final class DocxDocumentBuilder
         $containerType = (string) self::g($order, 'container_type', '');
         DocxComponents::addSectionTitle($section, '5. CONTAINER & CARGO DETAILS');
         DocxComponents::addKvTable($section, [
+            ['label' => 'Number of Containers', 'value' => self::g($shipping, 'container_count', 'To Be Confirmed')],
             ['label' => 'Container Load Type *', 'value' => self::checkbox(true, 'FCL (Full Container Load)') . '    ' . self::checkbox(false, 'LCL (Less than Container Load)')],
             ['label' => 'Container Size *', 'value' =>
                 self::checkbox(str_contains($containerType, '20ft'), '20ft Standard') . '   ' .
@@ -1375,6 +1376,7 @@ final class DocxDocumentBuilder
             ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Number of Containers', 'value' => self::g($shipping, 'container_count', 'To Be Confirmed')],
             ['label' => 'Container No. *', 'value' => self::g($shipping, 'container_no', 'To Be Confirmed')],
             ['label' => 'Bill of Lading No. *', 'value' => self::g($shipping, 'bl_number', 'To Be Confirmed')],
             ['label' => 'Bill of Lading Date *', 'value' => self::g($shipping, 'bl_date', 'TBC — must match this invoice date')],

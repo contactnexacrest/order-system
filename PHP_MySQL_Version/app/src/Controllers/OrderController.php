@@ -1698,9 +1698,10 @@ final class OrderController
             'voyage_number'  => trim((string) ($_POST['voyage_number'] ?? '')) ?: null,
             'etd'            => trim((string) ($_POST['etd'] ?? '')) ?: null,
             'eta'            => trim((string) ($_POST['eta'] ?? '')) ?: null,
-            'container_type' => trim((string) ($_POST['ship_container_type'] ?? '')) ?: null,
-            'container_no'   => trim((string) ($_POST['container_no'] ?? '')) ?: null,
-            'seal_no'        => trim((string) ($_POST['seal_no'] ?? '')) ?: null,
+            'container_type'  => trim((string) ($_POST['ship_container_type'] ?? '')) ?: null,
+            'container_count' => trim((string) ($_POST['container_count'] ?? '')) ?: null,
+            'container_no'    => trim((string) ($_POST['container_no'] ?? '')) ?: null,
+            'seal_no'         => trim((string) ($_POST['seal_no'] ?? '')) ?: null,
         ]);
         Flash::set('success', 'Shipping details saved. Generate the BL Instruction Sheet below.');
         header("Location: /orders/{$orderId}");

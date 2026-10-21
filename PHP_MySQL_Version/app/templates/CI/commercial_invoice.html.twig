@@ -30,6 +30,7 @@
   <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Number of Containers</td><td class="v">{{ shipping.container_count ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Bill of Lading No. *</td><td class="v">{{ shipping.bl_number ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Bill of Lading Date *</td><td class="v">{{ shipping.bl_date ?: 'To Be Confirmed — must match this invoice date' }}</td></tr>

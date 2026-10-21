@@ -34,7 +34,11 @@ Three things happen in this section, each building toward the BL:
    dimensions, pieces, weight, HS code per crate). Once saved, **Generate
    Packing List** produces the PL document.
 2. **Save Shipping Details** — shipping line, vessel name, voyage number,
-   ETD/ETA, container and seal numbers:
+   ETD/ETA, number of containers, container number(s), and seal number.
+   Number of Containers is a simple count distinct from Container No. —
+   it covers multi-container shipments (e.g. one product split across 2
+   containers) without needing a structured per-product-line assignment;
+   staff still record the actual container number(s) as free text:
 
    ![Shipping / Vessel Details form](./images/s7_shipping_bl_before.png)
 

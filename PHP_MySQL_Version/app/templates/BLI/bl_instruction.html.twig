@@ -54,6 +54,7 @@
 
 <div class="section-title">5. CONTAINER &amp; CARGO DETAILS</div>
 <table class="kv kv-solid">
+  <tr><td class="k">Number of Containers</td><td class="v">{{ shipping.container_count ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Container Load Type *</td><td class="v checkbox-row"><span class="box checked"><span class="cbx">&#8730;</span>FCL (Full Container Load)</span> &nbsp;&nbsp; <span class="box"><span class="cbx"></span>LCL (Less than Container Load)</span></td></tr>
   <tr><td class="k">Container Size *</td><td class="v checkbox-row">
     <span class="box{{ '20ft' in order.container_type ? ' checked' : '' }}"><span class="cbx">{{ ('20ft' in order.container_type ? '&#8730;' : '')|raw }}</span>20ft Standard</span> &nbsp;
