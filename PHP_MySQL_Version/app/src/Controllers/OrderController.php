@@ -45,6 +45,7 @@ use App\Repositories\OrderStageRepository;
 use App\Repositories\OrderSupplierPoDocumentRepository;
 use App\Repositories\OrderSupplierPoRepository;
 use App\Repositories\PiIntakeRepository;
+use App\Repositories\SupplierFactoryAddressRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\UserRepository;
 use App\Config\Env;
@@ -807,6 +808,8 @@ final class OrderController
             'units' => LookupRepository::dropdownOptions('unit'),
             'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
             'gstRates' => LookupRepository::dropdownOptions('gst_rate'),
+            'dimensionalTolerances' => LookupRepository::dropdownOptions('dimensional_tolerance'),
+            'supplierFactoryAddressesBySupplier' => SupplierFactoryAddressRepository::allGroupedBySupplier(),
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
             'complianceTasks' => OrderComplianceTaskRepository::forOrder($orderId),
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
@@ -1419,6 +1422,41 @@ final class OrderController
             SupplierRepository::markTest($supplierId);
         }
         Flash::set('success', "Supplier \"{$name}\" added.");
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * User-reported batch item 12 — a supplier can have several factory/
+     * delivery addresses; added from the order page (suppliers have no
+     * dedicated admin screen of their own) the same way a new supplier
+     * itself is.
+     */
+    public function createSupplierFactoryAddress(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $supplierId = (int) $params['supplierId'];
+        if (!SupplierRepository::find($supplierId)) {
+            Flash::set('error', 'Supplier not found.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $address = trim((string) ($_POST['address'] ?? ''));
+        if ($address === '') {
+            Flash::set('error', 'Factory address is required.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        SupplierFactoryAddressRepository::create($supplierId, $address, trim((string) ($_POST['label'] ?? '')) ?: null);
+        Flash::set('success', 'Factory address added.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function deleteSupplierFactoryAddress(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $addressId = (int) $params['addressId'];
+        SupplierFactoryAddressRepository::delete($addressId);
+        Flash::set('success', 'Factory address removed.');
         header("Location: /orders/{$orderId}");
     }
 

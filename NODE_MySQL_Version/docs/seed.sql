@@ -469,6 +469,17 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
   ('unit', 'KG', 7, 0, 1),
   ('unit', 'NOS', 8, 0, 1),
   ('unit', 'CBM', 9, 0, 1),
+  -- User-reported batch item 12: Dimensional Tolerance on the Supplier PO
+  -- Terms form was plain free text with only a placeholder hint
+  -- ("e.g., ±1 mm") and no real default — same admin-editable dropdown
+  -- treatment as Unit/Surface Finish/GST Rate above, still writing the
+  -- same plain string into the existing dimensional_tolerance VARCHAR
+  -- column (no schema change to order_supplier_po).
+  ('dimensional_tolerance', '±1 mm', 1, 1, 1),
+  ('dimensional_tolerance', '±0.5 mm', 2, 0, 1),
+  ('dimensional_tolerance', '±2 mm', 3, 0, 1),
+  ('dimensional_tolerance', '±3 mm', 4, 0, 1),
+  ('dimensional_tolerance', 'As per approved sample', 5, 0, 1),
   -- 90-item backlog #66: Package Type was plain free text defaulting to
   -- the literal hardcoded string 'Wooden Crates' — this is default=1 for
   -- the exact same reason, so an order's package type is byte-identical

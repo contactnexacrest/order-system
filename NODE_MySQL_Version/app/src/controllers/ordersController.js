@@ -47,6 +47,7 @@ const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
 const supplierRepository = require('../repositories/supplierRepository');
+const supplierFactoryAddressRepository = require('../repositories/supplierFactoryAddressRepository');
 const userRepository = require('../repositories/userRepository');
 const env = require('../config/env');
 const emailService = require('../services/emailService');
@@ -763,6 +764,16 @@ async function show(req, res) {
     buyerActionFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${order.buyer_action_token_plain}`;
   }
 
+  const supplierFactoryAddressesBySupplier = await supplierFactoryAddressRepository.allGroupedBySupplier();
+  // User-reported batch item 12: a flat supplierId -> [addressText] map
+  // alongside the full-row one above, embedded per <option> for the
+  // Delivery Location dropdown's client-side repopulation — Nunjucks has
+  // no built-in way to pluck one field out of a list of objects inline.
+  const supplierFactoryAddressTextsBySupplier = {};
+  for (const [supplierId, addresses] of Object.entries(supplierFactoryAddressesBySupplier)) {
+    supplierFactoryAddressTextsBySupplier[supplierId] = addresses.map((a) => a.address);
+  }
+
   res.renderView(
     'orders/show',
     {
@@ -796,6 +807,9 @@ async function show(req, res) {
       units: await lookupRepository.dropdownOptions('unit'),
       surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
       gstRates: await lookupRepository.dropdownOptions('gst_rate'),
+      dimensionalTolerances: await lookupRepository.dropdownOptions('dimensional_tolerance'),
+      supplierFactoryAddressesBySupplier,
+      supplierFactoryAddressTextsBySupplier,
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
       complianceTasks: await orderComplianceTaskRepository.forOrder(orderId),
       complianceStatuses: orderComplianceTaskRepository.STATUSES,
@@ -1405,6 +1419,39 @@ async function createSupplier(req, res) {
     await supplierRepository.markTest(supplierId);
   }
   flash.set(req, 'success', `Supplier "${name}" added.`);
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * User-reported batch item 12 — a supplier can have several factory/
+ * delivery addresses; added from the order page (suppliers have no
+ * dedicated admin screen of their own) the same way a new supplier
+ * itself is.
+ */
+async function createSupplierFactoryAddress(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const supplierId = parseInt(req.params.supplierId, 10);
+  if (!(await supplierRepository.find(supplierId))) {
+    flash.set(req, 'error', 'Supplier not found.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const address = str(req.body.address);
+  if (address === '') {
+    flash.set(req, 'error', 'Factory address is required.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  await supplierFactoryAddressRepository.create(supplierId, address, str(req.body.label) || null);
+  flash.set(req, 'success', 'Factory address added.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function deleteSupplierFactoryAddress(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const addressId = parseInt(req.params.addressId, 10);
+  await supplierFactoryAddressRepository.remove(addressId);
+  flash.set(req, 'success', 'Factory address removed.');
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -2148,7 +2195,7 @@ module.exports = {
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, downloadDossier, generatePiFormLink, generateBuyerActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment, updateProductionStatus,
-  recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, confirmSupplierSigned, uploadSupplierPoDocument,
+  recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, recordBlIssued, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

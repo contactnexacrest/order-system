@@ -51,10 +51,14 @@ describe('P5 copy wording (backlog #20, #79)', () => {
     const html = read('views/orders/show.njk');
     expect(html).toContain('name="material_stone_type" placeholder="e.g., Black Granite"');
     expect(html).toContain('name="dimensions" placeholder="e.g., 600 x 600 x 20 mm"');
-    expect(html).toContain('name="dimensional_tolerance" placeholder="e.g., &plusmn;1 mm"');
+    // User-reported batch item 12: Dimensional Tolerance and Delivery
+    // Location both moved from bare placeholder hints to real dropdowns
+    // (admin-editable, and the selected supplier's own factory addresses
+    // respectively — see supplierFactoryAddressAndDimensionalTolerance.
+    // test.js) — neither is a free-text field by default any more, so no
+    // placeholder-hint guard applies to them here any more.
     expect(html).toContain('name="colour_reference" placeholder="e.g., Jet Black"');
     expect(html).toContain('name="special_requirements" placeholder="e.g., Polished finish, edge chamfer"');
-    expect(html).toContain('name="delivery_location" placeholder="e.g., Factory warehouse, Udaipur"');
     expect(html).toContain('name="packing_requirement" placeholder="e.g., Wooden crates, export packing"');
   });
 

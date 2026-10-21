@@ -27,14 +27,27 @@ specification and commercial terms in the same section:
 
 ![Stage 5 section — add supplier and fill in Supplier PO terms](./images/s5_before_supplier.png)
 
-**Supplier Type**, **Surface Finish**, **Unit**, and **GST Rate** are all
-admin-editable dropdowns (same `manage_dropdown_options` screen as
-Container Type/COO Type — see
+**Supplier Type**, **Surface Finish**, **Unit**, **GST Rate**, and
+**Dimensional Tolerance** are all admin-editable dropdowns (same
+`manage_dropdown_options` screen as Container Type/COO Type — see
 [Chapter 15](./15-admin-settings.md#admin--settings)), not free text.
 Supplier Type offers **Quarry Owner**, **Processor (Job-Work Basis)**
 (a unit that processes material supplied by/on behalf of someone else, not
 one that owns the quarry or the factory itself), **Trader**, and
 **Factory Owner** — four genuinely distinct roles, not overlapping labels.
+
+**Delivery Location** is a dropdown of the *selected supplier's own*
+factory addresses, repopulating the moment a different supplier is
+picked — a supplier with none yet shows only **Other (not listed) —
+specify**, which reveals a free-text box. Staff add a supplier's factory
+addresses from the **Manage factory addresses** section, just below
+**Add a new supplier** — a label (optional) plus the address, one
+supplier at a time; each added address is immediately available in every
+Supplier PO Terms form's Delivery Location dropdown for that supplier,
+on this order and any other. Whatever Delivery Location text was
+actually selected or typed is saved directly onto that Supplier PO's own
+record — editing or removing a factory address later never changes a
+Supplier PO that already used it.
 
 **Basic Value, GST Amount, Total Payable, Advance Amount, and Balance
 Amount auto-calculate** as Quantity, Unit Price, GST Rate, and Advance %

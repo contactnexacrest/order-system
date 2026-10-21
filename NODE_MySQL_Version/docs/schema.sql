@@ -3300,3 +3300,32 @@ ALTER TABLE orders
 -- ================================================================
 ALTER TABLE users
   ADD COLUMN email_action_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER two_fa_method;
+
+-- ================================================================
+-- SECTION BL — SUPPLIER FACTORY ADDRESSES (user-reported batch item 12)
+-- ================================================================
+-- "Delivery Location = factory address (supplier details must have
+-- factory address add option - one owner may have multiple factory
+-- addresses - dropdown)". suppliers.address was always a single free-
+-- text field for the supplier's own registered/billing address — this
+-- is a SEPARATE list, since a supplier can have several factory/
+-- delivery locations distinct from that one address, and the Supplier
+-- PO Terms form's own Delivery Location field needs to offer them as a
+-- dropdown (plus an "Other" free-text fallback) once a supplier is
+-- selected. Deliberately its own table rather than a repeated-group on
+-- suppliers (an unbounded one-to-many, same reasoning as every other
+-- "a parent can have several of these" table in this schema).
+-- Delivery Location on order_supplier_po itself stays a plain VARCHAR
+-- (no FK) — same "snapshot the chosen value, don't depend on the
+-- source list" reasoning as every other admin-managed dropdown here;
+-- deleting or editing a factory address later never changes a
+-- Supplier PO's already-saved Delivery Location text.
+-- ================================================================
+CREATE TABLE supplier_factory_addresses (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  supplier_id BIGINT UNSIGNED NOT NULL,
+  label       VARCHAR(100) NULL,     -- optional friendly name, e.g. "Udaipur Factory"
+  address     VARCHAR(255) NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+) ENGINE=InnoDB;

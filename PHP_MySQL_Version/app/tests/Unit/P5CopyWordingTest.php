@@ -62,10 +62,19 @@ final class P5CopyWordingTest extends TestCase
         $html = $this->read('views/orders/show.php');
         self::assertStringContainsString('name="material_stone_type" placeholder="e.g., Black Granite"', $html);
         self::assertStringContainsString('name="dimensions" placeholder="e.g., 600 x 600 x 20 mm"', $html);
-        self::assertStringContainsString('name="dimensional_tolerance" placeholder="e.g., &plusmn;1 mm"', $html);
+        // User-reported batch item 12: Dimensional Tolerance moved from a
+        // bare placeholder hint to a real admin-editable dropdown (see
+        // SupplierFactoryAddressAndDimensionalToleranceTest) — it's no
+        // longer a free-text field, so no placeholder-hint guard applies
+        // to it here any more.
         self::assertStringContainsString('name="colour_reference" placeholder="e.g., Jet Black"', $html);
         self::assertStringContainsString('name="special_requirements" placeholder="e.g., Polished finish, edge chamfer"', $html);
-        self::assertStringContainsString('name="delivery_location" placeholder="e.g., Factory warehouse, Udaipur"', $html);
+        // User-reported batch item 12: Delivery Location moved from a bare
+        // placeholder hint to a dropdown of the selected supplier's own
+        // factory addresses (see
+        // SupplierFactoryAddressAndDimensionalToleranceTest) — it's no
+        // longer a free-text field by default, so no placeholder-hint
+        // guard applies to it here any more.
         self::assertStringContainsString('name="packing_requirement" placeholder="e.g., Wooden crates, export packing"', $html);
     }
 

@@ -113,6 +113,11 @@ njkEnv.addFilter('humanDate', dates.human);
 // built-in startswith, and the PHP side's equivalent ($isActive) is a
 // plain str_starts_with(), so this is the same one-line check.
 njkEnv.addFilter('startswith', (value, prefix) => typeof value === 'string' && value.startsWith(prefix));
+// User-reported batch item 12: embeds a small JS array (a supplier's
+// factory addresses) into a data-* attribute for client-side use, the
+// same way PHP's view does an inline json_encode() — Nunjucks has no
+// built-in equivalent to Twig/PHP's json_encode.
+njkEnv.addFilter('json', (value) => JSON.stringify(value === undefined ? null : value));
 // Mirrors PHP's number_format($v, 2) — comma thousands separator, fixed 2
 // decimals — so money amounts render identically on both stacks (e.g.
 // "1,500.00", not the raw "1500").
@@ -639,6 +644,8 @@ app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePerm
 app.post('/orders/:id/oc-acknowledgment', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordOcAcknowledgment));
 
 app.post('/orders/:id/suppliers', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.createSupplier));
+app.post('/orders/:id/suppliers/:supplierId/factory-addresses', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.createSupplierFactoryAddress));
+app.post('/orders/:id/suppliers/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.deleteSupplierFactoryAddress));
 app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
 app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
 app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));

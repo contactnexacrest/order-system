@@ -1289,14 +1289,52 @@ foreach ($stages as $s) {
           </form>
         </details>
 
+        <?php if (!empty($suppliers)): ?>
+        <details>
+          <summary>Manage factory addresses</summary>
+          <?php foreach ($suppliers as $sup): ?>
+            <div class="card-nested">
+              <strong><?= htmlspecialchars($sup['supplier_legal_name']) ?></strong>
+              <?php $supAddresses = $supplierFactoryAddressesBySupplier[(int) $sup['id']] ?? []; ?>
+              <?php if (!empty($supAddresses)): ?>
+                <table class="list">
+                  <tr><th>Label</th><th>Address</th><th></th></tr>
+                  <?php foreach ($supAddresses as $fa): ?>
+                    <tr>
+                      <td><?= htmlspecialchars($fa['label'] ?? '—') ?></td>
+                      <td><?= htmlspecialchars($fa['address']) ?></td>
+                      <td>
+                        <form method="post" action="/orders/<?= (int) $order['id'] ?>/suppliers/factory-addresses/<?= (int) $fa['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove this factory address?');">
+                          <?= Csrf::field() ?>
+                          <button type="submit" class="btn-sm btn-danger">&times;</button>
+                        </form>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </table>
+              <?php else: ?>
+                <p class="muted small">No factory addresses added yet.</p>
+              <?php endif; ?>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/suppliers/<?= (int) $sup['id'] ?>/factory-addresses" class="field-grid">
+                <?= Csrf::field() ?>
+                <label>Label <small class="muted">(optional)</small><input type="text" name="label" placeholder="e.g. Udaipur Factory"></label>
+                <label>Address *<input type="text" name="address" required placeholder="e.g. Plot 12, Industrial Area, Udaipur, Rajasthan"></label>
+                <button type="submit" class="btn-sm">Add Factory Address</button>
+              </form>
+            </div>
+          <?php endforeach; ?>
+        </details>
+        <?php endif; ?>
+
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po" id="supplier-po-form">
           <?= Csrf::field() ?>
           <div class="field-grid">
           <label>Supplier *
-            <select name="supplier_id" required>
+            <select name="supplier_id" id="spo-supplier-select" required>
               <option value="">Select supplier…</option>
               <?php foreach ($suppliers as $sup): ?>
-                <option value="<?= (int) $sup['id'] ?>"><?= htmlspecialchars($sup['supplier_legal_name']) ?></option>
+                <?php $supAddressesForOption = $supplierFactoryAddressesBySupplier[(int) $sup['id']] ?? []; ?>
+                <option value="<?= (int) $sup['id'] ?>" data-addresses="<?= htmlspecialchars(json_encode(array_map(static fn(array $a): string => $a['address'], $supAddressesForOption)) ?: '[]') ?>"><?= htmlspecialchars($sup['supplier_legal_name']) ?></option>
               <?php endforeach; ?>
             </select>
           </label>
@@ -1311,7 +1349,14 @@ foreach ($stages as $s) {
             </select>
           </label>
           <label>Dimensions<input type="text" name="dimensions" placeholder="e.g., 600 x 600 x 20 mm"></label>
-          <label>Dimensional Tolerance<input type="text" name="dimensional_tolerance" placeholder="e.g., &plusmn;1 mm"></label>
+          <label>Dimensional Tolerance
+            <select name="dimensional_tolerance">
+              <option value="">—</option>
+              <?php foreach ($dimensionalTolerances as $o): ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <label>Quantity<input type="text" name="quantity" data-spo-calc="quantity" placeholder="e.g., 500"></label>
           <label>Unit
             <select name="unit">
@@ -1337,7 +1382,13 @@ foreach ($stages as $s) {
           <label>Advance (%)<input type="text" name="advance_pct" data-spo-calc="advance_pct" placeholder="e.g., 30"></label>
           <label>Advance Amount (INR) <small class="muted">(auto: Total Payable &times; Advance %)</small><input type="text" name="advance_amount_inr" data-spo-calc="advance_amount_inr"></label>
           <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr"></label>
-          <label>Delivery Location<input type="text" name="delivery_location" placeholder="e.g., Factory warehouse, Udaipur"></label>
+          <label>Delivery Location
+            <select id="spo-delivery-location-select">
+              <option value="">— Select —</option>
+              <option value="__other__">Other (not listed) — specify</option>
+            </select>
+            <input type="text" id="spo-delivery-location-input" name="delivery_location" placeholder="Select a supplier first, or specify" style="display:none">
+          </label>
           <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
           <label>Packing Requirement<input type="text" name="packing_requirement" placeholder="e.g., Wooden crates, export packing"></label>
           </div>
@@ -1374,6 +1425,47 @@ foreach ($stages as $s) {
               el.addEventListener('change', recalc);
             }
           });
+
+          // User-reported batch item 12: Delivery Location offers the
+          // selected supplier's own factory addresses, repopulated here
+          // whenever the Supplier changes, plus an "Other" free-text
+          // fallback — same dropdown-with-other-fallback pattern as the
+          // Incoterm fields on the client-facing intake forms.
+          var supplierSelect = document.getElementById('spo-supplier-select');
+          var deliverySelect = document.getElementById('spo-delivery-location-select');
+          var deliveryInput = document.getElementById('spo-delivery-location-input');
+          if (supplierSelect && deliverySelect && deliveryInput) {
+            function applyDeliveryInput() {
+              var isOther = deliverySelect.value === '__other__';
+              deliveryInput.style.display = isOther ? '' : 'none';
+              deliveryInput.readOnly = !isOther;
+              if (!isOther) { deliveryInput.value = deliverySelect.value; }
+            }
+            function repopulateDeliveryOptions() {
+              var opt = supplierSelect.options[supplierSelect.selectedIndex];
+              var addresses = [];
+              try { addresses = opt && opt.dataset.addresses ? JSON.parse(opt.dataset.addresses) : []; } catch (e) { addresses = []; }
+              deliverySelect.innerHTML = '';
+              var blank = document.createElement('option');
+              blank.value = '';
+              blank.textContent = '— Select —';
+              deliverySelect.appendChild(blank);
+              addresses.forEach(function (addr) {
+                var o = document.createElement('option');
+                o.value = addr;
+                o.textContent = addr;
+                deliverySelect.appendChild(o);
+              });
+              var other = document.createElement('option');
+              other.value = '__other__';
+              other.textContent = 'Other (not listed) — specify';
+              deliverySelect.appendChild(other);
+              applyDeliveryInput();
+            }
+            supplierSelect.addEventListener('change', repopulateDeliveryOptions);
+            deliverySelect.addEventListener('change', applyDeliveryInput);
+            repopulateDeliveryOptions();
+          }
         })();
         </script>
       <?php endif; ?>

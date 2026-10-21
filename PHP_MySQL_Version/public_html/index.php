@@ -439,6 +439,8 @@ $router->post('/orders/{id}/annexure/images/{imageId}/remove', [$annexure, 'remo
 $router->post('/orders/{id}/oc-acknowledgment', [$orders, 'recordOcAcknowledgment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/suppliers', [$orders, 'createSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/suppliers/{supplierId}/factory-addresses', [$orders, 'createSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/suppliers/factory-addresses/{addressId}/delete', [$orders, 'deleteSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
