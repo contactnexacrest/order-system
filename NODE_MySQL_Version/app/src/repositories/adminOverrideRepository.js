@@ -10,7 +10,7 @@ const db = require('../config/db');
 // flags, and an amendment's reference.
 
 async function documentTypes() {
-  return db.query('SELECT id, code, name, ref_format, min_reviewers_default FROM document_types ORDER BY code');
+  return db.query('SELECT id, code, name, category, ref_format, min_reviewers_default FROM document_types ORDER BY code');
 }
 
 async function updateDocumentTypeRefFormat(id, refFormat, minReviewers) {
@@ -20,8 +20,22 @@ async function updateDocumentTypeRefFormat(id, refFormat, minReviewers) {
   );
 }
 
+// 90-item backlog "per-doc-type Legal Terms toggle": each clause's
+// document_type_ids (from tc_clause_documents) is merged in here, so the
+// Legal Terms section of the admin screen can render — and the clause's
+// actual reach can be seen and changed — without a second round trip per
+// clause.
 async function tcClauses() {
-  return db.query('SELECT id, clause_number, clause_order, clause_title, clause_text, clause_group, status, is_locked, is_protected FROM tc_clauses ORDER BY clause_order');
+  const clauses = await db.query('SELECT id, clause_number, clause_order, clause_title, clause_text, clause_group, status, is_locked, is_protected FROM tc_clauses ORDER BY clause_order');
+  const links = await db.query('SELECT clause_id, document_type_id FROM tc_clause_documents');
+  const documentTypeIdsByClause = {};
+  for (const link of links) {
+    (documentTypeIdsByClause[link.clause_id] = documentTypeIdsByClause[link.clause_id] || []).push(link.document_type_id);
+  }
+  for (const clause of clauses) {
+    clause.document_type_ids = documentTypeIdsByClause[clause.id] || [];
+  }
+  return clauses;
 }
 
 async function updateTcClause(id, title, text, userId) {
@@ -29,6 +43,17 @@ async function updateTcClause(id, title, text, userId) {
     'UPDATE tc_clauses SET clause_title = :title, clause_text = :text, modified_by = :user_id WHERE id = :id',
     { title, text, user_id: userId, id }
   );
+}
+
+/** @param {number[]} documentTypeIds The complete new set this clause should be linked to. */
+async function setTcClauseDocumentTypes(clauseId, documentTypeIds) {
+  await db.execute('DELETE FROM tc_clause_documents WHERE clause_id = :clause_id', { clause_id: clauseId });
+  for (const documentTypeId of [...new Set(documentTypeIds)]) {
+    await db.execute(
+      'INSERT INTO tc_clause_documents (clause_id, document_type_id) VALUES (:clause_id, :document_type_id)',
+      { clause_id: clauseId, document_type_id: documentTypeId }
+    );
+  }
 }
 
 async function paymentPresets() {
@@ -58,6 +83,6 @@ async function updateAmendmentReference(amendmentId, newReference) {
 }
 
 module.exports = {
-  documentTypes, updateDocumentTypeRefFormat, tcClauses, updateTcClause, paymentPresets,
+  documentTypes, updateDocumentTypeRefFormat, tcClauses, updateTcClause, setTcClauseDocumentTypes, paymentPresets,
   updatePaymentPreset, updateClientUniqueNumber, updateOrderStatusLock, updateAmendmentReference,
 };

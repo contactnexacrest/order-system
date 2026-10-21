@@ -240,6 +240,15 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   (and vice versa). Leaving visibility_rule on its default ("always")
   shows the clause on every order regardless of preset, same as every
   ordinary T&C clause already does.
+  A Legal Terms clause's own **"Shown on"** checkbox row (next to its
+  title/text, same screen) sets which document types it actually prints
+  on — only customer-facing document types are offered, since Legal
+  Terms is a buyer-facing section only (an internal-only document like
+  CAFIN, or a procurement one like the Supplier PO, is never offered as
+  an option, whatever an admin ticks). A protected clause's checkboxes
+  are disabled the same way its title/text fields are, until unlocked.
+  Changing which document types a clause reaches is logged exactly like
+  a text edit (old/new document-type codes, reason required).
 - **Compliance Task Types** (`/compliance-task-types`) — the admin-editable
   list of names (ECGC Cover, Pre-Shipment Inspection, Fumigation
   Certificate, Phytosanitary Certificate, Due Diligence by default) that

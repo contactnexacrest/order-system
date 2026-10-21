@@ -29,7 +29,7 @@ final class AdminOverrideRepository
     public static function documentTypes(): array
     {
         return Database::connection()->query(
-            'SELECT id, code, name, ref_format, min_reviewers_default FROM document_types ORDER BY code'
+            'SELECT id, code, name, category, ref_format, min_reviewers_default FROM document_types ORDER BY code'
         )->fetchAll();
     }
 
@@ -40,12 +40,34 @@ final class AdminOverrideRepository
         )->execute(['ref_format' => $refFormat, 'min_reviewers' => $minReviewers, 'id' => $id]);
     }
 
-    /** @return array<int, array<string,mixed>> */
+    /**
+     * 90-item backlog "per-doc-type Legal Terms toggle": each clause's
+     * document_type_ids (from tc_clause_documents) is merged in here, so
+     * the Legal Terms section of the admin screen can render — and the
+     * clause's actual reach can be seen and changed — without a second
+     * round trip per clause.
+     *
+     * @return array<int, array<string,mixed>>
+     */
     public static function tcClauses(): array
     {
-        return Database::connection()->query(
+        $clauses = Database::connection()->query(
             'SELECT id, clause_number, clause_order, clause_title, clause_text, clause_group, status, is_locked, is_protected FROM tc_clauses ORDER BY clause_order'
         )->fetchAll();
+
+        $links = Database::connection()->query(
+            'SELECT clause_id, document_type_id FROM tc_clause_documents'
+        )->fetchAll();
+        $documentTypeIdsByClause = [];
+        foreach ($links as $link) {
+            $documentTypeIdsByClause[(int) $link['clause_id']][] = (int) $link['document_type_id'];
+        }
+
+        foreach ($clauses as &$clause) {
+            $clause['document_type_ids'] = $documentTypeIdsByClause[(int) $clause['id']] ?? [];
+        }
+
+        return $clauses;
     }
 
     public static function updateTcClause(int $id, string $title, string $text, int $userId): void
@@ -53,6 +75,17 @@ final class AdminOverrideRepository
         Database::connection()->prepare(
             'UPDATE tc_clauses SET clause_title = :title, clause_text = :text, modified_by = :user_id WHERE id = :id'
         )->execute(['title' => $title, 'text' => $text, 'user_id' => $userId, 'id' => $id]);
+    }
+
+    /** @param int[] $documentTypeIds The complete new set this clause should be linked to. */
+    public static function setTcClauseDocumentTypes(int $clauseId, array $documentTypeIds): void
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('DELETE FROM tc_clause_documents WHERE clause_id = :clause_id')->execute(['clause_id' => $clauseId]);
+        $stmt = $pdo->prepare('INSERT INTO tc_clause_documents (clause_id, document_type_id) VALUES (:clause_id, :document_type_id)');
+        foreach (array_unique($documentTypeIds) as $documentTypeId) {
+            $stmt->execute(['clause_id' => $clauseId, 'document_type_id' => $documentTypeId]);
+        }
     }
 
     /** @return array<int, array<string,mixed>> */

@@ -32,6 +32,11 @@ async function index(req, res) {
   }
   res.renderView('admin_overrides/index', {
     documentTypes,
+    // Legal Terms is a buyer-facing section (never shown on an internal-
+    // only or procurement document like SUPPO/STAGEGATE), so the per-
+    // document-type toggle only offers the document types it can
+    // actually appear on.
+    customerFacingDocumentTypes: documentTypes.filter((dt) => dt.category === 'customer_facing'),
     tcClausesStandard: byGroup.standard,
     tcClausesLegalTerms: byGroup.legal_terms,
     tcClausesDefinitions: byGroup.definitions,
@@ -118,7 +123,34 @@ async function updateTcClauses(req, res) {
     }
   }
 
-  if (Object.keys(toApply).length === 0) {
+  // 90-item backlog "per-doc-type Legal Terms toggle": which document
+  // types a Legal Terms clause is linked to (tc_clause_documents) used
+  // to be fixed at whatever seed.sql originally set, with no admin-
+  // facing way to change it. Only clauses the form actually submitted a
+  // document_types[] field for are touched here (today, only
+  // clause_group='legal_terms' rows get that checkbox grid in the
+  // view), and only against the customer-facing document types the view
+  // ever offers, so a tampered POST can't link a clause to an internal-
+  // only/procurement document type the Legal Terms box never even
+  // renders on.
+  const allDocumentTypes = await adminOverrideRepository.documentTypes();
+  const allowedDocumentTypeIds = new Set(
+    allDocumentTypes.filter((dt) => dt.category === 'customer_facing').map((dt) => dt.id)
+  );
+  const documentTypesInput = req.body.document_types || {};
+  const docTypeChanges = {};
+  for (const [rawId, rawNewIds] of Object.entries(documentTypesInput)) {
+    const id = stripFieldPrefix(rawId);
+    if (!byId[id]) continue;
+    const submitted = Array.isArray(rawNewIds) ? rawNewIds : [rawNewIds];
+    const newIds = [...new Set(submitted.map((v) => parseInt(v, 10)).filter((v) => allowedDocumentTypeIds.has(v)))].sort();
+    const oldIds = [...byId[id].document_type_ids].sort();
+    if (JSON.stringify(newIds) !== JSON.stringify(oldIds)) {
+      docTypeChanges[id] = { old: byId[id].document_type_ids, new: newIds };
+    }
+  }
+
+  if (Object.keys(toApply).length === 0 && Object.keys(docTypeChanges).length === 0) {
     flash.set(req, 'success', 'No changes were made.');
     res.redirect('/admin/overrides');
     return;
@@ -130,11 +162,22 @@ async function updateTcClauses(req, res) {
     return;
   }
 
-  const blockedProtected = Object.keys(toApply).filter((id) => byId[id].is_protected && !unlockedIds.has(parseInt(id, 10)));
+  const blockedProtected = [...new Set([...Object.keys(toApply), ...Object.keys(docTypeChanges)])]
+    .filter((id) => byId[id].is_protected && !unlockedIds.has(parseInt(id, 10)));
   if (blockedProtected.length > 0) {
     flash.set(req, 'error', `Protected clause(s) must be unlocked before editing (id ${blockedProtected.join(', ')}) — nothing was saved.`);
     res.redirect('/admin/overrides');
     return;
+  }
+
+  if (Object.keys(docTypeChanges).length > 0) {
+    const codeById = {};
+    for (const dt of allDocumentTypes) codeById[dt.id] = dt.code;
+    const codesOf = (ids) => ids.map((dtId) => codeById[dtId] ?? String(dtId)).join(',');
+    for (const [id, c] of Object.entries(docTypeChanges)) {
+      await adminOverrideRepository.setTcClauseDocumentTypes(id, c.new);
+      await auditLogRepository.log(user.id, 'FIELD_EDIT', 'tc_clause_documents', id, 'document_type_ids', codesOf(c.old), codesOf(c.new), reason);
+    }
   }
 
   for (const [id, c] of Object.entries(toApply)) {
@@ -147,7 +190,7 @@ async function updateTcClauses(req, res) {
       await auditLogRepository.log(user.id, 'FIELD_EDIT', 'tc_clauses', id, 'clause_title', c.old_title, c.new_title, reason);
     }
   }
-  flash.set(req, 'success', `${Object.keys(toApply).length} clause(s) updated.`);
+  flash.set(req, 'success', `${new Set([...Object.keys(toApply), ...Object.keys(docTypeChanges)]).size} clause(s) updated.`);
   res.redirect('/admin/overrides');
 }
 

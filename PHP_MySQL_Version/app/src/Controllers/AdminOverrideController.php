@@ -22,8 +22,18 @@ final class AdminOverrideController
             $byGroup[$c['clause_group'] ?? 'standard'][] = $c;
         }
 
+        $documentTypes = AdminOverrideRepository::documentTypes();
+
         View::render('admin_overrides/index', [
-            'documentTypes' => AdminOverrideRepository::documentTypes(),
+            'documentTypes' => $documentTypes,
+            // Legal Terms is a buyer-facing section (never shown on an
+            // internal-only or procurement document like SUPPO/STAGEGATE),
+            // so the per-document-type toggle only offers the document
+            // types it can actually appear on.
+            'customerFacingDocumentTypes' => array_values(array_filter(
+                $documentTypes,
+                static fn(array $dt): bool => $dt['category'] === 'customer_facing'
+            )),
             'tcClausesStandard' => $byGroup['standard'],
             'tcClausesLegalTerms' => $byGroup['legal_terms'],
             'tcClausesDefinitions' => $byGroup['definitions'],
@@ -108,7 +118,38 @@ final class AdminOverrideController
             }
         }
 
-        if (empty($toApply)) {
+        // 90-item backlog "per-doc-type Legal Terms toggle": which
+        // document types a Legal Terms clause is linked to
+        // (tc_clause_documents) used to be fixed at whatever seed.sql
+        // originally set, with no admin-facing way to change it — the
+        // view's own "Printed on QT/PI/OC/..." text was accurate but
+        // static. Only clauses the form actually submitted a
+        // document_types[] field for are touched here (today, only
+        // clause_group='legal_terms' rows get that checkbox grid in the
+        // view), and only against the customer-facing document types the
+        // view ever offers, so a tampered POST can't link a clause to an
+        // internal-only/procurement document type the Legal Terms box
+        // never even renders on.
+        $allowedDocumentTypeIds = array_map(
+            static fn(array $dt): int => (int) $dt['id'],
+            array_filter(AdminOverrideRepository::documentTypes(), static fn(array $dt): bool => $dt['category'] === 'customer_facing')
+        );
+        $docTypeChanges = [];
+        foreach (($_POST['document_types'] ?? []) as $id => $newIds) {
+            $id = (int) $id;
+            if (!isset($byId[$id])) {
+                continue;
+            }
+            $newIds = array_values(array_unique(array_intersect(array_map('intval', (array) $newIds), $allowedDocumentTypeIds)));
+            $oldIds = $byId[$id]['document_type_ids'];
+            sort($newIds);
+            sort($oldIds);
+            if ($newIds !== $oldIds) {
+                $docTypeChanges[$id] = ['old' => $byId[$id]['document_type_ids'], 'new' => $newIds];
+            }
+        }
+
+        if (empty($toApply) && empty($docTypeChanges)) {
             Flash::set('success', 'No changes were made.');
             header('Location: /admin/overrides');
             return;
@@ -124,7 +165,7 @@ final class AdminOverrideController
         // changed without its unlock flag present fails the whole
         // submission (nothing partial is saved).
         $blockedProtected = [];
-        foreach ($toApply as $id => $c) {
+        foreach (array_unique(array_merge(array_keys($toApply), array_keys($docTypeChanges))) as $id) {
             if ($byId[$id]['is_protected'] && !isset($unlockedIds[$id])) {
                 $blockedProtected[] = $id;
             }
@@ -133,6 +174,30 @@ final class AdminOverrideController
             Flash::set('error', 'Protected clause(s) must be unlocked before editing (id ' . implode(', ', $blockedProtected) . ') — nothing was saved.');
             header('Location: /admin/overrides');
             return;
+        }
+
+        if (!empty($docTypeChanges)) {
+            $codeById = [];
+            foreach (AdminOverrideRepository::documentTypes() as $dt) {
+                $codeById[(int) $dt['id']] = $dt['code'];
+            }
+            $codesOf = static fn(array $ids): string => implode(',', array_map(
+                static fn(int $dtId): string => $codeById[$dtId] ?? (string) $dtId,
+                $ids
+            ));
+            foreach ($docTypeChanges as $id => $c) {
+                AdminOverrideRepository::setTcClauseDocumentTypes($id, $c['new']);
+                AuditLogRepository::log(
+                    (int) $user['id'],
+                    'FIELD_EDIT',
+                    'tc_clause_documents',
+                    $id,
+                    'document_type_ids',
+                    $codesOf($c['old']),
+                    $codesOf($c['new']),
+                    $reason
+                );
+            }
         }
 
         foreach ($toApply as $id => $c) {
@@ -145,7 +210,7 @@ final class AdminOverrideController
                 AuditLogRepository::log((int) $user['id'], 'FIELD_EDIT', 'tc_clauses', $id, 'clause_title', $c['old_title'], $c['new_title'], $reason);
             }
         }
-        Flash::set('success', count($toApply) . ' clause(s) updated.');
+        Flash::set('success', count(array_unique(array_merge(array_keys($toApply), array_keys($docTypeChanges)))) . ' clause(s) updated.');
         header('Location: /admin/overrides');
     }
 

@@ -56,7 +56,7 @@
       <?php endforeach; ?>
 
       <h3>Legal Terms</h3>
-      <p class="muted small">Printed in the red Legal Terms box on QT/PI/OC/PL/CI/FDN/BUYERPO/ANNEXA.</p>
+      <p class="muted small">Printed in the red Legal Terms box — which document types it appears on is set per clause below (Legal Terms is a buyer-facing section, so only customer-facing document types are offered).</p>
       <?php foreach ($tcClausesLegalTerms as $c): ?>
         <fieldset class="<?= $c['is_protected'] ? 'protected-row' : '' ?>">
           <legend>
@@ -72,6 +72,15 @@
             <label class="full">Text
               <textarea name="clause_text[<?= (int) $c['id'] ?>]" rows="3" placeholder="Full clause wording" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>><?= htmlspecialchars($c['clause_text']) ?></textarea>
             </label>
+          </div>
+          <div class="field-grid doc-type-toggle">
+            <span class="muted small full">Shown on:</span>
+            <?php foreach ($customerFacingDocumentTypes as $dt): ?>
+              <label style="display:inline-block;width:auto;">
+                <input type="checkbox" name="document_types[<?= (int) $c['id'] ?>][]" value="<?= (int) $dt['id'] ?>" <?= in_array((int) $dt['id'], $c['document_type_ids'], true) ? 'checked' : '' ?> <?= $c['is_protected'] ? 'disabled' : '' ?>>
+                <?= htmlspecialchars($dt['code']) ?>
+              </label>
+            <?php endforeach; ?>
           </div>
           <?php if ($c['is_protected']): ?>
             <input type="hidden" name="unlocked_clause[<?= (int) $c['id'] ?>]" value="0" class="unlock-flag">
@@ -161,7 +170,7 @@ function unlockFieldset(btn) {
   fieldset.querySelectorAll('input[data-protected="1"], textarea[data-protected="1"]').forEach(function (el) {
     el.removeAttribute('readonly');
   });
-  fieldset.querySelectorAll('select').forEach(function (el) { el.disabled = false; });
+  fieldset.querySelectorAll('select, input[type=checkbox]').forEach(function (el) { el.disabled = false; });
   var flag = fieldset.querySelector('.unlock-flag');
   if (flag) { flag.value = '1'; }
   var icon = fieldset.querySelector('.lock-icon');
