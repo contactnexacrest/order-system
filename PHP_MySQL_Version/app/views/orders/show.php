@@ -1323,7 +1323,7 @@ foreach ($stages as $s) {
           <label>Colour Reference<input type="text" name="colour_reference" placeholder="e.g., Jet Black"></label>
           <label>Special Requirements/Instructions<input type="text" name="special_requirements" placeholder="e.g., Polished finish, edge chamfer"></label>
           <label>Unit Price (INR) <small class="muted">(auto-calculates Basic Value when multiplied by Quantity)</small><input type="text" name="unit_price_inr" data-spo-calc="unit_price_inr" placeholder="e.g., 450.00"></label>
-          <label>Basic Value (INR) <small class="muted">(auto: Unit Price &times; Quantity)</small><input type="text" name="basic_value_inr" data-spo-calc="basic_value_inr"></label>
+          <label>Basic Value (INR) <small class="muted">(auto: Unit Price &times; Quantity)</small><input type="text" name="basic_value_inr" data-spo-calc="basic_value_inr" placeholder="e.g., 225000.00"></label>
           <label>GST Rate (%)
             <select name="gst_rate_pct" data-spo-calc="gst_rate_pct">
               <option value="">—</option>
