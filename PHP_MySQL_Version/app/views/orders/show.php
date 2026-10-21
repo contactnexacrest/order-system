@@ -1268,26 +1268,29 @@ foreach ($stages as $s) {
           <summary>Add a new supplier</summary>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/suppliers">
             <?= Csrf::field() ?>
-            <label>Supplier Legal Name *<input type="text" name="supplier_legal_name" required></label>
-            <label>Address<input type="text" name="address"></label>
-            <label>GSTIN<input type="text" name="gstin"></label>
-            <label>PAN<input type="text" name="pan"></label>
-            <label>Contact Person<input type="text" name="contact_person"></label>
-            <label>Phone<input type="text" name="phone"></label>
-            <label>Supplier Type
-              <select name="supplier_type">
-                <option value="">—</option>
-                <?php foreach ($supplierTypes as $opt): ?>
-                  <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </label>
+            <div class="field-grid">
+              <label>Supplier Legal Name *<input type="text" name="supplier_legal_name" required></label>
+              <label>Address<input type="text" name="address"></label>
+              <label>GSTIN<input type="text" name="gstin"></label>
+              <label>PAN<input type="text" name="pan"></label>
+              <label>Contact Person<input type="text" name="contact_person"></label>
+              <label>Phone<input type="text" name="phone"></label>
+              <label>Supplier Type
+                <select name="supplier_type">
+                  <option value="">—</option>
+                  <?php foreach ($supplierTypes as $opt): ?>
+                    <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </label>
+            </div>
             <button type="submit" class="btn-sm">Add Supplier</button>
           </form>
         </details>
 
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po" id="supplier-po-form">
           <?= Csrf::field() ?>
+          <div class="field-grid">
           <label>Supplier *
             <select name="supplier_id" required>
               <option value="">Select supplier…</option>
@@ -1336,6 +1339,7 @@ foreach ($stages as $s) {
           <label>Delivery Location<input type="text" name="delivery_location" placeholder="e.g., Factory warehouse, Udaipur"></label>
           <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
           <label>Packing Requirement<input type="text" name="packing_requirement" placeholder="e.g., Wooden crates, export packing"></label>
+          </div>
           <?= $stepBadge('5a') ?><button type="submit" class="btn-sm">Save Supplier PO Terms</button>
         </form>
         <script>

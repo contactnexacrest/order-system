@@ -1154,26 +1154,29 @@
           <summary>Add a new supplier</summary>
           <form method="post" action="/orders/{{ order.id }}/suppliers">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Supplier Legal Name *<input type="text" name="supplier_legal_name" required></label>
-            <label>Address<input type="text" name="address"></label>
-            <label>GSTIN<input type="text" name="gstin"></label>
-            <label>PAN<input type="text" name="pan"></label>
-            <label>Contact Person<input type="text" name="contact_person"></label>
-            <label>Phone<input type="text" name="phone"></label>
-            <label>Supplier Type
-              <select name="supplier_type">
-                <option value="">—</option>
-                {% for opt in supplierTypes %}
-                  <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
-                {% endfor %}
-              </select>
-            </label>
+            <div class="field-grid">
+              <label>Supplier Legal Name *<input type="text" name="supplier_legal_name" required></label>
+              <label>Address<input type="text" name="address"></label>
+              <label>GSTIN<input type="text" name="gstin"></label>
+              <label>PAN<input type="text" name="pan"></label>
+              <label>Contact Person<input type="text" name="contact_person"></label>
+              <label>Phone<input type="text" name="phone"></label>
+              <label>Supplier Type
+                <select name="supplier_type">
+                  <option value="">—</option>
+                  {% for opt in supplierTypes %}
+                    <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
             <button type="submit" class="btn-sm">Add Supplier</button>
           </form>
         </details>
 
         <form method="post" action="/orders/{{ order.id }}/supplier-po" id="supplier-po-form">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <div class="field-grid">
           <label>Supplier *
             <select name="supplier_id" required>
               <option value="">Select supplier…</option>
@@ -1222,6 +1225,7 @@
           <label>Delivery Location<input type="text" name="delivery_location" placeholder="e.g., Factory warehouse, Udaipur"></label>
           <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
           <label>Packing Requirement<input type="text" name="packing_requirement" placeholder="e.g., Wooden crates, export packing"></label>
+          </div>
           {{ stepBadge('5a') | safe }}<button type="submit" class="btn-sm">Save Supplier PO Terms</button>
         </form>
         <script>

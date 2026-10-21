@@ -116,19 +116,21 @@
     <p class="muted">Made a payment on this order? Let us know the transaction details below — our team will verify it against our bank statement before updating your order.</p>
     <form method="post" action="/client/orders/{{ order.id }}/report-payment" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Which Payment? *
-        <select name="payment_type" required>
-          <option value="">Select…</option>
-          <option value="advance">Advance Payment</option>
-          <option value="balance">Balance Payment</option>
-          <option value="freight">Freight Payment</option>
-        </select>
-      </label>
-      <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required></label>
-      <label>Amount Paid<input type="text" name="amount" placeholder="e.g. 12500.00"></label>
-      <label>Date Paid<input type="date" name="payment_date"></label>
-      <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
-      <label>Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
+      <div class="field-grid">
+        <label>Which Payment? *
+          <select name="payment_type" required>
+            <option value="">Select…</option>
+            <option value="advance">Advance Payment</option>
+            <option value="balance">Balance Payment</option>
+            <option value="freight">Freight Payment</option>
+          </select>
+        </label>
+        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required></label>
+        <label>Amount Paid<input type="text" name="amount" placeholder="e.g. 12500.00"></label>
+        <label>Date Paid<input type="date" name="payment_date"></label>
+        <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label>Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
+      </div>
       <button type="submit">Submit Payment Details</button>
     </form>
 
