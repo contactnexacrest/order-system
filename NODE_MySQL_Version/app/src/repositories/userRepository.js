@@ -100,9 +100,14 @@ async function updateSignature(userId, signature) {
   await db.execute('UPDATE users SET email_signature = :signature WHERE id = :id', { signature, id: userId });
 }
 
+/** User-reported batch item 20 — the per-user "configurable option" opt-in/out for action-notification emails. */
+async function updateNotificationPreference(userId, enabled) {
+  await db.execute('UPDATE users SET email_action_notifications_enabled = :enabled WHERE id = :id', { enabled: enabled ? 1 : 0, id: userId });
+}
+
 module.exports = {
   findByEmail, findById, incrementFailedLogins, resetFailedLogins, lockUntil,
   updateLastLogin, updatePassword, flagPasswordExpired, setTwoFactor,
   listActive, listAllForAdmin, create, update, setActive, adminForceResetPassword,
-  updateSignature,
+  updateSignature, updateNotificationPreference,
 };

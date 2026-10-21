@@ -20,6 +20,14 @@ async function updateSignature(req, res) {
   res.redirect('/account');
 }
 
+/** User-reported batch item 20 — the per-user opt-in/out for action-notification emails. */
+async function updateNotificationPreference(req, res) {
+  const enabled = !!req.body.email_action_notifications_enabled;
+  await userRepository.updateNotificationPreference(req.user.id, enabled);
+  flash.set(req, 'success', 'Notification preference saved.');
+  res.redirect('/account');
+}
+
 /**
  * 90-item backlog #26: a voluntary, logged-in self-service password
  * change — previously the only ways a staff user's password could
@@ -58,4 +66,4 @@ async function updatePassword(req, res) {
   res.redirect('/account');
 }
 
-module.exports = { edit, updateSignature, updatePassword };
+module.exports = { edit, updateSignature, updateNotificationPreference, updatePassword };

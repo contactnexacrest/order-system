@@ -28,6 +28,16 @@ final class AccountController
         header('Location: /account');
     }
 
+    /** User-reported batch item 20 — the per-user opt-in/out for action-notification emails. */
+    public function updateNotificationPreference(array $params): void
+    {
+        $userId = (int) AuthService::currentUser()['id'];
+        $enabled = !empty($_POST['email_action_notifications_enabled']);
+        UserRepository::updateNotificationPreference($userId, $enabled);
+        Flash::set('success', 'Notification preference saved.');
+        header('Location: /account');
+    }
+
     /**
      * 90-item backlog #26: a voluntary, logged-in self-service password
      * change — previously the only ways a staff user's password could

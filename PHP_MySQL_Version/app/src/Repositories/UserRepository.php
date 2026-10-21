@@ -189,4 +189,12 @@ final class UserRepository
             'UPDATE users SET email_signature = :signature WHERE id = :id'
         )->execute(['signature' => $signature, 'id' => $userId]);
     }
+
+    /** User-reported batch item 20 — the per-user "configurable option" opt-in/out for action-notification emails. */
+    public static function updateNotificationPreference(int $userId, bool $enabled): void
+    {
+        Database::connection()->prepare(
+            'UPDATE users SET email_action_notifications_enabled = :enabled WHERE id = :id'
+        )->execute(['enabled' => $enabled ? 1 : 0, 'id' => $userId]);
+    }
 }

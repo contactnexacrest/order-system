@@ -96,7 +96,19 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   one for Zoho Mail if it's enabled — send one real email straight through
   that transport only, bypassing Test Mode, Mail Redirect, and each
   other's fallback, so a connection/credential problem shows up as an
-  actual error on screen instead of a silent log line. The three **RBI
+  actual error on screen instead of a silent log line. Also on this
+  screen, under its own **Notifications** category: **Notification
+  Email** — a catch-all address that receives one email for every
+  action logged anywhere in the system (an order field edited, a
+  document generated, a payment recorded, an approval, and so on —
+  anything that already appears in the audit trail). Leave it blank to
+  turn this off entirely; there is no per-action on/off switch, by
+  design. Separately, every staff member has their own **Email me when
+  I perform an action in the system** toggle on their own **My Account**
+  page (on by default) — this only controls whether *that person* also
+  gets a copy of *their own* actions; it never affects the Notification
+  Email address above, which always receives everything regardless of
+  anyone's personal preference. The three **RBI
   Purpose Code** fields (advance/balance/freight payment wires) are
   **dropdowns, not free text** — fed from the same `dropdown_options`
   admin list used elsewhere on this page (`list_key = 'rbi_purpose_code'`),

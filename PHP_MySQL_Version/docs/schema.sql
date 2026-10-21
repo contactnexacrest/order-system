@@ -3280,3 +3280,25 @@ ALTER TABLE pi_intake_submissions
 ALTER TABLE orders
   CHANGE COLUMN indicative_freight_low indicative_freight_amount DECIMAL(14,2) NULL,
   DROP COLUMN indicative_freight_high;
+
+-- ================================================================
+-- SECTION BK — ACTION NOTIFICATIONS (user-reported batch item 20)
+-- ================================================================
+-- "Admin/staff OR notification email must get notifications for all
+-- actions happening in system" — AuditLogRepository::log() is already
+-- the single choke point every meaningful state-changing action in this
+-- codebase funnels through (47+ call sites across every controller/
+-- service), so ActionNotificationService hooks in there rather than
+-- requiring a separate instrumentation pass per action. Sends to the
+-- configurable company_settings.notification_email catch-all (when
+-- set) on every audit-logged action, plus the acting user's own email
+-- when they've opted in via the new per-user toggle below (default on,
+-- matching the "configurable option" ask — a staff member can turn
+-- their own copy off; the catch-all notification_email is never
+-- opt-out-able, since the instruction was explicit: non-negotiable).
+-- Same Test-Mode exclusion AuditLogRepository::log() already applies
+-- (TestModeService::isTestEntity) — no notification noise from test
+-- orders/clients.
+-- ================================================================
+ALTER TABLE users
+  ADD COLUMN email_action_notifications_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER two_fa_method;

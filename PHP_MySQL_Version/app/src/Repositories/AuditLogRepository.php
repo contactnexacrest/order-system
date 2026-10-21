@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\ActionNotificationService;
 use App\Services\TestModeService;
 
 final class AuditLogRepository
@@ -43,6 +44,20 @@ final class AuditLogRepository
             'reason'      => $reason,
             'ip'          => $_SERVER['REMOTE_ADDR'] ?? null,
         ]);
+
+        // User-reported batch item 20 ("non-negotiable"): every action
+        // logged here also fires a notification email — see
+        // ActionNotificationService's own docblock for the full
+        // rationale. Wrapped so a notification failure (bad SMTP config,
+        // a transient DB hiccup reading company_settings/users) can
+        // never break the action this audit-log call is reporting on;
+        // ActionNotificationService::notify() itself also guards its own
+        // per-recipient sends.
+        try {
+            ActionNotificationService::notify($userId, $actionType, $entityType, $entityId, $fieldName, $oldValue, $newValue, $reason);
+        } catch (\Throwable $e) {
+            // Intentionally swallowed — see comment above.
+        }
     }
 
     /**

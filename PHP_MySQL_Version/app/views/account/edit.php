@@ -14,6 +14,16 @@
   </div>
 
   <div class="section">
+    <h2>Notifications</h2>
+    <p class="muted">The system emails a notification for every action logged against orders, clients, documents, payments, and more. This controls whether you personally receive a copy of your own actions — a separate, always-on notification address can also be configured by an admin (Settings &gt; Notifications).</p>
+    <form method="post" action="/account/notifications">
+      <?= Csrf::field() ?>
+      <label><input type="checkbox" name="email_action_notifications_enabled" value="1" <?= !empty($user['email_action_notifications_enabled']) ? 'checked' : '' ?>> Email me when I perform an action in the system</label>
+      <button type="submit" class="btn-sm btn-accent">Save Notification Preference</button>
+    </form>
+  </div>
+
+  <div class="section">
     <h2>Change Password</h2>
     <form method="post" action="/account/password">
       <?= Csrf::field() ?>

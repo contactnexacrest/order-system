@@ -2,6 +2,7 @@
 
 const db = require('../config/db');
 const testModeService = require('../services/testModeService');
+const actionNotificationService = require('../services/actionNotificationService');
 
 // Port of App\Repositories\AuditLogRepository. Read-only viewer by design —
 // no function here ever updates or deletes a row.
@@ -25,6 +26,19 @@ async function log(userId, actionType, entityType = null, entityId = null, field
       field_name: fieldName, old_value: oldValue, new_value: newValue, reason, ip: ipAddress,
     }
   );
+
+  // User-reported batch item 20 ("non-negotiable"): every action logged
+  // here also fires a notification email — see actionNotificationService's
+  // own docblock for the full rationale. Wrapped so a notification
+  // failure (bad SMTP config, a transient DB hiccup reading
+  // company_settings/users) can never break the action this audit-log
+  // call is reporting on; actionNotificationService.notify() itself also
+  // guards its own per-recipient sends.
+  try {
+    await actionNotificationService.notify(userId, actionType, entityType, entityId, fieldName, oldValue, newValue, reason);
+  } catch (e) {
+    // Intentionally swallowed — see comment above.
+  }
 }
 
 async function search({ entityType = null, entityId = null, userId = null, actionType = null, dateFrom = null, dateTo = null, limit = 100, offset = 0 } = {}) {
