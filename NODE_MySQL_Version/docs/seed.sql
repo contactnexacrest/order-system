@@ -149,8 +149,8 @@ INSERT INTO currencies (code, name, is_default, is_active) VALUES
 -- seeded with an example here — it's buyer-specific, entered per client/
 -- order, and per your standing instruction not to bake a particular
 -- destination region into the system as a default.
-INSERT INTO ports (name, country, port_role, is_default, is_active, sort_order) VALUES
-  ('Chennai, India', 'India', 'loading', 1, 1, 1);
+INSERT INTO ports (name, city, country, port_role, is_default, is_active, sort_order) VALUES
+  ('Chennai, India', 'Chennai', 'India', 'loading', 1, 1, 1);
 
 INSERT INTO incoterms (code, label_template, requires_port_role, is_default, is_active, sort_order) VALUES
   ('FOB', '{code} {port} — Incoterms® 2020', 'loading',    1, 1, 1),

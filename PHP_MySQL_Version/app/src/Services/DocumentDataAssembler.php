@@ -64,7 +64,14 @@ final class DocumentDataAssembler
         $balanceAmount = round($fobValue - $advanceAmount, 2);
 
         $isFob = strtoupper($order['incoterm_code']) === 'FOB';
-        $portOfDischarge = $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed';
+        // 90-item backlog "ports city field": Incoterms convention prints
+        // the CITY alone (e.g. "FOB Mumbai"), never the formal terminal
+        // name (e.g. "FOB Nhava Sheva (JNPT)") — ports.city now carries
+        // that, falling back to the port's own `name` (and, for a free-
+        // text discharge port never matched to a real ports row,
+        // port_of_discharge_text) for any older/incomplete port row.
+        $portOfLoading = $order['port_of_loading_city'] ?? $order['port_of_loading_name'] ?? 'Chennai';
+        $portOfDischarge = $order['port_of_discharge_city'] ?? $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed';
 
         // Cross-document references: PI cites the QT ref, OC cites the PI
         // ref. Looked up from documents already generated for this order —
@@ -105,9 +112,9 @@ final class DocumentDataAssembler
                 // first-ever CIF sample order): this always named the loading
                 // port, so a CIF document's own header read "CIF Chennai, India"
                 // (the seller's own port) instead of the buyer's discharge port.
-                'incoterm_label'       => $order['incoterm_code'] . ' ' . ($isFob ? ($order['port_of_loading_name'] ?? 'Chennai, India') : $portOfDischarge) . ' — Incoterms® 2020',
+                'incoterm_label'       => $order['incoterm_code'] . ' ' . ($isFob ? $portOfLoading : $portOfDischarge) . ' — Incoterms® 2020',
                 'is_fob'               => $isFob,
-                'port_of_loading'      => $order['port_of_loading_name'] ?? 'Chennai, India',
+                'port_of_loading'      => $portOfLoading,
                 'port_of_discharge'    => $portOfDischarge,
                 'container_type'       => $order['container_type'] ?? 'To Be Confirmed',
                 'est_lead_time_text'   => $order['est_lead_time_text'] ?? 'To Be Confirmed',

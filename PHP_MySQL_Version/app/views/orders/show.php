@@ -266,7 +266,7 @@ foreach ($stages as $s) {
   <p class="muted">
     <?= htmlspecialchars($order['company_legal_name']) ?> &nbsp;·&nbsp;
     Buyer Inquiry Ref: <?= htmlspecialchars($order['buyer_inquiry_ref']) ?> &nbsp;·&nbsp;
-    <?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '') ?>
+    <?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_city'] ?? $order['port_of_loading_name'] ?? '') ?>
     <?php if ($canViewReports): ?>&nbsp;·&nbsp; <a href="/reports/order/<?= (int) $order['id'] ?>">Full Report</a><?php endif; ?>
     <?php if ($canManageOrders): ?>&nbsp;·&nbsp; <a href="/orders/<?= (int) $order['id'] ?>/edit">Edit Order Details</a><?php endif; ?>
   </p>

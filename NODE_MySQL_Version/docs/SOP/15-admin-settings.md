@@ -179,7 +179,16 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   the flag from every port that would otherwise appear alongside it in
   that same dropdown. A port already used on a real order is never
   deleted outright — deactivate it instead, same convention as every
-  other admin-editable list on this page.
+  other admin-editable list on this page. 90-item backlog "ports city
+  field": each port also carries an optional **City** — Incoterms® 2020
+  labels print the city alone (e.g. "FOB Mumbai"), never the formal
+  terminal/port name that's entered above it (e.g. "Nhava Sheva (JNPT)"),
+  so generated documents' Incoterm label and port-of-loading/discharge
+  fields read the City when one is on file, falling back to the port's
+  own name when it isn't. The plain "Port of Loading"/"Port of Discharge"
+  informational fields on the Order Detail page and the Bill of Lading's
+  own endorsement defaults are unaffected — those conventionally show the
+  specific terminal name, not the city.
 - **Payment Presets** (`/payment-presets`) — full CRUD for the advance/
   balance split every order picks up, gated by its own
   `manage_payment_presets` permission (same tier as Logistics Partners:

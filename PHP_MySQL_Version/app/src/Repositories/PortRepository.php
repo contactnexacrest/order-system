@@ -36,21 +36,21 @@ final class PortRepository
         return $stmt->fetch() ?: null;
     }
 
-    public static function create(string $name, ?string $country, string $portRole, int $sortOrder): int
+    public static function create(string $name, ?string $city, ?string $country, string $portRole, int $sortOrder): int
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
-            'INSERT INTO ports (name, country, port_role, is_default, is_active, sort_order) VALUES (:name, :country, :role, 0, 1, :sort_order)'
+            'INSERT INTO ports (name, city, country, port_role, is_default, is_active, sort_order) VALUES (:name, :city, :country, :role, 0, 1, :sort_order)'
         );
-        $stmt->execute(['name' => $name, 'country' => $country, 'role' => $portRole, 'sort_order' => $sortOrder]);
+        $stmt->execute(['name' => $name, 'city' => $city, 'country' => $country, 'role' => $portRole, 'sort_order' => $sortOrder]);
         return (int) $pdo->lastInsertId();
     }
 
-    public static function update(int $id, string $name, ?string $country, string $portRole, int $sortOrder): void
+    public static function update(int $id, string $name, ?string $city, ?string $country, string $portRole, int $sortOrder): void
     {
         Database::connection()->prepare(
-            'UPDATE ports SET name = :name, country = :country, port_role = :role, sort_order = :sort_order WHERE id = :id'
-        )->execute(['name' => $name, 'country' => $country, 'role' => $portRole, 'sort_order' => $sortOrder, 'id' => $id]);
+            'UPDATE ports SET name = :name, city = :city, country = :country, port_role = :role, sort_order = :sort_order WHERE id = :id'
+        )->execute(['name' => $name, 'city' => $city, 'country' => $country, 'role' => $portRole, 'sort_order' => $sortOrder, 'id' => $id]);
     }
 
     public static function toggleActive(int $id): void

@@ -34,7 +34,14 @@ function collectFormData(req) {
     return { error: 'Select a valid role (Loading, Discharge, or both).' };
   }
 
-  return { data: { name, country: String(req.body.country || '').trim() || null, port_role: portRole } };
+  return {
+    data: {
+      name,
+      city: String(req.body.city || '').trim() || null,
+      country: String(req.body.country || '').trim() || null,
+      port_role: portRole,
+    },
+  };
 }
 
 async function create(req, res) {
@@ -47,7 +54,7 @@ async function create(req, res) {
 
   const existing = await portRepository.all(true);
   const nextSortOrder = existing.length > 0 ? Math.max(...existing.map((p) => p.sort_order)) + 1 : 1;
-  const id = await portRepository.create(result.data.name, result.data.country, result.data.port_role, nextSortOrder);
+  const id = await portRepository.create(result.data.name, result.data.city, result.data.country, result.data.port_role, nextSortOrder);
   await auditLogRepository.log(req.user.id, 'PORT_ADDED', 'ports', id, null, null, `${result.data.name} (${result.data.port_role})`);
   flash.set(req, 'success', `"${result.data.name}" added to the ports list.`);
   res.redirect('/ports');
@@ -78,7 +85,7 @@ async function update(req, res) {
     return;
   }
 
-  await portRepository.update(id, result.data.name, result.data.country, result.data.port_role, port.sort_order);
+  await portRepository.update(id, result.data.name, result.data.city, result.data.country, result.data.port_role, port.sort_order);
   await auditLogRepository.log(req.user.id, 'PORT_UPDATED', 'ports', id, 'name', port.name, result.data.name);
   flash.set(req, 'success', `"${result.data.name}" updated.`);
   res.redirect('/ports');

@@ -61,7 +61,14 @@ CREATE TABLE company_settings (
 
 CREATE TABLE ports (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name          VARCHAR(150) NOT NULL,
+  name          VARCHAR(150) NOT NULL,         -- the specific terminal/port name, e.g. "Nhava Sheva (JNPT)"
+  city          VARCHAR(100) NULL,             -- 90-item backlog "ports city field": the city alone, e.g.
+                                                -- "Mumbai" — Incoterms convention prints the CITY
+                                                -- ("FOB Mumbai"), not the formal terminal name, so this is
+                                                -- what DocumentDataAssembler's incoterm_label/port_of_loading/
+                                                -- port_of_discharge now read, falling back to `name` when a
+                                                -- port has none (so an older row with no city filled in yet
+                                                -- renders identically to before this column existed).
   country       VARCHAR(100) NULL,
   port_role     ENUM('loading','discharge','both') NOT NULL DEFAULT 'both',
   is_default    TINYINT(1) NOT NULL DEFAULT 0,

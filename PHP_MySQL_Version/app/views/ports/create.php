@@ -8,6 +8,9 @@
       <label>Port Name *
         <input type="text" name="name" placeholder="e.g., Nhava Sheva (JNPT)" required>
       </label>
+      <label>City <small class="muted">(printed on Incoterms labels, e.g. "FOB Mumbai" — not the terminal name above)</small>
+        <input type="text" name="city" placeholder="e.g., Mumbai">
+      </label>
       <label>Country
         <input type="text" name="country" placeholder="e.g., India">
       </label>

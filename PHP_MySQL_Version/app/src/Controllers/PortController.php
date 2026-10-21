@@ -43,7 +43,7 @@ final class PortController
         $user = AuthService::currentUser();
         $existing = PortRepository::all(true);
         $nextSortOrder = count($existing) > 0 ? max(array_column($existing, 'sort_order')) + 1 : 1;
-        $id = PortRepository::create($data['name'], $data['country'], $data['port_role'], $nextSortOrder);
+        $id = PortRepository::create($data['name'], $data['city'], $data['country'], $data['port_role'], $nextSortOrder);
         AuditLogRepository::log((int) $user['id'], 'PORT_ADDED', 'ports', $id, null, null, "{$data['name']} ({$data['port_role']})");
         Flash::set('success', "\"{$data['name']}\" added to the ports list.");
         header('Location: /ports');
@@ -78,7 +78,7 @@ final class PortController
         }
 
         $user = AuthService::currentUser();
-        PortRepository::update($id, $data['name'], $data['country'], $data['port_role'], (int) $port['sort_order']);
+        PortRepository::update($id, $data['name'], $data['city'], $data['country'], $data['port_role'], (int) $port['sort_order']);
         AuditLogRepository::log((int) $user['id'], 'PORT_UPDATED', 'ports', $id, 'name', $port['name'], $data['name']);
         Flash::set('success', "\"{$data['name']}\" updated.");
         header('Location: /ports');
@@ -119,7 +119,7 @@ final class PortController
         header('Location: /ports');
     }
 
-    /** @return array{name:string,country:?string,port_role:string}|null null if validation failed (flash already set) */
+    /** @return array{name:string,city:?string,country:?string,port_role:string}|null null if validation failed (flash already set) */
     private function collectFormData(): ?array
     {
         $name = trim((string) ($_POST['name'] ?? ''));
@@ -136,6 +136,7 @@ final class PortController
 
         return [
             'name'      => $name,
+            'city'      => trim((string) ($_POST['city'] ?? '')) ?: null,
             'country'   => trim((string) ($_POST['country'] ?? '')) ?: null,
             'port_role' => $portRole,
         ];

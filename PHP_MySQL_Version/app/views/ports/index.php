@@ -7,13 +7,14 @@
     <div class="btn-row"><a href="/ports/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Port</a></div>
 
     <table class="list">
-      <tr><th>Name</th><th>Country</th><th>Role</th><th>Default</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Name</th><th>City</th><th>Country</th><th>Role</th><th>Default</th><th>Status</th><th>Actions</th></tr>
       <?php if (empty($ports)): ?>
-      <tr><td colspan="6" class="muted">No ports yet — add the first one above.</td></tr>
+      <tr><td colspan="7" class="muted">No ports yet — add the first one above.</td></tr>
       <?php endif; ?>
       <?php foreach ($ports as $p): ?>
       <tr>
         <td><?= htmlspecialchars($p['name']) ?></td>
+        <td><?= $p['city'] ? htmlspecialchars($p['city']) : '—' ?></td>
         <td><?= $p['country'] ? htmlspecialchars($p['country']) : '—' ?></td>
         <td><?= htmlspecialchars($roles[$p['port_role']] ?? $p['port_role']) ?></td>
         <td>

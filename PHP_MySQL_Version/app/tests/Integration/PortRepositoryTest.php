@@ -24,12 +24,13 @@ final class PortRepositoryTest extends DbTestCase
 {
     public function testCreateThenFindReturnsAllFields(): void
     {
-        $id = PortRepository::create('PHPUnit Test Port', 'Testland', 'discharge', 5);
+        $id = PortRepository::create('PHPUnit Test Port', 'Testville', 'Testland', 'discharge', 5);
 
         $row = PortRepository::find($id);
 
         self::assertNotNull($row);
         self::assertSame('PHPUnit Test Port', $row['name']);
+        self::assertSame('Testville', $row['city']);
         self::assertSame('Testland', $row['country']);
         self::assertSame('discharge', $row['port_role']);
         self::assertSame(5, (int) $row['sort_order']);
@@ -39,19 +40,34 @@ final class PortRepositoryTest extends DbTestCase
 
     public function testCountryIsOptional(): void
     {
-        $id = PortRepository::create('PHPUnit No-Country Port', null, 'loading', 1);
+        $id = PortRepository::create('PHPUnit No-Country Port', null, null, 'loading', 1);
 
         self::assertNull(PortRepository::find($id)['country']);
     }
 
+    /**
+     * 90-item backlog "ports city field": city is independent of
+     * country/name — a port can have one without the other, and it
+     * must never be confused with either in storage.
+     */
+    public function testCityIsOptionalAndIndependentOfCountry(): void
+    {
+        $id = PortRepository::create('PHPUnit No-City Port', null, 'Testland', 'loading', 1);
+
+        $row = PortRepository::find($id);
+        self::assertNull($row['city']);
+        self::assertSame('Testland', $row['country']);
+    }
+
     public function testUpdateOverwritesFields(): void
     {
-        $id = PortRepository::create('PHPUnit Original Port', 'Testland', 'loading', 1);
+        $id = PortRepository::create('PHPUnit Original Port', 'Oldville', 'Testland', 'loading', 1);
 
-        PortRepository::update($id, 'PHPUnit Renamed Port', 'Newland', 'both', 2);
+        PortRepository::update($id, 'PHPUnit Renamed Port', 'Newville', 'Newland', 'both', 2);
 
         $row = PortRepository::find($id);
         self::assertSame('PHPUnit Renamed Port', $row['name']);
+        self::assertSame('Newville', $row['city']);
         self::assertSame('Newland', $row['country']);
         self::assertSame('both', $row['port_role']);
         self::assertSame(2, (int) $row['sort_order']);
@@ -59,7 +75,7 @@ final class PortRepositoryTest extends DbTestCase
 
     public function testToggleActiveFlipsBothWays(): void
     {
-        $id = PortRepository::create('PHPUnit Toggle Port', null, 'discharge', 1);
+        $id = PortRepository::create('PHPUnit Toggle Port', null, null, 'discharge', 1);
         self::assertSame(1, (int) PortRepository::find($id)['is_active']);
 
         PortRepository::toggleActive($id);
@@ -71,8 +87,8 @@ final class PortRepositoryTest extends DbTestCase
 
     public function testAllExcludesInactiveByDefaultButIncludesOnRequest(): void
     {
-        $activeId = PortRepository::create('PHPUnit Active Port', null, 'discharge', 1);
-        $inactiveId = PortRepository::create('PHPUnit Inactive Port', null, 'discharge', 2);
+        $activeId = PortRepository::create('PHPUnit Active Port', null, null, 'discharge', 1);
+        $inactiveId = PortRepository::create('PHPUnit Inactive Port', null, null, 'discharge', 2);
         PortRepository::toggleActive($inactiveId);
 
         $activeOnly = array_column(PortRepository::all(false), 'id');
@@ -86,10 +102,10 @@ final class PortRepositoryTest extends DbTestCase
 
     public function testSetDefaultOnALoadingPortClearsOtherLoadingAndBothPortsOnly(): void
     {
-        $loadingA = PortRepository::create('PHPUnit Loading A', null, 'loading', 1);
-        $loadingB = PortRepository::create('PHPUnit Loading B', null, 'loading', 2);
-        $bothPort = PortRepository::create('PHPUnit Both Port', null, 'both', 3);
-        $dischargeOnly = PortRepository::create('PHPUnit Discharge Only', null, 'discharge', 4);
+        $loadingA = PortRepository::create('PHPUnit Loading A', null, null, 'loading', 1);
+        $loadingB = PortRepository::create('PHPUnit Loading B', null, null, 'loading', 2);
+        $bothPort = PortRepository::create('PHPUnit Both Port', null, null, 'both', 3);
+        $dischargeOnly = PortRepository::create('PHPUnit Discharge Only', null, null, 'discharge', 4);
         PortRepository::setDefault($loadingA);
         PortRepository::setDefault($bothPort);
         // $bothPort being default cleared $loadingA's flag too (it appears in
@@ -106,9 +122,9 @@ final class PortRepositoryTest extends DbTestCase
 
     public function testSetDefaultOnABothRolePortClearsEveryOtherPort(): void
     {
-        $loading = PortRepository::create('PHPUnit Loading X', null, 'loading', 1);
-        $discharge = PortRepository::create('PHPUnit Discharge X', null, 'discharge', 2);
-        $bothPort = PortRepository::create('PHPUnit Both X', null, 'both', 3);
+        $loading = PortRepository::create('PHPUnit Loading X', null, null, 'loading', 1);
+        $discharge = PortRepository::create('PHPUnit Discharge X', null, null, 'discharge', 2);
+        $bothPort = PortRepository::create('PHPUnit Both X', null, null, 'both', 3);
         PortRepository::setDefault($loading);
         PortRepository::setDefault($discharge);
 

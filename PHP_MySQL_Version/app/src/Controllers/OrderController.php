@@ -193,7 +193,19 @@ final class OrderController
         // the buyer actually asked for — otherwise Incoterm/container type
         // silently default away from what was requested (e.g. Incoterm
         // defaulting to FOB when the buyer's intake said CIF).
-        if ($old === [] && $preselectedClientId) {
+        //
+        // 90-item backlog "feedback-loop fix": the guard above only checked
+        // "no validation-retry data yet", so this kept firing on EVERY
+        // later New Order form for the same client too — a second, third,
+        // Nth order all silently re-prefilled from that client's very
+        // first intake, feeding the same stale commercial terms back in
+        // indefinitely even once the buyer's actual preference had moved
+        // on. Added `$clientHasNoOrdersYet` so this only ever applies to
+        // the client's genuinely first order, immediately following
+        // conversion — once they have any order on record, staff type
+        // this order's own terms instead of inheriting an aging intake.
+        $clientHasNoOrdersYet = $preselectedClientId && empty(OrderRepository::forClient($preselectedClientId));
+        if ($old === [] && $preselectedClientId && $clientHasNoOrdersYet) {
             $intake = ClientIntakeRepository::latestConvertedForClient($preselectedClientId);
             if ($intake) {
                 if ($intake['incoterm_preference']) {

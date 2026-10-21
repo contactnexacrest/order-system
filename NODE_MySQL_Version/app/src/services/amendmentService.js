@@ -55,7 +55,11 @@ async function createRequest(
   const balancePct = parseFloat(order.balance_pct);
   const advanceAmount = Math.round((fobValue * advancePct) / 100 * 100) / 100;
   const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
-  const portOfDischarge = order.port_of_discharge_name || order.port_of_discharge_text || 'To Be Confirmed';
+  // 90-item backlog "ports city field": same fix as
+  // documentDataAssembler — Incoterms convention prints the CITY alone,
+  // never the formal terminal name.
+  const portOfLoading = order.port_of_loading_city || order.port_of_loading_name || 'Chennai';
+  const portOfDischarge = order.port_of_discharge_city || order.port_of_discharge_name || order.port_of_discharge_text || 'To Be Confirmed';
 
   const qtDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'QT');
   const piDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
@@ -80,10 +84,10 @@ async function createRequest(
     balance_amount: formatMoney(fobValue - advanceAmount),
     freight_terms: order.incoterm_code,
     currency: order.currency_code,
-    port_of_loading: order.port_of_loading_name || 'Chennai, India',
+    port_of_loading: portOfLoading,
     // Incoterms® 2020: FOB names the port of LOADING; CFR/CIF name the port
     // of DISCHARGE — same bug/fix as documentDataAssembler.js.
-    incoterm_label: `${order.incoterm_code} ${isFob ? (order.port_of_loading_name || 'Chennai, India') : portOfDischarge} — Incoterms® 2020`,
+    incoterm_label: `${order.incoterm_code} ${isFob ? portOfLoading : portOfDischarge} — Incoterms® 2020`,
     lut_number: await companySettingsRepository.get('lut_number'),
     gstin: await companySettingsRepository.get('gstin'),
     iec_pan: await companySettingsRepository.get('iec_pan'),

@@ -75,6 +75,7 @@ async function find(id) {
             sm.stage_number AS current_stage_number,
             i.code AS incoterm_code, cur.code AS currency_code,
             pl.name AS port_of_loading_name, pd.name AS port_of_discharge_name,
+            pl.city AS port_of_loading_city, pd.city AS port_of_discharge_city,
             pp.preset_name, pp.advance_trigger_text, pp.requires_md_approval,
             pp.balance_trigger_wording, pp.show_bl_instructions,
             COALESCE(o.advance_pct_override, pp.advance_pct) AS advance_pct,

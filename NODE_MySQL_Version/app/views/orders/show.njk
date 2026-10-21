@@ -189,7 +189,7 @@
   <p class="muted">
     {{ order.company_legal_name }} &nbsp;&middot;&nbsp;
     Buyer Inquiry Ref: {{ order.buyer_inquiry_ref }} &nbsp;&middot;&nbsp;
-    {{ order.incoterm_code }} {{ order.port_of_loading_name or '' }}
+    {{ order.incoterm_code }} {{ order.port_of_loading_city or order.port_of_loading_name or '' }}
     {% if permissions.view_reports %}&nbsp;&middot;&nbsp; <a href="/reports/order/{{ order.id }}">Full Report</a>{% endif %}
     {% if permissions.manage_orders %}&nbsp;&middot;&nbsp; <a href="/orders/{{ order.id }}/edit">Edit Order Details</a>{% endif %}
   </p>

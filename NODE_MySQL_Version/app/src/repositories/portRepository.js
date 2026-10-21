@@ -25,18 +25,18 @@ async function find(id) {
   return db.queryOne('SELECT * FROM ports WHERE id = :id', { id });
 }
 
-async function create(name, country, portRole, sortOrder) {
+async function create(name, city, country, portRole, sortOrder) {
   const result = await db.execute(
-    'INSERT INTO ports (name, country, port_role, is_default, is_active, sort_order) VALUES (:name, :country, :role, 0, 1, :sort_order)',
-    { name, country, role: portRole, sort_order: sortOrder }
+    'INSERT INTO ports (name, city, country, port_role, is_default, is_active, sort_order) VALUES (:name, :city, :country, :role, 0, 1, :sort_order)',
+    { name, city, country, role: portRole, sort_order: sortOrder }
   );
   return result.insertId;
 }
 
-async function update(id, name, country, portRole, sortOrder) {
+async function update(id, name, city, country, portRole, sortOrder) {
   await db.execute(
-    'UPDATE ports SET name = :name, country = :country, port_role = :role, sort_order = :sort_order WHERE id = :id',
-    { name, country, role: portRole, sort_order: sortOrder, id }
+    'UPDATE ports SET name = :name, city = :city, country = :country, port_role = :role, sort_order = :sort_order WHERE id = :id',
+    { name, city, country, role: portRole, sort_order: sortOrder, id }
   );
 }
 

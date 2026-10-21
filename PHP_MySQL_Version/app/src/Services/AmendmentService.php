@@ -49,7 +49,11 @@ final class AmendmentService
         $balancePct = (float) $order['balance_pct'];
         $advanceAmount = round($fobValue * $advancePct / 100, 2);
         $isFob = strtoupper((string) $order['incoterm_code']) === 'FOB';
-        $portOfDischarge = $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed';
+        // 90-item backlog "ports city field": same fix as
+        // DocumentDataAssembler — Incoterms convention prints the CITY
+        // alone, never the formal terminal name.
+        $portOfLoading = $order['port_of_loading_city'] ?? $order['port_of_loading_name'] ?? 'Chennai';
+        $portOfDischarge = $order['port_of_discharge_city'] ?? $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed';
 
         $qtDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'QT');
         $piDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
@@ -75,10 +79,10 @@ final class AmendmentService
             'balance_amount'      => number_format($fobValue - $advanceAmount, 2),
             'freight_terms'       => $order['incoterm_code'],
             'currency'            => $order['currency_code'],
-            'port_of_loading'     => $order['port_of_loading_name'] ?? 'Chennai, India',
+            'port_of_loading'     => $portOfLoading,
             // Incoterms® 2020: FOB names the port of LOADING; CFR/CIF name the
             // port of DISCHARGE — same bug/fix as DocumentDataAssembler.
-            'incoterm_label'      => $order['incoterm_code'] . ' ' . ($isFob ? ($order['port_of_loading_name'] ?? 'Chennai, India') : $portOfDischarge) . ' — Incoterms® 2020',
+            'incoterm_label'      => $order['incoterm_code'] . ' ' . ($isFob ? $portOfLoading : $portOfDischarge) . ' — Incoterms® 2020',
             'lut_number'          => CompanySettingsRepository::get('lut_number'),
             'gstin'               => CompanySettingsRepository::get('gstin'),
             'iec_pan'             => CompanySettingsRepository::get('iec_pan'),

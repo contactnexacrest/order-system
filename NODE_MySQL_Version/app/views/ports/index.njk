@@ -6,13 +6,14 @@
     <div class="btn-row"><a href="/ports/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Port</a></div>
 
     <table class="list">
-      <tr><th>Name</th><th>Country</th><th>Role</th><th>Default</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Name</th><th>City</th><th>Country</th><th>Role</th><th>Default</th><th>Status</th><th>Actions</th></tr>
       {% if ports.length == 0 %}
-      <tr><td colspan="6" class="muted">No ports yet — add the first one above.</td></tr>
+      <tr><td colspan="7" class="muted">No ports yet — add the first one above.</td></tr>
       {% endif %}
       {% for p in ports %}
       <tr>
         <td>{{ p.name }}</td>
+        <td>{{ p.city or '—' }}</td>
         <td>{{ p.country or '—' }}</td>
         <td>{{ roles[p.port_role] or p.port_role }}</td>
         <td>

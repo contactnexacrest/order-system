@@ -22,12 +22,13 @@ describe('PortRepository (90-item backlog #59)', () => {
   });
 
   it('create then find returns all fields', async () => {
-    const id = await portRepository.create('Jest Test Port', 'Testland', 'discharge', 5);
+    const id = await portRepository.create('Jest Test Port', 'Testville', 'Testland', 'discharge', 5);
 
     const row = await portRepository.find(id);
 
     expect(row).not.toBeNull();
     expect(row.name).toBe('Jest Test Port');
+    expect(row.city).toBe('Testville');
     expect(row.country).toBe('Testland');
     expect(row.port_role).toBe('discharge');
     expect(row.sort_order).toBe(5);
@@ -36,25 +37,37 @@ describe('PortRepository (90-item backlog #59)', () => {
   });
 
   it('country is optional', async () => {
-    const id = await portRepository.create('Jest No-Country Port', null, 'loading', 1);
+    const id = await portRepository.create('Jest No-Country Port', null, null, 'loading', 1);
 
     expect((await portRepository.find(id)).country).toBeNull();
   });
 
-  it('update overwrites fields', async () => {
-    const id = await portRepository.create('Jest Original Port', 'Testland', 'loading', 1);
+  // 90-item backlog "ports city field": city is independent of country/
+  // name — a port can have one without the other, and it must never be
+  // confused with either in storage.
+  it('city is optional and independent of country', async () => {
+    const id = await portRepository.create('Jest No-City Port', null, 'Testland', 'loading', 1);
 
-    await portRepository.update(id, 'Jest Renamed Port', 'Newland', 'both', 2);
+    const row = await portRepository.find(id);
+    expect(row.city).toBeNull();
+    expect(row.country).toBe('Testland');
+  });
+
+  it('update overwrites fields', async () => {
+    const id = await portRepository.create('Jest Original Port', 'Oldville', 'Testland', 'loading', 1);
+
+    await portRepository.update(id, 'Jest Renamed Port', 'Newville', 'Newland', 'both', 2);
 
     const row = await portRepository.find(id);
     expect(row.name).toBe('Jest Renamed Port');
+    expect(row.city).toBe('Newville');
     expect(row.country).toBe('Newland');
     expect(row.port_role).toBe('both');
     expect(row.sort_order).toBe(2);
   });
 
   it('toggleActive flips both ways', async () => {
-    const id = await portRepository.create('Jest Toggle Port', null, 'discharge', 1);
+    const id = await portRepository.create('Jest Toggle Port', null, null, 'discharge', 1);
     expect((await portRepository.find(id)).is_active).toBe(1);
 
     await portRepository.toggleActive(id);
@@ -65,8 +78,8 @@ describe('PortRepository (90-item backlog #59)', () => {
   });
 
   it('all() excludes inactive by default but includes on request', async () => {
-    const activeId = await portRepository.create('Jest Active Port', null, 'discharge', 1);
-    const inactiveId = await portRepository.create('Jest Inactive Port', null, 'discharge', 2);
+    const activeId = await portRepository.create('Jest Active Port', null, null, 'discharge', 1);
+    const inactiveId = await portRepository.create('Jest Inactive Port', null, null, 'discharge', 2);
     await portRepository.toggleActive(inactiveId);
 
     const activeOnly = (await portRepository.all(false)).map((p) => p.id);
@@ -79,10 +92,10 @@ describe('PortRepository (90-item backlog #59)', () => {
   });
 
   it('setDefault on a loading port clears other loading and both ports only', async () => {
-    const loadingA = await portRepository.create('Jest Loading A', null, 'loading', 1);
-    const loadingB = await portRepository.create('Jest Loading B', null, 'loading', 2);
-    const bothPort = await portRepository.create('Jest Both Port', null, 'both', 3);
-    const dischargeOnly = await portRepository.create('Jest Discharge Only', null, 'discharge', 4);
+    const loadingA = await portRepository.create('Jest Loading A', null, null, 'loading', 1);
+    const loadingB = await portRepository.create('Jest Loading B', null, null, 'loading', 2);
+    const bothPort = await portRepository.create('Jest Both Port', null, null, 'both', 3);
+    const dischargeOnly = await portRepository.create('Jest Discharge Only', null, null, 'discharge', 4);
     await portRepository.setDefault(loadingA);
     await portRepository.setDefault(bothPort);
     // bothPort being default cleared loadingA's flag too (it appears in the
@@ -98,9 +111,9 @@ describe('PortRepository (90-item backlog #59)', () => {
   });
 
   it("setDefault on a both-role port clears every other port", async () => {
-    const loading = await portRepository.create('Jest Loading X', null, 'loading', 1);
-    const discharge = await portRepository.create('Jest Discharge X', null, 'discharge', 2);
-    const bothPort = await portRepository.create('Jest Both X', null, 'both', 3);
+    const loading = await portRepository.create('Jest Loading X', null, null, 'loading', 1);
+    const discharge = await portRepository.create('Jest Discharge X', null, null, 'discharge', 2);
+    const bothPort = await portRepository.create('Jest Both X', null, null, 'both', 3);
     await portRepository.setDefault(loading);
     await portRepository.setDefault(discharge);
 
