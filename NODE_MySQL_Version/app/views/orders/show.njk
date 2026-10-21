@@ -1470,6 +1470,15 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <div class="kv-grid">
           <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="{{ packing.actual_quantity_packed or '' }}"></label>
+          <label>Actual Quantity Unit
+            {% set packingUnit = packing.actual_quantity_unit or (orderedQuantitySummary.comparable and orderedQuantitySummary.unit) or '' %}
+            <select name="actual_quantity_unit">
+              <option value="">— Select —</option>
+              {% for u in units %}
+                <option value="{{ u.option_value }}" {% if packingUnit == u.option_value %}selected{% endif %}>{{ u.option_value }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label>Crate Count<input type="text" name="crate_count" value="{{ packing.crate_count or '' }}"></label>
           <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="{{ packing.total_net_weight_kg or '' }}"></label>
           <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="{{ packing.total_gross_weight_kg or '' }}"></label>

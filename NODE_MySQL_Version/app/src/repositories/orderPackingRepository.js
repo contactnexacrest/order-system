@@ -5,11 +5,12 @@ const db = require('../config/db');
 async function upsert(orderId, data) {
   await db.execute(
     `INSERT INTO order_packing
-        (order_id, actual_quantity_packed, crate_count, total_net_weight_kg, total_gross_weight_kg,
+        (order_id, actual_quantity_packed, actual_quantity_unit, crate_count, total_net_weight_kg, total_gross_weight_kg,
          total_cbm, packing_date, shortfall_pct)
-     VALUES (:order_id, :qty, :crates, :net, :gross, :cbm, :packing_date, :shortfall_pct)
+     VALUES (:order_id, :qty, :unit, :crates, :net, :gross, :cbm, :packing_date, :shortfall_pct)
      ON DUPLICATE KEY UPDATE
         actual_quantity_packed = VALUES(actual_quantity_packed),
+        actual_quantity_unit = VALUES(actual_quantity_unit),
         crate_count = VALUES(crate_count),
         total_net_weight_kg = VALUES(total_net_weight_kg),
         total_gross_weight_kg = VALUES(total_gross_weight_kg),
@@ -19,6 +20,7 @@ async function upsert(orderId, data) {
     {
       order_id: orderId,
       qty: data.actual_quantity_packed || null,
+      unit: data.actual_quantity_unit || null,
       crates: data.crate_count || null,
       net: data.total_net_weight_kg || null,
       gross: data.total_gross_weight_kg || null,

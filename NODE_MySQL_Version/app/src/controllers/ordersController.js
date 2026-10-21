@@ -1620,6 +1620,7 @@ async function savePacking(req, res) {
 
   await orderPackingRepository.upsert(orderId, {
     actual_quantity_packed: actualQtyRaw || null,
+    actual_quantity_unit: str(body.actual_quantity_unit) || (summary.comparable ? summary.unit : null),
     crate_count: str(body.crate_count) || null,
     total_net_weight_kg: str(body.total_net_weight_kg) || null,
     total_gross_weight_kg: str(body.total_gross_weight_kg) || null,

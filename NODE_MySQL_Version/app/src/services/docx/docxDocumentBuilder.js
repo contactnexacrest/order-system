@@ -1171,7 +1171,7 @@ function renderPl(context) {
       { label: 'Product Description *', value: productList },
       { label: 'HS Code *', value: hsCodeList },
       { label: 'Country of Origin *', value: 'India' },
-      { label: 'Total Quantity *', value: g(packing, 'actual_quantity_packed', 'To Be Confirmed') },
+      { label: 'Total Quantity *', value: g(packing, 'actual_quantity_packed') !== '—' ? `${g(packing, 'actual_quantity_packed')}${g(packing, 'actual_quantity_unit') !== '—' ? ` ${g(packing, 'actual_quantity_unit')}` : ''}` : 'To Be Confirmed' },
       { label: 'Total No. of Crates *', value: g(packing, 'crate_count', 'To Be Confirmed') },
       { label: 'Total Net Weight *', value: g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'To Be Confirmed' },
       { label: 'Total Gross Weight *', value: g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'To Be Confirmed' },

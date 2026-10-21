@@ -29,10 +29,13 @@ path an order took through Stage 5/6, they arrive here identically.
 
 Three things happen in this section, each building toward the BL:
 
-1. **Save Packing & Crates** — actual quantity packed, crate count, weights,
-   CBM, packing date, and a crate-by-crate breakdown (marks & numbers,
-   dimensions, pieces, weight, HS code per crate). Once saved, **Generate
-   Packing List** produces the PL document.
+1. **Save Packing & Crates** — actual quantity packed (with its own unit,
+   defaulting to the order's own product unit when the order has one
+   comparable unit across its lines), crate count, weights, CBM, packing
+   date, and a crate-by-crate breakdown (marks & numbers, dimensions,
+   pieces, weight, HS code per crate). Once saved, **Generate Packing
+   List** produces the PL document, which prints the quantity with its
+   unit.
 2. **Save Shipping Details** — shipping line, vessel name, voyage number,
    ETD/ETA, number of containers, container number(s), and seal number.
    Number of Containers is a simple count distinct from Container No. —

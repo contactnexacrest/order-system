@@ -1631,6 +1631,7 @@ final class OrderController
 
         OrderPackingRepository::upsert($orderId, [
             'actual_quantity_packed' => $actualQtyRaw ?: null,
+            'actual_quantity_unit'   => trim((string) ($_POST['actual_quantity_unit'] ?? '')) ?: ($summary['comparable'] ? $summary['unit'] : null),
             'crate_count'            => trim((string) ($_POST['crate_count'] ?? '')) ?: null,
             'total_net_weight_kg'    => trim((string) ($_POST['total_net_weight_kg'] ?? '')) ?: null,
             'total_gross_weight_kg'  => trim((string) ($_POST['total_gross_weight_kg'] ?? '')) ?: null,

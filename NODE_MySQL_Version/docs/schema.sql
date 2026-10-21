@@ -707,6 +707,7 @@ CREATE TABLE order_packing (
   id                             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id                       BIGINT UNSIGNED NOT NULL UNIQUE,
   actual_quantity_packed         DECIMAL(14,3) NULL,
+  actual_quantity_unit           VARCHAR(50) NULL,   -- from dropdown_options('unit'); defaults to the order's own product unit when comparable, same list PI/product lines use
   crate_count                   INT NULL,
   total_net_weight_kg            DECIMAL(14,2) NULL,
   total_gross_weight_kg          DECIMAL(14,2) NULL,

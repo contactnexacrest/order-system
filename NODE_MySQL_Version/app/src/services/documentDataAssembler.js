@@ -440,6 +440,7 @@ async function packingBlock(orderId) {
   }
   return {
     actual_quantity_packed: row.actual_quantity_packed !== null ? formatNumber(row.actual_quantity_packed) : 'To Be Confirmed',
+    actual_quantity_unit: row.actual_quantity_unit,
     crate_count: row.crate_count,
     total_net_weight_kg: row.total_net_weight_kg,
     total_gross_weight_kg: row.total_gross_weight_kg,

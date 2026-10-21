@@ -1589,6 +1589,15 @@ foreach ($stages as $s) {
         <?= Csrf::field() ?>
         <div class="kv-grid">
           <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="<?= htmlspecialchars((string) ($packing['actual_quantity_packed'] ?? '')) ?>"></label>
+          <label>Actual Quantity Unit
+            <?php $__packingUnit = $packing['actual_quantity_unit'] ?? ($orderedSummary['comparable'] ? $orderedSummary['unit'] : ''); ?>
+            <select name="actual_quantity_unit">
+              <option value="">— Select —</option>
+              <?php foreach ($units as $__u): ?>
+                <option value="<?= htmlspecialchars($__u['option_value']) ?>" <?= ($__packingUnit === $__u['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($__u['option_value']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
           <label>Crate Count<input type="text" name="crate_count" value="<?= htmlspecialchars((string) ($packing['crate_count'] ?? '')) ?>"></label>
           <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_net_weight_kg'] ?? '')) ?>"></label>
           <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_gross_weight_kg'] ?? '')) ?>"></label>

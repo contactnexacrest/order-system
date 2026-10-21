@@ -39,7 +39,7 @@
   <tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }}</td></tr>
   <tr><td class="k">HS Code *</td><td class="v">{{ hsCodeList|join(', ') }}</td></tr>
   <tr><td class="k">Country of Origin *</td><td class="v">India</td></tr>
-  <tr><td class="k">Total Quantity *</td><td class="v">{{ packing.actual_quantity_packed ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Total Quantity *</td><td class="v">{{ packing.actual_quantity_packed ?: 'To Be Confirmed' }}{{ packing.actual_quantity_unit ? ' ' ~ packing.actual_quantity_unit : '' }}</td></tr>
   <tr><td class="k">Total No. of Crates *</td><td class="v">{{ packing.crate_count ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Total Net Weight *</td><td class="v">{{ packing.total_net_weight_kg ? packing.total_net_weight_kg ~ ' kg' : 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Total Gross Weight *</td><td class="v">{{ packing.total_gross_weight_kg ? packing.total_gross_weight_kg ~ ' kg' : 'To Be Confirmed' }}</td></tr>
