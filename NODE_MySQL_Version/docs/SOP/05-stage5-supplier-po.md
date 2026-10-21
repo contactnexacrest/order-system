@@ -97,6 +97,16 @@ actions**:
 > with zero physical evidence ever attached. Turn the toggle off only for
 > a workflow that genuinely doesn't need the physical copy.
 
+Below the signing actions, staff with the Order Financials permission
+(the same one that unlocks the Order Profitability Sheet — Admin/MD/ED
+and Super Admin by default) see a **Supplier Payments** section:
+**Mark Advance Paid** and **Mark Balance Paid**, each with its own date.
+Previously only the amount owed to a supplier was ever recorded —
+nothing tracked whether or when it was actually paid, so "today's
+supplier payments" had no data to report on at all. Each button
+disappears once that leg is marked paid; the paid date then feeds the
+Reports hub's **Today's Payments** view (see Chapter 14).
+
 Once confirmed:
 
 ![Stage 5 section — supplier signature confirmed](./images/s5_signed_confirmed.png)

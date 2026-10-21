@@ -1481,6 +1481,28 @@ foreach ($stages as $s) {
         <p>Supplier has signed and returned the PO.</p>
       <?php endif; ?>
 
+      <?php if ($supplierPo && $canManageOrderFinancials): ?>
+        <h3 style="font-size:0.95em; margin-top:14px;">Supplier Payments</h3>
+        <div class="kv-grid">
+          <div><span class="k">Advance (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['advance_amount_inr'] ?? '—') ?><?= !empty($supplierPo['advance_paid_at']) ? ' — paid ' . htmlspecialchars($supplierPo['advance_paid_at']) : '' ?></span></div>
+          <div><span class="k">Balance (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['balance_amount_inr'] ?? '—') ?><?= !empty($supplierPo['balance_paid_at']) ? ' — paid ' . htmlspecialchars($supplierPo['balance_paid_at']) : '' ?></span></div>
+        </div>
+        <?php if (empty($supplierPo['advance_paid_at'])): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/advance-paid" style="display:inline-block; margin-right:8px;">
+            <?= Csrf::field() ?>
+            <label>Date<input type="date" name="paid_date" value="<?= date('Y-m-d') ?>"></label>
+            <button type="submit" class="btn-sm">Mark Advance Paid</button>
+          </form>
+        <?php endif; ?>
+        <?php if (empty($supplierPo['balance_paid_at'])): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/balance-paid" style="display:inline-block;">
+            <?= Csrf::field() ?>
+            <label>Date<input type="date" name="paid_date" value="<?= date('Y-m-d') ?>"></label>
+            <button type="submit" class="btn-sm">Mark Balance Paid</button>
+          </form>
+        <?php endif; ?>
+      <?php endif; ?>
+
       <?php if ($supplierPo): ?>
         <?php if (!empty($supplierPoDocuments)): ?>
           <table class="list" style="margin-top:8px">

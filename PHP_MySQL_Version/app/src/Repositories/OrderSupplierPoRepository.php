@@ -75,4 +75,33 @@ final class OrderSupplierPoRepository
             "UPDATE order_supplier_po SET status = 'signed', signed_at = NOW() WHERE id = :id"
         )->execute(['id' => $id]);
     }
+
+    public static function markAdvancePaid(int $id, string $date, int $userId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_supplier_po SET advance_paid_at = :date, advance_paid_by = :user_id WHERE id = :id'
+        )->execute(['date' => $date, 'user_id' => $userId, 'id' => $id]);
+    }
+
+    public static function markBalancePaid(int $id, string $date, int $userId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_supplier_po SET balance_paid_at = :date, balance_paid_by = :user_id WHERE id = :id'
+        )->execute(['date' => $date, 'user_id' => $userId, 'id' => $id]);
+    }
+
+    /** @return array<int,array<string,mixed>> every supplier PO leg (advance/balance) paid on the given date, for the "today's supplier payments" report. */
+    public static function paidOnDate(string $date): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT sp.id, sp.order_id, sp.supplier_po_reference, sp.advance_amount_inr, sp.advance_paid_at,
+                    sp.balance_amount_inr, sp.balance_paid_at, s.supplier_legal_name, o.order_reference
+             FROM order_supplier_po sp
+             JOIN suppliers s ON s.id = sp.supplier_id
+             JOIN orders o ON o.id = sp.order_id
+             WHERE sp.advance_paid_at = :date OR sp.balance_paid_at = :date2"
+        );
+        $stmt->execute(['date' => $date, 'date2' => $date]);
+        return $stmt->fetchAll();
+    }
 }

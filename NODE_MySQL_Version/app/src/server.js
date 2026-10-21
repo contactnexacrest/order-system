@@ -648,6 +648,8 @@ app.post('/orders/:id/suppliers/:supplierId/factory-addresses', requireAuth, req
 app.post('/orders/:id/suppliers/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.deleteSupplierFactoryAddress));
 app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
 app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
+app.post('/orders/:id/supplier-po/advance-paid', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(ordersController.markSupplierAdvancePaid));
+app.post('/orders/:id/supplier-po/balance-paid', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(ordersController.markSupplierBalancePaid));
 app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
 
 app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.saveFreightTerms));
@@ -762,6 +764,7 @@ app.get('/reports/order/:orderId', requireAuth, requirePermission('view_reports'
 app.get('/reports/aggregate', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.aggregate));
 app.get('/reports/queues', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.queues));
 app.get('/reports/payments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.payments));
+app.get('/reports/todays-payments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.todaysPayments));
 app.get('/reports/disputes', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.disputes));
 app.get('/reports/amendments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.amendments));
 app.get('/reports/trends', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.trends));

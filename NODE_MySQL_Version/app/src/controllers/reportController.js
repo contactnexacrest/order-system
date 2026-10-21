@@ -8,6 +8,8 @@ const clientRepository = require('../repositories/clientRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const reportDefinitionRepository = require('../repositories/reportDefinitionRepository');
 const reportRepository = require('../repositories/reportRepository');
+const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
+const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const { todayIst } = require('../helpers/dbDateTime');
 
 // Port of App\Controllers\ReportController. Spec Section 16 — REPORTS:
@@ -423,6 +425,71 @@ async function payments(req, res) {
   );
 }
 
+/**
+ * 90-item backlog item #1 ("today's incoming/supplier payments") —
+ * distinct from payments() above, which filters orders by CREATED date
+ * and shows their current status regardless of when a leg actually
+ * cleared. This instead answers "what cleared/was paid on this specific
+ * day", both directions: buyer legs cleared (order_payment_status) and
+ * supplier legs paid (order_supplier_po).
+ */
+async function todaysPayments(req, res) {
+  const date = str(req.query.date) || todayIst();
+
+  const incoming = await orderPaymentStatusRepository.clearedOnDate(date);
+  const supplier = await orderSupplierPoRepository.paidOnDate(date);
+
+  if (req.query.format === 'csv') {
+    const rows = [];
+    for (const r of incoming) {
+      if (r.advance_cleared_at && String(r.advance_cleared_at).slice(0, 10) === date) {
+        rows.push({ Direction: 'Incoming', Leg: 'Advance', 'Order Ref': r.order_reference, Party: r.company_legal_name, Currency: r.currency_code, Amount: r.advance_amount });
+      }
+      if (r.balance_cleared_at && String(r.balance_cleared_at).slice(0, 10) === date) {
+        rows.push({ Direction: 'Incoming', Leg: 'Balance', 'Order Ref': r.order_reference, Party: r.company_legal_name, Currency: r.currency_code, Amount: r.balance_amount });
+      }
+      if (r.freight_cleared_at && String(r.freight_cleared_at).slice(0, 10) === date) {
+        rows.push({ Direction: 'Incoming', Leg: 'Freight', 'Order Ref': r.order_reference, Party: r.company_legal_name, Currency: r.currency_code, Amount: r.freight_amount });
+      }
+    }
+    for (const r of supplier) {
+      if (r.advance_paid_at === date) {
+        rows.push({ Direction: 'Outgoing', Leg: 'Advance', 'Order Ref': r.order_reference, Party: r.supplier_legal_name, Currency: 'INR', Amount: r.advance_amount_inr });
+      }
+      if (r.balance_paid_at === date) {
+        rows.push({ Direction: 'Outgoing', Leg: 'Balance', 'Order Ref': r.order_reference, Party: r.supplier_legal_name, Currency: 'INR', Amount: r.balance_amount_inr });
+      }
+    }
+    csv.stream(res, `payments_${date}.csv`, ['Direction', 'Leg', 'Order Ref', 'Party', 'Currency', 'Amount'], rows);
+    return;
+  }
+
+  const incomingRows = [];
+  for (const r of incoming) {
+    if (r.advance_cleared_at && String(r.advance_cleared_at).slice(0, 10) === date) {
+      incomingRows.push({ order_id: r.order_id, order_reference: r.order_reference, company_legal_name: r.company_legal_name, currency_code: r.currency_code, leg: 'Advance', amount: r.advance_amount, cleared_at: r.advance_cleared_at });
+    }
+    if (r.balance_cleared_at && String(r.balance_cleared_at).slice(0, 10) === date) {
+      incomingRows.push({ order_id: r.order_id, order_reference: r.order_reference, company_legal_name: r.company_legal_name, currency_code: r.currency_code, leg: 'Balance', amount: r.balance_amount, cleared_at: r.balance_cleared_at });
+    }
+    if (r.freight_cleared_at && String(r.freight_cleared_at).slice(0, 10) === date) {
+      incomingRows.push({ order_id: r.order_id, order_reference: r.order_reference, company_legal_name: r.company_legal_name, currency_code: r.currency_code, leg: 'Freight', amount: r.freight_amount, cleared_at: r.freight_cleared_at });
+    }
+  }
+
+  const supplierRows = [];
+  for (const r of supplier) {
+    if (r.advance_paid_at === date) {
+      supplierRows.push({ order_id: r.order_id, order_reference: r.order_reference, supplier_legal_name: r.supplier_legal_name, leg: 'Advance', amount: r.advance_amount_inr, paid_at: r.advance_paid_at });
+    }
+    if (r.balance_paid_at === date) {
+      supplierRows.push({ order_id: r.order_id, order_reference: r.order_reference, supplier_legal_name: r.supplier_legal_name, leg: 'Balance', amount: r.balance_amount_inr, paid_at: r.balance_paid_at });
+    }
+  }
+
+  res.renderView('reports/todays_payments', { date, incomingRows, supplierRows }, 'layout/base');
+}
+
 function defaultDateFrom() {
   // 90-item backlog "timezone": date-pure arithmetic on todayIst(), not
   // local-getter mutation (setDate/getDate) formatted back via
@@ -764,7 +831,7 @@ async function performance(req, res) {
 
 module.exports = {
   index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
-  payments, disputes, amendments, trends, staff, ageing, freightCost, products, suppliers, conversion,
+  payments, todaysPayments, disputes, amendments, trends, staff, ageing, freightCost, products, suppliers, conversion,
   profitability, performance, presetRange,
   trendsCsvRows, staffCsvRows, suppliersCsvRows, conversionCsvRows, performanceCsvRows, orderAuditCsvRows,
 };

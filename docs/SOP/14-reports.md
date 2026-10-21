@@ -23,7 +23,9 @@ Everything starts from the **Reports** hub:
 ![Reports hub — every report one click away](./images/reports_hub.png)
 
 - **Aggregate Report** — filter orders by date range, stage, Incoterm, or
-  country; the base report most others build on or reference.
+  country; the base report most others build on or reference. Its summary
+  now also breaks down FOB value by customer and by country, not just by
+  order count.
 - **Operations Queues** — how many quotations/PIs/POs/CIs are sitting
   unresolved right now, plus sent/won/lost totals for a date range — the
   "what needs attention today" view.
@@ -31,6 +33,16 @@ Everything starts from the **Reports** hub:
   across advance/balance/freight:
 
   ![Payments Report — summary by currency, backed by the exact order detail below it](./images/reports_payments.png)
+
+- **Today's Payments** — distinct from the Payments Report above, which
+  filters orders by *created* date and shows their current status
+  regardless of when a leg actually cleared. This instead answers "what
+  actually cleared/was paid on this specific day", both directions:
+  incoming (buyer advance/balance/freight, from the same clearing dates
+  the Payments Report uses) and outgoing (supplier advance/balance,
+  recorded from the order page's new **Mark Advance Paid** / **Mark
+  Balance Paid** buttons on the Supplier PO section — Stage 5, visible to
+  the same roles that can see the Order Profitability Sheet).
 
 - **Dispute Report** / **Amendment Report** — status and aging breakdowns
   across every order, not just one at a time.

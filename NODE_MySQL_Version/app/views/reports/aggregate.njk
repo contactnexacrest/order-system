@@ -61,8 +61,20 @@
         <span class="v">{% for status, n in summary.by_status %}{{ status | capitalize }}: {{ n }}<br>{% endfor %}{% if (summary.by_status | length) == 0 %}—{% endif %}</span>
       </div>
       <div>
-        <span class="k">By Country</span>
-        <span class="v">{% for country, n in summary.by_country %}{{ country }}: {{ n }}<br>{% endfor %}{% if (summary.by_country | length) == 0 %}—{% endif %}</span>
+        <span class="k">By Country (orders / FOB value)</span>
+        <span class="v">{% for country, n in summary.by_country %}
+          {{ country }}: {{ n }}
+          {% for cc, amt in summary.country_fob_by_currency[country] %} &middot; {{ cc }} {{ amt | money }}{% endfor %}
+          <br>
+        {% endfor %}{% if (summary.by_country | length) == 0 %}—{% endif %}</span>
+      </div>
+      <div>
+        <span class="k">By Customer (orders / FOB value)</span>
+        <span class="v">{% for clientName, c in summary.by_client %}
+          {{ clientName }}: {{ c.count }}
+          {% for cc, amt in c.fob_by_currency %} &middot; {{ cc }} {{ amt | money }}{% endfor %}
+          <br>
+        {% endfor %}{% if (summary.by_client | length) == 0 %}—{% endif %}</span>
       </div>
     </div>
   </div>

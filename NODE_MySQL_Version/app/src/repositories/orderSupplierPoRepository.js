@@ -60,4 +60,25 @@ async function markSigned(id) {
   await db.execute("UPDATE order_supplier_po SET status = 'signed', signed_at = NOW() WHERE id = :id", { id });
 }
 
-module.exports = { create, findLatestForOrder, markSigned };
+async function markAdvancePaid(id, date, userId) {
+  await db.execute('UPDATE order_supplier_po SET advance_paid_at = :date, advance_paid_by = :user_id WHERE id = :id', { date, user_id: userId, id });
+}
+
+async function markBalancePaid(id, date, userId) {
+  await db.execute('UPDATE order_supplier_po SET balance_paid_at = :date, balance_paid_by = :user_id WHERE id = :id', { date, user_id: userId, id });
+}
+
+/** Every supplier PO leg (advance/balance) paid on the given date, for the "today's supplier payments" report. */
+async function paidOnDate(date) {
+  return db.query(
+    `SELECT sp.id, sp.order_id, sp.supplier_po_reference, sp.advance_amount_inr, sp.advance_paid_at,
+            sp.balance_amount_inr, sp.balance_paid_at, s.supplier_legal_name, o.order_reference
+     FROM order_supplier_po sp
+     JOIN suppliers s ON s.id = sp.supplier_id
+     JOIN orders o ON o.id = sp.order_id
+     WHERE sp.advance_paid_at = :date OR sp.balance_paid_at = :date2`,
+    { date, date2: date }
+  );
+}
+
+module.exports = { create, findLatestForOrder, markSigned, markAdvancePaid, markBalancePaid, paidOnDate };

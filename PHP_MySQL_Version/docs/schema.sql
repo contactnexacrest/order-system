@@ -3335,3 +3335,22 @@ CREATE TABLE supplier_factory_addresses (
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION BM — SUPPLIER PAYMENT DATES (user-reported batch item 1)
+-- ================================================================
+-- Closes a Reports gap: "today's incoming/supplier payments" cannot be
+-- reported on without knowing WHEN a supplier was actually paid — until
+-- now, order_supplier_po only ever recorded the AMOUNT owed
+-- (advance_amount_inr/balance_amount_inr), never the date it was
+-- actually paid, unlike the buyer side (order_payment_status.
+-- advance_cleared_at/balance_cleared_at/freight_cleared_at). Mirrors
+-- that same pattern: a date + who recorded it, per leg.
+-- ================================================================
+ALTER TABLE order_supplier_po
+  ADD COLUMN advance_paid_at DATE NULL,
+  ADD COLUMN advance_paid_by BIGINT UNSIGNED NULL,
+  ADD COLUMN balance_paid_at DATE NULL,
+  ADD COLUMN balance_paid_by BIGINT UNSIGNED NULL,
+  ADD CONSTRAINT fk_spo_advance_paid_by FOREIGN KEY (advance_paid_by) REFERENCES users(id),
+  ADD CONSTRAINT fk_spo_balance_paid_by FOREIGN KEY (balance_paid_by) REFERENCES users(id);

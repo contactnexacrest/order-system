@@ -64,8 +64,20 @@
         <span class="v"><?php foreach ($summary['by_status'] as $status => $n): ?><?= htmlspecialchars(ucfirst($status)) ?>: <?= (int) $n ?><br><?php endforeach; ?><?= empty($summary['by_status']) ? '—' : '' ?></span>
       </div>
       <div>
-        <span class="k">By Country</span>
-        <span class="v"><?php foreach ($summary['by_country'] as $country2 => $n): ?><?= htmlspecialchars($country2) ?>: <?= (int) $n ?><br><?php endforeach; ?><?= empty($summary['by_country']) ? '—' : '' ?></span>
+        <span class="k">By Country (orders / FOB value)</span>
+        <span class="v"><?php foreach ($summary['by_country'] as $country2 => $n): ?>
+          <?= htmlspecialchars($country2) ?>: <?= (int) $n ?>
+          <?php foreach (($summary['country_fob_by_currency'][$country2] ?? []) as $cc => $amt): ?> &middot; <?= htmlspecialchars($cc) ?> <?= number_format($amt, 2) ?><?php endforeach; ?>
+          <br>
+        <?php endforeach; ?><?= empty($summary['by_country']) ? '—' : '' ?></span>
+      </div>
+      <div>
+        <span class="k">By Customer (orders / FOB value)</span>
+        <span class="v"><?php foreach ($summary['by_client'] as $clientName => $c): ?>
+          <?= htmlspecialchars($clientName) ?>: <?= (int) $c['count'] ?>
+          <?php foreach ($c['fob_by_currency'] as $cc => $amt): ?> &middot; <?= htmlspecialchars($cc) ?> <?= number_format($amt, 2) ?><?php endforeach; ?>
+          <br>
+        <?php endforeach; ?><?= empty($summary['by_client']) ? '—' : '' ?></span>
       </div>
     </div>
   </div>

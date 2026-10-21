@@ -10,6 +10,8 @@ use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\LookupRepository;
+use App\Repositories\OrderPaymentStatusRepository;
+use App\Repositories\OrderSupplierPoRepository;
 use App\Repositories\ReportDefinitionRepository;
 use App\Repositories\ReportRepository;
 use App\Services\AuthService;
@@ -251,6 +253,52 @@ final class ReportController
             'rows' => $data['rows'],
             'byCurrency' => $data['by_currency'],
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
+        ], 'layout/base');
+    }
+
+    /**
+     * 90-item backlog item #1 ("today's incoming/supplier payments") —
+     * distinct from payments() above, which filters orders by CREATED
+     * date and shows their current status regardless of when a leg
+     * actually cleared. This instead answers "what cleared/was paid on
+     * this specific day", both directions: buyer legs cleared
+     * (order_payment_status) and supplier legs paid (order_supplier_po).
+     */
+    public function todaysPayments(array $params): void
+    {
+        $date = trim((string) ($_GET['date'] ?? '')) ?: date('Y-m-d');
+
+        $incoming = OrderPaymentStatusRepository::clearedOnDate($date);
+        $supplier = OrderSupplierPoRepository::paidOnDate($date);
+
+        if (($_GET['format'] ?? '') === 'csv') {
+            $rows = [];
+            foreach ($incoming as $r) {
+                if ($r['advance_cleared_at'] !== null && substr((string) $r['advance_cleared_at'], 0, 10) === $date) {
+                    $rows[] = ['Direction' => 'Incoming', 'Leg' => 'Advance', 'Order Ref' => $r['order_reference'], 'Party' => $r['company_legal_name'], 'Currency' => $r['currency_code'], 'Amount' => $r['advance_amount']];
+                }
+                if ($r['balance_cleared_at'] !== null && substr((string) $r['balance_cleared_at'], 0, 10) === $date) {
+                    $rows[] = ['Direction' => 'Incoming', 'Leg' => 'Balance', 'Order Ref' => $r['order_reference'], 'Party' => $r['company_legal_name'], 'Currency' => $r['currency_code'], 'Amount' => $r['balance_amount']];
+                }
+                if ($r['freight_cleared_at'] !== null && substr((string) $r['freight_cleared_at'], 0, 10) === $date) {
+                    $rows[] = ['Direction' => 'Incoming', 'Leg' => 'Freight', 'Order Ref' => $r['order_reference'], 'Party' => $r['company_legal_name'], 'Currency' => $r['currency_code'], 'Amount' => $r['freight_amount']];
+                }
+            }
+            foreach ($supplier as $r) {
+                if ($r['advance_paid_at'] === $date) {
+                    $rows[] = ['Direction' => 'Outgoing', 'Leg' => 'Advance', 'Order Ref' => $r['order_reference'], 'Party' => $r['supplier_legal_name'], 'Currency' => 'INR', 'Amount' => $r['advance_amount_inr']];
+                }
+                if ($r['balance_paid_at'] === $date) {
+                    $rows[] = ['Direction' => 'Outgoing', 'Leg' => 'Balance', 'Order Ref' => $r['order_reference'], 'Party' => $r['supplier_legal_name'], 'Currency' => 'INR', 'Amount' => $r['balance_amount_inr']];
+                }
+            }
+            Csv::stream('payments_' . $date . '.csv', ['Direction', 'Leg', 'Order Ref', 'Party', 'Currency', 'Amount'], $rows);
+        }
+
+        View::render('reports/todays_payments', [
+            'date' => $date,
+            'incoming' => $incoming,
+            'supplier' => $supplier,
         ], 'layout/base');
     }
 

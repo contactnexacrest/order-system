@@ -264,6 +264,15 @@ final class ReportRepository
         $byStage = [];
         $byStatus = [];
         $byCountry = [];
+        // 90-item backlog item #1 ("customer-wise / product-wise /
+        // country-wise reports"): product-wise already existed
+        // (products()); this adds customer-wise (byClient) and gives
+        // country-wise an actual value breakdown, not just an order
+        // count — both keyed by name with a nested per-currency FOB
+        // total, matching fobByCurrency's own shape, since orders in
+        // this aggregate can span multiple currencies.
+        $byClient = [];
+        $countryFobByCurrency = [];
 
         foreach ($rows as $r) {
             $cc = $r['currency_code'];
@@ -276,12 +285,21 @@ final class ReportRepository
 
             $country = $r['country_of_destination'] ?? '—';
             $byCountry[$country] = ($byCountry[$country] ?? 0) + 1;
+            $countryFobByCurrency[$country][$cc] = ($countryFobByCurrency[$country][$cc] ?? 0.0) + (float) $r['total_fob_value'];
+
+            $client = $r['company_legal_name'] ?? '—';
+            if (!isset($byClient[$client])) {
+                $byClient[$client] = ['count' => 0, 'fob_by_currency' => []];
+            }
+            $byClient[$client]['count']++;
+            $byClient[$client]['fob_by_currency'][$cc] = ($byClient[$client]['fob_by_currency'][$cc] ?? 0.0) + (float) $r['total_fob_value'];
         }
 
         ksort($fobByCurrency);
         arsort($byStage);
         arsort($byStatus);
         arsort($byCountry);
+        uasort($byClient, static fn(array $a, array $b): int => $b['count'] <=> $a['count']);
 
         return [
             'total_orders' => count($rows),
@@ -289,6 +307,8 @@ final class ReportRepository
             'by_stage' => $byStage,
             'by_status' => $byStatus,
             'by_country' => $byCountry,
+            'by_client' => $byClient,
+            'country_fob_by_currency' => $countryFobByCurrency,
         ];
     }
 

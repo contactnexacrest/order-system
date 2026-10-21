@@ -1491,6 +1491,34 @@ async function confirmSupplierSigned(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+async function markSupplierAdvancePaid(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  if (!supplierPo) {
+    flash.set(req, 'error', 'No Supplier PO found for this order.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const date = str(req.body.paid_date) || todayYmd();
+  await orderSupplierPoRepository.markAdvancePaid(supplierPo.id, date, req.user.id);
+  flash.set(req, 'success', 'Supplier advance payment recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function markSupplierBalancePaid(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  if (!supplierPo) {
+    flash.set(req, 'error', 'No Supplier PO found for this order.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const date = str(req.body.paid_date) || todayYmd();
+  await orderSupplierPoRepository.markBalancePaid(supplierPo.id, date, req.user.id);
+  flash.set(req, 'success', 'Supplier balance payment recorded.');
+  res.redirect(`/orders/${orderId}`);
+}
+
 /**
  * Real gap this closes: confirmSupplierSigned() above only ever flipped
  * order_supplier_po.status on a button click — the supplier's actual
@@ -2250,7 +2278,7 @@ module.exports = {
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, downloadDossier, generatePiFormLink, generateBuyerActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment, updateProductionStatus,
-  recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument,
+  recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

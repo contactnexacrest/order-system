@@ -227,6 +227,24 @@ final class OrderPaymentStatusRepository
      *
      * @return array<int, array<string,mixed>>
      */
+    /** @return array<int, array<string,mixed>> every buyer payment leg (advance/balance/freight) cleared on the given date, for the "today's incoming payments" report. */
+    public static function clearedOnDate(string $date): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT ops.*, o.order_reference, c.company_legal_name, cur.code AS currency_code
+             FROM order_payment_status ops
+             JOIN orders o ON o.id = ops.order_id
+             JOIN clients c ON c.id = o.client_id
+             JOIN currencies cur ON cur.id = o.currency_id
+             WHERE DATE(ops.advance_cleared_at) = :date1
+                OR DATE(ops.balance_cleared_at) = :date2
+                OR DATE(ops.freight_cleared_at) = :date3
+             ORDER BY o.id DESC"
+        );
+        $stmt->execute(['date1' => $date, 'date2' => $date, 'date3' => $date]);
+        return $stmt->fetchAll();
+    }
+
     public static function clearedSettlements(): array
     {
         return Database::connection()->query(

@@ -1497,6 +1497,38 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    public function markSupplierAdvancePaid(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
+        if (!$supplierPo) {
+            Flash::set('error', 'No Supplier PO found for this order.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $date = trim((string) ($_POST['paid_date'] ?? '')) ?: date('Y-m-d');
+        OrderSupplierPoRepository::markAdvancePaid((int) $supplierPo['id'], $date, (int) $user['id']);
+        Flash::set('success', 'Supplier advance payment recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function markSupplierBalancePaid(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
+        if (!$supplierPo) {
+            Flash::set('error', 'No Supplier PO found for this order.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $date = trim((string) ($_POST['paid_date'] ?? '')) ?: date('Y-m-d');
+        OrderSupplierPoRepository::markBalancePaid((int) $supplierPo['id'], $date, (int) $user['id']);
+        Flash::set('success', 'Supplier balance payment recorded.');
+        header("Location: /orders/{$orderId}");
+    }
+
     /**
      * Real gap this closes: confirmSupplierSigned() above only ever
      * flipped order_supplier_po.status on a button click — the supplier's

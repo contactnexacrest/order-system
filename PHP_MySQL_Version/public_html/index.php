@@ -443,6 +443,8 @@ $router->post('/orders/{id}/suppliers/{supplierId}/factory-addresses', [$orders,
 $router->post('/orders/{id}/suppliers/factory-addresses/{addressId}/delete', [$orders, 'deleteSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/advance-paid', [$orders, 'markSupplierAdvancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/balance-paid', [$orders, 'markSupplierBalancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 // QA-5 RBAC-04: freight/packing/shipping/BL/closure are Logistics' duty,
@@ -537,6 +539,7 @@ $router->get('/reports/order/{orderId}', [$reports, 'order'], [SessionAuth::requ
 $router->get('/reports/aggregate', [$reports, 'aggregate'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/queues', [$reports, 'queues'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/payments', [$reports, 'payments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/todays-payments', [$reports, 'todaysPayments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/disputes', [$reports, 'disputes'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/amendments', [$reports, 'amendments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/trends', [$reports, 'trends'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);

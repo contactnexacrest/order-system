@@ -131,6 +131,22 @@ async function clearedSettlements() {
   );
 }
 
+/** Every buyer payment leg (advance/balance/freight) cleared on the given date, for the "today's incoming payments" report. */
+async function clearedOnDate(date) {
+  return db.query(
+    `SELECT ops.*, o.order_reference, c.company_legal_name, cur.code AS currency_code
+     FROM order_payment_status ops
+     JOIN orders o ON o.id = ops.order_id
+     JOIN clients c ON c.id = o.client_id
+     JOIN currencies cur ON cur.id = o.currency_id
+     WHERE DATE(ops.advance_cleared_at) = :date1
+        OR DATE(ops.balance_cleared_at) = :date2
+        OR DATE(ops.freight_cleared_at) = :date3
+     ORDER BY o.id DESC`,
+    { date1: date, date2: date, date3: date }
+  );
+}
+
 // ----------------------------------------------------------------
 // CA / Accounting module (Phase 2, Batch 3 #3) — one exchange rate per
 // settlement leg (for the forex gain/loss shown in the register) and
@@ -203,7 +219,7 @@ module.exports = {
   initializeForOrder, find, recordAdvanceReceived, markAdvanceCleared, setBalanceAmount,
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
   setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,
-  setFreightInrActual, clearFreightInrActual, clearedSettlements,
+  setFreightInrActual, clearFreightInrActual, clearedSettlements, clearedOnDate,
   setLegExchangeRate, setAdvanceFirc, setBalanceFirc, setFreightFirc,
   setAdvanceZohoSync, setBalanceZohoSync, setFreightZohoSync,
 };

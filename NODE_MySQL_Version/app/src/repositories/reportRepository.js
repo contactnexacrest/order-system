@@ -234,11 +234,19 @@ async function aggregate(dateFrom, dateTo, stageId, incotermId, country) {
  *
  * @param {Array<object>} rows
  */
+// 90-item backlog item #1 ("customer-wise / product-wise / country-wise
+// reports"): product-wise already existed (products()); this adds
+// customer-wise (byClient) and gives country-wise an actual value
+// breakdown, not just an order count — both keyed by name with a
+// nested per-currency FOB total, matching fobByCurrency's own shape,
+// since orders in this aggregate can span multiple currencies.
 function aggregateSummary(rows) {
   const fobByCurrency = {};
   const byStage = {};
   const byStatus = {};
   const byCountry = {};
+  const byClient = {};
+  const countryFobByCurrency = {};
 
   for (const r of rows) {
     const cc = r.currency_code;
@@ -251,6 +259,21 @@ function aggregateSummary(rows) {
 
     const country = r.country_of_destination ?? '—';
     byCountry[country] = (byCountry[country] || 0) + 1;
+    countryFobByCurrency[country] = countryFobByCurrency[country] || {};
+    countryFobByCurrency[country][cc] = (countryFobByCurrency[country][cc] || 0) + (parseFloat(r.total_fob_value) || 0);
+
+    const client = r.company_legal_name ?? '—';
+    if (!byClient[client]) {
+      byClient[client] = { count: 0, fob_by_currency: {} };
+    }
+    byClient[client].count++;
+    byClient[client].fob_by_currency[cc] = (byClient[client].fob_by_currency[cc] || 0) + (parseFloat(r.total_fob_value) || 0);
+  }
+
+  const sortedClientNames = Object.keys(byClient).sort((a, b) => byClient[b].count - byClient[a].count);
+  const sortedByClient = {};
+  for (const name of sortedClientNames) {
+    sortedByClient[name] = byClient[name];
   }
 
   return {
@@ -259,6 +282,8 @@ function aggregateSummary(rows) {
     by_stage: sortByCountDesc(byStage),
     by_status: sortByCountDesc(byStatus),
     by_country: sortByCountDesc(byCountry),
+    by_client: sortedByClient,
+    country_fob_by_currency: countryFobByCurrency,
   };
 }
 
