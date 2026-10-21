@@ -36,6 +36,29 @@ final class Database
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
             ]);
+            // User-reported batch item 6: the connection's session time
+            // zone defaulted to SYSTEM (UTC on this host), so NOW()/
+            // CURRENT_TIMESTAMP wrote UTC wall-clock values into every
+            // TIMESTAMP column while bootstrap.php's own
+            // date_default_timezone_set('Asia/Kolkata') meant every
+            // PHP-computed date()/DateTimeImmutable() value (token
+            // expiries, the OC-acknowledgment deadline, etc.) was ALREADY
+            // IST wall-clock — a split-timezone app, not just a display
+            // bug: documents re-rendered from a stored generated_at could
+            // show the wrong calendar date, and a TIMESTAMP comparison
+            // against NOW() (e.g. "has this link expired?",
+            // "is the 48-hour acknowledgment window up?") was off by the
+            // full 5.5-hour gap between UTC and IST. Fixing the session to
+            // the same Asia/Kolkata offset makes every TIMESTAMP column
+            // consistent with PHP's own clock on both reads and writes.
+            // Safe for data already stored: a TIMESTAMP column keeps its
+            // true UTC instant internally regardless of session time
+            // zone — only the wall-clock string MySQL converts it to/from
+            // changes, so existing rows now correctly display as IST with
+            // no migration needed. A fixed offset (not a named zone) is
+            // used so this works even when the host's MySQL has no
+            // time zone tables loaded.
+            self::$connection->exec("SET time_zone = '+05:30'");
         } catch (PDOException $e) {
             // Never leak DSN/credentials in the exception surface to the client.
             error_log('[DB CONNECT FAILURE] ' . $e->getMessage());

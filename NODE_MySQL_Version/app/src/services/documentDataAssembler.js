@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 
+const { parseDbDateTime } = require('../helpers/dbDateTime');
 const db = require('../config/db');
 const orderRepository = require('../repositories/orderRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
@@ -939,7 +940,20 @@ function formatDate(value) {
   if (!value) {
     return null;
   }
-  const d = value instanceof Date ? value : new Date(value);
+  // User-reported batch item 6: `value` here is sometimes a plain DATE
+  // column (no time-of-day, no timezone ambiguity) and sometimes a
+  // TIMESTAMP column's generated_at — written by MySQL's own UTC system
+  // clock (see config/db.js's dateStrings note: this app deliberately
+  // keeps the DB in UTC). A bare `new Date(str)` on that latter kind of
+  // value is parsed as LOCAL time (process.env.TZ = 'Asia/Kolkata'),
+  // mislabeling UTC digits as IST — exactly what dbDateTime.js's
+  // parseDbDateTime() exists to avoid for comparisons; this does the
+  // same for display. A time-bearing value is parsed as UTC via
+  // parseDbDateTime() and then read with LOCAL (IST) getters below, so
+  // the calendar date shown is the correct IST date, not the raw UTC
+  // one with no conversion applied.
+  const str = value instanceof Date ? null : String(value);
+  const d = value instanceof Date ? value : (/\d{1,2}:\d{2}/.test(str) ? parseDbDateTime(str) : new Date(str));
   if (Number.isNaN(d.getTime())) {
     return String(value);
   }
@@ -947,7 +961,7 @@ function formatDate(value) {
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
-  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function round2(n) {

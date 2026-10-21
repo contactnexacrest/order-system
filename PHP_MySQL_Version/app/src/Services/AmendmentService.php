@@ -66,9 +66,16 @@ final class AmendmentService
 
         $snapshot = [
             'quotation_ref'       => $qtDoc['document_reference'] ?? null,
-            'quotation_date'      => $qtDoc ? DocumentDataAssembler::formatDate(substr((string) $qtDoc['generated_at'], 0, 10)) : null,
+            // User-reported batch item 6: generated_at comes back from
+            // MySQL already converted to IST (the connection's session
+            // time zone — see Database::connection()), so truncating it
+            // to its first 10 characters before formatDate() already
+            // gave the correct IST calendar date; passing the full value
+            // through is simply the more direct equivalent of the
+            // Node port's own fix for the same field.
+            'quotation_date'      => $qtDoc ? DocumentDataAssembler::formatDate($qtDoc['generated_at']) : null,
             'pi_ref'              => $piDoc['document_reference'] ?? null,
-            'pi_date'             => $piDoc ? DocumentDataAssembler::formatDate(substr((string) $piDoc['generated_at'], 0, 10)) : null,
+            'pi_date'             => $piDoc ? DocumentDataAssembler::formatDate($piDoc['generated_at']) : null,
             'oc_ref'              => $ocDoc['document_reference'] ?? null,
             'product_summary'     => $productSummary,
             'total_fob_value'     => number_format($fobValue, 2),

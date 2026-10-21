@@ -71,9 +71,15 @@ async function createRequest(
 
   const snapshot = {
     quotation_ref: (qtDoc && qtDoc.document_reference) || null,
-    quotation_date: qtDoc ? documentDataAssembler.formatDate(String(qtDoc.generated_at).substring(0, 10)) : null,
+    // User-reported batch item 6: generated_at is a UTC-stored TIMESTAMP
+    // (see config/db.js) — truncating it to its first 10 characters
+    // before formatDate() took the raw UTC calendar date, which can be a
+    // day behind the correct IST one. formatDate() itself now converts a
+    // time-bearing value from UTC before reading its calendar date, so
+    // the full value is passed through instead of a pre-truncated one.
+    quotation_date: qtDoc ? documentDataAssembler.formatDate(qtDoc.generated_at) : null,
     pi_ref: (piDoc && piDoc.document_reference) || null,
-    pi_date: piDoc ? documentDataAssembler.formatDate(String(piDoc.generated_at).substring(0, 10)) : null,
+    pi_date: piDoc ? documentDataAssembler.formatDate(piDoc.generated_at) : null,
     oc_ref: (ocDoc && ocDoc.document_reference) || null,
     product_summary: productSummary,
     total_fob_value: formatMoney(fobValue),

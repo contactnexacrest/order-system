@@ -39,6 +39,15 @@ require __DIR__ . '/Support/DbTestCase.php';
 
 use App\Config\Env;
 
+// User-reported batch item 6: this bootstrap never set the default
+// timezone, so every test ran under PHP's php.ini default (UTC) while
+// the real app (via ../bootstrap.php) has run under Asia/Kolkata all
+// along — a gap that let a real IST-vs-UTC mismatch between PHP and the
+// MySQL session (see Database::connection()'s own fix) go completely
+// uncovered by the test suite. Matching the real app's timezone here is
+// what makes a test of that fix actually exercise production behaviour.
+date_default_timezone_set('Asia/Kolkata');
+
 Env::load(__DIR__ . '/../.env');
 putenv('DB_DATABASE=nexacrest_phpunit_test');
 $_ENV['DB_DATABASE'] = 'nexacrest_phpunit_test';
