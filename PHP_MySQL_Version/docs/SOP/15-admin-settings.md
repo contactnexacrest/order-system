@@ -336,7 +336,13 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
 - **Assets** — logo, company seal, and signature images used across every
   document template.
 - **Signatories** — which users are eligible to sign which document types,
-  and their designation.
+  and their designation. Each document type can be pointed at a specific
+  signatory (falling back to one global default if not set); whoever is
+  resolved prints with their own name, designation, signature and
+  designation seal. The Payment Terms Amendment (AMD) document type is
+  seeded to default to the Managing Director for exactly this reason — it's
+  not hardcoded, so it can be repointed here to any other eligible user
+  (and designation) at any time, the same as any other document type.
 - **Field Protection** — which specific fields are locked from casual
   editing once set (e.g. the BL type field mentioned in Stage 7).
 - **Admin Overrides** — a log/interface for the various "override" actions

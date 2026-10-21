@@ -40,15 +40,19 @@ From **Amendments** on the order page, the full sequence is:
 
    ![Amendment created, pending MD approval](./images/amd_pending.png)
 
-2. **MD Approve** — a Managing Director-level sign-off is required before
-   any amendment document exists at all; **Reject** is available instead if
-   it shouldn't proceed.
+2. **MD Approve** — sign-off from whoever holds the `approve_documents`
+   permission is required before any amendment document exists at all;
+   **Reject** is available instead if it shouldn't proceed.
 3. **Generate Agreement Document** — produces the actual Payment Terms
    Amendment Agreement PDF, with a blank importer signature/designation/date
    section exactly like the AMD document discussed for Stage 2's Buyer PO —
    these fields are never pre-filled or editable anywhere in the system;
    the importer's actual signature only ever exists on the physical/scanned
-   returned copy.
+   returned copy. NexaCrest's own side of the signature block — the
+   signatory whose name/designation/seal print opposite the importer's —
+   defaults to the Managing Director, configurable from Settings →
+   Signatories → Per-Document-Type Default like any other document type
+   (see Chapter 15).
 4. **Upload Signed Copy & Activate** — once the importer's countersigned
    copy comes back, staff upload it here directly.
 
