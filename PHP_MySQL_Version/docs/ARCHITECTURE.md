@@ -54,8 +54,8 @@ Bluehost shared hosting only exposes one web root (typically `public_html`); eve
 │   ├── cron/                       (scheduled jobs: deferred_send.php, expiry_alerts.php, balance_followup.php)
 │   ├── vendor/                     (Composer packages)
 │   ├── composer.json
-│   └── .env                        (never committed; DB creds, SMTP creds, SESSION_SECRET_KEY,
-│                                     APP_ENCRYPTION_KEY, STORAGE_BASE_PATH)
+│   └── .env                        (never committed; DB creds, SMTP creds, STORAGE_BASE_PATH —
+│                                     PHP's native session needs no app-level secret key)
 │
 ├── storage/                        ← OUTSIDE web root — exactly the structure in spec Section 3:
 │   ├── assets/{logos,signatures,seals,watermarks,email_headers}/

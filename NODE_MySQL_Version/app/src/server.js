@@ -224,7 +224,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(session({
   store: new ConnectSessionKnexStore({ knex: sessionKnex, createTable: true, tableName: 'sessions', sidFieldName: 'sid' }),
   name: 'nexacrest_session',
-  secret: env.get('SESSION_SECRET_KEY', 'change-this-in-.env'),
+  secret: env.sessionSecret(),
   resave: false,
   saveUninitialized: false,
   rolling: false,

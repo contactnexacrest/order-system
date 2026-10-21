@@ -55,4 +55,29 @@ function isDevServer() {
   return getBool('DEV_SERVER', false);
 }
 
-module.exports = { get, getBool, getInt, isLocal, isDevServer };
+// 90-item backlog ".env fallbacks": express-session signs the session-id
+// cookie with this secret to stop tampering/forgery — unlike PHP's native
+// session, which needs no app-level secret since PHP's own CSPRNG
+// generates the session ID. server.js used to fall back to the literal
+// string 'change-this-in-.env' whenever SESSION_SECRET_KEY was unset, with
+// nothing to stop that silently reaching a real deployment — anyone who's
+// read this (or any other NexaCrest) deployment's source then knows the
+// exact secret, and can forge a validly-signed session cookie. Outside
+// local dev (where tests/support/testEnv.js always supplies one), a
+// missing value now fails loudly at startup instead of limping on with a
+// guessable secret.
+function sessionSecret() {
+  const value = get('SESSION_SECRET_KEY');
+  if (value) {
+    return value;
+  }
+  if (!isLocal()) {
+    throw new Error(
+      'SESSION_SECRET_KEY is not set in .env. Refusing to start with a guessable ' +
+        'session-signing secret outside local development — set a real random value.'
+    );
+  }
+  return 'change-this-in-.env';
+}
+
+module.exports = { get, getBool, getInt, isLocal, isDevServer, sessionSecret };

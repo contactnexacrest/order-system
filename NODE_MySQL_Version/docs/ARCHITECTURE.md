@@ -55,7 +55,7 @@ Bluehost shared hosting only exposes one web root (typically `public_html`); eve
 │   ├── vendor/                     (Composer packages)
 │   ├── composer.json
 │   └── .env                        (never committed; DB creds, SMTP creds, SESSION_SECRET_KEY,
-│                                     APP_ENCRYPTION_KEY, STORAGE_BASE_PATH)
+│                                     STORAGE_BASE_PATH)
 │
 ├── storage/                        ← OUTSIDE web root — exactly the structure in spec Section 3:
 │   ├── assets/{logos,signatures,seals,watermarks,email_headers}/
