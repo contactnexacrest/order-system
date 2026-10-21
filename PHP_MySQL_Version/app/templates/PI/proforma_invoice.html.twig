@@ -12,7 +12,7 @@
 {% endblock %}
 
 {% block banner %}
-<div class="banner banner-amber">&#9201;&nbsp; <span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.pi_valid_until ?: 'To Be Confirmed' }}</span> &nbsp;&nbsp;<span class="note">Payment must be received before this date for prices and terms to remain valid.</span></div>
+<div class="banner banner-amber"><span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.pi_valid_until ?: 'To Be Confirmed' }}</span> &nbsp;&nbsp;<span class="note">Payment must be received before this date for prices and terms to remain valid.</span></div>
 <div class="banner banner-green"><span class="label">GST DECLARATION:</span> <span class="value">Supply meant for export under Letter of Undertaking (LUT) without payment of Integrated Tax (IGST).</span> <span class="label">LUT Order No.: {{ company.lut_number }}</span> <span class="value">&nbsp;·&nbsp; Valid for {{ company.lut_valid_fy }} &nbsp;·&nbsp; GSTIN: {{ company.gstin }}</span></div>
 {% endblock %}
 

@@ -54,11 +54,11 @@
 
 <div class="section-title">5. CONTAINER &amp; CARGO DETAILS</div>
 <table class="kv kv-solid">
-  <tr><td class="k">Container Load Type *</td><td class="v checkbox-row"><span class="box checked"><span class="cbx">&#10003;</span>FCL (Full Container Load)</span> &nbsp;&nbsp; <span class="box"><span class="cbx"></span>LCL (Less than Container Load)</span></td></tr>
+  <tr><td class="k">Container Load Type *</td><td class="v checkbox-row"><span class="box checked"><span class="cbx">&#8730;</span>FCL (Full Container Load)</span> &nbsp;&nbsp; <span class="box"><span class="cbx"></span>LCL (Less than Container Load)</span></td></tr>
   <tr><td class="k">Container Size *</td><td class="v checkbox-row">
-    <span class="box{{ ' checked' if '20ft' in order.container_type else '' }}"><span class="cbx">{{ ('&#10003;' if '20ft' in order.container_type else '')|safe }}</span>20ft Standard</span> &nbsp;
-    <span class="box{{ ' checked' if ('40ft' in order.container_type and 'High Cube' not in order.container_type) else '' }}"><span class="cbx">{{ ('&#10003;' if ('40ft' in order.container_type and 'High Cube' not in order.container_type) else '')|safe }}</span>40ft Standard</span> &nbsp;
-    <span class="box{{ ' checked' if 'High Cube' in order.container_type else '' }}"><span class="cbx">{{ ('&#10003;' if 'High Cube' in order.container_type else '')|safe }}</span>40ft High Cube</span>
+    <span class="box{{ ' checked' if '20ft' in order.container_type else '' }}"><span class="cbx">{{ ('&#8730;' if '20ft' in order.container_type else '')|safe }}</span>20ft Standard</span> &nbsp;
+    <span class="box{{ ' checked' if ('40ft' in order.container_type and 'High Cube' not in order.container_type) else '' }}"><span class="cbx">{{ ('&#8730;' if ('40ft' in order.container_type and 'High Cube' not in order.container_type) else '')|safe }}</span>40ft Standard</span> &nbsp;
+    <span class="box{{ ' checked' if 'High Cube' in order.container_type else '' }}"><span class="cbx">{{ ('&#8730;' if 'High Cube' in order.container_type else '')|safe }}</span>40ft High Cube</span>
   </td></tr>
   <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no or 'To Be Confirmed — to be confirmed by shipping line after stuffing' }}</td></tr>
   <tr><td class="k">Seal No. *</td><td class="v">{{ shipping.seal_no or 'To Be Confirmed — to be confirmed after stuffing' }}</td></tr>
@@ -85,14 +85,14 @@
 <div class="section-title">7. FREIGHT &amp; CHARGES ON BL &nbsp;|&nbsp; {{ order.incoterm_label }}</div>
 <table class="kv kv-solid">
   <tr><td class="k">Freight Terms *</td><td class="v checkbox-row">
-    <span class="box{{ '' if order.is_fob else ' checked' }}"><span class="cbx">{{ ('' if order.is_fob else '&#10003;')|safe }}</span>Freight Prepaid (seller pays freight — CFR/CIF)</span> &nbsp;&nbsp;
-    <span class="box{{ ' checked' if order.is_fob else '' }}"><span class="cbx">{{ ('&#10003;' if order.is_fob else '')|safe }}</span>Freight Collect (buyer pays freight — FOB)</span>
+    <span class="box{{ '' if order.is_fob else ' checked' }}"><span class="cbx">{{ ('' if order.is_fob else '&#8730;')|safe }}</span>Freight Prepaid (seller pays freight — CFR/CIF)</span> &nbsp;&nbsp;
+    <span class="box{{ ' checked' if order.is_fob else '' }}"><span class="cbx">{{ ('&#8730;' if order.is_fob else '')|safe }}</span>Freight Collect (buyer pays freight — FOB)</span>
   </td></tr>
   <tr><td class="k">Freight Amount</td><td class="v">{{ 'N/A — Freight Collect' if order.is_fob else ((freight.confirmed_freight_rate or 'To Be Confirmed') ~ ' ' ~ order.currency_code) }}</td></tr>
 </table>
 
 <div class="banner banner-red">
-  <span class="headline">&#9888;&nbsp; MANDATORY — DRAFT BL APPROVAL REQUIRED BEFORE ORIGINALS ARE ISSUED</span>
+  <span class="headline">&#8252;&nbsp; MANDATORY — DRAFT BL APPROVAL REQUIRED BEFORE ORIGINALS ARE ISSUED</span>
   <span class="sub">CHA / Shipping Line must send the complete draft Bill of Lading to NexaCrest for written approval before issuing any original BL. No original BL may be issued without NexaCrest's prior written approval. Send draft BL to NexaCrest at contact details in Section 1 above.</span>
 </div>
 

@@ -261,7 +261,7 @@
 {% if terms is defined and terms is not empty %}
 <div class="section-title">{{ terms_section_number }}. {{ terms_section_title }}</div>
 {% if order.include_annexure_a and annexure_has_content %}
-<div class="annexure-notice">&#9888; Annexure A is attached and forms an integral part of this {{ doc_title|lower }}. Refer Annexure A for full details.</div>
+<div class="annexure-notice">&#8252; Annexure A is attached and forms an integral part of this {{ doc_title|lower }}. Refer Annexure A for full details.</div>
 {% endif %}
 <ul class="terms">
   {% for clause in terms %}

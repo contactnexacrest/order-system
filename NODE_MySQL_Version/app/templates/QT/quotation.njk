@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block banner %}
-<div class="banner banner-amber">&#9201;&nbsp; <span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.quotation_valid_until or 'To Be Confirmed' }}</span> &nbsp;&nbsp;<span class="note">Prices and terms are not valid after this date.</span></div>
+<div class="banner banner-amber"><span class="label">VALID UNTIL *</span> &nbsp; <span class="value">{{ order.quotation_valid_until or 'To Be Confirmed' }}</span> &nbsp;&nbsp;<span class="note">Prices and terms are not valid after this date.</span></div>
 {% endblock %}
 
 {% block body %}

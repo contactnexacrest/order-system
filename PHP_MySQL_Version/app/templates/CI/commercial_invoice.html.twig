@@ -101,12 +101,12 @@
   </tr>
   <tr><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION B — PAYMENT SETTLEMENT</td></tr>
   <tr>
-    <td class="k">&#10003;&nbsp; {{ financial.advance_pct }}% Advance — {{ payment_status.advance_cleared_at ? 'RECEIVED' : 'PENDING' }}</td>
+    <td class="k">&#8730;&nbsp; {{ financial.advance_pct }}% Advance — {{ payment_status.advance_cleared_at ? 'RECEIVED' : 'PENDING' }}</td>
     <td class="v" style="text-align:right;">{{ order.currency_code }} {{ payment_status.advance_amount ?: financial.advance_amount }} <strong style="color:#C0392B;">*</strong></td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Received: {{ payment_status.advance_cleared_at ?: 'To Be Confirmed' }}<br>Against: PI No. {{ order.pi_ref ?: 'To Be Confirmed' }}</td>
   </tr>
   <tr>
-    <td class="k">&#10003;&nbsp; Freight &amp; Insurance — {% if order.is_fob %}NIL (FOB){% else %}{{ payment_status.freight_cleared_at ? 'PAID VIA FDN' : 'PENDING' }}{% endif %}</td>
+    <td class="k">&#8730;&nbsp; Freight &amp; Insurance — {% if order.is_fob %}NIL (FOB){% else %}{{ payment_status.freight_cleared_at ? 'PAID VIA FDN' : 'PENDING' }}{% endif %}</td>
     <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB{% else %}{{ order.currency_code }} {{ payment_status.freight_amount ?: 'To Be Confirmed' }} <strong style="color:#C0392B;">*</strong>{% endif %}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}CFR/CIF: Against FDN No. {{ order.fdn_ref ?: 'To Be Confirmed' }} dated {{ order.fdn_date ?: 'To Be Confirmed' }}{% endif %}</td>
   </tr>
@@ -116,13 +116,13 @@
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{{ financial.advance_pct }}% Advance{% if not order.is_fob %} + FDN (if applicable){% endif %}</td>
   </tr>
   <tr>
-    <td class="k" style="background:#FFF3CD; font-weight:bold;">&#8658;&nbsp; BALANCE DUE NOW</td>
+    <td class="k" style="background:#FFF3CD; font-weight:bold;">&#8594;&nbsp; BALANCE DUE NOW</td>
     <td class="v" style="background:#FFF3CD; text-align:right; font-weight:bold; color:#8A1F1F;">{{ order.currency_code }} {{ payment_status.balance_amount ?: financial.balance_amount }} <strong>*</strong></td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">= FOB Value minus {{ financial.advance_pct }}% advance received<br>Payable by T/T (Telegraphic Transfer) within {{ financial.ci_balance_days_post_bl }} Calendar Days of the date NexaCrest emails the scanned BL copy<br>Against scanned copy of Bill of Lading<br>Payment Reference: Quote CI No. {{ meta.document_reference }}</td>
   </tr>
   <tr>
     <td class="k">VERIFICATION</td>
-    <td class="v" style="text-align:right;">Advance + Balance = FOB Value<br>{{ payment_status.advance_amount ?: financial.advance_amount }} + {{ payment_status.balance_amount ?: financial.balance_amount }} = {{ financial.fob_value }} &#10003;</td>
+    <td class="v" style="text-align:right;">Advance + Balance = FOB Value<br>{{ payment_status.advance_amount ?: financial.advance_amount }} + {{ payment_status.balance_amount ?: financial.balance_amount }} = {{ financial.fob_value }} &#8730;</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Freight &amp; Insurance paid separately via FDN — not included in CI value or this verification.</td>
   </tr>
 </table>

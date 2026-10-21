@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block banner %}
-<div class="banner banner-amber">&#9201;&nbsp; <span class="label">EFFECTIVE DATE OF AMENDMENT *</span> &nbsp; <span class="value">{{ amendment.effective_from or 'To Be Confirmed — date from which amended terms apply' }}</span> &nbsp;&nbsp;<span class="note">This amendment is not valid unless signed by authorised representatives of both parties.</span></div>
+<div class="banner banner-amber"><span class="label">EFFECTIVE DATE OF AMENDMENT *</span> &nbsp; <span class="value">{{ amendment.effective_from or 'To Be Confirmed — date from which amended terms apply' }}</span> &nbsp;&nbsp;<span class="note">This amendment is not valid unless signed by authorised representatives of both parties.</span></div>
 {% endblock %}
 
 {% block section1 %}
@@ -54,7 +54,7 @@
 </table>
 
 <div class="section-title">3. ORIGINAL PAYMENT TERMS — AS STATED IN PROFORMA INVOICE</div>
-<div class="box-warning-red">&#9888; Copy these terms exactly from the original Proforma Invoice — character for character. Any difference between what is written here and what appears on the PI may be used to argue that the terms were already varied before this amendment. Exact copy only.</div>
+<div class="box-warning-red">&#8252; Copy these terms exactly from the original Proforma Invoice — character for character. Any difference between what is written here and what appears on the PI may be used to argue that the terms were already varied before this amendment. Exact copy only.</div>
 <table class="kv">
   <tr><td class="k">Advance Payment *</td><td class="v">{{ amendment.original.advance_terms_text or '—' }}</td></tr>
   <tr><td class="k">Advance Amount *</td><td class="v">{{ amendment.original.currency }} {{ amendment.original.advance_amount or '—' }}</td></tr>
@@ -70,7 +70,7 @@
 </table>
 
 <div class="section-title">4. AMENDED PAYMENT TERMS — REPLACING SECTION 3 ABOVE</div>
-<div class="box-confirm-green">&#9989;&nbsp; These amended terms replace the original payment terms stated in Section 3 above in their entirety. All other terms and conditions of the original Quotation and Proforma Invoice remain unchanged and in full force.</div>
+<div class="box-confirm-green">&#8730;&nbsp; These amended terms replace the original payment terms stated in Section 3 above in their entirety. All other terms and conditions of the original Quotation and Proforma Invoice remain unchanged and in full force.</div>
 <table class="kv">
   <tr><td class="k">Amended Advance Payment *</td><td class="v">{{ amendment.amended.advance_terms_text or 'Unchanged from Section 3 above' }}</td></tr>
   <tr><td class="k">Amended Advance Amount *</td><td class="v">{{ (amendment.original.currency ~ ' ' ~ amendment.amended.advance_amount) if amendment.amended.advance_amount else 'Unchanged from Section 3 above' }}</td></tr>
