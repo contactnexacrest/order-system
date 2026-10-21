@@ -56,12 +56,14 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
       <div class="card-nested">
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>" <?= $annexureConfirmAttr() ?>>
           <?= Csrf::field() ?>
-          <label>Name *<input type="text" name="name" value="<?= htmlspecialchars($p['name']) ?>" required></label>
-          <label>Description<textarea name="description" rows="2"><?= htmlspecialchars($p['description'] ?? '') ?></textarea></label>
-          <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
-          <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
-          <label>Components<textarea name="components" rows="2"><?= htmlspecialchars($p['components'] ?? '') ?></textarea></label>
-          <label>Technical Notes<textarea name="technical_notes" rows="2"><?= htmlspecialchars($p['technical_notes'] ?? '') ?></textarea></label>
+          <div class="field-grid">
+            <label>Name *<input type="text" name="name" value="<?= htmlspecialchars($p['name']) ?>" required></label>
+            <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
+            <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
+            <label class="full">Description<textarea name="description" rows="2"><?= htmlspecialchars($p['description'] ?? '') ?></textarea></label>
+            <label class="full">Components<textarea name="components" rows="2"><?= htmlspecialchars($p['components'] ?? '') ?></textarea></label>
+            <label class="full">Technical Notes<textarea name="technical_notes" rows="2"><?= htmlspecialchars($p['technical_notes'] ?? '') ?></textarea></label>
+          </div>
           <button type="submit" class="btn-sm">Save</button>
         </form>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>/delete" style="display:inline" <?= $annexureConfirmAttr('Remove this product entry and its images?') ?>>
