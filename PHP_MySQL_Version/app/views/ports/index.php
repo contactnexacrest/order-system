@@ -2,6 +2,7 @@
 <div class="card page-wide">
   <h1>Ports — Loading &amp; Discharge</h1>
   <p class="muted">The list staff pick from on the New Order form's Port of Loading / Port of Discharge dropdowns. A port tagged "Loading &amp; Discharge" shows up in both lists. One port per role (or marked "Loading &amp; Discharge") can be the default that's pre-selected on a new order.</p>
+  <p class="muted small"><a href="/port-routes">Port Routes — sailing-days reference &rarr;</a></p>
 
   <div class="section">
     <div class="btn-row"><a href="/ports/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Port</a></div>

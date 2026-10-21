@@ -88,6 +88,8 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
       est_lead_time_text: source.est_lead_time_text,
       lead_time_min_days: source.lead_time_min_days,
       lead_time_max_days: source.lead_time_max_days,
+      sailing_lead_time_min_days: source.sailing_lead_time_min_days,
+      sailing_lead_time_max_days: source.sailing_lead_time_max_days,
       indicative_freight_amount: source.indicative_freight_amount,
       indicative_insurance_amount: source.indicative_insurance_amount,
       buyers_po_ref: 'NIL', // the buyer's own ref is specific to each order — staff records the new one

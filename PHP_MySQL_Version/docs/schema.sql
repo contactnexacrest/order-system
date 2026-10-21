@@ -76,6 +76,25 @@ CREATE TABLE ports (
   sort_order    INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
 
+-- 90-item backlog item 15: a reference document of known port-to-port
+-- sailing times, so a route's sailing lead time can be looked up (and
+-- offered to auto-fill the order's own sailing_lead_time_min/max_days)
+-- instead of staff re-estimating it from memory for every order. Kept as
+-- its own reference table, never hard-deleted (same convention as
+-- `ports` itself) since nothing here is tied to a specific order.
+CREATE TABLE port_routes (
+  id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  port_of_loading_id      BIGINT UNSIGNED NOT NULL,
+  port_of_discharge_id    BIGINT UNSIGNED NOT NULL,
+  sailing_days_min        INT UNSIGNED NOT NULL,
+  sailing_days_max        INT UNSIGNED NOT NULL,
+  notes                   VARCHAR(255) NULL,
+  is_active               TINYINT(1) NOT NULL DEFAULT 1,
+  UNIQUE KEY uq_port_routes_pair (port_of_loading_id, port_of_discharge_id),
+  FOREIGN KEY (port_of_loading_id) REFERENCES ports(id),
+  FOREIGN KEY (port_of_discharge_id) REFERENCES ports(id)
+) ENGINE=InnoDB;
+
 CREATE TABLE incoterms (
   id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   code                VARCHAR(10) NOT NULL,        -- FOB / CFR / CIF
@@ -490,6 +509,11 @@ CREATE TABLE orders (
   lead_time_max_days       INT UNSIGNED NULL,              -- structured min/max in days, alongside (never replacing)
                                                             -- est_lead_time_text above — internal reporting/sorting
                                                             -- only, not shown on any customer-facing document
+                                                            -- ("Production Lead Time" in the UI) —
+  sailing_lead_time_min_days INT UNSIGNED NULL,            -- 90-item backlog item 15: a SEPARATE lead-time pair for
+  sailing_lead_time_max_days INT UNSIGNED NULL,            -- the sea transit itself, auto-suggested from port_routes
+                                                            -- once both ports are picked (still freely editable) —
+                                                            -- same "internal only" scope as the pair above
   indicative_freight_low   DECIMAL(14,2) NULL,             -- CFR/CIF only
   indicative_freight_high  DECIMAL(14,2) NULL,
   indicative_insurance_amount DECIMAL(14,2) NULL,

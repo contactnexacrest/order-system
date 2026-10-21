@@ -30,7 +30,7 @@
           </select>
         </label>
         <label>Port of Loading
-          <select name="port_of_loading_id">
+          <select name="port_of_loading_id" id="port-of-loading-select" onchange="lookupSailingLeadTime()">
             <?php foreach ($loadingPorts as $p): ?>
               <option value="<?= (int) $p['id'] ?>" <?= isset($old['port_of_loading_id']) ? ((int) $p['id'] === (int) $old['port_of_loading_id'] ? 'selected' : '') : ($p['is_default'] ? 'selected' : '') ?>><?= htmlspecialchars($p['name']) ?></option>
             <?php endforeach; ?>
@@ -67,7 +67,7 @@
           </select>
         </label>
         <label>Port of Discharge <small class="muted">(select if it's a repeat port, or type a new one below)</small>
-          <select name="port_of_discharge_id">
+          <select name="port_of_discharge_id" id="port-of-discharge-select" onchange="lookupSailingLeadTime()">
             <option value="">— Type below instead —</option>
             <?php foreach ($dischargePorts as $p): ?>
               <option value="<?= (int) $p['id'] ?>" <?= (isset($old['port_of_discharge_id']) && (int) $p['id'] === (int) $old['port_of_discharge_id']) ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
@@ -80,11 +80,17 @@
         <label class="full">Est. Lead Time <small class="muted">(free text, shown on the Quotation)</small>
           <input type="text" name="est_lead_time_text" value="<?= htmlspecialchars((string) ($old['est_lead_time_text'] ?? '')) ?>" placeholder="e.g. 45-60 days from advance receipt">
         </label>
-        <label>Lead Time Min (days) <small class="muted">(internal only, not shown on documents)</small>
+        <label>Production Lead Time Min (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="lead_time_min_days" value="<?= htmlspecialchars((string) ($old['lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 45">
         </label>
-        <label>Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
+        <label>Production Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="lead_time_max_days" value="<?= htmlspecialchars((string) ($old['lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 60">
+        </label>
+        <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from <a href="/port-routes" target="_blank">Port Routes</a> once both ports are picked, still editable)</small>
+          <input type="number" min="0" name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="<?= htmlspecialchars((string) ($old['sailing_lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 18">
+        </label>
+        <label>Sailing Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
+          <input type="number" min="0" name="sailing_lead_time_max_days" id="sailing-lead-time-max" value="<?= htmlspecialchars((string) ($old['sailing_lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 24">
         </label>
       </div>
     </fieldset>
@@ -195,6 +201,30 @@ function updateFreightCurrencyLabels(selectEl) {
   if (insuranceLabel) { insuranceLabel.textContent = code; }
 }
 updateFreightCurrencyLabels(document.getElementById('order-currency-select'));
+
+// 90-item backlog item 15: once both ports are picked, offer (never
+// force — the fields stay freely editable) a sailing lead-time suggestion
+// from the Port Routes reference document. Only fills in currently-blank
+// fields, so it never clobbers a value staff already typed.
+function lookupSailingLeadTime() {
+  var fromSel = document.getElementById('port-of-loading-select');
+  var toSel = document.getElementById('port-of-discharge-select');
+  var minField = document.getElementById('sailing-lead-time-min');
+  var maxField = document.getElementById('sailing-lead-time-max');
+  if (!fromSel || !toSel || !minField || !maxField) { return; }
+  var from = fromSel.value;
+  var to = toSel.value;
+  if (!from || !to) { return; }
+  fetch('/port-routes/lookup?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to))
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data && data.found) {
+        if (minField.value === '') { minField.value = data.min; }
+        if (maxField.value === '') { maxField.value = data.max; }
+      }
+    })
+    .catch(function () { /* best-effort suggestion only — a failed lookup never blocks the form */ });
+}
 
 document.getElementById('add-product-row').addEventListener('click', function () {
   var rows = document.getElementById('product-rows');

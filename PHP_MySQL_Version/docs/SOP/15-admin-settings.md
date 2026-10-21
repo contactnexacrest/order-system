@@ -229,6 +229,21 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   informational fields on the Order Detail page and the Bill of Lading's
   own endorsement defaults are unaffected — those conventionally show the
   specific terminal name, not the city.
+- **Port Routes** (`/port-routes`) — 90-item backlog item 15: a reference
+  document of known port-to-port sailing times, gated by the same
+  `manage_ports` permission as Ports itself (linked from the Ports
+  screen). Each route carries a **Port of Loading**, a **Port of
+  Discharge**, a **Sailing Days Min/Max** range, and optional **Notes**
+  (e.g. "Direct service, no transshipment"). One route per port pair —
+  recording the same pair twice is refused with a message pointing at the
+  existing entry; edit that one instead. A route already quoted from is
+  never deleted outright — deactivate it instead, same convention as
+  every other admin-editable list on this page. Once both ports are
+  picked on the New Order form or the order's own Edit Details screen, a
+  matching active route auto-fills the order's **Sailing Lead Time
+  Min/Max (days)** fields (see below) — a suggestion only: it never
+  overwrites a value staff already typed, and staff can always change it
+  afterward.
 - **Payment Presets** (`/payment-presets`) — full CRUD for the advance/
   balance split every order picks up, gated by its own
   `manage_payment_presets` permission (same tier as Logistics Partners:

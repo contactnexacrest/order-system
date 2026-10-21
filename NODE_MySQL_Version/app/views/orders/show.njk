@@ -296,7 +296,8 @@
       <div><span class="k">FOB Value</span><span class="v">{{ order.currency_code }} {{ fobTotal | money }}</span></div>
       <div><span class="k">Port of Discharge</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or 'To Be Confirmed' }}</span></div>
       <div><span class="k">Container Type</span><span class="v">{{ order.container_type or '—' }}</span></div>
-      <div><span class="k">Lead Time (days)</span><span class="v">{% if order.lead_time_min_days != null or order.lead_time_max_days != null %}{{ order.lead_time_min_days if order.lead_time_min_days != null else '?' }}–{{ order.lead_time_max_days if order.lead_time_max_days != null else '?' }}{% else %}—{% endif %}</span></div>
+      <div><span class="k">Production Lead Time (days)</span><span class="v">{% if order.lead_time_min_days != null or order.lead_time_max_days != null %}{{ order.lead_time_min_days if order.lead_time_min_days != null else '?' }}–{{ order.lead_time_max_days if order.lead_time_max_days != null else '?' }}{% else %}—{% endif %}</span></div>
+      <div><span class="k">Sailing Lead Time (days)</span><span class="v">{% if order.sailing_lead_time_min_days != null or order.sailing_lead_time_max_days != null %}{{ order.sailing_lead_time_min_days if order.sailing_lead_time_min_days != null else '?' }}–{{ order.sailing_lead_time_max_days if order.sailing_lead_time_max_days != null else '?' }}{% else %}—{% endif %}</span></div>
       <div><span class="k">Payment Preset</span><span class="v">{{ order.preset_name }}</span></div>
       <div><span class="k">Buyer's PO Ref</span><span class="v">
         {% if order.buyers_po_ref and order.buyers_po_ref != 'NIL' %}

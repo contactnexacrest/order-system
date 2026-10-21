@@ -76,6 +76,7 @@ const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const logisticsPartnerController = require('./controllers/logisticsPartnerController');
 const portController = require('./controllers/portController');
+const portRouteController = require('./controllers/portRouteController');
 const paymentPresetController = require('./controllers/paymentPresetController');
 const dropdownOptionController = require('./controllers/dropdownOptionController');
 const complianceTaskTypeController = require('./controllers/complianceTaskTypeController');
@@ -433,6 +434,14 @@ app.get('/ports/:id/edit', requireAuth, requirePermission('manage_ports'), async
 app.post('/ports/:id/update', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portController.update));
 app.post('/ports/:id/toggle', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portController.toggleActive));
 app.post('/ports/:id/set-default', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portController.setDefault));
+
+app.get('/port-routes', requireAuth, requirePermission('manage_ports'), asyncHandler(portRouteController.index));
+app.get('/port-routes/create', requireAuth, requirePermission('manage_ports'), asyncHandler(portRouteController.createForm));
+app.post('/port-routes', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portRouteController.create));
+app.get('/port-routes/:id/edit', requireAuth, requirePermission('manage_ports'), asyncHandler(portRouteController.editForm));
+app.post('/port-routes/:id/update', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portRouteController.update));
+app.post('/port-routes/:id/toggle', requireAuth, requirePermission('manage_ports'), verifyCsrf, asyncHandler(portRouteController.toggleActive));
+app.get('/port-routes/lookup', requireAuth, requirePermission('manage_orders'), asyncHandler(portRouteController.lookup));
 
 app.get('/admin/dropdown-options', requireAuth, requirePermission('manage_dropdown_options'), asyncHandler(dropdownOptionController.index));
 app.post('/admin/dropdown-options/:listKey/create', requireAuth, requirePermission('manage_dropdown_options'), verifyCsrf, asyncHandler(dropdownOptionController.create));
