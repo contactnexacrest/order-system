@@ -143,6 +143,43 @@ async function run() {
     created += await notifyMdAndAdmin([...targets], 'dispute_overdue', `Dispute response overdue on order ${row.order_reference} — was due ${row.response_due_date}.`, row.order_id, usersById);
   }
 
+  // --- Quotation/PI validity expired, order still stuck at that stage ---
+  // 90-item backlog "expiry alerts": orders.quotation_valid_until and
+  // pi_valid_until (quotation_date/pi_date + their company_settings-driven
+  // validity span) have existed since the Quotation/PI documents
+  // themselves — rendered on every QT/PI as the buyer-facing "valid for N
+  // days" disclaimer — but nothing ever alerted STAFF when one actually
+  // lapsed with the order still sitting there, unconfirmed. Checked
+  // against is_locked = 0 (excludes complete/lost orders) and the order's
+  // own progress past the stage where that validity still matters: a
+  // quotation stops mattering once a PI is issued (pi_date set); a PI
+  // stops mattering once Order Confirmation (Stage 4) is reached.
+  const expiredQuotations = await db.query(
+    `SELECT o.id AS order_id, o.order_reference, o.quotation_valid_until
+     FROM orders o
+     WHERE o.is_locked = 0
+       AND o.quotation_valid_until IS NOT NULL
+       AND o.quotation_valid_until < CURDATE()
+       AND o.pi_date IS NULL`
+  );
+  for (const row of expiredQuotations) {
+    created += await notifyMdAndAdmin(mdAndAdminIds, 'quotation_expired', `Quotation validity expired on order ${row.order_reference} — was valid until ${row.quotation_valid_until}, still no PI issued.`, row.order_id, usersById);
+  }
+
+  const expiredPis = await db.query(
+    `SELECT o.id AS order_id, o.order_reference, o.pi_valid_until
+     FROM orders o
+     LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+     WHERE o.is_locked = 0
+       AND o.pi_valid_until IS NOT NULL
+       AND o.pi_valid_until < CURDATE()
+       AND o.pi_date IS NOT NULL
+       AND (sm.stage_number IS NULL OR sm.stage_number < 4)`
+  );
+  for (const row of expiredPis) {
+    created += await notifyMdAndAdmin(mdAndAdminIds, 'pi_expired', `Proforma Invoice validity expired on order ${row.order_reference} — was valid until ${row.pi_valid_until}, Order Confirmation not yet reached.`, row.order_id, usersById);
+  }
+
   return created;
 }
 

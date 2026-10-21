@@ -22,6 +22,11 @@ declare(strict_types=1);
  * never sends more than one email per user per condition per day.
  *
  * Usage: php /path/to/app/cron/check_alerts.php
+ *
+ * Wrapped in run() (mirroring the Node port's own run()/module.exports
+ * shape, src/jobs/checkAlerts.js) so a test can require this file once
+ * and call run() fresh per test case, instead of every assertion needing
+ * its own PHP process.
  */
 
 require __DIR__ . '/../bootstrap.php';
@@ -33,20 +38,6 @@ use App\Repositories\PermissionRepository;
 use App\Repositories\UserRepository;
 use App\Services\EmailService;
 use App\Services\WorkingDaysCalculator;
-
-$pdo = Database::connection();
-$today = new DateTimeImmutable('today');
-$created = 0;
-
-$activeUsersById = [];
-foreach (UserRepository::listActive() as $u) {
-    $activeUsersById[(int) $u['id']] = $u;
-}
-
-// Whoever can manage company settings is who these compliance-deadline
-// escalations are for — checked by permission, not a hardcoded role name,
-// since roles can be renamed via /admin/roles.
-$mdAndAdminIds = PermissionRepository::usersWithPermission('manage_company_settings');
 
 function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $relatedOrderId = null, array $activeUsersById = []): int
 {
@@ -65,76 +56,142 @@ function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $r
     return $count;
 }
 
-// --- LUT expiry ---
-$lutExpiry = CompanySettingsRepository::get('lut_expiry_date');
-if ($lutExpiry) {
-    $daysLeft = $today->diff(new DateTimeImmutable($lutExpiry))->days * (new DateTimeImmutable($lutExpiry) >= $today ? 1 : -1);
-    $alertDays = (int) (CompanySettingsRepository::get('lut_alert_days_x') ?? '30');
-    $escalationDays = (int) (CompanySettingsRepository::get('lut_escalation_days_y') ?? '15');
-    if ($daysLeft <= $escalationDays && $daysLeft >= 0) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_escalation', "ESCALATION: LUT expires in {$daysLeft} day(s) ({$lutExpiry}). Renew before 1 April or document generation will be blocked.", null, $activeUsersById);
-    } elseif ($daysLeft <= $alertDays && $daysLeft >= 0) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_expiry', "LUT expires in {$daysLeft} day(s) ({$lutExpiry}).", null, $activeUsersById);
+function run(): int
+{
+    $pdo = Database::connection();
+    $today = new DateTimeImmutable('today');
+    $created = 0;
+
+    $activeUsersById = [];
+    foreach (UserRepository::listActive() as $u) {
+        $activeUsersById[(int) $u['id']] = $u;
     }
+
+    // Whoever can manage company settings is who these compliance-deadline
+    // escalations are for — checked by permission, not a hardcoded role name,
+    // since roles can be renamed via /admin/roles.
+    $mdAndAdminIds = PermissionRepository::usersWithPermission('manage_company_settings');
+
+    // --- LUT expiry ---
+    $lutExpiry = CompanySettingsRepository::get('lut_expiry_date');
+    if ($lutExpiry) {
+        $daysLeft = $today->diff(new DateTimeImmutable($lutExpiry))->days * (new DateTimeImmutable($lutExpiry) >= $today ? 1 : -1);
+        $alertDays = (int) (CompanySettingsRepository::get('lut_alert_days_x') ?? '30');
+        $escalationDays = (int) (CompanySettingsRepository::get('lut_escalation_days_y') ?? '15');
+        if ($daysLeft <= $escalationDays && $daysLeft >= 0) {
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_escalation', "ESCALATION: LUT expires in {$daysLeft} day(s) ({$lutExpiry}). Renew before 1 April or document generation will be blocked.", null, $activeUsersById);
+        } elseif ($daysLeft <= $alertDays && $daysLeft >= 0) {
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_expiry', "LUT expires in {$daysLeft} day(s) ({$lutExpiry}).", null, $activeUsersById);
+        }
+    }
+
+    // --- RCMC expiry ---
+    $rcmcExpiry = CompanySettingsRepository::get('rcmc_valid_until');
+    if ($rcmcExpiry) {
+        $daysLeft = $today->diff(new DateTimeImmutable($rcmcExpiry))->days * (new DateTimeImmutable($rcmcExpiry) >= $today ? 1 : -1);
+        $alertDays = (int) (CompanySettingsRepository::get('rcmc_alert_days_a') ?? '60');
+        $escalationDays = (int) (CompanySettingsRepository::get('rcmc_escalation_days_b') ?? '30');
+        if ($daysLeft <= $escalationDays && $daysLeft >= 0) {
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_escalation', "ESCALATION: RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}). Renew with CAPEXIL.", null, $activeUsersById);
+        } elseif ($daysLeft <= $alertDays && $daysLeft >= 0) {
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_expiry', "RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}).", null, $activeUsersById);
+        }
+    }
+
+    // --- FDN payment overdue (freight generated, not yet cleared, C WORKING days
+    // elapsed) --- Real bug this closes: the CFR/CIF Indicative Freight Validity
+    // clause (seeded on QT and PI) is a written promise to the buyer that
+    // freight "must be received BEFORE shipment booking is confirmed... payable
+    // within 3 working days of issue" — but this check used plain calendar-day
+    // SQL arithmetic against fdn_overdue_days_c=7, so the alert didn't fire
+    // until 7 calendar days after issue. For the 4+ days between the buyer
+    // actually breaching their 3-WORKING-day written commitment and this alert
+    // finally firing, nothing in the system showed the payment as overdue at
+    // all. Aligned fdn_overdue_days_c to 3 (the clause's own figure) and
+    // switched the comparison to WorkingDaysCalculator, matching the same
+    // working-days-not-calendar-days fix already applied to the dispute
+    // response deadline.
+    $fdnOverdueDays = (int) (CompanySettingsRepository::get('fdn_overdue_days_c') ?? '3');
+    $stmt = $pdo->query(
+        "SELECT o.id AS order_id, o.order_reference, d.generated_at
+         FROM order_freight of_
+         JOIN documents d ON d.id = of_.fdn_document_id
+         JOIN orders o ON o.id = of_.order_id
+         LEFT JOIN order_payment_status ps ON ps.order_id = o.id
+         WHERE of_.fdn_document_id IS NOT NULL
+           AND ps.freight_cleared_at IS NULL"
+    );
+    foreach ($stmt->fetchAll() as $row) {
+        $dueDate = WorkingDaysCalculator::addWorkingDays(substr((string) $row['generated_at'], 0, 10), $fdnOverdueDays);
+        if ($dueDate < $today->format('Y-m-d')) {
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN issued {$row['generated_at']}, still not cleared.", (int) $row['order_id'], $activeUsersById);
+        }
+    }
+
+    // --- Dispute response overdue ---
+    $stmt = $pdo->query(
+        "SELECT d.id, d.order_id, d.response_due_date, d.assigned_to, o.order_reference
+         FROM disputes d JOIN orders o ON o.id = d.order_id
+         WHERE d.status IN ('Open', 'Under Review')
+           AND d.response_due_date IS NOT NULL
+           AND d.response_due_date < CURDATE()"
+    );
+    foreach ($stmt->fetchAll() as $row) {
+        $targets = $mdAndAdminIds;
+        if ($row['assigned_to']) {
+            $targets[] = (int) $row['assigned_to'];
+        }
+        $created += notifyMdAndAdmin(array_unique($targets), 'dispute_overdue', "Dispute response overdue on order {$row['order_reference']} — was due {$row['response_due_date']}.", (int) $row['order_id'], $activeUsersById);
+    }
+
+    // --- Quotation/PI validity expired, order still stuck at that stage ---
+    // 90-item backlog "expiry alerts": orders.quotation_valid_until and
+    // pi_valid_until (quotation_date/pi_date + their company_settings-driven
+    // validity span) have existed since the Quotation/PI documents
+    // themselves — rendered on every QT/PI as the buyer-facing "valid for N
+    // days" disclaimer — but nothing ever alerted STAFF when one actually
+    // lapsed with the order still sitting there, unconfirmed. A buyer who
+    // comes back to accept stale pricing/terms after the window closes is
+    // exactly the kind of risk this alert system exists to catch, same as
+    // every other deadline here — this was simply missing. Checked against
+    // is_locked = 0 (excludes complete/lost orders, which have nothing left
+    // to confirm) and the order's own progress past the stage where that
+    // validity still matters: a quotation stops mattering once a PI is
+    // issued (pi_date set); a PI stops mattering once Order Confirmation
+    // (Stage 4) is reached.
+    $stmt = $pdo->query(
+        "SELECT o.id AS order_id, o.order_reference, o.quotation_valid_until
+         FROM orders o
+         WHERE o.is_locked = 0
+           AND o.quotation_valid_until IS NOT NULL
+           AND o.quotation_valid_until < CURDATE()
+           AND o.pi_date IS NULL"
+    );
+    foreach ($stmt->fetchAll() as $row) {
+        $created += notifyMdAndAdmin($mdAndAdminIds, 'quotation_expired', "Quotation validity expired on order {$row['order_reference']} — was valid until {$row['quotation_valid_until']}, still no PI issued.", (int) $row['order_id'], $activeUsersById);
+    }
+
+    $stmt = $pdo->query(
+        "SELECT o.id AS order_id, o.order_reference, o.pi_valid_until
+         FROM orders o
+         LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+         WHERE o.is_locked = 0
+           AND o.pi_valid_until IS NOT NULL
+           AND o.pi_valid_until < CURDATE()
+           AND o.pi_date IS NOT NULL
+           AND (sm.stage_number IS NULL OR sm.stage_number < 4)"
+    );
+    foreach ($stmt->fetchAll() as $row) {
+        $created += notifyMdAndAdmin($mdAndAdminIds, 'pi_expired', "Proforma Invoice validity expired on order {$row['order_reference']} — was valid until {$row['pi_valid_until']}, Order Confirmation not yet reached.", (int) $row['order_id'], $activeUsersById);
+    }
+
+    return $created;
 }
 
-// --- RCMC expiry ---
-$rcmcExpiry = CompanySettingsRepository::get('rcmc_valid_until');
-if ($rcmcExpiry) {
-    $daysLeft = $today->diff(new DateTimeImmutable($rcmcExpiry))->days * (new DateTimeImmutable($rcmcExpiry) >= $today ? 1 : -1);
-    $alertDays = (int) (CompanySettingsRepository::get('rcmc_alert_days_a') ?? '60');
-    $escalationDays = (int) (CompanySettingsRepository::get('rcmc_escalation_days_b') ?? '30');
-    if ($daysLeft <= $escalationDays && $daysLeft >= 0) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_escalation', "ESCALATION: RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}). Renew with CAPEXIL.", null, $activeUsersById);
-    } elseif ($daysLeft <= $alertDays && $daysLeft >= 0) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_expiry', "RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}).", null, $activeUsersById);
-    }
+// Runnable directly (`php cron/check_alerts.php`) for a cPanel Cron Job,
+// but not when required by a test — $argv[0] is phpunit's own script
+// path in that case, never this file's.
+if (($argv[0] ?? null) && realpath($argv[0]) === __FILE__) {
+    $created = run();
+    echo "[check_alerts] created {$created} notification(s)." . PHP_EOL;
 }
-
-// --- FDN payment overdue (freight generated, not yet cleared, C WORKING days
-// elapsed) --- Real bug this closes: the CFR/CIF Indicative Freight Validity
-// clause (seeded on QT and PI) is a written promise to the buyer that
-// freight "must be received BEFORE shipment booking is confirmed... payable
-// within 3 working days of issue" — but this check used plain calendar-day
-// SQL arithmetic against fdn_overdue_days_c=7, so the alert didn't fire
-// until 7 calendar days after issue. For the 4+ days between the buyer
-// actually breaching their 3-WORKING-day written commitment and this alert
-// finally firing, nothing in the system showed the payment as overdue at
-// all. Aligned fdn_overdue_days_c to 3 (the clause's own figure) and
-// switched the comparison to WorkingDaysCalculator, matching the same
-// working-days-not-calendar-days fix already applied to the dispute
-// response deadline.
-$fdnOverdueDays = (int) (CompanySettingsRepository::get('fdn_overdue_days_c') ?? '3');
-$stmt = $pdo->query(
-    "SELECT o.id AS order_id, o.order_reference, d.generated_at
-     FROM order_freight of_
-     JOIN documents d ON d.id = of_.fdn_document_id
-     JOIN orders o ON o.id = of_.order_id
-     LEFT JOIN order_payment_status ps ON ps.order_id = o.id
-     WHERE of_.fdn_document_id IS NOT NULL
-       AND ps.freight_cleared_at IS NULL"
-);
-foreach ($stmt->fetchAll() as $row) {
-    $dueDate = WorkingDaysCalculator::addWorkingDays(substr((string) $row['generated_at'], 0, 10), $fdnOverdueDays);
-    if ($dueDate < $today->format('Y-m-d')) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN issued {$row['generated_at']}, still not cleared.", (int) $row['order_id'], $activeUsersById);
-    }
-}
-
-// --- Dispute response overdue ---
-$stmt = $pdo->query(
-    "SELECT d.id, d.order_id, d.response_due_date, d.assigned_to, o.order_reference
-     FROM disputes d JOIN orders o ON o.id = d.order_id
-     WHERE d.status IN ('Open', 'Under Review')
-       AND d.response_due_date IS NOT NULL
-       AND d.response_due_date < CURDATE()"
-);
-foreach ($stmt->fetchAll() as $row) {
-    $targets = $mdAndAdminIds;
-    if ($row['assigned_to']) {
-        $targets[] = (int) $row['assigned_to'];
-    }
-    $created += notifyMdAndAdmin(array_unique($targets), 'dispute_overdue', "Dispute response overdue on order {$row['order_reference']} — was due {$row['response_due_date']}.", (int) $row['order_id'], $activeUsersById);
-}
-
-echo "[check_alerts] created {$created} notification(s)." . PHP_EOL;
