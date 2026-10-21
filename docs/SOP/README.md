@@ -41,7 +41,7 @@ implementation detail.
 Two orders are followed live through this manual, with real screenshots
 from each real action:
 
-- **SC/OC/2026/001-2** — an FOB order to a repeat buyer, walked through all
+- **SC/ORD/2026/001-2** — an FOB order to a repeat buyer, walked through all
   9 stages start to finish (Chapters 1–5, 7–9). Being FOB, it auto-skips
   Stage 6.
 - **A second, CIF order to a Norwegian buyer** — used specifically for

@@ -204,6 +204,6 @@ this SOP's chapter list ("CA / Accounting"), starting with
 ## A running example
 
 Several chapters follow one real order end-to-end (referred to as
-**SC/OC/2026/001-2**) as it's walked through the pipeline, so you can see
+**SC/ORD/2026/001-2**) as it's walked through the pipeline, so you can see
 the same order at each stage rather than a different disconnected example
 every time.

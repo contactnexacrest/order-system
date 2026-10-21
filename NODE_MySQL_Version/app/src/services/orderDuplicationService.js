@@ -46,7 +46,7 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
   }
   const client = await clientRepository.find(source.client_id);
 
-  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/OC/{YYYY}/{NNN}';
+  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YYYY}/{NNN}';
   const testModeEnabled = await testModeService.isEnabled();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
   // 90-item backlog "timezone": todayIst() replaces the old

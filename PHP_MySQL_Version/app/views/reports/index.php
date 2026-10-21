@@ -82,7 +82,7 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <p class="muted">Search by order reference or client company name to jump straight to that order's Full Report.</p>
     <form method="get" action="/reports" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
       <label style="display:inline-block;width:auto;">Order reference or client name
-        <input type="text" name="q" value="<?= htmlspecialchars($searchQuery ?? '') ?>" placeholder="e.g., SC/OC/2026/001 or Test Company Ltd" style="width:280px;">
+        <input type="text" name="q" value="<?= htmlspecialchars($searchQuery ?? '') ?>" placeholder="e.g., SC/ORD/2026/001 or Test Company Ltd" style="width:280px;">
       </label>
       <button type="submit" class="btn-sm">Search</button>
     </form>

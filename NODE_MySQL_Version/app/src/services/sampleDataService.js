@@ -355,7 +355,7 @@ async function createSampleClient(companyName, billingAddress, userId, email = n
  */
 async function createSampleOrderShell(clientId, incoterm, currency, loadingPort, preset, userId, portOfDischargeText = null, includeAnnexureA = false) {
   const client = await clientRepository.find(clientId);
-  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/OC/{YYYY}/{NNN}';
+  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YYYY}/{NNN}';
   const now = new Date();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
   const quotationDate = formatDate(now);

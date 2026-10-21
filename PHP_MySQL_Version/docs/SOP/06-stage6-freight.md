@@ -20,7 +20,7 @@ before the rename keeps its original `SC/FDN/…` reference — it is never
 retroactively renumbered.
 
 > This chapter uses a **second example order** (a CIF order to a Norwegian
-> buyer) rather than the main running example — SC/OC/2026/001-2 is on FOB
+> buyer) rather than the main running example — SC/ORD/2026/001-2 is on FOB
 > terms, so Stage 6 auto-skips for it entirely (see the end of
 > [Chapter 5](./05-stage5-supplier-po.md)). Everything else about this
 > second order's journey through Stages 1–5 is identical to what the

@@ -355,7 +355,7 @@ async function store(req, res) {
   const portOfDischargeId = body.port_of_discharge_id ? parseInt(body.port_of_discharge_id, 10) : null;
   const portOfDischargeText = str(body.port_of_discharge_text);
 
-  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/OC/{YYYY}/{NNN}';
+  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YYYY}/{NNN}';
   const testModeEnabled = await testModeService.isEnabled();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
 

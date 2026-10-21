@@ -354,7 +354,7 @@ final class OrderController
         $portOfDischargeId = !empty($_POST['port_of_discharge_id']) ? (int) $_POST['port_of_discharge_id'] : null;
         $portOfDischargeText = trim((string) ($_POST['port_of_discharge_text'] ?? ''));
 
-        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/OC/{YYYY}/{NNN}';
+        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YYYY}/{NNN}';
         $testModeEnabled = TestModeService::isEnabled();
 
         // QA-5 ORD-05: the order row, its stage/payment-status rows, and
