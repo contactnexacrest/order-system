@@ -230,6 +230,17 @@ an explanatory line) still gets one. Where a figure could be read two ways
 packing), the field's label carries a small tag spelling out exactly which
 one it is, so nobody has to guess or check twice at the Packing List stage.
 
+**A signature block never appears bare.** Every generated document's
+signature block (the "For [Company] / Authorised Signatory" block most
+document types carry, and the Buyer/Supplier PO's own "fill, sign and
+return" acceptance table) always carries a line identifying exactly which
+document it belongs to — document type, document reference, date, and
+Buyer Inquiry Ref — immediately above the signature itself, kept together
+with it as one unit that can never be split across a page break. If a
+long document pushes the signature block onto a fresh page by itself,
+that page still clearly states which document it is, so a signature page
+can never be mistaken for, or substituted into, a different document.
+
 ## Roles in this system
 
 Six roles exist today (Admin → Settings → Roles & Permissions): **Admin**,

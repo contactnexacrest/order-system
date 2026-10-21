@@ -387,12 +387,40 @@ final class DocxComponents
     // disclaimer text — mirrors _layout.html.twig's default signature_block.
     // ------------------------------------------------------------------
 
+    /**
+     * 90-item backlog Phase 6 Item C: a signature block/table must always
+     * carry real, document-identifying text — never just a bare
+     * seal/signature with no reference to which document it belongs to
+     * — so a signature page can never be mistaken for or substituted
+     * into a different document, even if it lands alone on its own page.
+     * Mirrors _layout.html.twig's .signature-doc-ref line.
+     */
+    public static function addSignatureDocRefLine(Section $section, array $context): void
+    {
+        $docTitle = (string) ($context['doc_title'] ?? 'document');
+        $meta = $context['meta'] ?? [];
+        $order = $context['order'] ?? [];
+        $text = "This signature forms part of {$docTitle}";
+        if (!empty($meta['document_reference'])) {
+            $text .= ' ' . $meta['document_reference'];
+        }
+        if (!empty($meta['generated_date'])) {
+            $text .= ', dated ' . $meta['generated_date'];
+        }
+        if (!empty($order['buyer_inquiry_ref'])) {
+            $text .= ', Buyer Inquiry Ref ' . $order['buyer_inquiry_ref'];
+        }
+        $text .= '.';
+        $section->addText($text, ['bold' => true, 'size' => 8.5, 'color' => self::NAVY], ['spaceAfter' => 80]);
+    }
+
     public static function addSignatureBlock(Section $section, array $context): void
     {
         $company = $context['company'] ?? [];
         $signatory = $context['signatory'] ?? [];
 
         $section->addTextBreak(1, 12);
+        self::addSignatureDocRefLine($section, $context);
         $table = $section->addTable(['unit' => TblWidth::PERCENT, 'width' => 5000]);
 
         $table->addRow();

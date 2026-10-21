@@ -111,6 +111,8 @@
 {% endif %}
 
 <div class="section-title">7. SUPPLIER ACCEPTANCE</div>
+<div class="acceptance-block">
+<p class="signature-doc-ref">This signature forms part of {{ doc_title }}{% if meta.document_reference is defined and meta.document_reference %} {{ meta.document_reference }}{% endif %}{% if meta.generated_date is defined and meta.generated_date %}, dated {{ meta.generated_date }}{% endif %}{% if order.buyer_inquiry_ref is defined and order.buyer_inquiry_ref %}, Buyer Inquiry Ref {{ order.buyer_inquiry_ref }}{% endif %}.</p>
 <table class="kv acceptance-table" style="table-layout:fixed;">
   <tr>
     <td colspan="1" style="background:#1A4A08; color:#FFFFFF; font-weight:bold; width:50%;">Issued by NexaCrest International Private Limited</td>
@@ -131,6 +133,7 @@
     </td>
   </tr>
 </table>
+</div>
 <div class="banner" style="background:#EAF3DE; color:#1A4A08; text-align:left; font-weight:normal;">By signing above, the supplier confirms acceptance of all specifications, commercial terms, delivery terms and quality conditions stated in this Purchase Order. <strong>Acceptance of advance payment constitutes full acceptance of all terms herein.</strong></div>
 
 {% endblock %}

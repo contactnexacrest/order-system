@@ -797,6 +797,7 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '4. BUYER ACCEPTANCE  (Buyer fills this section, signs and returns)');
+        DocxComponents::addSignatureDocRefLine($section, $context);
         $table = $section->addTable(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 5000]);
         $table->addRow();
         $table->addCell(2500, ['bgColor' => DocxComponents::NAVY_MID])->addText('Prepared & Issued by NexaCrest', ['bold' => true, 'color' => DocxComponents::WHITE]);
@@ -939,6 +940,7 @@ final class DocxDocumentBuilder
         }
 
         DocxComponents::addSectionTitle($section, '7. SUPPLIER ACCEPTANCE', $green);
+        DocxComponents::addSignatureDocRefLine($section, $context);
         $table = $section->addTable(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 5000]);
         $table->addRow();
         $table->addCell(2500, ['bgColor' => $green])->addText('Issued by NexaCrest International Private Limited', ['bold' => true, 'color' => DocxComponents::WHITE]);

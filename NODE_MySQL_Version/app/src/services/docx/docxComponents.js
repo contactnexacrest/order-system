@@ -637,10 +637,30 @@ function markdownLiteBulletList(items, baseStyle = {}) {
 // disclaimer text.
 // --------------------------------------------------------------------
 
+/**
+ * 90-item backlog Phase 6 Item C: a signature block/table must always
+ * carry real, document-identifying text — never just a bare
+ * seal/signature with no reference to which document it belongs to —
+ * so a signature page can never be mistaken for or substituted into a
+ * different document, even if it lands alone on its own page. Mirrors
+ * _layout.njk's .signature-doc-ref line.
+ */
+function signatureDocRefLine(context) {
+  const docTitle = String(context.doc_title || 'document');
+  const meta = context.meta || {};
+  const order = context.order || {};
+  let text = `This signature forms part of ${docTitle}`;
+  if (meta.document_reference) text += ` ${meta.document_reference}`;
+  if (meta.generated_date) text += `, dated ${meta.generated_date}`;
+  if (order.buyer_inquiry_ref) text += `, Buyer Inquiry Ref ${order.buyer_inquiry_ref}`;
+  text += '.';
+  return plain(text, { bold: true, size: 17, color: NAVY }, { spacing: { after: 80 } });
+}
+
 function signatureBlock(context) {
   const company = context.company || {};
   const signatory = context.signatory || {};
-  const out = [spacer(200)];
+  const out = [spacer(200), signatureDocRefLine(context)];
 
   const row1 = new TableRow({
     children: [
@@ -844,6 +864,7 @@ module.exports = {
   markdownLiteSegments,
   markdownLiteBulletList,
   signatureBlock,
+  signatureDocRefLine,
   termsSection,
   clientAgreementFooter,
   watermarkHeader,

@@ -55,6 +55,8 @@
 </table>
 
 <div class="section-title">4. BUYER ACCEPTANCE &nbsp;(Buyer fills this section, signs and returns)</div>
+<div class="acceptance-block">
+<p class="signature-doc-ref">This signature forms part of {{ doc_title }}{% if meta.document_reference is defined and meta.document_reference %} {{ meta.document_reference }}{% endif %}{% if meta.generated_date is defined and meta.generated_date %}, dated {{ meta.generated_date }}{% endif %}{% if order.buyer_inquiry_ref is defined and order.buyer_inquiry_ref %}, Buyer Inquiry Ref {{ order.buyer_inquiry_ref }}{% endif %}.</p>
 <table class="kv acceptance-table" style="table-layout:fixed;">
   <tr>
     <td colspan="1" style="background:#173B73; color:#FFFFFF; font-weight:bold; width:50%;">Prepared &amp; Issued by NexaCrest</td>
@@ -76,6 +78,7 @@
     </td>
   </tr>
 </table>
+</div>
 
 <div class="banner" style="background:#E8F1FB; color:#185FA5; text-align:left; font-weight:normal;">
   <p style="margin:0 0 6pt;">By signing above, the buyer confirms acceptance of all order details, specifications and payment terms stated in this Purchase Order. <strong>This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production upon receipt of the {{ financial.advance_pct }}% advance payment.</strong> <span style="color:#000000;">The following clauses are legally binding on both parties:</span></p>

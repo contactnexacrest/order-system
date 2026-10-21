@@ -130,6 +130,7 @@
 
   /* --- Signature block --- */
   .signature-block { margin-top: 14pt; page-break-inside: avoid; break-inside: avoid; }
+  .signature-doc-ref { font-size: 8.5pt; font-weight: bold; color: #17233A; margin-bottom: 6pt; }
   .signature-block table { width: 100%; }
   .signature-block td { vertical-align: top; font-size: 10pt; padding: 2pt 8pt; border: none; }
   .signature-block .for-line { font-weight: bold; color: #17233A; }
@@ -148,6 +149,10 @@
      at the bottom of one page while the signature/blank-line row it
      labels flows to the next), so kept together the same way. */
   .acceptance-table { page-break-inside: avoid; break-inside: avoid; }
+  /* 90-item backlog Phase 6 Item C: keeps the doc-ref caption line and
+     the acceptance table itself together as one unit, so if this lands
+     alone on a page, that page is never a bare signature strip. */
+  .acceptance-block { page-break-inside: avoid; break-inside: avoid; }
 
   .annexure-notice { background: #FBEAEA; color: #8A1F1F; padding: 6pt 9pt; font-size: 10pt; font-weight: bold; margin-top: 6pt; margin-bottom: 4pt; }
   .annexure-appendix-start { page-break-before: always; }
@@ -316,6 +321,12 @@
 
 {% block signature_block %}
 <div class="signature-block">
+  {# 90-item backlog Phase 6 Item C: a signature block must always carry
+     real, document-identifying text — never just a bare seal/signature
+     with no reference to which document it belongs to — so that a
+     signature page can never be mistaken for or substituted into a
+     different document, even if it lands alone on its own page. #}
+  <p class="signature-doc-ref">This signature forms part of {{ doc_title }}{% if meta.document_reference is defined and meta.document_reference %} {{ meta.document_reference }}{% endif %}{% if meta.generated_date is defined and meta.generated_date %}, dated {{ meta.generated_date }}{% endif %}{% if order.buyer_inquiry_ref is defined and order.buyer_inquiry_ref %}, Buyer Inquiry Ref {{ order.buyer_inquiry_ref }}{% endif %}.</p>
   <table>
     <tr>
       <td style="width:50%;" class="for-line">For<br>{{ company.legal_name }}</td>

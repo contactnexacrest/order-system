@@ -802,6 +802,7 @@ function renderBuyerPo(context) {
   );
 
   children.push(...C.sectionTitle('4. BUYER ACCEPTANCE  (Buyer fills this section, signs and returns)'));
+  children.push(C.signatureDocRefLine(context));
   const headerRow = new TableRow({
     children: [
       C.cell(C.plain('Prepared & Issued by NexaCrest', { bold: true, color: C.WHITE }), { width: C.pctWidth(50), shading: C.shade(C.NAVY_MID) }),
@@ -967,6 +968,7 @@ function renderSupPo(context) {
   }
 
   children.push(...C.sectionTitle('7. SUPPLIER ACCEPTANCE', green));
+  children.push(C.signatureDocRefLine(context));
   const headerRow = new TableRow({
     children: [
       C.cell(C.plain('Issued by NexaCrest International Private Limited', { bold: true, color: C.WHITE }), { width: C.pctWidth(50), shading: C.shade(green) }),
