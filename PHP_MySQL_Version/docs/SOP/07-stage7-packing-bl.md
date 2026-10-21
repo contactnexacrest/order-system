@@ -63,8 +63,10 @@ Three things happen in this section, each building toward the BL:
    unchecked and the sheet simply omits both rows for every order on it.
    Both seeded presets ship with it checked (unchanged behavior).
 3. **Confirm BL Issued** — once the shipping line actually issues the BL,
-   staff type its number in here. **This is the action that passes Stage
-   7's gate.**
+   staff type its number in here, with an optional scanned-copy upload on
+   the same form. **This is the action that passes Stage 7's gate.** If
+   the scanned copy isn't in hand yet, confirm with just the number and
+   attach the copy afterward from the same section once it arrives.
 
    ![Confirm BL Issued form](./images/s7_bl_confirm_before.png)
 

@@ -48,6 +48,14 @@ final class OrderShippingRepository
         )->execute(['bl_number' => $blNumber, 'bl_date' => $blDate, 'order_id' => $orderId]);
     }
 
+    /** Attaches the actual scanned BL document to the already-recorded BL number/date. */
+    public static function attachBlCopy(int $orderId, int $fileId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_shipping SET bl_copy_file_id = :file_id WHERE order_id = :order_id'
+        )->execute(['file_id' => $fileId, 'order_id' => $orderId]);
+    }
+
     public static function recordBlOriginalsReceived(int $orderId, int $count): void
     {
         Database::connection()->prepare(

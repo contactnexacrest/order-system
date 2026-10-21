@@ -1665,14 +1665,24 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if (!$blIssued): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-issued">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-issued" enctype="multipart/form-data">
           <?= Csrf::field() ?>
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date" value="<?= date('Y-m-d') ?>"></label>
+          <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png"></label>
           <?= $stepBadge('7d') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
       <?php else: ?>
         <p>Bill of Lading recorded: <strong><?= htmlspecialchars($shipping['bl_number']) ?></strong> (<?= htmlspecialchars($shipping['bl_date']) ?>)</p>
+        <?php if (!empty($shipping['bl_copy_file_id'])): ?>
+          <p class="muted small"><a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">Download scanned BL copy</a></p>
+        <?php else: ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-copy" enctype="multipart/form-data">
+            <?= Csrf::field() ?>
+            <label>Scanned BL Copy<input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png" required></label>
+            <button type="submit" class="btn-sm">Attach Scanned BL Copy</button>
+          </form>
+        <?php endif; ?>
       <?php endif; ?>
     <?php endif; ?>
   </div>

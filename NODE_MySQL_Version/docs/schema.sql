@@ -765,6 +765,7 @@ CREATE TABLE order_shipping (
   seal_no                   VARCHAR(50) NULL,
   bl_number                 VARCHAR(60) NULL,
   bl_date                   DATE NULL,
+  bl_copy_file_id           BIGINT UNSIGNED NULL,   -- the actual scanned Bill of Lading, uploaded alongside bl_number/bl_date once the shipping line issues it (distinct from draft_bl_file_id below, which is an earlier pre-issuance draft for review)
   draft_bl_file_id          BIGINT UNSIGNED NULL,
   draft_bl_uploaded_at      TIMESTAMP NULL,
   draft_bl_approved_at      TIMESTAMP NULL,
@@ -947,6 +948,7 @@ ALTER TABLE order_packing
   ADD CONSTRAINT fk_op_fumigation FOREIGN KEY (fumigation_cert_file_id) REFERENCES file_store(id),
   ADD CONSTRAINT fk_op_buyer_approval FOREIGN KEY (buyer_approval_file_id) REFERENCES file_store(id);
 ALTER TABLE order_shipping
+  ADD CONSTRAINT fk_os_bl_copy FOREIGN KEY (bl_copy_file_id) REFERENCES file_store(id),
   ADD CONSTRAINT fk_os_draft_bl FOREIGN KEY (draft_bl_file_id) REFERENCES file_store(id);
 ALTER TABLE amendments
   ADD CONSTRAINT fk_amd_signed FOREIGN KEY (signed_copy_file_id) REFERENCES file_store(id);

@@ -1547,14 +1547,24 @@
       {% endif %}
 
       {% if not blIssued %}
-        <form method="post" action="/orders/{{ order.id }}/bl-issued">
+        <form method="post" action="/orders/{{ order.id }}/bl-issued" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date"></label>
+          <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png"></label>
           {{ stepBadge('7d') | safe }}<button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
       {% else %}
         <p>Bill of Lading recorded: <strong>{{ shipping.bl_number }}</strong> ({{ shipping.bl_date }})</p>
+        {% if shipping.bl_copy_file_id %}
+          <p class="muted small"><a href="/file-store/{{ shipping.bl_copy_file_id }}/download">Download scanned BL copy</a></p>
+        {% else %}
+          <form method="post" action="/orders/{{ order.id }}/bl-copy" enctype="multipart/form-data">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Scanned BL Copy<input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png" required></label>
+            <button type="submit" class="btn-sm">Attach Scanned BL Copy</button>
+          </form>
+        {% endif %}
       {% endif %}
     {% endif %}
   </div>

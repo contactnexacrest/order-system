@@ -456,6 +456,7 @@ $router->post('/orders/{id}/payment/freight/clear', [$orders, 'clearFreightPayme
 $router->post('/orders/{id}/packing', [$orders, 'savePacking'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/shipping', [$orders, 'saveShipping'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-issued', [$orders, 'recordBlIssued'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-copy', [$orders, 'attachBlCopy'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/payment/balance', [$orders, 'recordBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);

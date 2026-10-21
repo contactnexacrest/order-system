@@ -656,7 +656,8 @@ app.post('/orders/:id/payment/freight/clear', requireAuth, requirePermission('ma
 
 app.post('/orders/:id/packing', requireAuth, requirePermission('manage_shipping'), upload.single('buyer_approval'), verifyCsrf, asyncHandler(ordersController.savePacking));
 app.post('/orders/:id/shipping', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.saveShipping));
-app.post('/orders/:id/bl-issued', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordBlIssued));
+app.post('/orders/:id/bl-issued', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), verifyCsrf, asyncHandler(ordersController.recordBlIssued));
+app.post('/orders/:id/bl-copy', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), verifyCsrf, asyncHandler(ordersController.attachBlCopy));
 app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordScannedBlSent));
 
 app.post('/orders/:id/payment/balance', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(ordersController.recordBalancePayment));

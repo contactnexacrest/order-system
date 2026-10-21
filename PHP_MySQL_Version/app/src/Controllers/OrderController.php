@@ -1726,8 +1726,62 @@ final class OrderController
             return;
         }
         OrderShippingRepository::recordBl($orderId, $blNumber, $blDate);
+
+        if (!empty($_FILES['bl_copy']['name'])) {
+            $order = OrderRepository::find($orderId);
+            try {
+                $fileId = FileUploadService::handleUpload(
+                    'bl_copy',
+                    'bl_copy',
+                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/shipping',
+                    null,
+                    $orderId,
+                    (int) $user['id'],
+                    null,
+                    'Shipping Line',
+                    'Scanned Bill of Lading'
+                );
+                OrderShippingRepository::attachBlCopy($orderId, $fileId);
+            } catch (\Throwable $e) {
+                Flash::set('error', "Bill of Lading recorded ({$blNumber}), but the copy upload failed: " . $e->getMessage());
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+        }
+
         StageGateService::passAndUnlockNext($orderId, 7, (int) $user['id']);
         Flash::set('success', "Bill of Lading recorded ({$blNumber}). Stage 8 (Commercial Invoice) unlocked.");
+        header("Location: /orders/{$orderId}");
+    }
+
+    /** Lets staff attach the scanned BL copy later, when it wasn't available yet at bl-issued time. */
+    public function attachBlCopy(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        try {
+            $fileId = FileUploadService::handleUpload(
+                'bl_copy',
+                'bl_copy',
+                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/shipping',
+                null,
+                $orderId,
+                (int) $user['id'],
+                null,
+                'Shipping Line',
+                'Scanned Bill of Lading'
+            );
+            OrderShippingRepository::attachBlCopy($orderId, $fileId);
+            Flash::set('success', 'Scanned BL copy attached.');
+        } catch (\Throwable $e) {
+            Flash::set('error', 'Could not attach the scanned BL copy: ' . $e->getMessage());
+        }
         header("Location: /orders/{$orderId}");
     }
 

@@ -1722,8 +1722,62 @@ async function recordBlIssued(req, res) {
     return;
   }
   await orderShippingRepository.recordBl(orderId, blNumber, blDate);
+
+  if (req.file && req.file.buffer) {
+    const order = await orderRepository.find(orderId);
+    try {
+      const fileId = await fileUploadService.handleUpload(
+        req,
+        'bl_copy',
+        'bl_copy',
+        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/shipping`,
+        null,
+        orderId,
+        user.id,
+        null,
+        'Shipping Line',
+        'Scanned Bill of Lading'
+      );
+      await orderShippingRepository.attachBlCopy(orderId, fileId);
+    } catch (e) {
+      flash.set(req, 'error', `Bill of Lading recorded (${blNumber}), but the copy upload failed: ${e.message}`);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+  }
+
   await stageGateService.passAndUnlockNext(orderId, 7, user.id);
   flash.set(req, 'success', `Bill of Lading recorded (${blNumber}). Stage 8 (Commercial Invoice) unlocked.`);
+  res.redirect(`/orders/${orderId}`);
+}
+
+/** Lets staff attach the scanned BL copy later, when it wasn't available yet at bl-issued time. */
+async function attachBlCopy(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  try {
+    const fileId = await fileUploadService.handleUpload(
+      req,
+      'bl_copy',
+      'bl_copy',
+      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/shipping`,
+      null,
+      orderId,
+      req.user.id,
+      null,
+      'Shipping Line',
+      'Scanned Bill of Lading'
+    );
+    await orderShippingRepository.attachBlCopy(orderId, fileId);
+    flash.set(req, 'success', 'Scanned BL copy attached.');
+  } catch (e) {
+    flash.set(req, 'error', `Could not attach the scanned BL copy: ${e.message}`);
+  }
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -2198,7 +2252,7 @@ module.exports = {
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment, updateProductionStatus,
   recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
-  savePacking, saveShipping, recordBlIssued, recordScannedBlSent,
+  savePacking, saveShipping, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   saveBlEndorsement, generateBlEndorsement,
   closeOrder, overrideStatusLock, markLost, updateComplianceTask,

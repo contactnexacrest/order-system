@@ -35,6 +35,11 @@ async function recordBl(orderId, blNumber, blDate) {
   await db.execute('UPDATE order_shipping SET bl_number = :bl_number, bl_date = :bl_date WHERE order_id = :order_id', { bl_number: blNumber, bl_date: blDate, order_id: orderId });
 }
 
+/** Attaches the actual scanned BL document to the already-recorded BL number/date. */
+async function attachBlCopy(orderId, fileId) {
+  await db.execute('UPDATE order_shipping SET bl_copy_file_id = :file_id WHERE order_id = :order_id', { file_id: fileId, order_id: orderId });
+}
+
 async function recordBlOriginalsReceived(orderId, count) {
   await db.execute('UPDATE order_shipping SET bl_originals_received_at = NOW(), bl_originals_received_count = :count WHERE order_id = :order_id', { count, order_id: orderId });
 }
@@ -51,4 +56,4 @@ async function recordScannedBlSent(orderId) {
   await db.execute('UPDATE order_shipping SET scanned_bl_sent_to_buyer_at = NOW() WHERE order_id = :order_id', { order_id: orderId });
 }
 
-module.exports = { upsert, find, recordBl, recordBlOriginalsReceived, recordBlEndorsed, recordCourierSent, recordScannedBlSent };
+module.exports = { upsert, find, recordBl, attachBlCopy, recordBlOriginalsReceived, recordBlEndorsed, recordCourierSent, recordScannedBlSent };
