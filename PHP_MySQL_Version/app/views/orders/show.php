@@ -44,7 +44,20 @@ foreach ($activeUsers as $u) {
 // rate), so the rate widget is rendered per-leg, right alongside that
 // leg's own INR Actual widget, instead of one shared order-wide widget.
 $renderExchangeRateWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canOverrideFyLock, $usersById): void {
-    if (!$canViewInrActual) {
+    // 90-item backlog "exchange-rate-at-clearing-time": this widget used
+    // to only ever render from inside $renderInrActualWidget, which
+    // itself returns early until the leg is marked CLEARED — but
+    // ca-02-revenue-reports.md's own spec says the rate is "typically
+    // entered once that leg is about to clear, whenever your accounts
+    // team fixes a working rate for it" — i.e. BEFORE clearing, as an
+    // anticipatory estimate, not after. Gating on cleared_at made that
+    // impossible: the box simply didn't exist yet, so staff could never
+    // record a rate ahead of the INR actual the way the SOP describes,
+    // and OrderProfitabilityService's "uncleared leg estimated using its
+    // own rate" branch could never have a rate to use in practice. Now
+    // gated on the leg's amount being on record (received) instead of
+    // cleared — the same point "about to clear" first becomes true.
+    if (!$canViewInrActual || ($payment[$leg . '_amount'] ?? null) === null) {
         return;
     }
     $rate = $payment[$leg . '_exchange_rate'] ?? null;
@@ -86,7 +99,7 @@ $renderExchangeRateWidget = function (string $leg, string $label) use ($payment,
     <?php
 };
 
-$renderInrActualWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canDeleteInrActual, $canOverrideFyLock, $usersById, $renderExchangeRateWidget): void {
+$renderInrActualWidget = function (string $leg, string $label) use ($payment, $order, $canViewInrActual, $canEditInrActual, $canDeleteInrActual, $canOverrideFyLock, $usersById): void {
     $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
     if ($clearedAt === null || !$canViewInrActual) {
         return;
@@ -135,8 +148,6 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
         <?php else: ?>
           <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
         <?php endif; ?>
-
-        <?php $renderExchangeRateWidget($leg, $label); ?>
 
         <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
           <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
@@ -1118,6 +1129,7 @@ foreach ($stages as $s) {
     <?php endif; ?>
 
     <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
+    <?php $renderExchangeRateWidget('advance', 'Advance Payment'); ?>
 
     <?php if (!empty($clientPaymentReports)): ?>
       <h3 style="margin-top:16px">Client-Reported Payments</h3>
@@ -1459,6 +1471,7 @@ foreach ($stages as $s) {
           <p>Freight payment cleared.</p>
           <?php $renderInrActualWidget('freight', 'Freight Payment'); ?>
         <?php endif; ?>
+        <?php $renderExchangeRateWidget('freight', 'Freight Payment'); ?>
       <?php endif; ?>
     <?php endif; ?>
   </div>
@@ -1609,6 +1622,7 @@ foreach ($stages as $s) {
         <p>Balance payment cleared.</p>
         <?php $renderInrActualWidget('balance', 'Balance Payment'); ?>
       <?php endif; ?>
+      <?php $renderExchangeRateWidget('balance', 'Balance Payment'); ?>
     <?php endif; ?>
   </div>
 

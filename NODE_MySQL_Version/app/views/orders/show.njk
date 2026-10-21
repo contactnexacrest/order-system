@@ -2,8 +2,16 @@
    balance/freight each clear on their own date, at their own market
    rate), so the rate widget is rendered per-leg, right alongside that
    leg's own INR Actual widget, instead of one shared order-wide widget. #}
+{# 90-item backlog "exchange-rate-at-clearing-time": this macro used to
+   only ever render from inside inrActualWidget, which itself returns
+   early until the leg is marked CLEARED — but ca-02-revenue-reports.md's
+   own spec says the rate is "typically entered once that leg is about to
+   clear, whenever your accounts team fixes a working rate for it" — i.e.
+   BEFORE clearing, as an anticipatory estimate, not after. Gated on the
+   leg's amount being on record (received) instead of cleared — the same
+   point "about to clear" first becomes true. #}
 {% macro exchangeRateWidget(leg, label) %}
-  {% if canViewInrActual %}
+  {% if canViewInrActual and payment[leg ~ '_amount'] != null %}
     {% set rate = payment[leg ~ '_exchange_rate'] %}
     {% set setBy = payment[leg ~ '_exchange_rate_set_by'] %}
     {% set lockMessage = caLockMessages[leg] %}
@@ -84,8 +92,6 @@
         {% else %}
           <span class="muted">Not yet recorded — needs someone with the "Add/edit INR actual" permission.</span>
         {% endif %}
-
-        {{ exchangeRateWidget(leg, label) }}
 
         <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
           <strong style="font-size:0.85em;">FIRC / eBRC Reference</strong><br>
@@ -1017,6 +1023,7 @@
     {% endif %}
 
     {{ inrActualWidget('advance', 'Advance Payment') }}
+    {{ exchangeRateWidget('advance', 'Advance Payment') }}
 
     {% if clientPaymentReports and clientPaymentReports.length > 0 %}
       <h3 style="margin-top:16px">Client-Reported Payments</h3>
@@ -1350,6 +1357,7 @@
           <p>Freight payment cleared.</p>
           {{ inrActualWidget('freight', 'Freight Payment') }}
         {% endif %}
+        {{ exchangeRateWidget('freight', 'Freight Payment') }}
       {% endif %}
     {% endif %}
   </div>
@@ -1494,6 +1502,7 @@
         <p>Balance payment cleared.</p>
         {{ inrActualWidget('balance', 'Balance Payment') }}
       {% endif %}
+      {{ exchangeRateWidget('balance', 'Balance Payment') }}
     {% endif %}
   </div>
 
