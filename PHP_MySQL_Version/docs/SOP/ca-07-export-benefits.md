@@ -93,6 +93,14 @@ own claimed-at or received-at date, never today's date, so a backdated
 entry into an already-locked year is refused unless the
 `ca_fy_lock_override` permission is used (logged to the audit trail).
 
+## Export CSV
+
+An **Export CSV** link above the Claims table downloads every claim in
+the same columns the on-screen table shows (claimed date, scheme, linked
+order, reference, claimed amount/currency, received amount/date, status)
+— never a separately computed export, so it can never disagree with
+what's on screen.
+
 ## What this doesn't do yet
 
 - No automatic pull from ICEGATE/DGFT — every claim is entered manually.

@@ -89,6 +89,11 @@ that:
 4. Lists every settlement leg that falls in the selected period, with its
    INR actual and forex gain/(loss), each linking back to its order.
 
+An **Export CSV** link above that list downloads the same legs, in the
+same columns, for the currently selected financial/calendar year — never
+a separately computed export, so it can never disagree with what's on
+screen.
+
 This report is computed entirely from the same Settlement Register data —
 never a separate query — so it can never disagree with what the register
 itself shows. It shares only the FY date-bucketing logic with the

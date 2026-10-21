@@ -103,6 +103,14 @@ Entry, and the order's own Profitability Sheet — so opening one order
 shows every financial detail tied to it at a glance, not just the
 separate CA-module list screens.
 
+## Export CSV
+
+An **Export CSV** link above the Expenses list downloads every imported
+expense in the same columns the on-screen table shows (date, category,
+vendor, description, amount/currency, linked order, TDS applicable/
+amount) — never a separately computed export, so it can never disagree
+with what's on screen.
+
 ## What this doesn't do yet
 
 - No expense editing or deletion here — corrections happen in Zoho Books;

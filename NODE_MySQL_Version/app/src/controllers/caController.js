@@ -18,12 +18,66 @@ const zohoBooksService = require('../services/zohoBooksService');
 const caSyncService = require('../services/caSyncService');
 const caFyLockGuard = require('../services/caFyLockGuard');
 const bankStatementCsvParser = require('../services/bankStatementCsvParser');
+const csv = require('../helpers/csv');
 const crypto = require('crypto');
 
 // CA / Accounting module — independent of the order-pipeline system. Every
 // route here is gated on ca_module_view (see server.js), never on
 // manage_orders, so a CA/Accounts-only user can reach this without any
 // order-management access.
+
+/**
+ * 90-item backlog item #13: the CA module had no CSV export anywhere
+ * (only CSV import, for a bank statement). Extracted as their own
+ * functions — same reasoning as reportController's *CsvRows() helpers —
+ * purely to mirror the PHP side's testable-without-exit() structure 1:1.
+ */
+function settlementRegisterCsvRows(legRows) {
+  const rows = legRows.map((r) => ({
+    'Order Ref': r.buyer_inquiry_ref,
+    Client: r.company_legal_name,
+    Leg: r.leg.charAt(0).toUpperCase() + r.leg.slice(1),
+    'Cleared On': r.cleared_at,
+    'Foreign Amount': r.foreign_amount,
+    Currency: r.currency_code,
+    'INR Actual': r.inr_actual,
+    'Forex Gain/(Loss)': r.forex_gain_loss,
+  }));
+
+  return { headers: ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'Forex Gain/(Loss)'], rows };
+}
+
+function expensesCsvRows(expenses) {
+  const rows = expenses.map((e) => ({
+    Date: e.expense_date,
+    Category: e.category,
+    Vendor: e.vendor_name ?? '',
+    Description: e.description ?? '',
+    Amount: e.amount,
+    Currency: e.currency_code,
+    'Order Ref': e.order_reference ?? '',
+    'TDS Applicable': e.is_tds_applicable ? 'Yes' : 'No',
+    'TDS Amount': e.tds_amount ?? '',
+  }));
+
+  return { headers: ['Date', 'Category', 'Vendor', 'Description', 'Amount', 'Currency', 'Order Ref', 'TDS Applicable', 'TDS Amount'], rows };
+}
+
+function exportBenefitsCsvRows(benefits) {
+  const rows = benefits.map((b) => ({
+    'Claimed On': b.claimed_at,
+    Scheme: b.scheme_name,
+    'Order Ref': b.order_reference ?? '',
+    Reference: b.reference_number ?? '',
+    'Claimed Amount': b.claimed_amount,
+    Currency: b.currency_code,
+    'Received Amount': b.received_amount ?? '',
+    'Received On': b.received_at ?? '',
+    Status: b.received_amount !== null ? 'Received' : 'Claimed',
+  }));
+
+  return { headers: ['Claimed On', 'Scheme', 'Order Ref', 'Reference', 'Claimed Amount', 'Currency', 'Received Amount', 'Received On', 'Status'], rows };
+}
 
 async function usersById() {
   const map = {};
@@ -65,6 +119,15 @@ async function reports(req, res) {
   }
 
   const report = await caRepository.revenueReport(mode, period);
+
+  // 90-item backlog item #13: same format=csv convention as
+  // reportController's reports, and the exact same columns the table
+  // below shows, so it can never disagree with what's on screen.
+  if (req.query.format === 'csv') {
+    const { headers, rows } = settlementRegisterCsvRows(report.rows);
+    csv.stream(res, `ca_inr_settlement_register_${period}.csv`, headers, rows);
+    return;
+  }
 
   res.renderView('ca/reports', {
     mode,
@@ -117,6 +180,14 @@ async function expenses(req, res) {
   const allExpenses = await caExpenseRepository.all();
   for (const e of allExpenses) {
     e.lockMessage = await caFyLockRepository.lockMessageForDate(e.expense_date);
+  }
+
+  // 90-item backlog item #13: same CSV-export convention as reports()
+  // above — columns match ca/expenses.njk's table exactly.
+  if (req.query.format === 'csv') {
+    const { headers, rows } = expensesCsvRows(allExpenses);
+    csv.stream(res, 'ca_expenses.csv', headers, rows);
+    return;
   }
 
   res.renderView('ca/expenses', {
@@ -282,6 +353,14 @@ async function exportBenefits(req, res) {
   const benefits = await caExportBenefitRepository.all();
   for (const b of benefits) {
     b.lockMessage = b.received_amount === null ? await caFyLockRepository.lockMessageForDate(b.claimed_at) : null;
+  }
+
+  // 90-item backlog item #13: same CSV-export convention as reports()
+  // above — columns match ca/export_benefits.njk's table exactly.
+  if (req.query.format === 'csv') {
+    const { headers, rows } = exportBenefitsCsvRows(benefits);
+    csv.stream(res, 'ca_export_benefits.csv', headers, rows);
+    return;
   }
 
   res.renderView('ca/export_benefits', {
@@ -647,4 +726,5 @@ module.exports = {
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,
   toggleInternalDoc, generateInternalDoc,
+  settlementRegisterCsvRows, expensesCsvRows, exportBenefitsCsvRows,
 };

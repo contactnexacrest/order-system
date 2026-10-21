@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\Csv;
 use App\Helpers\Flash;
 use App\Helpers\FinancialYear;
 use App\Helpers\View;
@@ -43,6 +44,67 @@ final class CaController
         return $usersById;
     }
 
+    /**
+     * 90-item backlog item #13: the CA module had no CSV export anywhere
+     * (only CSV import, for a bank statement). Extracted as static
+     * methods — same reasoning as ReportController's *CsvRows() helpers —
+     * purely so this can be unit-tested without exercising Csv::stream()'s
+     * exit() call.
+     *
+     * @return array{headers: string[], rows: array<int, array<string, mixed>>}
+     */
+    public static function settlementRegisterCsvRows(array $legRows): array
+    {
+        $rows = array_map(static fn(array $r): array => [
+            'Order Ref' => $r['buyer_inquiry_ref'],
+            'Client' => $r['company_legal_name'],
+            'Leg' => ucfirst($r['leg']),
+            'Cleared On' => $r['cleared_at'],
+            'Foreign Amount' => $r['foreign_amount'],
+            'Currency' => $r['currency_code'],
+            'INR Actual' => $r['inr_actual'],
+            'Forex Gain/(Loss)' => $r['forex_gain_loss'],
+        ], $legRows);
+
+        return ['headers' => ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'Forex Gain/(Loss)'], 'rows' => $rows];
+    }
+
+    /** @return array{headers: string[], rows: array<int, array<string, mixed>>} */
+    public static function expensesCsvRows(array $expenses): array
+    {
+        $rows = array_map(static fn(array $e): array => [
+            'Date' => $e['expense_date'],
+            'Category' => $e['category'],
+            'Vendor' => $e['vendor_name'] ?? '',
+            'Description' => $e['description'] ?? '',
+            'Amount' => $e['amount'],
+            'Currency' => $e['currency_code'],
+            'Order Ref' => $e['order_reference'] ?? '',
+            'TDS Applicable' => $e['is_tds_applicable'] ? 'Yes' : 'No',
+            'TDS Amount' => $e['tds_amount'] ?? '',
+        ], $expenses);
+
+        return ['headers' => ['Date', 'Category', 'Vendor', 'Description', 'Amount', 'Currency', 'Order Ref', 'TDS Applicable', 'TDS Amount'], 'rows' => $rows];
+    }
+
+    /** @return array{headers: string[], rows: array<int, array<string, mixed>>} */
+    public static function exportBenefitsCsvRows(array $benefits): array
+    {
+        $rows = array_map(static fn(array $b): array => [
+            'Claimed On' => $b['claimed_at'],
+            'Scheme' => $b['scheme_name'],
+            'Order Ref' => $b['order_reference'] ?? '',
+            'Reference' => $b['reference_number'] ?? '',
+            'Claimed Amount' => $b['claimed_amount'],
+            'Currency' => $b['currency_code'],
+            'Received Amount' => $b['received_amount'] ?? '',
+            'Received On' => $b['received_at'] ?? '',
+            'Status' => $b['received_amount'] !== null ? 'Received' : 'Claimed',
+        ], $benefits);
+
+        return ['headers' => ['Claimed On', 'Scheme', 'Order Ref', 'Reference', 'Claimed Amount', 'Currency', 'Received Amount', 'Received On', 'Status'], 'rows' => $rows];
+    }
+
     public function index(array $params): void
     {
         $user = AuthService::currentUser();
@@ -80,6 +142,17 @@ final class CaController
         }
 
         $report = CaRepository::revenueReport($mode, $period);
+
+        // 90-item backlog item #13: the CA section had zero CSV export
+        // anywhere — the CSV code that existed there was all for
+        // IMPORTING a bank statement, not exporting a report. Same
+        // format=csv convention as ReportController's reports, and the
+        // exact same columns the table below shows, so it can never
+        // disagree with what's on screen.
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $rows] = self::settlementRegisterCsvRows($report['rows']);
+            Csv::stream("ca_inr_settlement_register_{$period}.csv", $headers, $rows);
+        }
 
         View::render('ca/reports', [
             'mode' => $mode,
@@ -136,8 +209,17 @@ final class CaController
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
 
+        $expenses = CaExpenseRepository::all();
+
+        // 90-item backlog item #13: same CSV-export convention as reports()
+        // above — columns match ca/expenses.php's table exactly.
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $rows] = self::expensesCsvRows($expenses);
+            Csv::stream('ca_expenses.csv', $headers, $rows);
+        }
+
         View::render('ca/expenses', [
-            'expenses' => CaExpenseRepository::all(),
+            'expenses' => $expenses,
             'usersById' => $this->usersById(),
             'canEditTds' => PermissionService::can((int) $user['id'], $roleId, 'inr_actual_edit'),
             'canOverrideFyLock' => CaFyLockGuard::canOverride((int) $user['id'], $roleId),
@@ -316,8 +398,17 @@ final class CaController
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
 
+        $benefits = CaExportBenefitRepository::all();
+
+        // 90-item backlog item #13: same CSV-export convention as reports()
+        // above — columns match ca/export_benefits.php's table exactly.
+        if (($_GET['format'] ?? '') === 'csv') {
+            ['headers' => $headers, 'rows' => $rows] = self::exportBenefitsCsvRows($benefits);
+            Csv::stream('ca_export_benefits.csv', $headers, $rows);
+        }
+
         View::render('ca/export_benefits', [
-            'benefits' => CaExportBenefitRepository::all(),
+            'benefits' => $benefits,
             'schemeOptions' => LookupRepository::dropdownOptions('export_benefit_scheme'),
             'totalClaimed' => CaExportBenefitRepository::totalClaimed(),
             'totalReceived' => CaExportBenefitRepository::totalReceived(),

@@ -6,6 +6,7 @@
   <div class="section">
     <h2>Imported Expenses</h2>
     <p class="muted small">The TDS column is a local-only annotation — setting it never changes anything in Zoho Books.</p>
+    <p><a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/ca/expenses?format=csv">Export CSV</a></p>
     <?php if (empty($expenses)): ?>
       <p class="muted">No expenses imported yet — run a Zoho Books sync once it's configured.</p>
     <?php else: ?>

@@ -64,6 +64,7 @@
 
   <div class="section">
     <h2>Legs in This Period</h2>
+    <p><a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/ca/reports?mode=<?= htmlspecialchars($mode) ?>&period=<?= htmlspecialchars($period) ?>&format=csv">Export CSV</a></p>
     <?php if (empty($report['rows'])): ?>
       <p class="muted">Nothing to show.</p>
     <?php else: ?>
