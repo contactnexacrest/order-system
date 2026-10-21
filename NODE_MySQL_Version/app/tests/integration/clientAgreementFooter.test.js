@@ -7,6 +7,7 @@ const clientRepository = require('../../src/repositories/clientRepository');
 const clientsController = require('../../src/controllers/clientsController');
 const documentDataAssembler = require('../../src/services/documentDataAssembler');
 const docxComponents = require('../../src/services/docx/docxComponents');
+const markdownLite = require('../../src/helpers/markdownLite');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 function templateEnv() {
@@ -17,6 +18,9 @@ function templateEnv() {
   env.addFilter('rate4', (v) => Number(v).toFixed(4));
   env.addFilter('maskEmail', (v) => v);
   env.addFilter('maskPhone', (v) => v);
+  // Mirrors documentGenerationService's own registration — every
+  // template rendered here that loops over `terms`/clause.text calls it.
+  env.addFilter('markdown_lite', (v) => new nunjucks.runtime.SafeString(markdownLite.toHtml(v)));
   return env;
 }
 

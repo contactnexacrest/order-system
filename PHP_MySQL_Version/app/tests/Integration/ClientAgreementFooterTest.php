@@ -11,9 +11,11 @@ use App\Repositories\OrderRepository;
 use App\Services\DocumentDataAssembler;
 use App\Services\Docx\DocxComponents;
 use App\Tests\Support\DbTestCase;
+use App\Helpers\MarkdownLite;
 use PhpOffice\PhpWord\PhpWord;
 use Twig\Environment as TwigEnvironment;
 use Twig\Loader\FilesystemLoader as TwigFilesystemLoader;
+use Twig\TwigFilter;
 
 /**
  * Batch 3 #12 — a client-level agreement T&C footer (clients.agreement_footer_text),
@@ -209,10 +211,14 @@ final class ClientAgreementFooterTest extends DbTestCase
 
     private function twigEnvironment(): TwigEnvironment
     {
-        return new TwigEnvironment(new TwigFilesystemLoader(__DIR__ . '/../../templates'), [
+        $twig = new TwigEnvironment(new TwigFilesystemLoader(__DIR__ . '/../../templates'), [
             'cache' => false,
             'autoescape' => 'html',
         ]);
+        // Mirrors DocumentGenerationService::twigEnvironment()'s own registration —
+        // every template rendered here that loops over `terms`/clause.text calls it.
+        $twig->addFilter(new TwigFilter('markdown_lite', [MarkdownLite::class, 'toHtml'], ['is_safe' => ['html']]));
+        return $twig;
     }
 
     /** @return array<string,mixed> */

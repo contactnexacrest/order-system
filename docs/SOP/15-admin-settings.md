@@ -321,6 +321,19 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   are disabled the same way its title/text fields are, until unlocked.
   Changing which document types a clause reaches is logged exactly like
   a text edit (old/new document-type codes, reason required).
+- **Bold/italic/underline in clause text** — 90-item backlog Phase 5: every
+  clause's **Text**/**Definition** textarea (all three groups above) takes
+  a small markdown-like syntax directly in the plain text — `**bold**`,
+  `*italic*`, `_underline_` — with a toolbar above the textarea (Bold/
+  Italic/Underline buttons) that wraps the current text selection in the
+  right markers as a convenience; typing the markers directly works
+  identically. Deliberately NOT a rich-text/WYSIWYG editor like the
+  Annexure's free-text field: the clause text itself stays plain text in
+  the database (so decades of existing legal wording never needs
+  migrating), and only the Order Detail/document generation step turns
+  the markers into real bold/italic/underline formatting on both the PDF
+  and the internal DOCX. An unpaired marker (e.g. a stray `_` in running
+  prose) is always left as a literal character, never guessed at.
 - **Compliance Task Types** (`/compliance-task-types`) — the admin-editable
   list of names (ECGC Cover, Pre-Shipment Inspection, Fumigation
   Certificate, Phytosanitary Certificate, Due Diligence by default) that

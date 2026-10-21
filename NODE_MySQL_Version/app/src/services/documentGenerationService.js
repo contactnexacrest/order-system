@@ -22,6 +22,7 @@ const orderProfitabilityService = require('./orderProfitabilityService');
 const termsClauseRepository = require('../repositories/termsClauseRepository');
 const userRepository = require('../repositories/userRepository');
 const documentDataAssembler = require('./documentDataAssembler');
+const markdownLite = require('../helpers/markdownLite');
 const { renderPdfFromHtml } = require('./pdfRenderService');
 const docxDocumentBuilder = require('./docx/docxDocumentBuilder');
 
@@ -94,6 +95,12 @@ function templatesEnvironment() {
       return s;
     });
   });
+  // 90-item backlog Phase 5: renders a clause's **bold**/*italic*/
+  // _underline_ markers (see src/helpers/markdownLite.js's own
+  // docblock) — wrapped SafeString because toHtml() already
+  // HTML-escapes every segment itself before wrapping it, so Nunjucks
+  // must not escape it a second time.
+  njkEnv.addFilter('markdown_lite', (value) => new nunjucks.runtime.SafeString(markdownLite.toHtml(value)));
   return njkEnv;
 }
 

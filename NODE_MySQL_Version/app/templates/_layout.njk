@@ -271,7 +271,7 @@
 {% endif %}
 <ul class="terms">
   {% for clause in terms %}
-    <li>{{ clause }}</li>
+    <li>{{ clause | markdown_lite }}</li>
   {% endfor %}
 </ul>
 {% endif %}
@@ -291,7 +291,7 @@
   <p class="box-header">LEGAL TERMS</p>
   <p class="box-intro">These terms govern all commercial obligations under this document.</p>
   {% for clause in legal_terms_clauses %}
-  <p class="clause">&#8226; <span class="clause-title">{{ clause.title }}:</span> {{ clause.text }}</p>
+  <p class="clause">&#8226; <span class="clause-title">{{ clause.title }}:</span> {{ clause.text | markdown_lite }}</p>
   {% endfor %}
 </div>
 {% endif %}
@@ -300,7 +300,7 @@
   <p class="box-header">DEFINITIONS</p>
   <p class="box-intro">The following terms have the meanings given below wherever they appear in this document.</p>
   {% for clause in definition_clauses %}
-  <p class="clause">&#8226; <span class="clause-title">{{ clause.title }}:</span> {{ clause.text }}</p>
+  <p class="clause">&#8226; <span class="clause-title">{{ clause.title }}:</span> {{ clause.text | markdown_lite }}</p>
   {% endfor %}
 </div>
 {% endif %}

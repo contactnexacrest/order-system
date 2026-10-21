@@ -41,6 +41,8 @@ const {
   TableLayoutType,
 } = require('docx');
 
+const markdownLite = require('../../helpers/markdownLite');
+
 // --------------------------------------------------------------------
 // Colors / constants
 // --------------------------------------------------------------------
@@ -601,6 +603,35 @@ function bulletList(items) {
   );
 }
 
+/**
+ * 90-item backlog Phase 5: converts markdownLite.tokenize()'s segments
+ * into rich()-style [text, style] pairs, merging baseStyle into every
+ * one — the DOCX side of the same tokenize() call the markdown_lite
+ * Nunjucks filter uses for the PDF side, so the two renderers can never
+ * disagree about which part of a clause is bold/italic/underlined.
+ */
+function markdownLiteSegments(text, baseStyle = {}) {
+  return markdownLite.tokenize(text).map((seg) => {
+    const style = Object.assign({}, baseStyle);
+    if (seg.bold) style.bold = true;
+    if (seg.italic) style.italics = true;
+    if (seg.underline) style.underline = {};
+    return [seg.text, style];
+  });
+}
+
+/** Same as bulletList() above, but each item's bold/italic/underline markers render as real formatting instead of literal asterisks. */
+function markdownLiteBulletList(items, baseStyle = {}) {
+  return items.map(
+    (text) =>
+      new Paragraph({
+        bullet: { level: 0 },
+        spacing: { after: 60 },
+        children: markdownLiteSegments(text, baseStyle).map(([t, style]) => run(t, style)),
+      })
+  );
+}
+
 // --------------------------------------------------------------------
 // Signature block: seal + signature images, name/designation/company,
 // disclaimer text.
@@ -670,7 +701,7 @@ function termsSection(context, number, title) {
       )
     );
   }
-  out.push(...bulletList(terms));
+  out.push(...markdownLiteBulletList(terms, { size: 19 }));
   out.push(spacer(80));
   return out;
 }
@@ -810,6 +841,8 @@ module.exports = {
   stepBadge,
   threeColFinanceTable,
   bulletList,
+  markdownLiteSegments,
+  markdownLiteBulletList,
   signatureBlock,
   termsSection,
   clientAgreementFooter,

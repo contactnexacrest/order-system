@@ -212,6 +212,10 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .wysiwyg-surface img{max-width:100%;}
 .wysiwyg-surface table{border-collapse:collapse;}
 .wysiwyg-surface table td,.wysiwyg-surface table th{border:1px solid var(--line);padding:0.3rem 0.5rem;}
+.md-toolbar{display:flex;flex-wrap:wrap;gap:0.3rem;align-items:center;margin-bottom:0.25rem;}
+.md-btn{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:0.2rem 0.5rem;font-size:0.8rem;cursor:pointer;color:var(--ink);line-height:1;}
+.md-btn:hover{background:var(--navy-soft);border-color:var(--navy);}
+.md-btn:disabled{opacity:0.5;cursor:not-allowed;}
 .badge-success{background:var(--success-soft);color:var(--success);}
 .badge-warning{background:var(--gold-soft);color:var(--gold-strong);}
 .badge-danger{background:var(--danger-soft);color:var(--danger);}

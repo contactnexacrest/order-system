@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Config\Database;
 use App\Config\Env;
+use App\Helpers\MarkdownLite;
 use App\Repositories\AmendmentRepository;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CaExpenseRepository;
@@ -20,6 +21,7 @@ use Dompdf\Dompdf;
 use Dompdf\Options as DompdfOptions;
 use Twig\Environment as TwigEnvironment;
 use Twig\Loader\FilesystemLoader as TwigFilesystemLoader;
+use Twig\TwigFilter;
 
 /**
  * Twig -> DOMPDF (buyer-facing PDF, always) and, when
@@ -1159,10 +1161,17 @@ final class DocumentGenerationService
     private static function twigEnvironment(): TwigEnvironment
     {
         $loader = new TwigFilesystemLoader(dirname(__DIR__, 2) . '/templates');
-        return new TwigEnvironment($loader, [
+        $twig = new TwigEnvironment($loader, [
             'cache' => false, // Bluehost-shared-hosting-safe default; enable a cache dir once storage permissions are confirmed
             'autoescape' => 'html',
         ]);
+        // 90-item backlog Phase 5: renders a clause's **bold**/*italic*/
+        // _underline_ markers (see App\Helpers\MarkdownLite's own
+        // docblock) — is_safe because toHtml() already HTML-escapes
+        // every segment itself before wrapping it, so Twig must not
+        // escape it a second time.
+        $twig->addFilter(new TwigFilter('markdown_lite', [MarkdownLite::class, 'toHtml'], ['is_safe' => ['html']]));
+        return $twig;
     }
 
     private static function templateFileFor(string $code): string

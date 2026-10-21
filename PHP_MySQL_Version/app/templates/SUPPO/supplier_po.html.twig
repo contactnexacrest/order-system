@@ -105,7 +105,7 @@
 <div class="section-title">6. QUALITY &amp; INSPECTION</div>
 <ul class="terms">
   {% for clause in terms %}
-    <li>{{ clause }}</li>
+    <li>{{ clause | markdown_lite }}</li>
   {% endfor %}
 </ul>
 {% endif %}

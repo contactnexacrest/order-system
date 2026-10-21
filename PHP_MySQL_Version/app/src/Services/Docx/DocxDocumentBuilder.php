@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Docx;
 
+use App\Helpers\MarkdownLite;
 use PhpOffice\PhpWord\Element\AbstractContainer;
 use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\IOFactory as PhpWordIOFactory;
@@ -825,7 +826,13 @@ final class DocxDocumentBuilder
                 $r2 = $cell->addTextRun();
                 $r2->addText('•  ', ['color' => DocxComponents::BLACK]);
                 $r2->addText(($parts[0] ?? '') . ': ', ['bold' => true, 'color' => DocxComponents::BLACK]);
-                $r2->addText($parts[1] ?? '', ['color' => DocxComponents::BLACK]);
+                foreach (MarkdownLite::tokenize($parts[1] ?? '') as $segment) {
+                    $style = ['color' => DocxComponents::BLACK, 'bold' => $segment['bold'], 'italic' => $segment['italic']];
+                    if ($segment['underline']) {
+                        $style['underline'] = 'single';
+                    }
+                    $r2->addText($segment['text'], $style);
+                }
             }
         }, 0);
 
@@ -927,7 +934,7 @@ final class DocxDocumentBuilder
         if (!empty($context['terms'])) {
             DocxComponents::addSectionTitle($section, '6. QUALITY & INSPECTION', $green);
             foreach ($context['terms'] as $clause) {
-                $section->addListItem((string) $clause, 0, ['size' => 9.5], null, ['spaceAfter' => 60]);
+                DocxComponents::addMarkdownLiteListItem($section, (string) $clause, ['size' => 9.5], ['spaceAfter' => 60]);
             }
         }
 

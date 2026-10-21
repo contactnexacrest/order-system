@@ -81,7 +81,7 @@
   <p style="margin:0 0 6pt;">By signing above, the buyer confirms acceptance of all order details, specifications and payment terms stated in this Purchase Order. <strong>This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production upon receipt of the {{ financial.advance_pct }}% advance payment.</strong> <span style="color:#000000;">The following clauses are legally binding on both parties:</span></p>
   {% for clause in terms %}
   {% set clauseParts = clause|split(': ', 2) %}
-  <p style="margin:0 0 6pt; color:#000000;">&#8226; <strong>{{ clauseParts[0] }}:</strong> {{ clauseParts[1]|default('') }}</p>
+  <p style="margin:0 0 6pt; color:#000000;">&#8226; <strong>{{ clauseParts[0] }}:</strong> {{ clauseParts[1]|default('')|markdown_lite }}</p>
   {% endfor %}
 </div>
 

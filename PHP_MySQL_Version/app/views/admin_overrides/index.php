@@ -45,6 +45,12 @@
               <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Force Majeure" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
             </label>
             <label class="full">Text
+              <div class="md-toolbar">
+                <button type="button" class="btn-sm md-btn" data-wrap="**" title="Bold" <?= $c['is_protected'] ? 'disabled' : '' ?>><strong>B</strong></button>
+                <button type="button" class="btn-sm md-btn" data-wrap="*" title="Italic" <?= $c['is_protected'] ? 'disabled' : '' ?>><em>I</em></button>
+                <button type="button" class="btn-sm md-btn" data-wrap="_" title="Underline" <?= $c['is_protected'] ? 'disabled' : '' ?>><u>U</u></button>
+                <span class="muted small">**bold**, *italic*, _underline_</span>
+              </div>
               <textarea name="clause_text[<?= (int) $c['id'] ?>]" rows="3" placeholder="Full clause wording" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>><?= htmlspecialchars($c['clause_text']) ?></textarea>
             </label>
           </div>
@@ -70,6 +76,12 @@
               <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Force Majeure" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
             </label>
             <label class="full">Text
+              <div class="md-toolbar">
+                <button type="button" class="btn-sm md-btn" data-wrap="**" title="Bold" <?= $c['is_protected'] ? 'disabled' : '' ?>><strong>B</strong></button>
+                <button type="button" class="btn-sm md-btn" data-wrap="*" title="Italic" <?= $c['is_protected'] ? 'disabled' : '' ?>><em>I</em></button>
+                <button type="button" class="btn-sm md-btn" data-wrap="_" title="Underline" <?= $c['is_protected'] ? 'disabled' : '' ?>><u>U</u></button>
+                <span class="muted small">**bold**, *italic*, _underline_</span>
+              </div>
               <textarea name="clause_text[<?= (int) $c['id'] ?>]" rows="3" placeholder="Full clause wording" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>><?= htmlspecialchars($c['clause_text']) ?></textarea>
             </label>
           </div>
@@ -104,6 +116,12 @@
               <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Shipment" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
             </label>
             <label class="full">Definition
+              <div class="md-toolbar">
+                <button type="button" class="btn-sm md-btn" data-wrap="**" title="Bold" <?= $c['is_protected'] ? 'disabled' : '' ?>><strong>B</strong></button>
+                <button type="button" class="btn-sm md-btn" data-wrap="*" title="Italic" <?= $c['is_protected'] ? 'disabled' : '' ?>><em>I</em></button>
+                <button type="button" class="btn-sm md-btn" data-wrap="_" title="Underline" <?= $c['is_protected'] ? 'disabled' : '' ?>><u>U</u></button>
+                <span class="muted small">**bold**, *italic*, _underline_</span>
+              </div>
               <textarea name="clause_text[<?= (int) $c['id'] ?>]" rows="3" placeholder="Full definition wording" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>><?= htmlspecialchars($c['clause_text']) ?></textarea>
             </label>
           </div>
@@ -163,6 +181,28 @@
   </details>
 </div>
 <script>
+// 90-item backlog Phase 5: wraps the textarea's current selection in
+// **/*/_ markers (see App\Helpers\MarkdownLite) — a convenience only;
+// typing the markers directly works identically. clause_text stays
+// plain text in the database either way, so this never touches a
+// readonly/protected textarea's value (the browser already refuses
+// that), hence disabling the button for a still-locked clause above.
+document.querySelectorAll('.md-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var marker = btn.getAttribute('data-wrap');
+    var textarea = btn.closest('.md-toolbar').nextElementSibling;
+    if (!textarea) { return; }
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var value = textarea.value;
+    var selected = value.slice(start, end);
+    textarea.value = value.slice(0, start) + marker + selected + marker + value.slice(end);
+    textarea.focus();
+    textarea.selectionStart = start + marker.length;
+    textarea.selectionEnd = start + marker.length + selected.length;
+  });
+});
+
 function unlockFieldset(btn) {
   var fieldset = btn.closest('fieldset');
   var reason = prompt('Why are you unlocking this protected item? (required)');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Docx;
 
+use App\Helpers\MarkdownLite;
 use PhpOffice\PhpWord\Element\AbstractContainer;
 use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\PhpWord;
@@ -451,9 +452,33 @@ final class DocxComponents
             });
         }
         foreach ($terms as $clause) {
-            $section->addListItem((string) $clause, 0, ['size' => 9.5], null, ['spaceAfter' => 60]);
+            self::addMarkdownLiteListItem($section, (string) $clause, ['size' => 9.5], ['spaceAfter' => 60]);
         }
         $section->addTextBreak(1, 4);
+    }
+
+    /**
+     * 90-item backlog Phase 5: a numbered-clause list item whose
+     * bold/italic/underline markdown markers (App\Helpers\MarkdownLite)
+     * render as real DOCX run formatting instead of literal asterisks —
+     * the exact same tokenize() call the markdown_lite Twig filter uses
+     * for the PDF side, so the two renderers can never disagree about
+     * which part of a clause is bold/italic/underlined. $baseStyle is
+     * merged into every run (size/color etc.); bold/italic/underline on
+     * it are always overridden per-segment.
+     */
+    public static function addMarkdownLiteListItem(AbstractContainer $container, string $text, array $baseStyle = [], ?array $paragraphStyle = null): void
+    {
+        $run = $container->addListItemRun(0, null, $paragraphStyle);
+        foreach (MarkdownLite::tokenize($text) as $segment) {
+            $style = $baseStyle;
+            $style['bold'] = $segment['bold'];
+            $style['italic'] = $segment['italic'];
+            if ($segment['underline']) {
+                $style['underline'] = 'single';
+            }
+            $run->addText($segment['text'], $style);
+        }
     }
 
     /**

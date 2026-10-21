@@ -833,10 +833,11 @@ function renderBuyerPo(context) {
 
   const clauseParas = (context.terms || []).map((clause) => {
     const parts = String(clause).split(': ');
+    const body = parts.slice(1).join(': ') || '';
     return C.rich([
       ['•  ', { color: C.BLACK }],
       [`${parts[0] || ''}: `, { bold: true, color: C.BLACK }],
-      [parts.slice(1).join(': ') || '', { color: C.BLACK }],
+      ...C.markdownLiteSegments(body, { color: C.BLACK }),
     ]);
   });
   children.push(
@@ -962,7 +963,7 @@ function renderSupPo(context) {
 
   if ((context.terms || []).length) {
     children.push(...C.sectionTitle('6. QUALITY & INSPECTION', green));
-    children.push(...C.bulletList(context.terms));
+    children.push(...C.markdownLiteBulletList(context.terms, { size: 19 }));
   }
 
   children.push(...C.sectionTitle('7. SUPPLIER ACCEPTANCE', green));
