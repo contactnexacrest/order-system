@@ -56,6 +56,12 @@ screen just to check. Staff review it here and either:
   the real client record and takes you straight to it, ready to create the
   order.
 - **Reject** (with a reason) — if it's not a genuine enquiry.
+- **Resend Link** — the buyer gets a one-time self-correction link by
+  email right after submitting (good for 7 days), so they can fix a typo
+  themselves without staff involvement. If that email never arrived, or
+  the buyer comes back after it's expired, staff click **Resend Link** on
+  the pending row to re-send a fresh one — this is the only recovery path,
+  since an expired link can't be reused.
 
 ![Quotation Intake Review queue](./images/s1_intake_review_queue.png)
 

@@ -545,6 +545,7 @@ app.post('/clients/:id/impersonate', requireAuth, requirePermission('impersonate
 app.get('/client-intake', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.index));
 app.post('/client-intake/:id/accept', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.accept));
 app.post('/client-intake/:id/reject', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.reject));
+app.post('/client-intake/:id/resend-link', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.resendLink));
 
 app.get('/pi-intake-review', requireAuth, requirePermission('manage_orders'), asyncHandler(piIntakeReviewController.index));
 app.post('/pi-intake-review/:id/accept', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(piIntakeReviewController.accept));

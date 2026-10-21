@@ -340,6 +340,7 @@ $router->post('/clients/{id}/impersonate', [$clients, 'impersonate'], [SessionAu
 $router->get('/client-intake', [$clientIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/client-intake/{id}/accept', [$clientIntakeReview, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/client-intake/{id}/reject', [$clientIntakeReview, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/client-intake/{id}/resend-link', [$clientIntakeReview, 'resendLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 
 $router->get('/pi-intake-review', [$piIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/pi-intake-review/{id}/accept', [$piIntakeReview, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

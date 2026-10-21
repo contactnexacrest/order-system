@@ -194,8 +194,14 @@ final class ClientIntakeController
         return $fields;
     }
 
-    /** Emails the client a one-time correction link and returns it, so the thank-you page can also show it directly. */
-    private static function issueCorrectionLink(int $submissionId, string $email): string
+    /**
+     * Emails the client a one-time correction link and returns it, so the
+     * thank-you page can also show it directly. Public — also called by
+     * ClientIntakeReviewController::resendLink() (90-item backlog
+     * "resend-lost-intake-link flow") to re-issue a fresh token/expiry
+     * when the client never got (or lost) the original.
+     */
+    public static function issueCorrectionLink(int $submissionId, string $email): string
     {
         $rawToken = bin2hex(random_bytes(32));
         $expiresAt = date('Y-m-d H:i:s', time() + (7 * 86400));

@@ -182,7 +182,13 @@ function collectConsigneeFields(req) {
   return fields;
 }
 
-/** Emails the client a one-time correction link and returns it, so the thank-you page can also show it directly. */
+/**
+ * Emails the client a one-time correction link and returns it, so the
+ * thank-you page can also show it directly. Exported — also called by
+ * clientIntakeReviewController.resendLink() (90-item backlog
+ * "resend-lost-intake-link flow") to re-issue a fresh token/expiry when
+ * the client never got (or lost) the original.
+ */
 async function issueCorrectionLink(submissionId, email) {
   const rawToken = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19).replace('T', ' ');
@@ -207,4 +213,4 @@ async function issueCorrectionLink(submissionId, email) {
   return link;
 }
 
-module.exports = { show, submit, showEdit, updateSubmission };
+module.exports = { show, submit, showEdit, updateSubmission, issueCorrectionLink };

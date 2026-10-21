@@ -28,6 +28,10 @@
             <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px">
             <button type="submit" class="btn-sm btn-danger">Reject</button>
           </form>
+          <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/resend-link" style="display:inline">
+            <?= Csrf::field() ?>
+            <button type="submit" class="btn-sm btn-secondary" title="Re-send the self-correction link if the client never got it or it's expired">Resend Link</button>
+          </form>
         </td>
       </tr>
       <?php endforeach; ?>

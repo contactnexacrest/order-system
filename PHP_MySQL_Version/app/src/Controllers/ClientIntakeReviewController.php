@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientIntakeRepository;
 use App\Repositories\ClientRepository;
 use App\Services\AuthService;
@@ -81,6 +82,35 @@ final class ClientIntakeReviewController
 
         Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}. Proceed to create the order and generate the Quotation.");
         header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * 90-item backlog "resend-lost-intake-link flow": the correction link
+     * issued at submit() time (ClientIntakeController::issueCorrectionLink)
+     * expires after 7 days with no recovery path — if the client never
+     * got the email, or it expired before they got to it, the submission
+     * was stuck pending forever with no way to correct it themselves.
+     * Re-issues a fresh token/expiry and re-emails it, same staff-
+     * initiated regenerate-and-send pattern as the PI-stage intake link
+     * (OrderController::generatePiFormLink) and the Buyer Action link.
+     */
+    public function resendLink(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $id = (int) ($params['id'] ?? 0);
+        $submission = ClientIntakeRepository::find($id);
+
+        if (!$submission || $submission['status'] !== 'pending') {
+            Flash::set('error', 'Submission not found, or already resolved.');
+            header('Location: /client-intake');
+            return;
+        }
+
+        $link = ClientIntakeController::issueCorrectionLink($id, $submission['email']);
+
+        AuditLogRepository::log((int) $user['id'], 'INTAKE_CORRECTION_LINK_RESENT', 'client_intake_submissions', $id, null, null, null, null);
+        Flash::set('success', "Correction link resent to {$submission['email']}: {$link}");
+        header('Location: /client-intake');
     }
 
     public function reject(array $params): void

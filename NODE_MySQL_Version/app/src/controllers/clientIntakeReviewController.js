@@ -2,9 +2,11 @@
 
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
+const auditLogRepository = require('../repositories/auditLogRepository');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const clientRepository = require('../repositories/clientRepository');
 const referenceNumberService = require('../services/referenceNumberService');
+const clientIntakeController = require('./clientIntakeController');
 
 /**
  * Port of App\Controllers\ClientIntakeReviewController. Staff review queue
@@ -78,6 +80,34 @@ async function accept(req, res) {
   res.redirect(`/clients/${clientId}`);
 }
 
+/**
+ * 90-item backlog "resend-lost-intake-link flow": the correction link
+ * issued at submit() time (clientIntakeController.issueCorrectionLink)
+ * expires after 7 days with no recovery path — if the client never got
+ * the email, or it expired before they got to it, the submission was
+ * stuck pending forever with no way to correct it themselves. Re-issues
+ * a fresh token/expiry and re-emails it, same staff-initiated
+ * regenerate-and-send pattern as the PI-stage intake link
+ * (ordersController.generatePiFormLink) and the Buyer Action link.
+ */
+async function resendLink(req, res) {
+  const user = req.user;
+  const id = parseInt(req.params.id, 10) || 0;
+  const submission = await clientIntakeRepository.find(id);
+
+  if (!submission || submission.status !== 'pending') {
+    flash.set(req, 'error', 'Submission not found, or already resolved.');
+    res.redirect('/client-intake');
+    return;
+  }
+
+  const link = await clientIntakeController.issueCorrectionLink(id, submission.email);
+
+  await auditLogRepository.log(user.id, 'INTAKE_CORRECTION_LINK_RESENT', 'client_intake_submissions', id);
+  flash.set(req, 'success', `Correction link resent to ${submission.email}: ${link}`);
+  res.redirect('/client-intake');
+}
+
 async function reject(req, res) {
   const user = req.user;
   const id = parseInt(req.params.id, 10) || 0;
@@ -95,4 +125,4 @@ async function reject(req, res) {
   res.redirect('/client-intake');
 }
 
-module.exports = { index, accept, reject };
+module.exports = { index, accept, reject, resendLink };
