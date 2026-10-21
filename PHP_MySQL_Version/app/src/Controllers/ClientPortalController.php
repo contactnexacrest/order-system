@@ -236,6 +236,21 @@ final class ClientPortalController
 
         $paymentStatus = OrderPaymentStatusRepository::find($orderId);
 
+        // User-reported batch item 10 — same lazy fallback as
+        // BuyerActionController::show(): the acknowledgement section only
+        // ever rendered when an order_oc_acknowledgments row already
+        // existed, which only EmailDispatchService::dispatch() (a sent OC
+        // email) ever created. A client logging into the portal before
+        // that email went out saw no acknowledgement option at all.
+        $ocAcknowledgment = OrderOcAcknowledgmentRepository::find($orderId);
+        if (!$ocAcknowledgment) {
+            $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
+            if ($ocDoc && in_array($ocDoc['status'], ['approved', 'sent'], true)) {
+                OrderOcAcknowledgmentRepository::ensureRowExists($orderId, (int) $ocDoc['id']);
+                $ocAcknowledgment = OrderOcAcknowledgmentRepository::find($orderId);
+            }
+        }
+
         View::render('client_portal/order_show', [
             'client' => ClientPortalService::currentClient(),
             'order' => $order,
@@ -243,7 +258,7 @@ final class ClientPortalController
             'totalFobValue' => OrderProductRepository::totalFobValue($orderId),
             'documents' => DocumentRepository::customerFacingForOrder($orderId),
             'paymentReports' => ClientPaymentReportRepository::forOrder($orderId),
-            'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
+            'ocAcknowledgment' => $ocAcknowledgment,
             'comments' => OrderCommentRepository::forOrder($orderId),
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
             // 90-item backlog #19: gates the self-upload form below once

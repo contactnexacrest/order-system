@@ -138,6 +138,50 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
     expect(res.renderedData.ocAcknowledgment).toBeNull();
   });
 
+  /**
+   * User-reported batch item 10: the acknowledgement banner used to
+   * depend on an order_oc_acknowledgments row already existing — but
+   * that row is only ever created by emailDispatchService.dispatch()
+   * when the OC email actually goes out. Staff generating the Buyer
+   * Action Link before that email was sent (still awaiting Level-2
+   * approval, or mail sending misconfigured entirely) got a page with
+   * nothing to acknowledge, even though an approved OC document
+   * genuinely existed. The page must lazily create that row itself, the
+   * same way the staff-side "Record Buyer's Acknowledgement" fallback
+   * already does.
+   */
+  it('show() renders the OC-ack banner data when OC is approved but never emailed', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await unlockThroughStage3(orderId);
+    await createTestDocument(orderId, 'OC', 'approved');
+    const token = await orderRepository.generateBuyerActionToken(orderId);
+    const res = fakeRes();
+
+    await buyerActionController.show(fakeReq({ token }), res);
+
+    expect(res.renderedData.ocAcknowledgment).not.toBeNull();
+    expect(res.renderedData.ocAcknowledgment.acknowledged_at).toBeNull();
+    const ack = await orderOcAcknowledgmentRepository.find(orderId);
+    expect(ack).not.toBeNull();
+  });
+
+  it('acknowledgeOc() succeeds when OC was approved but never emailed', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await unlockThroughStage3(orderId);
+    await createTestDocument(orderId, 'OC', 'approved');
+    const token = await orderRepository.generateBuyerActionToken(orderId);
+    const req = fakeReq({ token });
+    const res = fakeRes();
+
+    await buyerActionController.acknowledgeOc(req, res);
+
+    const flashMessages = flash.pull(req);
+    expect(flashMessages[0].type).toBe('success');
+    const ack = await orderOcAcknowledgmentRepository.find(orderId);
+    expect(ack.acknowledged_at).not.toBeNull();
+    expect(await stageGateService.isUnlocked(orderId, 5)).toBe(true);
+  });
+
   // ---------------------------------------------------------------
   // buyerActionController.acknowledgeOc
   // ---------------------------------------------------------------
@@ -205,6 +249,28 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
   // Regression: the session-gated client-portal path must still behave
   // identically now that it delegates to the shared buyerActionService.
   // ---------------------------------------------------------------
+
+  /**
+   * User-reported batch item 10 — same lazy-create fix applies to the
+   * session-gated client-portal order page, not just the no-login Buyer
+   * Action Link: a client who logs in before the OC email went out must
+   * also see something real to acknowledge.
+   */
+  it('clientPortalController.showOrder renders the OC-ack banner data when OC is approved but never emailed', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    await unlockThroughStage3(orderId);
+    await createTestDocument(orderId, 'OC', 'approved');
+    const req = { params: { id: String(orderId) }, body: {}, session: { _client_portal_client_id: clientId } };
+    const res = fakeRes();
+
+    await clientPortalController.showOrder(req, res);
+
+    expect(res.renderedData.ocAcknowledgment).not.toBeNull();
+    expect(res.renderedData.ocAcknowledgment.acknowledged_at).toBeNull();
+    const ack = await orderOcAcknowledgmentRepository.find(orderId);
+    expect(ack).not.toBeNull();
+  });
 
   it('clientPortalController.acknowledgeOc still works after the refactor', async () => {
     const clientId = await createTestClient();

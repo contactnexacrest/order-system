@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientPaymentReportRepository;
+use App\Repositories\DocumentRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderPaymentStatusRepository;
@@ -34,6 +35,23 @@ final class BuyerActionService
     public static function acknowledgeOc(int $orderId): array
     {
         $ack = OrderOcAcknowledgmentRepository::find($orderId);
+        if (!$ack) {
+            // User-reported batch item 10: no OC send has ever completed
+            // for this order (still awaiting Level-2 email approval, mail
+            // sending misconfigured, or staff generated the Buyer Action
+            // Link before the OC ever went out by email at all) — there
+            // is nothing yet for EmailDispatchService::dispatch()'s own
+            // recordSent() to have created. Same lazy fallback
+            // OrderController::recordOcAcknowledgment() already uses for
+            // the staff-side "Record Buyer's Acknowledgement" path: the OC
+            // must at least have been generated/approved so there's a
+            // real document to point this record at.
+            $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
+            if ($ocDoc && in_array($ocDoc['status'], ['approved', 'sent'], true)) {
+                OrderOcAcknowledgmentRepository::ensureRowExists($orderId, (int) $ocDoc['id']);
+                $ack = OrderOcAcknowledgmentRepository::find($orderId);
+            }
+        }
         if (!$ack || $ack['acknowledged_at'] !== null) {
             return ['ok' => false, 'message' => 'There is nothing awaiting your acknowledgement on this order.'];
         }

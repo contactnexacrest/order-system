@@ -5,6 +5,7 @@ const clientPaymentReportRepository = require('../repositories/clientPaymentRepo
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
+const documentRepository = require('../repositories/documentRepository');
 const stageGateService = require('./stageGateService');
 const fileUploadService = require('./fileUploadService');
 
@@ -36,7 +37,21 @@ async function advanceAlreadyCleared(orderId) {
   return !!status && status.advance_cleared_at !== null;
 }
 async function acknowledgeOc(orderId) {
-  const ack = await orderOcAcknowledgmentRepository.find(orderId);
+  let ack = await orderOcAcknowledgmentRepository.find(orderId);
+  if (!ack) {
+    // User-reported batch item 10: no OC send has ever completed for this
+    // order (still awaiting Level-2 email approval, mail sending
+    // misconfigured, or staff generated the Buyer Action Link before the
+    // OC ever went out by email at all) — there is nothing yet for
+    // emailDispatchService.dispatch()'s own recordSent() to have created.
+    // Same lazy fallback ordersController.recordOcAcknowledgment() already
+    // uses for the staff-side "Record Buyer's Acknowledgement" path.
+    const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
+    if (ocDoc && ['approved', 'sent'].includes(ocDoc.status)) {
+      await orderOcAcknowledgmentRepository.ensureRowExists(orderId, ocDoc.id);
+      ack = await orderOcAcknowledgmentRepository.find(orderId);
+    }
+  }
   if (!ack || ack.acknowledged_at !== null) {
     return { ok: false, message: 'There is nothing awaiting your acknowledgement on this order.' };
   }

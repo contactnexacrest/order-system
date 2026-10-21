@@ -122,6 +122,51 @@ final class BuyerActionLinkTest extends DbTestCase
         self::assertStringContainsString('Buyer PO', $html);
     }
 
+    /**
+     * User-reported batch item 10: the acknowledgement banner used to
+     * depend on an order_oc_acknowledgments row already existing — but
+     * that row is only ever created by EmailDispatchService::dispatch()
+     * when the OC email actually goes out. Staff generating the Buyer
+     * Action Link before that email was sent (still awaiting Level-2
+     * approval, or mail sending misconfigured entirely) got a page with
+     * nothing to acknowledge, even though an approved OC document
+     * genuinely existed. The page must lazily create that row itself,
+     * the same way the staff-side "Record Buyer's Acknowledgement"
+     * fallback already does.
+     */
+    public function testShowRendersOcAckBannerWhenOcIsApprovedButNeverEmailed(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThroughStage3($orderId);
+        $this->createTestDocument($orderId, 'OC', 'approved');
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+
+        ob_start();
+        (new BuyerActionController())->show(['token' => $token]);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('Your Acknowledgement Needed', $html);
+        $ack = OrderOcAcknowledgmentRepository::find($orderId);
+        self::assertNotNull($ack, 'visiting the page must lazily create the acknowledgment row so there is something real to acknowledge');
+        self::assertNull($ack['acknowledged_at']);
+    }
+
+    public function testAcknowledgeOcSucceedsWhenOcWasApprovedButNeverEmailed(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThroughStage3($orderId);
+        $this->createTestDocument($orderId, 'OC', 'approved');
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+
+        (new BuyerActionController())->acknowledgeOc(['token' => $token]);
+
+        $flash = Flash::pull();
+        self::assertSame('success', $flash[0]['type']);
+        $ack = OrderOcAcknowledgmentRepository::find($orderId);
+        self::assertNotNull($ack['acknowledged_at']);
+        self::assertTrue(StageGateService::isUnlocked($orderId, 5));
+    }
+
     // ---------------------------------------------------------------
     // BuyerActionController::acknowledgeOc
     // ---------------------------------------------------------------
@@ -191,6 +236,30 @@ final class BuyerActionLinkTest extends DbTestCase
     // Regression: the session-gated client-portal path must still behave
     // identically now that it delegates to the shared BuyerActionService.
     // ---------------------------------------------------------------
+
+    /**
+     * User-reported batch item 10 — same lazy-create fix applies to the
+     * session-gated client-portal order page, not just the no-login
+     * Buyer Action Link: a client who logs in before the OC email went
+     * out must also see something real to acknowledge.
+     */
+    public function testClientPortalShowOrderRendersOcAckBannerWhenOcIsApprovedButNeverEmailed(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $this->unlockThroughStage3($orderId);
+        $this->createTestDocument($orderId, 'OC', 'approved');
+        $_SESSION['_client_portal_client_id'] = $clientId;
+
+        ob_start();
+        (new ClientPortalController())->showOrder(['id' => (string) $orderId]);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('Your Acknowledgement Needed', $html);
+        $ack = OrderOcAcknowledgmentRepository::find($orderId);
+        self::assertNotNull($ack);
+        self::assertNull($ack['acknowledged_at']);
+    }
 
     public function testClientPortalAcknowledgeOcStillWorksAfterTheRefactor(): void
     {

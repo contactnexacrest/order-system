@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\DocumentRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderPaymentStatusRepository;
@@ -60,12 +61,31 @@ final class BuyerActionController
 
         $paymentStatus = OrderPaymentStatusRepository::find($orderId);
 
+        // User-reported batch item 10: the acknowledgement section below
+        // only ever rendered when an order_oc_acknowledgments row already
+        // existed — but that row was only ever created by
+        // EmailDispatchService::dispatch() when the OC email actually went
+        // out. A Buyer Action Link generated before that email was sent
+        // (still awaiting Level-2 approval, mail misconfigured, or staff
+        // just generated the link to hand the buyer directly) led to a
+        // page with nothing to acknowledge at all. Same lazy fallback
+        // OrderController::recordOcAcknowledgment() already uses for the
+        // staff-side "Record Buyer's Acknowledgement" path.
+        $ocAcknowledgment = OrderOcAcknowledgmentRepository::find($orderId);
+        if (!$ocAcknowledgment) {
+            $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
+            if ($ocDoc && in_array($ocDoc['status'], ['approved', 'sent'], true)) {
+                OrderOcAcknowledgmentRepository::ensureRowExists($orderId, (int) $ocDoc['id']);
+                $ocAcknowledgment = OrderOcAcknowledgmentRepository::find($orderId);
+            }
+        }
+
         View::render('buyer_action/show', [
             'token' => $params['token'],
             'order' => $order,
             'products' => OrderProductRepository::forOrder($orderId),
             'totalFobValue' => OrderProductRepository::totalFobValue($orderId),
-            'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),
+            'ocAcknowledgment' => $ocAcknowledgment,
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
             'advanceCleared' => $paymentStatus !== null && $paymentStatus['advance_cleared_at'] !== null,
         ], 'layout/bare');

@@ -6,6 +6,7 @@ const orderProductRepository = require('../repositories/orderProductRepository')
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
+const documentRepository = require('../repositories/documentRepository');
 const buyerActionService = require('../services/buyerActionService');
 
 /**
@@ -52,12 +53,30 @@ async function show(req, res) {
 
   const paymentStatus = await orderPaymentStatusRepository.find(order.id);
 
+  // User-reported batch item 10: the acknowledgement section below only
+  // ever rendered when an order_oc_acknowledgments row already existed —
+  // but that row was only ever created by emailDispatchService.dispatch()
+  // when the OC email actually went out. A Buyer Action Link generated
+  // before that email was sent (still awaiting Level-2 approval, mail
+  // misconfigured, or staff just generated the link to hand the buyer
+  // directly) led to a page with nothing to acknowledge at all. Same lazy
+  // fallback ordersController.recordOcAcknowledgment() already uses for
+  // the staff-side "Record Buyer's Acknowledgement" path.
+  let ocAcknowledgment = await orderOcAcknowledgmentRepository.find(order.id);
+  if (!ocAcknowledgment) {
+    const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(order.id, 'OC');
+    if (ocDoc && ['approved', 'sent'].includes(ocDoc.status)) {
+      await orderOcAcknowledgmentRepository.ensureRowExists(order.id, ocDoc.id);
+      ocAcknowledgment = await orderOcAcknowledgmentRepository.find(order.id);
+    }
+  }
+
   res.renderView('buyer_action/show', {
     token: req.params.token,
     order,
     products: await orderProductRepository.forOrder(order.id),
     totalFobValue: await orderProductRepository.totalFobValue(order.id),
-    ocAcknowledgment: await orderOcAcknowledgmentRepository.find(order.id),
+    ocAcknowledgment,
     buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(order.id),
     advanceCleared: !!paymentStatus && paymentStatus.advance_cleared_at !== null,
   }, 'layout/bare');

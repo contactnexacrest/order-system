@@ -232,6 +232,21 @@ async function showOrder(req, res) {
 
   const paymentStatus = await orderPaymentStatusRepository.find(orderId);
 
+  // User-reported batch item 10 — same lazy fallback as
+  // buyerActionController's show(): the acknowledgement section only ever
+  // rendered when an order_oc_acknowledgments row already existed, which
+  // only emailDispatchService.dispatch() (a sent OC email) ever created. A
+  // client logging into the portal before that email went out saw no
+  // acknowledgement option at all.
+  let ocAcknowledgment = await orderOcAcknowledgmentRepository.find(orderId);
+  if (!ocAcknowledgment) {
+    const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
+    if (ocDoc && ['approved', 'sent'].includes(ocDoc.status)) {
+      await orderOcAcknowledgmentRepository.ensureRowExists(orderId, ocDoc.id);
+      ocAcknowledgment = await orderOcAcknowledgmentRepository.find(orderId);
+    }
+  }
+
   res.renderView('client_portal/order_show', {
     client: await clientPortalService.currentClient(req),
     order,
@@ -239,7 +254,7 @@ async function showOrder(req, res) {
     totalFobValue: await orderProductRepository.totalFobValue(orderId),
     documents: await documentRepository.customerFacingForOrder(orderId),
     paymentReports: await clientPaymentReportRepository.forOrder(orderId),
-    ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
+    ocAcknowledgment,
     comments: await orderCommentRepository.forOrder(orderId),
     buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(orderId),
     // 90-item backlog #19: gates the self-upload form below once the
