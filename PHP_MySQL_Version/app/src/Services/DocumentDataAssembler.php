@@ -442,7 +442,6 @@ final class DocumentDataAssembler
             'total_freight_and_insurance' => $freightRaw !== null ? self::formatMoney($freightRaw + $insuranceRaw) : null,
             'freight_forwarder_name'    => $row['freight_forwarder_name'],
             'freight_forwarder_contact' => $row['freight_forwarder_contact'],
-            'gst_treatment'             => $row['gst_treatment'],
             'freight_cleared_at'        => self::formatDate($row['freight_cleared_at']),
             // FDN's own "Payment Due: ... by [date]" line — 3 working days
             // from today (the date this debit note is being generated),

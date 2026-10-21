@@ -1547,7 +1547,6 @@ final class OrderController
             'insurance_amount'          => trim((string) ($_POST['insurance_amount'] ?? '')) ?: null,
             'freight_forwarder_name'    => trim((string) ($_POST['freight_forwarder_name'] ?? '')) ?: null,
             'freight_forwarder_contact' => trim((string) ($_POST['freight_forwarder_contact'] ?? '')) ?: null,
-            'gst_treatment'             => trim((string) ($_POST['gst_treatment'] ?? '')) ?: null,
         ]);
         Flash::set('success', 'Freight & insurance terms saved. Generate the Freight Debit Note below.');
         header("Location: /orders/{$orderId}");

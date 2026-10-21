@@ -78,7 +78,6 @@ describe('Remittance input currency label (90-item backlog #82)', () => {
       insurance_amount: '50',
       freight_forwarder_name: 'Test Forwarder',
       freight_forwarder_contact: 'test@forwarder.test',
-      gst_treatment: 'NIL',
     });
     await orderPaymentStatusRepository.initializeForOrder(orderId);
 

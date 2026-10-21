@@ -10,23 +10,28 @@ final class OrderFreightRepository
 {
     public static function upsert(int $orderId, array $data): void
     {
+        // gst_treatment is deliberately never written here (dropped along
+        // with its dead admin dropdown): the FDN is always a pure cost
+        // reimbursement, never a taxable service supply, so there is
+        // nothing left for this column to configure. The column itself is
+        // left in the schema rather than dropped, same as
+        // freight_cleared_at/freight_cleared_by above — removing a column
+        // is a real migration, not a code change.
         Database::connection()->prepare(
             'INSERT INTO order_freight
-                (order_id, confirmed_freight_rate, insurance_amount, freight_forwarder_name, freight_forwarder_contact, gst_treatment)
-             VALUES (:order_id, :rate, :insurance, :forwarder_name, :forwarder_contact, :gst_treatment)
+                (order_id, confirmed_freight_rate, insurance_amount, freight_forwarder_name, freight_forwarder_contact)
+             VALUES (:order_id, :rate, :insurance, :forwarder_name, :forwarder_contact)
              ON DUPLICATE KEY UPDATE
                 confirmed_freight_rate = VALUES(confirmed_freight_rate),
                 insurance_amount = VALUES(insurance_amount),
                 freight_forwarder_name = VALUES(freight_forwarder_name),
-                freight_forwarder_contact = VALUES(freight_forwarder_contact),
-                gst_treatment = VALUES(gst_treatment)'
+                freight_forwarder_contact = VALUES(freight_forwarder_contact)'
         )->execute([
             'order_id'          => $orderId,
             'rate'              => $data['confirmed_freight_rate'] ?: null,
             'insurance'         => $data['insurance_amount'] ?: null,
             'forwarder_name'    => $data['freight_forwarder_name'] ?? null,
             'forwarder_contact' => $data['freight_forwarder_contact'] ?? null,
-            'gst_treatment'     => $data['gst_treatment'] ?? null,
         ]);
     }
 

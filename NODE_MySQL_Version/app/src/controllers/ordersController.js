@@ -1541,7 +1541,6 @@ async function saveFreightTerms(req, res) {
     insurance_amount: str(body.insurance_amount) || null,
     freight_forwarder_name: str(body.freight_forwarder_name) || null,
     freight_forwarder_contact: str(body.freight_forwarder_contact) || null,
-    gst_treatment: str(body.gst_treatment) || null,
   });
   flash.set(req, 'success', 'Freight & insurance terms saved. Generate the Freight Debit Note below.');
   res.redirect(`/orders/${orderId}`);

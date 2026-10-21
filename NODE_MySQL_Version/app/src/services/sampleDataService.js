@@ -785,7 +785,6 @@ async function advanceSampleOrderToStage9(orderId, supplierId, userId) {
     insurance_amount: '185.00',
     freight_forwarder_name: 'Sample Forwarder Logistics',
     freight_forwarder_contact: 'ops@sampleforwarder.test',
-    gst_treatment: 'NIL',
   });
   await documentGenerationService.generate(orderId, 'FDN', userId);
   await orderPaymentStatusRepository.recordFreightReceived(orderId, 1635.00, formatDate(new Date()));

@@ -1074,7 +1074,7 @@ function renderFdn(context) {
       { cells: ['Ocean Freight', g(order, 'container_type'), g(freight, 'confirmed_freight_rate', 'To Be Confirmed'), `Confirmed rate — ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}`], align: [null, null, 'right', null] },
       { cells: ['Origin Charges (if any)', '', 'NIL', `THC, documentation charges at ${g(order, 'port_of_loading')} — if applicable`], align: [null, null, 'right', null] },
       { cells: ['Insurance', '', g(order, 'incoterm_code') === 'CIF' ? g(freight, 'insurance_amount', 'To Be Confirmed') : 'NIL', 'CIF only — if FOB/CFR enter NIL'], align: [null, null, 'right', null] },
-      { cells: ['GST / IGST (if applicable)', '', g(freight, 'gst_treatment') === 'IGST_18' ? '18% IGST' : 'NIL', 'As advised by CA — NIL if pure cost reimbursement'], align: [null, null, 'right', null] },
+      { cells: ['GST / IGST (if applicable)', '', 'NIL', 'Freight recovery is a pure cost reimbursement, not a taxable service supply'], align: [null, null, 'right', null] },
     ])
   );
   children.push(...C.totalsTable([{ label: `TOTAL AMOUNT DUE (${currency}) *  (incl. GST if applicable)`, value: g(freight, 'total_freight_and_insurance', 'To Be Confirmed'), highlight: true }]));

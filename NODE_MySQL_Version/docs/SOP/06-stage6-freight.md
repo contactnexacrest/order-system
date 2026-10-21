@@ -51,11 +51,12 @@ these charges.
 The Debit Note itself states payment is due within **3 Calendar Days**
 of its own date (previously "3 working days" — every buyer payment
 obligation across the system now counts in Calendar Days, not Working
-Days, for consistency). Its GST/IGST line now reads "Treated as taxable
-service supply" or "Treated as pure cost reimbursement" depending on the
-GST Treatment recorded in Freight Terms, rather than leaking NexaCrest's
-own internal CA guidance text ("As advised by CA — NIL if pure cost
-reimbursement") onto a document the buyer actually sees.
+Days, for consistency). Its GST/IGST line always reads "NIL — Freight
+recovery is a pure cost reimbursement, not a taxable service supply." This
+is a fixed, non-configurable statement, not a per-order choice — freight
+recovery is never treated as a taxable service supply, so there is no
+Freight Terms setting for it to depend on, and no internal CA guidance
+text ever reaches a document the buyer actually sees.
 
 Recording and clearing the payment itself follows the exact same
 two-step pattern as the advance payment in Stage 3:

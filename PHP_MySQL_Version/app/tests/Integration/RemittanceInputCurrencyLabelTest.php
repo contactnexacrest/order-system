@@ -74,7 +74,6 @@ final class RemittanceInputCurrencyLabelTest extends DbTestCase
             'insurance_amount'           => '50',
             'freight_forwarder_name'     => 'Test Forwarder',
             'freight_forwarder_contact'  => 'test@forwarder.test',
-            'gst_treatment'              => 'NIL',
         ]);
         OrderPaymentStatusRepository::initializeForOrder($orderId);
 

@@ -1420,12 +1420,6 @@
           <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
           <label>Freight Forwarder Name<input type="text" name="freight_forwarder_name"></label>
           <label>Freight Forwarder Contact<input type="text" name="freight_forwarder_contact"></label>
-          <label>GST Treatment
-            <select name="gst_treatment">
-              <option value="NIL">NIL</option>
-              <option value="IGST_18">18% IGST</option>
-            </select>
-          </label>
           {{ stepBadge('6a') | safe }}<button type="submit" class="btn-sm">Save Freight Terms</button>
         </form>
       {% else %}

@@ -1039,7 +1039,7 @@ final class DocxDocumentBuilder
             ['cells' => ['Ocean Freight', self::g($order, 'container_type'), self::g($freight, 'confirmed_freight_rate', 'To Be Confirmed'), 'Confirmed rate — ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge')], 'align' => [null, null, 'right', null]],
             ['cells' => ['Origin Charges (if any)', '', 'NIL', 'THC, documentation charges at ' . self::g($order, 'port_of_loading') . ' — if applicable'], 'align' => [null, null, 'right', null]],
             ['cells' => ['Insurance', '', self::g($order, 'incoterm_code') === 'CIF' ? self::g($freight, 'insurance_amount', 'To Be Confirmed') : 'NIL', 'CIF only — if FOB/CFR enter NIL'], 'align' => [null, null, 'right', null]],
-            ['cells' => ['GST / IGST (if applicable)', '', self::g($freight, 'gst_treatment') === 'IGST_18' ? '18% IGST' : 'NIL', 'As advised by CA — NIL if pure cost reimbursement'], 'align' => [null, null, 'right', null]],
+            ['cells' => ['GST / IGST (if applicable)', '', 'NIL', 'Freight recovery is a pure cost reimbursement, not a taxable service supply'], 'align' => [null, null, 'right', null]],
         ]);
         DocxComponents::addTotalsTable($section, [
             ['label' => "TOTAL AMOUNT DUE ({$currency}) *  (incl. GST if applicable)", 'value' => self::g($freight, 'total_freight_and_insurance', 'To Be Confirmed'), 'highlight' => true],

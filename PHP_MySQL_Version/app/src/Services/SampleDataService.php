@@ -827,7 +827,6 @@ final class SampleDataService
             'insurance_amount'          => '185.00',
             'freight_forwarder_name'    => 'Sample Forwarder Logistics',
             'freight_forwarder_contact' => 'ops@sampleforwarder.test',
-            'gst_treatment'             => 'NIL',
         ]);
         DocumentGenerationService::generate($orderId, 'FDN', $userId);
         OrderPaymentStatusRepository::recordFreightReceived($orderId, 1635.00, date('Y-m-d'));
