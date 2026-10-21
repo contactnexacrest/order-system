@@ -181,6 +181,22 @@ FROM currencies c WHERE c.code = 'USD';
 -- actually sent/received; see field_protection_requests to unprotect.
 UPDATE payment_presets SET is_protected = 1;
 
+-- 90-item backlog "30/70 payment preset": a third preset for an
+-- established buyer wanting an even lighter upfront commitment than
+-- the existing 40/60 presets. Deliberately left UNPROTECTED (added
+-- after the blanket UPDATE above, not before it) — unlike the two
+-- foundational presets, this one didn't exist when the app shipped, so
+-- there's nothing historical to guard; an admin can freely adjust it
+-- via the full Payment Presets CRUD screen (/payment-presets) without
+-- the unlock gesture, same as any other preset they create themselves.
+INSERT INTO payment_presets
+  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
+SELECT 'Extended Terms — 30/70', 0, 30.00, 'against Proforma Invoice before production commences',
+       70.00, 'B_AGAINST_BL', 7,
+       'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
+       c.id, 1, 1
+FROM currencies c WHERE c.code = 'USD';
+
 -- ================================================================
 -- STAGES MASTER — the 9 gates from StageGate.docx / WallReference.docx
 -- ================================================================
