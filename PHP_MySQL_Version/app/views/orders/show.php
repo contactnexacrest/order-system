@@ -376,6 +376,7 @@ foreach ($stages as $s) {
       <div><span class="k">FOB Value</span><span class="v"><?= htmlspecialchars($order['currency_code']) ?> <?= number_format((float) $fobTotal, 2) ?></span></div>
       <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed') ?></span></div>
       <div><span class="k">Container Type</span><span class="v"><?= htmlspecialchars($order['container_type'] ?? '—') ?></span></div>
+      <div><span class="k">Lead Time (days)</span><span class="v"><?= (isset($order['lead_time_min_days']) || isset($order['lead_time_max_days'])) ? htmlspecialchars((string) ($order['lead_time_min_days'] ?? '?')) . '–' . htmlspecialchars((string) ($order['lead_time_max_days'] ?? '?')) : '—' ?></span></div>
       <div><span class="k">Payment Preset</span><span class="v"><?= htmlspecialchars($order['preset_name']) ?></span></div>
       <div><span class="k">Buyer's PO Ref</span><span class="v">
         <?php if (!empty($order['buyers_po_ref']) && $order['buyers_po_ref'] !== 'NIL'): ?>

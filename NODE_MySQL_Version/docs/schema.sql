@@ -486,6 +486,10 @@ CREATE TABLE orders (
   estimated_package_count  VARCHAR(50) NULL,               -- e.g. '4' or 'TBD at packing'
   estimated_package_type   VARCHAR(100) NULL DEFAULT 'Wooden Crates',
   est_lead_time_text       VARCHAR(255) NULL,              -- e.g. '4-6 weeks from advance payment receipt'
+  lead_time_min_days       INT UNSIGNED NULL,              -- 90-item backlog "dual lead-time fields in days":
+  lead_time_max_days       INT UNSIGNED NULL,              -- structured min/max in days, alongside (never replacing)
+                                                            -- est_lead_time_text above — internal reporting/sorting
+                                                            -- only, not shown on any customer-facing document
   indicative_freight_low   DECIMAL(14,2) NULL,             -- CFR/CIF only
   indicative_freight_high  DECIMAL(14,2) NULL,
   indicative_insurance_amount DECIMAL(14,2) NULL,

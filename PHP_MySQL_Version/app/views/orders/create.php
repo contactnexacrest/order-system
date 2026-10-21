@@ -80,6 +80,12 @@
         <label class="full">Est. Lead Time <small class="muted">(free text, shown on the Quotation)</small>
           <input type="text" name="est_lead_time_text" value="<?= htmlspecialchars((string) ($old['est_lead_time_text'] ?? '')) ?>" placeholder="e.g. 45-60 days from advance receipt">
         </label>
+        <label>Lead Time Min (days) <small class="muted">(internal only, not shown on documents)</small>
+          <input type="number" min="0" name="lead_time_min_days" value="<?= htmlspecialchars((string) ($old['lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 45">
+        </label>
+        <label>Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
+          <input type="number" min="0" name="lead_time_max_days" value="<?= htmlspecialchars((string) ($old['lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 60">
+        </label>
       </div>
     </fieldset>
 
