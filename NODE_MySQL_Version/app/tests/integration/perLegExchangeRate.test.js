@@ -58,6 +58,15 @@ describe('Per-leg exchange rate (Batch 3 #3)', () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     await orderPaymentStatusRepository.initializeForOrder(orderId);
+    // External QA report L-35 (OOS-01): recording a leg's exchange rate
+    // before its own payment amount is on record is exactly the
+    // out-of-sequence bug that fix closed — see
+    // orderOutOfSequenceActions.test.js. Record all 3 legs' amounts
+    // first, same as a real user would reach this form at all (the rate
+    // box itself is hidden until then — exchangeRateBeforeClearing.test.js).
+    await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 1000.0, '2026-01-10');
+    await orderPaymentStatusRepository.recordBalanceReceived(orderId, 1000.0, '2026-01-10');
+    await orderPaymentStatusRepository.recordFreightReceived(orderId, 1000.0, '2026-01-10');
 
     await recordLegRateViaRoute(orderId, 'advance', 88.5);
     await recordLegRateViaRoute(orderId, 'balance', 90.25);
@@ -74,6 +83,8 @@ describe('Per-leg exchange rate (Batch 3 #3)', () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 1000.0, '2026-01-10');
+    await orderPaymentStatusRepository.recordBalanceReceived(orderId, 1000.0, '2026-01-10');
     await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId);
     await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'balance', 86.0, userId);
 

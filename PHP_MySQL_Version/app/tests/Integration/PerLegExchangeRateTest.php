@@ -39,6 +39,15 @@ final class PerLegExchangeRateTest extends DbTestCase
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderPaymentStatusRepository::initializeForOrder($orderId);
+        // External QA report L-35 (OOS-01): recording a leg's exchange
+        // rate before its own payment amount is on record is exactly the
+        // out-of-sequence bug that fix closed — see
+        // OrderOutOfSequenceActionsTest. Record all 3 legs' amounts
+        // first, same as a real user would reach this form at all (the
+        // rate box itself is hidden until then — ExchangeRateBeforeClearingTest).
+        OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 1000.0, '2026-01-10');
+        OrderPaymentStatusRepository::recordBalanceReceived($orderId, 1000.0, '2026-01-10');
+        OrderPaymentStatusRepository::recordFreightReceived($orderId, 1000.0, '2026-01-10');
 
         $_POST = ['advance_exchange_rate' => '88.5'];
         ob_start();
@@ -66,6 +75,8 @@ final class PerLegExchangeRateTest extends DbTestCase
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 1000.0, '2026-01-10');
+        OrderPaymentStatusRepository::recordBalanceReceived($orderId, 1000.0, '2026-01-10');
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $this->userId);
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', 86.0, $this->userId);
 

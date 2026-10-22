@@ -1618,9 +1618,20 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /**
+     * External QA report L-35 (OOS-01): on an order still at Stage 1,
+     * this would accept a freight payment with no stage check at all —
+     * freight is a Stage 6 ("Freight Payment") activity, so Stage 6 must
+     * actually be unlocked first (Stage 5 — Supplier PO — passed).
+     */
     public function recordFreightPayment(array $params): void
     {
         $orderId = (int) $params['id'];
+        if (!StageGateService::isUnlocked($orderId, 6)) {
+            Flash::set('error', 'Stage 6 has not been unlocked for this order yet — complete Stage 5 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $amount = (float) ($_POST['freight_amount'] ?? 0);
         $receivedAt = trim((string) ($_POST['freight_received_at'] ?? '')) ?: date('Y-m-d');
         if ($amount <= 0) {
@@ -1671,6 +1682,15 @@ final class OrderController
     public function savePacking(array $params): void
     {
         $orderId = (int) $params['id'];
+        // External QA report L-35 (OOS-01): had no stage check at all —
+        // packing is a Stage 7 activity (see this method's own docblock),
+        // so Stage 7 must actually be unlocked first (Stage 6 — freight
+        // payment cleared — passed).
+        if (!StageGateService::isUnlocked($orderId, 7)) {
+            Flash::set('error', 'Stage 7 has not been unlocked for this order yet — complete Stage 6 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $actualQtyRaw = trim((string) ($_POST['actual_quantity_packed'] ?? ''));
         $actualQty = $actualQtyRaw !== '' ? (float) $actualQtyRaw : null;
 
@@ -1755,10 +1775,23 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
-    /** Stage 7: record shipping/vessel details, ahead of generating the BL Instruction Sheet. */
+    /**
+     * Stage 7: record shipping/vessel details, ahead of generating the BL
+     * Instruction Sheet.
+     *
+     * External QA report L-35 (OOS-01): had no stage check at all — an
+     * order still at Stage 1 could have vessel/container details stored
+     * here. Stage 7 must actually be unlocked first (Stage 6 — freight
+     * payment cleared — passed).
+     */
     public function saveShipping(array $params): void
     {
         $orderId = (int) $params['id'];
+        if (!StageGateService::isUnlocked($orderId, 7)) {
+            Flash::set('error', 'Stage 7 has not been unlocked for this order yet — complete Stage 6 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderShippingRepository::upsert($orderId, [
             'shipping_line'  => trim((string) ($_POST['shipping_line'] ?? '')) ?: null,
             'vessel_name'    => trim((string) ($_POST['vessel_name'] ?? '')) ?: null,
@@ -1942,8 +1975,14 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+        if (!$this->legAmountRecorded($paymentStatus, 'advance')) {
+            Flash::set('error', 'Record the advance payment itself before entering its INR actual amount.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'advance_inr_actual')) {
+        if (!CaFyLockGuard::allow($paymentStatus['advance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'advance_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1978,8 +2017,14 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+        if (!$this->legAmountRecorded($paymentStatus, 'balance')) {
+            Flash::set('error', 'Record the balance payment itself before entering its INR actual amount.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'balance_inr_actual')) {
+        if (!CaFyLockGuard::allow($paymentStatus['balance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'balance_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -2014,8 +2059,14 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+        if (!$this->legAmountRecorded($paymentStatus, 'freight')) {
+            Flash::set('error', 'Record the freight payment itself before entering its INR actual amount.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'freight_inr_actual')) {
+        if (!CaFyLockGuard::allow($paymentStatus['freight_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'freight_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -2050,6 +2101,19 @@ final class OrderController
     // inr_actual_edit gating as Phase 1.
     // ----------------------------------------------------------------
 
+    /**
+     * External QA report L-35 (OOS-01): "the advance FIRC, exchange rate
+     * and INR-credited amount (the advance itself was never recorded)" —
+     * none of these 3 per-leg CA fields checked that the leg's own
+     * payment (advance/balance/freight_amount) had actually been
+     * recorded first. Shared by every FIRC/exchange-rate/INR-actual
+     * handler below.
+     */
+    private function legAmountRecorded(?array $paymentStatus, string $leg): bool
+    {
+        return $paymentStatus !== null && $paymentStatus[$leg . '_amount'] !== null;
+    }
+
     public function recordAdvanceExchangeRate(array $params): void
     {
         $this->recordLegExchangeRate((int) $params['id'], 'advance');
@@ -2074,8 +2138,14 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+        if (!$this->legAmountRecorded($paymentStatus, $leg)) {
+            Flash::set('error', "Record the {$leg} payment itself before entering its exchange rate.");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        $clearedAt = (OrderPaymentStatusRepository::find($orderId) ?? [])[$leg . '_cleared_at'] ?? null;
+        $clearedAt = $paymentStatus[$leg . '_cleared_at'] ?? null;
         if (!CaFyLockGuard::allow($clearedAt, (int) $user['id'], $roleId, 'order_payment_status', $orderId, $leg . '_exchange_rate')) {
             header("Location: /orders/{$orderId}");
             return;
@@ -2096,8 +2166,14 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+        if (!$this->legAmountRecorded($paymentStatus, 'advance')) {
+            Flash::set('error', 'Record the advance payment itself before entering its FIRC/eBRC reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'advance_firc_reference')) {
+        if (!CaFyLockGuard::allow($paymentStatus['advance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'advance_firc_reference')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -2118,8 +2194,14 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+        if (!$this->legAmountRecorded($paymentStatus, 'balance')) {
+            Flash::set('error', 'Record the balance payment itself before entering its FIRC/eBRC reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'balance_firc_reference')) {
+        if (!CaFyLockGuard::allow($paymentStatus['balance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'balance_firc_reference')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -2140,8 +2222,14 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        $paymentStatus = OrderPaymentStatusRepository::find($orderId);
+        if (!$this->legAmountRecorded($paymentStatus, 'freight')) {
+            Flash::set('error', 'Record the freight payment itself before entering its FIRC/eBRC reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'freight_firc_reference')) {
+        if (!CaFyLockGuard::allow($paymentStatus['freight_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'freight_firc_reference')) {
             header("Location: /orders/{$orderId}");
             return;
         }

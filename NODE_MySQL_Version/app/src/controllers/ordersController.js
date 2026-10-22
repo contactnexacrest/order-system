@@ -1608,8 +1608,19 @@ async function saveFreightTerms(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * External QA report L-35 (OOS-01): on an order still at Stage 1, this
+ * would accept a freight payment with no stage check at all — freight
+ * is a Stage 6 ("Freight Payment") activity, so Stage 6 must actually be
+ * unlocked first (Stage 5 — Supplier PO — passed).
+ */
 async function recordFreightPayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  if (!(await stageGateService.isUnlocked(orderId, 6))) {
+    flash.set(req, 'error', 'Stage 6 has not been unlocked for this order yet — complete Stage 5 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const amount = parseFloat(req.body.freight_amount || 0);
   const receivedAt = str(req.body.freight_received_at) || todayYmd();
   if (!(amount > 0)) {
@@ -1657,6 +1668,15 @@ async function clearFreightPayment(req, res) {
  */
 async function savePacking(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  // External QA report L-35 (OOS-01): had no stage check at all —
+  // packing is a Stage 7 activity (see this function's own docblock), so
+  // Stage 7 must actually be unlocked first (Stage 6 — freight payment
+  // cleared — passed).
+  if (!(await stageGateService.isUnlocked(orderId, 7))) {
+    flash.set(req, 'error', 'Stage 7 has not been unlocked for this order yet — complete Stage 6 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const body = req.body;
   const actualQtyRaw = str(body.actual_quantity_packed);
   const actualQty = actualQtyRaw !== '' ? parseFloat(actualQtyRaw) : null;
@@ -1748,9 +1768,22 @@ async function savePacking(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
-/** Stage 7: record shipping/vessel details, ahead of generating the BL Instruction Sheet. */
+/**
+ * Stage 7: record shipping/vessel details, ahead of generating the BL
+ * Instruction Sheet.
+ *
+ * External QA report L-35 (OOS-01): had no stage check at all — an
+ * order still at Stage 1 could have vessel/container details stored
+ * here. Stage 7 must actually be unlocked first (Stage 6 — freight
+ * payment cleared — passed).
+ */
 async function saveShipping(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  if (!(await stageGateService.isUnlocked(orderId, 7))) {
+    flash.set(req, 'error', 'Stage 7 has not been unlocked for this order yet — complete Stage 6 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const body = req.body;
   await orderShippingRepository.upsert(orderId, {
     shipping_line: str(body.shipping_line) || null,
@@ -1919,6 +1952,17 @@ async function clearBalancePayment(req, res) {
 // auditor/CA will want a trail on.
 // ----------------------------------------------------------------
 
+/**
+ * External QA report L-35 (OOS-01): "the advance FIRC, exchange rate
+ * and INR-credited amount (the advance itself was never recorded)" —
+ * none of these 3 per-leg CA fields checked that the leg's own payment
+ * (advance/balance/freight_amount) had actually been recorded first.
+ * Shared by every FIRC/exchange-rate/INR-actual handler below.
+ */
+function legAmountRecorded(paymentStatus, leg) {
+  return !!paymentStatus && paymentStatus[`${leg}_amount`] !== null && paymentStatus[`${leg}_amount`] !== undefined;
+}
+
 async function recordAdvanceInrActual(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
@@ -1928,7 +1972,13 @@ async function recordAdvanceInrActual(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null, 'order_payment_status', orderId, 'advance_inr_actual'))) {
+  const paymentStatus = await orderPaymentStatusRepository.find(orderId);
+  if (!legAmountRecorded(paymentStatus, 'advance')) {
+    flash.set(req, 'error', 'Record the advance payment itself before entering its INR actual amount.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, paymentStatus.advance_cleared_at ?? null, 'order_payment_status', orderId, 'advance_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1960,7 +2010,13 @@ async function recordBalanceInrActual(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null, 'order_payment_status', orderId, 'balance_inr_actual'))) {
+  const paymentStatus = await orderPaymentStatusRepository.find(orderId);
+  if (!legAmountRecorded(paymentStatus, 'balance')) {
+    flash.set(req, 'error', 'Record the balance payment itself before entering its INR actual amount.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, paymentStatus.balance_cleared_at ?? null, 'order_payment_status', orderId, 'balance_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1992,7 +2048,13 @@ async function recordFreightInrActual(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null, 'order_payment_status', orderId, 'freight_inr_actual'))) {
+  const paymentStatus = await orderPaymentStatusRepository.find(orderId);
+  if (!legAmountRecorded(paymentStatus, 'freight')) {
+    flash.set(req, 'error', 'Record the freight payment itself before entering its INR actual amount.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, paymentStatus.freight_cleared_at ?? null, 'order_payment_status', orderId, 'freight_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -2033,7 +2095,12 @@ async function recordLegExchangeRate(req, res, leg) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const ops = (await orderPaymentStatusRepository.find(orderId)) || {};
+  const ops = await orderPaymentStatusRepository.find(orderId);
+  if (!legAmountRecorded(ops, leg)) {
+    flash.set(req, 'error', `Record the ${leg} payment itself before entering its exchange rate.`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (!(await caFyLockGuard.allow(req, ops[`${leg}_cleared_at`] ?? null, 'order_payment_status', orderId, `${leg}_exchange_rate`))) {
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2065,7 +2132,13 @@ async function recordAdvanceFirc(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null, 'order_payment_status', orderId, 'advance_firc_reference'))) {
+  const paymentStatus = await orderPaymentStatusRepository.find(orderId);
+  if (!legAmountRecorded(paymentStatus, 'advance')) {
+    flash.set(req, 'error', 'Record the advance payment itself before entering its FIRC/eBRC reference.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, paymentStatus.advance_cleared_at ?? null, 'order_payment_status', orderId, 'advance_firc_reference'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -2085,7 +2158,13 @@ async function recordBalanceFirc(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null, 'order_payment_status', orderId, 'balance_firc_reference'))) {
+  const paymentStatus = await orderPaymentStatusRepository.find(orderId);
+  if (!legAmountRecorded(paymentStatus, 'balance')) {
+    flash.set(req, 'error', 'Record the balance payment itself before entering its FIRC/eBRC reference.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, paymentStatus.balance_cleared_at ?? null, 'order_payment_status', orderId, 'balance_firc_reference'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -2105,7 +2184,13 @@ async function recordFreightFirc(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null, 'order_payment_status', orderId, 'freight_firc_reference'))) {
+  const paymentStatus = await orderPaymentStatusRepository.find(orderId);
+  if (!legAmountRecorded(paymentStatus, 'freight')) {
+    flash.set(req, 'error', 'Record the freight payment itself before entering its FIRC/eBRC reference.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, paymentStatus.freight_cleared_at ?? null, 'order_payment_status', orderId, 'freight_firc_reference'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
