@@ -43,6 +43,12 @@ async function attemptLogin(req, email, password) {
   const passwordCorrect = user !== null && verified;
 
   if (!passwordCorrect) {
+    // External QA report L-03: this failed attempt must be recorded
+    // BEFORE recentFailedCount() runs, or the count it reads never
+    // includes the very attempt that triggered it — with "lock after 5",
+    // the 5th failure would see only 4 prior rows (4 >= 5 is false) and
+    // the account would only actually lock on the 6th.
+    await loginAttemptRepository.record(user ? user.id : null, email, ip, false);
     if (user) {
       await userRepository.incrementFailedLogins(user.id);
 
@@ -57,7 +63,6 @@ async function attemptLogin(req, email, password) {
         await auditLogRepository.log(user.id, 'ACCOUNT_LOCKED', 'users', user.id, null, null, null, `${recentFailures} failed attempts within ${lockoutMinutes} minutes`, ip);
       }
     }
-    await loginAttemptRepository.record(user ? user.id : null, email, ip, false);
     return { status: 'invalid_credentials' };
   }
 

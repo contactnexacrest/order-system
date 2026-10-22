@@ -39,6 +39,13 @@ final class AuthService
         $passwordCorrect = password_verify($password, $user['password_hash'] ?? self::DUMMY_PASSWORD_HASH) && $user !== null;
 
         if (!$passwordCorrect) {
+            // External QA report L-03: this failed attempt must be recorded
+            // BEFORE recentFailedCount() runs, or the count it reads never
+            // includes the very attempt that triggered it — with
+            // "lock after 5", the 5th failure would see only 4 prior rows
+            // (4 >= 5 is false) and the account would only actually lock on
+            // the 6th.
+            LoginAttemptRepository::record($user['id'] ?? null, $email, $ip, false);
             if ($user) {
                 UserRepository::incrementFailedLogins((int) $user['id']);
 
@@ -52,7 +59,6 @@ final class AuthService
                     AuditLogRepository::log((int) $user['id'], 'ACCOUNT_LOCKED', 'users', (int) $user['id'], null, null, null, "{$recentFailures} failed attempts within {$lockoutMinutes} minutes");
                 }
             }
-            LoginAttemptRepository::record($user['id'] ?? null, $email, $ip, false);
             return ['status' => 'invalid_credentials'];
         }
 
