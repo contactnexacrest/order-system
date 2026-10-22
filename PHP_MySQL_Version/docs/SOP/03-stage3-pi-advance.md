@@ -81,8 +81,14 @@ confused with each other — where staff either:
   to match official documents exactly) — including the Consignee/Notify
   Party "Same as X?" flags and every structured field underneath them —
   locks the client's data from further edits, and — if the buyer supplied
-  one — records the Buyer's PO Ref on the order. Everything else on the
-  submission (payment-terms confirmation, confirmed Incoterm/port/COO,
+  one — records the Buyer's PO Ref on the order. 90-item backlog
+  "standalone order" follow-on: that same confirmed Buyer/Consignee/
+  Notify Party data is also written onto *this order's own* snapshot
+  columns at the same moment, so this order's documents reflect the
+  correction immediately and permanently — a later, unrelated edit to the
+  client record (or an acceptance on a different order for the same
+  client) never reaches back into it. Everything else on the submission
+  (payment-terms confirmation, confirmed Incoterm/port/COO,
   quotation-acceptance reference, any changes from the quotation) stays
   visible on the order for staff to read before generating the PI, but is
   never auto-written into the order's own structured fields.

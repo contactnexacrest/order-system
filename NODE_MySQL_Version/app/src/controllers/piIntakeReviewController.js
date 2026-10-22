@@ -14,13 +14,19 @@ const piIntakeRepository = require('../repositories/piIntakeRepository');
  * Accepting is the authoritative correction point for the client's
  * identity fields (the PI Form spec explicitly says "must match exactly
  * as they appear on official documents"), so it overwrites the live
- * `clients` row with what the client confirmed, plus the order's
- * buyers_po_ref. Everything else on the submission (payment-terms
- * confirmation, formal quotation-acceptance reference, confirmed
- * Incoterm/port/COO, changes from quotation, special document
- * requirements) stays on the row itself as the record staff read before
- * generating the PI — never auto-written onto the order's own
- * structured/FK-driven columns.
+ * `clients` row with what the client confirmed (so any FUTURE new order
+ * for this client starts from the corrected details), plus the order's
+ * buyers_po_ref. 90-item backlog "standalone order" follow-on: it also
+ * applies that same correction onto THIS order's own snapshot columns
+ * (orderRepository.applyClientSnapshot()) — this order's own printed
+ * content is this order's own current truth, never a side effect of
+ * what happens to be true on `clients` right now. Every other existing
+ * order for this client is untouched either way. Everything else on the
+ * submission (payment-terms confirmation, formal quotation-acceptance
+ * reference, confirmed Incoterm/port/COO, changes from quotation,
+ * special document requirements) stays on the row itself as the record
+ * staff read before generating the PI — never auto-written onto the
+ * order's own structured/FK-driven columns.
  */
 
 async function index(req, res) {
@@ -88,6 +94,13 @@ async function accept(req, res) {
     notify_party_phone: submission.notify_party_phone,
     notify_party_email: submission.notify_party_email,
   });
+  // 90-item backlog "standalone order" follow-on: the correction above
+  // only changes what a FUTURE new order for this client starts from.
+  // This order is already created — its own printed content only
+  // changes when something happens to it directly, so the same
+  // confirmed details are applied onto its own snapshot columns too.
+  // Every other existing order for this client is untouched.
+  await orderRepository.applyClientSnapshot(order.id, order.client_id);
   if (submission.buyer_po_ref) {
     await orderRepository.setBuyersPoRef(order.id, submission.buyer_po_ref);
   }

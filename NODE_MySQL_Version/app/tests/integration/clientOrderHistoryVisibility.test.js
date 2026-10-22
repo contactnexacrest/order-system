@@ -76,12 +76,14 @@ describe('Client order history visibility (90-item backlog Phase 6 Item B)', () 
          (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
           currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
           incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text,
-          balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions)
+          balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions,
+          company_legal_name)
        VALUES
          (:ref, :client_id, :seq, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, 'TBC', 'NIL',
           CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active',
           :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text,
-          :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions)`,
+          :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions,
+          :company_legal_name)`,
       {
         ref: `JEST-TEST-${Math.random().toString(16).slice(2, 10)}`,
         client_id: clientId,
@@ -90,6 +92,7 @@ describe('Client order history visibility (90-item backlog Phase 6 Item B)', () 
         preset_id: preset.id,
         incoterm_id: incoterm.id,
         currency_id: currency.id,
+        company_legal_name: 'Jest Test Buyer Ltd',
         incoterm_code: incoterm.code,
         currency_code: currency.code,
         preset_name: preset.preset_name,

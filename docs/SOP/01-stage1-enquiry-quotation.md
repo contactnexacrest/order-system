@@ -113,23 +113,34 @@ different entities:
   as" checkbox here.
 - **Consignee Details** — defaults to a checked **Same as Buyer?**
   checkbox. While checked, the consignee fields are disabled on the form
-  and every Consignee section on every generated document shows the
-  Buyer's own current details, resolved fresh each time a document is
-  generated — never a one-time copy, so a later edit to the Buyer block
-  is reflected automatically on the next document without anyone having
-  to re-enter anything on the Consignee side. Unchecking it enables an
-  independent set of fields (company name, structured address, VAT/EORI,
-  contact person, phone, email) for a client whose goods genuinely ship
-  to a different company than the one paying for them.
+  and the Consignee block resolves from whatever the Buyer block
+  currently holds, so staff never re-type anything on the Consignee side.
+  Unchecking it enables an independent set of fields (company name,
+  structured address, VAT/EORI, contact person, phone, email) for a
+  client whose goods genuinely ship to a different company than the one
+  paying for them.
 - **Notify Party** — defaults to a checked **Same as Consignee?**
   checkbox, resolving from whatever the Consignee block *itself* resolved
   to (so if Consignee is also "same as Buyer", Notify Party shows the
-  Buyer's details too) for the same always-fresh reason. Unchecking it
-  enables independent fields for a freight-forwarder/agent that needs
-  notifying on arrival but isn't the consignee itself. Notify Party only
-  appears on the documents the Developer Spec defines it for (Proforma
-  Invoice, Packing List, Commercial Invoice) — the Quotation, Order
-  Confirmation, and Buyer PO never show a Notify Party section.
+  Buyer's details too). Unchecking it enables independent fields for a
+  freight-forwarder/agent that needs notifying on arrival but isn't the
+  consignee itself. Notify Party only appears on the documents the
+  Developer Spec defines it for (Proforma Invoice, Packing List,
+  Commercial Invoice) — the Quotation, Order Confirmation, and Buyer PO
+  never show a Notify Party section.
+
+90-item backlog "standalone order" follow-on: all of the above describes
+how the **client record itself** resolves these — and, by extension,
+what a *brand-new* order starts from the moment it's created. An
+*existing* order's own documents never re-read any of this live: the
+Buyer/Consignee/Notify Party details (and every toggle above) are
+snapshotted onto the order's own row once, at creation, and again
+whenever that specific order's own PI-details form is accepted (Chapter
+3) — never on a later, unrelated edit to the client record or to another
+order for the same client. A correction made on the admin Clients form
+(or on a different order's PI-intake) only ever changes what a *new*
+order will start from; it never reaches back into an order already
+created.
 
 **Certificate of Origin Type** is a dropdown (same admin-managed list the
 order-creation form itself uses, e.g. Non-Preferential), not a free-text
@@ -155,7 +166,12 @@ Either way, accepting the submission (Quotation-stage) or applying it
 (PI-stage) copies the buyer's own checkbox state and structured fields
 straight onto the `clients` row — the exact same columns the admin Clients
 form reads and writes — so there's only ever one Consignee/Notify Party
-story for a given client, however it was captured.
+story for a given client, however it was captured. Applying the PI-stage
+form also writes that same confirmed data onto the order it was
+submitted for (see the standalone-order note above) — the client record
+update governs what any *future* order starts from; the order-level
+write is what makes *this* order's own documents correct immediately,
+without waiting on anything else.
 
 #### Whether the Consignee/Notify Party sections print when identical to the Buyer
 

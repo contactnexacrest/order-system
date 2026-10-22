@@ -10,12 +10,13 @@ const referenceNumberService = require('../services/referenceNumberService');
  * all of these for its incoterm tag, 9-segment stage bar, and displayed
  * amount, none of which a plain o.* + one join used to expose.
  */
-// 90-item backlog "standalone order": incoterm_code/currency_code come
-// straight off o.* now — no join to incoterms/currencies needed, since
-// they're snapshotted on the order itself.
+// 90-item backlog "standalone order": incoterm_code/currency_code/
+// company_legal_name all come straight off o.* now — no join to
+// incoterms/currencies/clients needed, since they're snapshotted on the
+// order itself.
 async function all() {
   return db.query(
-    `SELECT o.*, c.company_legal_name, sm.stage_name AS current_stage_name,
+    `SELECT o.*, sm.stage_name AS current_stage_name,
             sm.stage_number AS current_stage_number,
             (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
             EXISTS (
@@ -24,7 +25,6 @@ async function all() {
                   AND ops.balance_cleared_at IS NULL AND ops.balance_due_date < CURDATE()
             ) AS is_overdue
      FROM orders o
-     JOIN clients c ON c.id = o.client_id
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      WHERE o.is_archived = 0
      ORDER BY o.created_at DESC`
@@ -34,10 +34,9 @@ async function all() {
 /** Archived orders only — visible via the separate view_archived_orders permission, never deleted, never dropped from any other listing/report. */
 async function allArchived() {
   return db.query(
-    `SELECT o.*, c.company_legal_name, sm.stage_name AS current_stage_name,
+    `SELECT o.*, sm.stage_name AS current_stage_name,
             u.name AS archived_by_name
      FROM orders o
-     JOIN clients c ON c.id = o.client_id
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      LEFT JOIN users u ON u.id = o.archived_by
      WHERE o.is_archived = 1
@@ -72,20 +71,18 @@ async function unarchive(orderId) {
  * balance_days are updated in place by an activated Amendment
  * (applyAmendmentOverride() below) rather than read via a separate
  * override column COALESCEd against the preset.
+ *
+ * 90-item backlog "standalone order" follow-on: company_legal_name,
+ * billing/consignee/notify-party details all come straight off o.* now
+ * too, for the same reason — see resolveClientSnapshot()'s own docblock.
+ * client_unique_number/agreement_footer_text/agreement_expiry_date/
+ * agreement_force_expired are deliberately still live-joined — see that
+ * docblock for why those four stay live.
  */
 async function find(id) {
   return db.queryOne(
-    `SELECT o.*, c.company_legal_name, c.billing_address, c.consignee_name, c.consignee_address,
-            c.vat_eori_tax_no, c.contact_person, c.email AS client_email, c.phone AS client_phone,
-            c.country_of_destination, c.notify_party, c.client_unique_number, c.agreement_footer_text,
+    `SELECT o.*, c.client_unique_number, c.agreement_footer_text,
             c.agreement_expiry_date, c.agreement_force_expired,
-            c.billing_address_line1, c.billing_address_line2, c.billing_city, c.billing_postcode, c.billing_country,
-            c.consignee_same_as_buyer, c.consignee_address_line1, c.consignee_address_line2,
-            c.consignee_city, c.consignee_postcode, c.consignee_country, c.consignee_vat_eori_tax_no,
-            c.consignee_contact_person, c.consignee_phone, c.consignee_email,
-            c.notify_party_same_as_consignee, c.notify_party_address_line1, c.notify_party_address_line2,
-            c.notify_party_city, c.notify_party_postcode, c.notify_party_country,
-            c.notify_party_contact_person, c.notify_party_phone, c.notify_party_email,
             sm.stage_name AS current_stage_name, sm.stage_slug AS current_stage_slug,
             sm.stage_number AS current_stage_number,
             (o.active_amendment_id IS NOT NULL) AS has_active_amendment
@@ -209,7 +206,104 @@ async function resolveSnapshot(executor, data) {
     balance_days: (preset && preset.balance_days) ?? null,
     balance_trigger_wording: (preset && preset.balance_trigger_wording) ?? null,
     show_bl_instructions: preset ? preset.show_bl_instructions : 1,
+    ...(await resolveClientSnapshot(executor, data.client_id)),
   };
+}
+
+/**
+ * 90-item backlog "standalone order" follow-on: resolves the buyer/
+ * billing/consignee/notify-party details from `clients` ONCE, here. Also
+ * used by applyClientSnapshot() below, since a PI-intake acceptance is
+ * really "re-run this same resolution, for this order only, against the
+ * client row that was just corrected."
+ */
+async function resolveClientSnapshot(executor, clientId) {
+  const client = (await executor.queryOne(
+    `SELECT company_legal_name, billing_address, billing_address_line1, billing_address_line2,
+            billing_city, billing_postcode, billing_country, vat_eori_tax_no, contact_person,
+            email, phone, country_of_destination,
+            consignee_same_as_buyer, consignee_name, consignee_address, consignee_address_line1,
+            consignee_address_line2, consignee_city, consignee_postcode, consignee_country,
+            consignee_vat_eori_tax_no, consignee_contact_person, consignee_phone, consignee_email,
+            notify_party_same_as_consignee, notify_party, notify_party_address_line1,
+            notify_party_address_line2, notify_party_city, notify_party_postcode, notify_party_country,
+            notify_party_contact_person, notify_party_phone, notify_party_email
+     FROM clients WHERE id = :id`,
+    { id: clientId }
+  )) || {};
+
+  return {
+    company_legal_name: client.company_legal_name ?? null,
+    billing_address: client.billing_address ?? null,
+    billing_address_line1: client.billing_address_line1 ?? null,
+    billing_address_line2: client.billing_address_line2 ?? null,
+    billing_city: client.billing_city ?? null,
+    billing_postcode: client.billing_postcode ?? null,
+    billing_country: client.billing_country ?? null,
+    vat_eori_tax_no: client.vat_eori_tax_no ?? null,
+    contact_person: client.contact_person ?? null,
+    client_email: client.email ?? null,
+    client_phone: client.phone ?? null,
+    country_of_destination: client.country_of_destination ?? null,
+    consignee_same_as_buyer: client.consignee_same_as_buyer ?? 1,
+    consignee_name: client.consignee_name ?? null,
+    consignee_address: client.consignee_address ?? null,
+    consignee_address_line1: client.consignee_address_line1 ?? null,
+    consignee_address_line2: client.consignee_address_line2 ?? null,
+    consignee_city: client.consignee_city ?? null,
+    consignee_postcode: client.consignee_postcode ?? null,
+    consignee_country: client.consignee_country ?? null,
+    consignee_vat_eori_tax_no: client.consignee_vat_eori_tax_no ?? null,
+    consignee_contact_person: client.consignee_contact_person ?? null,
+    consignee_phone: client.consignee_phone ?? null,
+    consignee_email: client.consignee_email ?? null,
+    notify_party_same_as_consignee: client.notify_party_same_as_consignee ?? 1,
+    notify_party: client.notify_party ?? null,
+    notify_party_address_line1: client.notify_party_address_line1 ?? null,
+    notify_party_address_line2: client.notify_party_address_line2 ?? null,
+    notify_party_city: client.notify_party_city ?? null,
+    notify_party_postcode: client.notify_party_postcode ?? null,
+    notify_party_country: client.notify_party_country ?? null,
+    notify_party_contact_person: client.notify_party_contact_person ?? null,
+    notify_party_phone: client.notify_party_phone ?? null,
+    notify_party_email: client.notify_party_email ?? null,
+  };
+}
+
+/**
+ * 90-item backlog "standalone order" follow-on: called by
+ * piIntakeReviewController.accept() right after it corrects the
+ * `clients` master row — applies that SAME correction onto this one
+ * order's own snapshot columns, since the buyer's confirmation is this
+ * order's own current truth. Every other existing order for this client
+ * is untouched.
+ */
+async function applyClientSnapshot(orderId, clientId, executor = db) {
+  const snapshot = await resolveClientSnapshot(executor, clientId);
+  await executor.execute(
+    `UPDATE orders SET
+        company_legal_name = :company_legal_name, billing_address = :billing_address,
+        billing_address_line1 = :billing_address_line1, billing_address_line2 = :billing_address_line2,
+        billing_city = :billing_city, billing_postcode = :billing_postcode, billing_country = :billing_country,
+        vat_eori_tax_no = :vat_eori_tax_no, contact_person = :contact_person,
+        client_email = :client_email, client_phone = :client_phone,
+        country_of_destination = :country_of_destination,
+        consignee_same_as_buyer = :consignee_same_as_buyer, consignee_name = :consignee_name,
+        consignee_address = :consignee_address, consignee_address_line1 = :consignee_address_line1,
+        consignee_address_line2 = :consignee_address_line2, consignee_city = :consignee_city,
+        consignee_postcode = :consignee_postcode, consignee_country = :consignee_country,
+        consignee_vat_eori_tax_no = :consignee_vat_eori_tax_no,
+        consignee_contact_person = :consignee_contact_person, consignee_phone = :consignee_phone,
+        consignee_email = :consignee_email,
+        notify_party_same_as_consignee = :notify_party_same_as_consignee, notify_party = :notify_party,
+        notify_party_address_line1 = :notify_party_address_line1,
+        notify_party_address_line2 = :notify_party_address_line2, notify_party_city = :notify_party_city,
+        notify_party_postcode = :notify_party_postcode, notify_party_country = :notify_party_country,
+        notify_party_contact_person = :notify_party_contact_person, notify_party_phone = :notify_party_phone,
+        notify_party_email = :notify_party_email
+     WHERE id = :id`,
+    { ...snapshot, id: orderId }
+  );
 }
 
 async function insertOrderRow(executor, data, createdBy) {
@@ -228,7 +322,16 @@ async function insertOrderRow(executor, data, createdBy) {
          incoterm_code, currency_code, port_of_loading_name, port_of_loading_city,
          port_of_discharge_name, port_of_discharge_city, preset_name, advance_pct,
          advance_trigger_text, balance_pct, balance_trigger_option, balance_days,
-         balance_trigger_wording, show_bl_instructions)
+         balance_trigger_wording, show_bl_instructions,
+         company_legal_name, billing_address, billing_address_line1, billing_address_line2,
+         billing_city, billing_postcode, billing_country, vat_eori_tax_no, contact_person,
+         client_email, client_phone, country_of_destination,
+         consignee_same_as_buyer, consignee_name, consignee_address, consignee_address_line1,
+         consignee_address_line2, consignee_city, consignee_postcode, consignee_country,
+         consignee_vat_eori_tax_no, consignee_contact_person, consignee_phone, consignee_email,
+         notify_party_same_as_consignee, notify_party, notify_party_address_line1,
+         notify_party_address_line2, notify_party_city, notify_party_postcode, notify_party_country,
+         notify_party_contact_person, notify_party_phone, notify_party_email)
      VALUES
         (:order_reference, :client_id, :sequence_no, :buyer_inquiry_ref, :payment_preset_id, :incoterm_id,
          :port_of_loading_id, :port_of_discharge_id, :port_of_discharge_text, :currency_id, :coo_type,
@@ -242,7 +345,16 @@ async function insertOrderRow(executor, data, createdBy) {
          :incoterm_code, :currency_code, :port_of_loading_name, :port_of_loading_city,
          :port_of_discharge_name, :port_of_discharge_city, :preset_name, :advance_pct,
          :advance_trigger_text, :balance_pct, :balance_trigger_option, :balance_days,
-         :balance_trigger_wording, :show_bl_instructions)`,
+         :balance_trigger_wording, :show_bl_instructions,
+         :company_legal_name, :billing_address, :billing_address_line1, :billing_address_line2,
+         :billing_city, :billing_postcode, :billing_country, :vat_eori_tax_no, :contact_person,
+         :client_email, :client_phone, :country_of_destination,
+         :consignee_same_as_buyer, :consignee_name, :consignee_address, :consignee_address_line1,
+         :consignee_address_line2, :consignee_city, :consignee_postcode, :consignee_country,
+         :consignee_vat_eori_tax_no, :consignee_contact_person, :consignee_phone, :consignee_email,
+         :notify_party_same_as_consignee, :notify_party, :notify_party_address_line1,
+         :notify_party_address_line2, :notify_party_city, :notify_party_postcode, :notify_party_country,
+         :notify_party_contact_person, :notify_party_phone, :notify_party_email)`,
     {
       order_reference: data.order_reference,
       client_id: data.client_id,
@@ -289,6 +401,40 @@ async function insertOrderRow(executor, data, createdBy) {
       balance_days: snapshot.balance_days,
       balance_trigger_wording: snapshot.balance_trigger_wording,
       show_bl_instructions: snapshot.show_bl_instructions,
+      company_legal_name: snapshot.company_legal_name,
+      billing_address: snapshot.billing_address,
+      billing_address_line1: snapshot.billing_address_line1,
+      billing_address_line2: snapshot.billing_address_line2,
+      billing_city: snapshot.billing_city,
+      billing_postcode: snapshot.billing_postcode,
+      billing_country: snapshot.billing_country,
+      vat_eori_tax_no: snapshot.vat_eori_tax_no,
+      contact_person: snapshot.contact_person,
+      client_email: snapshot.client_email,
+      client_phone: snapshot.client_phone,
+      country_of_destination: snapshot.country_of_destination,
+      consignee_same_as_buyer: snapshot.consignee_same_as_buyer,
+      consignee_name: snapshot.consignee_name,
+      consignee_address: snapshot.consignee_address,
+      consignee_address_line1: snapshot.consignee_address_line1,
+      consignee_address_line2: snapshot.consignee_address_line2,
+      consignee_city: snapshot.consignee_city,
+      consignee_postcode: snapshot.consignee_postcode,
+      consignee_country: snapshot.consignee_country,
+      consignee_vat_eori_tax_no: snapshot.consignee_vat_eori_tax_no,
+      consignee_contact_person: snapshot.consignee_contact_person,
+      consignee_phone: snapshot.consignee_phone,
+      consignee_email: snapshot.consignee_email,
+      notify_party_same_as_consignee: snapshot.notify_party_same_as_consignee,
+      notify_party: snapshot.notify_party,
+      notify_party_address_line1: snapshot.notify_party_address_line1,
+      notify_party_address_line2: snapshot.notify_party_address_line2,
+      notify_party_city: snapshot.notify_party_city,
+      notify_party_postcode: snapshot.notify_party_postcode,
+      notify_party_country: snapshot.notify_party_country,
+      notify_party_contact_person: snapshot.notify_party_contact_person,
+      notify_party_phone: snapshot.notify_party_phone,
+      notify_party_email: snapshot.notify_party_email,
     }
   );
   return result.insertId;
@@ -507,5 +653,5 @@ module.exports = {
   all, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
-  generateBuyerActionToken, findByValidBuyerActionToken,
+  generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot,
 };

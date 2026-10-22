@@ -220,17 +220,16 @@ final class ReportRepository
             $params['incoterm_id'] = $incotermId;
         }
         if ($country) {
-            $where[] = 'c.country_of_destination = :country';
+            $where[] = 'o.country_of_destination = :country';
             $params['country'] = $country;
         }
 
         $sql = "SELECT o.id, o.order_reference, o.status, o.created_at,
-                       c.company_legal_name, c.country_of_destination,
+                       o.company_legal_name, o.country_of_destination,
                        o.incoterm_code, o.currency_code,
                        sm.stage_name AS current_stage_name,
                        (SELECT COALESCE(SUM(fob_value), 0) FROM order_products WHERE order_id = o.id AND is_active = 1) AS total_fob_value
                 FROM orders o
-                JOIN clients c ON c.id = o.client_id
                 LEFT JOIN stages_master sm ON sm.id = o.current_stage_id";
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -306,11 +305,18 @@ final class ReportRepository
         ];
     }
 
-    /** @return string[] distinct country_of_destination values seeded so far, for the aggregate filter dropdown */
+    /**
+     * @return string[] distinct country_of_destination values seeded so far, for the aggregate filter dropdown.
+     *
+     * 90-item backlog "standalone order" follow-on: sourced from `orders`
+     * (each order's own snapshot), not `clients` — the filter this feeds
+     * (aggregate() above) matches against o.country_of_destination, so
+     * the dropdown must offer the same values it can actually match.
+     */
     public static function distinctCountries(): array
     {
         $stmt = Database::connection()->query(
-            "SELECT DISTINCT country_of_destination FROM clients WHERE country_of_destination IS NOT NULL AND country_of_destination != '' ORDER BY country_of_destination"
+            "SELECT DISTINCT country_of_destination FROM orders WHERE country_of_destination IS NOT NULL AND country_of_destination != '' ORDER BY country_of_destination"
         );
         return array_column($stmt->fetchAll(), 'country_of_destination');
     }
@@ -350,12 +356,11 @@ final class ReportRepository
             $params['date_to'] = $dateTo;
         }
 
-        $sql = "SELECT o.id, o.order_reference, o.status, o.created_at, c.company_legal_name, o.currency_code,
+        $sql = "SELECT o.id, o.order_reference, o.status, o.created_at, o.company_legal_name, o.currency_code,
                        ops.advance_amount, ops.advance_cleared_at,
                        ops.balance_amount, ops.balance_cleared_at,
                        ops.freight_amount, ops.freight_cleared_at
                 FROM orders o
-                JOIN clients c ON c.id = o.client_id
                 LEFT JOIN order_payment_status ops ON ops.order_id = o.id
                 WHERE " . implode(' AND ', $where) . '
                 ORDER BY o.created_at DESC';
@@ -448,8 +453,8 @@ final class ReportRepository
     // latestOfType() convention, so a document that was superseded by a later
     // revision is correctly ignored in favor of the current one.
 
-    private const ORDER_ROW_COLS = 'o.id, o.order_reference, c.company_legal_name, o.created_at';
-    private const ORDER_ROW_JOIN = 'FROM orders o JOIN clients c ON c.id = o.client_id';
+    private const ORDER_ROW_COLS = 'o.id, o.order_reference, o.company_legal_name, o.created_at';
+    private const ORDER_ROW_JOIN = 'FROM orders o';
 
     private static function latestDocStatusExpr(string $code): string
     {
@@ -724,12 +729,11 @@ final class ReportRepository
             $params['date_to'] = $dateTo;
         }
 
-        $sql = "SELECT d.id, d.order_id, o.order_reference, c.company_legal_name, d.notice_date, d.from_party,
+        $sql = "SELECT d.id, d.order_id, o.order_reference, o.company_legal_name, d.notice_date, d.from_party,
                        d.status, d.response_due_date, d.resolved_at, d.created_at,
                        DATEDIFF(COALESCE(d.resolved_at, NOW()), d.notice_date) AS days_open
                 FROM disputes d
                 JOIN orders o ON o.id = d.order_id
-                JOIN clients c ON c.id = o.client_id
                 WHERE " . implode(' AND ', $where) . '
                 ORDER BY d.notice_date DESC';
 
@@ -782,12 +786,11 @@ final class ReportRepository
             $params['date_to'] = $dateTo;
         }
 
-        $sql = "SELECT a.id, a.amendment_reference, a.order_id, o.order_reference, c.company_legal_name,
+        $sql = "SELECT a.id, a.amendment_reference, a.order_id, o.order_reference, o.company_legal_name,
                        a.reason, a.requested_by, a.status, a.effective_from, a.created_at,
                        a.amended_advance_amount, a.amended_balance_amount, o.currency_code
                 FROM amendments a
                 JOIN orders o ON o.id = a.order_id
-                JOIN clients c ON c.id = o.client_id
                 WHERE " . implode(' AND ', $where) . '
                 ORDER BY a.created_at DESC';
 
@@ -824,10 +827,10 @@ final class ReportRepository
             return [];
         }
         $stmt = Database::connection()->prepare(
-            'SELECT o.id, o.order_reference, o.status, o.created_at, c.company_legal_name
-             FROM orders o JOIN clients c ON c.id = o.client_id
+            'SELECT o.id, o.order_reference, o.status, o.created_at, o.company_legal_name
+             FROM orders o
              WHERE o.is_test_data = :is_test_data
-               AND (o.order_reference LIKE :q OR c.company_legal_name LIKE :q2)
+               AND (o.order_reference LIKE :q OR o.company_legal_name LIKE :q2)
              ORDER BY o.created_at DESC
              LIMIT 25'
         );
@@ -1076,12 +1079,11 @@ final class ReportRepository
         $pdo = Database::connection();
 
         $stmt = $pdo->prepare(
-            "SELECT o.id, o.order_reference, o.created_at, c.company_legal_name, o.currency_code,
+            "SELECT o.id, o.order_reference, o.created_at, o.company_legal_name, o.currency_code,
                     ops.advance_amount, ops.advance_cleared_at,
                     ops.balance_amount, ops.balance_cleared_at, ops.balance_due_date,
                     ops.freight_amount, ops.freight_cleared_at
              FROM orders o
-             JOIN clients c ON c.id = o.client_id
              JOIN order_payment_status ops ON ops.order_id = o.id
              WHERE o.is_test_data = :is_test_data AND o.status NOT IN ('lost')
                AND (
@@ -1168,12 +1170,11 @@ final class ReportRepository
             $params['date_to'] = $dateTo;
         }
 
-        $sql = "SELECT o.id, o.order_reference, o.created_at, c.company_legal_name, o.currency_code,
+        $sql = "SELECT o.id, o.order_reference, o.created_at, o.company_legal_name, o.currency_code,
                        o.incoterm_code,
                        fr.freight_forwarder_name, fr.confirmed_freight_rate, fr.insurance_amount, fr.freight_cleared_at,
                        ops.freight_amount, ops.freight_cleared_at AS payment_cleared_at
                 FROM orders o
-                JOIN clients c ON c.id = o.client_id
                 JOIN order_freight fr ON fr.order_id = o.id
                 LEFT JOIN order_payment_status ops ON ops.order_id = o.id
                 WHERE " . implode(' AND ', $where) . '
@@ -1232,9 +1233,8 @@ final class ReportRepository
             $params['date_to'] = $dateTo;
         }
 
-        $sql = 'SELECT o.id, o.order_reference, o.created_at, c.company_legal_name
+        $sql = 'SELECT o.id, o.order_reference, o.created_at, o.company_legal_name
                 FROM orders o
-                JOIN clients c ON c.id = o.client_id
                 WHERE ' . implode(' AND ', $where) . '
                 ORDER BY o.created_at DESC';
 
@@ -1544,10 +1544,9 @@ final class ReportRepository
             $params['date_to'] = $dateTo;
         }
         $stmt = Database::connection()->prepare(
-            "SELECT o.id, o.order_reference, c.company_legal_name, o.lost_at, o.lost_reason,
+            "SELECT o.id, o.order_reference, o.company_legal_name, o.lost_at, o.lost_reason,
                     {$reachedClause} AS reached_pi
                FROM orders o
-               JOIN clients c ON c.id = o.client_id
               WHERE " . implode(' AND ', $clauses) . '
               ORDER BY o.lost_at DESC'
         );

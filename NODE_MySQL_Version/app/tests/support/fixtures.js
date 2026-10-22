@@ -51,6 +51,22 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
     portOfDischargeCity = port ? port.city : null;
   }
 
+  // 90-item backlog "standalone order" follow-on: mirrors
+  // orderRepository.js's own resolveClientSnapshot().
+  const client = (await db.queryOne(
+    `SELECT company_legal_name, billing_address, billing_address_line1, billing_address_line2,
+            billing_city, billing_postcode, billing_country, vat_eori_tax_no, contact_person,
+            email, phone, country_of_destination,
+            consignee_same_as_buyer, consignee_name, consignee_address, consignee_address_line1,
+            consignee_address_line2, consignee_city, consignee_postcode, consignee_country,
+            consignee_vat_eori_tax_no, consignee_contact_person, consignee_phone, consignee_email,
+            notify_party_same_as_consignee, notify_party, notify_party_address_line1,
+            notify_party_address_line2, notify_party_city, notify_party_postcode, notify_party_country,
+            notify_party_contact_person, notify_party_phone, notify_party_email
+     FROM clients WHERE id = :id`,
+    { id: clientId }
+  )) || {};
+
   const ref = `JEST-TEST-${Math.random().toString(16).slice(2, 10)}`;
   const inquiryRef = `JEST-${Math.random().toString(16).slice(2, 8)}`;
   const result = await db.execute(
@@ -60,14 +76,32 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
          port_of_loading_id, port_of_discharge_id,
          incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text,
          balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions,
-         port_of_loading_name, port_of_loading_city, port_of_discharge_name, port_of_discharge_city)
+         port_of_loading_name, port_of_loading_city, port_of_discharge_name, port_of_discharge_city,
+         company_legal_name, billing_address, billing_address_line1, billing_address_line2,
+         billing_city, billing_postcode, billing_country, vat_eori_tax_no, contact_person,
+         client_email, client_phone, country_of_destination,
+         consignee_same_as_buyer, consignee_name, consignee_address, consignee_address_line1,
+         consignee_address_line2, consignee_city, consignee_postcode, consignee_country,
+         consignee_vat_eori_tax_no, consignee_contact_person, consignee_phone, consignee_email,
+         notify_party_same_as_consignee, notify_party, notify_party_address_line1,
+         notify_party_address_line2, notify_party_city, notify_party_postcode, notify_party_country,
+         notify_party_contact_person, notify_party_phone, notify_party_email)
      VALUES
         (:ref, :client_id, 1, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, 'TBC', 'NIL',
          CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active',
          :port_of_loading_id, :port_of_discharge_id,
          :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text,
          :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions,
-         :port_of_loading_name, :port_of_loading_city, :port_of_discharge_name, :port_of_discharge_city)`,
+         :port_of_loading_name, :port_of_loading_city, :port_of_discharge_name, :port_of_discharge_city,
+         :company_legal_name, :billing_address, :billing_address_line1, :billing_address_line2,
+         :billing_city, :billing_postcode, :billing_country, :vat_eori_tax_no, :contact_person,
+         :client_email, :client_phone, :country_of_destination,
+         :consignee_same_as_buyer, :consignee_name, :consignee_address, :consignee_address_line1,
+         :consignee_address_line2, :consignee_city, :consignee_postcode, :consignee_country,
+         :consignee_vat_eori_tax_no, :consignee_contact_person, :consignee_phone, :consignee_email,
+         :notify_party_same_as_consignee, :notify_party, :notify_party_address_line1,
+         :notify_party_address_line2, :notify_party_city, :notify_party_postcode, :notify_party_country,
+         :notify_party_contact_person, :notify_party_phone, :notify_party_email)`,
     {
       ref, client_id: clientId, inquiry_ref: inquiryRef,
       preset_id: preset.id, incoterm_id: incoterm.id, currency_id: currency.id,
@@ -86,6 +120,40 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
       port_of_loading_city: portOfLoadingCity,
       port_of_discharge_name: portOfDischargeName,
       port_of_discharge_city: portOfDischargeCity,
+      company_legal_name: client.company_legal_name ?? null,
+      billing_address: client.billing_address ?? null,
+      billing_address_line1: client.billing_address_line1 ?? null,
+      billing_address_line2: client.billing_address_line2 ?? null,
+      billing_city: client.billing_city ?? null,
+      billing_postcode: client.billing_postcode ?? null,
+      billing_country: client.billing_country ?? null,
+      vat_eori_tax_no: client.vat_eori_tax_no ?? null,
+      contact_person: client.contact_person ?? null,
+      client_email: client.email ?? null,
+      client_phone: client.phone ?? null,
+      country_of_destination: client.country_of_destination ?? null,
+      consignee_same_as_buyer: client.consignee_same_as_buyer ?? 1,
+      consignee_name: client.consignee_name ?? null,
+      consignee_address: client.consignee_address ?? null,
+      consignee_address_line1: client.consignee_address_line1 ?? null,
+      consignee_address_line2: client.consignee_address_line2 ?? null,
+      consignee_city: client.consignee_city ?? null,
+      consignee_postcode: client.consignee_postcode ?? null,
+      consignee_country: client.consignee_country ?? null,
+      consignee_vat_eori_tax_no: client.consignee_vat_eori_tax_no ?? null,
+      consignee_contact_person: client.consignee_contact_person ?? null,
+      consignee_phone: client.consignee_phone ?? null,
+      consignee_email: client.consignee_email ?? null,
+      notify_party_same_as_consignee: client.notify_party_same_as_consignee ?? 1,
+      notify_party: client.notify_party ?? null,
+      notify_party_address_line1: client.notify_party_address_line1 ?? null,
+      notify_party_address_line2: client.notify_party_address_line2 ?? null,
+      notify_party_city: client.notify_party_city ?? null,
+      notify_party_postcode: client.notify_party_postcode ?? null,
+      notify_party_country: client.notify_party_country ?? null,
+      notify_party_contact_person: client.notify_party_contact_person ?? null,
+      notify_party_phone: client.notify_party_phone ?? null,
+      notify_party_email: client.notify_party_email ?? null,
     }
   );
   const orderId = result.insertId;

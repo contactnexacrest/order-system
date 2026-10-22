@@ -115,18 +115,9 @@ final class AnnexureLockWarningTest extends DbTestCase
         return ob_get_clean();
     }
 
-    /** buildPreview() requires a client email on file — createTestClient() leaves it NULL. */
-    private function setClientEmailForOrder(int $orderId): void
-    {
-        $pdo = \App\Config\Database::connection();
-        $pdo->prepare('UPDATE clients c JOIN orders o ON o.client_id = c.id SET c.email = :email WHERE o.id = :order_id')
-            ->execute(['email' => 'buyer@example.test', 'order_id' => $orderId]);
-    }
-
     public function testNoResendWarningForFirstTimeApprovedAnnexureSend(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->setClientEmailForOrder($orderId);
+        $orderId = $this->createTestOrder($this->createTestClient('buyer@example.test'));
         $documentId = $this->createTestDocument($orderId, 'ANNEXA', 'approved');
 
         $output = $this->renderCompose($orderId, $documentId);
@@ -136,8 +127,7 @@ final class AnnexureLockWarningTest extends DbTestCase
 
     public function testResendWarningAppearsWhenAnnexaWasAlreadySent(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->setClientEmailForOrder($orderId);
+        $orderId = $this->createTestOrder($this->createTestClient('buyer@example.test'));
         $documentId = $this->createTestDocument($orderId, 'ANNEXA', 'sent');
 
         $output = $this->renderCompose($orderId, $documentId);
@@ -148,8 +138,7 @@ final class AnnexureLockWarningTest extends DbTestCase
 
     public function testResendWarningDoesNotAppearForOtherDocumentTypesWhenSent(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->setClientEmailForOrder($orderId);
+        $orderId = $this->createTestOrder($this->createTestClient('buyer@example.test'));
         $documentId = $this->createTestDocument($orderId, 'QT', 'sent');
 
         $output = $this->renderCompose($orderId, $documentId);

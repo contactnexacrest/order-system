@@ -482,7 +482,8 @@ CREATE TABLE stages_master (
 CREATE TABLE orders (
   id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_reference         VARCHAR(60) NOT NULL UNIQUE,  -- NC-SC-2026-0409001-001 (display form uses /)
-  client_id               BIGINT UNSIGNED NOT NULL,
+  client_id               BIGINT UNSIGNED NOT NULL,       -- traceability only — see the buyer/consignee/notify-party
+                                                           -- snapshot columns below
   sequence_no             INT NOT NULL,                  -- per-client order sequence
   buyer_inquiry_ref        VARCHAR(50) NOT NULL,          -- NC/SC/YYYY/DDMMNNN — master tracking ref
   payment_preset_id       BIGINT UNSIGNED NOT NULL,       -- 90-item backlog "standalone order": kept for admin
@@ -533,6 +534,70 @@ CREATE TABLE orders (
   balance_days            INT NULL,                       -- payment_presets.balance_days — Amendment-updatable, as above
   balance_trigger_wording TEXT NULL,                       -- payment_presets.balance_trigger_wording at creation time
   show_bl_instructions    TINYINT(1) NOT NULL DEFAULT 1,  -- payment_presets.show_bl_instructions at creation time
+
+  -- ================================================================
+  -- "Standalone order" snapshot columns, part 2 (90-item backlog
+  -- follow-on): the buyer/billing/consignee/notify-party details every
+  -- document reads. Resolved ONCE at order creation (OrderRepository::
+  -- insertRow()) from whatever `clients` said at that moment, then never
+  -- re-read from `clients` again — `clients` is fully admin-editable
+  -- (ClientRepository::update()) and, in the ordinary PI-intake workflow
+  -- (PiIntakeReviewController::accept()), is actually overwritten as a
+  -- matter of routine, every time a buyer confirms/corrects their own
+  -- details — without a snapshot, that correction on ANY order for this
+  -- client would silently rewrite what every OTHER order for the same
+  -- client — including ones closed years ago — displays and prints.
+  -- accept() now ALSO writes the correction onto THIS order's own
+  -- snapshot columns directly (OrderRepository::applyClientSnapshot()),
+  -- since the buyer's confirmation is this order's own current truth;
+  -- every other existing order is untouched. client_id above stays for
+  -- admin traceability only. Duplicating an order (OrderDuplicationService)
+  -- re-resolves these fresh from the client's current record, same
+  -- "a duplicate is a new commercial decision made today" rule as every
+  -- other snapshot column. Deliberately NOT included here:
+  -- client_unique_number (immutable after creation, and load-bearing for
+  -- the real current file-storage path — must stay a live lookup) and
+  -- agreement_footer_text/agreement_expiry_date/agreement_force_expired
+  -- (by design always reflect whether the client's OVERARCHING agreement
+  -- is active right now when a document is generated, not a point-in-time
+  -- fact about this one order — see DocumentDataAssembler::
+  -- resolveAgreementFooter()'s own docblock).
+  -- ================================================================
+  company_legal_name      VARCHAR(255) NULL,              -- clients.company_legal_name at creation time
+  billing_address         TEXT NULL,                       -- clients.billing_address (legacy single-field) at creation time
+  billing_address_line1   VARCHAR(255) NULL,
+  billing_address_line2   VARCHAR(255) NULL,
+  billing_city            VARCHAR(100) NULL,
+  billing_postcode        VARCHAR(30) NULL,
+  billing_country         VARCHAR(100) NULL,
+  vat_eori_tax_no         VARCHAR(100) NULL,
+  contact_person          VARCHAR(150) NULL,
+  client_email            VARCHAR(190) NULL,
+  client_phone            VARCHAR(30) NULL,
+  country_of_destination VARCHAR(100) NULL,
+  consignee_same_as_buyer TINYINT(1) NOT NULL DEFAULT 1,
+  consignee_name          VARCHAR(255) NULL,
+  consignee_address       TEXT NULL,                       -- legacy single-field fallback, same convention as billing_address
+  consignee_address_line1 VARCHAR(255) NULL,
+  consignee_address_line2 VARCHAR(255) NULL,
+  consignee_city          VARCHAR(100) NULL,
+  consignee_postcode      VARCHAR(30) NULL,
+  consignee_country       VARCHAR(100) NULL,
+  consignee_vat_eori_tax_no VARCHAR(100) NULL,
+  consignee_contact_person VARCHAR(150) NULL,
+  consignee_phone         VARCHAR(30) NULL,
+  consignee_email         VARCHAR(190) NULL,
+  notify_party_same_as_consignee TINYINT(1) NOT NULL DEFAULT 1,
+  notify_party            VARCHAR(255) NULL,
+  notify_party_address_line1 VARCHAR(255) NULL,
+  notify_party_address_line2 VARCHAR(255) NULL,
+  notify_party_city       VARCHAR(100) NULL,
+  notify_party_postcode   VARCHAR(30) NULL,
+  notify_party_country    VARCHAR(100) NULL,
+  notify_party_contact_person VARCHAR(150) NULL,
+  notify_party_phone      VARCHAR(30) NULL,
+  notify_party_email      VARCHAR(190) NULL,
+
   include_annexure_a      TINYINT(1) NOT NULL DEFAULT 0,
   special_requirements    TEXT NULL,
 

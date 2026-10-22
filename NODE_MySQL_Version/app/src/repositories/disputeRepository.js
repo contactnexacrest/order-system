@@ -23,15 +23,15 @@ async function forOrder(orderId) {
 async function all(statusFilter = null) {
   if (statusFilter) {
     return db.query(
-      `SELECT d.*, o.order_reference, c.company_legal_name FROM disputes d
-       JOIN orders o ON o.id = d.order_id JOIN clients c ON c.id = o.client_id
+      `SELECT d.*, o.order_reference, o.company_legal_name FROM disputes d
+       JOIN orders o ON o.id = d.order_id
        WHERE d.status = :status ORDER BY d.created_at DESC`,
       { status: statusFilter }
     );
   }
   return db.query(
-    `SELECT d.*, o.order_reference, c.company_legal_name FROM disputes d
-     JOIN orders o ON o.id = d.order_id JOIN clients c ON c.id = o.client_id
+    `SELECT d.*, o.order_reference, o.company_legal_name FROM disputes d
+     JOIN orders o ON o.id = d.order_id
      ORDER BY d.created_at DESC`
   );
 }

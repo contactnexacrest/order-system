@@ -45,17 +45,28 @@ final class ClientOrderHistoryVisibilityTest extends DbTestCase
              FROM payment_presets WHERE preset_name = 'Standard — New Buyer'"
         )->fetch();
 
+        // 90-item backlog "standalone order" follow-on: mirrors
+        // OrderRepository::insertRow()'s own resolveClientSnapshot(), so
+        // this order doesn't leak a NULL company_legal_name into
+        // global queries like OrderRepository::all() that other tests
+        // in the same process also render.
+        $clientStmt = $pdo->prepare('SELECT company_legal_name FROM clients WHERE id = :id');
+        $clientStmt->execute(['id' => $clientId]);
+        $client = $clientStmt->fetch() ?: [];
+
         $stmt = $pdo->prepare(
             'INSERT INTO orders
                 (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
                  currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
                  incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text,
-                 balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions)
+                 balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions,
+                 company_legal_name)
              VALUES
                 (:ref, :client_id, :seq, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, \'TBC\', \'NIL\',
                  CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), \'active\',
                  :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text,
-                 :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions)'
+                 :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions,
+                 :company_legal_name)'
         );
         $stmt->execute([
             'ref'         => 'PHPUNIT-TEST-' . bin2hex(random_bytes(4)),
@@ -75,6 +86,7 @@ final class ClientOrderHistoryVisibilityTest extends DbTestCase
             'balance_days'            => $preset['balance_days'],
             'balance_trigger_wording' => $preset['balance_trigger_wording'],
             'show_bl_instructions'    => $preset['show_bl_instructions'],
+            'company_legal_name'      => $client['company_legal_name'] ?? null,
         ]);
         $orderId = (int) $pdo->lastInsertId();
         \App\Repositories\OrderStageRepository::initializeForOrder($orderId);
