@@ -30,6 +30,32 @@ async function findContext(contextKey) {
 }
 
 /**
+ * External QA report L-15 (UP-02): the stored mime_type came straight from
+ * the browser's declared Content-Type, so an HTML file renamed
+ * "invoice.pdf" was stored and served back as text/html — mitigated today
+ * only by the sitewide X-Content-Type-Options: nosniff header plus
+ * Content-Disposition: attachment, neither of which this service
+ * controls. Rather than a full per-extension MIME matrix (risky: docx/
+ * xlsx are zip-based and legitimately detect as application/zip
+ * depending on the tool, eml/msg have no single canonical signature, so
+ * a wrong entry would reject a real upload), this checks the buffer's
+ * own first bytes for the handful of signatures that mean "this is
+ * actually HTML or a script," which is never legitimate content under
+ * ANY extension this app accepts (none of file_upload_contexts'
+ * allowed_extensions is itself html/js/php) — directly closing the exact
+ * attack this defect describes. A plain string match on the leading
+ * bytes, identical to fileUploadService.php's looksLikeDangerousContent(),
+ * so behavior matches exactly between stacks.
+ */
+const DANGEROUS_CONTENT_PATTERN = /^\s*(<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>]|<script[\s>]|<\?php|<%)/i;
+
+/** @returns {boolean} true if the buffer's own leading bytes look like HTML/script content, regardless of what extension or Content-Type the browser claimed */
+function looksLikeDangerousContent(buffer) {
+  const head = buffer.subarray(0, 1024).toString('utf8');
+  return DANGEROUS_CONTENT_PATTERN.test(head);
+}
+
+/**
  * @param {import('express').Request} req
  * @param {string} formFieldName e.g. 'signed_copy' — the <input type="file" name="...">
  * @throws on missing file, disallowed extension, or oversize
@@ -128,6 +154,10 @@ async function storeOne(buffer, originalName, mimeType, contextKey, subPath, cli
   if (buffer.length > parseInt(context.max_size_bytes, 10)) {
     const maxMb = Math.round((parseInt(context.max_size_bytes, 10) / 1048576) * 10) / 10;
     throw new Error(`File "${originalName}" is too large — maximum is ${maxMb} MB for this upload.`);
+  }
+
+  if (looksLikeDangerousContent(buffer)) {
+    throw new Error(`File "${originalName}" was rejected: its content does not match a safe file type for a .${extension} upload.`);
   }
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');

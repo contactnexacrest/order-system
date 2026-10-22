@@ -22,6 +22,38 @@ use App\Repositories\FileStoreRepository;
 final class FileUploadService
 {
     /**
+     * External QA report L-15 (UP-02): the stored mime_type came straight
+     * from the browser's Content-Type header, so an HTML file renamed
+     * "invoice.pdf" was stored and served back as text/html — mitigated
+     * today only by the sitewide X-Content-Type-Options: nosniff header
+     * plus Content-Disposition: attachment (Router::SECURITY_HEADERS /
+     * FileStoreController), neither of which this service controls.
+     * Rather than a full per-extension MIME matrix (risky: docx/xlsx are
+     * zip-based and legitimately detect as application/zip depending on
+     * the tool, eml/msg have no single canonical signature, so a wrong
+     * entry would reject a real upload), this checks the file's own
+     * first bytes for the handful of signatures that mean "this is
+     * actually HTML or a script," which is never legitimate content
+     * under ANY extension this app accepts (none of
+     * file_upload_contexts' allowed_extensions is itself html/js/php) —
+     * directly closing the exact attack this defect describes. A plain
+     * string match on the leading bytes, not finfo's magic database, so
+     * behavior is identical and deterministic on both the PHP and Node
+     * stacks (see fileUploadService.js's matching sniffDangerousContent()).
+     */
+    private const DANGEROUS_CONTENT_PATTERN = '/^\s*(<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>]|<script[\s>]|<\?php|<%)/i';
+
+    /** @return bool true if the file's own leading bytes look like HTML/script content, regardless of what extension or Content-Type the browser claimed */
+    private static function looksLikeDangerousContent(string $tmpName): bool
+    {
+        $head = @file_get_contents($tmpName, false, null, 0, 1024);
+        if ($head === false || $head === '') {
+            return false;
+        }
+        return (bool) preg_match(self::DANGEROUS_CONTENT_PATTERN, $head);
+    }
+
+    /**
      * @param string $formFieldName e.g. 'signed_copy' — the <input type="file" name="...">
      * @throws \RuntimeException on missing file, disallowed extension, or oversize
      */
@@ -144,6 +176,10 @@ final class FileUploadService
         if ($size > (int) $context['max_size_bytes']) {
             $maxMb = round(((int) $context['max_size_bytes']) / 1048576, 1);
             throw new \RuntimeException("File \"{$originalName}\" is too large — maximum is {$maxMb} MB for this upload.");
+        }
+
+        if (self::looksLikeDangerousContent($tmpName)) {
+            throw new \RuntimeException("File \"{$originalName}\" was rejected: its content does not match a safe file type for a .{$extension} upload.");
         }
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
