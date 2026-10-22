@@ -53,6 +53,17 @@ final class EmailDispatchService
             if ($document['status'] !== 'approved' && $document['status'] !== 'sent') {
                 throw new \RuntimeException('Only an approved document can be sent to the buyer — it must clear internal review first (Section 9).');
             }
+            // QA-5 L-40: document_types.never_shown_to_buyer (Business
+            // Rule #20) is a hard, server-side gate — the order page only
+            // ever offers "Send to Buyer" for category='customer_facing'
+            // documents, but that's a UI convenience, not a security
+            // boundary; the send route itself must refuse any type this
+            // flag covers (Supplier PO with its INR unit prices, BL
+            // Instruction Sheet, COO Prep, internal checklists, Amendment
+            // drafts, ...) even hit directly by a typed URL.
+            if (!empty($document['document_type_never_shown_to_buyer'])) {
+                throw new \RuntimeException("{$document['document_type_name']} is an internal document and can never be sent to the buyer.");
+            }
         }
         if (empty($order['client_email'])) {
             throw new \RuntimeException('This client has no email address on file.');

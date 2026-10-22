@@ -51,7 +51,7 @@ final class DocumentRepository
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default, dt.category AS document_type_category
+            'SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default, dt.category AS document_type_category, dt.never_shown_to_buyer AS document_type_never_shown_to_buyer
              FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
              WHERE d.id = :id'
         );
