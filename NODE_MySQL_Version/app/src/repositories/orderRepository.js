@@ -165,25 +165,6 @@ async function createWithNextSequence(clientId, buildFields, createdBy, executor
  * made today.
  */
 async function resolveSnapshot(executor, data) {
-  const incoterm = await executor.queryOne('SELECT code FROM incoterms WHERE id = :id', { id: data.incoterm_id });
-  const currency = await executor.queryOne('SELECT code FROM currencies WHERE id = :id', { id: data.currency_id });
-
-  let portOfLoadingName = null;
-  let portOfLoadingCity = null;
-  if (data.port_of_loading_id) {
-    const port = await executor.queryOne('SELECT name, city FROM ports WHERE id = :id', { id: data.port_of_loading_id });
-    portOfLoadingName = port ? port.name : null;
-    portOfLoadingCity = port ? port.city : null;
-  }
-
-  let portOfDischargeName = null;
-  let portOfDischargeCity = null;
-  if (data.port_of_discharge_id) {
-    const port = await executor.queryOne('SELECT name, city FROM ports WHERE id = :id', { id: data.port_of_discharge_id });
-    portOfDischargeName = port ? port.name : null;
-    portOfDischargeCity = port ? port.city : null;
-  }
-
   const preset = await executor.queryOne(
     `SELECT preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
             balance_days, balance_trigger_wording, show_bl_instructions
@@ -192,12 +173,7 @@ async function resolveSnapshot(executor, data) {
   );
 
   return {
-    incoterm_code: (incoterm && incoterm.code) || null,
-    currency_code: (currency && currency.code) || null,
-    port_of_loading_name: portOfLoadingName,
-    port_of_loading_city: portOfLoadingCity,
-    port_of_discharge_name: portOfDischargeName,
-    port_of_discharge_city: portOfDischargeCity,
+    ...(await resolveLogisticsSnapshot(executor, data.incoterm_id, data.currency_id, data.port_of_loading_id, data.port_of_discharge_id)),
     preset_name: (preset && preset.preset_name) ?? null,
     advance_pct: (preset && preset.advance_pct) ?? null,
     advance_trigger_text: (preset && preset.advance_trigger_text) ?? null,
@@ -207,6 +183,45 @@ async function resolveSnapshot(executor, data) {
     balance_trigger_wording: (preset && preset.balance_trigger_wording) ?? null,
     show_bl_instructions: preset ? preset.show_bl_instructions : 1,
     ...(await resolveClientSnapshot(executor, data.client_id)),
+  };
+}
+
+/**
+ * 90-item backlog "standalone order" follow-on: factored out of
+ * resolveSnapshot() so ordersController.js's own in-progress Incoterm/
+ * Currency/Port edit ("Edit Details") can re-resolve just these four
+ * fields without touching the payment-preset or client snapshot —
+ * editing the logistics side must never silently revert an activated
+ * Amendment's override or a PI-intake-specific correction on this order
+ * back to its preset/client defaults.
+ */
+async function resolveLogisticsSnapshot(executor, incotermId, currencyId, portOfLoadingId, portOfDischargeId) {
+  const incoterm = await executor.queryOne('SELECT code FROM incoterms WHERE id = :id', { id: incotermId });
+  const currency = await executor.queryOne('SELECT code FROM currencies WHERE id = :id', { id: currencyId });
+
+  let portOfLoadingName = null;
+  let portOfLoadingCity = null;
+  if (portOfLoadingId) {
+    const port = await executor.queryOne('SELECT name, city FROM ports WHERE id = :id', { id: portOfLoadingId });
+    portOfLoadingName = port ? port.name : null;
+    portOfLoadingCity = port ? port.city : null;
+  }
+
+  let portOfDischargeName = null;
+  let portOfDischargeCity = null;
+  if (portOfDischargeId) {
+    const port = await executor.queryOne('SELECT name, city FROM ports WHERE id = :id', { id: portOfDischargeId });
+    portOfDischargeName = port ? port.name : null;
+    portOfDischargeCity = port ? port.city : null;
+  }
+
+  return {
+    incoterm_code: (incoterm && incoterm.code) || null,
+    currency_code: (currency && currency.code) || null,
+    port_of_loading_name: portOfLoadingName,
+    port_of_loading_city: portOfLoadingCity,
+    port_of_discharge_name: portOfDischargeName,
+    port_of_discharge_city: portOfDischargeCity,
   };
 }
 
@@ -457,7 +472,24 @@ async function findOrdersDuplicatedFrom(sourceOrderId) {
  * Caller (ordersController.updateDetails) is responsible for the
  * orderEditGuard check before calling this.
  */
+/**
+ * 90-item backlog "standalone order" follow-on: a real regression found
+ * after the original snapshot fix — this is called from ordersController.js's
+ * in-progress Incoterm/Currency/Port edit ("Edit Details"), but only ever
+ * wrote the *_id FK columns. Once find()/every document stopped
+ * live-joining incoterms/currencies/ports and started reading
+ * incoterm_code/currency_code/port_of_loading_name/_city/port_of_discharge_name/_city
+ * instead, an edit here silently stopped being reflected anywhere — the
+ * FK changed, the snapshot didn't. Now re-resolves those four snapshot
+ * fields too, via the same resolveLogisticsSnapshot() insertOrderRow()
+ * uses — deliberately NOT the full resolveSnapshot(), so this never
+ * re-reads payment_presets/clients and overwrites an activated
+ * Amendment's override or a PI-intake-specific correction on this order
+ * with their current defaults.
+ */
 async function updateDetails(orderId, data) {
+  const snapshot = await resolveLogisticsSnapshot(db, data.incoterm_id, data.currency_id, data.port_of_loading_id, data.port_of_discharge_id);
+
   await db.execute(
     `UPDATE orders SET
         incoterm_id = :incoterm_id,
@@ -480,7 +512,13 @@ async function updateDetails(orderId, data) {
         estimated_package_count = :estimated_package_count,
         estimated_package_type = :estimated_package_type,
         indicative_freight_amount = :indicative_freight_amount,
-        indicative_insurance_amount = :indicative_insurance_amount
+        indicative_insurance_amount = :indicative_insurance_amount,
+        incoterm_code = :incoterm_code,
+        currency_code = :currency_code,
+        port_of_loading_name = :port_of_loading_name,
+        port_of_loading_city = :port_of_loading_city,
+        port_of_discharge_name = :port_of_discharge_name,
+        port_of_discharge_city = :port_of_discharge_city
      WHERE id = :id`,
     {
       incoterm_id: data.incoterm_id,
@@ -504,6 +542,12 @@ async function updateDetails(orderId, data) {
       estimated_package_type: data.estimated_package_type || null,
       indicative_freight_amount: data.indicative_freight_amount || null,
       indicative_insurance_amount: data.indicative_insurance_amount || null,
+      incoterm_code: snapshot.incoterm_code,
+      currency_code: snapshot.currency_code,
+      port_of_loading_name: snapshot.port_of_loading_name,
+      port_of_loading_city: snapshot.port_of_loading_city,
+      port_of_discharge_name: snapshot.port_of_discharge_name,
+      port_of_discharge_city: snapshot.port_of_discharge_city,
       id: orderId,
     }
   );

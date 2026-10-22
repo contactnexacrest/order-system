@@ -171,37 +171,7 @@ final class OrderRepository
      */
     private static function resolveSnapshot(array $data): array
     {
-        $pdo = Database::connection();
-
-        $incoterm = $pdo->prepare('SELECT code FROM incoterms WHERE id = :id');
-        $incoterm->execute(['id' => $data['incoterm_id']]);
-        $incotermCode = $incoterm->fetchColumn();
-
-        $currency = $pdo->prepare('SELECT code FROM currencies WHERE id = :id');
-        $currency->execute(['id' => $data['currency_id']]);
-        $currencyCode = $currency->fetchColumn();
-
-        $portOfLoadingName = null;
-        $portOfLoadingCity = null;
-        if (!empty($data['port_of_loading_id'])) {
-            $port = $pdo->prepare('SELECT name, city FROM ports WHERE id = :id');
-            $port->execute(['id' => $data['port_of_loading_id']]);
-            $row = $port->fetch();
-            $portOfLoadingName = $row['name'] ?? null;
-            $portOfLoadingCity = $row['city'] ?? null;
-        }
-
-        $portOfDischargeName = null;
-        $portOfDischargeCity = null;
-        if (!empty($data['port_of_discharge_id'])) {
-            $port = $pdo->prepare('SELECT name, city FROM ports WHERE id = :id');
-            $port->execute(['id' => $data['port_of_discharge_id']]);
-            $row = $port->fetch();
-            $portOfDischargeName = $row['name'] ?? null;
-            $portOfDischargeCity = $row['city'] ?? null;
-        }
-
-        $preset = $pdo->prepare(
+        $preset = Database::connection()->prepare(
             'SELECT preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
                     balance_days, balance_trigger_wording, show_bl_instructions
              FROM payment_presets WHERE id = :id'
@@ -209,13 +179,12 @@ final class OrderRepository
         $preset->execute(['id' => $data['payment_preset_id']]);
         $presetRow = $preset->fetch();
 
-        return [
-            'incoterm_code'           => $incotermCode ?: null,
-            'currency_code'           => $currencyCode ?: null,
-            'port_of_loading_name'    => $portOfLoadingName,
-            'port_of_loading_city'    => $portOfLoadingCity,
-            'port_of_discharge_name'  => $portOfDischargeName,
-            'port_of_discharge_city'  => $portOfDischargeCity,
+        return self::resolveLogisticsSnapshot(
+            (int) $data['incoterm_id'],
+            (int) $data['currency_id'],
+            !empty($data['port_of_loading_id']) ? (int) $data['port_of_loading_id'] : null,
+            !empty($data['port_of_discharge_id']) ? (int) $data['port_of_discharge_id'] : null
+        ) + [
             'preset_name'             => $presetRow['preset_name'] ?? null,
             'advance_pct'             => $presetRow['advance_pct'] ?? null,
             'advance_trigger_text'    => $presetRow['advance_trigger_text'] ?? null,
@@ -225,6 +194,60 @@ final class OrderRepository
             'balance_trigger_wording' => $presetRow['balance_trigger_wording'] ?? null,
             'show_bl_instructions'    => $presetRow['show_bl_instructions'] ?? 1,
         ] + self::resolveClientSnapshot((int) $data['client_id']);
+    }
+
+    /**
+     * 90-item backlog "standalone order" follow-on: factored out of
+     * resolveSnapshot() so OrderController::updateDetails()'s own
+     * in-progress Incoterm/Currency/Port edit (Chapter 17 — "Edit
+     * Details") can re-resolve just these four fields without touching
+     * the payment-preset or client snapshot — editing the logistics side
+     * must never silently revert an activated Amendment's override or a
+     * PI-intake-specific correction on this order back to its preset/
+     * client defaults.
+     *
+     * @return array{incoterm_code:?string, currency_code:?string, port_of_loading_name:?string, port_of_loading_city:?string, port_of_discharge_name:?string, port_of_discharge_city:?string}
+     */
+    private static function resolveLogisticsSnapshot(int $incotermId, int $currencyId, ?int $portOfLoadingId, ?int $portOfDischargeId): array
+    {
+        $pdo = Database::connection();
+
+        $incoterm = $pdo->prepare('SELECT code FROM incoterms WHERE id = :id');
+        $incoterm->execute(['id' => $incotermId]);
+        $incotermCode = $incoterm->fetchColumn();
+
+        $currency = $pdo->prepare('SELECT code FROM currencies WHERE id = :id');
+        $currency->execute(['id' => $currencyId]);
+        $currencyCode = $currency->fetchColumn();
+
+        $portOfLoadingName = null;
+        $portOfLoadingCity = null;
+        if ($portOfLoadingId) {
+            $port = $pdo->prepare('SELECT name, city FROM ports WHERE id = :id');
+            $port->execute(['id' => $portOfLoadingId]);
+            $row = $port->fetch();
+            $portOfLoadingName = $row['name'] ?? null;
+            $portOfLoadingCity = $row['city'] ?? null;
+        }
+
+        $portOfDischargeName = null;
+        $portOfDischargeCity = null;
+        if ($portOfDischargeId) {
+            $port = $pdo->prepare('SELECT name, city FROM ports WHERE id = :id');
+            $port->execute(['id' => $portOfDischargeId]);
+            $row = $port->fetch();
+            $portOfDischargeName = $row['name'] ?? null;
+            $portOfDischargeCity = $row['city'] ?? null;
+        }
+
+        return [
+            'incoterm_code'           => $incotermCode ?: null,
+            'currency_code'           => $currencyCode ?: null,
+            'port_of_loading_name'    => $portOfLoadingName,
+            'port_of_loading_city'    => $portOfLoadingCity,
+            'port_of_discharge_name'  => $portOfDischargeName,
+            'port_of_discharge_city'  => $portOfDischargeCity,
+        ];
     }
 
     /**
@@ -484,8 +507,31 @@ final class OrderRepository
      * buyer_inquiry_ref). Caller (OrderController::updateDetails) is
      * responsible for the OrderEditGuard check before calling this.
      */
+    /**
+     * 90-item backlog "standalone order" follow-on: a real regression
+     * found after the original snapshot fix — this screen lets staff
+     * change an in-progress order's Incoterm/Currency/Port (Chapter 17 —
+     * "Edit Details"), but only ever wrote the *_id FK columns. Once
+     * find()/every document stopped live-joining incoterms/currencies/
+     * ports and started reading incoterm_code/currency_code/port_of_
+     * loading_name/_city/port_of_discharge_name/_city instead, an edit
+     * here silently stopped being reflected anywhere — the FK changed,
+     * the snapshot didn't. Now re-resolves those four snapshot fields
+     * too, via the same resolveLogisticsSnapshot() insertRow() uses —
+     * deliberately NOT the full resolveSnapshot(), so this never
+     * re-reads payment_presets/clients and overwrites an activated
+     * Amendment's override or a PI-intake-specific correction on this
+     * order with their current defaults.
+     */
     public static function updateDetails(int $orderId, array $data): void
     {
+        $snapshot = self::resolveLogisticsSnapshot(
+            (int) $data['incoterm_id'],
+            (int) $data['currency_id'],
+            !empty($data['port_of_loading_id']) ? (int) $data['port_of_loading_id'] : null,
+            !empty($data['port_of_discharge_id']) ? (int) $data['port_of_discharge_id'] : null
+        );
+
         Database::connection()->prepare(
             'UPDATE orders SET
                 incoterm_id = :incoterm_id,
@@ -508,7 +554,13 @@ final class OrderRepository
                 estimated_package_count = :estimated_package_count,
                 estimated_package_type = :estimated_package_type,
                 indicative_freight_amount = :indicative_freight_amount,
-                indicative_insurance_amount = :indicative_insurance_amount
+                indicative_insurance_amount = :indicative_insurance_amount,
+                incoterm_code = :incoterm_code,
+                currency_code = :currency_code,
+                port_of_loading_name = :port_of_loading_name,
+                port_of_loading_city = :port_of_loading_city,
+                port_of_discharge_name = :port_of_discharge_name,
+                port_of_discharge_city = :port_of_discharge_city
              WHERE id = :id'
         )->execute([
             'incoterm_id'                 => $data['incoterm_id'],
@@ -532,6 +584,12 @@ final class OrderRepository
             'estimated_package_type'      => $data['estimated_package_type'] ?: null,
             'indicative_freight_amount'   => $data['indicative_freight_amount'] ?: null,
             'indicative_insurance_amount' => $data['indicative_insurance_amount'] ?: null,
+            'incoterm_code'               => $snapshot['incoterm_code'],
+            'currency_code'               => $snapshot['currency_code'],
+            'port_of_loading_name'        => $snapshot['port_of_loading_name'],
+            'port_of_loading_city'        => $snapshot['port_of_loading_city'],
+            'port_of_discharge_name'      => $snapshot['port_of_discharge_name'],
+            'port_of_discharge_city'      => $snapshot['port_of_discharge_city'],
             'id'                          => $orderId,
         ]);
     }
