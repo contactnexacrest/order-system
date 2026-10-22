@@ -16,8 +16,9 @@ use App\Repositories\PermissionRepository;
 /**
  * Spec Section 8 — PAYMENT TERMS AMENDMENT SYSTEM (SC/AMD). Orchestrates
  * AmendmentRepository + ReferenceNumberService + DocumentGenerationService
- * + OrderRepository's override columns. See AmendmentRepository's docblock
- * for why original_terms_snapshot is frozen once, at request time.
+ * + OrderRepository's own order-level payment-term snapshot columns. See
+ * AmendmentRepository's docblock for why original_terms_snapshot is
+ * frozen once, at request time.
  */
 final class AmendmentService
 {
@@ -216,13 +217,24 @@ final class AmendmentService
         $finalAdvancePct = $advancePct ?? (float) $order['advance_pct'];
 
         // Structured balance-trigger fields drive what PI/CI templates
-        // actually render (see OrderRepository::find()'s COALESCE) — fall
-        // back to the order's current values when this amendment didn't
-        // change that side of the terms.
+        // actually render — fall back to the order's current values when
+        // this amendment didn't change that side of the terms.
         $balanceTriggerOption = $amendment['amended_balance_trigger_option'] ?? $order['balance_trigger_option'];
         $balanceDays = $amendment['amended_balance_days'] !== null
             ? (int) $amendment['amended_balance_days']
             : (int) $order['balance_days'];
+
+        // The order's own snapshotted balance_trigger_wording is custom
+        // free text written for whichever option the order started
+        // with — it stays valid only while that option is unchanged. If
+        // this amendment actually flips the option, keeping the old
+        // wording would print text written for the OTHER option
+        // alongside the new one, so it's cleared instead and
+        // DocumentDataAssembler::balanceTriggerSentence() falls back to
+        // its generic built-in sentence for the new option.
+        $balanceTriggerWording = $balanceTriggerOption === $order['balance_trigger_option']
+            ? $order['balance_trigger_wording']
+            : null;
 
         OrderRepository::applyAmendmentOverride(
             (int) $amendment['order_id'],
@@ -230,6 +242,7 @@ final class AmendmentService
             $balancePct,
             $balanceTriggerOption,
             $balanceDays,
+            $balanceTriggerWording,
             $amendmentId
         );
 

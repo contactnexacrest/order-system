@@ -112,11 +112,13 @@ final class DocumentDataAssembler
         // Item raised 2026-09-26: once an amendment is signed and activated,
         // OrderRepository::applyAmendmentOverride() already makes every
         // subsequently-generated document use the amended payment terms
-        // (via the COALESCE(*_override, preset) columns OrderRepository::find()
-        // selects) — that part worked before this change. What was missing
-        // was any VISIBLE trace on the document itself that its terms were
-        // amended, so a reader had no way to know a document's Section 4/5
-        // figures came from an amendment rather than the original preset.
+        // (it writes them straight onto the order's own snapshot columns,
+        // which OrderRepository::find() returns directly — no join or
+        // COALESCE involved) — that part worked before this change. What
+        // was missing was any VISIBLE trace on the document itself that
+        // its terms were amended, so a reader had no way to know a
+        // document's Section 4/5 figures came from an amendment rather
+        // than the original preset.
         $activeAmendment = !empty($order['has_active_amendment']) && !empty($order['active_amendment_id'])
             ? AmendmentRepository::find((int) $order['active_amendment_id'])
             : null;

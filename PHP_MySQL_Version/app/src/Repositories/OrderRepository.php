@@ -605,18 +605,23 @@ final class OrderRepository
      * document generated, signed copy uploaded — see AmendmentService).
      * Overrides this one order's advance/balance terms without touching
      * the shared payment_presets row every other order on that preset
-     * still reads from. find() above resolves the effective value with
-     * COALESCE(override, preset) — every future document generation for
-     * this order (a new PI revision, the CI, etc.) picks this up for
-     * free, with no per-document-type special-casing.
-     */
-    /**
-     * 90-item backlog "standalone order": writes directly to the order's
-     * own base columns (advance_pct, balance_pct, balance_trigger_option,
-     * balance_days) rather than a separate *_override column — those are
-     * the order's own snapshotted values now, not a preset-derived
-     * default with a floor on top, so an activated amendment just
-     * updates them in place.
+     * still reads from. Writes directly to the order's own base columns
+     * (advance_pct, balance_pct, balance_trigger_option, balance_days) —
+     * those are the order's own snapshotted values (90-item backlog
+     * "standalone order"), not a preset-derived default with a floor on
+     * top, so an activated amendment just updates them in place; every
+     * future document generation for this order (a new PI revision, the
+     * CI, etc.) picks this up for free, with no per-document-type
+     * special-casing.
+     *
+     * $balanceTriggerWording is caller-resolved (see AmendmentService::
+     * attachSignedCopyAndActivate()): the order's OWN snapshotted wording
+     * is custom free text written for whatever trigger option the order
+     * started with, so it stays valid only while the option is
+     * unchanged. When this amendment actually flips the option, the
+     * caller passes null here, falling back to balanceTriggerSentence()'s
+     * generic built-in sentence for that option rather than printing
+     * custom wording that was written for the OTHER option.
      */
     public static function applyAmendmentOverride(
         int $orderId,
@@ -624,6 +629,7 @@ final class OrderRepository
         float $balancePct,
         ?string $balanceTriggerOption,
         ?int $balanceDays,
+        ?string $balanceTriggerWording,
         int $amendmentId
     ): void {
         Database::connection()->prepare(
@@ -632,6 +638,7 @@ final class OrderRepository
                  balance_pct = :balance_pct,
                  balance_trigger_option = :balance_trigger_option,
                  balance_days = :balance_days,
+                 balance_trigger_wording = :balance_trigger_wording,
                  active_amendment_id = :amendment_id
              WHERE id = :id'
         )->execute([
@@ -639,6 +646,7 @@ final class OrderRepository
             'balance_pct'          => $balancePct,
             'balance_trigger_option' => $balanceTriggerOption,
             'balance_days'         => $balanceDays,
+            'balance_trigger_wording' => $balanceTriggerWording,
             'amendment_id'         => $amendmentId,
             'id'                   => $orderId,
         ]);

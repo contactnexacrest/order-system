@@ -568,19 +568,30 @@ async function markLost(orderId, reason, userId) {
  * balance_days) rather than a separate *_override column — those are the
  * order's own snapshotted values now, not a preset-derived default with
  * a floor on top, so an activated amendment just updates them in place.
+ *
+ * balanceTriggerWording is caller-resolved (see amendmentService.js's
+ * attachSignedCopyAndActivate()): the order's OWN snapshotted wording is
+ * custom free text written for whatever trigger option the order
+ * started with, so it stays valid only while the option is unchanged.
+ * When this amendment actually flips the option, the caller passes null
+ * here, falling back to documentDataAssembler.js's
+ * balanceTriggerSentence()'s generic built-in sentence for that option
+ * rather than printing custom wording that was written for the OTHER
+ * option.
  */
-async function applyAmendmentOverride(orderId, advancePct, balancePct, balanceTriggerOption, balanceDays, amendmentId) {
+async function applyAmendmentOverride(orderId, advancePct, balancePct, balanceTriggerOption, balanceDays, balanceTriggerWording, amendmentId) {
   await db.execute(
     `UPDATE orders
      SET advance_pct = :advance_pct,
          balance_pct = :balance_pct,
          balance_trigger_option = :balance_trigger_option,
          balance_days = :balance_days,
+         balance_trigger_wording = :balance_trigger_wording,
          active_amendment_id = :amendment_id
      WHERE id = :id`,
     {
       advance_pct: advancePct, balance_pct: balancePct, balance_trigger_option: balanceTriggerOption,
-      balance_days: balanceDays, amendment_id: amendmentId, id: orderId,
+      balance_days: balanceDays, balance_trigger_wording: balanceTriggerWording, amendment_id: amendmentId, id: orderId,
     }
   );
 }

@@ -16,8 +16,9 @@ const makerCheckerGuard = require('./makerCheckerGuard');
 /**
  * Spec Section 8 — PAYMENT TERMS AMENDMENT SYSTEM (SC/AMD). Orchestrates
  * amendmentRepository + referenceNumberService + documentGenerationService
- * + orderRepository's override columns. See amendmentRepository's docblock
- * for why original_terms_snapshot is frozen once, at request time.
+ * + orderRepository's own order-level payment-term snapshot columns. See
+ * amendmentRepository's docblock for why original_terms_snapshot is
+ * frozen once, at request time.
  */
 
 function trimTrailingZeros(numStr) {
@@ -216,15 +217,23 @@ async function attachSignedCopyAndActivate(amendmentId, signedCopyFileId, userId
   const finalAdvancePct = advancePct !== null ? advancePct : parseFloat(order.advance_pct);
 
   // Structured balance-trigger fields drive what PI/CI templates actually
-  // render (see orderRepository.find()'s COALESCE) — fall back to the
-  // order's current values when this amendment didn't change that side of
-  // the terms.
+  // render — fall back to the order's current values when this amendment
+  // didn't change that side of the terms.
   const balanceTriggerOption = amendment.amended_balance_trigger_option || order.balance_trigger_option;
   const balanceDays = amendment.amended_balance_days !== null && amendment.amended_balance_days !== undefined
     ? parseInt(amendment.amended_balance_days, 10)
     : parseInt(order.balance_days, 10);
 
-  await orderRepository.applyAmendmentOverride(amendment.order_id, finalAdvancePct, balancePct, balanceTriggerOption, balanceDays, amendmentId);
+  // The order's own snapshotted balance_trigger_wording is custom free
+  // text written for whichever option the order started with — it stays
+  // valid only while that option is unchanged. If this amendment actually
+  // flips the option, keeping the old wording would print text written
+  // for the OTHER option alongside the new one, so it's cleared instead
+  // and documentDataAssembler.balanceTriggerSentence() falls back to its
+  // generic built-in sentence for the new option.
+  const balanceTriggerWording = balanceTriggerOption === order.balance_trigger_option ? order.balance_trigger_wording : null;
+
+  await orderRepository.applyAmendmentOverride(amendment.order_id, finalAdvancePct, balancePct, balanceTriggerOption, balanceDays, balanceTriggerWording, amendmentId);
 
   await auditLogRepository.log(userId, 'AMENDMENT_ACTIVATED', 'amendments', amendmentId, 'payment_terms', null, amendment.amendment_reference);
 }
