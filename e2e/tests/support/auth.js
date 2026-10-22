@@ -29,4 +29,15 @@ async function login(page, role = 'admin') {
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
 
-module.exports = { login, ROLES, PASSWORD };
+async function logout(page) {
+  await page.getByRole('button', { name: 'Log out' }).click();
+}
+
+async function loginClient(page, email, password) {
+  await page.goto('/client/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+}
+
+module.exports = { login, logout, loginClient, ROLES, PASSWORD };
