@@ -122,19 +122,88 @@ final class Router
                 array_shift($matches);
                 $params = array_combine($route['paramNames'], $matches) ?: [];
 
-                foreach ($route['middleware'] as $mw) {
-                    $result = $mw($params);
-                    if ($result === false) {
-                        return; // middleware already sent a response (redirect/403/etc.)
+                try {
+                    foreach ($route['middleware'] as $mw) {
+                        $result = $mw($params);
+                        if ($result === false) {
+                            return; // middleware already sent a response (redirect/403/etc.)
+                        }
                     }
-                }
 
-                ($route['handler'])($params);
+                    ($route['handler'])($params);
+                } catch (\PDOException $e) {
+                    // External QA report R-01: no form anywhere validated a
+                    // text field against its column's actual max length —
+                    // submitting text longer than the DB column crashed the
+                    // request as an uncaught PDOException (a raw HTTP 500,
+                    // no flash message, every field the user typed lost).
+                    // SQLSTATE 22001 ("string data, right truncated") is
+                    // MySQL's own signal for exactly this, nothing else —
+                    // safe to treat generically as "a submitted field was
+                    // too long" everywhere in this app, since every write
+                    // here comes from a user-submitted form field. This is
+                    // the single chokepoint every one of the ~60 affected
+                    // forms' requests already passes through, so one fix
+                    // here closes the crash for all of them at once rather
+                    // than requiring an individual length check added to
+                    // every form (a real, separate, much larger follow-up —
+                    // see R-01's own fix direction for the ideal
+                    // per-field/HTML maxlength UX this does not replace).
+                    if ($e->getCode() === '22001') {
+                        self::handleDataTooLong();
+                        return;
+                    }
+                    throw $e;
+                }
                 return;
             }
         }
 
         http_response_code(404);
         echo '404 Not Found';
+    }
+
+    private static function handleDataTooLong(): void
+    {
+        $message = 'One of the fields you entered is too long for this form — please shorten it and try again. Nothing was saved.';
+
+        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+        $requestedWith = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '');
+        if ($requestedWith === 'xmlhttprequest' || str_contains($accept, 'application/json')) {
+            http_response_code(422);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => $message]);
+            return;
+        }
+
+        Flash::set('error', $message);
+        if (!empty($_POST)) {
+            Flash::setOld($_POST);
+        }
+        header('Location: ' . self::safeRedirectBack());
+    }
+
+    /**
+     * Only ever redirects back to a same-origin relative path — the
+     * Referer header is client-supplied and must never be trusted for an
+     * absolute/external redirect target (open-redirect risk).
+     */
+    private static function safeRedirectBack(): string
+    {
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+        $host = $_SERVER['HTTP_HOST'] ?? null;
+        if ($referer !== '' && $host !== null) {
+            // A scheme-relative Referer ("//evil.example.com/phish") still
+            // parses PHP_URL_PATH as "/phish" alone — only trust the path
+            // when the Referer's own host actually matches this request's.
+            if (parse_url($referer, PHP_URL_HOST) === $host) {
+                $path = parse_url($referer, PHP_URL_PATH);
+                if (is_string($path) && str_starts_with($path, '/')) {
+                    $query = parse_url($referer, PHP_URL_QUERY);
+                    return $path . ($query ? "?{$query}" : '');
+                }
+            }
+        }
+        return '/';
     }
 }

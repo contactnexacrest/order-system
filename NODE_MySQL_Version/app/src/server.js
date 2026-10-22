@@ -861,6 +861,58 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+// External QA report R-01: no form anywhere validated a text field
+// against its database column's actual max length — submitting text
+// longer than the column crashed the request as an uncaught mysql2
+// error (SQLSTATE 22001, "string data, right truncated"/ER_DATA_TOO_LONG):
+// a raw HTTP 500, no flash message, every field the user typed lost.
+// Safe to treat generically as "a submitted field was too long"
+// everywhere in this app, since every write here comes from a
+// user-submitted form field. This is the single chokepoint every one of
+// the ~60 affected forms' requests already pass through (asyncHandler
+// funnels every rejected controller promise to next(err), landing here),
+// so one fix closes the crash for all of them at once rather than
+// requiring an individual length check added to every form (a real,
+// separate, much larger follow-up — see R-01's own fix direction for
+// the ideal per-field/HTML maxlength UX this does not replace).
+app.use((err, req, res, next) => {
+  if (!err || err.sqlState !== '22001') {
+    next(err);
+    return;
+  }
+  const message = 'One of the fields you entered is too long for this form — please shorten it and try again. Nothing was saved.';
+  const wantsJson = req.xhr || String(req.get('Accept') || '').includes('application/json');
+  if (wantsJson) {
+    res.status(422).json({ error: message });
+    return;
+  }
+  flash.set(req, 'error', message);
+  if (req.body && Object.keys(req.body).length > 0) {
+    flash.setOld(req, req.body);
+  }
+  res.redirect(safeRedirectBack(req));
+});
+
+/**
+ * Only ever redirects back to a same-origin relative path — the Referer
+ * header is client-supplied and must never be trusted for an
+ * absolute/external redirect target (open-redirect risk).
+ */
+function safeRedirectBack(req) {
+  const referer = req.get('Referer') || '';
+  if (referer) {
+    try {
+      const url = new URL(referer);
+      if (url.host === req.get('host')) {
+        return url.pathname + url.search;
+      }
+    } catch (e) {
+      // malformed Referer — fall through to the safe default below
+    }
+  }
+  return '/';
+}
+
 // --- Error handler (never leak stack traces outside APP_ENV=local, same rule as bootstrap.php's display_errors) ---
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   logger.error('UNHANDLED ERROR', err, { method: req.method, url: req.originalUrl, user: req.user ? req.user.id : null });
