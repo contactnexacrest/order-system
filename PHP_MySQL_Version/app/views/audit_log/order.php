@@ -1,6 +1,9 @@
 <div class="card page-wide">
   <p><a href="/orders/<?= (int) $order['id'] ?>">&larr; Order <?= htmlspecialchars($order['order_reference']) ?></a></p>
-  <h1>Audit Log — Order <?= htmlspecialchars($order['order_reference']) ?></h1>
+  <div class="page-header-row">
+    <h1>Audit Log — Order <?= htmlspecialchars($order['order_reference']) ?></h1>
+    <a class="btn-sm btn-secondary" href="/orders/<?= (int) $order['id'] ?>/audit-log?format=csv">Export CSV</a>
+  </div>
   <p class="muted">Every logged change against this order, its documents, disputes, amendments, and buyer email sends — immutable, newest first. For anything else (company settings, other orders' data), use the <a href="/audit-log">full Audit Log</a>.</p>
 
   <table class="list">

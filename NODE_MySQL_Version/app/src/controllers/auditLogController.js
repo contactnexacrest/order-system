@@ -3,6 +3,7 @@
 const querystring = require('querystring');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const orderRepository = require('../repositories/orderRepository');
+const csv = require('../helpers/csv');
 
 // Port of App\Controllers\AuditLogController. Spec Section 14/17 — Audit
 // Log viewer. Read-only; no delete anywhere.
@@ -70,7 +71,39 @@ async function forOrder(req, res) {
     return;
   }
 
-  res.renderView('audit_log/order', { order, rows: await auditLogRepository.forOrder(orderId) }, 'layout/base');
+  const rows = await auditLogRepository.forOrder(orderId);
+
+  // External QA report M-03: "One-click export of an order's audit log
+  // (privileged only)." Reuses this page's own existing view_audit_log
+  // permission gate rather than adding a separate export route — same
+  // ?format=csv-on-the-same-GET convention reportController already uses.
+  if (req.query.format === 'csv') {
+    csv.stream(
+      res,
+      `audit_log_order_${String(order.order_reference).replace(/[^A-Za-z0-9_-]+/g, '-')}.csv`,
+      CSV_HEADERS,
+      orderAuditLogCsvRows(rows)
+    );
+    return;
+  }
+
+  res.renderView('audit_log/order', { order, rows }, 'layout/base');
 }
 
-module.exports = { index, forOrder };
+const CSV_HEADERS = ['When', 'User', 'Action', 'Entity', 'Field', 'Old', 'New', 'Reason'];
+
+/** Pure row-mapping, exported so it can be unit-tested directly — same pattern as reportController's own orderAuditCsvRows(). */
+function orderAuditLogCsvRows(rows) {
+  return rows.map((r) => ({
+    When: r.created_at,
+    User: r.user_name || 'system',
+    Action: r.action_type,
+    Entity: (r.entity_type || '') + (r.entity_id ? ` #${r.entity_id}` : ''),
+    Field: r.field_name || '',
+    Old: r.old_value || '',
+    New: r.new_value || '',
+    Reason: r.reason || '',
+  }));
+}
+
+module.exports = { index, forOrder, orderAuditLogCsvRows };

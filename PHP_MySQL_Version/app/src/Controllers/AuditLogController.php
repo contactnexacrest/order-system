@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\Csv;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\OrderRepository;
@@ -12,6 +13,29 @@ use App\Repositories\OrderRepository;
 final class AuditLogController
 {
     private const PAGE_SIZE = 100;
+    private const CSV_HEADERS = ['When', 'User', 'Action', 'Entity', 'Field', 'Old', 'New', 'Reason'];
+
+    /**
+     * Pure row-mapping, extracted so it can be unit-tested directly —
+     * Csv::stream() calls exit() on its success path, same reasoning as
+     * ReportController's own *CsvRows() helpers.
+     *
+     * @param array<int,array<string,mixed>> $rows
+     * @return array<int,array<string,mixed>>
+     */
+    public static function orderAuditLogCsvRows(array $rows): array
+    {
+        return array_map(static fn(array $r): array => [
+            'When'   => $r['created_at'],
+            'User'   => $r['user_name'] ?? 'system',
+            'Action' => $r['action_type'],
+            'Entity' => ($r['entity_type'] ?? '') . ($r['entity_id'] ? ' #' . $r['entity_id'] : ''),
+            'Field'  => $r['field_name'] ?? '',
+            'Old'    => $r['old_value'] ?? '',
+            'New'    => $r['new_value'] ?? '',
+            'Reason' => $r['reason'] ?? '',
+        ], $rows);
+    }
 
     /**
      * Everything logged against this order — its own row, plus every
@@ -29,9 +53,25 @@ final class AuditLogController
             return;
         }
 
+        $rows = AuditLogRepository::forOrder($orderId);
+
+        // External QA report M-03: "One-click export of an order's audit
+        // log (privileged only)." Reuses the page's own existing
+        // view_audit_log permission gate (this whole action is already
+        // restricted to it) rather than adding a separate export route —
+        // same ?format=csv-on-the-same-GET convention ReportController
+        // already uses elsewhere in this codebase.
+        if (($_GET['format'] ?? '') === 'csv') {
+            Csv::stream(
+                'audit_log_order_' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '.csv',
+                self::CSV_HEADERS,
+                self::orderAuditLogCsvRows($rows)
+            );
+        }
+
         View::render('audit_log/order', [
             'order' => $order,
-            'rows'  => AuditLogRepository::forOrder($orderId),
+            'rows'  => $rows,
         ], 'layout/base');
     }
 
