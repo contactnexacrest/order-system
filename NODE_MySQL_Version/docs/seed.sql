@@ -304,7 +304,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Shipment Booking (CFR/CIF)' AND dt.code IN ('QT','PI','OC');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (100, 'Quotation Validity', 'This Quotation is valid for {quotation_validity_days} days from the date of issue as shown in the Valid Until field above. After this date, prices and terms are subject to revision.', 'active', 0);
+  (100, 'Quotation Validity', 'This Quotation is valid for {quotation_validity_days} days from the date of issue as shown in the Valid Until field above. After this date, prices and terms are subject to revision. An advance payment received after the Valid Until date does not constitute acceptance of this Quotation — NexaCrest will issue a revised Quotation at the same or updated prices before proceeding.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Quotation Validity' AND dt.code IN ('QT');
