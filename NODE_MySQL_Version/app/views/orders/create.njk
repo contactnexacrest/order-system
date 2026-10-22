@@ -112,7 +112,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Indicative Freight / Insurance <small class="muted">(only shown when Incoterm is not FOB)</small></legend>
+      <legend>Indicative Freight / Insurance <small class="muted">(printed on the Quotation only for CFR/CIF)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">order currency</span></span>)<input type="text" name="indicative_freight_amount" value="{{ old.indicative_freight_amount or '' }}" placeholder="e.g. 950"></label>
         <label class="full">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input type="text" name="indicative_insurance_amount" value="{{ old.indicative_insurance_amount or '' }}" placeholder="e.g. 120"></label>

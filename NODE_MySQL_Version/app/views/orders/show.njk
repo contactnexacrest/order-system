@@ -635,7 +635,7 @@
           <input type="hidden" name="document_type" value="FDN">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('6b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'FDN') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Freight Debit Note</button>
+          {{ stepBadge('6b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'FDN') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Debit Note</button>
         </form>
       {% endif %}
 
@@ -2020,7 +2020,7 @@
       <input type="hidden" name="override_gate" value="1">
       <label>Document Type
         <select name="document_type" required>
-          {% for code, label in {"QT": "Quotation", "BUYERPO": "Buyer PO", "PI": "Proforma Invoice", "OC": "Order Confirmation", "SUPPO": "Supplier PO", "FDN": "Freight Debit Note", "PL": "Packing List", "BLI": "BL Instruction Sheet", "CI": "Commercial Invoice", "COOPREP": "COO Prep Sheet (internal)"} %}
+          {% for code, label in {"QT": "Quotation", "BUYERPO": "Buyer PO", "PI": "Proforma Invoice", "OC": "Order Confirmation", "SUPPO": "Supplier PO", "FDN": "Debit Note", "PL": "Packing List", "BLI": "BL Instruction Sheet", "CI": "Commercial Invoice", "COOPREP": "COO Prep Sheet (internal)"} %}
             <option value="{{ code }}">{{ label }} ({{ code }})</option>
           {% endfor %}
         </select>

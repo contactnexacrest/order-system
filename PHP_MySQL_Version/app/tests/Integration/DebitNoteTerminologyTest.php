@@ -46,4 +46,18 @@ final class DebitNoteTerminologyTest extends DbTestCase
         self::assertSame('Debit Note', $row['name']);
         self::assertSame('SC/DN/{YYYY}/{DDMM}{NNN}', $row['ref_format']);
     }
+
+    /**
+     * External QA report U-09: screen text (the staff-facing order page's
+     * "Generate ..." button and its out-of-sequence document-type picker)
+     * still said the pre-rename full name "Freight Debit Note" — a
+     * different, still-open spot from L-07's "FDN" abbreviation above.
+     */
+    public function testOrderShowScreenTextUsesTheRenamedLabel(): void
+    {
+        $html = (string) file_get_contents(__DIR__ . '/../../views/orders/show.php');
+
+        self::assertStringNotContainsString('Freight Debit Note', $html, 'U-09: the staff-facing order screen must use the renamed "Debit Note" label');
+        self::assertStringContainsString('Generate Debit Note', $html);
+    }
 }

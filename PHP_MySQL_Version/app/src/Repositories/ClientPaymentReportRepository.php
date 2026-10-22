@@ -52,7 +52,7 @@ final class ClientPaymentReportRepository
              LEFT JOIN users u ON u.id = r.reviewed_by
              LEFT JOIN file_store fs ON fs.id = r.screenshot_file_id
              WHERE r.order_id = :order_id
-             ORDER BY r.reported_at DESC'
+             ORDER BY r.reported_at DESC, r.id DESC'
         );
         $stmt->execute(['order_id' => $orderId]);
         return $stmt->fetchAll();

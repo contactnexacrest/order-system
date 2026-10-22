@@ -1646,7 +1646,7 @@ final class OrderController
             'freight_forwarder_name'    => trim((string) ($_POST['freight_forwarder_name'] ?? '')) ?: null,
             'freight_forwarder_contact' => trim((string) ($_POST['freight_forwarder_contact'] ?? '')) ?: null,
         ]);
-        Flash::set('success', 'Freight & insurance terms saved. Generate the Freight Debit Note below.');
+        Flash::set('success', 'Freight & insurance terms saved. Generate the Debit Note below.');
         header("Location: /orders/{$orderId}");
     }
 

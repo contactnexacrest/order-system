@@ -1,7 +1,7 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
   <h1>Holiday Calendar</h1>
-  <p class="muted">Specific dated holidays that WorkingDaysCalculator skips when computing a "working days" deadline — e.g. the Dispute Resolution clause's contractual ten (10) working day response window. Deliberately a flat list of exact dates rather than a recurring rule: a holiday like Diwali falls on a different date every year, so re-enter each year's actual dates rather than relying on a "same day every year" rule. The weekly off-day (currently Sunday) is configured on the <a href="/settings">Settings</a> screen under the "disputes" category (<code>weekly_off_days</code>).</p>
+  <p class="muted">Specific dated holidays that are skipped when computing a "working days" deadline — e.g. the Dispute Resolution clause's contractual ten (10) working day response window. Deliberately a flat list of exact dates rather than a recurring rule: a holiday like Diwali falls on a different date every year, so re-enter each year's actual dates rather than relying on a "same day every year" rule. The weekly off-day (currently Sunday) is configured on the <a href="/settings">Settings</a> screen under the "disputes" category (<code>weekly_off_days</code>).</p>
 
   <div class="section">
     <table class="list">

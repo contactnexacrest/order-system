@@ -1,4 +1,18 @@
 /*
+ * External QA report U-13: Poppins was loaded live from Google Fonts on
+ * every page — if that request is blocked or slow (a corporate firewall,
+ * a flaky connection), the whole UI silently fell back to a different
+ * font with no warning. Self-hosted instead: just the 4 weights this
+ * CSS actually asks for (400/500/600/700), Latin-subset woff2 only (this
+ * app's UI content is English throughout), so a page that needs the font
+ * at all never depends on a third-party request succeeding.
+ */
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 400; font-display: swap; src: url('/assets/fonts/poppins-400.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 500; font-display: swap; src: url('/assets/fonts/poppins-500.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 600; font-display: swap; src: url('/assets/fonts/poppins-600.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 700; font-display: swap; src: url('/assets/fonts/poppins-700.woff2') format('woff2'); }
+
+/*
  * "Trade Gold" redesign (2026-09-23) — replaces the plain beige/navy theme
  * with the palette/typography chosen from the UI direction concepts
  * (navy #013090 + gold #C9962B on an ivory ground, Poppins), a left

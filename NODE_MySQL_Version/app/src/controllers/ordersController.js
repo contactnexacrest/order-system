@@ -1635,7 +1635,7 @@ async function saveFreightTerms(req, res) {
     freight_forwarder_name: str(body.freight_forwarder_name) || null,
     freight_forwarder_contact: str(body.freight_forwarder_contact) || null,
   });
-  flash.set(req, 'success', 'Freight & insurance terms saved. Generate the Freight Debit Note below.');
+  flash.set(req, 'success', 'Freight & insurance terms saved. Generate the Debit Note below.');
   res.redirect(`/orders/${orderId}`);
 }
 

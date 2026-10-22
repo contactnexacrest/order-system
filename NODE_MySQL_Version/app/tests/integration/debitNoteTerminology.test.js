@@ -43,4 +43,15 @@ describe('Debit Note terminology (External QA report L-07)', () => {
     expect(row.name).toBe('Debit Note');
     expect(row.ref_format).toBe('SC/DN/{YYYY}/{DDMM}{NNN}');
   });
+
+  // External QA report U-09: screen text (the staff-facing order page's
+  // "Generate ..." button and its out-of-sequence document-type picker)
+  // still said the pre-rename full name "Freight Debit Note" — a
+  // different, still-open spot from L-07's "FDN" abbreviation above.
+  it('order show screen text uses the renamed label', () => {
+    const html = fs.readFileSync(path.join(__dirname, '../../views/orders/show.njk'), 'utf8');
+
+    expect(html).not.toContain('Freight Debit Note');
+    expect(html).toContain('Generate Debit Note');
+  });
 });

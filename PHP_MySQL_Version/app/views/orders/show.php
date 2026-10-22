@@ -732,7 +732,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="FDN">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('6b') ?><button type="submit" class="<?= $__docBtnClass('FDN') ?>" data-loading-text="Generating…">Generate Freight Debit Note</button>
+          <?= $stepBadge('6b') ?><button type="submit" class="<?= $__docBtnClass('FDN') ?>" data-loading-text="Generating…">Generate Debit Note</button>
         </form>
       <?php endif; ?>
 
@@ -2157,7 +2157,7 @@ foreach ($stages as $s) {
       <input type="hidden" name="override_gate" value="1">
       <label>Document Type
         <select name="document_type" required>
-          <?php foreach (['QT' => 'Quotation', 'BUYERPO' => 'Buyer PO', 'PI' => 'Proforma Invoice', 'OC' => 'Order Confirmation', 'SUPPO' => 'Supplier PO', 'FDN' => 'Freight Debit Note', 'PL' => 'Packing List', 'BLI' => 'BL Instruction Sheet', 'CI' => 'Commercial Invoice', 'COOPREP' => 'COO Prep Sheet (internal)'] as $code => $label): ?>
+          <?php foreach (['QT' => 'Quotation', 'BUYERPO' => 'Buyer PO', 'PI' => 'Proforma Invoice', 'OC' => 'Order Confirmation', 'SUPPO' => 'Supplier PO', 'FDN' => 'Debit Note', 'PL' => 'Packing List', 'BLI' => 'BL Instruction Sheet', 'CI' => 'Commercial Invoice', 'COOPREP' => 'COO Prep Sheet (internal)'] as $code => $label): ?>
             <option value="<?= $code ?>"><?= htmlspecialchars($label) ?> (<?= $code ?>)</option>
           <?php endforeach; ?>
         </select>

@@ -48,7 +48,7 @@ final class ReportRepository
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
              WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data
-             ORDER BY o.created_at DESC"
+             ORDER BY o.created_at DESC, o.id DESC"
         );
         $orders->execute(['client_id' => $clientId, 'is_test_data' => $isTestMode]);
         $orders = $orders->fetchAll();
@@ -234,7 +234,7 @@ final class ReportRepository
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY o.created_at DESC';
+        $sql .= ' ORDER BY o.created_at DESC, o.id DESC';
 
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute($params);
@@ -363,7 +363,7 @@ final class ReportRepository
                 FROM orders o
                 LEFT JOIN order_payment_status ops ON ops.order_id = o.id
                 WHERE " . implode(' AND ', $where) . '
-                ORDER BY o.created_at DESC';
+                ORDER BY o.created_at DESC, o.id DESC';
 
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute($params);
@@ -831,7 +831,7 @@ final class ReportRepository
              FROM orders o
              WHERE o.is_test_data = :is_test_data
                AND (o.order_reference LIKE :q OR o.company_legal_name LIKE :q2)
-             ORDER BY o.created_at DESC
+             ORDER BY o.created_at DESC, o.id DESC
              LIMIT 25'
         );
         $like = '%' . $query . '%';
@@ -1178,7 +1178,7 @@ final class ReportRepository
                 JOIN order_freight fr ON fr.order_id = o.id
                 LEFT JOIN order_payment_status ops ON ops.order_id = o.id
                 WHERE " . implode(' AND ', $where) . '
-                ORDER BY o.created_at DESC';
+                ORDER BY o.created_at DESC, o.id DESC';
 
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute($params);
@@ -1236,7 +1236,7 @@ final class ReportRepository
         $sql = 'SELECT o.id, o.order_reference, o.created_at, o.company_legal_name
                 FROM orders o
                 WHERE ' . implode(' AND ', $where) . '
-                ORDER BY o.created_at DESC';
+                ORDER BY o.created_at DESC, o.id DESC';
 
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute($params);

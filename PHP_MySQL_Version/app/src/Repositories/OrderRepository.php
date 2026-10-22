@@ -34,7 +34,7 @@ final class OrderRepository
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
              WHERE o.is_archived = 0
-             ORDER BY o.created_at DESC"
+             ORDER BY o.created_at DESC, o.id DESC"
         )->fetchAll();
     }
 
@@ -48,7 +48,7 @@ final class OrderRepository
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
              LEFT JOIN users u ON u.id = o.archived_by
              WHERE o.is_archived = 1
-             ORDER BY o.archived_at DESC'
+             ORDER BY o.archived_at DESC, o.id DESC'
         )->fetchAll();
     }
 

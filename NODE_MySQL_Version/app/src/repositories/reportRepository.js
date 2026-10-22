@@ -44,7 +44,7 @@ async function perClient(clientId) {
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data
-     ORDER BY o.created_at DESC`,
+     ORDER BY o.created_at DESC, o.id DESC`,
     { client_id: clientId, is_test_data: isTestMode }
   );
 
@@ -214,7 +214,7 @@ async function aggregate(dateFrom, dateTo, stageId, incotermId, country) {
   if (where.length) {
     sql += ' WHERE ' + where.join(' AND ');
   }
-  sql += ' ORDER BY o.created_at DESC';
+  sql += ' ORDER BY o.created_at DESC, o.id DESC';
 
   return db.query(sql, params);
 }
@@ -617,7 +617,7 @@ async function paymentsReport(dateFrom, dateTo) {
                FROM orders o
                LEFT JOIN order_payment_status ops ON ops.order_id = o.id
                WHERE ${where.join(' AND ')}
-               ORDER BY o.created_at DESC`;
+               ORDER BY o.created_at DESC, o.id DESC`;
 
   const rows = await db.query(sql, params);
 
@@ -799,7 +799,7 @@ async function searchOrders(query) {
      FROM orders o
      WHERE o.is_test_data = :is_test_data
        AND (o.order_reference LIKE :q OR o.company_legal_name LIKE :q2)
-     ORDER BY o.created_at DESC
+     ORDER BY o.created_at DESC, o.id DESC
      LIMIT 25`,
     { is_test_data: await isTestModeFlag(), q: like, q2: like }
   );
@@ -1104,7 +1104,7 @@ async function freightCostReport(dateFrom, dateTo) {
      JOIN order_freight fr ON fr.order_id = o.id
      LEFT JOIN order_payment_status ops ON ops.order_id = o.id
      WHERE ${where.join(' AND ')}
-     ORDER BY o.created_at DESC`,
+     ORDER BY o.created_at DESC, o.id DESC`,
     params
   );
 
@@ -1467,7 +1467,7 @@ async function orderProfitabilityReport(dateFrom, dateTo) {
     `SELECT o.id, o.order_reference, o.created_at, o.company_legal_name
      FROM orders o
      WHERE ${where.join(' AND ')}
-     ORDER BY o.created_at DESC`,
+     ORDER BY o.created_at DESC, o.id DESC`,
     params
   );
 

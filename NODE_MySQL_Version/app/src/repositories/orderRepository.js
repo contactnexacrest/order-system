@@ -29,7 +29,7 @@ async function all() {
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      WHERE o.is_archived = 0
-     ORDER BY o.created_at DESC`
+     ORDER BY o.created_at DESC, o.id DESC`
   );
 }
 
@@ -42,7 +42,7 @@ async function allArchived() {
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      LEFT JOIN users u ON u.id = o.archived_by
      WHERE o.is_archived = 1
-     ORDER BY o.archived_at DESC`
+     ORDER BY o.archived_at DESC, o.id DESC`
   );
 }
 
@@ -675,7 +675,7 @@ async function forClient(clientId, activeOnly = false) {
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      WHERE o.client_id = :client_id${statusFilter}
-     ORDER BY o.created_at DESC`,
+     ORDER BY o.created_at DESC, o.id DESC`,
     { client_id: clientId }
   );
 }
