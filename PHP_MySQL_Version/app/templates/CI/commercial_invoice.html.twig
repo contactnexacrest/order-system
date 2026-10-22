@@ -107,14 +107,14 @@
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Received: {{ payment_status.advance_cleared_at ?: 'To Be Confirmed' }}<br>Against: PI No. {{ order.pi_ref ?: 'To Be Confirmed' }}</td>
   </tr>
   <tr>
-    <td class="k">&#8730;&nbsp; Freight &amp; Insurance — {% if order.is_fob %}NIL (FOB){% else %}{{ payment_status.freight_cleared_at ? 'PAID VIA FDN' : 'PENDING' }}{% endif %}</td>
+    <td class="k">&#8730;&nbsp; Freight &amp; Insurance — {% if order.is_fob %}NIL (FOB){% else %}{{ payment_status.freight_cleared_at ? 'PAID VIA DEBIT NOTE' : 'PENDING' }}{% endif %}</td>
     <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB{% else %}{{ order.currency_code }} {{ payment_status.freight_amount ?: 'To Be Confirmed' }} <strong style="color:#C0392B;">*</strong>{% endif %}</td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}CFR/CIF: Against FDN No. {{ order.fdn_ref ?: 'To Be Confirmed' }} dated {{ order.fdn_date ?: 'To Be Confirmed' }}{% endif %}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}CFR/CIF: Against Debit Note No. {{ order.fdn_ref ?: 'To Be Confirmed' }} dated {{ order.fdn_date ?: 'To Be Confirmed' }}{% endif %}</td>
   </tr>
   <tr>
     <td class="k" style="font-weight:bold;">SUBTOTAL ALREADY PAID</td>
     <td class="v" style="text-align:right; font-weight:bold;">{{ order.currency_code }} {{ payment_status.advance_amount ?: financial.advance_amount }}{% if not order.is_fob and payment_status.freight_amount %} + {{ payment_status.freight_amount }} (freight){% endif %}</td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{{ financial.advance_pct }}% Advance{% if not order.is_fob %} + FDN (if applicable){% endif %}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{{ financial.advance_pct }}% Advance{% if not order.is_fob %} + Debit Note (if applicable){% endif %}</td>
   </tr>
   <tr>
     <td class="k" style="background:#FFF3CD; font-weight:bold;">&#8594;&nbsp; BALANCE DUE NOW</td>
@@ -124,7 +124,7 @@
   <tr>
     <td class="k">VERIFICATION</td>
     <td class="v" style="text-align:right;">Advance + Balance = FOB Value<br>{{ payment_status.advance_amount ?: financial.advance_amount }} + {{ payment_status.balance_amount ?: financial.balance_amount }} = {{ financial.fob_value }} &#8730;</td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}Freight &amp; Insurance not applicable on an FOB order.{% else %}Freight &amp; Insurance is paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.{% endif %}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}Freight &amp; Insurance not applicable on an FOB order.{% else %}Freight &amp; Insurance is paid separately via Debit Note, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.{% endif %}</td>
   </tr>
 </table>
 <p class="mandatory-note" style="margin-top:6pt;"><strong>Total Invoice Value in Words ({{ order.currency_code }}):</strong> <span class="placeholder-italic">{{ financial.fob_value_in_words ?: '_________________________________________________________' }}</span> <strong style="color:#C0392B;">*</strong></p>
