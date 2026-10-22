@@ -8,16 +8,47 @@ rendered pages, not a direct controller/HTTP call.
 
 ## What it covers
 
-One real order, created and walked end-to-end through all 9 pipeline
-stages exactly as staff would in the browser — login, create an order,
-pass each of the 9 stage gates (generating the real documents and
-recording the real payments/confirmations each gate needs), through to
-`status = 'complete'` at Stage 9.
+- `00-login.spec.js` — basic login smoke test.
+- `01-critical-path.spec.js` — one real order, walked end-to-end through
+  all 9 pipeline stages exactly as staff would in the browser, through
+  to `status = 'complete'`.
+- `01-role-visibility.spec.js` — every staff role (Admin, Managing
+  Director, Executive Director, Export Executive, Accounts Executive,
+  Logistics Executive, Viewer/Auditor, CA) logs in and the nav renders
+  exactly what that role is permitted, with denied routes refused
+  directly (not just hidden).
+- `02-role-workflows.spec.js` — the same 9-stage order, but each stage's
+  real work done by whichever role's actual permission grant covers it
+  (not assumed from the TEST_PLAN's summaries), plus Viewer/Auditor
+  read-only confirmation, CA's view-only boundary, and a real client
+  portal login/workflow.
+- `03-disputes-amendments.spec.js` — a real client-raised dispute
+  replied to and resolved by staff, and an amendment through its real
+  maker-checker approval rule.
+- `04-intake-reorder.spec.js` — one client's full journey: cold public
+  intake accepted into a client, a PI-stage confirmation applied, and a
+  reorder request approved into a new order.
+- `05-email-admin.spec.js` — the Level-1/Level-2 deferred email send
+  approval queue, and a representative Admin/Settings CRUD screen.
+- `06-responsive.spec.js` — real phone/tablet viewport coverage against
+  the app's actual responsive CSS breakpoints (hamburger nav,
+  single-column grids, horizontal-overflow checks). Chromium only — see
+  that file's own header comment for why cross-browser-engine testing
+  isn't reachable in this sandbox.
+- `07-ca-module.spec.js` — Accounts Executive's real CA-module writes
+  (export benefit claims, FY lock/unlock) vs. the CA role's view-only
+  boundary.
+- `08-email-functionality.spec.js` — does the app actually attempt to
+  send the right email, to the right recipient, with the right
+  attachment (plain-text notifications, the client-portal invite, and a
+  full document-send-to-dispatch cycle). See that file's own header
+  comment for what this can and can't prove without a real SMTP server.
 
-This is a smoke suite, not exhaustive coverage — it proves the critical
-path works end-to-end on a real rendered page in a real browser, which
-the existing Unit/Integration suites (controller-level or HTTP-level, no
-browser involved) don't. It is not a substitute for those — see
+This is real end-to-end coverage of the features above, not exhaustive
+coverage of the whole app — it proves these specific flows work on a
+real rendered page in a real browser, which the existing Unit/
+Integration suites (controller-level or HTTP-level, no browser
+involved) don't. It is not a substitute for those — see
 `docs/QA/TEST_PLAN.md` in either stack for the full test strategy.
 
 ## Prerequisites
@@ -67,15 +98,24 @@ shipped with; a stale/missing path fails every document-generation step with
 "Document generation failed" and the real reason only in the server's own
 log, not the browser.
 
-Then start each stack's dev server (see that stack's own README's
-"First-time setup" / local-testing section) and point the suite at it:
+`08-email-functionality.spec.js` reads each stack's own "email attempt"
+log rather than a real inbox (neither stack has SMTP configured in a dev
+sandbox — see that file's own header comment). PHP's is stable
+(`PHP_MySQL_Version/storage/logs/error.log`, independent of how the
+server was started) but Node's email service only ever calls
+`console.error` with no file sink of its own, so the Node dev server
+**must** be started with its output redirected to a file, or that one
+spec file fails outright with a clear error naming the missing path
+(override it with `NODE_SERVER_LOG` if you redirect somewhere other
+than the default below):
 
 ```bash
 # PHP
 cd PHP_MySQL_Version/public_html && php -S 127.0.0.1:8080 _dev_router.php &
 
-# Node
-cd NODE_MySQL_Version/app && npm start &
+# Node — note the redirect, required for 08-email-functionality.spec.js
+mkdir -p /tmp/claude-0
+cd NODE_MySQL_Version/app && npm start > /tmp/claude-0/node-server.log 2>&1 &
 ```
 
 ## Running
