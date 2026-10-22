@@ -253,11 +253,19 @@ async function customDelete(req, res) {
 }
 
 async function categoriesIndex(req, res) {
-  const [categories, permissions] = await Promise.all([
+  // External QA report U-11: this used to destructure the local variable
+  // as `permissions` — the full list of permission definitions, for the
+  // "required permission" dropdown below — which collided with and
+  // silently overwrote res.renderView()'s own `permissions` context key
+  // (the current user's permission-check object the sidebar's
+  // `{% if permissions.xxx %}` guards actually read), hiding the Email
+  // Approvals/CA/Accounting/Products/Insights sidebar groups on this one
+  // page. Renamed to `allPermissions` so the two never collide.
+  const [categories, allPermissions] = await Promise.all([
     referenceLibraryCategoryRepository.all(),
     permissionRepository.all(),
   ]);
-  res.renderView('reference_docs/categories', { categories, permissions }, 'layout/base');
+  res.renderView('reference_docs/categories', { categories, allPermissions }, 'layout/base');
 }
 
 async function categoryCreate(req, res) {

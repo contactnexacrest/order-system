@@ -16,7 +16,7 @@
           <input type="text" name="name" value="{{ c.name }}" required style="width:200px">
           <select name="required_permission" style="width:280px">
             <option value="">— None (visible to everyone) —</option>
-            {% for p in permissions %}
+            {% for p in allPermissions %}
             <option value="{{ p.permission_key }}" {{ 'selected' if c.required_permission == p.permission_key }}>{{ p.name }} ({{ p.permission_key }})</option>
             {% endfor %}
           </select>
@@ -42,7 +42,7 @@
       <label>Required Permission <small class="muted">(optional — leave blank to make it visible to everyone)</small>
         <select name="required_permission" style="width:100%">
           <option value="">— None (visible to everyone) —</option>
-          {% for p in permissions %}
+          {% for p in allPermissions %}
           <option value="{{ p.permission_key }}">{{ p.name }} ({{ p.permission_key }})</option>
           {% endfor %}
         </select>
