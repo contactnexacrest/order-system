@@ -274,7 +274,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   const filenameSafeReference = documentReference !== null ? documentReference.replace(/\//g, '-') : documentTypeCode;
 
   // --- PDF (always) ---
-  const pdfBytes = await renderPdfFromHtml(html);
+  const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
   const pdfUuidName = uuidFilename('pdf');
   const pdfPath = path.join(targetDir, pdfUuidName);
   fs.writeFileSync(pdfPath, pdfBytes);
@@ -632,7 +632,7 @@ async function finalizeApproval(documentId) {
 
   const twig = templatesEnvironment();
   const html = twig.render(templateFileFor(documentTypeCode), context);
-  const pdfBytes = await renderPdfFromHtml(html);
+  const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
@@ -787,7 +787,7 @@ async function markSuperseded(documentId) {
 
   const twig = templatesEnvironment();
   const html = twig.render(templateFileFor(documentTypeCode), context);
-  const pdfBytes = await renderPdfFromHtml(html);
+  const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
@@ -962,7 +962,7 @@ async function generateAmendment(amendmentId, generatedByUserId) {
 
   const twig = templatesEnvironment();
   const html = twig.render('AMD/payment_terms_amendment.njk', context);
-  const pdfBytes = await renderPdfFromHtml(html);
+  const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
@@ -1099,7 +1099,7 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
 
   const twig = templatesEnvironment();
   const html = twig.render('CAFIN/ca_financial_annexure.njk', context);
-  const pdfBytes = await renderPdfFromHtml(html);
+  const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);
@@ -1207,7 +1207,7 @@ async function generateBlEndorsement(orderId, generatedByUserId) {
 
   const twig = templatesEnvironment();
   const html = twig.render('BLE/bl_endorsement.njk', context);
-  const pdfBytes = await renderPdfFromHtml(html);
+  const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
   const clientNumber = sanitizePathSegment(order.client_unique_number);

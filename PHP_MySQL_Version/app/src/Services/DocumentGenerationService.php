@@ -174,7 +174,7 @@ final class DocumentGenerationService
         $filenameSafeReference = $documentReference !== null ? str_replace('/', '-', $documentReference) : $documentTypeCode;
 
         // --- PDF (always) ---
-        $pdfBytes = self::renderPdf($html);
+        $pdfBytes = self::renderPdf($html, $context);
         $pdfUuidName = self::uuidFilename('pdf');
         $pdfPath = "{$targetDir}/{$pdfUuidName}";
         file_put_contents($pdfPath, $pdfBytes);
@@ -556,7 +556,7 @@ final class DocumentGenerationService
 
         $twig = self::twigEnvironment();
         $html = $twig->render(self::templateFileFor($documentTypeCode), $context);
-        $pdfBytes = self::renderPdf($html);
+        $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
@@ -718,7 +718,7 @@ final class DocumentGenerationService
 
         $twig = self::twigEnvironment();
         $html = $twig->render(self::templateFileFor($documentTypeCode), $context);
-        $pdfBytes = self::renderPdf($html);
+        $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
@@ -899,7 +899,7 @@ final class DocumentGenerationService
 
         $twig = self::twigEnvironment();
         $html = $twig->render('AMD/payment_terms_amendment.html.twig', $context);
-        $pdfBytes = self::renderPdf($html);
+        $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
@@ -1031,7 +1031,7 @@ final class DocumentGenerationService
 
         $twig = self::twigEnvironment();
         $html = $twig->render('CAFIN/ca_financial_annexure.html.twig', $context);
-        $pdfBytes = self::renderPdf($html);
+        $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
@@ -1151,7 +1151,7 @@ final class DocumentGenerationService
 
         $twig = self::twigEnvironment();
         $html = $twig->render('BLE/bl_endorsement.html.twig', $context);
-        $pdfBytes = self::renderPdf($html);
+        $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
         $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
@@ -1274,7 +1274,7 @@ final class DocumentGenerationService
         }
     }
 
-    private static function renderPdf(string $html): string
+    private static function renderPdf(string $html, array $context = []): string
     {
         $options = new DompdfOptions();
         $options->set('isRemoteEnabled', false); // security: never fetch remote resources into a generated PDF
@@ -1299,7 +1299,62 @@ final class DocumentGenerationService
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
+        self::addRunningHeaderFooter($dompdf, $context);
         return $dompdf->output();
+    }
+
+    /**
+     * External QA report L-04: CSS `position: fixed` (the Twig layout's own
+     * .watermark-image/.watermark-text + a running footer would have been)
+     * is not reliable for a REPLACED element (an <img>) across every page
+     * in DOMPDF — confirmed exactly as reported: with watermark mode
+     * 'both', the logo painted on page 1 only, continuation pages got
+     * neither the logo nor any document reference at all (the only place
+     * the reference appears is the doc-header table, an ordinary in-flow
+     * element that only exists once, on page 1).
+     *
+     * Canvas::page_script() runs its callback once per ACTUAL final page,
+     * after pagination is complete — this is DOMPDF's own documented
+     * mechanism for a guaranteed-repeating header/footer, unaffected by
+     * the replaced-element bug above. Used here for both the new running
+     * footer (reference + page x/y) and the watermark logo image itself;
+     * the CSS watermark-text layer is left as-is since the report never
+     * reported it missing, only the image.
+     */
+    private static function addRunningHeaderFooter(Dompdf $dompdf, array $context): void
+    {
+        $documentReference = $context['meta']['document_reference'] ?? null;
+        $watermark = $context['watermark'] ?? [];
+        $footerFont = $dompdf->getFontMetrics()->getFont('Aptos', 'normal');
+
+        $dompdf->getCanvas()->page_script(static function (int $pageNumber, int $pageCount, $canvas) use ($documentReference, $footerFont, $watermark) {
+            $pageWidth = $canvas->get_width();
+            $pageHeight = $canvas->get_height();
+
+            if ($documentReference !== null && $documentReference !== '') {
+                $canvas->text(42.5, $pageHeight - 24, "{$documentReference}  —  Page {$pageNumber} of {$pageCount}", $footerFont, 8, [0.35, 0.37, 0.45]);
+            }
+
+            if (!empty($watermark['enabled']) && !empty($watermark['show_image']) && !empty($watermark['image_data_uri'])) {
+                $size = @getimagesize($watermark['image_data_uri']);
+                $naturalW = ($size[0] ?? 0) > 0 ? $size[0] : 1;
+                $naturalH = ($size[1] ?? 0) > 0 ? $size[1] : 1;
+                $position = $watermark['image_position'] ?? 'center';
+                $corner = in_array($position, ['top-left', 'top-right', 'bottom-left', 'bottom-right'], true);
+                $w = $corner ? $pageWidth * 0.25 : $pageWidth * 0.50;
+                $h = $w * ($naturalH / $naturalW);
+                switch ($position) {
+                    case 'top-left':     $x = 20;                   $y = 20;                    break;
+                    case 'top-right':    $x = $pageWidth - $w - 20; $y = 20;                     break;
+                    case 'bottom-left':  $x = 20;                   $y = $pageHeight - $h - 20;  break;
+                    case 'bottom-right': $x = $pageWidth - $w - 20; $y = $pageHeight - $h - 20;   break;
+                    default:             $x = $pageWidth * 0.25;    $y = $pageHeight * 0.35;
+                }
+                $canvas->set_opacity((float) ($watermark['image_opacity'] ?? 0.15));
+                $canvas->image($watermark['image_data_uri'], $x, $y, $w, $h);
+                $canvas->set_opacity(1.0);
+            }
+        });
     }
 
     /**

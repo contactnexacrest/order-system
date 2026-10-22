@@ -205,23 +205,22 @@
   .watermark-text { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
     opacity: {{ watermark.opacity }}; transform: rotate(-{{ watermark.angle }}deg); z-index: 0; }
   {% endif %}
-  {% if watermark.enabled and watermark.show_image %}
-  .watermark-image { position: fixed;
-    {% if watermark.image_position == 'center' %}top: 35%; left: 25%; width: 50%;
-    {% elseif watermark.image_position == 'top-left' %}top: 20pt; left: 20pt; width: 25%;
-    {% elseif watermark.image_position == 'top-right' %}top: 20pt; right: 20pt; width: 25%;
-    {% elseif watermark.image_position == 'bottom-left' %}bottom: 20pt; left: 20pt; width: 25%;
-    {% elseif watermark.image_position == 'bottom-right' %}bottom: 20pt; right: 20pt; width: 25%;
-    {% else %}top: 35%; left: 25%; width: 50%;
-    {% endif %}
-    opacity: {{ watermark.image_opacity }}; z-index: 0; }
-  {% endif %}
   {% block extra_style %}{% endblock %}
 </style>
 </head>
 <body>
 
-{% if watermark.enabled and watermark.show_image %}<img class="watermark-image" src="{{ watermark.image_data_uri }}">{% endif %}
+{#
+  External QA report L-04: the watermark LOGO image used to be a plain
+  <img> here with CSS `position: fixed` — DOMPDF does not reliably repeat
+  a replaced element like an <img> across every page (confirmed exactly
+  as reported: it painted on page 1 only). It's now drawn directly on the
+  DOMPDF canvas, once per actual final page, by
+  DocumentGenerationService::addRunningHeaderFooter() — see that
+  method's docblock. The watermark TEXT layer is left as CSS
+  position:fixed below; the report never reported that layer missing,
+  only the image.
+#}
 {% if watermark.enabled and watermark.show_text %}<div class="watermark-text">{{ watermark.text }}</div>{% endif %}
 
 <table class="doc-header"><tr>

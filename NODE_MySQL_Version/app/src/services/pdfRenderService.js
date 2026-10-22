@@ -57,12 +57,23 @@ async function getBrowser() {
   return browserPromise;
 }
 
-/** @returns {Promise<Buffer>} A4 portrait PDF bytes rendered from a self-contained HTML string. */
-async function renderPdfFromHtml(html) {
-  return renderOnce(html, true);
+/**
+ * @param {string} html self-contained HTML (every image already a base64 data: URI)
+ * @param {string|null} [documentReference] External QA report L-04: when
+ *   given, a running footer (reference + "Page X of Y") is painted on
+ *   every page via Puppeteer's own header/footer template mechanism —
+ *   the one reliable way to get live pagination totals into a PDF here
+ *   (unlike the watermark image, a CSS `position: fixed` footer can't
+ *   know the total page count before printing). Before this, the
+ *   document reference only ever appeared once, in the page-1 header
+ *   table, so a continuation page carried no identifying reference at all.
+ * @returns {Promise<Buffer>} A4 portrait PDF bytes
+ */
+async function renderPdfFromHtml(html, documentReference = null) {
+  return renderOnce(html, true, documentReference);
 }
 
-async function renderOnce(html, allowRetry) {
+async function renderOnce(html, allowRetry, documentReference = null) {
   const browser = await getBrowser();
   let page;
   try {
@@ -74,7 +85,7 @@ async function renderOnce(html, allowRetry) {
     // real error to the caller instead of hanging.
     if (allowRetry) {
       browserPromise = null;
-      return renderOnce(html, false);
+      return renderOnce(html, false, documentReference);
     }
     throw err;
   }
@@ -86,16 +97,46 @@ async function renderOnce(html, allowRetry) {
     // environments where Chromium's own background requests (e.g. a
     // favicon probe) never resolve either way.
     await page.setContent(html, { waitUntil: 'load' });
-    const pdf = await page.pdf({
-      format: 'A4',
-      landscape: false,
-      printBackground: true,
-      margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' },
-    });
+    const pdf = await page.pdf(buildPdfOptions(documentReference));
     return pdf;
   } finally {
     await page.close();
   }
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/**
+ * External QA report L-04: `displayHeaderFooter`/`footerTemplate` is
+ * Puppeteer's own built-in mechanism for a page.pdf() running
+ * header/footer — the `pageNumber`/`totalPages` spans are special
+ * classes Chromium substitutes with live pagination totals at
+ * print time, something no amount of static page content could ever
+ * know in advance. `margin.bottom` must be non-zero for the footer to
+ * have room to draw in — otherwise it's clipped to nothing; the content
+ * itself keeps using its own `@page` CSS margin as before (`top`/`left`/
+ * `right` stay 0 here, unchanged), confirmed by rendering a real
+ * multi-page document that nothing overlaps or gets cut off.
+ */
+function buildPdfOptions(documentReference) {
+  const options = {
+    format: 'A4',
+    landscape: false,
+    printBackground: true,
+    margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' },
+  };
+  if (documentReference) {
+    options.margin.bottom = '0.4in';
+    options.displayHeaderFooter = true;
+    options.headerTemplate = '<div></div>';
+    options.footerTemplate = `<div style="width:100%; font-size:8px; padding:0 42px; color:#5B6573; font-family:sans-serif; display:flex; justify-content:space-between;">
+      <span>${escapeHtml(documentReference)}</span>
+      <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+    </div>`;
+  }
+  return options;
 }
 
 /** Call once at process shutdown so a held Chromium process doesn't dangle. */
@@ -107,4 +148,4 @@ async function closeBrowser() {
   }
 }
 
-module.exports = { renderPdfFromHtml, closeBrowser };
+module.exports = { renderPdfFromHtml, closeBrowser, buildPdfOptions };
