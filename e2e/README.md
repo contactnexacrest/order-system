@@ -59,6 +59,14 @@ node -e "console.log(require('bcrypt').hashSync('<password>', 12))"
 Update `ADMIN_EMAIL`/`ADMIN_PASSWORD` in `tests/support/auth.js` to match
 whatever you set.
 
+The critical-path spec generates real documents, which on the Node stack
+means Puppeteer actually launches a browser — `NODE_MySQL_Version/app/.env`'s
+`PUPPETEER_EXECUTABLE_PATH` has to point at a real Chromium/Chrome binary on
+this machine (`which chromium`), not just whatever the `.env` template
+shipped with; a stale/missing path fails every document-generation step with
+"Document generation failed" and the real reason only in the server's own
+log, not the browser.
+
 Then start each stack's dev server (see that stack's own README's
 "First-time setup" / local-testing section) and point the suite at it:
 

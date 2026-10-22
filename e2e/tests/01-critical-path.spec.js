@@ -56,8 +56,14 @@ function docForm(page, orderId, typeCode) {
   );
 }
 
+// Every document type's Generate button lives in the "Documents &
+// Approvals" panel (data-stage=1) EXCEPT BLI and COOPREP, which are
+// embedded directly in the Stage 7 / Stage 9 panels they belong to
+// instead (the real markup, not the TEST_PLAN's simplified summary).
+const DOC_GENERATE_STAGE = { BLI: 7, COOPREP: 9 };
+
 async function generateDocument(page, orderId, typeCode, expectedBannerSubstring) {
-  await openStage(page, 1);
+  await openStage(page, DOC_GENERATE_STAGE[typeCode] ?? 1);
   await docForm(page, orderId, typeCode).locator('button[type="submit"]').click();
   await expect(page.locator('.alert')).toContainText(expectedBannerSubstring);
 }
