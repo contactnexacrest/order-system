@@ -13,6 +13,7 @@ const orderRepository = require('../repositories/orderRepository');
 const orderShippingRepository = require('../repositories/orderShippingRepository');
 const { formatForDb } = require('../helpers/dbDateTime');
 const permissionRepository = require('../repositories/permissionRepository');
+const roleRepository = require('../repositories/roleRepository');
 const signatoryRepository = require('../repositories/signatoryRepository');
 const userRepository = require('../repositories/userRepository');
 const mailSenderService = require('./mailSenderService');
@@ -48,14 +49,27 @@ async function tokensFor(order, document, sender) {
   // md_title setting ("Founder & Managing Director") regardless of who
   // actually sent the email — a Logistics or Accounts user's approved send
   // would go out signed with the MD's own title. Use the real sender's own
-  // designation when they have one; md_title is now only the fallback for
-  // a sender with none set (or no specific sender at all).
-  let senderTitle = (await companySettingsRepository.get('md_title')) || '';
+  // designation when they have one.
+  // External QA report L-12: a sender with no designation set still fell
+  // all the way back to md_title, so e.g. an Export Executive's email went
+  // out signed "Founder & Managing Director". Fall back to the sender's own
+  // role name instead; md_title is now only the fallback when there is no
+  // specific sender at all (system emails).
+  let senderTitle = sender ? '' : ((await companySettingsRepository.get('md_title')) || '');
   if (sender && sender.designation_id) {
     const designation = await signatoryRepository.findDesignation(sender.designation_id);
     if (designation) {
       senderTitle = designation.title;
     }
+  }
+  if (sender && senderTitle === '' && sender.role_id) {
+    const role = await roleRepository.find(sender.role_id);
+    if (role) {
+      senderTitle = role.name;
+    }
+  }
+  if (senderTitle === '') {
+    senderTitle = (await companySettingsRepository.get('md_title')) || '';
   }
 
   let signature = (sender && sender.email_signature ? String(sender.email_signature).trim() : '');

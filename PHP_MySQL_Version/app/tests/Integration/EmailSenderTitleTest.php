@@ -47,7 +47,13 @@ final class EmailSenderTitleTest extends DbTestCase
         self::assertStringNotContainsString($mdTitle, $preview['body'], "the sender's own designation must replace the MD's title, not sit alongside it");
     }
 
-    public function testSendPreviewFallsBackToMdTitleWhenTheSenderHasNoDesignation(): void
+    /**
+     * External QA report L-12: a sender with no designation set still fell
+     * all the way back to md_title ("Founder & Managing Director"), so e.g.
+     * an Export Executive's email went out signed with the MD's own title.
+     * It must fall back to the sender's own role name instead.
+     */
+    public function testSendPreviewFallsBackToTheSendersRoleNameWhenTheSenderHasNoDesignation(): void
     {
         $mdTitle = (string) CompanySettingsRepository::get('md_title');
         $senderId = $this->createTestUser('Export Executive'); // designation_id left NULL
@@ -58,7 +64,8 @@ final class EmailSenderTitleTest extends DbTestCase
 
         $preview = EmailDispatchService::buildPreview($orderId, null, 'payment_followup', $senderId);
 
-        self::assertStringContainsString($mdTitle, $preview['body']);
+        self::assertStringContainsString('Export Executive', $preview['body']);
+        self::assertStringNotContainsString($mdTitle, $preview['body'], "a sender with no designation must be signed with their own role name, never the MD's title");
     }
 
     private function createTestDesignation(string $title): int

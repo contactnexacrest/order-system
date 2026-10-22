@@ -81,6 +81,33 @@ final class BuyerActionLinkTest extends DbTestCase
         self::assertNotNull(OrderRepository::findByValidBuyerActionToken($newToken));
     }
 
+    /**
+     * External QA report L-25: the Buyer Action Link kept accepting OC
+     * acknowledgments, Buyer PO uploads and advance self-reports after the
+     * order was marked lost or closed.
+     */
+    public function testTokenNoLongerValidatesOnceTheOrderIsMarkedLost(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+        self::assertNotNull(OrderRepository::findByValidBuyerActionToken($token));
+
+        OrderRepository::markLost($orderId, 'Buyer went with another supplier', 1);
+
+        self::assertNull(OrderRepository::findByValidBuyerActionToken($token));
+    }
+
+    public function testTokenNoLongerValidatesOnceTheOrderIsClosed(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+        self::assertNotNull(OrderRepository::findByValidBuyerActionToken($token));
+
+        OrderRepository::markComplete($orderId);
+
+        self::assertNull(OrderRepository::findByValidBuyerActionToken($token));
+    }
+
     // ---------------------------------------------------------------
     // BuyerActionController::show
     // ---------------------------------------------------------------

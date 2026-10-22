@@ -650,11 +650,18 @@ final class OrderRepository
         )->execute(['visible' => $visible ? 1 : 0, 'id' => $orderId]);
     }
 
-    /** Stage 9 closure gate: full document set couriered to buyer — order.status='complete' and locked (Business Rule #17). */
+    /**
+     * Stage 9 closure gate: full document set couriered to buyer —
+     * order.status='complete' and locked (Business Rule #17).
+     * External QA report L-25: clear any live Buyer Action Link on close
+     * too — see markLost()'s matching docblock.
+     */
     public static function markComplete(int $orderId): void
     {
         Database::connection()->prepare(
-            "UPDATE orders SET status = 'complete', is_locked = 1 WHERE id = :id"
+            "UPDATE orders SET status = 'complete', is_locked = 1,
+                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+             WHERE id = :id"
         )->execute(['id' => $orderId]);
     }
 
@@ -710,11 +717,21 @@ final class OrderRepository
         ]);
     }
 
-    /** Added 2026-09-19 — see orders.lost_reason/lost_at/lost_by in schema.sql. Mirrors markComplete()'s locking behavior. */
+    /**
+     * Added 2026-09-19 — see orders.lost_reason/lost_at/lost_by in
+     * schema.sql. Mirrors markComplete()'s locking behavior.
+     * External QA report L-25: the Buyer Action Link (OC acknowledgment,
+     * Buyer PO upload, advance self-report) kept working after the order
+     * was marked lost, since findByValidBuyerActionToken() never checked
+     * status. Clear the token here too, belt-and-braces with that lookup's
+     * own status check.
+     */
     public static function markLost(int $orderId, string $reason, int $userId): void
     {
         Database::connection()->prepare(
-            "UPDATE orders SET status = 'lost', is_locked = 1, lost_reason = :reason, lost_at = NOW(), lost_by = :user_id WHERE id = :id"
+            "UPDATE orders SET status = 'lost', is_locked = 1, lost_reason = :reason, lost_at = NOW(), lost_by = :user_id,
+                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+             WHERE id = :id"
         )->execute(['reason' => $reason, 'user_id' => $userId, 'id' => $orderId]);
     }
 
@@ -788,11 +805,23 @@ final class OrderRepository
      * re-loads the full row via find() for everything the page/upload
      * actually needs (client_unique_number, incoterm/currency/port names,
      * etc.) rather than duplicating find()'s whole JOIN here.
+     *
+     * External QA report L-25: this never checked the order's status, so a
+     * link kept working (OC acknowledgment, Buyer PO upload, advance
+     * self-report all stayed open) after the order was marked lost or
+     * closed. 'active'/'disputed' is this codebase's established
+     * "still in progress" status set — see forClient()'s $activeOnly
+     * filter above — vs. 'complete'/'lost' for a finished order.
+     * markLost()/markComplete() also now clear the token outright; this
+     * status check is the authoritative guard in case an older row still
+     * has a token left over from before that existed.
      */
     public static function findByValidBuyerActionToken(string $rawToken): ?array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT * FROM orders WHERE buyer_action_token_hash = :hash AND buyer_action_token_expires_at > NOW()'
+            "SELECT * FROM orders
+              WHERE buyer_action_token_hash = :hash AND buyer_action_token_expires_at > NOW()
+                AND status IN ('active', 'disputed')"
         );
         $stmt->execute(['hash' => hash('sha256', $rawToken)]);
         return $stmt->fetch() ?: null;

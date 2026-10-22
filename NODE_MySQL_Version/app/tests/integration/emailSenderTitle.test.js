@@ -60,7 +60,11 @@ describe('Email sender title (QA-5 EML-08)', () => {
     expect(preview.body).not.toEqual(expect.stringContaining(mdTitle));
   });
 
-  it('falls back to the MD title when the sender has no designation', async () => {
+  // External QA report L-12: a sender with no designation set still fell
+  // all the way back to md_title ("Founder & Managing Director"), so e.g.
+  // an Export Executive's email went out signed with the MD's own title. It
+  // must fall back to the sender's own role name instead.
+  it('falls back to the sender\'s own role name when the sender has no designation', async () => {
     const mdTitle = (await companySettingsRepository.get('md_title')) || '';
     const senderId = await createTestUser('Export Executive'); // designation_id left NULL
 
@@ -70,6 +74,7 @@ describe('Email sender title (QA-5 EML-08)', () => {
 
     const preview = await emailDispatchService.buildPreview(orderId, null, 'payment_followup', senderId);
 
-    expect(preview.body).toEqual(expect.stringContaining(mdTitle));
+    expect(preview.body).toEqual(expect.stringContaining('Export Executive'));
+    expect(preview.body).not.toEqual(expect.stringContaining(mdTitle));
   });
 });

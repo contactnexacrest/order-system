@@ -101,6 +101,29 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
     expect(await orderRepository.findByValidBuyerActionToken(newToken)).not.toBeNull();
   });
 
+  // External QA report L-25: the Buyer Action Link kept accepting OC
+  // acknowledgments, Buyer PO uploads and advance self-reports after the
+  // order was marked lost or closed.
+  it('the token no longer validates once the order is marked lost', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const token = await orderRepository.generateBuyerActionToken(orderId);
+    expect(await orderRepository.findByValidBuyerActionToken(token)).not.toBeNull();
+
+    await orderRepository.markLost(orderId, 'Buyer went with another supplier', 1);
+
+    expect(await orderRepository.findByValidBuyerActionToken(token)).toBeNull();
+  });
+
+  it('the token no longer validates once the order is closed', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const token = await orderRepository.generateBuyerActionToken(orderId);
+    expect(await orderRepository.findByValidBuyerActionToken(token)).not.toBeNull();
+
+    await orderRepository.markComplete(orderId);
+
+    expect(await orderRepository.findByValidBuyerActionToken(token)).toBeNull();
+  });
+
   // ---------------------------------------------------------------
   // buyerActionController.show
   // ---------------------------------------------------------------

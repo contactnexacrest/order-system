@@ -14,6 +14,7 @@ use App\Repositories\FileStoreRepository;
 use App\Repositories\NotificationRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\PermissionRepository;
+use App\Repositories\RoleRepository;
 use App\Repositories\SignatoryRepository;
 use App\Repositories\UserRepository;
 
@@ -390,14 +391,27 @@ final class EmailDispatchService
         // regardless of who actually sent the email — a Logistics or
         // Accounts user's approved send would go out signed with the MD's
         // own title. Use the real sender's own designation when they have
-        // one; md_title is now only the fallback for a sender with none set
-        // (or no specific sender at all).
-        $senderTitle = (string) CompanySettingsRepository::get('md_title');
+        // one.
+        // External QA report L-12: a sender with no designation set still
+        // fell all the way back to md_title, so e.g. an Export Executive's
+        // email went out signed "Founder & Managing Director". Fall back to
+        // the sender's own role name instead; md_title is now only the
+        // fallback when there is no specific sender at all (system emails).
+        $senderTitle = $sender ? '' : (string) CompanySettingsRepository::get('md_title');
         if ($sender && $sender['designation_id']) {
             $designation = SignatoryRepository::findDesignation((int) $sender['designation_id']);
             if ($designation) {
                 $senderTitle = $designation['title'];
             }
+        }
+        if ($sender && $senderTitle === '' && $sender['role_id']) {
+            $role = RoleRepository::find((int) $sender['role_id']);
+            if ($role) {
+                $senderTitle = $role['name'];
+            }
+        }
+        if ($senderTitle === '') {
+            $senderTitle = (string) CompanySettingsRepository::get('md_title');
         }
 
         $signature = trim((string) ($sender['email_signature'] ?? ''));
