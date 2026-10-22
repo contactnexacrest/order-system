@@ -564,7 +564,7 @@ final class CaController
         try {
             $parsed = BankStatementCsvParser::parse($_FILES['statement']['tmp_name']);
         } catch (\RuntimeException $e) {
-            Flash::set('error', 'Could not read the file: ' . $e->getMessage());
+            Flash::set('error', 'Could not read the file: ' . Flash::describeException($e, 'read failed — check the server error log.'));
             header('Location: /ca/bank-statement');
             return;
         }

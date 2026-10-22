@@ -119,7 +119,7 @@ final class AnnexureController
                 );
                 OrderAnnexureRepository::addImage($productId, $fileId);
             } catch (\Throwable $e) {
-                Flash::set('error', "Product entry added, but the image failed to upload: {$e->getMessage()}");
+                Flash::set('error', 'Product entry added, but the image failed to upload: ' . Flash::describeException($e, 'upload failed — check the server error log.'));
                 header("Location: /orders/{$orderId}/annexure");
                 return;
             }
@@ -185,7 +185,7 @@ final class AnnexureController
             OrderAnnexureRepository::addImage($productId, $fileId);
             Flash::set('success', 'Image uploaded.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: /orders/{$orderId}/annexure");
     }

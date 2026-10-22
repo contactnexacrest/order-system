@@ -527,7 +527,7 @@ async function uploadBankStatement(req, res) {
   try {
     parsed = bankStatementCsvParser.parse(req.file.buffer.toString('utf8'));
   } catch (e) {
-    flash.set(req, 'error', `Could not read the file: ${e.message}`);
+    flash.set(req, 'error', `Could not read the file: ${flash.describeException(e, 'read failed — check the server error log.')}`);
     res.redirect('/ca/bank-statement');
     return;
   }

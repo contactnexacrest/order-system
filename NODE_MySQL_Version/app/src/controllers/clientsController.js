@@ -399,7 +399,7 @@ async function uploadAgreement(req, res) {
     await auditLogRepository.log(req.user.id, 'CLIENT_AGREEMENT_FILE_UPLOADED', 'clients', clientId, 'agreement_file_original_name', null, file.original_filename);
     flash.set(req, 'success', 'Agreement file uploaded.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(`/clients/${clientId}`);
 }
@@ -459,7 +459,7 @@ async function renewAgreement(req, res) {
     await auditLogRepository.log(req.user.id, 'CLIENT_AGREEMENT_RENEWED', 'clients', clientId, 'agreement_expiry_date', client.agreement_expiry_date ?? null, expiryDate);
     flash.set(req, 'success', 'Agreement renewed.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(`/clients/${clientId}`);
 }
@@ -679,7 +679,7 @@ async function uploadAdditionalDocument(req, res) {
     await auditLogRepository.log(req.user.id, 'CLIENT_ADDITIONAL_DOCUMENT_ADDED', 'file_store', fileId, 'document_type_label', null, title);
     flash.set(req, 'success', `"${title}" attached to this client.`);
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(`/clients/${clientId}`);
 }

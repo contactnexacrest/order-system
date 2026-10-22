@@ -63,7 +63,7 @@ async function create(req, res) {
     );
     flash.set(req, 'success', 'Amendment request created — awaiting MD approval.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${orderId}/amendments`);
@@ -81,7 +81,7 @@ async function mdApprove(req, res) {
     await amendmentService.approveByMd(amendmentId, req.user.id);
     flash.set(req, 'success', 'Amendment MD-approved. Generate the agreement document next.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${amendment.order_id}/amendments`);
@@ -99,7 +99,7 @@ async function reject(req, res) {
     await amendmentService.rejectAmendment(amendmentId, req.user.id);
     flash.set(req, 'success', 'Amendment request rejected.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${amendment.order_id}/amendments`);
@@ -117,7 +117,7 @@ async function generateDocument(req, res) {
     await amendmentService.generateDocument(amendmentId, req.user.id);
     flash.set(req, 'success', 'Payment Terms Amendment Agreement generated. Print, obtain wet signature + company stamp from the Importer, then upload the signed copy.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${amendment.order_id}/amendments`);
@@ -148,7 +148,7 @@ async function uploadSignedCopy(req, res) {
     await amendmentService.attachSignedCopyAndActivate(amendmentId, fileId, req.user.id);
     flash.set(req, 'success', 'Signed copy uploaded — amendment is now active and payment terms are updated.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${amendment.order_id}/amendments`);

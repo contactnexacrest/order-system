@@ -34,7 +34,7 @@ final class SampleDataController
             $result = SampleDataService::load((int) $user['id']);
         } catch (\Throwable $e) {
             error_log('[SAMPLE DATA LOAD FAILED] ' . $e->getMessage());
-            Flash::set('error', $e->getMessage() ?: 'Could not load sample data — check the server error log.');
+            Flash::setErrorFromException($e, 'Could not load sample data — check the server error log.');
             header('Location: /sample-data');
             return;
         }

@@ -40,4 +40,41 @@ final class Flash
         unset($_SESSION['_flash_old']);
         return $old;
     }
+
+    /**
+     * External QA report R-02: `catch (\Throwable $e) { Flash::set('error',
+     * $e->getMessage()); }` is this app's standard way (~30 call sites) to
+     * surface a deliberately-thrown business exception's message (e.g.
+     * `new \RuntimeException('friendly text here')`) to the user — correct
+     * for that case. The bug is that the same broad `\Throwable` catch also
+     * catches genuinely unexpected errors (a PDOException with raw SQL
+     * internals, a TypeError from malformed input, ...) and shows THEIR raw
+     * message the exact same way, leaking internals. This shows the real
+     * message only for the one exception type this codebase actually
+     * throws on purpose for a user-facing reason; anything else gets a
+     * generic message instead, with the real error still logged.
+     */
+    public static function setErrorFromException(\Throwable $e, string $fallback = 'Something went wrong. Please try again.'): void
+    {
+        self::set('error', self::describeException($e, $fallback));
+    }
+
+    /**
+     * Same decision as setErrorFromException(), for the handful of call
+     * sites that build a longer flash message with the exception text
+     * embedded in a friendlier sentence (e.g. "X saved, but the upload
+     * failed: {reason}") rather than setting the flash directly.
+     */
+    public static function describeException(\Throwable $e, string $fallback = 'Something went wrong. Please try again.'): string
+    {
+        // \PDOException extends \RuntimeException in PHP's own SPL
+        // hierarchy, so it would otherwise pass the check below and leak
+        // raw SQLSTATE/driver text — exactly the R-02 bug, just one level
+        // deeper. It must always be treated as unexpected, never trusted.
+        if ($e instanceof \RuntimeException && !($e instanceof \PDOException)) {
+            return $e->getMessage();
+        }
+        error_log('[UNEXPECTED ERROR shown generically] ' . $e->getMessage());
+        return $fallback;
+    }
 }

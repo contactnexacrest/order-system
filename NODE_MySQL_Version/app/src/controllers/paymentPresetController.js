@@ -151,7 +151,7 @@ async function toggleActive(req, res) {
   try {
     await paymentPresetRepository.toggleActive(id);
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
     res.redirect('/payment-presets');
     return;
   }

@@ -35,7 +35,7 @@ async function assign(req, res) {
     await reviewWorkflowService.assignReviewers(documentId, reviewerIds, req.user.id);
     flash.set(req, 'success', 'Reviewer(s) assigned — document is now in review.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${document.order_id}`);
@@ -52,7 +52,7 @@ async function approve(req, res) {
     await reviewWorkflowService.approve(reviewId, req.user.id, comments);
     flash.set(req, 'success', 'Review approved.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(orderId ? `/orders/${orderId}` : '/reviews');
@@ -68,7 +68,7 @@ async function reject(req, res) {
     await reviewWorkflowService.reject(reviewId, req.user.id, String(req.body.comments || '').trim());
     flash.set(req, 'success', 'Review rejected — sent back to the creator.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(orderId ? `/orders/${orderId}` : '/reviews');
@@ -87,7 +87,7 @@ async function crossVerify(req, res) {
     await reviewWorkflowService.crossVerify(documentId, req.user.id, String(req.body.result || ''), comments);
     flash.set(req, 'success', 'Cross-verification recorded.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${document.order_id}`);

@@ -70,7 +70,7 @@ final class AmendmentController
             );
             Flash::set('success', 'Amendment request created — awaiting MD approval.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header("Location: /orders/{$orderId}/amendments");
@@ -90,7 +90,7 @@ final class AmendmentController
             AmendmentService::approveByMd($amendmentId, (int) AuthService::currentUser()['id']);
             Flash::set('success', 'Amendment MD-approved. Generate the agreement document next.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header('Location: /orders/' . $amendment['order_id'] . '/amendments');
@@ -110,7 +110,7 @@ final class AmendmentController
             \App\Services\AmendmentService::rejectAmendment($amendmentId, (int) AuthService::currentUser()['id']);
             Flash::set('success', 'Amendment request rejected.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header('Location: /orders/' . $amendment['order_id'] . '/amendments');
@@ -130,7 +130,7 @@ final class AmendmentController
             AmendmentService::generateDocument($amendmentId, (int) AuthService::currentUser()['id']);
             Flash::set('success', 'Payment Terms Amendment Agreement generated. Print, obtain wet signature + company stamp from the Importer, then upload the signed copy.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header('Location: /orders/' . $amendment['order_id'] . '/amendments');
@@ -162,7 +162,7 @@ final class AmendmentController
             AmendmentService::attachSignedCopyAndActivate($amendmentId, $fileId, (int) AuthService::currentUser()['id']);
             Flash::set('success', 'Signed copy uploaded — amendment is now active and payment terms are updated.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header('Location: /orders/' . ($amendment['order_id'] ?? '') . '/amendments');

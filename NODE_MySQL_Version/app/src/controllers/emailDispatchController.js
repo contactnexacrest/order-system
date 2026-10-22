@@ -99,7 +99,7 @@ async function requestSend(req, res) {
       flash.set(req, 'success', 'Send submitted for approval.');
     }
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${orderId}`);
@@ -129,7 +129,7 @@ async function requestSendGeneric(req, res) {
       flash.set(req, 'success', 'Send submitted for approval.');
     }
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${orderId}`);
@@ -146,7 +146,7 @@ async function approve(req, res) {
     await emailDispatchService.approveSend(id, req.user.id);
     flash.set(req, 'success', 'Send approved — will go out once its scheduled time arrives (dispatched by the background job).');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect('/email-approvals');
 }
@@ -158,7 +158,7 @@ async function sendNow(req, res) {
     const sent = await emailDispatchService.sendNowOverride(id, req.user.id);
     flash.set(req, sent ? 'success' : 'error', sent ? 'Sent.' : 'Send attempted now but it failed — check the mail configuration in Settings.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect('/email-approvals');
 }
@@ -169,7 +169,7 @@ async function reject(req, res) {
     await emailDispatchService.rejectSend(id, req.user.id, String(req.body.reason || '').trim());
     flash.set(req, 'success', 'Send rejected.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect('/email-approvals');
 }
@@ -198,7 +198,7 @@ async function cancel(req, res) {
     await emailDispatchService.cancelSend(id, req.user.id, reason, isApprover);
     flash.set(req, 'success', 'Send cancelled before it went out.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(redirectTo);
 }

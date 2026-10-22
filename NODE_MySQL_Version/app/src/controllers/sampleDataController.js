@@ -32,7 +32,7 @@ async function load(req, res) {
     result = await sampleDataService.load(user.id);
   } catch (e) {
     logger.error('SAMPLE DATA LOAD FAILED', e);
-    flash.set(req, 'error', e.message || 'Could not load sample data — check the server error log.');
+    flash.setErrorFromException(req, e, 'Could not load sample data — check the server error log.');
     res.redirect('/sample-data');
     return;
   }

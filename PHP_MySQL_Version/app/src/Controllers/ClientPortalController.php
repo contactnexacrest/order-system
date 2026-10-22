@@ -408,7 +408,7 @@ final class ClientPortalController
             OrderCommentService::postAsClient($orderId, $clientId, $body !== '' ? $body : null, $fileIds);
             Flash::set('success', 'Message sent.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: /client/orders/{$orderId}#order-updates");
     }
@@ -578,7 +578,7 @@ final class ClientPortalController
                     'Client payment self-report screenshot'
                 );
             } catch (\Throwable $e) {
-                Flash::set('error', $e->getMessage());
+                Flash::setErrorFromException($e);
                 header("Location: /client/orders/{$orderId}");
                 return;
             }

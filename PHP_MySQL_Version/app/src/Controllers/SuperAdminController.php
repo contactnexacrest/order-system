@@ -40,7 +40,7 @@ final class SuperAdminController
             SuperAdminService::grantDelegation($delegateUserId, (int) $user['id'], $reason, $expiresAt);
             Flash::set('success', 'Super Admin delegation granted.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header('Location: /super-admin');
     }
@@ -55,7 +55,7 @@ final class SuperAdminController
             SuperAdminService::revokeDelegation($delegationId, (int) $user['id'], $reason);
             Flash::set('success', 'Delegation revoked.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header('Location: /super-admin');
     }
@@ -71,7 +71,7 @@ final class SuperAdminController
             SuperAdminService::setPermanentFlag($targetUserId, $makeSuperAdmin, (int) $user['id'], $reason);
             Flash::set('success', $makeSuperAdmin ? 'User promoted to Super Admin.' : 'Super Admin status removed.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header('Location: /super-admin');
     }

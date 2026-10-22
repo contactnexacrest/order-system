@@ -150,7 +150,7 @@ async function customCreate(req, res) {
       const saved = saveUploadedFile(req.file);
       await referenceLibraryRepository.updateFile(id, saved.targetPath, saved.originalName, saved.mimeType, req.user.id);
     } catch (e) {
-      flash.set(req, 'error', `Document created, but the file wasn't attached: ${e.message}`);
+      flash.set(req, 'error', `Document created, but the file wasn't attached: ${flash.describeException(e, 'attachment failed — check the server error log.')}`);
       res.redirect('/reference-docs');
       return;
     }
@@ -226,7 +226,7 @@ async function customUpdate(req, res) {
       const saved = saveUploadedFile(req.file);
       await referenceLibraryRepository.updateFile(id, saved.targetPath, saved.originalName, saved.mimeType, req.user.id);
     } catch (e) {
-      flash.set(req, 'error', `Text saved, but the new file wasn't attached: ${e.message}`);
+      flash.set(req, 'error', `Text saved, but the new file wasn't attached: ${flash.describeException(e, 'attachment failed — check the server error log.')}`);
       res.redirect(`/reference-docs/custom/${id}/edit`);
       return;
     }

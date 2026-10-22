@@ -29,7 +29,7 @@ async function grantDelegation(req, res) {
     await superAdminService.grantDelegation(delegateUserId, user.id, reason, expiresAt);
     flash.set(req, 'success', 'Super Admin delegation granted.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect('/super-admin');
 }
@@ -43,7 +43,7 @@ async function revokeDelegation(req, res) {
     await superAdminService.revokeDelegation(delegationId, user.id, reason);
     flash.set(req, 'success', 'Delegation revoked.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect('/super-admin');
 }
@@ -58,7 +58,7 @@ async function setPermanent(req, res) {
     await superAdminService.setPermanentFlag(targetUserId, makeSuperAdmin, user.id, reason);
     flash.set(req, 'success', makeSuperAdmin ? 'User promoted to Super Admin.' : 'Super Admin status removed.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect('/super-admin');
 }

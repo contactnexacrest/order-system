@@ -181,7 +181,7 @@ final class DisputeController
             DisputeDocumentRepository::attach($disputeId, $fileId);
             Flash::set('success', 'Document attached to dispute.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header("Location: /orders/{$dispute['order_id']}/disputes");

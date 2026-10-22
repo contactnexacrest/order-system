@@ -1090,7 +1090,7 @@ async function uploadBuyerPoDocument(req, res) {
     await orderBuyerPoDocumentRepository.attach(orderId, fileId);
     flash.set(req, 'success', 'Buyer PO copy attached.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(`/orders/${orderId}`);
 }
@@ -1136,7 +1136,7 @@ async function uploadAdditionalDocument(req, res) {
     await auditLogRepository.log(req.user.id, 'ORDER_ADDITIONAL_DOCUMENT_ADDED', 'file_store', fileId, 'document_type_label', null, title);
     flash.set(req, 'success', `"${title}" attached to this order.`);
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(`/orders/${orderId}`);
 }
@@ -1585,7 +1585,7 @@ async function uploadSupplierPoDocument(req, res) {
     await orderSupplierPoDocumentRepository.attach(supplierPo.id, fileId);
     flash.set(req, 'success', 'Supplier PO acknowledgment attached.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(`/orders/${orderId}`);
 }
@@ -1706,7 +1706,7 @@ async function savePacking(req, res) {
       );
       await orderPackingRepository.attachBuyerApproval(orderId, fileId);
     } catch (e) {
-      flash.set(req, 'error', `Packing figures saved, but the approval upload failed: ${e.message}`);
+      flash.set(req, 'error', `Packing figures saved, but the approval upload failed: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
       res.redirect(`/orders/${orderId}`);
       return;
     }
@@ -1800,7 +1800,7 @@ async function recordBlIssued(req, res) {
       );
       await orderShippingRepository.attachBlCopy(orderId, fileId);
     } catch (e) {
-      flash.set(req, 'error', `Bill of Lading recorded (${blNumber}), but the copy upload failed: ${e.message}`);
+      flash.set(req, 'error', `Bill of Lading recorded (${blNumber}), but the copy upload failed: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
       res.redirect(`/orders/${orderId}`);
       return;
     }
@@ -1836,7 +1836,7 @@ async function attachBlCopy(req, res) {
     await orderShippingRepository.attachBlCopy(orderId, fileId);
     flash.set(req, 'success', 'Scanned BL copy attached.');
   } catch (e) {
-    flash.set(req, 'error', `Could not attach the scanned BL copy: ${e.message}`);
+    flash.set(req, 'error', `Could not attach the scanned BL copy: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
   }
   res.redirect(`/orders/${orderId}`);
 }
@@ -2160,7 +2160,7 @@ async function generateBlEndorsement(req, res) {
     await documentGenerationService.generateBlEndorsement(orderId, user.id);
     flash.set(req, 'success', 'BL Endorsement generated — print it and physically endorse all 3 original BLs.');
   } catch (err) {
-    flash.set(req, 'error', err.message);
+    flash.setErrorFromException(req, err);
   }
   res.redirect(`/orders/${orderId}`);
 }

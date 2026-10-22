@@ -26,7 +26,7 @@ async function disable(req, res) {
     await testModeService.disable();
     flash.set(req, 'success', 'Test Mode disabled.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect('/test-mode');
 }

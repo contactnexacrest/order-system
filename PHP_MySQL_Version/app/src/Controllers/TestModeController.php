@@ -40,7 +40,7 @@ final class TestModeController
             TestModeService::disable();
             Flash::set('success', 'Test Mode disabled.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header('Location: /test-mode');
     }

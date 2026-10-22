@@ -177,7 +177,7 @@ final class ReferenceDocController
                 $saved = $this->saveUploadedFile($_FILES['file']);
                 ReferenceLibraryRepository::updateFile($id, $saved['path'], $saved['originalName'], $saved['mimeType'], (int) $user['id']);
             } catch (\Throwable $e) {
-                Flash::set('error', "Document created, but the file wasn't attached: {$e->getMessage()}");
+                Flash::set('error', "Document created, but the file wasn't attached: " . Flash::describeException($e, 'attachment failed — check the server error log.'));
                 header('Location: /reference-docs');
                 return;
             }
@@ -266,7 +266,7 @@ final class ReferenceDocController
                 $saved = $this->saveUploadedFile($_FILES['file']);
                 ReferenceLibraryRepository::updateFile($id, $saved['path'], $saved['originalName'], $saved['mimeType'], (int) $user['id']);
             } catch (\Throwable $e) {
-                Flash::set('error', "Text saved, but the new file wasn't attached: {$e->getMessage()}");
+                Flash::set('error', "Text saved, but the new file wasn't attached: " . Flash::describeException($e, 'attachment failed — check the server error log.'));
                 header("Location: /reference-docs/custom/{$id}/edit");
                 return;
             }

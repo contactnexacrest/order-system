@@ -69,7 +69,7 @@ final class EmailDispatchController
             try {
                 $preview = EmailDispatchService::buildPreview($orderId, $documentId, $templateKey, (int) AuthService::currentUser()['id']);
             } catch (\Throwable $e) {
-                $previewError = $e->getMessage();
+                $previewError = Flash::describeException($e, 'Could not build the preview — check the server error log.');
             }
         }
 
@@ -106,7 +106,7 @@ final class EmailDispatchController
                 Flash::set('success', 'Send submitted for approval.');
             }
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header("Location: /orders/{$orderId}");
@@ -137,7 +137,7 @@ final class EmailDispatchController
                 Flash::set('success', 'Send submitted for approval.');
             }
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header("Location: /orders/{$orderId}");
@@ -165,7 +165,7 @@ final class EmailDispatchController
             EmailDispatchService::approveSend($id, (int) AuthService::currentUser()['id']);
             Flash::set('success', 'Send approved — will go out once its scheduled time arrives (dispatched by the cron job).');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header('Location: /email-approvals');
     }
@@ -178,7 +178,7 @@ final class EmailDispatchController
             $sent = EmailDispatchService::sendNowOverride($id, (int) AuthService::currentUser()['id']);
             Flash::set($sent ? 'success' : 'error', $sent ? 'Sent.' : 'Send attempted now but it failed — check the mail configuration in Settings.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header('Location: /email-approvals');
     }
@@ -190,7 +190,7 @@ final class EmailDispatchController
             EmailDispatchService::rejectSend($id, (int) AuthService::currentUser()['id'], trim((string) ($_POST['reason'] ?? '')));
             Flash::set('success', 'Send rejected.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header('Location: /email-approvals');
     }
@@ -220,7 +220,7 @@ final class EmailDispatchController
             EmailDispatchService::cancelSend($id, (int) $user['id'], trim((string) ($_POST['reason'] ?? '')), $isApprover);
             Flash::set('success', 'Send cancelled before it went out.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: {$redirectTo}");
     }

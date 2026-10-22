@@ -389,7 +389,7 @@ async function postComment(req, res) {
     await orderCommentService.postAsClient(orderId, clientId, body !== '' ? body : null, fileIds);
     flash.set(req, 'success', 'Message sent.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(`/client/orders/${orderId}#order-updates`);
 }
@@ -484,7 +484,7 @@ async function reportPayment(req, res) {
         'Client payment self-report screenshot'
       );
     } catch (e) {
-      flash.set(req, 'error', e.message);
+      flash.setErrorFromException(req, e);
       res.redirect(`/client/orders/${orderId}`);
       return;
     }

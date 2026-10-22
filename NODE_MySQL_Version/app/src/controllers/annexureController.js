@@ -109,7 +109,7 @@ async function createProduct(req, res) {
       );
       await orderAnnexureRepository.addImage(productId, fileId);
     } catch (e) {
-      flash.set(req, 'error', `Product entry added, but the image failed to upload: ${e.message}`);
+      flash.set(req, 'error', `Product entry added, but the image failed to upload: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
       res.redirect(`/orders/${orderId}/annexure`);
       return;
     }
@@ -172,7 +172,7 @@ async function uploadImage(req, res) {
     await orderAnnexureRepository.addImage(productId, fileId);
     flash.set(req, 'success', 'Image uploaded.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
   res.redirect(`/orders/${orderId}/annexure`);
 }

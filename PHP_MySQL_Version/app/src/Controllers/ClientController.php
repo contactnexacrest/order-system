@@ -432,7 +432,7 @@ final class ClientController
             AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_AGREEMENT_FILE_UPLOADED', 'clients', $clientId, 'agreement_file_original_name', null, $file['original_filename']);
             Flash::set('success', 'Agreement file uploaded.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: /clients/{$clientId}");
     }
@@ -495,7 +495,7 @@ final class ClientController
             AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_AGREEMENT_RENEWED', 'clients', $clientId, 'agreement_expiry_date', $client['agreement_expiry_date'] ?? null, $expiryDate);
             Flash::set('success', 'Agreement renewed.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: /clients/{$clientId}");
     }
@@ -740,7 +740,7 @@ final class ClientController
             AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_ADDITIONAL_DOCUMENT_ADDED', 'file_store', $fileId, 'document_type_label', null, $title);
             Flash::set('success', "\"{$title}\" attached to this client.");
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: /clients/{$clientId}");
     }

@@ -177,7 +177,7 @@ async function uploadDocument(req, res) {
     await disputeDocumentRepository.attach(disputeId, fileId);
     flash.set(req, 'success', 'Document attached to dispute.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${dispute.order_id}/disputes`);

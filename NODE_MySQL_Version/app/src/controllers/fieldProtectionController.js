@@ -76,7 +76,7 @@ async function approve(req, res) {
     );
     flash.set(req, 'success', `Request #${requestId} approved — the field is now ${result.requested_action === 'lock' ? 'protected' : 'unprotected'}.`);
   } catch (e) {
-    flash.set(req, 'error', e.message || 'Could not approve this request.');
+    flash.setErrorFromException(req, e, 'Could not approve this request.');
   }
   res.redirect('/admin/field-protection');
 }
@@ -94,7 +94,7 @@ async function reject(req, res) {
     );
     flash.set(req, 'success', `Request #${requestId} rejected.`);
   } catch (e) {
-    flash.set(req, 'error', e.message || 'Could not reject this request.');
+    flash.setErrorFromException(req, e, 'Could not reject this request.');
   }
   res.redirect('/admin/field-protection');
 }

@@ -33,7 +33,7 @@ async function post(req, res) {
     await orderCommentService.postAsStaff(orderId, req.user.id, body !== '' ? body : null, fileIds);
     flash.set(req, 'success', 'Posted — the client has been emailed.');
   } catch (e) {
-    flash.set(req, 'error', e.message);
+    flash.setErrorFromException(req, e);
   }
 
   res.redirect(`/orders/${orderId}#order-updates`);

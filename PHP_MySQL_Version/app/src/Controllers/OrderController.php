@@ -1077,7 +1077,7 @@ final class OrderController
             OrderBuyerPoDocumentRepository::attach($orderId, $fileId);
             Flash::set('success', 'Buyer PO copy attached.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: /orders/{$orderId}");
     }
@@ -1124,7 +1124,7 @@ final class OrderController
             AuditLogRepository::log((int) AuthService::currentUser()['id'], 'ORDER_ADDITIONAL_DOCUMENT_ADDED', 'file_store', $fileId, 'document_type_label', null, $title);
             Flash::set('success', "\"{$title}\" attached to this order.");
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: /orders/{$orderId}");
     }
@@ -1584,7 +1584,7 @@ final class OrderController
             OrderSupplierPoDocumentRepository::attach((int) $supplierPo['id'], $fileId);
             Flash::set('success', 'Supplier PO acknowledgment attached.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
         header("Location: /orders/{$orderId}");
     }
@@ -1709,7 +1709,7 @@ final class OrderController
                 );
                 OrderPackingRepository::attachBuyerApproval($orderId, $fileId);
             } catch (\Throwable $e) {
-                Flash::set('error', 'Packing figures saved, but the approval upload failed: ' . $e->getMessage());
+                Flash::set('error', 'Packing figures saved, but the approval upload failed: ' . Flash::describeException($e, 'upload failed — check the server error log.'));
                 header("Location: /orders/{$orderId}");
                 return;
             }
@@ -1796,7 +1796,7 @@ final class OrderController
                 );
                 OrderShippingRepository::attachBlCopy($orderId, $fileId);
             } catch (\Throwable $e) {
-                Flash::set('error', "Bill of Lading recorded ({$blNumber}), but the copy upload failed: " . $e->getMessage());
+                Flash::set('error', "Bill of Lading recorded ({$blNumber}), but the copy upload failed: " . Flash::describeException($e, 'upload failed — check the server error log.'));
                 header("Location: /orders/{$orderId}");
                 return;
             }
@@ -1833,7 +1833,7 @@ final class OrderController
             OrderShippingRepository::attachBlCopy($orderId, $fileId);
             Flash::set('success', 'Scanned BL copy attached.');
         } catch (\Throwable $e) {
-            Flash::set('error', 'Could not attach the scanned BL copy: ' . $e->getMessage());
+            Flash::set('error', 'Could not attach the scanned BL copy: ' . Flash::describeException($e, 'upload failed — check the server error log.'));
         }
         header("Location: /orders/{$orderId}");
     }

@@ -96,7 +96,7 @@ final class FieldProtectionController
             $newState = $result['requested_action'] === 'lock' ? 'protected' : 'unprotected';
             Flash::set('success', "Request #{$requestId} approved — the field is now {$newState}.");
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage() ?: 'Could not approve this request.');
+            Flash::setErrorFromException($e, 'Could not approve this request.');
         }
         header('Location: /admin/field-protection');
     }
@@ -121,7 +121,7 @@ final class FieldProtectionController
             );
             Flash::set('success', "Request #{$requestId} rejected.");
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage() ?: 'Could not reject this request.');
+            Flash::setErrorFromException($e, 'Could not reject this request.');
         }
         header('Location: /admin/field-protection');
     }

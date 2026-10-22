@@ -41,7 +41,7 @@ final class OrderCommentController
             OrderCommentService::postAsStaff($orderId, (int) $user['id'], $body !== '' ? $body : null, $fileIds);
             Flash::set('success', 'Posted — the client has been emailed.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header("Location: /orders/{$orderId}#order-updates");

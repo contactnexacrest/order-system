@@ -49,7 +49,7 @@ final class ReviewController
             ReviewWorkflowService::assignReviewers($documentId, $reviewerIds, (int) AuthService::currentUser()['id']);
             Flash::set('success', 'Reviewer(s) assigned — document is now in review.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header("Location: /orders/{$document['order_id']}");
@@ -65,7 +65,7 @@ final class ReviewController
             ReviewWorkflowService::approve($reviewId, (int) AuthService::currentUser()['id'], trim((string) ($_POST['comments'] ?? '')) ?: null);
             Flash::set('success', 'Review approved.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header('Location: ' . ($orderId ? "/orders/{$orderId}" : '/reviews'));
@@ -81,7 +81,7 @@ final class ReviewController
             ReviewWorkflowService::reject($reviewId, (int) AuthService::currentUser()['id'], trim((string) ($_POST['comments'] ?? '')));
             Flash::set('success', 'Review rejected — sent back to the creator.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header('Location: ' . ($orderId ? "/orders/{$orderId}" : '/reviews'));
@@ -106,7 +106,7 @@ final class ReviewController
             );
             Flash::set('success', 'Cross-verification recorded.');
         } catch (\Throwable $e) {
-            Flash::set('error', $e->getMessage());
+            Flash::setErrorFromException($e);
         }
 
         header("Location: /orders/{$document['order_id']}");
