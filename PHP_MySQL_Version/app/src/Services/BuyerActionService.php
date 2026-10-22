@@ -66,6 +66,13 @@ final class BuyerActionService
             return ['ok' => true, 'message' => 'This order has already been acknowledged and is moving to production.'];
         }
         StageGateService::passAndUnlockNext($orderId, 4, null);
+        // External QA report L-30/M-07: nothing here ever told staff a
+        // buyer had acknowledged their OC — the only way to notice was to
+        // happen to reopen the order. AuditLogRepository::log() already
+        // fans out to ActionNotificationService for every other action in
+        // this codebase; this was simply the one self-service action that
+        // never called it.
+        AuditLogRepository::log(null, 'BUYER_OC_ACKNOWLEDGED', 'orders', $orderId, null, null, null, 'Order Confirmation acknowledged by the client (self-service).');
         return ['ok' => true, 'message' => 'Thank you — your acknowledgement has been recorded and your order is moving to production.'];
     }
 
@@ -176,6 +183,11 @@ final class BuyerActionService
             $paymentDate !== '' ? $paymentDate : null,
             $screenshotFileId
         );
+        // External QA report L-30/M-07: a client payment self-report
+        // never notified staff at all — the "our team will verify this"
+        // promise below depended entirely on staff happening to reopen
+        // this order. See acknowledgeOc()'s own comment on the same gap.
+        AuditLogRepository::log(null, 'CLIENT_PAYMENT_REPORTED', 'orders', $orderId, 'payment_type', null, 'advance', "Client self-reported an advance payment: ref {$transactionRef}.");
 
         return ['ok' => true, 'message' => 'Thank you — we have noted your advance payment details. Our team will verify this against our bank statement and update your order.'];
     }

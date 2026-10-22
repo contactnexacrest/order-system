@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Config\Database;
 use App\Controllers\BuyerActionController;
 use App\Controllers\ClientPortalController;
 use App\Controllers\OrderController;
@@ -214,6 +215,26 @@ final class BuyerActionLinkTest extends DbTestCase
         $ack = OrderOcAcknowledgmentRepository::find($orderId);
         self::assertNotNull($ack['acknowledged_at']);
         self::assertTrue(StageGateService::isUnlocked($orderId, 5));
+    }
+
+    /** External QA report L-30/M-07: nothing ever told staff a buyer had acknowledged their OC via the no-login link. */
+    public function testAcknowledgeOcViaTokenIsAuditLogged(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThroughStage3($orderId);
+        $documentId = $this->createTestDocument($orderId, 'OC', 'sent');
+        OrderOcAcknowledgmentRepository::recordSent($orderId, $documentId, date('Y-m-d H:i:s'), date('Y-m-d H:i:s', strtotime('+48 hours')));
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+
+        (new BuyerActionController())->acknowledgeOc(['token' => $token]);
+
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM audit_log WHERE action_type = :t ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute(['t' => 'BUYER_OC_ACKNOWLEDGED']);
+        $log = $stmt->fetch();
+        self::assertNotFalse($log, 'a buyer self-service OC acknowledgment must be audit-logged (and so notified — see ActionNotificationService)');
+        self::assertSame($orderId, (int) $log['entity_id']);
     }
 
     public function testAcknowledgeOcWithAnInvalidTokenNeverTouchesAnyOrder(): void

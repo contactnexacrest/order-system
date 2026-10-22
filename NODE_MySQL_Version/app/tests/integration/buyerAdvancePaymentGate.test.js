@@ -123,6 +123,37 @@ describe('Buyer advance-payment gate (90-item backlog #19/#48)', () => {
     expect(reports[0].transaction_ref).toBe('UTR123456789');
   });
 
+  // External QA report L-30/M-07: neither buyer self-service payment
+  // report ever told staff at all — the only way to notice was to happen
+  // to reopen the order and see the row in clientPaymentReports.
+  it('reportPayment() via token is audit-logged', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const token = await orderRepository.generateBuyerActionToken(orderId);
+    const req = fakeReq({ token }, { transaction_ref: 'UTR123456789' });
+
+    await buyerActionController.reportPayment(req, fakeRes());
+
+    const log = await db.queryOne('SELECT * FROM audit_log WHERE action_type = :t ORDER BY id DESC LIMIT 1', { t: 'CLIENT_PAYMENT_REPORTED' });
+    expect(log).toBeTruthy();
+    expect(log.entity_id).toBe(orderId);
+    expect(log.new_value).toBe('advance');
+    expect(log.reason).toContain('UTR123456789');
+  });
+
+  it('clientPortalController.reportPayment() is audit-logged', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    const req = fakeReq({ id: String(orderId) }, { payment_type: 'balance', transaction_ref: 'UTR999888777' }, { _client_portal_client_id: clientId });
+
+    await clientPortalController.reportPayment(req, fakeRes());
+
+    const log = await db.queryOne('SELECT * FROM audit_log WHERE action_type = :t ORDER BY id DESC LIMIT 1', { t: 'CLIENT_PAYMENT_REPORTED' });
+    expect(log).toBeTruthy();
+    expect(log.entity_id).toBe(orderId);
+    expect(log.new_value).toBe('balance');
+    expect(log.reason).toContain('UTR999888777');
+  });
+
   it('reportPayment() via token requires a transaction reference', async () => {
     const orderId = await createTestOrder(await createTestClient());
     const token = await orderRepository.generateBuyerActionToken(orderId);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Config\Database;
 use App\Controllers\BuyerActionController;
 use App\Controllers\ClientPortalController;
 use App\Helpers\Flash;
@@ -191,5 +192,52 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
         self::assertStringNotContainsString('Submit Payment Details', $html);
         self::assertStringNotContainsString('name="document"', $html);
         self::assertStringContainsString('already cleared', $html);
+    }
+
+    // ---------------------------------------------------------------
+    // External QA report L-30/M-07: neither buyer self-service payment
+    // report ever told staff at all — the only way to notice was to
+    // happen to reopen the order and see the row in clientPaymentReports.
+    // ---------------------------------------------------------------
+
+    private function latestLogFor(string $actionType): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM audit_log WHERE action_type = :action_type ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute(['action_type' => $actionType]);
+        $row = $stmt->fetch();
+        return $row === false ? null : $row;
+    }
+
+    public function testReportAdvancePaymentViaTokenIsAuditLogged(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+        $_POST['transaction_ref'] = 'UTR123456789';
+
+        (new BuyerActionController())->reportPayment(['token' => $token]);
+
+        $log = $this->latestLogFor('CLIENT_PAYMENT_REPORTED');
+        self::assertNotNull($log, 'a client payment self-report via the Buyer Action Link must be audit-logged (and so notified — see ActionNotificationService)');
+        self::assertSame($orderId, (int) $log['entity_id']);
+        self::assertSame('advance', $log['new_value']);
+        self::assertStringContainsString('UTR123456789', (string) $log['reason']);
+    }
+
+    public function testReportPaymentViaThePortalIsAuditLogged(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $_SESSION['_client_portal_client_id'] = $clientId;
+        $_POST = ['payment_type' => 'balance', 'transaction_ref' => 'UTR999888777'];
+
+        (new ClientPortalController())->reportPayment(['id' => $orderId]);
+
+        $log = $this->latestLogFor('CLIENT_PAYMENT_REPORTED');
+        self::assertNotNull($log, 'a client payment self-report via the logged-in portal must be audit-logged (and so notified)');
+        self::assertSame($orderId, (int) $log['entity_id']);
+        self::assertSame('balance', $log['new_value']);
+        self::assertStringContainsString('UTR999888777', (string) $log['reason']);
     }
 }

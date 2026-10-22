@@ -595,6 +595,9 @@ final class ClientPortalController
             $paymentDate !== '' ? $paymentDate : null,
             $screenshotFileId
         );
+        // External QA report L-30/M-07: same missing-notification gap as
+        // BuyerActionService::reportAdvancePayment() — see its own comment.
+        AuditLogRepository::log(null, 'CLIENT_PAYMENT_REPORTED', 'orders', $orderId, 'payment_type', null, $paymentType, "Client self-reported a {$paymentType} payment: ref {$transactionRef}.");
 
         Flash::set('success', 'Thank you — we have noted your payment details. Our team will verify this against our bank statement and update your order.');
         header("Location: /client/orders/{$orderId}");

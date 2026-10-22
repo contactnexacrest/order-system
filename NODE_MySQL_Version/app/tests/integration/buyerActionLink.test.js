@@ -228,6 +228,22 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
     expect(await stageGateService.isUnlocked(orderId, 5)).toBe(true);
   });
 
+  // External QA report L-30/M-07: nothing ever told staff a buyer had
+  // acknowledged their OC via the no-login link.
+  it('acknowledgeOc() via token is audit-logged', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await unlockThroughStage3(orderId);
+    const documentId = await createTestDocument(orderId, 'OC', 'sent');
+    await orderOcAcknowledgmentRepository.recordSent(orderId, documentId, new Date(), new Date(Date.now() + 48 * 3600 * 1000));
+    const token = await orderRepository.generateBuyerActionToken(orderId);
+
+    await buyerActionController.acknowledgeOc(fakeReq({ token }), fakeRes());
+
+    const log = await db.queryOne('SELECT * FROM audit_log WHERE action_type = :t ORDER BY id DESC LIMIT 1', { t: 'BUYER_OC_ACKNOWLEDGED' });
+    expect(log).toBeTruthy();
+    expect(log.entity_id).toBe(orderId);
+  });
+
   it('acknowledgeOc() with an invalid token never touches any order', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThroughStage3(orderId);

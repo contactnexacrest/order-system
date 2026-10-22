@@ -66,6 +66,12 @@ async function acknowledgeOc(orderId) {
     return { ok: true, message: 'This order has already been acknowledged and is moving to production.' };
   }
   await stageGateService.passAndUnlockNext(orderId, 4, null);
+  // External QA report L-30/M-07: nothing here ever told staff a buyer
+  // had acknowledged their OC — the only way to notice was to happen to
+  // reopen the order. auditLogRepository.log() already fans out to
+  // actionNotificationService for every other action in this codebase;
+  // this was simply the one self-service action that never called it.
+  await auditLogRepository.log(null, 'BUYER_OC_ACKNOWLEDGED', 'orders', orderId, null, null, null, 'Order Confirmation acknowledged by the client (self-service).');
   return { ok: true, message: 'Thank you — your acknowledgement has been recorded and your order is moving to production.' };
 }
 
@@ -159,6 +165,11 @@ async function reportAdvancePayment(req, order) {
     paymentDate !== '' ? paymentDate : null,
     screenshotFileId
   );
+  // External QA report L-30/M-07: a client payment self-report never
+  // notified staff at all — the "our team will verify this" promise
+  // below depended entirely on staff happening to reopen this order. See
+  // acknowledgeOc()'s own comment on the same gap.
+  await auditLogRepository.log(null, 'CLIENT_PAYMENT_REPORTED', 'orders', orderId, 'payment_type', null, 'advance', `Client self-reported an advance payment: ref ${transactionRef}.`);
 
   return { ok: true, message: 'Thank you — we have noted your advance payment details. Our team will verify this against our bank statement and update your order.' };
 }
