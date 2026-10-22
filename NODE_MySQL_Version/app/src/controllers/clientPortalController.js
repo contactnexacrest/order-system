@@ -32,7 +32,7 @@ const orderCommentService = require('../services/orderCommentService');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const fileUploadService = require('../services/fileUploadService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
-const { todayIst } = require('../helpers/dbDateTime');
+const { todayIst, formatForDb } = require('../helpers/dbDateTime');
 
 function todayYmd() {
   return todayIst();
@@ -139,7 +139,9 @@ async function forgotPassword(req, res) {
     if ((await clientPasswordResetTokenRepository.countRecentForClient(login.client_id, 60)) < 5) {
       const rawToken = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expiresAt = new Date(Date.now() + 72 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+      // External QA report L-21/L-02: toISOString() is always UTC — see
+      // dbDateTime.formatForDb()'s docblock.
+      const expiresAt = formatForDb(new Date(Date.now() + 72 * 3600000));
       const ip = req.ip || null;
 
       await clientPasswordResetTokenRepository.create(login.client_id, tokenHash, expiresAt, ip);

@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 
 const env = require('../config/env');
-const { parseDbDateTime } = require('../helpers/dbDateTime');
+const { parseDbDateTime, formatForDb } = require('../helpers/dbDateTime');
 const passwordHash = require('../helpers/passwordHash');
 const { regeneratePreserving } = require('../helpers/sessionRegenerate');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -81,7 +81,9 @@ async function provisionIfNeeded(clientId, orderId) {
 async function sendSetPasswordEmail(clientId, email) {
   const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-  const expiresAt = new Date(Date.now() + 72 * 3600000).toISOString().slice(0, 19).replace('T', ' '); // longer than the staff 45-minute window — a client may not check email immediately
+  // External QA report L-21/L-02: toISOString() is always UTC — see
+  // dbDateTime.formatForDb()'s docblock.
+  const expiresAt = formatForDb(new Date(Date.now() + 72 * 3600000)); // longer than the staff 45-minute window — a client may not check email immediately
   await clientPasswordResetTokenRepository.create(clientId, tokenHash, expiresAt, null);
 
   const setUrl = `${env.get('APP_URL', '').replace(/\/+$/, '')}/client/set-password/${rawToken}`;
@@ -117,7 +119,7 @@ async function attemptLogin(req, email, password) {
     if (login) {
       await clientLoginRepository.incrementFailedLogins(login.client_id);
       if (parseInt(login.failed_login_count, 10) + 1 >= 5) {
-        const until = new Date(Date.now() + 15 * 60000).toISOString().slice(0, 19).replace('T', ' ');
+        const until = formatForDb(new Date(Date.now() + 15 * 60000));
         await clientLoginRepository.lockUntil(login.client_id, until);
       }
     }

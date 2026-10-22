@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const referenceNumberService = require('../services/referenceNumberService');
 const encryptionService = require('../services/encryptionService');
+const { formatForDb } = require('../helpers/dbDateTime');
 
 /**
  * Also carries incoterm_code, current_stage_number, currency_code, and
@@ -688,7 +689,10 @@ async function generateBuyerActionToken(orderId, ttlDays = 90) {
       // time before it expires, so this can't just be shown once and
       // discarded; see encryptionService.js's docblock.
       plain: encryptionService.encrypt(rawToken),
-      expires: new Date(Date.now() + ttlDays * 86400000).toISOString().slice(0, 19).replace('T', ' '),
+      // External QA report L-21/L-02: toISOString() is always UTC — see
+      // dbDateTime.formatForDb()'s docblock. (This is the exact bug the
+      // report reproduced: this expiry stored 06:20 instead of 11:50.)
+      expires: formatForDb(new Date(Date.now() + ttlDays * 86400000)),
       id: orderId,
     }
   );

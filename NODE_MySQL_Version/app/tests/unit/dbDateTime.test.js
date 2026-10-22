@@ -1,6 +1,6 @@
 'use strict';
 
-const { parseDbDateTime, todayIst } = require('../../src/helpers/dbDateTime');
+const { parseDbDateTime, todayIst, formatForDb } = require('../../src/helpers/dbDateTime');
 
 /**
  * QA-5 DEF-04 follow-on: pins parseDbDateTime's contract — a naive
@@ -62,5 +62,37 @@ describe('todayIst() (90-item backlog "timezone")', () => {
     jest.setSystemTime(new Date('2026-10-16T08:30:00Z'));
 
     expect(todayIst()).toBe('2026-10-16');
+  });
+});
+
+/**
+ * External QA report L-21/L-02: every app-computed TIMESTAMP/DATETIME
+ * literal (a token expiry, a lockout timer) must be written as IST
+ * wall-clock, not UTC — config/db.js now pins the DB session itself to
+ * +05:30, so a UTC-formatted literal (toISOString()) would be
+ * misread by MySQL as already-IST and land 5h30m off. This was the
+ * concretely reproduced bug: a Buyer Action Link's expiry stored as
+ * 06:20 instead of 11:50.
+ */
+describe('formatForDb() (External QA report L-21/L-02)', () => {
+  it('formats a UTC instant as its IST wall-clock, not the UTC wall-clock', () => {
+    // 2026-10-22 11:50:00 IST == 2026-10-22 06:20:00 UTC.
+    const instant = new Date('2026-10-22T06:20:00Z');
+
+    expect(formatForDb(instant)).toBe('2026-10-22 11:50:00');
+  });
+
+  it('rolls over to the next IST calendar day near UTC midnight', () => {
+    // 2026-10-23 00:15:00 IST == 2026-10-22 18:45:00 UTC.
+    const instant = new Date('2026-10-22T18:45:00Z');
+
+    expect(formatForDb(instant)).toBe('2026-10-23 00:15:00');
+  });
+
+  it('pads single-digit month/day/hour/minute/second components', () => {
+    // 2026-01-02 03:04:05 IST == 2026-01-01 21:34:05 UTC.
+    const instant = new Date('2026-01-01T21:34:05Z');
+
+    expect(formatForDb(instant)).toBe('2026-01-02 03:04:05');
   });
 });

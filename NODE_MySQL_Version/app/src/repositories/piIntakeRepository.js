@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const db = require('../config/db');
+const { formatForDb } = require('../helpers/dbDateTime');
 
 // Port of App\Repositories\PiIntakeRepository. PI-stage intake — see
 // schema.sql Section AA. A separate, second public form from
@@ -22,7 +23,9 @@ async function createLink(orderId, createdBy) {
       order_id: orderId,
       hash: crypto.createHash('sha256').update(rawToken).digest('hex'),
       plain: rawToken,
-      expires: new Date(Date.now() + TOKEN_TTL_DAYS * 86400000).toISOString().slice(0, 19).replace('T', ' '),
+      // External QA report L-21/L-02: toISOString() is always UTC — see
+      // dbDateTime.formatForDb()'s docblock.
+      expires: formatForDb(new Date(Date.now() + TOKEN_TTL_DAYS * 86400000)),
       created_by: createdBy,
     }
   );

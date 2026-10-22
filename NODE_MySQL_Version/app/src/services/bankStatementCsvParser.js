@@ -12,6 +12,8 @@
 // only writes CSV) — this is a small, dependency-free RFC4180-ish reader,
 // good enough for the plain comma-separated exports bank portals produce.
 
+const { ymd } = require('../helpers/dbDateTime');
+
 const DATE_ALIASES = ['date', 'txn date', 'transaction date', 'value date'];
 const DESCRIPTION_ALIASES = ['description', 'narration', 'particulars', 'remarks'];
 const REFERENCE_ALIASES = ['reference', 'reference no', 'ref no', 'cheque no', 'chq no', 'utr'];
@@ -72,7 +74,12 @@ function parseDate(raw) {
 
   const parsed = new Date(raw);
   if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
+    // External QA report L-21/L-02: a non-ISO, non-d/m/y format (e.g.
+    // "22 Oct 2026") is parsed by `new Date()` as LOCAL midnight, so
+    // reading it back with toISOString() (always UTC) would shift it to
+    // the PREVIOUS day — use the local-time getters instead, same as
+    // dbDateTime.ymd()/todayIst().
+    return ymd(parsed);
   }
   return null;
 }

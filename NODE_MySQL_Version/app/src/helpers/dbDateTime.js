@@ -36,11 +36,31 @@ function parseDbDateTime(value) {
  * getters, so they correctly follow process.env.TZ.
  */
 function todayIst() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return ymd(new Date());
 }
 
-module.exports = { parseDbDateTime, todayIst };
+/** @returns {string} `date`'s LOCAL (process.env.TZ, i.e. IST) calendar date as 'YYYY-MM-DD'. */
+function ymd(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * External QA report L-21/L-02: formats a JS Date as a 'YYYY-MM-DD HH:MM:SS'
+ * wall-clock string in this process's own time zone (Asia/Kolkata —
+ * config/env.js), for writing into a TIMESTAMP/DATETIME column. Needed
+ * because `date.toISOString()` is always UTC — writing that string as a
+ * literal, now that config/db.js pins the DB session to the same +05:30
+ * offset, would have MySQL read a UTC wall-clock string as if it were
+ * already IST wall-clock and land 5h30m off (this was the actual bug:
+ * e.g. a Buyer Action Link's expiry stored as 06:20 instead of 11:50).
+ * getFullYear()/getMonth()/.../getSeconds() are LOCAL-time getters, so
+ * they already follow process.env.TZ correctly — never use toISOString()
+ * for a value headed into the database or shown to a user.
+ */
+function formatForDb(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${ymd(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+module.exports = { parseDbDateTime, todayIst, ymd, formatForDb };

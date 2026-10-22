@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const { formatForDb } = require('../helpers/dbDateTime');
 
 // QA-5 ORD-05: optional executor lets this join the caller's transaction
 // (order creation — see ordersController.store()), defaulting to the plain
@@ -15,7 +16,9 @@ async function initializeForOrder(orderId, executor = db) {
         order_id: orderId,
         stage_id: stage.id,
         status: isFirst ? 'in_progress' : 'locked',
-        unlocked_at: isFirst ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
+        // External QA report L-21/L-02: toISOString() is always UTC — see
+        // dbDateTime.formatForDb()'s docblock.
+        unlocked_at: isFirst ? formatForDb(new Date()) : null,
       }
     );
   }

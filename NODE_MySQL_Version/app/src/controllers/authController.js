@@ -11,6 +11,7 @@ const emailTemplateRepository = require('../repositories/emailTemplateRepository
 const passwordResetTokenRepository = require('../repositories/passwordResetTokenRepository');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const emailService = require('../services/emailService');
+const { formatForDb } = require('../helpers/dbDateTime');
 
 // Port of App\Controllers\AuthController.
 
@@ -125,7 +126,9 @@ async function forgotPassword(req, res) {
     if ((await passwordResetTokenRepository.countRecentForUser(user.id, 60)) < 5) {
       const rawToken = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expiresAt = new Date(Date.now() + 45 * 60000).toISOString().slice(0, 19).replace('T', ' ');
+      // External QA report L-21/L-02: toISOString() is always UTC — see
+      // dbDateTime.formatForDb()'s docblock.
+      const expiresAt = formatForDb(new Date(Date.now() + 45 * 60000));
       const ip = req.ip || null;
 
       await passwordResetTokenRepository.create(user.id, tokenHash, expiresAt, ip);

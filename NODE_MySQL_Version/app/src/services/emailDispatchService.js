@@ -10,6 +10,7 @@ const fileStoreRepository = require('../repositories/fileStoreRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderRepository = require('../repositories/orderRepository');
+const { formatForDb } = require('../helpers/dbDateTime');
 const permissionRepository = require('../repositories/permissionRepository');
 const signatoryRepository = require('../repositories/signatoryRepository');
 const userRepository = require('../repositories/userRepository');
@@ -345,10 +346,11 @@ async function dispatch(emailLogRow) {
       // docs/schema.sql Section AU: admin-configurable, default 48 (matches
       // the original hardcoded value exactly).
       const hours = parseInt((await companySettingsRepository.get('oc_ack_auto_confirm_hours')) || '48', 10);
+      // External QA report L-21/L-02: toISOString() is always UTC — see
+      // dbDateTime.formatForDb()'s docblock.
       const now = new Date();
       const due = new Date(now.getTime() + hours * 60 * 60 * 1000);
-      const fmt = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
-      await orderOcAcknowledgmentRepository.recordSent(document.order_id, document.id, fmt(now), fmt(due));
+      await orderOcAcknowledgmentRepository.recordSent(document.order_id, document.id, formatForDb(now), formatForDb(due));
     }
   } else {
     await emailLogRepository.markFailed(emailLogRow.id);

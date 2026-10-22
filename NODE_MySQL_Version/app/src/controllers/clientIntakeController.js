@@ -8,6 +8,7 @@ const rateLimiter = require('../helpers/rateLimiter');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const lookupRepository = require('../repositories/lookupRepository');
+const { formatForDb } = require('../helpers/dbDateTime');
 
 // QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order token
 // the way PI-intake does — a scripted flood from a single IP is otherwise
@@ -196,7 +197,9 @@ function collectConsigneeFields(req) {
  */
 async function issueCorrectionLink(submissionId, email) {
   const rawToken = crypto.randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19).replace('T', ' ');
+  // External QA report L-21/L-02: toISOString() is always UTC — see
+  // dbDateTime.formatForDb()'s docblock.
+  const expiresAt = formatForDb(new Date(Date.now() + 7 * 86400000));
   await clientIntakeRepository.setAccessToken(submissionId, crypto.createHash('sha256').update(rawToken).digest('hex'), expiresAt);
 
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/quotation-details/edit/${rawToken}`;

@@ -1,6 +1,6 @@
 'use strict';
 
-const { parseDbDateTime } = require('../helpers/dbDateTime');
+const { parseDbDateTime, formatForDb } = require('../helpers/dbDateTime');
 const passwordHash = require('../helpers/passwordHash');
 const { regeneratePreserving } = require('../helpers/sessionRegenerate');
 const userRepository = require('../repositories/userRepository');
@@ -57,8 +57,10 @@ async function attemptLogin(req, email, password) {
       const recentFailures = await loginAttemptRepository.recentFailedCount(user.id, lockoutMinutes);
 
       if (recentFailures >= maxAttempts) {
+        // External QA report L-21/L-02: toISOString() is always UTC — see
+        // dbDateTime.formatForDb()'s docblock.
         const until = new Date(Date.now() + lockoutMinutes * 60000);
-        const untilStr = until.toISOString().slice(0, 19).replace('T', ' ');
+        const untilStr = formatForDb(until);
         await userRepository.lockUntil(user.id, untilStr);
         await auditLogRepository.log(user.id, 'ACCOUNT_LOCKED', 'users', user.id, null, null, null, `${recentFailures} failed attempts within ${lockoutMinutes} minutes`, ip);
       }
