@@ -12,13 +12,37 @@ const flash = require('../helpers/flash');
  * edit_order_post_confirmation (or is Super Admin — req.permissions
  * already carries every key as true for one, per sessionAuth) and must
  * supply a reason; every such edit is logged.
+ *
+ * 90-item backlog Phase 6 Item 4: a SECOND, stricter check sits in front
+ * of the stage-4 one — once an order is_locked (closed via Stage 9, or
+ * marked lost), editing it needs edit_locked_data specifically, the same
+ * permission documentGenerationService.generate() already requires to
+ * force a document through on a locked order. Checked first because
+ * it's the stricter gate: a locked order is always past Stage 4 too,
+ * but the reverse isn't true.
  */
 
 function isPostConfirmation(currentStageNumber) {
   return currentStageNumber !== null && currentStageNumber !== undefined && currentStageNumber >= 4;
 }
 
-async function allow(req, currentStageNumber, reason, entityType, entityId, field) {
+async function allow(req, currentStageNumber, isLocked, reason, entityType, entityId, field) {
+  if (isLocked) {
+    if (!req.permissions.edit_locked_data) {
+      flash.set(req, 'error', 'This order is locked (closed or marked lost) — editing it now needs the "Override locked data" permission.');
+      return false;
+    }
+    const lockError = reasonValidator.check(reason);
+    if (lockError) {
+      flash.set(req, 'error', lockError);
+      return false;
+    }
+
+    await auditLogRepository.log(req.user.id, 'ORDER_EDITED_WHILE_LOCKED', entityType, entityId, field, null, null, reason);
+    flash.set(req, 'warning', `Editing this LOCKED order — logged for audit (${field}).`);
+    return true;
+  }
+
   if (!isPostConfirmation(currentStageNumber)) {
     return true;
   }
@@ -41,4 +65,8 @@ function canOverride(req) {
   return !!req.permissions.edit_order_post_confirmation;
 }
 
-module.exports = { isPostConfirmation, allow, canOverride };
+function canOverrideLock(req) {
+  return !!req.permissions.edit_locked_data;
+}
+
+module.exports = { isPostConfirmation, allow, canOverride, canOverrideLock };

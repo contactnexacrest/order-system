@@ -330,6 +330,47 @@ final class DocumentGenerationService
         return $atRisk;
     }
 
+    /**
+     * 90-item backlog Phase 6 Item 3 — Stage 9 ("Close Order") requires
+     * both the BL Instruction Sheet (BLI) and COO Prep Sheet (COOPREP) to
+     * exist in an approved/sent state. Stage 9 only unlocks after the
+     * Stage 8 balance payment clears, which itself sits downstream of the
+     * freight/BL stages — so by construction, any order reaching this
+     * point has already shipped. This applies unconditionally: a dispute
+     * never exempts it (disputes are tracked on their own table and never
+     * touch order status/stage progression — see docs/SOP/11-disputes.md),
+     * and OrderRepository::markLost()'s own caller-side guard refuses to
+     * mark an order lost once a real Bill of Lading already exists, so
+     * "lost" can no longer be used to dodge this requirement either.
+     * Previously this exact check existed ONLY in orders/show.php for
+     * display (the "Before closing: ..." note) — never re-checked
+     * server-side, so posting the close route directly skipped it
+     * entirely. Centralized here so both the view and
+     * OrderController::closeOrder() read the same answer.
+     *
+     * @return array<int, string> human-readable labels of required
+     *         document types still missing or not yet approved/sent
+     */
+    public static function closureBlockedBy(int $orderId): array
+    {
+        $required = ['BLI' => 'BL Instruction Sheet', 'COOPREP' => 'COO Prep Sheet'];
+        $documents = DocumentRepository::forOrder($orderId);
+        $blockedBy = [];
+        foreach ($required as $code => $label) {
+            $latest = null;
+            foreach ($documents as $doc) {
+                if ($doc['document_type_code'] === $code) {
+                    $latest = $doc;
+                    break;
+                }
+            }
+            if (!$latest || !in_array($latest['status'], ['approved', 'sent'], true)) {
+                $blockedBy[] = $label;
+            }
+        }
+        return $blockedBy;
+    }
+
     private static function findDocumentType(string $code): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM document_types WHERE code = :code');

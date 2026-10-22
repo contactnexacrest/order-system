@@ -443,6 +443,40 @@ async function downstreamDocumentsAtRisk(orderId, regeneratedCode) {
 }
 
 /**
+ * 90-item backlog Phase 6 Item 3 — Stage 9 ("Close Order") requires both
+ * the BL Instruction Sheet (BLI) and COO Prep Sheet (COOPREP) to exist
+ * in an approved/sent state. Stage 9 only unlocks after the Stage 8
+ * balance payment clears, which itself sits downstream of the
+ * freight/BL stages — so by construction, any order reaching this
+ * point has already shipped. This applies unconditionally: a dispute
+ * never exempts it (disputes are tracked on their own table and never
+ * touch order status/stage progression — see docs/SOP/11-disputes.md),
+ * and ordersController.markLost()'s own caller-side guard refuses to
+ * mark an order lost once a real Bill of Lading already exists, so
+ * "lost" can no longer be used to dodge this requirement either.
+ * Previously this exact check existed ONLY in show.njk for display (the
+ * "Before closing: ..." note) — never re-checked server-side, so
+ * posting the close route directly skipped it entirely. Centralized
+ * here so both the view and ordersController.closeOrder() read the
+ * same answer.
+ *
+ * @returns {Promise<string[]>} human-readable labels of required
+ *          document types still missing or not yet approved/sent
+ */
+async function closureBlockedBy(orderId) {
+  const required = { BLI: 'BL Instruction Sheet', COOPREP: 'COO Prep Sheet' };
+  const documents = await documentRepository.forOrder(orderId);
+  const blockedBy = [];
+  for (const [code, label] of Object.entries(required)) {
+    const latest = documents.find((doc) => doc.document_type_code === code) || null;
+    if (!latest || !['approved', 'sent'].includes(latest.status)) {
+      blockedBy.push(label);
+    }
+  }
+  return blockedBy;
+}
+
+/**
  * Public lookup for callers outside this service that need a
  * document_types.id before generate() itself runs — currently just
  * ordersController's saveSupplierPo, which must mint SUPPO's reference
@@ -1461,6 +1495,7 @@ module.exports = {
   generateBlEndorsement,
   documentTypeIdFor,
   downstreamDocumentsAtRisk,
+  closureBlockedBy,
   templatesEnvironment,
   StageGateBlockedError,
   // Exported for tests only (Point 8 watermark fix) — Node has no

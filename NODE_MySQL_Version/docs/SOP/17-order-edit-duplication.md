@@ -57,13 +57,38 @@ meaningful point has passed, rather than being blocked outright — because
 "the client asked for a change after confirmation" is a real, if
 infrequent, situation.
 
+### A stricter line once the order is locked
+
+A **second, stricter** gate sits in front of the one above: once an
+order is **locked** (`is_locked`) — closed via
+[Stage 9](./09-stage9-despatch-closure.md), or marked lost — editing its
+details or product lines needs the **"Override locked data"**
+permission specifically, not just "Edit an order after confirmation."
+This is the same permission already required to force a document
+through on a locked order (see [Documents](./13-document-review-approval.md)),
+applied consistently to the order's own core fields and product lines
+too. A locked order is always past Order Confirmation as well, but a
+post-confirmation order is not necessarily locked — so this check is
+evaluated first, and whichever one applies decides what the edit form
+shows: the warning banner and reason field read differently depending on
+which line was crossed, and the change is logged as
+`ORDER_EDITED_WHILE_LOCKED` rather than `ORDER_EDITED_POST_CONFIRMATION`.
+A Super Admin always has this, unconditionally, like every other
+permission. Before this, a closed, fully-despatched order's own details
+could still be edited by anyone holding just "Edit an order after
+confirmation" — this closes that gap, matching how document generation
+on a locked order has always worked.
+
 ## Editing Order Details
 
 **Edit Order Details**, linked from the order page, opens a form with
 every core field pre-filled. Before Stage 4 it saves immediately; from
 Stage 4 on, the same form appears with a warning banner and a required
 Reason field, and the button relabels to "Override & Save" so it's never
-ambiguous that a lock is being bypassed.
+ambiguous that a lock is being bypassed. Once the order is actually
+**locked** (see above), the banner, reason prompt, and button wording
+change again — "Override Lock & Save" — and require "Override locked
+data" specifically rather than "Edit an order after confirmation."
 
 ## Product lines: edit, add, remove, duplicate
 

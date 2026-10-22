@@ -486,6 +486,8 @@ async function editDetails(req, res) {
       packageTypes: await lookupRepository.dropdownOptions('package_type'),
       isPostConfirmation: orderEditGuard.isPostConfirmation(order.current_stage_number),
       canOverride: orderEditGuard.canOverride(req),
+      isLocked: !!order.is_locked,
+      canOverrideLock: orderEditGuard.canOverrideLock(req),
     },
     'layout/base'
   );
@@ -509,7 +511,7 @@ async function updateDetails(req, res) {
   }
 
   const reason = str(body.reason);
-  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'orders', orderId, 'order_details'))) {
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'orders', orderId, 'order_details'))) {
     res.redirect(`/orders/${orderId}/edit`);
     return;
   }
@@ -573,7 +575,7 @@ async function addProduct(req, res) {
   }
 
   const reason = str(body.reason);
-  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'order_products', orderId, 'product_added'))) {
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', orderId, 'product_added'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -618,7 +620,7 @@ async function updateProduct(req, res) {
   }
 
   const reason = str(body.reason);
-  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'order_products', productId, 'product_line'))) {
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', productId, 'product_line'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -649,7 +651,7 @@ async function deleteProduct(req, res) {
   }
 
   const reason = str(req.body.reason);
-  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'order_products', productId, 'product_removed'))) {
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', productId, 'product_removed'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -671,7 +673,7 @@ async function duplicateProduct(req, res) {
   }
 
   const reason = str(req.body.reason);
-  if (!(await orderEditGuard.allow(req, order.current_stage_number, reason, 'order_products', productId, 'product_duplicated'))) {
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', productId, 'product_duplicated'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -787,7 +789,14 @@ async function show(req, res) {
       hsCodes: await hsCodeRepository.active(),
       isPostConfirmationOrder: orderEditGuard.isPostConfirmation(order.current_stage_number),
       canOverrideOrderEdit: orderEditGuard.canOverride(req),
+      // 90-item backlog Phase 6 Item 4 — the stricter lock check sits in front of the post-confirmation one.
+      isLockedOrder: !!order.is_locked,
+      canOverrideLockEdit: orderEditGuard.canOverrideLock(req),
       canManageOrders: !!req.permissions.manage_orders,
+      // 90-item backlog #57 / Phase 6 Item 3: now a real server-side hard
+      // gate too (see documentGenerationService.closureBlockedBy() and
+      // closeOrder() below), not just a display-only hint.
+      closeBlockedBy: await documentGenerationService.closureBlockedBy(orderId),
       stages,
       stageByNumber,
       payment: await orderPaymentStatusRepository.find(orderId),
@@ -2135,6 +2144,15 @@ async function generateBlEndorsement(req, res) {
 }
 
 /** Stage 9 gate: COO received, BL originals endorsed, complete document set couriered to buyer -> order closed. */
+/**
+ * 90-item backlog Phase 6 Item 3 — BLI + COOPREP are now a real,
+ * server-side hard gate (see documentGenerationService.closureBlockedBy()'s
+ * docblock for why this applies unconditionally, dispute or not). The
+ * one deliberately narrow escape hatch mirrors every other locked-data
+ * override in this controller: edit_locked_data permission (Super Admin
+ * bypasses automatically) plus a mandatory reason, both re-checked here
+ * rather than trusted from the form.
+ */
 async function closeOrder(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
@@ -2143,6 +2161,33 @@ async function closeOrder(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+
+  const overrideRequested = !!req.body.override_gate;
+  const overrideReason = str(req.body.override_reason).trim();
+  let allowOverride = false;
+  if (overrideRequested) {
+    if (!req.permissions || !req.permissions.edit_locked_data) {
+      flash.set(req, 'error', 'You do not have permission to override the closure document requirement.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    if (overrideReason.length < 10) {
+      flash.set(req, 'error', 'A reason (at least 10 characters) is required to close an order without both required documents approved.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    allowOverride = true;
+  }
+
+  if (!allowOverride) {
+    const blockedBy = await documentGenerationService.closureBlockedBy(orderId);
+    if (blockedBy.length > 0) {
+      flash.set(req, 'error', `Before closing: generate and get approval for ${blockedBy.join(' and ')}. A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.`);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+  }
+
   const trackingNumber = str(req.body.courier_tracking_number);
   if (trackingNumber === '') {
     flash.set(req, 'error', 'Courier tracking number is required to close the order.');
@@ -2152,6 +2197,9 @@ async function closeOrder(req, res) {
   await orderShippingRepository.recordCourierSent(orderId, trackingNumber);
   await stageGateService.passAndUnlockNext(orderId, 9, user.id);
   await orderRepository.markComplete(orderId);
+  if (allowOverride) {
+    await auditLogRepository.log(user.id, 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE', 'orders', orderId, 'status', null, 'complete', overrideReason);
+  }
   flash.set(req, 'success', `Order closed — complete document set couriered to buyer (tracking: ${trackingNumber}).`);
   res.redirect(`/orders/${orderId}`);
 }
@@ -2262,6 +2310,18 @@ async function markLost(req, res) {
   }
   if (order.status !== 'active') {
     flash.set(req, 'error', `Only an active order can be marked lost (this one is already "${order.status}").`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // 90-item backlog Phase 6 Item 3 — once a real Bill of Lading exists,
+  // the goods have actually shipped, so "lost" (buyer walked away,
+  // nothing ever shipped) no longer describes this order's reality.
+  // Closes a side door around Close Order's own BLI/COOPREP requirement:
+  // without this, staff could mark an already-shipped order "lost" and
+  // skip that paperwork entirely.
+  const shipping = await orderShippingRepository.find(orderId);
+  if (shipping && shipping.bl_number) {
+    flash.set(req, 'error', 'This order already has a Bill of Lading on file — the goods have shipped, so it can no longer be marked "lost". Use Close Order instead.');
     res.redirect(`/orders/${orderId}`);
     return;
   }

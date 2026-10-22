@@ -5,6 +5,7 @@ use App\Helpers\Dates;
 use App\Helpers\LeadTimeDisplay;
 use App\Repositories\CaFyLockRepository;
 use App\Services\AuthService;
+use App\Services\DocumentGenerationService;
 use App\Services\OrderEditGuard;
 use App\Services\PermissionService;
 
@@ -30,7 +31,10 @@ $canOverrideFyLock = PermissionService::can((int) $currentUser['id'], $currentUs
 // Order-Edit feature — product-row edits/duplication once Order Confirmation is reached — see OrderEditGuard.
 $isPostConfirmationOrder = OrderEditGuard::isPostConfirmation($order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null);
 $canOverrideOrderEdit = OrderEditGuard::canOverride((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null);
-$canEditProducts = $canManageOrders && (!$isPostConfirmationOrder || $canOverrideOrderEdit);
+// 90-item backlog Phase 6 Item 4 — the stricter lock check sits in front of the post-confirmation one.
+$isLockedOrder = (bool) $order['is_locked'];
+$canOverrideLockEdit = OrderEditGuard::canOverrideLock((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null);
+$canEditProducts = $canManageOrders && (!$isLockedOrder || $canOverrideLockEdit) && (!$isPostConfirmationOrder || $canOverrideOrderEdit);
 
 // CA / Accounting module (Phase 1) — one small widget per settlement leg,
 // rendered inline in the Payment Status section rather than a separate
@@ -409,13 +413,18 @@ foreach ($stages as $s) {
         </tr>
         <?php endforeach; ?>
       </table>
-      <?php if ($isPostConfirmationOrder && $canManageOrders): ?>
+      <?php if ($isLockedOrder && $canManageOrders): ?>
+        <p class="notice notice-error">This order is LOCKED (closed or marked lost) — editing or duplicating a product line now needs the "Override locked data" permission.</p>
+      <?php elseif ($isPostConfirmationOrder && $canManageOrders): ?>
         <p class="notice notice-error">This order has already reached Order Confirmation — editing or duplicating a product line now needs the "Edit an order after confirmation" permission.</p>
       <?php endif; ?>
     <?php else: ?>
-      <?php if ($isPostConfirmationOrder): ?>
+      <?php if ($isLockedOrder): ?>
+        <p class="notice notice-warning">This order is LOCKED (closed or marked lost). Adding, editing, duplicating, or removing a product line will be logged as a locked-order edit override — a reason is required below.</p>
+      <?php elseif ($isPostConfirmationOrder): ?>
         <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required below.</p>
       <?php endif; ?>
+      <?php $__productReasonRequired = $isLockedOrder || $isPostConfirmationOrder; ?>
       <?php foreach ($products as $i => $p): ?>
         <div class="card-nested">
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>">
@@ -445,19 +454,19 @@ foreach ($stages as $s) {
               <label>Unit Price<input type="text" name="unit_price" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
               <label>HS Code<input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" required></label>
             </div>
-            <?php if ($isPostConfirmationOrder): ?>
-              <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing after confirmation?"></textarea></label>
+            <?php if ($__productReasonRequired): ?>
+              <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing?"></textarea></label>
             <?php endif; ?>
-            <button type="submit" class="btn-sm"><?= $isPostConfirmationOrder ? 'Override & Save' : 'Save' ?></button>
+            <button type="submit" class="btn-sm"><?= $__productReasonRequired ? 'Override & Save' : 'Save' ?></button>
           </form>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/duplicate" style="display:inline">
             <?= Csrf::field() ?>
-            <?php if ($isPostConfirmationOrder): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;"><?php endif; ?>
+            <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;"><?php endif; ?>
             <button type="submit" class="btn-sm btn-secondary" title="Clone this line — handy when only the name or dimensions differ">Duplicate</button>
           </form>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove this product line?');">
             <?= Csrf::field() ?>
-            <?php if ($isPostConfirmationOrder): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;"><?php endif; ?>
+            <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;"><?php endif; ?>
             <button type="submit" class="btn-sm btn-danger">Remove</button>
           </form>
         </div>
@@ -491,10 +500,10 @@ foreach ($stages as $s) {
             <label>Unit Price<input type="text" name="unit_price"></label>
             <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
           </div>
-          <?php if ($isPostConfirmationOrder): ?>
-            <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added after confirmation?"></textarea></label>
+          <?php if ($__productReasonRequired): ?>
+            <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added?"></textarea></label>
           <?php endif; ?>
-          <button type="submit"><?= $isPostConfirmationOrder ? 'Override & Add' : 'Add Product Line' ?></button>
+          <button type="submit"><?= $__productReasonRequired ? 'Override & Add' : 'Add Product Line' ?></button>
         </form>
       </div>
       <datalist id="hs_code_list_edit">
@@ -1935,20 +1944,12 @@ foreach ($stages as $s) {
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php else: ?>
       <?php
-        // 90-item backlog #57: computed once here and reused below to warn
-        // staff before they try to close, rather than letting them fill in
-        // the tracking number and only find out from the resulting error.
-        $__closeRequiredTypes = ['BLI' => 'BL Instruction Sheet', 'COOPREP' => 'COO Prep Sheet'];
-        $__closeBlockedBy = [];
-        foreach ($__closeRequiredTypes as $__closeCode => $__closeLabel) {
-          $__closeLatest = null;
-          foreach ($documents as $__closeDoc) {
-            if ($__closeDoc['document_type_code'] === $__closeCode) { $__closeLatest = $__closeDoc; break; }
-          }
-          if (!$__closeLatest || !in_array($__closeLatest['status'], ['approved', 'sent'], true)) {
-            $__closeBlockedBy[] = $__closeLabel;
-          }
-        }
+        // 90-item backlog #57 / Phase 6 Item 3: computed once here and
+        // reused below to warn staff before they try to close — this is
+        // now a real server-side hard gate too (see
+        // DocumentGenerationService::closureBlockedBy()'s docblock and
+        // OrderController::closeOrder()), not just a display-only hint.
+        $__closeBlockedBy = DocumentGenerationService::closureBlockedBy((int) $order['id']);
       ?>
       <h3 style="font-size:0.95em; margin-top:0;">COO Prep Sheet (internal — for the Chamber of Commerce application)</h3>
       <p class="muted small">Generates an internal worksheet summarizing everything needed to apply for the Certificate of Origin with the Chamber of Commerce — shipper, consignee, shipment, and cargo details, the same source data as the BL Instruction Sheet. Never shown to the client.</p>
@@ -2009,13 +2010,25 @@ foreach ($stages as $s) {
 
       <?php if ($canCloseOrders): ?>
       <?php if (!empty($__closeBlockedBy)): ?>
-        <p class="muted small">⚠ Before closing: generate and get approval for <?= htmlspecialchars(implode(' and ', $__closeBlockedBy)) ?> above.</p>
-      <?php endif; ?>
+        <p class="notice notice-error">⚠ Before closing: generate and get approval for <?= htmlspecialchars(implode(' and ', $__closeBlockedBy)) ?> above. Close Order is blocked until then<?= $canEditLockedData ? ' — or override below with a reason.' : '.' ?></p>
+        <?php if ($canEditLockedData): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/close" onsubmit="return confirmFieldOverride(this, 'closing this order without both required documents approved');" style="border:1px solid #D9822B; padding:10px; border-radius:4px;">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="override_gate" value="1">
+          <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
+          <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+          </label>
+          <?= $stepBadge('9f') ?><button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
+        </form>
+        <?php endif; ?>
+      <?php else: ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
         <?= $stepBadge('9f') ?><button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
+      <?php endif; ?>
       <?php else: ?>
       <p class="muted">Only Export/Logistics can close this order.</p>
       <?php endif; ?>

@@ -2,7 +2,19 @@
   <p class="muted small"><a href="/orders/{{ order.id }}">&larr; Back to Order</a></p>
   <h1>Edit Order Details — {{ order.order_reference }}</h1>
 
-  {% if isPostConfirmation %}
+  {% if isLocked %}
+    {% if canOverrideLock %}
+      <p class="notice notice-warning">
+        This order is LOCKED (closed or marked lost). Saving a change here will be logged as a
+        locked-order edit override — a reason is required below.
+      </p>
+    {% else %}
+      <p class="notice notice-error">
+        This order is LOCKED (closed or marked lost) — editing it now needs the
+        "Override locked data" permission. Contact a Super Admin if this genuinely needs to change.
+      </p>
+    {% endif %}
+  {% elif isPostConfirmation %}
     {% if canOverride %}
       <p class="notice notice-warning">
         This order has already reached Order Confirmation. Saving a change here will be logged as a
@@ -17,7 +29,7 @@
     {% endif %}
   {% endif %}
 
-  {% if not isPostConfirmation or canOverride %}
+  {% if (not isLocked or canOverrideLock) and (not isPostConfirmation or canOverride) %}
   <form method="post" action="/orders/{{ order.id }}/edit">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
@@ -135,14 +147,19 @@
       <a href="/orders/{{ order.id }}/amendments">Amendments</a> for those.
     </p>
 
-    {% if isPostConfirmation %}
+    {% if isLocked %}
+      <fieldset>
+        <legend>Reason <small class="muted">(required — this order is locked)</small></legend>
+        <textarea name="reason" rows="2" placeholder="Why does this locked order need to change? (e.g. correcting a genuine mistake found after closure)" required minlength="10"></textarea>
+      </fieldset>
+    {% elif isPostConfirmation %}
       <fieldset>
         <legend>Reason <small class="muted">(required — this order has already reached Order Confirmation)</small></legend>
         <textarea name="reason" rows="2" placeholder="Why is this changing now, after confirmation? (e.g. client requested a change)" required minlength="10"></textarea>
       </fieldset>
     {% endif %}
 
-    <button type="submit">{{ 'Override & Save' if isPostConfirmation else 'Save Changes' }}</button>
+    <button type="submit">{{ 'Override Lock & Save' if isLocked else ('Override & Save' if isPostConfirmation else 'Save Changes') }}</button>
   </form>
   {% endif %}
 </div>

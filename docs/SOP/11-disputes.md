@@ -9,6 +9,12 @@ comments in [Client Portal](./12-client-portal.md).
 
 Like Amendments, this isn't part of the 9-stage pipeline: a dispute can be
 raised at any point on any order and never blocks or unlocks a stage gate.
+This cuts both ways: an open dispute also never *exempts* an order from a
+stage's own requirements — most notably, [Stage 9's Close Order
+gate](./09-stage9-despatch-closure.md) (BLI + COO Prep approved/sent)
+still applies in full to a disputed order that has shipped, since the
+goods have gone out regardless of what's being disputed with the buyer
+afterward.
 
 ## Who can do what
 

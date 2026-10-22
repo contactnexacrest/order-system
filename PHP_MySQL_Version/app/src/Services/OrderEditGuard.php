@@ -16,6 +16,17 @@ use App\Repositories\AuditLogRepository;
  * unconditional as everywhere else) and must supply a reason; every such
  * edit is logged. Mirrors the CaFyLockGuard pattern used for the CA
  * module's financial-year-lock override.
+ *
+ * 90-item backlog Phase 6 Item 4: a SECOND, stricter check sits in front
+ * of the stage-4 one — once an order is_locked (closed via Stage 9, or
+ * marked lost), editing it needs edit_locked_data specifically, the same
+ * permission DocumentGenerationService::generate() already requires to
+ * force a document through on a locked order. Before this, is_locked was
+ * checked for document generation but never for the order's own core
+ * details/product lines — anyone holding just edit_order_post_confirmation
+ * could silently edit a closed order. Checked first because it's the
+ * stricter gate: a locked order is always past Stage 4 too, but the
+ * reverse isn't true.
  */
 final class OrderEditGuard
 {
@@ -26,6 +37,7 @@ final class OrderEditGuard
 
     public static function allow(
         ?int $currentStageNumber,
+        bool $isLocked,
         int $userId,
         ?int $roleId,
         string $reason,
@@ -33,6 +45,21 @@ final class OrderEditGuard
         int $entityId,
         string $field
     ): bool {
+        if ($isLocked) {
+            if (!PermissionService::can($userId, $roleId, 'edit_locked_data')) {
+                Flash::set('error', 'This order is locked (closed or marked lost) — editing it now needs the "Override locked data" permission.');
+                return false;
+            }
+            if ($error = ReasonValidator::check($reason)) {
+                Flash::set('error', $error);
+                return false;
+            }
+
+            AuditLogRepository::log($userId, 'ORDER_EDITED_WHILE_LOCKED', $entityType, $entityId, $field, null, null, $reason);
+            Flash::set('warning', "Editing this LOCKED order — logged for audit ({$field}).");
+            return true;
+        }
+
         if (!self::isPostConfirmation($currentStageNumber)) {
             return true;
         }
@@ -53,5 +80,10 @@ final class OrderEditGuard
     public static function canOverride(int $userId, ?int $roleId): bool
     {
         return PermissionService::can($userId, $roleId, 'edit_order_post_confirmation');
+    }
+
+    public static function canOverrideLock(int $userId, ?int $roleId): bool
+    {
+        return PermissionService::can($userId, $roleId, 'edit_locked_data');
     }
 }

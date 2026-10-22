@@ -3,7 +3,19 @@
   <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>">&larr; Back to Order</a></p>
   <h1>Edit Order Details — <?= htmlspecialchars($order['order_reference']) ?></h1>
 
-  <?php if ($isPostConfirmation): ?>
+  <?php if ($isLocked): ?>
+    <?php if ($canOverrideLock): ?>
+      <p class="notice notice-warning">
+        This order is LOCKED (closed or marked lost). Saving a change here will be logged as a
+        locked-order edit override — a reason is required below.
+      </p>
+    <?php else: ?>
+      <p class="notice notice-error">
+        This order is LOCKED (closed or marked lost) — editing it now needs the
+        "Override locked data" permission. Contact a Super Admin if this genuinely needs to change.
+      </p>
+    <?php endif; ?>
+  <?php elseif ($isPostConfirmation): ?>
     <?php if ($canOverride): ?>
       <p class="notice notice-warning">
         This order has already reached Order Confirmation. Saving a change here will be logged as a
@@ -18,7 +30,7 @@
     <?php endif; ?>
   <?php endif; ?>
 
-  <?php if (!$isPostConfirmation || $canOverride): ?>
+  <?php if ((!$isLocked || $canOverrideLock) && (!$isPostConfirmation || $canOverride)): ?>
   <form method="post" action="/orders/<?= (int) $order['id'] ?>/edit">
     <?= Csrf::field() ?>
 
@@ -136,14 +148,19 @@
       <a href="/orders/<?= (int) $order['id'] ?>/amendments">Amendments</a> for those.
     </p>
 
-    <?php if ($isPostConfirmation): ?>
+    <?php if ($isLocked): ?>
+      <fieldset>
+        <legend>Reason <small class="muted">(required — this order is locked)</small></legend>
+        <textarea name="reason" rows="2" placeholder="Why does this locked order need to change? (e.g. correcting a genuine mistake found after closure)" required minlength="10"></textarea>
+      </fieldset>
+    <?php elseif ($isPostConfirmation): ?>
       <fieldset>
         <legend>Reason <small class="muted">(required — this order has already reached Order Confirmation)</small></legend>
         <textarea name="reason" rows="2" placeholder="Why is this changing now, after confirmation? (e.g. client requested a change)" required minlength="10"></textarea>
       </fieldset>
     <?php endif; ?>
 
-    <button type="submit"><?= $isPostConfirmation ? 'Override & Save' : 'Save Changes' ?></button>
+    <button type="submit"><?= $isLocked ? 'Override Lock & Save' : ($isPostConfirmation ? 'Override & Save' : 'Save Changes') ?></button>
   </form>
   <?php endif; ?>
 </div>

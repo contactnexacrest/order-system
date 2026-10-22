@@ -51,6 +51,7 @@ use App\Repositories\UserRepository;
 use App\Config\Env;
 use App\Services\AuthService;
 use App\Services\CaFyLockGuard;
+use App\Services\DocumentGenerationService;
 use App\Services\EmailService;
 use App\Services\FileUploadService;
 use App\Services\OrderDuplicationService;
@@ -487,6 +488,8 @@ final class OrderController
             'packageTypes'    => LookupRepository::dropdownOptions('package_type'),
             'isPostConfirmation' => OrderEditGuard::isPostConfirmation($order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null),
             'canOverride'     => OrderEditGuard::canOverride((int) $user['id'], $roleId),
+            'isLocked'        => (bool) $order['is_locked'],
+            'canOverrideLock' => OrderEditGuard::canOverrideLock((int) $user['id'], $roleId),
         ], 'layout/base');
     }
 
@@ -512,7 +515,7 @@ final class OrderController
 
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
         $reason = trim((string) ($_POST['reason'] ?? ''));
-        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'orders', $orderId, 'order_details')) {
+        if (!OrderEditGuard::allow($currentStageNumber, (bool) $order['is_locked'], (int) $user['id'], $roleId, $reason, 'orders', $orderId, 'order_details')) {
             header("Location: /orders/{$orderId}/edit");
             return;
         }
@@ -580,7 +583,7 @@ final class OrderController
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
         $reason = trim((string) ($_POST['reason'] ?? ''));
-        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'order_products', $orderId, 'product_added')) {
+        if (!OrderEditGuard::allow($currentStageNumber, (bool) $order['is_locked'], (int) $user['id'], $roleId, $reason, 'order_products', $orderId, 'product_added')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -629,7 +632,7 @@ final class OrderController
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
         $reason = trim((string) ($_POST['reason'] ?? ''));
-        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_line')) {
+        if (!OrderEditGuard::allow($currentStageNumber, (bool) $order['is_locked'], (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_line')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -665,7 +668,7 @@ final class OrderController
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
         $reason = trim((string) ($_POST['reason'] ?? ''));
-        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_removed')) {
+        if (!OrderEditGuard::allow($currentStageNumber, (bool) $order['is_locked'], (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_removed')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -692,7 +695,7 @@ final class OrderController
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
         $reason = trim((string) ($_POST['reason'] ?? ''));
-        if (!OrderEditGuard::allow($currentStageNumber, (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_duplicated')) {
+        if (!OrderEditGuard::allow($currentStageNumber, (bool) $order['is_locked'], (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_duplicated')) {
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -2171,15 +2174,52 @@ final class OrderController
     }
 
     /** Stage 9 gate: COO received, BL originals endorsed, complete document set couriered to buyer -> order closed. */
+    /**
+     * 90-item backlog Phase 6 Item 3 — BLI + COOPREP are now a real,
+     * server-side hard gate (see DocumentGenerationService::closureBlockedBy()'s
+     * docblock for why this applies unconditionally, dispute or not).
+     * The one deliberately narrow escape hatch mirrors every other
+     * locked-data override in this controller: edit_locked_data
+     * permission (Super Admin bypasses automatically) plus a mandatory
+     * reason, both re-checked here rather than trusted from the form.
+     */
     public function closeOrder(array $params): void
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         if (!StageGateService::isUnlocked($orderId, 9)) {
             Flash::set('error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
             header("Location: /orders/{$orderId}");
             return;
         }
+
+        $overrideRequested = !empty($_POST['override_gate']);
+        $overrideReason = trim((string) ($_POST['override_reason'] ?? ''));
+        $allowOverride = false;
+        if ($overrideRequested) {
+            if (!PermissionService::can((int) $user['id'], $roleId, 'edit_locked_data')) {
+                Flash::set('error', 'You do not have permission to override the closure document requirement.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            if ($overrideReason === '' || mb_strlen($overrideReason) < 10) {
+                Flash::set('error', 'A reason (at least 10 characters) is required to close an order without both required documents approved.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            $allowOverride = true;
+        }
+
+        if (!$allowOverride) {
+            $blockedBy = DocumentGenerationService::closureBlockedBy($orderId);
+            if (!empty($blockedBy)) {
+                Flash::set('error', 'Before closing: generate and get approval for ' . implode(' and ', $blockedBy) . '. A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+        }
+
         $trackingNumber = trim((string) ($_POST['courier_tracking_number'] ?? ''));
         if ($trackingNumber === '') {
             Flash::set('error', 'Courier tracking number is required to close the order.');
@@ -2189,6 +2229,9 @@ final class OrderController
         OrderShippingRepository::recordCourierSent($orderId, $trackingNumber);
         StageGateService::passAndUnlockNext($orderId, 9, (int) $user['id']);
         OrderRepository::markComplete($orderId);
+        if ($allowOverride) {
+            AuditLogRepository::log((int) $user['id'], 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE', 'orders', $orderId, 'status', null, 'complete', $overrideReason);
+        }
         Flash::set('success', "Order closed — complete document set couriered to buyer (tracking: {$trackingNumber}).");
         header("Location: /orders/{$orderId}");
     }
@@ -2253,6 +2296,18 @@ final class OrderController
         }
         if ($order['status'] !== 'active') {
             Flash::set('error', "Only an active order can be marked lost (this one is already \"{$order['status']}\").");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // 90-item backlog Phase 6 Item 3 — once a real Bill of Lading
+        // exists, the goods have actually shipped, so "lost" (buyer
+        // walked away, nothing ever shipped) no longer describes this
+        // order's reality. Closes a side door around Close Order's own
+        // BLI/COOPREP requirement: without this, staff could mark an
+        // already-shipped order "lost" and skip that paperwork entirely.
+        $shipping = OrderShippingRepository::find($orderId);
+        if ($shipping && !empty($shipping['bl_number'])) {
+            Flash::set('error', 'This order already has a Bill of Lading on file — the goods have shipped, so it can no longer be marked "lost". Use Close Order instead.');
             header("Location: /orders/{$orderId}");
             return;
         }

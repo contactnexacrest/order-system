@@ -163,7 +163,6 @@ njkEnv.addGlobal('today', () => {
 // Batch 3 #5 — document generate buttons: whether a document of this type code already
 // exists for the order, so the view can pick btn-doc-new vs btn-doc-regenerate.
 njkEnv.addGlobal('docGenerated', (documents, code) => (documents || []).some((d) => d.document_type_code === code));
-njkEnv.addGlobal('closeOrderBlockedBy', require('./helpers/closeOrderBlockedBy').closeOrderBlockedBy);
 njkEnv.addGlobal('annexureConfirmAttr', require('./helpers/annexureConfirmAttr').annexureConfirmAttr);
 njkEnv.addGlobal('stepBadge', require('./helpers/stepBadge').stepBadge);
 njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').formatRange);

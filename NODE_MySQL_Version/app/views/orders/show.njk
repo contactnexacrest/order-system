@@ -314,7 +314,7 @@
 
   <div class="section">
     <h2>Products</h2>
-    {% set canEditProducts = permissions.manage_orders and (not isPostConfirmationOrder or canOverrideOrderEdit) %}
+    {% set canEditProducts = permissions.manage_orders and (not isLockedOrder or canOverrideLockEdit) and (not isPostConfirmationOrder or canOverrideOrderEdit) %}
     {% if not canEditProducts %}
       <table class="list">
         <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
@@ -329,13 +329,18 @@
         </tr>
         {% endfor %}
       </table>
-      {% if isPostConfirmationOrder and permissions.manage_orders %}
+      {% if isLockedOrder and permissions.manage_orders %}
+        <p class="notice notice-error">This order is LOCKED (closed or marked lost) — editing or duplicating a product line now needs the "Override locked data" permission.</p>
+      {% elif isPostConfirmationOrder and permissions.manage_orders %}
         <p class="notice notice-error">This order has already reached Order Confirmation — editing or duplicating a product line now needs the "Edit an order after confirmation" permission.</p>
       {% endif %}
     {% else %}
-      {% if isPostConfirmationOrder %}
+      {% if isLockedOrder %}
+        <p class="notice notice-warning">This order is LOCKED (closed or marked lost). Adding, editing, duplicating, or removing a product line will be logged as a locked-order edit override — a reason is required below.</p>
+      {% elif isPostConfirmationOrder %}
         <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required below.</p>
       {% endif %}
+      {% set productReasonRequired = isLockedOrder or isPostConfirmationOrder %}
       {% for p in products %}
         <div class="card-nested">
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}">
@@ -363,19 +368,19 @@
               <label>Unit Price<input type="text" name="unit_price" value="{{ p.unit_price or '' }}"></label>
               <label>HS Code<input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" required></label>
             </div>
-            {% if isPostConfirmationOrder %}
-              <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing after confirmation?"></textarea></label>
+            {% if productReasonRequired %}
+              <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing?"></textarea></label>
             {% endif %}
-            <button type="submit" class="btn-sm">{{ 'Override & Save' if isPostConfirmationOrder else 'Save' }}</button>
+            <button type="submit" class="btn-sm">{{ 'Override & Save' if productReasonRequired else 'Save' }}</button>
           </form>
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/duplicate" style="display:inline">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            {% if isPostConfirmationOrder %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;">{% endif %}
+            {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;">{% endif %}
             <button type="submit" class="btn-sm btn-secondary" title="Clone this line — handy when only the name or dimensions differ">Duplicate</button>
           </form>
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Remove this product line?');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            {% if isPostConfirmationOrder %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;">{% endif %}
+            {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;">{% endif %}
             <button type="submit" class="btn-sm btn-danger">Remove</button>
           </form>
         </div>
@@ -409,10 +414,10 @@
             <label>Unit Price<input type="text" name="unit_price"></label>
             <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
           </div>
-          {% if isPostConfirmationOrder %}
-            <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added after confirmation?"></textarea></label>
+          {% if productReasonRequired %}
+            <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added?"></textarea></label>
           {% endif %}
-          <button type="submit">{{ 'Override & Add' if isPostConfirmationOrder else 'Add Product Line' }}</button>
+          <button type="submit">{{ 'Override & Add' if productReasonRequired else 'Add Product Line' }}</button>
         </form>
       </div>
       <datalist id="hs_code_list_edit">
@@ -1870,15 +1875,26 @@
       {% endif %}
 
       {% if permissions.close_orders %}
-      {% set closeBlockedBy = closeOrderBlockedBy(documents) %}
       {% if closeBlockedBy.length %}
-        <p class="muted small">⚠ Before closing: generate and get approval for {{ closeBlockedBy | join(' and ') }} above.</p>
-      {% endif %}
+        <p class="notice notice-error">⚠ Before closing: generate and get approval for {{ closeBlockedBy | join(' and ') }} above. Close Order is blocked until then{{ ' — or override below with a reason.' if permissions.edit_locked_data else '.' }}</p>
+        {% if permissions.edit_locked_data %}
+        <form method="post" action="/orders/{{ order.id }}/close" onsubmit="return confirmFieldOverride(this, 'closing this order without both required documents approved');" style="border:1px solid #D9822B; padding:10px; border-radius:4px;">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="override_gate" value="1">
+          <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
+          <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+          </label>
+          {{ stepBadge('9f') | safe }}<button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
+        </form>
+        {% endif %}
+      {% else %}
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
         {{ stepBadge('9f') | safe }}<button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
+      {% endif %}
       {% else %}
       <p class="muted">Only Export/Logistics can close this order.</p>
       {% endif %}

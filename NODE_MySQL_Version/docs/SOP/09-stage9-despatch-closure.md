@@ -45,14 +45,33 @@ Stage 9's gate and marks the order complete.**
 
 ![Stage 9 section — order closed](./images/s9_closed.png)
 
-If the **BL Instruction Sheet** (Stage 7) or **COO Prep Sheet** (below)
-hasn't been generated and approved yet, a small note appears just above the
-Close Order form naming which one is still outstanding. Like the
-Compliance Checklist below, this is a reminder only — it never disables or
-hides the form. Close Order remains available throughout this stage
-regardless of either document's state, for the same reason the two
-record-keeping steps above aren't enforced either: the system trusts staff
-to follow the real-world process rather than hard-coding it as a rule here.
+**Close Order requires both the BL Instruction Sheet** (Stage 7) **and
+COO Prep Sheet** (below) **to be generated and approved/sent first** — a
+real, server-side gate, not just a display hint. The goods have, by
+construction, already shipped by the time Stage 9 is even reachable
+(this stage only unlocks once the Stage 8 balance payment clears, which
+itself sits downstream of the freight/BL stages), so this requirement
+applies to every order reaching Close Order, with no exception for a
+disputed order — a dispute never touches an order's own status or stage
+progression (see [Disputes](./11-disputes.md)), so a disputed-but-shipped
+order hits this exact same gate like any other. If either document is
+still missing or not yet approved/sent, the normal Close Order form is
+replaced by an error naming which one, plus — for whoever holds the
+**"Override locked data"** permission — a privileged override form
+requiring a reason (minimum 10 characters), logged to the audit trail as
+`CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE`. Anyone without that permission sees
+only the error; Close Order itself stays unavailable to them until both
+documents are in order.
+
+This reverses an earlier, deliberate decision (see the Compliance
+Checklist note below, and the two record-keeping steps above, which
+*are* still non-blocking by design) that treated this the same way — the
+business has since decided BLI/COO Prep are a hard requirement, not a
+reminder, because an order that has already shipped needs this paperwork
+regardless of what happens with the buyer afterward. An order that is
+genuinely abandoned *before* shipping doesn't reach this gate at all: see
+"Marking an order lost" below for why an order can no longer be marked
+lost once a real Bill of Lading already exists on file.
 
 ## BL Endorsement document
 
@@ -123,10 +142,30 @@ the checklist itself. Every status change is recorded in the order's own
 [Audit Log](./13-document-review-approval.md) under
 `COMPLIANCE_TASK_STATUS_UPDATED`.
 
-The checklist does not itself gate **Close Order** — closing still only
-requires Stage 9's own gate (BL originals/endorsement) and the courier
-tracking number. The checklist is a tracking aid for the same person who
-has the authority to close the order, not an additional hard-coded lock.
+The checklist does not itself gate **Close Order** — closing requires
+Stage 9's own gate, the courier tracking number, and (see above) the BLI
+and COO Prep Sheet being approved/sent, but never the checklist itself.
+The checklist is a tracking aid for the same person who has the
+authority to close the order, not an additional hard-coded lock.
+
+## Marking an order lost
+
+Any **active** order, at any stage, can be marked **lost** instead of
+progressing further — the buyer walked away, the deal fell through,
+whatever the reason (mandatory, free text). This locks the order the
+same way closing it does (`is_locked`), and it shows up in reporting as
+lost rather than active or complete.
+
+**Once a real Bill of Lading already exists on file for the order**
+(`order_shipping.bl_number` — set at [Stage 7](./07-stage7-packing-bl.md)
+once the shipping line actually issues one), **it can no longer be
+marked lost.** At that point the goods have genuinely shipped, so "lost"
+(nothing ever shipped, buyer walked away before it did) no longer
+describes reality — the order has to go through Close Order instead,
+BLI/COO Prep requirement included, whatever is also happening
+commercially with the buyer. Without this guard, marking an
+already-shipped order "lost" would have been a side door around that
+requirement.
 
 ## What the client does (or doesn't)
 
