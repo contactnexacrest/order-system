@@ -8,18 +8,50 @@ use App\Config\Database;
 
 final class OrderSupplierPoRepository
 {
+    /**
+     * 90-item backlog "standalone order" follow-on: resolves the
+     * supplier's identity details ONCE, at Supplier PO creation — never
+     * re-read from `suppliers` again. Mirrors OrderRepository's own
+     * resolveSnapshot() for incoterm/currency/port/preset.
+     *
+     * @return array<string,mixed>
+     */
+    private static function resolveSupplierSnapshot(int $supplierId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT supplier_legal_name, address, gstin, pan, contact_person, phone, supplier_type FROM suppliers WHERE id = :id'
+        );
+        $stmt->execute(['id' => $supplierId]);
+        $supplier = $stmt->fetch() ?: [];
+
+        return [
+            'supplier_legal_name'     => $supplier['supplier_legal_name'] ?? null,
+            'supplier_address'        => $supplier['address'] ?? null,
+            'supplier_gstin'          => $supplier['gstin'] ?? null,
+            'supplier_pan'            => $supplier['pan'] ?? null,
+            'supplier_contact_person' => $supplier['contact_person'] ?? null,
+            'supplier_phone'          => $supplier['phone'] ?? null,
+            'supplier_type'           => $supplier['supplier_type'] ?? null,
+        ];
+    }
+
     public static function create(int $orderId, int $supplierId, string $supplierPoReference, array $data, string $status = 'issued'): int
     {
         $pdo = Database::connection();
+        $snapshot = self::resolveSupplierSnapshot($supplierId);
         $stmt = $pdo->prepare(
             'INSERT INTO order_supplier_po
-                (order_id, supplier_id, supplier_po_reference, material_stone_type, grade, surface_finish,
+                (order_id, supplier_id, supplier_legal_name, supplier_address, supplier_gstin, supplier_pan,
+                 supplier_contact_person, supplier_phone, supplier_type,
+                 supplier_po_reference, material_stone_type, grade, surface_finish,
                  dimensions, dimensional_tolerance, quantity, unit, colour_reference, special_requirements,
                  unit_price_inr, basic_value_inr, gst_rate_pct, gst_amount_inr, total_payable_inr,
                  advance_pct, advance_amount_inr, balance_amount_inr,
                  delivery_location, required_delivery_date, packing_requirement, status)
              VALUES
-                (:order_id, :supplier_id, :ref, :material, :grade, :finish,
+                (:order_id, :supplier_id, :supplier_legal_name, :supplier_address, :supplier_gstin, :supplier_pan,
+                 :supplier_contact_person, :supplier_phone, :supplier_type,
+                 :ref, :material, :grade, :finish,
                  :dimensions, :tolerance, :quantity, :unit, :colour, :special,
                  :unit_price, :basic_value, :gst_rate, :gst_amount, :total_payable,
                  :advance_pct, :advance_amount, :balance_amount,
@@ -28,6 +60,13 @@ final class OrderSupplierPoRepository
         $stmt->execute([
             'order_id'    => $orderId,
             'supplier_id' => $supplierId,
+            'supplier_legal_name'     => $snapshot['supplier_legal_name'],
+            'supplier_address'        => $snapshot['supplier_address'],
+            'supplier_gstin'          => $snapshot['supplier_gstin'],
+            'supplier_pan'            => $snapshot['supplier_pan'],
+            'supplier_contact_person' => $snapshot['supplier_contact_person'],
+            'supplier_phone'          => $snapshot['supplier_phone'],
+            'supplier_type'           => $snapshot['supplier_type'],
             'ref'         => $supplierPoReference,
             'status'      => $status,
             'material'    => $data['material_stone_type'] ?? null,
@@ -54,16 +93,15 @@ final class OrderSupplierPoRepository
         return (int) $pdo->lastInsertId();
     }
 
+    /**
+     * 90-item backlog "standalone order" follow-on: every field this
+     * returns, supplier identity included, now lives on the row itself —
+     * no JOIN against `suppliers` needed or performed.
+     */
     public static function findLatestForOrder(int $orderId): ?array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT sp.*, s.supplier_legal_name, s.address AS supplier_address, s.gstin AS supplier_gstin,
-                    s.pan AS supplier_pan, s.contact_person AS supplier_contact_person, s.phone AS supplier_phone,
-                    s.supplier_type
-             FROM order_supplier_po sp
-             JOIN suppliers s ON s.id = sp.supplier_id
-             WHERE sp.order_id = :order_id
-             ORDER BY sp.id DESC LIMIT 1'
+            'SELECT * FROM order_supplier_po WHERE order_id = :order_id ORDER BY id DESC LIMIT 1'
         );
         $stmt->execute(['order_id' => $orderId]);
         return $stmt->fetch() ?: null;
@@ -95,9 +133,8 @@ final class OrderSupplierPoRepository
     {
         $stmt = Database::connection()->prepare(
             "SELECT sp.id, sp.order_id, sp.supplier_po_reference, sp.advance_amount_inr, sp.advance_paid_at,
-                    sp.balance_amount_inr, sp.balance_paid_at, s.supplier_legal_name, o.order_reference
+                    sp.balance_amount_inr, sp.balance_paid_at, sp.supplier_legal_name, o.order_reference
              FROM order_supplier_po sp
-             JOIN suppliers s ON s.id = sp.supplier_id
              JOIN orders o ON o.id = sp.order_id
              WHERE sp.advance_paid_at = :date OR sp.balance_paid_at = :date2"
         );

@@ -47,7 +47,12 @@ Supplier PO Terms form's Delivery Location dropdown for that supplier,
 on this order and any other. Whatever Delivery Location text was
 actually selected or typed is saved directly onto that Supplier PO's own
 record — editing or removing a factory address later never changes a
-Supplier PO that already used it.
+Supplier PO that already used it. 90-item backlog "standalone order"
+follow-on: the same holds for the supplier's own legal name, address,
+GSTIN, PAN, contact person, and phone — picking a supplier on **Save
+Supplier PO Terms** copies those details onto that Supplier PO's own
+record at that moment, so a later correction to the supplier's own
+details never changes a Supplier PO already saved against them.
 
 **Basic Value, GST Amount, Total Payable, Advance Amount, and Balance
 Amount auto-calculate** as Quantity, Unit Price, GST Rate, and Advance %

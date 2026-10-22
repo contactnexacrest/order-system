@@ -2,22 +2,57 @@
 
 const db = require('../config/db');
 
+/**
+ * 90-item backlog "standalone order" follow-on: resolves the supplier's
+ * identity details ONCE, at Supplier PO creation — never re-read from
+ * `suppliers` again. Mirrors orderRepository.js's own resolveSnapshot()
+ * for incoterm/currency/port/preset.
+ */
+async function resolveSupplierSnapshot(supplierId) {
+  const supplier = await db.queryOne(
+    'SELECT supplier_legal_name, address, gstin, pan, contact_person, phone, supplier_type FROM suppliers WHERE id = :id',
+    { id: supplierId }
+  );
+  return {
+    supplier_legal_name: supplier ? supplier.supplier_legal_name : null,
+    supplier_address: supplier ? supplier.address : null,
+    supplier_gstin: supplier ? supplier.gstin : null,
+    supplier_pan: supplier ? supplier.pan : null,
+    supplier_contact_person: supplier ? supplier.contact_person : null,
+    supplier_phone: supplier ? supplier.phone : null,
+    supplier_type: supplier ? supplier.supplier_type : null,
+  };
+}
+
 async function create(orderId, supplierId, supplierPoReference, data, status = 'issued') {
+  const snapshot = await resolveSupplierSnapshot(supplierId);
   const result = await db.execute(
     `INSERT INTO order_supplier_po
-        (order_id, supplier_id, supplier_po_reference, material_stone_type, grade, surface_finish,
+        (order_id, supplier_id, supplier_legal_name, supplier_address, supplier_gstin, supplier_pan,
+         supplier_contact_person, supplier_phone, supplier_type,
+         supplier_po_reference, material_stone_type, grade, surface_finish,
          dimensions, dimensional_tolerance, quantity, unit, colour_reference, special_requirements,
          unit_price_inr, basic_value_inr, gst_rate_pct, gst_amount_inr, total_payable_inr,
          advance_pct, advance_amount_inr, balance_amount_inr,
          delivery_location, required_delivery_date, packing_requirement, status)
      VALUES
-        (:order_id, :supplier_id, :ref, :material, :grade, :finish,
+        (:order_id, :supplier_id, :supplier_legal_name, :supplier_address, :supplier_gstin, :supplier_pan,
+         :supplier_contact_person, :supplier_phone, :supplier_type,
+         :ref, :material, :grade, :finish,
          :dimensions, :tolerance, :quantity, :unit, :colour, :special,
          :unit_price, :basic_value, :gst_rate, :gst_amount, :total_payable,
          :advance_pct, :advance_amount, :balance_amount,
          :delivery_location, :required_delivery_date, :packing_requirement, :status)`,
     {
-      order_id: orderId, supplier_id: supplierId, ref: supplierPoReference, status,
+      order_id: orderId, supplier_id: supplierId,
+      supplier_legal_name: snapshot.supplier_legal_name,
+      supplier_address: snapshot.supplier_address,
+      supplier_gstin: snapshot.supplier_gstin,
+      supplier_pan: snapshot.supplier_pan,
+      supplier_contact_person: snapshot.supplier_contact_person,
+      supplier_phone: snapshot.supplier_phone,
+      supplier_type: snapshot.supplier_type,
+      ref: supplierPoReference, status,
       material: data.material_stone_type ?? null,
       grade: data.grade ?? 'Grade A',
       finish: data.surface_finish ?? null,
@@ -43,15 +78,14 @@ async function create(orderId, supplierId, supplierPoReference, data, status = '
   return result.insertId;
 }
 
+/**
+ * 90-item backlog "standalone order" follow-on: every field this returns,
+ * supplier identity included, now lives on the row itself — no JOIN
+ * against `suppliers` needed or performed.
+ */
 async function findLatestForOrder(orderId) {
   return db.queryOne(
-    `SELECT sp.*, s.supplier_legal_name, s.address AS supplier_address, s.gstin AS supplier_gstin,
-            s.pan AS supplier_pan, s.contact_person AS supplier_contact_person, s.phone AS supplier_phone,
-            s.supplier_type
-     FROM order_supplier_po sp
-     JOIN suppliers s ON s.id = sp.supplier_id
-     WHERE sp.order_id = :order_id
-     ORDER BY sp.id DESC LIMIT 1`,
+    'SELECT * FROM order_supplier_po WHERE order_id = :order_id ORDER BY id DESC LIMIT 1',
     { order_id: orderId }
   );
 }
@@ -72,9 +106,8 @@ async function markBalancePaid(id, date, userId) {
 async function paidOnDate(date) {
   return db.query(
     `SELECT sp.id, sp.order_id, sp.supplier_po_reference, sp.advance_amount_inr, sp.advance_paid_at,
-            sp.balance_amount_inr, sp.balance_paid_at, s.supplier_legal_name, o.order_reference
+            sp.balance_amount_inr, sp.balance_paid_at, sp.supplier_legal_name, o.order_reference
      FROM order_supplier_po sp
-     JOIN suppliers s ON s.id = sp.supplier_id
      JOIN orders o ON o.id = sp.order_id
      WHERE sp.advance_paid_at = :date OR sp.balance_paid_at = :date2`,
     { date, date2: date }

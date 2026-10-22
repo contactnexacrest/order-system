@@ -736,7 +736,19 @@ CREATE TABLE order_production (
 CREATE TABLE order_supplier_po (
   id                            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id                      BIGINT UNSIGNED NOT NULL,
-  supplier_id                   BIGINT UNSIGNED NOT NULL,
+  supplier_id                   BIGINT UNSIGNED NOT NULL,   -- traceability only, see 90-item backlog "standalone order" follow-on below — never read for document content
+  -- 90-item backlog "standalone order" follow-on: the supplier's own
+  -- identity details, snapshotted once (OrderSupplierPoRepository's
+  -- resolveSupplierSnapshot()) when this Supplier PO is created — never
+  -- re-read from `suppliers` again, same reasoning as the orders table's
+  -- own incoterm/currency/port/preset snapshot above.
+  supplier_legal_name           VARCHAR(255) NULL,
+  supplier_address               TEXT NULL,
+  supplier_gstin                 VARCHAR(20) NULL,
+  supplier_pan                   VARCHAR(20) NULL,
+  supplier_contact_person        VARCHAR(150) NULL,
+  supplier_phone                 VARCHAR(30) NULL,
+  supplier_type                  VARCHAR(50) NULL,
   supplier_po_reference         VARCHAR(60) NOT NULL,   -- SC/SPO/YYYY/DDMMNNN
   material_stone_type           VARCHAR(150) NULL,
   grade                         VARCHAR(50) NOT NULL DEFAULT 'Grade A',
