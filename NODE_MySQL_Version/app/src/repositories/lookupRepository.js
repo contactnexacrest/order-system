@@ -36,4 +36,25 @@ async function dropdownOptions(listKey) {
   return db.query('SELECT * FROM dropdown_options WHERE list_key = :list_key AND is_active = 1 ORDER BY sort_order', { list_key: listKey });
 }
 
-module.exports = { incoterms, currencies, ports, paymentPresets, stagesMaster, roles, dropdownOptions };
+/**
+ * External QA report R-13: a dropdown_options-backed field like coo_type
+ * was never validated server-side — any string the client sent (e.g.
+ * "a,b" from array-shaped input, or stale text from before an admin
+ * removed an option) was stored as-is, even though the form itself only
+ * ever offers the active options plus the "nothing chosen yet" sentinel.
+ * Returns value unchanged when it matches an active option for listKey
+ * or is the literal "To Be Confirmed" sentinel every such field already
+ * falls back to when blank; otherwise returns '' so the caller's own
+ * existing `|| <fallback>` handles an invalid value exactly like a blank
+ * submission.
+ */
+async function sanitizeOption(listKey, value) {
+  if (value === '' || value === 'To Be Confirmed') {
+    return value;
+  }
+  const options = await dropdownOptions(listKey);
+  const valid = options.some((row) => row.option_value === value);
+  return valid ? value : '';
+}
+
+module.exports = { incoterms, currencies, ports, paymentPresets, stagesMaster, roles, dropdownOptions, sanitizeOption };

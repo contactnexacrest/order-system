@@ -65,4 +65,25 @@ final class LookupRepository
         $stmt->execute(['list_key' => $listKey]);
         return $stmt->fetchAll();
     }
+
+    /**
+     * External QA report R-13: a dropdown_options-backed field like
+     * coo_type was never validated server-side — any string the client
+     * sent (e.g. "TBC", or stale text from before an admin removed an
+     * option) was stored as-is, even though the form itself only ever
+     * offers the active options plus the "nothing chosen yet" sentinel.
+     * Returns $value unchanged when it matches an active option for
+     * $listKey or is the literal "To Be Confirmed" sentinel every such
+     * field already falls back to when blank; otherwise returns '' so
+     * the caller's own existing `?: <fallback>` handles an invalid value
+     * exactly like a blank submission.
+     */
+    public static function sanitizeOption(string $listKey, string $value): string
+    {
+        if ($value === '' || $value === 'To Be Confirmed') {
+            return $value;
+        }
+        $valid = array_column(self::dropdownOptions($listKey), 'option_value');
+        return in_array($value, $valid, true) ? $value : '';
+    }
 }

@@ -109,7 +109,7 @@ async function submit(req, res) {
     container_type_text: String(req.body.container_type_text || '').trim(),
     payment_terms_confirmation: String(req.body.payment_terms_confirmation || '').trim(),
     quotation_acceptance_reference: String(req.body.quotation_acceptance_reference || '').trim(),
-    coo_type: String(req.body.coo_type || '').trim(),
+    coo_type: await lookupRepository.sanitizeOption('coo_type', String(req.body.coo_type || '').trim()),
     buyer_po_ref: String(req.body.buyer_po_ref || '').trim(),
     changes_from_quotation: String(req.body.changes_from_quotation || '').trim(),
     special_document_requirements: String(req.body.special_document_requirements || '').trim(),

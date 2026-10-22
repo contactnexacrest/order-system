@@ -186,10 +186,21 @@ final class UserRepository
      * error (see UserController::delete()) avoids hand-maintaining a
      * table list that would silently go stale the moment a new FK to
      * users is added anywhere else in this schema.
+     *
+     * External QA report L-33: password_reset_tokens and notifications
+     * rows are the one exception — they carry zero history value once
+     * the user is gone (an expired/used reset token, a read-or-not
+     * notification), yet their FK was enough to block the delete and
+     * show "has order, document, or audit history" for a user with
+     * neither. Cleared here first so only a REAL blocker (an order,
+     * document, audit_log entry, ...) ever reaches that message.
      */
     public static function delete(int $userId): void
     {
-        Database::connection()->prepare('DELETE FROM users WHERE id = :id')->execute(['id' => $userId]);
+        $pdo = Database::connection();
+        $pdo->prepare('DELETE FROM password_reset_tokens WHERE user_id = :id')->execute(['id' => $userId]);
+        $pdo->prepare('DELETE FROM notifications WHERE user_id = :id')->execute(['id' => $userId]);
+        $pdo->prepare('DELETE FROM users WHERE id = :id')->execute(['id' => $userId]);
     }
 
     /**

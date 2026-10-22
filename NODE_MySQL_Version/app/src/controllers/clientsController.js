@@ -51,7 +51,7 @@ async function store(req, res) {
     return;
   }
 
-  const data = collectClientFields(req, companyLegalName, billingAddress);
+  const data = await collectClientFields(req, companyLegalName, billingAddress);
   const clientUniqueNumber = await referenceNumberService.generateClientUniqueNumber();
   const clientId = await clientRepository.create(data, user.id, clientUniqueNumber);
   if (await testModeService.isEnabled()) {
@@ -106,7 +106,7 @@ async function duplicateStore(req, res) {
     return;
   }
 
-  const data = collectClientFields(req, companyLegalName, billingAddress);
+  const data = await collectClientFields(req, companyLegalName, billingAddress);
 
   if (isIdenticalToSource(data, source)) {
     flash.set(req, 'error', 'Change at least one detail before saving a duplicate — if nothing is different, there is no need for a new client record.');
@@ -128,7 +128,7 @@ async function duplicateStore(req, res) {
 }
 
 /** Every field store()/duplicateStore() can set, shared so both build it identically. */
-function collectClientFields(req, companyLegalName, billingAddress) {
+async function collectClientFields(req, companyLegalName, billingAddress) {
   return {
     company_legal_name: companyLegalName,
     billing_address: billingAddress,
@@ -137,7 +137,7 @@ function collectClientFields(req, companyLegalName, billingAddress) {
     email: String(req.body.email || '').trim() || null,
     phone: String(req.body.phone || '').trim() || null,
     country_of_destination: String(req.body.country_of_destination || '').trim() || null,
-    coo_type: String(req.body.coo_type || '').trim() || 'To Be Confirmed',
+    coo_type: (await lookupRepository.sanitizeOption('coo_type', String(req.body.coo_type || '').trim())) || 'To Be Confirmed',
     ...collectPartyFields(req),
   };
 }
@@ -242,7 +242,7 @@ async function update(req, res) {
     email: String(req.body.email || '').trim() || null,
     phone: String(req.body.phone || '').trim() || null,
     country_of_destination: String(req.body.country_of_destination || '').trim() || null,
-    coo_type: String(req.body.coo_type || '').trim() || null,
+    coo_type: (await lookupRepository.sanitizeOption('coo_type', String(req.body.coo_type || '').trim())) || null,
     ...collectPartyFields(req),
   };
 

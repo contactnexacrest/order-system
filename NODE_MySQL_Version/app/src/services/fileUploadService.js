@@ -111,6 +111,14 @@ async function storeOne(buffer, originalName, mimeType, contextKey, subPath, cli
     throw new Error(`Unknown upload context: ${contextKey}`);
   }
 
+  // External QA report R-10: a 0-byte file was accepted as the buyer's
+  // signed PO (Buyer Action Link upload) — and anywhere else via this
+  // same shared service, since size was only ever checked against the
+  // upper bound below, never a lower one.
+  if (buffer.length === 0) {
+    throw new Error(`File "${originalName}" is empty — please choose a valid file.`);
+  }
+
   const extension = path.extname(originalName).replace(/^\./, '').toLowerCase();
   const allowed = String(context.allowed_extensions).toLowerCase().split(',').map((s) => s.trim());
   if (!allowed.includes(extension)) {

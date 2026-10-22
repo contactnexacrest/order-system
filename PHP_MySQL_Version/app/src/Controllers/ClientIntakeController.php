@@ -130,7 +130,7 @@ final class ClientIntakeController
             'phone'                  => trim((string) ($_POST['phone'] ?? '')),
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')),
             'port_of_discharge_text' => trim((string) ($_POST['port_of_discharge_text'] ?? '')),
-            'coo_type'               => trim((string) ($_POST['coo_type'] ?? '')),
+            'coo_type'               => LookupRepository::sanitizeOption('coo_type', trim((string) ($_POST['coo_type'] ?? ''))),
             'incoterm_preference'    => trim((string) ($_POST['incoterm_preference'] ?? '')),
             'container_type_text'    => trim((string) ($_POST['container_type_text'] ?? '')),
             'buyer_own_reference'    => trim((string) ($_POST['buyer_own_reference'] ?? '')),

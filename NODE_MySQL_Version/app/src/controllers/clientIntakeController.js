@@ -43,7 +43,7 @@ async function submit(req, res) {
     return;
   }
 
-  const data = extractAndValidate(req);
+  const data = await extractAndValidate(req);
   if (!data) {
     res.redirect('/quotation-details');
     return;
@@ -81,7 +81,7 @@ async function updateSubmission(req, res) {
     return;
   }
 
-  const data = extractAndValidate(req);
+  const data = await extractAndValidate(req);
   if (!data) {
     res.redirect(`/quotation-details/edit/${token}`);
     return;
@@ -92,7 +92,7 @@ async function updateSubmission(req, res) {
 }
 
 /** @returns {object|null} null means validation failed and a flash error was already set */
-function extractAndValidate(req) {
+async function extractAndValidate(req) {
   // Point 8 — the Billing Address field used to be one free-text box; it's
   // now structured (Line 1/Line 2/City/Postcode/Country), same pattern as
   // the Consignee section just below it on this same form, since documents
@@ -123,7 +123,7 @@ function extractAndValidate(req) {
     phone: String(req.body.phone || '').trim(),
     country_of_destination: String(req.body.country_of_destination || '').trim(),
     port_of_discharge_text: String(req.body.port_of_discharge_text || '').trim(),
-    coo_type: String(req.body.coo_type || '').trim(),
+    coo_type: await lookupRepository.sanitizeOption('coo_type', String(req.body.coo_type || '').trim()),
     incoterm_preference: String(req.body.incoterm_preference || '').trim(),
     container_type_text: String(req.body.container_type_text || '').trim(),
     buyer_own_reference: String(req.body.buyer_own_reference || '').trim(),

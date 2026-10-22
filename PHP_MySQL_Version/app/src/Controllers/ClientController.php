@@ -148,7 +148,7 @@ final class ClientController
             'email'                 => trim((string) ($_POST['email'] ?? '')) ?: null,
             'phone'                 => trim((string) ($_POST['phone'] ?? '')) ?: null,
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
-            'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: 'To Be Confirmed',
+            'coo_type'              => LookupRepository::sanitizeOption('coo_type', trim((string) ($_POST['coo_type'] ?? ''))) ?: 'To Be Confirmed',
         ], self::collectPartyFields());
     }
 
@@ -257,7 +257,7 @@ final class ClientController
             'email'                 => trim((string) ($_POST['email'] ?? '')) ?: null,
             'phone'                 => trim((string) ($_POST['phone'] ?? '')) ?: null,
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
-            'coo_type'              => trim((string) ($_POST['coo_type'] ?? '')) ?: null,
+            'coo_type'              => LookupRepository::sanitizeOption('coo_type', trim((string) ($_POST['coo_type'] ?? ''))) ?: null,
         ], self::collectPartyFields());
 
         $changes = array_filter(

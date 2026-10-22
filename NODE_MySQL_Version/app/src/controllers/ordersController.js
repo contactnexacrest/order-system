@@ -356,6 +356,10 @@ async function store(req, res) {
 
   const portOfDischargeId = body.port_of_discharge_id ? parseInt(body.port_of_discharge_id, 10) : null;
   const portOfDischargeText = str(body.port_of_discharge_text);
+  // External QA report R-13: validated here, before the (synchronous)
+  // createWithNextSequence builder callback below, since that callback
+  // cannot itself await.
+  const sanitizedCooType = await lookupRepository.sanitizeOption('coo_type', str(body.coo_type));
 
   const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YYYY}/{NNN}';
   const testModeEnabled = await testModeService.isEnabled();
@@ -393,7 +397,7 @@ async function store(req, res) {
         port_of_discharge_id: portOfDischargeId,
         port_of_discharge_text: portOfDischargeId ? null : portOfDischargeText || null,
         currency_id: currencyId,
-        coo_type: str(body.coo_type) || client.coo_type || 'To Be Confirmed',
+        coo_type: sanitizedCooType || client.coo_type || 'To Be Confirmed',
         include_annexure_a: !!body.include_annexure_a,
         special_requirements: str(body.special_requirements) || null,
         container_type: str(body.container_type) || null,
@@ -529,7 +533,7 @@ async function updateDetails(req, res) {
     port_of_loading_id: body.port_of_loading_id ? parseInt(body.port_of_loading_id, 10) : null,
     port_of_discharge_id: portOfDischargeId,
     port_of_discharge_text: portOfDischargeId ? null : portOfDischargeText || null,
-    coo_type: str(body.coo_type) || 'To Be Confirmed',
+    coo_type: (await lookupRepository.sanitizeOption('coo_type', str(body.coo_type))) || 'To Be Confirmed',
     container_type: str(body.container_type) || null,
     buyers_po_ref: str(body.buyers_po_ref) || 'NIL',
     special_requirements: str(body.special_requirements) || null,

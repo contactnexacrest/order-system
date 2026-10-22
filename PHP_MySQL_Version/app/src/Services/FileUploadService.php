@@ -127,6 +127,14 @@ final class FileUploadService
             throw new \RuntimeException("Unknown upload context: {$contextKey}");
         }
 
+        // External QA report R-10: a 0-byte file was accepted as the
+        // buyer's signed PO (Buyer Action Link upload) — and anywhere
+        // else via this same shared service, since size was only ever
+        // checked against the upper bound below, never a lower one.
+        if ($size === 0) {
+            throw new \RuntimeException("File \"{$originalName}\" is empty — please choose a valid file.");
+        }
+
         $extension = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
         $allowed = array_map('trim', explode(',', strtolower($context['allowed_extensions'])));
         if (!in_array($extension, $allowed, true)) {

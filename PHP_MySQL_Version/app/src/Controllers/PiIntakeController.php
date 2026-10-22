@@ -120,7 +120,7 @@ final class PiIntakeController
             'container_type_text'            => trim((string) ($_POST['container_type_text'] ?? '')),
             'payment_terms_confirmation'      => trim((string) ($_POST['payment_terms_confirmation'] ?? '')),
             'quotation_acceptance_reference'  => trim((string) ($_POST['quotation_acceptance_reference'] ?? '')),
-            'coo_type'                        => trim((string) ($_POST['coo_type'] ?? '')),
+            'coo_type'                        => LookupRepository::sanitizeOption('coo_type', trim((string) ($_POST['coo_type'] ?? ''))),
             'buyer_po_ref'                    => trim((string) ($_POST['buyer_po_ref'] ?? '')),
             'changes_from_quotation'          => trim((string) ($_POST['changes_from_quotation'] ?? '')),
             'special_document_requirements'   => trim((string) ($_POST['special_document_requirements'] ?? '')),
