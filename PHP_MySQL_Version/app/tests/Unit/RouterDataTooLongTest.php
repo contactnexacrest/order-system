@@ -10,15 +10,16 @@ use App\Helpers\Router;
 use PHPUnit\Framework\TestCase;
 
 /**
- * External QA report R-01: no form anywhere (~27 named, but the fuzzer
- * found 59-67 across both stacks) validated a text field against its
- * database column's actual max length — submitting text longer than the
- * column crashed the request as an uncaught PDOException (SQLSTATE
- * 22001, "string data, right truncated"): a raw HTTP 500, no flash
- * message, every field the user had typed lost. Router::dispatch() is
- * the single chokepoint every one of those forms' requests already
- * passes through, so catching this there closes the crash everywhere at
- * once.
+ * External QA report R-01/R-03/R-04/R-09/R-11/R-12: no form anywhere
+ * validated a field against what the database would actually accept —
+ * text longer than its column (R-01/R-12, SQLSTATE 22001), an impossible
+ * date like 30-Feb or a non-numeric amount (R-03/R-09/R-11, SQLSTATE
+ * 22007), or an id referencing a row that doesn't exist (R-04, SQLSTATE
+ * 23000). Each crashed the request as an uncaught PDOException: a raw
+ * HTTP 500, no flash message, every field the user had typed lost.
+ * Router::dispatch() is the single chokepoint every one of those forms'
+ * requests already passes through, so catching these there closes the
+ * crash everywhere at once.
  */
 final class RouterDataTooLongTest extends TestCase
 {
@@ -94,6 +95,51 @@ final class RouterDataTooLongTest extends TestCase
         $decoded = json_decode($output, true);
         self::assertIsArray($decoded, 'an AJAX caller must get a JSON body, not a redirect it can\'t follow');
         self::assertStringContainsString('too long', $decoded['error'] ?? '');
+    }
+
+    public function testDispatchNeverLetsAnImpossibleDateCrashAsAnUncaughtException(): void
+    {
+        $pdo = Database::connection();
+        $pdo->exec('DROP TEMPORARY TABLE IF EXISTS router_r03_test');
+        $pdo->exec('CREATE TEMPORARY TABLE router_r03_test (d DATE NOT NULL)');
+
+        $router = new Router();
+        $router->post('/router-r03-test', function (array $params): void {
+            Database::connection()
+                ->prepare('INSERT INTO router_r03_test (d) VALUES (:d)')
+                ->execute(['d' => (string) ($_POST['notice_date'] ?? '')]);
+        });
+        $_POST = ['notice_date' => '2026-02-30'];
+        $_SERVER['HTTP_REFERER'] = '';
+
+        // Before this fix, this threw PDOException("SQLSTATE[22007]: ...
+        // Incorrect date value") straight out of dispatch().
+        $router->dispatch('POST', '/router-r03-test');
+
+        $flash = Flash::pull();
+        self::assertSame('error', $flash[0]['type']);
+        self::assertStringContainsString("isn't valid", $flash[0]['message']);
+    }
+
+    public function testDispatchNeverLetsAForeignKeyViolationCrashAsAnUncaughtException(): void
+    {
+        $router = new Router();
+        $router->post('/router-r04-test', function (array $params): void {
+            // A real FK relationship from the actual schema (documents.order_id -> orders.id).
+            Database::connection()
+                ->prepare("INSERT INTO documents (order_id, document_type_id, status) VALUES (:order_id, 1, 'draft')")
+                ->execute(['order_id' => 999999999]);
+        });
+        $_POST = [];
+        $_SERVER['HTTP_REFERER'] = '';
+
+        // Before this fix, this threw PDOException("SQLSTATE[23000]: ...
+        // a foreign key constraint fails") straight out of dispatch().
+        $router->dispatch('POST', '/router-r04-test');
+
+        $flash = Flash::pull();
+        self::assertSame('error', $flash[0]['type']);
+        self::assertStringContainsString('no longer exists', $flash[0]['message']);
     }
 
     public function testADifferentPdoExceptionIsNeverSwallowed(): void

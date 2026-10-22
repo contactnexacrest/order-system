@@ -223,8 +223,15 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// External QA report R-05: Express's own default body-size limit (100kb)
+// is small enough that a genuine admin editing long T&C/legal text could
+// hit it — the fuzzer did, 25 times, with an unhandled PayloadTooLargeError.
+// 2mb comfortably covers any real text form in this app (file uploads go
+// through multer's own, separate, much larger limit — see uploadLarge
+// below) while the friendly 413 handler further down still catches
+// anything that somehow still exceeds this.
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use(session({
@@ -861,26 +868,39 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// External QA report R-01: no form anywhere validated a text field
-// against its database column's actual max length — submitting text
-// longer than the column crashed the request as an uncaught mysql2
-// error (SQLSTATE 22001, "string data, right truncated"/ER_DATA_TOO_LONG):
-// a raw HTTP 500, no flash message, every field the user typed lost.
-// Safe to treat generically as "a submitted field was too long"
-// everywhere in this app, since every write here comes from a
-// user-submitted form field. This is the single chokepoint every one of
-// the ~60 affected forms' requests already pass through (asyncHandler
-// funnels every rejected controller promise to next(err), landing here),
-// so one fix closes the crash for all of them at once rather than
-// requiring an individual length check added to every form (a real,
-// separate, much larger follow-up — see R-01's own fix direction for
-// the ideal per-field/HTML maxlength UX this does not replace).
+// External QA report R-01/R-03/R-04/R-09/R-11/R-12: no form anywhere
+// validated a field against what the database would actually accept —
+// text longer than its column (R-01/R-12, SQLSTATE 22001), an impossible
+// date like 30-Feb or a non-numeric amount (R-03/R-09/R-11, SQLSTATE
+// 22007), or an id referencing a row that doesn't exist (R-04, SQLSTATE
+// 23000). Each crashed the request as an uncaught mysql2 error: a raw
+// HTTP 500, no flash message, every field the user typed lost. Safe to
+// treat generically everywhere in this app, since every write here comes
+// from a user-submitted form field. This is the single chokepoint every
+// affected form's request already passes through (asyncHandler funnels
+// every rejected controller promise to next(err), landing here), so one
+// fix closes the crash for all of them at once rather than requiring an
+// individual check added to every form (a real, separate, much larger
+// follow-up — see R-01's own fix direction for the ideal per-field/HTML
+// maxlength UX this does not replace).
+const MESSAGE_FOR_SQLSTATE = {
+  // "String data, right truncated" — a field longer than its column (R-01/R-12).
+  22001: 'One of the fields you entered is too long for this form — please shorten it and try again. Nothing was saved.',
+  // "Invalid datetime format" — covers both an impossible date like
+  // 30-Feb (R-03/R-09/R-11) and a non-numeric amount in a DECIMAL column
+  // (R-09) — MySQL uses this same SQLSTATE for both.
+  22007: "One of the dates or numbers you entered isn't valid — please check it and try again. Nothing was saved.",
+  // "Integrity constraint violation" — either a duplicate value where one
+  // must be unique, or an id referring to a row that doesn't exist (R-04).
+  23000: "That couldn't be saved — either this already exists, or it refers to something that no longer exists. Please check your input and try again.",
+};
+
 app.use((err, req, res, next) => {
-  if (!err || err.sqlState !== '22001') {
+  const message = err ? MESSAGE_FOR_SQLSTATE[err.sqlState] : undefined;
+  if (!message) {
     next(err);
     return;
   }
-  const message = 'One of the fields you entered is too long for this form — please shorten it and try again. Nothing was saved.';
   const wantsJson = req.xhr || String(req.get('Accept') || '').includes('application/json');
   if (wantsJson) {
     res.status(422).json({ error: message });
@@ -891,6 +911,26 @@ app.use((err, req, res, next) => {
     flash.setOld(req, req.body);
   }
   res.redirect(safeRedirectBack(req));
+});
+
+// External QA report R-05: a form body over Express's default 100kb
+// limit (a genuine admin editing long T&C/legal text could hit this)
+// crashed as an unhandled PayloadTooLargeError before any route handler
+// ran — the fuzzer hit this 25 times. The limit itself is raised where
+// the body parsers are configured (see express.urlencoded/express.json
+// above); this is the friendly fallback for whatever still exceeds it.
+app.use((err, req, res, next) => {
+  if (!err || err.type !== 'entity.too.large') {
+    next(err);
+    return;
+  }
+  const message = 'The data you submitted is too large for this form to accept. Please shorten it and try again.';
+  const wantsJson = req.xhr || String(req.get('Accept') || '').includes('application/json');
+  if (wantsJson) {
+    res.status(413).json({ error: message });
+    return;
+  }
+  res.status(413).send(`<h1>413 — Too much data</h1><p>${message}</p>`);
 });
 
 /**

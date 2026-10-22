@@ -132,25 +132,27 @@ final class Router
 
                     ($route['handler'])($params);
                 } catch (\PDOException $e) {
-                    // External QA report R-01: no form anywhere validated a
-                    // text field against its column's actual max length —
-                    // submitting text longer than the DB column crashed the
-                    // request as an uncaught PDOException (a raw HTTP 500,
-                    // no flash message, every field the user typed lost).
-                    // SQLSTATE 22001 ("string data, right truncated") is
-                    // MySQL's own signal for exactly this, nothing else —
-                    // safe to treat generically as "a submitted field was
-                    // too long" everywhere in this app, since every write
-                    // here comes from a user-submitted form field. This is
-                    // the single chokepoint every one of the ~60 affected
-                    // forms' requests already passes through, so one fix
-                    // here closes the crash for all of them at once rather
-                    // than requiring an individual length check added to
-                    // every form (a real, separate, much larger follow-up —
-                    // see R-01's own fix direction for the ideal
-                    // per-field/HTML maxlength UX this does not replace).
-                    if ($e->getCode() === '22001') {
-                        self::handleDataTooLong();
+                    // External QA report R-01/R-03/R-04/R-09/R-11/R-12: no
+                    // form anywhere validated its fields against what the
+                    // DB would actually accept — a too-long value, an
+                    // impossible date (30-Feb), a non-numeric amount, or an
+                    // id referencing a row that doesn't exist all crashed
+                    // the request as an uncaught PDOException: a raw HTTP
+                    // 500, no flash message, every field the user typed
+                    // lost. Each SQLSTATE below is MySQL's own unambiguous
+                    // signal for exactly one of those — safe to treat
+                    // generically everywhere in this app, since every
+                    // write here comes from a user-submitted form field.
+                    // This is the single chokepoint every affected form's
+                    // request already passes through, so one fix here
+                    // closes the crash for all of them at once rather than
+                    // requiring an individual check added to every form (a
+                    // real, separate, much larger follow-up — see R-01's
+                    // own fix direction for the ideal per-field/HTML
+                    // maxlength UX this does not replace).
+                    $message = self::MESSAGE_FOR_SQLSTATE[$e->getCode()] ?? null;
+                    if ($message !== null) {
+                        self::handleBadInput($message);
                         return;
                     }
                     throw $e;
@@ -163,10 +165,22 @@ final class Router
         echo '404 Not Found';
     }
 
-    private static function handleDataTooLong(): void
-    {
-        $message = 'One of the fields you entered is too long for this form — please shorten it and try again. Nothing was saved.';
+    /** @var array<string,string> SQLSTATE => friendly message */
+    private const MESSAGE_FOR_SQLSTATE = [
+        // "String data, right truncated" — a field longer than its column (R-01/R-12).
+        '22001' => 'One of the fields you entered is too long for this form — please shorten it and try again. Nothing was saved.',
+        // "Invalid datetime format" — covers both an impossible date like
+        // 30-Feb (R-03/R-09/R-11) and a non-numeric amount in a DECIMAL
+        // column (R-09) — MySQL uses this same SQLSTATE for both.
+        '22007' => "One of the dates or numbers you entered isn't valid — please check it and try again. Nothing was saved.",
+        // "Integrity constraint violation" — either a duplicate value where
+        // one must be unique, or an id referring to a row that doesn't
+        // exist (R-04).
+        '23000' => "That couldn't be saved — either this already exists, or it refers to something that no longer exists. Please check your input and try again.",
+    ];
 
+    private static function handleBadInput(string $message): void
+    {
         $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
         $requestedWith = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '');
         if ($requestedWith === 'xmlhttprequest' || str_contains($accept, 'application/json')) {
