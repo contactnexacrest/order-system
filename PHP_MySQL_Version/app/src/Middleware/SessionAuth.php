@@ -51,6 +51,18 @@ final class SessionAuth
                 return false;
             }
 
+            // External QA report L-26: a password change bumps
+            // users.session_version — any OTHER session (a stolen one
+            // included) still carries the OLD value it snapshotted at
+            // its own login time, so it's logged out right here on its
+            // very next request, the same immediate-effect guarantee
+            // the is_active check above already gives for deactivation.
+            if ((int) $user['session_version'] !== (int) (AuthService::sessionVersion() ?? 0)) {
+                AuthService::logout();
+                header('Location: /login');
+                return false;
+            }
+
             $mustChange = (int) $user['force_password_change'] === 1;
 
             // password_expiry_days (company_settings, category 'security')

@@ -18,6 +18,7 @@ use App\Repositories\UserRepository;
 final class AuthService
 {
     private const SESSION_USER_ID = '_auth_user_id';
+    private const SESSION_VERSION_KEY = '_session_version';
 
     // AUTH-04/AUTH-05: a fixed dummy hash so password_verify() always runs
     // real bcrypt work, even for an email that doesn't exist — otherwise
@@ -119,7 +120,25 @@ final class AuthService
     {
         session_regenerate_id(true);
         $_SESSION[self::SESSION_USER_ID] = $userId;
+        // External QA report L-26: snapshot the row's current
+        // session_version at login time — SessionAuth::required()
+        // compares this against the live DB value on every request.
+        $user = UserRepository::findById($userId);
+        $_SESSION[self::SESSION_VERSION_KEY] = $user ? (int) $user['session_version'] : 0;
         UserRepository::updateLastLogin($userId);
+    }
+
+    /** @see SessionAuth::required() — the value this session logged in with. */
+    public static function sessionVersion(): ?int
+    {
+        return $_SESSION[self::SESSION_VERSION_KEY] ?? null;
+    }
+
+    /** Called after a successful in-session password change, so THIS session (unlike every other one) keeps working. */
+    public static function refreshSessionVersion(int $userId): void
+    {
+        $user = UserRepository::findById($userId);
+        $_SESSION[self::SESSION_VERSION_KEY] = $user ? (int) $user['session_version'] : 0;
     }
 
     public static function currentUserId(): ?int
@@ -154,5 +173,12 @@ final class AuthService
     {
         UserRepository::updatePassword($userId, password_hash($newPassword, PASSWORD_DEFAULT), false);
         AuditLogRepository::log($userId, 'PASSWORD_CHANGED', 'users', $userId);
+        // External QA report L-26: updatePassword() just bumped
+        // session_version — without this, the session that JUST made
+        // this very change would itself be logged out on its next
+        // request, which only makes sense for every OTHER session.
+        if (self::currentUserId() === $userId) {
+            self::refreshSessionVersion($userId);
+        }
     }
 }

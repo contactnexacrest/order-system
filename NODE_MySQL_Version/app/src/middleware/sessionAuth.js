@@ -54,6 +54,18 @@ function required() {
       return;
     }
 
+    // External QA report L-26: a password change bumps
+    // users.session_version — any OTHER session (a stolen one
+    // included) still carries the OLD value it snapshotted at its own
+    // login time, so it's logged out right here on its very next
+    // request, the same immediate-effect guarantee the is_active check
+    // above already gives for deactivation.
+    if (Number(user.session_version) !== Number(authService.sessionVersion(req) ?? 0)) {
+      await authService.logout(req);
+      res.redirect('/login');
+      return;
+    }
+
     let mustChange = parseInt(user.force_password_change, 10) === 1;
 
     if (!mustChange && user.password_changed_at !== null) {

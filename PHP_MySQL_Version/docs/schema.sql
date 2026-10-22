@@ -326,6 +326,14 @@ CREATE TABLE users (
   locked_until          TIMESTAMP NULL,
   last_login_at         TIMESTAMP NULL,
   password_changed_at   TIMESTAMP NULL,
+  -- External QA report L-26: incremented on every password change
+  -- (self-service, forgot-password, or admin force-reset). Stored in
+  -- the session at login time; SessionAuth compares the two on every
+  -- request and logs out any session whose stored value no longer
+  -- matches — the only way, with PHP's file-based sessions, to kill
+  -- every OTHER session for this user (a stolen one included) without
+  -- a server-side session store keyed by user id.
+  session_version       INT UNSIGNED NOT NULL DEFAULT 0,
   created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (role_id) REFERENCES roles(id)
 ) ENGINE=InnoDB;

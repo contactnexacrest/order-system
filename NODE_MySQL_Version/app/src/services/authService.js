@@ -16,6 +16,7 @@ const twoFactorService = require('./twoFactorService');
 // (company_settings, category 'security'), same as the original.
 
 const SESSION_USER_ID = '_auth_user_id';
+const SESSION_VERSION_KEY = '_session_version';
 
 // QA-5 CP-13: mirrors clientPortalService.js's own SESSION_CLIENT_ID. Kept
 // as a literal rather than required from clientPortalService.js to avoid a
@@ -117,14 +118,30 @@ async function completeTwoFactor(req, submittedCode) {
 }
 
 async function establishSession(req, userId) {
+  // External QA report L-26: snapshot the row's current session_version
+  // at login time — sessionAuth's middleware compares this against the
+  // live DB value on every request.
+  const user = await userRepository.findById(userId);
   await regeneratePreserving(req, [CLIENT_PORTAL_SESSION_KEY], () => {
     req.session[SESSION_USER_ID] = userId;
+    req.session[SESSION_VERSION_KEY] = user ? Number(user.session_version) : 0;
   });
   await userRepository.updateLastLogin(userId);
 }
 
 function currentUserId(req) {
   return req.session[SESSION_USER_ID] ?? null;
+}
+
+/** @see sessionAuth.js — the value this session logged in with. */
+function sessionVersion(req) {
+  return req.session[SESSION_VERSION_KEY] ?? null;
+}
+
+/** Called after a successful in-session password change, so THIS session (unlike every other one) keeps working. */
+async function refreshSessionVersion(req, userId) {
+  const user = await userRepository.findById(userId);
+  req.session[SESSION_VERSION_KEY] = user ? Number(user.session_version) : 0;
 }
 
 async function currentUser(req) {
@@ -140,13 +157,20 @@ async function logout(req) {
   await regeneratePreserving(req, [CLIENT_PORTAL_SESSION_KEY]);
 }
 
-async function changePassword(userId, newPassword) {
+async function changePassword(req, userId, newPassword) {
   const hash = await passwordHash.hash(newPassword, 12);
   await userRepository.updatePassword(userId, hash, false);
   await auditLogRepository.log(userId, 'PASSWORD_CHANGED', 'users', userId);
+  // External QA report L-26: updatePassword() just bumped
+  // session_version — without this, the session that JUST made this
+  // very change would itself be logged out on its next request, which
+  // only makes sense for every OTHER session.
+  if (req && currentUserId(req) === userId) {
+    await refreshSessionVersion(req, userId);
+  }
 }
 
 module.exports = {
-  attemptLogin, completeTwoFactor, currentUserId, currentUser, logout, changePassword,
+  attemptLogin, completeTwoFactor, currentUserId, sessionVersion, refreshSessionVersion, currentUser, logout, changePassword,
   SESSION_USER_ID,
 };

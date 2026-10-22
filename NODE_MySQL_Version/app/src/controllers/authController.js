@@ -100,7 +100,7 @@ async function forcePasswordChange(req, res) {
     return;
   }
 
-  await authService.changePassword(user.id, newPassword);
+  await authService.changePassword(req, user.id, newPassword);
   flash.set(req, 'success', 'Password updated.');
   res.redirect('/');
 }
@@ -194,7 +194,7 @@ async function resetPassword(req, res) {
     return;
   }
 
-  await authService.changePassword(row.user_id, newPassword);
+  await authService.changePassword(req, row.user_id, newPassword);
   await passwordResetTokenRepository.markUsed(row.id);
   await passwordResetTokenRepository.invalidateAllForUser(row.user_id);
   await auditLogRepository.log(row.user_id, 'PASSWORD_RESET_VIA_EMAIL', 'users', row.user_id);

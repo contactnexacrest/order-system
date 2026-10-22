@@ -61,7 +61,7 @@ async function updatePassword(req, res) {
     return;
   }
 
-  await authService.changePassword(userId, newPassword);
+  await authService.changePassword(req, userId, newPassword);
   flash.set(req, 'success', 'Password updated.');
   res.redirect('/account');
 }

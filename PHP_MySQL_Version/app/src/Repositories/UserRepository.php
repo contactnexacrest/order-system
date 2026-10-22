@@ -59,8 +59,12 @@ final class UserRepository
 
     public static function updatePassword(int $userId, string $passwordHash, bool $forceChange = false): void
     {
+        // External QA report L-26: session_version is bumped on every
+        // password change so SessionAuth can tell an OTHER, still-open
+        // session (which stored the old value at its own login time) to
+        // log out on its very next request — see SessionAuth::required().
         Database::connection()->prepare(
-            'UPDATE users SET password_hash = :hash, force_password_change = :force, password_changed_at = NOW() WHERE id = :id'
+            'UPDATE users SET password_hash = :hash, force_password_change = :force, password_changed_at = NOW(), session_version = session_version + 1 WHERE id = :id'
         )->execute([
             'hash'  => $passwordHash,
             'force' => $forceChange ? 1 : 0,
@@ -247,9 +251,14 @@ final class UserRepository
      */
     public static function adminForceResetPassword(int $userId, string $tempPasswordHash): void
     {
+        // External QA report L-26: see updatePassword()'s own comment —
+        // this is the one password-change path most likely to be used
+        // specifically BECAUSE a session may already be compromised, so
+        // invalidating it is the whole point.
         Database::connection()->prepare(
             'UPDATE users SET password_hash = :hash, force_password_change = 1,
-                    password_changed_at = NULL, failed_login_count = 0, locked_until = NULL
+                    password_changed_at = NULL, failed_login_count = 0, locked_until = NULL,
+                    session_version = session_version + 1
              WHERE id = :id'
         )->execute(['hash' => $tempPasswordHash, 'id' => $userId]);
     }
