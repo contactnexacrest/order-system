@@ -19,6 +19,8 @@
 -- — no such value existed before). Idempotent (safe to re-run).
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 SET @col_exists = (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_archived'

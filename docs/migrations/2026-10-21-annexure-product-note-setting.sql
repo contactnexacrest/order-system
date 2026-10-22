@@ -20,6 +20,8 @@
 -- Idempotent (safe to re-run).
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive)
 SELECT 'annexure_product_note',
        'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.',

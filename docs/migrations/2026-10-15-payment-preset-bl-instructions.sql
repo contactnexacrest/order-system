@@ -24,5 +24,8 @@
 -- retain the BL as leverage (e.g. balance paid before shipment).
 -- ================================================================
 
+
+SET NAMES utf8mb4;
+-- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
 ALTER TABLE payment_presets
-  ADD COLUMN show_bl_instructions TINYINT(1) NOT NULL DEFAULT 1 AFTER requires_md_approval;
+  ADD COLUMN IF NOT EXISTS show_bl_instructions TINYINT(1) NOT NULL DEFAULT 1 AFTER requires_md_approval;

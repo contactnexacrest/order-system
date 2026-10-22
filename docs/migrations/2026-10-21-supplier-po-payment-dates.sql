@@ -20,6 +20,8 @@
 -- existed before). Idempotent (safe to re-run).
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 SET @col_exists = (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'advance_paid_at'

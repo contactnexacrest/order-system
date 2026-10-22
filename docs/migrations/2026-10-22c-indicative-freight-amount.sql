@@ -17,6 +17,9 @@
 -- (the one every pre-existing order had populated first, and the more
 -- conservative of the two); indicative_freight_high is dropped. Apply to
 -- both the PHP and Node MySQL databases — same schema.
+
+SET NAMES utf8mb4;
+-- External QA report L-32: IF EXISTS makes this safe to re-run.
 ALTER TABLE orders
-  CHANGE COLUMN indicative_freight_low indicative_freight_amount DECIMAL(14,2) NULL,
-  DROP COLUMN indicative_freight_high;
+  CHANGE COLUMN IF EXISTS indicative_freight_low indicative_freight_amount DECIMAL(14,2) NULL,
+  DROP COLUMN IF EXISTS indicative_freight_high;

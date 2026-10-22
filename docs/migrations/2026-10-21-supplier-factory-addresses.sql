@@ -27,6 +27,8 @@
 -- Idempotent (safe to re-run) — both changes are guarded.
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 SET @tbl_exists = (
   SELECT COUNT(*) FROM information_schema.TABLES
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'supplier_factory_addresses'

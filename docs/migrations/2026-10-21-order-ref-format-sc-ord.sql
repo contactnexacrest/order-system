@@ -23,6 +23,8 @@
 -- Idempotent (safe to re-run).
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 UPDATE company_settings
 SET setting_value = 'SC/ORD/{YYYY}/{NNN}'
 WHERE setting_key = 'order_ref_format'

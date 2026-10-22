@@ -3,7 +3,10 @@
 -- combined lead_time_min_days/max_days, which stays as "Production Lead
 -- Time"). Apply to both the PHP and Node MySQL databases — same schema.
 
-CREATE TABLE port_routes (
+
+SET NAMES utf8mb4;
+-- External QA report L-32: IF NOT EXISTS makes both statements below safe to re-run.
+CREATE TABLE IF NOT EXISTS port_routes (
   id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   port_of_loading_id      BIGINT UNSIGNED NOT NULL,
   port_of_discharge_id    BIGINT UNSIGNED NOT NULL,
@@ -17,5 +20,5 @@ CREATE TABLE port_routes (
 ) ENGINE=InnoDB;
 
 ALTER TABLE orders
-  ADD COLUMN sailing_lead_time_min_days INT UNSIGNED NULL AFTER lead_time_max_days,
-  ADD COLUMN sailing_lead_time_max_days INT UNSIGNED NULL AFTER sailing_lead_time_min_days;
+  ADD COLUMN IF NOT EXISTS sailing_lead_time_min_days INT UNSIGNED NULL AFTER lead_time_max_days,
+  ADD COLUMN IF NOT EXISTS sailing_lead_time_max_days INT UNSIGNED NULL AFTER sailing_lead_time_min_days;

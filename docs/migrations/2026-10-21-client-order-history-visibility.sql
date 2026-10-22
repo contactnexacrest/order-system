@@ -2,8 +2,11 @@
 -- override). Adds one new clients column and one new company_settings
 -- row. Apply to both the PHP and Node MySQL databases — same schema.
 
+
+SET NAMES utf8mb4;
+-- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
 ALTER TABLE clients
-  ADD COLUMN order_history_visibility_override TINYINT(1) NULL;
+  ADD COLUMN IF NOT EXISTS order_history_visibility_override TINYINT(1) NULL;
 
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin)
 SELECT 'client_portal_show_order_history', '1', 'boolean', 'clients',

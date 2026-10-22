@@ -10,17 +10,22 @@
 --
 -- Already applied to both local dev databases (nexacrest,
 -- nexacrest_node_test) during this session. NOT yet applied anywhere
--- else. Safe to run top-to-bottom in one transaction-less pass; each
--- statement is a one-time structural change, not re-runnable (running
--- it twice will error on "column already exists" / duplicate key —
--- that's the signal it's already been applied).
+-- else.
+--
+-- External QA report L-32: safe to re-run (idempotent) — every
+-- statement below is now guarded (IF NOT EXISTS / INSERT IGNORE /
+-- WHERE NOT EXISTS), so running it again after it already applied is
+-- a clean no-op instead of a "column already exists" / duplicate-key
+-- error.
 -- ================================================================
 
 
 -- ----------------------------------------------------------------
 -- Section BD — Dropdown Options admin screen permission
 -- ----------------------------------------------------------------
-INSERT INTO permissions (permission_key, name, description, category) VALUES
+
+SET NAMES utf8mb4;
+INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
   ('manage_dropdown_options', 'Manage dropdown option lists', 'Add, edit, and deactivate the admin-editable option lists used across the app (Container Type, Certificate of Origin Type, etc. — see dropdown_options.list_key). Same tier as manage_hs_codes/manage_logistics_partners: Admin/MD/ED and Super Admin only.', 'catalog');
 
 -- Grants the new permission to the same roles that already hold every
@@ -30,7 +35,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
 -- this automatically — this INSERT is only needed because an existing
 -- database already ran that blanket grant once, against the
 -- permissions table as it stood before this permission existed.
-INSERT INTO role_permissions (role_id, permission_id, is_enabled)
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
 WHERE r.name IN ('Admin', 'Managing Director', 'Executive Director')
   AND p.permission_key = 'manage_dropdown_options';
@@ -40,14 +45,14 @@ WHERE r.name IN ('Admin', 'Managing Director', 'Executive Director')
 -- Section BE — Client Agreement: file upload + expiry
 -- ----------------------------------------------------------------
 ALTER TABLE clients
-  ADD COLUMN agreement_file_path VARCHAR(500) NULL AFTER agreement_footer_text,
-  ADD COLUMN agreement_file_original_name VARCHAR(255) NULL AFTER agreement_file_path,
-  ADD COLUMN agreement_uploaded_at TIMESTAMP NULL AFTER agreement_file_original_name,
-  ADD COLUMN agreement_expiry_date DATE NULL AFTER agreement_uploaded_at,
-  ADD COLUMN agreement_force_expired TINYINT(1) NOT NULL DEFAULT 0 AFTER agreement_expiry_date;
+  ADD COLUMN IF NOT EXISTS agreement_file_path VARCHAR(500) NULL AFTER agreement_footer_text,
+  ADD COLUMN IF NOT EXISTS agreement_file_original_name VARCHAR(255) NULL AFTER agreement_file_path,
+  ADD COLUMN IF NOT EXISTS agreement_uploaded_at TIMESTAMP NULL AFTER agreement_file_original_name,
+  ADD COLUMN IF NOT EXISTS agreement_expiry_date DATE NULL AFTER agreement_uploaded_at,
+  ADD COLUMN IF NOT EXISTS agreement_force_expired TINYINT(1) NOT NULL DEFAULT 0 AFTER agreement_expiry_date;
 
 -- New upload context for the agreement file itself (type/size validation).
-INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description) VALUES
+INSERT IGNORE INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description) VALUES
   ('client_agreement_file', 'pdf,doc,docx', 15728640, 'Item 2 — the actual signed copy of a client''s commercial agreement, tied to that client''s expiry/renew tracking (clients.agreement_file_path etc — see schema.sql Section BE).');
 
 
@@ -55,16 +60,16 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
 -- Section BF — QT intake: structured billing address
 -- ----------------------------------------------------------------
 ALTER TABLE client_intake_submissions
-  ADD COLUMN billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
-  ADD COLUMN billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
-  ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2,
-  ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city,
-  ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode;
+  ADD COLUMN IF NOT EXISTS billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
+  ADD COLUMN IF NOT EXISTS billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
+  ADD COLUMN IF NOT EXISTS billing_city VARCHAR(100) NULL AFTER billing_address_line2,
+  ADD COLUMN IF NOT EXISTS billing_postcode VARCHAR(30) NULL AFTER billing_city,
+  ADD COLUMN IF NOT EXISTS billing_country VARCHAR(100) NULL AFTER billing_postcode;
 
 -- Backfills a gap in the original clients table rollout (Section BA
 -- added billing_address_line1/2/city/postcode but not country).
 ALTER TABLE clients
-  ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode;
+  ADD COLUMN IF NOT EXISTS billing_country VARCHAR(100) NULL AFTER billing_postcode;
 
 
 -- ----------------------------------------------------------------
@@ -72,7 +77,12 @@ ALTER TABLE clients
 -- later from Admin > Dropdown Option Lists; these were a starting
 -- suggestion, not yet explicitly confirmed by the business).
 -- ----------------------------------------------------------------
-INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active) VALUES
-  ('container_type', '20ft Flat Rack', 4, 0, 1),
-  ('container_type', '40ft Flat Rack', 5, 0, 1),
-  ('container_type', 'LCL (Less than Container Load)', 6, 0, 1);
+INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
+SELECT * FROM (SELECT 'container_type' AS list_key, '20ft Flat Rack' AS option_value, 4 AS sort_order, 0 AS is_default, 1 AS is_active) t
+WHERE NOT EXISTS (SELECT 1 FROM dropdown_options WHERE list_key = t.list_key AND option_value = t.option_value);
+INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
+SELECT * FROM (SELECT 'container_type' AS list_key, '40ft Flat Rack' AS option_value, 5 AS sort_order, 0 AS is_default, 1 AS is_active) t
+WHERE NOT EXISTS (SELECT 1 FROM dropdown_options WHERE list_key = t.list_key AND option_value = t.option_value);
+INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
+SELECT * FROM (SELECT 'container_type' AS list_key, 'LCL (Less than Container Load)' AS option_value, 6 AS sort_order, 0 AS is_default, 1 AS is_active) t
+WHERE NOT EXISTS (SELECT 1 FROM dropdown_options WHERE list_key = t.list_key AND option_value = t.option_value);

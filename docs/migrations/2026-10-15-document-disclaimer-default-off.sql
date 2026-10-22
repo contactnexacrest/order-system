@@ -23,6 +23,8 @@
 -- for a while.
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 UPDATE company_settings
 SET setting_value = '0'
 WHERE setting_key = 'show_generated_document_disclaimer' AND setting_value = '1';

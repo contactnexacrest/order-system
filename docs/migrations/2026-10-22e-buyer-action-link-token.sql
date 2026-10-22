@@ -24,9 +24,12 @@
 -- link from the order page at any time before it expires, decrypted only
 -- at that one display point. Apply to both the PHP and Node MySQL
 -- databases — same schema.
-ALTER TABLE orders
-  ADD COLUMN buyer_action_token_hash VARCHAR(64) NULL AFTER pi_valid_until,
-  ADD COLUMN buyer_action_token_plain VARCHAR(255) NULL AFTER buyer_action_token_hash,
-  ADD COLUMN buyer_action_token_expires_at DATETIME NULL AFTER buyer_action_token_plain;
 
-CREATE INDEX idx_orders_buyer_action_token_hash ON orders(buyer_action_token_hash);
+SET NAMES utf8mb4;
+-- External QA report L-32: IF NOT EXISTS makes both statements below safe to re-run.
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS buyer_action_token_hash VARCHAR(64) NULL AFTER pi_valid_until,
+  ADD COLUMN IF NOT EXISTS buyer_action_token_plain VARCHAR(255) NULL AFTER buyer_action_token_hash,
+  ADD COLUMN IF NOT EXISTS buyer_action_token_expires_at DATETIME NULL AFTER buyer_action_token_plain;
+
+CREATE INDEX IF NOT EXISTS idx_orders_buyer_action_token_hash ON orders(buyer_action_token_hash);

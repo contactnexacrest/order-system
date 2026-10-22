@@ -39,6 +39,8 @@
 -- ================================================================
 
 -- --- Part 1: new Factory Owner option ---------------------------------
+
+SET NAMES utf8mb4;
 INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
 SELECT * FROM (SELECT 'supplier_type' AS list_key, 'Factory Owner' AS option_value, 4 AS sort_order, 0 AS is_default, 1 AS is_active) AS t
 WHERE NOT EXISTS (SELECT 1 FROM dropdown_options WHERE list_key = 'supplier_type' AND option_value = 'Factory Owner');

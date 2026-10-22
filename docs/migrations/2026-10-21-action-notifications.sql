@@ -25,6 +25,8 @@
 -- Idempotent (safe to re-run) — both changes are guarded.
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 SET @col_exists = (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email_action_notifications_enabled'

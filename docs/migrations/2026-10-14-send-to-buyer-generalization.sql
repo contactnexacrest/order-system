@@ -22,6 +22,8 @@
 -- else.
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 INSERT IGNORE INTO email_templates (template_key, subject, body, footer) VALUES
   ('send_buyerpo', 'Buyer PO — Order Acceptance {document_reference} — {company_name}',
    'Dear {buyer_contact_person},\n\nPlease find attached our formal acceptance of your Purchase Order, {document_reference} dated {generated_date}, issued against Order Confirmation {oc_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{sender_signature}',

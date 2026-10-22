@@ -15,9 +15,12 @@
 -- — still what a pre-this-change row has, and what the review screen
 -- falls back to), the new structured columns are used when present.
 -- Apply to both the PHP and Node MySQL databases — same schema.
+
+SET NAMES utf8mb4;
+-- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
 ALTER TABLE pi_intake_submissions
-  ADD COLUMN billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
-  ADD COLUMN billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
-  ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2,
-  ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city,
-  ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode;
+  ADD COLUMN IF NOT EXISTS billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
+  ADD COLUMN IF NOT EXISTS billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
+  ADD COLUMN IF NOT EXISTS billing_city VARCHAR(100) NULL AFTER billing_address_line2,
+  ADD COLUMN IF NOT EXISTS billing_postcode VARCHAR(30) NULL AFTER billing_city,
+  ADD COLUMN IF NOT EXISTS billing_country VARCHAR(100) NULL AFTER billing_postcode;

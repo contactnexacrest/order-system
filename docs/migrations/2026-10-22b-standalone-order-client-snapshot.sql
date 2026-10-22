@@ -23,47 +23,56 @@
 -- ================================================================
 -- STEP 1 — add the new snapshot columns
 -- ================================================================
+
+SET NAMES utf8mb4;
 ALTER TABLE orders
-  ADD COLUMN company_legal_name       VARCHAR(255) NULL AFTER show_bl_instructions,
-  ADD COLUMN billing_address          TEXT NULL AFTER company_legal_name,
-  ADD COLUMN billing_address_line1    VARCHAR(255) NULL AFTER billing_address,
-  ADD COLUMN billing_address_line2    VARCHAR(255) NULL AFTER billing_address_line1,
-  ADD COLUMN billing_city             VARCHAR(100) NULL AFTER billing_address_line2,
-  ADD COLUMN billing_postcode         VARCHAR(30) NULL AFTER billing_city,
-  ADD COLUMN billing_country          VARCHAR(100) NULL AFTER billing_postcode,
-  ADD COLUMN vat_eori_tax_no          VARCHAR(100) NULL AFTER billing_country,
-  ADD COLUMN contact_person           VARCHAR(150) NULL AFTER vat_eori_tax_no,
-  ADD COLUMN client_email             VARCHAR(190) NULL AFTER contact_person,
-  ADD COLUMN client_phone             VARCHAR(30) NULL AFTER client_email,
-  ADD COLUMN country_of_destination   VARCHAR(100) NULL AFTER client_phone,
-  ADD COLUMN consignee_same_as_buyer  TINYINT(1) NOT NULL DEFAULT 1 AFTER country_of_destination,
-  ADD COLUMN consignee_name           VARCHAR(255) NULL AFTER consignee_same_as_buyer,
-  ADD COLUMN consignee_address        TEXT NULL AFTER consignee_name,
-  ADD COLUMN consignee_address_line1  VARCHAR(255) NULL AFTER consignee_address,
-  ADD COLUMN consignee_address_line2  VARCHAR(255) NULL AFTER consignee_address_line1,
-  ADD COLUMN consignee_city           VARCHAR(100) NULL AFTER consignee_address_line2,
-  ADD COLUMN consignee_postcode       VARCHAR(30) NULL AFTER consignee_city,
-  ADD COLUMN consignee_country        VARCHAR(100) NULL AFTER consignee_postcode,
-  ADD COLUMN consignee_vat_eori_tax_no VARCHAR(100) NULL AFTER consignee_country,
-  ADD COLUMN consignee_contact_person VARCHAR(150) NULL AFTER consignee_vat_eori_tax_no,
-  ADD COLUMN consignee_phone          VARCHAR(30) NULL AFTER consignee_contact_person,
-  ADD COLUMN consignee_email          VARCHAR(190) NULL AFTER consignee_phone,
-  ADD COLUMN notify_party_same_as_consignee TINYINT(1) NOT NULL DEFAULT 1 AFTER consignee_email,
-  ADD COLUMN notify_party             VARCHAR(255) NULL AFTER notify_party_same_as_consignee,
-  ADD COLUMN notify_party_address_line1 VARCHAR(255) NULL AFTER notify_party,
-  ADD COLUMN notify_party_address_line2 VARCHAR(255) NULL AFTER notify_party_address_line1,
-  ADD COLUMN notify_party_city        VARCHAR(100) NULL AFTER notify_party_address_line2,
-  ADD COLUMN notify_party_postcode    VARCHAR(30) NULL AFTER notify_party_city,
-  ADD COLUMN notify_party_country     VARCHAR(100) NULL AFTER notify_party_postcode,
-  ADD COLUMN notify_party_contact_person VARCHAR(150) NULL AFTER notify_party_country,
-  ADD COLUMN notify_party_phone       VARCHAR(30) NULL AFTER notify_party_contact_person,
-  ADD COLUMN notify_party_email       VARCHAR(190) NULL AFTER notify_party_phone;
+  ADD COLUMN IF NOT EXISTS company_legal_name       VARCHAR(255) NULL AFTER show_bl_instructions,
+  ADD COLUMN IF NOT EXISTS billing_address          TEXT NULL AFTER company_legal_name,
+  ADD COLUMN IF NOT EXISTS billing_address_line1    VARCHAR(255) NULL AFTER billing_address,
+  ADD COLUMN IF NOT EXISTS billing_address_line2    VARCHAR(255) NULL AFTER billing_address_line1,
+  ADD COLUMN IF NOT EXISTS billing_city             VARCHAR(100) NULL AFTER billing_address_line2,
+  ADD COLUMN IF NOT EXISTS billing_postcode         VARCHAR(30) NULL AFTER billing_city,
+  ADD COLUMN IF NOT EXISTS billing_country          VARCHAR(100) NULL AFTER billing_postcode,
+  ADD COLUMN IF NOT EXISTS vat_eori_tax_no          VARCHAR(100) NULL AFTER billing_country,
+  ADD COLUMN IF NOT EXISTS contact_person           VARCHAR(150) NULL AFTER vat_eori_tax_no,
+  ADD COLUMN IF NOT EXISTS client_email             VARCHAR(190) NULL AFTER contact_person,
+  ADD COLUMN IF NOT EXISTS client_phone             VARCHAR(30) NULL AFTER client_email,
+  ADD COLUMN IF NOT EXISTS country_of_destination   VARCHAR(100) NULL AFTER client_phone,
+  ADD COLUMN IF NOT EXISTS consignee_same_as_buyer  TINYINT(1) NOT NULL DEFAULT 1 AFTER country_of_destination,
+  ADD COLUMN IF NOT EXISTS consignee_name           VARCHAR(255) NULL AFTER consignee_same_as_buyer,
+  ADD COLUMN IF NOT EXISTS consignee_address        TEXT NULL AFTER consignee_name,
+  ADD COLUMN IF NOT EXISTS consignee_address_line1  VARCHAR(255) NULL AFTER consignee_address,
+  ADD COLUMN IF NOT EXISTS consignee_address_line2  VARCHAR(255) NULL AFTER consignee_address_line1,
+  ADD COLUMN IF NOT EXISTS consignee_city           VARCHAR(100) NULL AFTER consignee_address_line2,
+  ADD COLUMN IF NOT EXISTS consignee_postcode       VARCHAR(30) NULL AFTER consignee_city,
+  ADD COLUMN IF NOT EXISTS consignee_country        VARCHAR(100) NULL AFTER consignee_postcode,
+  ADD COLUMN IF NOT EXISTS consignee_vat_eori_tax_no VARCHAR(100) NULL AFTER consignee_country,
+  ADD COLUMN IF NOT EXISTS consignee_contact_person VARCHAR(150) NULL AFTER consignee_vat_eori_tax_no,
+  ADD COLUMN IF NOT EXISTS consignee_phone          VARCHAR(30) NULL AFTER consignee_contact_person,
+  ADD COLUMN IF NOT EXISTS consignee_email          VARCHAR(190) NULL AFTER consignee_phone,
+  ADD COLUMN IF NOT EXISTS notify_party_same_as_consignee TINYINT(1) NOT NULL DEFAULT 1 AFTER consignee_email,
+  ADD COLUMN IF NOT EXISTS notify_party             VARCHAR(255) NULL AFTER notify_party_same_as_consignee,
+  ADD COLUMN IF NOT EXISTS notify_party_address_line1 VARCHAR(255) NULL AFTER notify_party,
+  ADD COLUMN IF NOT EXISTS notify_party_address_line2 VARCHAR(255) NULL AFTER notify_party_address_line1,
+  ADD COLUMN IF NOT EXISTS notify_party_city        VARCHAR(100) NULL AFTER notify_party_address_line2,
+  ADD COLUMN IF NOT EXISTS notify_party_postcode    VARCHAR(30) NULL AFTER notify_party_city,
+  ADD COLUMN IF NOT EXISTS notify_party_country     VARCHAR(100) NULL AFTER notify_party_postcode,
+  ADD COLUMN IF NOT EXISTS notify_party_contact_person VARCHAR(150) NULL AFTER notify_party_country,
+  ADD COLUMN IF NOT EXISTS notify_party_phone       VARCHAR(30) NULL AFTER notify_party_contact_person,
+  ADD COLUMN IF NOT EXISTS notify_party_email       VARCHAR(190) NULL AFTER notify_party_phone;
 
 -- ================================================================
 -- STEP 2 — backfill every existing order from whatever the live join
 -- currently resolves to. Safe and accurate: nothing has drifted yet as
 -- of this migration running, so "today's live-join answer" IS the
 -- correct historical record for every order that exists right now.
+--
+-- External QA report L-32: restricted to rows not yet snapshotted
+-- (company_legal_name IS NULL) — without this, re-running the
+-- migration after a client's details later legitimately changed
+-- would silently overwrite the correct FROZEN historical snapshot
+-- with today's (now-drifted) live values, defeating the entire point
+-- of this migration.
 -- ================================================================
 UPDATE orders o
   JOIN clients c ON c.id = o.client_id
@@ -101,4 +110,5 @@ SET
   o.notify_party_country     = c.notify_party_country,
   o.notify_party_contact_person = c.notify_party_contact_person,
   o.notify_party_phone       = c.notify_party_phone,
-  o.notify_party_email       = c.notify_party_email;
+  o.notify_party_email       = c.notify_party_email
+WHERE o.company_legal_name IS NULL;

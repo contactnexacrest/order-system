@@ -29,6 +29,8 @@
 -- Idempotent (safe to re-run).
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 INSERT INTO payment_presets
   (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
 SELECT 'Extended Terms — 30/70', 0, 30.00, 'against Proforma Invoice before production commences',

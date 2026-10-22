@@ -15,20 +15,30 @@
 -- ================================================================
 -- STEP 1 — add the new snapshot columns
 -- ================================================================
+
+SET NAMES utf8mb4;
+-- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
 ALTER TABLE order_supplier_po
-  ADD COLUMN supplier_legal_name    VARCHAR(255) NULL AFTER supplier_id,
-  ADD COLUMN supplier_address       TEXT NULL AFTER supplier_legal_name,
-  ADD COLUMN supplier_gstin         VARCHAR(20) NULL AFTER supplier_address,
-  ADD COLUMN supplier_pan           VARCHAR(20) NULL AFTER supplier_gstin,
-  ADD COLUMN supplier_contact_person VARCHAR(150) NULL AFTER supplier_pan,
-  ADD COLUMN supplier_phone         VARCHAR(30) NULL AFTER supplier_contact_person,
-  ADD COLUMN supplier_type          VARCHAR(50) NULL AFTER supplier_phone;
+  ADD COLUMN IF NOT EXISTS supplier_legal_name    VARCHAR(255) NULL AFTER supplier_id,
+  ADD COLUMN IF NOT EXISTS supplier_address       TEXT NULL AFTER supplier_legal_name,
+  ADD COLUMN IF NOT EXISTS supplier_gstin         VARCHAR(20) NULL AFTER supplier_address,
+  ADD COLUMN IF NOT EXISTS supplier_pan           VARCHAR(20) NULL AFTER supplier_gstin,
+  ADD COLUMN IF NOT EXISTS supplier_contact_person VARCHAR(150) NULL AFTER supplier_pan,
+  ADD COLUMN IF NOT EXISTS supplier_phone         VARCHAR(30) NULL AFTER supplier_contact_person,
+  ADD COLUMN IF NOT EXISTS supplier_type          VARCHAR(50) NULL AFTER supplier_phone;
 
 -- ================================================================
 -- STEP 2 — backfill every existing Supplier PO from whatever the live
 -- join currently resolves to. Safe and accurate: nothing has drifted yet
 -- as of this migration running, so "today's live-join answer" IS the
 -- correct historical record for every Supplier PO that exists right now.
+--
+-- External QA report L-32: restricted to rows not yet snapshotted
+-- (supplier_legal_name IS NULL) — without this, re-running the
+-- migration after a supplier's details later legitimately changed
+-- would silently overwrite the correct FROZEN historical snapshot
+-- with today's (now-drifted) live values, defeating the entire point
+-- of this migration.
 -- ================================================================
 UPDATE order_supplier_po sp
   JOIN suppliers s ON s.id = sp.supplier_id
@@ -39,4 +49,5 @@ SET
   sp.supplier_pan           = s.pan,
   sp.supplier_contact_person = s.contact_person,
   sp.supplier_phone         = s.phone,
-  sp.supplier_type          = s.supplier_type;
+  sp.supplier_type          = s.supplier_type
+WHERE sp.supplier_legal_name IS NULL;

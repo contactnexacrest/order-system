@@ -26,6 +26,8 @@
 -- regardless of whether it matches one of these 3 seeded options.
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
 SELECT * FROM (SELECT 'rbi_purpose_code' AS list_key, 'P0102' AS option_value, 1 AS sort_order, 0 AS is_default, 1 AS is_active) AS t
 WHERE NOT EXISTS (SELECT 1 FROM dropdown_options WHERE list_key = 'rbi_purpose_code' AND option_value = 'P0102');

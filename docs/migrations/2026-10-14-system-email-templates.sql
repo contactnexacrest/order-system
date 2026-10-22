@@ -27,6 +27,8 @@
 -- else.
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 INSERT IGNORE INTO email_templates (template_key, subject, body, footer) VALUES
   ('two_factor_code', 'Your NexaCrest login verification code',
    'Your verification code is: {code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator.',

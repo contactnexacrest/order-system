@@ -26,6 +26,8 @@
 -- unique constraint on (list_key, option_value) to lean on instead).
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
 SELECT * FROM (SELECT 'unit' AS list_key, 'PCS' AS option_value, 1 AS sort_order, 1 AS is_default, 1 AS is_active) AS t
 WHERE NOT EXISTS (SELECT 1 FROM dropdown_options WHERE list_key = 'unit' AND option_value = 'PCS');

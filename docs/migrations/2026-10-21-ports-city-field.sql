@@ -27,6 +27,8 @@
 -- only touches rows where city is still NULL.
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 SET @col_exists = (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ports' AND COLUMN_NAME = 'city'

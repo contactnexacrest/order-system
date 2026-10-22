@@ -22,6 +22,8 @@
 -- Idempotent (safe to re-run).
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive)
 SELECT 'default_estimated_total_cbm', '12.5', 'number', 'order_defaults', 'Pre-fills Total CBM (m³) on the New Order form — staff edit per order as always.', 0
 WHERE NOT EXISTS (SELECT 1 FROM company_settings WHERE setting_key = 'default_estimated_total_cbm');

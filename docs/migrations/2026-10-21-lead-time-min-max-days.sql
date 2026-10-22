@@ -19,6 +19,8 @@
 -- Idempotent (safe to re-run) — each ADD COLUMN is guarded.
 -- ================================================================
 
+
+SET NAMES utf8mb4;
 SET @min_exists = (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'lead_time_min_days'

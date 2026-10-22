@@ -9,6 +9,8 @@
 -- A fresh install now gets this row directly from seed.sql; this
 -- migration brings an already-seeded database up to date. Apply to both
 -- the PHP and Node MySQL databases — same schema/seed content.
+
+SET NAMES utf8mb4;
 INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
 SELECT 'bl_copy', 'pdf,jpg,jpeg,png', 10485760,
   'External QA report L-22: scanned FINAL Bill of Lading, attached at the Stage 7->8 BL-issued gate or any time after — distinct from draft_bl, which is the pre-approval draft.'
