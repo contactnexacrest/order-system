@@ -7,6 +7,7 @@ namespace App\Tests\Integration;
 use App\Controllers\OrderController;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\OrderShippingRepository;
+use App\Services\FileUploadService;
 use App\Services\StageGateService;
 use App\Tests\Support\DbTestCase;
 
@@ -85,5 +86,43 @@ final class BlCopyUploadTest extends DbTestCase
         $shipping = OrderShippingRepository::find($orderId);
         self::assertSame($fileId, (int) $shipping['bl_copy_file_id']);
         self::assertNotNull(FileStoreRepository::find($fileId));
+    }
+
+    /**
+     * External QA report L-22: every test above exercises
+     * OrderShippingRepository::attachBlCopy() directly against a
+     * pre-made test file, never through FileUploadService::handleUpload()
+     * — the actual code path OrderController::recordBlIssued()/
+     * attachBlCopy() use, and the one that was actually broken: the
+     * 'bl_copy' upload context row was never seeded, so every real
+     * attempt failed with "Unknown upload context: bl_copy" before a
+     * file was ever written. FileUploadService checks the context
+     * (and throws that exact message) BEFORE calling move_uploaded_file()
+     * — which this test cannot satisfy for real outside an actual HTTP
+     * request — so reaching the move_uploaded_file failure instead of
+     * the context error is exactly what proves the context now resolves.
+     */
+    public function testHandleUploadResolvesTheBlCopyContextInsteadOfFailingUnknownContext(): void
+    {
+        $tmpPath = tempnam(sys_get_temp_dir(), 'bl-copy-test-');
+        file_put_contents($tmpPath, '%PDF-1.4 fake pdf content for test');
+        $_FILES['bl_copy'] = [
+            'name' => 'bl-scan.pdf',
+            'type' => 'application/pdf',
+            'tmp_name' => $tmpPath,
+            'error' => UPLOAD_ERR_OK,
+            'size' => filesize($tmpPath),
+        ];
+
+        try {
+            FileUploadService::handleUpload('bl_copy', 'bl_copy', 'test/bl-copy', null, null, null);
+            self::fail('move_uploaded_file() cannot succeed outside a real HTTP upload, so handleUpload() must throw here — the point is which error it throws');
+        } catch (\RuntimeException $e) {
+            self::assertStringNotContainsString('Unknown upload context', $e->getMessage(), "the 'bl_copy' context row must exist — this was the actual L-22 bug");
+            self::assertStringContainsString('Failed to move the uploaded file', $e->getMessage(), 'getting this far means the context, extension, and size checks all passed');
+        } finally {
+            unset($_FILES['bl_copy']);
+            @unlink($tmpPath);
+        }
     }
 }

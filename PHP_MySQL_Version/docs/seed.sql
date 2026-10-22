@@ -534,6 +534,7 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
   ('dispute_document',      'pdf,jpg,jpeg,png,docx,eml,msg', 10485760, 'Any document related to a dispute — notice, correspondence, supporting evidence.'),
   ('received_remittance',   'pdf,jpg,jpeg,png', 10485760, 'Buyer/bank remittance advice or payment confirmation copy.'),
   ('draft_bl',              'pdf', 10485760, 'Draft Bill of Lading from the CHA/shipping line, pending written approval before originals are issued.'),
+  ('bl_copy',               'pdf,jpg,jpeg,png', 10485760, 'External QA report L-22: scanned FINAL Bill of Lading, attached at the Stage 7->8 BL-issued gate or any time after — distinct from draft_bl above, which is the pre-approval draft.'),
   ('fumigation_cert',       'pdf,jpg,jpeg,png', 5242880, 'Fumigation certificate for wooden packing.'),
   ('buyer_approval',        'pdf,jpg,jpeg,png,eml,msg', 5242880, 'Buyer''s written approval (e.g. quantity shortfall, draft BL sign-off).'),
   ('product_image',         'jpg,jpeg,png,webp', 5242880, 'Product image/technical drawing attached to an Annexure A entry.'),

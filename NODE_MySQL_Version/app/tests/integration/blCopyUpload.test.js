@@ -5,6 +5,7 @@ const path = require('path');
 const db = require('../../src/config/db');
 const orderShippingRepository = require('../../src/repositories/orderShippingRepository');
 const fileStoreRepository = require('../../src/repositories/fileStoreRepository');
+const fileUploadService = require('../../src/services/fileUploadService');
 const { createTestClient, createTestOrder, createTestFile } = require('../support/fixtures');
 
 /**
@@ -53,5 +54,29 @@ describe('BL copy upload (Phase 2 item 15)', () => {
     const shipping = await orderShippingRepository.find(orderId);
     expect(Number(shipping.bl_copy_file_id)).toBe(fileId);
     expect(await fileStoreRepository.find(fileId)).not.toBeNull();
+  });
+
+  /**
+   * External QA report L-22: every test above exercises
+   * orderShippingRepository.attachBlCopy() directly against a pre-made
+   * test file, never through fileUploadService.handleUpload() — the
+   * actual code path ordersController.recordBlIssued()/attachBlCopy()
+   * use, and the one that was actually broken: the 'bl_copy' upload
+   * context row was never seeded, so every real attempt failed with
+   * "Unknown upload context: bl_copy" before any file was ever written.
+   * Unlike PHP's move_uploaded_file() (which requires a genuine HTTP
+   * upload and can never succeed from a CLI test), Node's multer-based
+   * upload already hands handleUpload() an in-memory buffer, so this can
+   * run the real path end to end.
+   */
+  it('handleUpload resolves the bl_copy context and actually stores the file', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const fakeReq = { file: { buffer: Buffer.from('%PDF-1.4 fake pdf content for test'), originalname: 'bl-scan.pdf', mimetype: 'application/pdf' } };
+
+    const fileId = await fileUploadService.handleUpload(fakeReq, 'bl_copy', 'bl_copy', 'test/bl-copy', null, orderId, null);
+
+    const stored = await fileStoreRepository.find(fileId);
+    expect(stored).not.toBeNull();
+    expect(stored.original_filename).toBe('bl-scan.pdf');
   });
 });
