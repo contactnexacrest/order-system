@@ -24,10 +24,10 @@ final class OrderShippingRepository
             'shipping_line'   => $data['shipping_line'] ?? null,
             'vessel'          => $data['vessel_name'] ?? null,
             'voyage'          => $data['voyage_number'] ?? null,
-            'etd'             => $data['etd'] ?: null,
-            'eta'             => $data['eta'] ?: null,
+            'etd'             => ($data['etd'] ?? null) ?: null,
+            'eta'             => ($data['eta'] ?? null) ?: null,
             'container_type'  => $data['container_type'] ?? null,
-            'container_count' => $data['container_count'] ?: null,
+            'container_count' => ($data['container_count'] ?? null) ?: null,
             'container_no'    => $data['container_no'] ?? null,
             'seal_no'         => $data['seal_no'] ?? null,
         ]);

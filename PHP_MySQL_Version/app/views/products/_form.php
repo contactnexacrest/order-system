@@ -17,11 +17,11 @@ $action = $isEdit ? '/products/' . (int) $product['id'] . '/update' : '/products
   <fieldset>
     <legend>Default Cost Components <small class="muted">(catalog-wide fallbacks used by computed-FOB suppliers)</small></legend>
     <div class="field-grid">
-      <label>Default Factory Cost<input type="number" step="0.01" name="default_factory_cost" value="<?= View::e($product['default_factory_cost'] !== null && $product['default_factory_cost'] !== '' ? (string) $product['default_factory_cost'] : '') ?>" placeholder="e.g., 450.00"></label>
-      <label>Default Transportation Cost<input type="number" step="0.01" name="default_transportation_cost" value="<?= View::e($product['default_transportation_cost'] !== null && $product['default_transportation_cost'] !== '' ? (string) $product['default_transportation_cost'] : '') ?>" placeholder="e.g., 60.00"></label>
-      <label>Default Packing Cost<input type="number" step="0.01" name="default_packing_cost" value="<?= View::e($product['default_packing_cost'] !== null && $product['default_packing_cost'] !== '' ? (string) $product['default_packing_cost'] : '') ?>" placeholder="e.g., 25.00"></label>
-      <label>Default Loading Cost<input type="number" step="0.01" name="default_loading_cost" value="<?= View::e($product['default_loading_cost'] !== null && $product['default_loading_cost'] !== '' ? (string) $product['default_loading_cost'] : '') ?>" placeholder="e.g., 15.00"></label>
-      <label>Default CHA Cost<input type="number" step="0.01" name="default_cha_cost" value="<?= View::e($product['default_cha_cost'] !== null && $product['default_cha_cost'] !== '' ? (string) $product['default_cha_cost'] : '') ?>" placeholder="e.g., 20.00"></label>
+      <label>Default Factory Cost<input type="number" step="0.01" name="default_factory_cost" value="<?= View::e(($product['default_factory_cost'] ?? '') !== '' ? (string) $product['default_factory_cost'] : '') ?>" placeholder="e.g., 450.00"></label>
+      <label>Default Transportation Cost<input type="number" step="0.01" name="default_transportation_cost" value="<?= View::e(($product['default_transportation_cost'] ?? '') !== '' ? (string) $product['default_transportation_cost'] : '') ?>" placeholder="e.g., 60.00"></label>
+      <label>Default Packing Cost<input type="number" step="0.01" name="default_packing_cost" value="<?= View::e(($product['default_packing_cost'] ?? '') !== '' ? (string) $product['default_packing_cost'] : '') ?>" placeholder="e.g., 25.00"></label>
+      <label>Default Loading Cost<input type="number" step="0.01" name="default_loading_cost" value="<?= View::e(($product['default_loading_cost'] ?? '') !== '' ? (string) $product['default_loading_cost'] : '') ?>" placeholder="e.g., 15.00"></label>
+      <label>Default CHA Cost<input type="number" step="0.01" name="default_cha_cost" value="<?= View::e(($product['default_cha_cost'] ?? '') !== '' ? (string) $product['default_cha_cost'] : '') ?>" placeholder="e.g., 20.00"></label>
     </div>
   </fieldset>
 

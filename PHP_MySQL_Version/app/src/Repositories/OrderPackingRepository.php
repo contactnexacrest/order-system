@@ -26,14 +26,14 @@ final class OrderPackingRepository
                 shortfall_pct = VALUES(shortfall_pct)'
         )->execute([
             'order_id'      => $orderId,
-            'qty'           => $data['actual_quantity_packed'] ?: null,
-            'unit'          => $data['actual_quantity_unit'] ?: null,
-            'crates'        => $data['crate_count'] ?: null,
-            'net'           => $data['total_net_weight_kg'] ?: null,
-            'gross'         => $data['total_gross_weight_kg'] ?: null,
-            'cbm'           => $data['total_cbm'] ?: null,
-            'packing_date'  => $data['packing_date'] ?: null,
-            'shortfall_pct' => $data['shortfall_pct'] ?: null,
+            'qty'           => ($data['actual_quantity_packed'] ?? null) ?: null,
+            'unit'          => ($data['actual_quantity_unit'] ?? null) ?: null,
+            'crates'        => ($data['crate_count'] ?? null) ?: null,
+            'net'           => ($data['total_net_weight_kg'] ?? null) ?: null,
+            'gross'         => ($data['total_gross_weight_kg'] ?? null) ?: null,
+            'cbm'           => ($data['total_cbm'] ?? null) ?: null,
+            'packing_date'  => ($data['packing_date'] ?? null) ?: null,
+            'shortfall_pct' => ($data['shortfall_pct'] ?? null) ?: null,
         ]);
     }
 

@@ -1710,7 +1710,7 @@ foreach ($stages as $s) {
           <?= $stepBadge('7d') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
       <?php else: ?>
-        <p>Bill of Lading recorded: <strong><?= htmlspecialchars($shipping['bl_number']) ?></strong> (<?= htmlspecialchars($shipping['bl_date']) ?>)</p>
+        <p>Bill of Lading recorded: <strong><?= htmlspecialchars((string) ($shipping['bl_number'] ?? '')) ?></strong> (<?= htmlspecialchars((string) ($shipping['bl_date'] ?? '')) ?>)</p>
         <?php if (!empty($shipping['bl_copy_file_id'])): ?>
           <p class="muted small"><a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">Download scanned BL copy</a></p>
         <?php else: ?>
