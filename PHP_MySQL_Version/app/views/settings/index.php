@@ -1,6 +1,9 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card">
   <h1>Company Settings</h1>
+  <?php if ($uploadLimitWarning): ?>
+    <div class="alert alert-warning">&#9888; <?= htmlspecialchars($uploadLimitWarning) ?></div>
+  <?php endif; ?>
   <p class="muted">Every value here is what document templates actually read at generation time — nothing is hardcoded in a template. Fields marked <span class="badge badge-sensitive">sensitive</span> affect banking/RBI-facing documents; double-check before saving.</p>
   <p class="muted small">Spec Section 13 — every edit here is logged with who/when/field/old value/new value/reason, and cannot be undone through this UI; only a further edit can change a value back.</p>
   <p class="muted small">&#128274; <strong>Protected</strong> fields are locked against accidental edits — click <em>Unlock</em> on a row before you can change it. Protecting or unprotecting a field itself is a separate, peer-approved request: see <a href="/admin/field-protection">Field Protection</a>.</p>

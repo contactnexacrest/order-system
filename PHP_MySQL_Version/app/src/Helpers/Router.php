@@ -200,9 +200,12 @@ final class Router
     /**
      * Only ever redirects back to a same-origin relative path — the
      * Referer header is client-supplied and must never be trusted for an
-     * absolute/external redirect target (open-redirect risk).
+     * absolute/external redirect target (open-redirect risk). Public so
+     * other chokepoints that need a safe "go back" target (e.g.
+     * CsrfCheck's L-34 oversized-upload page) can reuse this exact
+     * same-origin check instead of duplicating it.
      */
-    private static function safeRedirectBack(): string
+    public static function safeRedirectBack(): string
     {
         $referer = $_SERVER['HTTP_REFERER'] ?? '';
         $host = $_SERVER['HTTP_HOST'] ?? null;

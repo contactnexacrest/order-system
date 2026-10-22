@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Config\Database;
 use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
 use App\Helpers\SettingValueValidator;
 use App\Helpers\View;
+use App\Middleware\CsrfCheck;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\LookupRepository;
@@ -29,6 +31,12 @@ final class SettingsController
         View::render('settings/index', [
             'grouped' => $grouped,
             'isSuperAdmin' => SuperAdminService::isEffective((int) $user['id']),
+            // External QA report L-34: PHP's own post_max_size/
+            // upload_max_filesize silently caps every upload below
+            // whatever a file_upload_contexts row advertises, with no
+            // warning anywhere that staff would ever see before a buyer
+            // document/dispute evidence upload mysteriously failed.
+            'uploadLimitWarning' => $this->uploadLimitWarning(),
             // 90-item backlog #31: rbi_purpose_code_advance/balance/freight
             // were plain free-text settings with no standard list — same
             // dropdown treatment as #43/#66/#51a, special-cased in the view
@@ -38,6 +46,37 @@ final class SettingsController
             // settings field type).
             'rbiPurposeCodes' => LookupRepository::dropdownOptions('rbi_purpose_code'),
         ], 'layout/base');
+    }
+
+    /**
+     * External QA report L-34: this server's own PHP post_max_size/
+     * upload_max_filesize silently cap every upload below whatever a
+     * file_upload_contexts row advertises as its allowed maximum — a
+     * buyer document/dispute evidence upload that's well within the
+     * app's own stated limit can still fail with the generic
+     * "File too large" page (CsrfCheck), with nothing on this page ever
+     * telling staff why. post_max_size also bounds the whole request
+     * (file + every other form field), so the EFFECTIVE server limit is
+     * whichever of the two ini settings is smaller.
+     */
+    private function uploadLimitWarning(): ?string
+    {
+        $postMax = CsrfCheck::iniSizeToBytes((string) ini_get('post_max_size'));
+        $uploadMax = CsrfCheck::iniSizeToBytes((string) ini_get('upload_max_filesize'));
+        $candidates = array_filter([$postMax, $uploadMax], static fn (int $v): bool => $v > 0);
+        if ($candidates === []) {
+            return null; // both unlimited (0) — nothing to warn about
+        }
+        $effectiveBytes = min($candidates);
+
+        $largestConfigured = (int) (Database::connection()->query('SELECT MAX(max_size_bytes) FROM file_upload_contexts')->fetchColumn() ?: 0);
+        if ($largestConfigured <= $effectiveBytes) {
+            return null;
+        }
+
+        $effectiveMb = round($effectiveBytes / 1048576, 1);
+        $configuredMb = round($largestConfigured / 1048576, 1);
+        return "This server's PHP upload limit (post_max_size / upload_max_filesize) is only {$effectiveMb} MB, but at least one upload type here is configured to allow files up to {$configuredMb} MB — any upload above {$effectiveMb} MB will fail with a generic \"File too large\" page. Ask your hosting provider to raise post_max_size and upload_max_filesize to at least {$configuredMb} MB, or lower that upload type's own limit to match.";
     }
 
     public function update(array $params): void

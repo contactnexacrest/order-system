@@ -126,4 +126,29 @@ final class CsrfCheckOversizedUploadTest extends TestCase
         self::assertFalse($result);
         self::assertSame('', $output);
     }
+
+    /**
+     * External QA report L-34: "the 413 page is a bare page without
+     * navigation." Now rendered through layout/bare (site branding, same
+     * wrapper every other unauthenticated-reachable page uses) with a
+     * same-origin Back link, instead of one bare, unstyled line.
+     */
+    public function testTheFileTooLargePageIsRenderedInsideTheSiteLayoutWithABackLink(): void
+    {
+        $postMaxSizeBytes = CsrfCheck::iniSizeToBytes((string) ini_get('post_max_size'));
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SERVER['CONTENT_LENGTH'] = (string) ($postMaxSizeBytes + 1024);
+        $_SERVER['HTTP_REFERER'] = 'https://order-system.test/orders/123';
+        $_SERVER['HTTP_HOST'] = 'order-system.test';
+
+        $verify = CsrfCheck::verify();
+        ob_start();
+        $result = $verify([]);
+        $output = ob_get_clean();
+        unset($_SERVER['HTTP_REFERER'], $_SERVER['HTTP_HOST']);
+
+        self::assertFalse($result);
+        self::assertStringContainsString('NexaCrest', $output, 'the bug: the old bare echo carried no site branding/navigation at all');
+        self::assertStringContainsString('href="/orders/123"', $output, 'a same-origin Back link, not a dead end');
+    }
 }

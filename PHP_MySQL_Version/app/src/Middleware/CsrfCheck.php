@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Middleware;
 
 use App\Helpers\Csrf;
+use App\Helpers\Router;
+use App\Helpers\View;
 
 final class CsrfCheck
 {
@@ -16,9 +18,18 @@ final class CsrfCheck
             }
 
             if (self::isLikelyOversizedUploadDrop()) {
+                // External QA report L-34: this used to echo a bare,
+                // unstyled line with no site navigation — a dead end for
+                // whoever hit it. Rendered inside layout/bare (branding,
+                // styling, no DB-backed nav — this chokepoint must stay
+                // usable even if the DB itself is what's under strain)
+                // with a same-origin Back link, same as every other
+                // error page in this app.
                 http_response_code(413);
-                $max = (string) ini_get('post_max_size') ?: 'the configured limit';
-                echo '<h1>413 — File too large</h1><p>The file you tried to upload is too large for this server to accept (max ' . htmlspecialchars($max) . '). Please use a smaller file and try again.</p>';
+                $maxLabel = ((string) ini_get('post_max_size')) !== ''
+                    ? ((string) ini_get('post_max_size')) . 'B'
+                    : 'the configured limit';
+                View::render('errors/413', ['maxLabel' => $maxLabel, 'backUrl' => Router::safeRedirectBack()], 'layout/bare');
                 return false;
             }
 
