@@ -130,7 +130,18 @@ async function grantOverride(userId, permissionId, grantedBy, reason) {
      ON DUPLICATE KEY UPDATE is_enabled = 1, granted_by = VALUES(granted_by), reason = VALUES(reason), granted_at = CURRENT_TIMESTAMP`,
     { user_id: userId, permission_id: permissionId, granted_by: grantedBy, reason }
   );
-  return result.insertId;
+  if (result.insertId > 0) {
+    return result.insertId;
+  }
+  // External QA report R-08: the driver's insertId after an INSERT ...
+  // ON DUPLICATE KEY UPDATE that took the UPDATE branch (re-granting an
+  // already-granted permission) is 0 — no new AUTO_INCREMENT value was
+  // ever generated. The caller's audit log entry then pointed at
+  // entity_id 0, losing which grant actually changed. uq_user_perm
+  // (user_id, permission_id) is the row's own unique key, so it always
+  // identifies exactly the row the statement above just touched.
+  const row = await db.queryOne('SELECT id FROM user_permissions WHERE user_id = :user_id AND permission_id = :permission_id', { user_id: userId, permission_id: permissionId });
+  return row.id;
 }
 
 /** Only ever removes a grant-only override row (is_enabled = 1) — never touches a force-disable row. */

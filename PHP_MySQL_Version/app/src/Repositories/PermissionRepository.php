@@ -152,7 +152,21 @@ final class PermissionRepository
              ON DUPLICATE KEY UPDATE is_enabled = 1, granted_by = VALUES(granted_by), reason = VALUES(reason), granted_at = CURRENT_TIMESTAMP'
         );
         $stmt->execute(['user_id' => $userId, 'permission_id' => $permissionId, 'granted_by' => $grantedBy, 'reason' => $reason]);
-        return (int) $pdo->lastInsertId();
+        $insertId = (int) $pdo->lastInsertId();
+        if ($insertId > 0) {
+            return $insertId;
+        }
+        // External QA report R-08: PDO::lastInsertId() after an INSERT ...
+        // ON DUPLICATE KEY UPDATE that took the UPDATE branch (re-granting
+        // an already-granted permission) returns 0 — no new AUTO_INCREMENT
+        // value was ever generated. The caller's audit log entry then
+        // pointed at entity_id 0, losing which grant actually changed.
+        // uq_user_perm (user_id, permission_id) is the row's own unique
+        // key, so it always identifies exactly the row the statement above
+        // just touched.
+        $stmt = $pdo->prepare('SELECT id FROM user_permissions WHERE user_id = :user_id AND permission_id = :permission_id');
+        $stmt->execute(['user_id' => $userId, 'permission_id' => $permissionId]);
+        return (int) $stmt->fetchColumn();
     }
 
     /** Only ever removes a grant-only override row (is_enabled = 1) — never touches a force-disable row. */
