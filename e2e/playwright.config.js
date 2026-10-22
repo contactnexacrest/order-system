@@ -17,6 +17,15 @@ module.exports = defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false, // the smoke spec creates and walks one real order through the whole pipeline — must stay serial
+  // Both dev servers are single-process (PHP's built-in server, Node's
+  // single event loop) and Node's own document generation shells out to
+  // a real headless Chrome per PDF — running multiple spec files
+  // concurrently across workers reliably produces request-queueing
+  // flakes under that load (confirmed: a spec that passes every time
+  // alone intermittently times out when another heavy spec runs
+  // alongside it). One worker trades a few seconds of wall-clock time
+  // for a suite that isn't flaky by construction.
+  workers: 1,
   retries: 0,
   reporter: [['list']],
   use: {
