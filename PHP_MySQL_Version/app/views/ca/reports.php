@@ -1,3 +1,10 @@
+<?php
+// External QA report U-01: see views/ca/index.php's own comment on $canViewOrders.
+$__caReportsUser = \App\Services\AuthService::currentUser();
+$__caReportsRoleId = $__caReportsUser['role_id'] !== null ? (int) $__caReportsUser['role_id'] : null;
+$canViewOrders = \App\Services\PermissionService::can((int) $__caReportsUser['id'], $__caReportsRoleId, 'manage_orders')
+    || \App\Services\PermissionService::can((int) $__caReportsUser['id'], $__caReportsRoleId, 'view_orders');
+?>
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Revenue Report</h1>
@@ -72,7 +79,7 @@
         <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Cleared On</th><th>Foreign Amount</th><th>INR Actual</th><th>Forex Gain/(Loss)</th></tr>
         <?php foreach ($report['rows'] as $r): ?>
         <tr>
-          <td><a href="/orders/<?= (int) $r['order_id'] ?>"><?= htmlspecialchars($r['buyer_inquiry_ref']) ?></a></td>
+          <td><?= $canViewOrders ? '<a href="/orders/' . (int) $r['order_id'] . '">' . htmlspecialchars($r['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($r['buyer_inquiry_ref']) ?></td>
           <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
           <td><?= htmlspecialchars(ucfirst($r['leg'])) ?></td>
           <td><?= htmlspecialchars((string) $r['cleared_at']) ?></td>

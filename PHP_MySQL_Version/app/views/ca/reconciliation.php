@@ -1,3 +1,10 @@
+<?php
+// External QA report U-01: see views/ca/index.php's own comment on $canViewOrders.
+$__caReconUser = \App\Services\AuthService::currentUser();
+$__caReconRoleId = $__caReconUser['role_id'] !== null ? (int) $__caReconUser['role_id'] : null;
+$canViewOrders = \App\Services\PermissionService::can((int) $__caReconUser['id'], $__caReconRoleId, 'manage_orders')
+    || \App\Services\PermissionService::can((int) $__caReconUser['id'], $__caReconRoleId, 'view_orders');
+?>
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Reconciliation Summary</h1>
@@ -34,7 +41,7 @@
         <tr><th>Order Ref</th><th>Leg</th><th>Cleared On</th><th>INR Actual</th></tr>
         <?php foreach ($unmatchedRevenueLegs as $leg): ?>
         <tr>
-          <td><a href="/orders/<?= (int) $leg['order_id'] ?>"><?= htmlspecialchars($leg['buyer_inquiry_ref']) ?></a></td>
+          <td><?= $canViewOrders ? '<a href="/orders/' . (int) $leg['order_id'] . '">' . htmlspecialchars($leg['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($leg['buyer_inquiry_ref']) ?></td>
           <td><?= htmlspecialchars(ucfirst($leg['leg'])) ?></td>
           <td><?= htmlspecialchars((string) $leg['cleared_at']) ?></td>
           <td>&#8377;<?= number_format((float) $leg['inr_actual'], 2) ?></td>

@@ -1,3 +1,10 @@
+<?php
+// External QA report U-01: see views/ca/index.php's own comment on $canViewOrders.
+$__caBankUser = \App\Services\AuthService::currentUser();
+$__caBankRoleId = $__caBankUser['role_id'] !== null ? (int) $__caBankUser['role_id'] : null;
+$canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'], $__caBankRoleId, 'manage_orders')
+    || \App\Services\PermissionService::can((int) $__caBankUser['id'], $__caBankRoleId, 'view_orders');
+?>
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Bank Statement</h1>
@@ -34,7 +41,7 @@
                   : ($l['matched_expense_id'] !== null ? \App\Repositories\CaFyLockRepository::lockMessageForDate($l['matched_expense_date'] ?? null) : null);
             ?>
             <?php if ($l['matched_order_id'] !== null): ?>
-              Revenue: <a href="/orders/<?= (int) $l['matched_order_id'] ?>"><?= htmlspecialchars($l['matched_order_ref']) ?></a> — <?= htmlspecialchars(ucfirst($l['matched_leg'])) ?>
+              Revenue: <?= $canViewOrders ? '<a href="/orders/' . (int) $l['matched_order_id'] . '">' . htmlspecialchars($l['matched_order_ref']) . '</a>' : htmlspecialchars($l['matched_order_ref']) ?> — <?= htmlspecialchars(ucfirst($l['matched_leg'])) ?>
               <?php if ($matchLockMessage !== null && !$canOverrideFyLock): ?>
                 <br><span class="muted small">&#128274; <?= htmlspecialchars($matchLockMessage) ?></span>
               <?php else: ?>

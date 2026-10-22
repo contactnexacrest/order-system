@@ -430,7 +430,7 @@
 
   <div class="section" id="order-updates">
     <h2>Order Communication</h2>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted. Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.</p>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.{% if permissions.generate_documents %} Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.{% endif %}</p>
     <div class="chat-thread">
       {% if comments.length == 0 %}
         <p class="chat-empty">No updates posted yet.</p>
@@ -681,7 +681,9 @@
         </form>
       {% endif %}
     </div>
+    {% if permissions.manage_orders %}
     <p class="muted small"><a href="/orders/{{ order.id }}/annexure">{% if order.include_annexure_a %}Manage Annexure A product entries &amp; images{% else %}Enable / manage Annexure A{% endif %}</a></p>
+    {% endif %}
 
     <h3 style="font-size:0.95em; margin-top:18px;">Review &amp; Approval</h3>
     <p class="muted">A document generated above starts life <strong>draft</strong> with the DRAFT watermark. Assign at least one reviewer to move it to review; once every assigned reviewer approves (minimum required per document type), it's re-watermarked as final and can be sent to the buyer. The buyer only ever receives that final watermarked PDF — never the internal DOCX, never an unwatermarked copy.</p>
@@ -1439,7 +1441,7 @@
       <div><span class="k">Production Status</span><span class="v">{{ order.production_status_text or 'Not yet commenced' }}</span></div>
       <div><span class="k">Est. Shipment</span><span class="v">{{ order.est_shipment_date_text or 'To Be Confirmed' }}</span></div>
     </div>
-    <p class="muted small">Every update here is logged — <a href="/orders/{{ order.id }}/audit-log">view update history</a>.</p>
+    <p class="muted small">Every update here is logged{% if permissions.view_audit_log %} — <a href="/orders/{{ order.id }}/audit-log">view update history</a>{% endif %}.</p>
     {% if stage4 and stage4.status != 'locked' %}
       <form method="post" action="/orders/{{ order.id }}/production-status">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -1921,7 +1923,7 @@
   {% if permissions.close_orders %}
   <div class="section" id="compliance-checklist">
     <h2>Compliance Checklist</h2>
-    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <a href="/compliance-task-types">Compliance Task Types</a> (Admin-only).</p>
+    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from {% if permissions.manage_compliance_task_types %}<a href="/compliance-task-types">Compliance Task Types</a>{% else %}Compliance Task Types{% endif %} (Admin-only).</p>
     {% if not complianceTasks or complianceTasks.length == 0 %}
     <p class="muted small">No compliance task types have been configured yet.</p>
     {% else %}
@@ -1953,11 +1955,13 @@
   </div>
   {% endif %}
 
+  {% if permissions.manage_orders %}
   <div class="section" id="amendments">
     <h2>Amendments</h2>
     <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>
     <p><a href="/orders/{{ order.id }}/amendments">Payment Terms Amendments ({{ amendmentCount }})</a></p>
   </div>
+  {% endif %}
 
   <div class="section" id="disputes">
     <h2>Disputes</h2>
@@ -1971,7 +1975,7 @@
       </label>
     </form>
     {% endif %}
-    <p><a href="/orders/{{ order.id }}/disputes">Disputes ({{ openDisputeCount }} open)</a>
+    <p>{% if permissions.manage_disputes or permissions.respond_to_disputes %}<a href="/orders/{{ order.id }}/disputes">Disputes ({{ openDisputeCount }} open)</a>{% else %}Disputes ({{ openDisputeCount }} open){% endif %}
        {% if permissions.view_audit_log %}
        &nbsp;&middot;&nbsp;
        <a href="/orders/{{ order.id }}/audit-log">Audit Log</a>

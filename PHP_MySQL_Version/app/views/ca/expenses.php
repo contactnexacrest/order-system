@@ -1,7 +1,21 @@
+<?php
+// External QA report U-01: "CA: order pages, Zoho sync" — see
+// views/ca/index.php's own comment on $canViewOrders for the order-link
+// half. The Zoho sync page itself needs ca_module_manage, a step up from
+// the plain ca_module_view this page only needs — views/ca/index.php
+// already hides its own Zoho Books card for a view-only CA user for the
+// exact same reason; this page's own inline link never got the same
+// treatment.
+$__caExpensesUser = \App\Services\AuthService::currentUser();
+$__caExpensesRoleId = $__caExpensesUser['role_id'] !== null ? (int) $__caExpensesUser['role_id'] : null;
+$canViewOrders = \App\Services\PermissionService::can((int) $__caExpensesUser['id'], $__caExpensesRoleId, 'manage_orders')
+    || \App\Services\PermissionService::can((int) $__caExpensesUser['id'], $__caExpensesRoleId, 'view_orders');
+$canManageCa = \App\Services\PermissionService::can((int) $__caExpensesUser['id'], $__caExpensesRoleId, 'ca_module_manage');
+?>
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Expenses</h1>
-  <p class="muted">Imported one-way from Zoho Books — salary, supplier payments, travel, and anything else entered as an expense there. This is a read-only mirror for CA/reconciliation reporting; expenses are still entered in Zoho Books itself, never here. <a href="/ca/zoho-sync">Zoho Books sync &rarr;</a></p>
+  <p class="muted">Imported one-way from Zoho Books — salary, supplier payments, travel, and anything else entered as an expense there. This is a read-only mirror for CA/reconciliation reporting; expenses are still entered in Zoho Books itself, never here.<?php if ($canManageCa): ?> <a href="/ca/zoho-sync">Zoho Books sync &rarr;</a><?php endif; ?></p>
 
   <div class="section">
     <h2>Imported Expenses</h2>
@@ -21,7 +35,7 @@
           <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
           <td>
             <?php if ($e['order_id'] !== null): ?>
-              <a href="/orders/<?= (int) $e['order_id'] ?>"><?= htmlspecialchars($e['order_reference']) ?></a>
+              <?= $canViewOrders ? '<a href="/orders/' . (int) $e['order_id'] . '">' . htmlspecialchars($e['order_reference']) . '</a>' : htmlspecialchars($e['order_reference']) ?>
               <?php if ($canEditTds): ?>
                 <form method="post" action="/ca/expenses/<?= (int) $e['id'] ?>/link-order" style="display:inline" onsubmit="return confirm('Unlink this expense from its order?');">
                   <?= \App\Helpers\Csrf::field() ?>

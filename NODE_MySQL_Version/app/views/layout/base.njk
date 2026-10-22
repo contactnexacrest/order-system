@@ -17,6 +17,8 @@
 {% endif %}
 {% set canDisputes = permissions.manage_disputes or permissions.respond_to_disputes %}
 {% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes %}
+{# External QA report U-01: the main /disputes LIST route requires manage_disputes only (see server.js) — respond_to_disputes alone (e.g. Export Executive) never grants the cross-order list page. canDisputes above stays as the Ops group's own broader visibility check. #}
+{% set canViewDisputesList = permissions.manage_disputes %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log %}
 {# 90-item backlog #34: manage_hs_codes/manage_compliance_task_types/
    manage_dropdown_options/manage_email_templates each gate their own link
@@ -60,7 +62,7 @@
           <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Quotation Intake Review{% if clientIntakePendingCount > 0 %} <span class="nav-badge">{{ clientIntakePendingCount }}</span>{% endif %}</a>
           <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review{% if piIntakePendingCount > 0 %} <span class="nav-badge">{{ piIntakePendingCount }}</span>{% endif %}</a>
           <a href="/reorder-requests" class="{{ 'active' if (currentPath | startswith('/reorder-requests')) else '' }}">Reorder Requests</a>
-          {% if canDisputes %}<a href="/disputes" class="{{ 'active' if (currentPath | startswith('/disputes')) else '' }}">Disputes</a>{% endif %}
+          {% if canViewDisputesList %}<a href="/disputes" class="{{ 'active' if (currentPath | startswith('/disputes')) else '' }}">Disputes</a>{% endif %}
         </div>
       </details>
     {% endif %}

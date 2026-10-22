@@ -1,7 +1,7 @@
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Expenses</h1>
-  <p class="muted">Imported one-way from Zoho Books — salary, supplier payments, travel, and anything else entered as an expense there. This is a read-only mirror for CA/reconciliation reporting; expenses are still entered in Zoho Books itself, never here. <a href="/ca/zoho-sync">Zoho Books sync &rarr;</a></p>
+  <p class="muted">Imported one-way from Zoho Books — salary, supplier payments, travel, and anything else entered as an expense there. This is a read-only mirror for CA/reconciliation reporting; expenses are still entered in Zoho Books itself, never here.{% if permissions.ca_module_manage %} <a href="/ca/zoho-sync">Zoho Books sync &rarr;</a>{% endif %}</p>
 
   <div class="section">
     <h2>Imported Expenses</h2>
@@ -21,7 +21,7 @@
           <td>{{ e.amount | money }} {{ e.currency_code }}</td>
           <td>
             {% if e.order_id != null %}
-              <a href="/orders/{{ e.order_id }}">{{ e.order_reference }}</a>
+              {% if permissions.manage_orders or permissions.view_orders %}<a href="/orders/{{ e.order_id }}">{{ e.order_reference }}</a>{% else %}{{ e.order_reference }}{% endif %}
               {% if canEditTds %}
                 <form method="post" action="/ca/expenses/{{ e.id }}/link-order" style="display:inline" onsubmit="return confirm('Unlink this expense from its order?');">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">

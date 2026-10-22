@@ -1,3 +1,18 @@
+<?php
+// External QA report U-01: "CA: order pages" — the CA / Chartered
+// Accountant role (ca_module_view, inr_actual_view only — "No
+// order-management access" per its own seeded description) sees order
+// references throughout this module; each one used to link straight to
+// /orders/{id}, which requires manage_orders or view_orders (neither of
+// which the CA role holds) and so 403'd. Computed inline here (rather
+// than threaded through every CaController method) since it's the exact
+// same self-contained pattern views/orders/show.php already uses for
+// its own permission checks.
+$__caViewOrdersUser = \App\Services\AuthService::currentUser();
+$__caViewOrdersRoleId = $__caViewOrdersUser['role_id'] !== null ? (int) $__caViewOrdersUser['role_id'] : null;
+$canViewOrders = \App\Services\PermissionService::can((int) $__caViewOrdersUser['id'], $__caViewOrdersRoleId, 'manage_orders')
+    || \App\Services\PermissionService::can((int) $__caViewOrdersUser['id'], $__caViewOrdersRoleId, 'view_orders');
+?>
 <div class="card page-wide">
   <h1>CA / Accounting</h1>
   <p class="muted">Independent of the order-pipeline system — nothing here affects order stages, and nothing in the order reports feeds this.</p>
@@ -50,7 +65,7 @@
         <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Exchange Rate</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th><th>Zoho Books</th></tr>
         <?php foreach ($settlements as $s): ?>
         <tr>
-          <td><a href="/orders/<?= (int) $s['order_id'] ?>"><?= htmlspecialchars($s['buyer_inquiry_ref']) ?></a></td>
+          <td><?= $canViewOrders ? '<a href="/orders/' . (int) $s['order_id'] . '">' . htmlspecialchars($s['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($s['buyer_inquiry_ref']) ?></td>
           <td><?= htmlspecialchars($s['company_legal_name']) ?></td>
           <td><?= htmlspecialchars(ucfirst($s['leg'])) ?></td>
           <td><?= $s['foreign_amount'] !== null ? number_format((float) $s['foreign_amount'], 2) : '—' ?></td>

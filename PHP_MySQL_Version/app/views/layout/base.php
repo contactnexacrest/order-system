@@ -56,6 +56,14 @@ $canCaModule = $can('ca_module_view');
 $canDataExport = $can('data_export_run');
 // docs/schema.sql Section AO — no longer folded into manage_orders.
 $canDisputes = $can('manage_disputes') || $can('respond_to_disputes');
+// External QA report U-01: the main /disputes LIST route requires
+// manage_disputes only (see public_html/index.php) — respond_to_disputes
+// alone (e.g. Export Executive) lets you respond on an order you're
+// already looking at, but never grants the cross-order list page. The
+// broader $canDisputes above stays as the Ops group's own
+// visibility check — that's just "is there a disputes-shaped doorway
+// into this group's worth of nav," not a doorway of its own.
+$canViewDisputesList = $can('manage_disputes');
 
 $opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes;
 $insightsGroupVisible = $canReports || $canAudit;
@@ -134,7 +142,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review<?= $clientIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $clientIntakePendingCount . '</span>' : '' ?></a>
           <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review<?= $piIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $piIntakePendingCount . '</span>' : '' ?></a>
           <a href="/reorder-requests" class="<?= $isActive('/reorder-requests') ? 'active' : '' ?>">Reorder Requests</a>
-          <?php if ($canDisputes): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
+          <?php if ($canViewDisputesList): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
         </div>
       </details>
     <?php endif; ?>

@@ -29,7 +29,7 @@
           <td>{{ (l.debit_amount | money) if l.debit_amount != null else '—' }}</td>
           <td>
             {% if l.matched_order_id != null %}
-              Revenue: <a href="/orders/{{ l.matched_order_id }}">{{ l.matched_order_ref }}</a> — {{ l.matched_leg | capitalize }}
+              Revenue: {% if permissions.manage_orders or permissions.view_orders %}<a href="/orders/{{ l.matched_order_id }}">{{ l.matched_order_ref }}</a>{% else %}{{ l.matched_order_ref }}{% endif %} — {{ l.matched_leg | capitalize }}
               {% if l.matchLockMessage != null and not canOverrideFyLock %}
                 <br><span class="muted small">&#128274; {{ l.matchLockMessage }}</span>
               {% else %}

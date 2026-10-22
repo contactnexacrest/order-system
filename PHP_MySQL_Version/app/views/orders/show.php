@@ -26,6 +26,19 @@ $canViewPaymentAmounts = $canManagePayments || $canCloseOrders;
 $canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
 // docs/schema.sql Section AO — split out of manage_orders so enabling the client-facing dispute button is privileged-only by default.
 $canManageDisputes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_disputes');
+// External QA report U-01: the /orders/{id}/disputes route itself accepts
+// either of these two (see public_html/index.php) — this page's own link
+// to it must use the exact same check, not just $canManageDisputes alone,
+// or a respond_to_disputes-only role (e.g. Export Executive) sees a link
+// that 403s.
+$canRespondToDisputes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'respond_to_disputes');
+$canViewOrderDisputes = $canManageDisputes || $canRespondToDisputes;
+// External QA report U-01: /compliance-task-types is Admin-only (the
+// close_orders permission that gates the section around this link below
+// is a much broader grant).
+$canManageComplianceTaskTypes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_compliance_task_types');
+// External QA report U-01: /orders/{id}/email/compose and .../email/send both require this (see public_html/index.php) — Accounts Executive and Viewer / Auditor both lack it.
+$canGenerateDocuments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'generate_documents');
 // Phase 7: a narrow exception to a financial year lock — see CaFyLockGuard.
 $canOverrideFyLock = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'ca_fy_lock_override');
 // Order-Edit feature — product-row edits/duplication once Order Confirmation is reached — see OrderEditGuard.
@@ -516,7 +529,7 @@ foreach ($stages as $s) {
 
   <div class="section" id="order-updates">
     <h2>Order Communication</h2>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted. Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.</p>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
     <div class="chat-thread">
       <?php if (empty($comments)): ?>
         <p class="chat-empty">No updates posted yet.</p>
@@ -778,7 +791,9 @@ foreach ($stages as $s) {
         </form>
       <?php endif; ?>
     </div>
+    <?php if ($canManageOrders): ?>
     <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>/annexure"><?= $order['include_annexure_a'] ? 'Manage Annexure A product entries &amp; images' : 'Enable / manage Annexure A' ?></a></p>
+    <?php endif; ?>
 
     <h3 style="font-size:0.95em; margin-top:18px;">Review &amp; Approval</h3>
     <p class="muted">A document generated above starts life <strong>draft</strong> with the DRAFT watermark. Assign at least one reviewer to move it to review; once every assigned reviewer approves (minimum required per document type), it's re-watermarked as final and can be sent to the buyer. The buyer only ever receives that final watermarked PDF — never the internal DOCX, never an unwatermarked copy.</p>
@@ -1562,7 +1577,7 @@ foreach ($stages as $s) {
       <div><span class="k">Production Status</span><span class="v"><?= htmlspecialchars($order['production_status_text'] ?? 'Not yet commenced') ?></span></div>
       <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
     </div>
-    <p class="muted small">Every update here is logged — <a href="/orders/<?= (int) $order['id'] ?>/audit-log">view update history</a>.</p>
+    <p class="muted small">Every update here is logged<?php if ($canViewAuditLog): ?> — <a href="/orders/<?= (int) $order['id'] ?>/audit-log">view update history</a><?php endif; ?>.</p>
     <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/production-status">
         <?= Csrf::field() ?>
@@ -2058,7 +2073,7 @@ foreach ($stages as $s) {
   <?php if ($canCloseOrders): ?>
   <div class="section" id="compliance-checklist">
     <h2>Compliance Checklist</h2>
-    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <a href="/compliance-task-types">Compliance Task Types</a> (Admin-only).</p>
+    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <?= $canManageComplianceTaskTypes ? '<a href="/compliance-task-types">Compliance Task Types</a>' : 'Compliance Task Types' ?> (Admin-only).</p>
     <?php if (empty($complianceTasks)): ?>
     <p class="muted small">No compliance task types have been configured yet.</p>
     <?php else: ?>
@@ -2090,11 +2105,13 @@ foreach ($stages as $s) {
   </div>
   <?php endif; ?>
 
+  <?php if ($canManageOrders): ?>
   <div class="section" id="amendments">
     <h2>Amendments</h2>
     <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>
     <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Payment Terms Amendments (<?= (int) $amendmentCount ?>)</a></p>
   </div>
+  <?php endif; ?>
 
   <div class="section" id="disputes">
     <h2>Disputes</h2>
@@ -2108,7 +2125,7 @@ foreach ($stages as $s) {
       </label>
     </form>
     <?php endif; ?>
-    <p><a href="/orders/<?= (int) $order['id'] ?>/disputes">Disputes (<?= (int) $openDisputeCount ?> open)</a>
+    <p><?= $canViewOrderDisputes ? '<a href="/orders/' . (int) $order['id'] . '/disputes">Disputes (' . (int) $openDisputeCount . ' open)</a>' : 'Disputes (' . (int) $openDisputeCount . ' open)' ?>
        <?php if ($canViewAuditLog): ?>
        &nbsp;·&nbsp;
        <a href="/orders/<?= (int) $order['id'] ?>/audit-log">Audit Log</a>
