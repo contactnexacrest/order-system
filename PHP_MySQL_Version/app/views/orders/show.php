@@ -611,9 +611,24 @@ foreach ($stages as $s) {
         if (!reason) { return false; }
         return confirm('Delete this draft document? This cannot be undone.');
       }
+      // External QA report L-18: removing an additional document took no
+      // reason at all — same prompt()-for-reason pattern as
+      // promptDeleteDraft() above.
+      function promptRemoveAdditionalDocument(btn) {
+        var form = btn.closest('form');
+        var reason = prompt('Why is this document being removed? (required, at least 10 characters — recorded in the audit log)');
+        if (!reason || reason.trim().length < 10) { return; }
+        form.querySelector('.remove-additional-document-reason').value = reason.trim();
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      }
+      function confirmRemoveAdditionalDocument(form) {
+        var reason = form.querySelector('.remove-additional-document-reason').value;
+        if (!reason) { return false; }
+        return confirm('Remove this document? The file itself is never deleted from disk.');
+      }
     </script>
 
-    <h3 style="font-size:0.95em; margin-top:18px;">Additional Documents</h3>
+    <h3 style="font-size:0.95em; margin-top:18px;">Additional Documents <a href="/orders/<?= (int) $order['id'] ?>/additional-documents/removed" class="muted small" style="font-weight:normal;">(show removed)</a></h3>
     <p class="muted small">Free-form extras that don't fit any fixed document type above — e.g. a buyer-supplied certificate template, a special packing instruction sheet.</p>
     <table class="list">
       <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
@@ -625,9 +640,10 @@ foreach ($stages as $s) {
         <td><?= htmlspecialchars((string) $ad['uploaded_at']) ?><?php if (!empty($ad['uploaded_by_name'])): ?> <span class="muted small">by <?= htmlspecialchars($ad['uploaded_by_name']) ?></span><?php endif; ?></td>
         <td>
           <?php if ($canManageOrders): ?>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents/<?= (int) $ad['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove &quot;<?= htmlspecialchars(addslashes((string) $ad['document_type_label'])) ?>&quot;? The file itself is never deleted from disk.');">
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents/<?= (int) $ad['id'] ?>/delete" style="display:inline" onsubmit="return confirmRemoveAdditionalDocument(this);">
             <?= Csrf::field() ?>
-            <button type="submit" class="btn-sm btn-danger">Remove</button>
+            <input type="hidden" name="reason" class="remove-additional-document-reason">
+            <button type="button" class="btn-sm btn-danger" onclick="promptRemoveAdditionalDocument(this)">Remove</button>
           </form>
           <?php endif; ?>
         </td>

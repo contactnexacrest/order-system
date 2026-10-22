@@ -142,10 +142,52 @@ describe('Additional Documents (Batch 3 #13b)', () => {
     await fileStoreRepository.markAsAdditionalDocument(fileId, null);
     const userId = await createTestUser('Admin');
 
-    const req = { params: { id: String(orderId), fileId: String(fileId) }, user: { id: userId }, session: {} };
+    const req = { params: { id: String(orderId), fileId: String(fileId) }, body: { reason: 'No longer required by the buyer.' }, user: { id: userId }, session: {} };
     await ordersController.deleteAdditionalDocument(req, fakeRes());
 
     expect((await fileStoreRepository.find(fileId)).is_active).toBe(0);
+  });
+
+  // External QA report L-18: "deleteAdditionalDocument (order + client) still takes no reason; no 'show removed' view."
+  test('order delete refuses without a reason', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const fileId = await createTestFile(orderId, null);
+    await fileStoreRepository.markAsAdditionalDocument(fileId, null);
+    const userId = await createTestUser('Admin');
+
+    const req = { params: { id: String(orderId), fileId: String(fileId) }, body: { reason: 'too short' }, user: { id: userId }, session: {} };
+    await ordersController.deleteAdditionalDocument(req, fakeRes());
+
+    expect((await fileStoreRepository.find(fileId)).is_active).toBe(1);
+    const messages = flash.pull(req);
+    expect(messages[0].type).toBe('error');
+  });
+
+  test('order delete logs the reason on the audit entry and it appears on the removed-documents view', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const fileId = await createTestFile(orderId, null);
+    await fileStoreRepository.markAsAdditionalDocument(fileId, 'Special inspection note.');
+    const userId = await createTestUser('Admin');
+
+    const req = {
+      params: { id: String(orderId), fileId: String(fileId) },
+      body: { reason: 'Buyer withdrew the special inspection requirement.' },
+      user: { id: userId },
+      session: {},
+    };
+    await ordersController.deleteAdditionalDocument(req, fakeRes());
+
+    const removed = await fileStoreRepository.removedAdditionalDocumentsForOrder(orderId);
+    expect(removed).toHaveLength(1);
+    expect(removed[0].removal_reason).toBe('Buyer withdrew the special inspection requirement.');
+    expect(removed[0].removed_at).not.toBeNull();
+
+    const res = fakeRes();
+    res.renderView = (viewPath, data) => { res.rendered = { viewPath, data }; };
+    await ordersController.showRemovedAdditionalDocuments({ params: { id: String(orderId) } }, res);
+
+    expect(res.rendered.viewPath).toBe('orders/removed_additional_documents');
+    expect(res.rendered.data.removedDocuments[0].removal_reason).toBe('Buyer withdrew the special inspection requirement.');
   });
 
   // -----------------------------------------------------------------
@@ -183,10 +225,51 @@ describe('Additional Documents (Batch 3 #13b)', () => {
     await fileStoreRepository.markAsAdditionalDocument(fileId, null);
     const userId = await createTestUser('Admin');
 
-    const req = { params: { id: String(clientId), fileId: String(fileId) }, user: { id: userId }, session: {} };
+    const req = { params: { id: String(clientId), fileId: String(fileId) }, body: { reason: 'No longer required by the buyer.' }, user: { id: userId }, session: {} };
     await clientsController.deleteAdditionalDocument(req, fakeRes());
 
     expect((await fileStoreRepository.find(fileId)).is_active).toBe(0);
+  });
+
+  test('client delete refuses without a reason', async () => {
+    const clientId = await createTestClient();
+    const fileId = await createTestFile(null, clientId);
+    await fileStoreRepository.markAsAdditionalDocument(fileId, null);
+    const userId = await createTestUser('Admin');
+
+    const req = { params: { id: String(clientId), fileId: String(fileId) }, body: { reason: 'too short' }, user: { id: userId }, session: {} };
+    await clientsController.deleteAdditionalDocument(req, fakeRes());
+
+    expect((await fileStoreRepository.find(fileId)).is_active).toBe(1);
+    const messages = flash.pull(req);
+    expect(messages[0].type).toBe('error');
+  });
+
+  test('client delete logs the reason on the audit entry and it appears on the removed-documents view', async () => {
+    const clientId = await createTestClient();
+    const fileId = await createTestFile(null, clientId);
+    await fileStoreRepository.markAsAdditionalDocument(fileId, 'Standing NDA.');
+    const userId = await createTestUser('Admin');
+
+    const req = {
+      params: { id: String(clientId), fileId: String(fileId) },
+      body: { reason: 'Superseded by a new NDA signed this quarter.' },
+      user: { id: userId },
+      session: {},
+    };
+    await clientsController.deleteAdditionalDocument(req, fakeRes());
+
+    const removed = await fileStoreRepository.removedAdditionalDocumentsForClient(clientId);
+    expect(removed).toHaveLength(1);
+    expect(removed[0].removal_reason).toBe('Superseded by a new NDA signed this quarter.');
+    expect(removed[0].removed_at).not.toBeNull();
+
+    const res = fakeRes();
+    res.renderView = (viewPath, data) => { res.rendered = { viewPath, data }; };
+    await clientsController.showRemovedAdditionalDocuments({ params: { id: String(clientId) } }, res);
+
+    expect(res.rendered.viewPath).toBe('clients/removed_additional_documents');
+    expect(res.rendered.data.removedDocuments[0].removal_reason).toBe('Superseded by a new NDA signed this quarter.');
   });
 
   // -----------------------------------------------------------------
@@ -247,6 +330,18 @@ describe('Additional Documents (Batch 3 #13b)', () => {
       expect(res.status).toBe(200);
       expect(res.text).toContain('Additional Documents');
       expect(res.text).toContain('Standing NDA.');
+    });
+
+    test('order and client show pages link to the removed-additional-documents view', async () => {
+      const clientId = await createTestClient();
+      const orderId = await createTestOrder(clientId);
+      const agent = await loginAs('Admin');
+
+      const orderRes = await agent.get(`/orders/${orderId}`);
+      expect(orderRes.text).toContain(`/orders/${orderId}/additional-documents/removed`);
+
+      const clientRes = await agent.get(`/clients/${clientId}`);
+      expect(clientRes.text).toContain(`/clients/${clientId}/additional-documents/removed`);
     });
 
     test('order show page hides the Attach Document form for a view-only user', async () => {

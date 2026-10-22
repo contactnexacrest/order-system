@@ -745,7 +745,16 @@ final class ClientController
         header("Location: /clients/{$clientId}");
     }
 
-    /** Soft delete only — the row is deactivated, the file on disk is never touched. */
+    /**
+     * Soft delete only — the row is deactivated, the file on disk is
+     * never touched.
+     *
+     * External QA report L-18: "deleteAdditionalDocument (order + client)
+     * still takes no reason; no 'show removed' view." Now requires a
+     * reason (ReasonValidator::MIN_LENGTH, same standing instruction as
+     * every other reason field in this app), logged on the audit entry —
+     * see showRemovedAdditionalDocuments() for the "show removed" half.
+     */
     public function deleteAdditionalDocument(array $params): void
     {
         $clientId = (int) $params['id'];
@@ -757,9 +766,32 @@ final class ClientController
             return;
         }
 
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+
         FileStoreRepository::deactivate($fileId);
-        AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_ADDITIONAL_DOCUMENT_REMOVED', 'file_store', $fileId, 'document_type_label', $file['document_type_label'], null);
+        AuditLogRepository::log((int) AuthService::currentUser()['id'], 'CLIENT_ADDITIONAL_DOCUMENT_REMOVED', 'file_store', $fileId, 'document_type_label', $file['document_type_label'], null, $reason);
         Flash::set('success', "\"{$file['document_type_label']}\" removed. The file itself is never deleted from disk.");
         header("Location: /clients/{$clientId}");
+    }
+
+    /** External QA report L-18: "no screen to see removed files" — a read-only list of this client's deactivated additional documents, newest first. */
+    public function showRemovedAdditionalDocuments(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+        View::render('clients/removed_additional_documents', [
+            'client' => $client,
+            'removedDocuments' => FileStoreRepository::removedAdditionalDocumentsForClient($clientId),
+        ]);
     }
 }

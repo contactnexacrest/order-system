@@ -344,6 +344,7 @@ $router->post('/clients/{id}/toggle-active', [$clients, 'toggleActive'], [Sessio
 // Batch 3 #13b — free-form extra documents attached to this client (schema.sql Section AZ).
 $router->post('/clients/{id}/additional-documents', [$clients, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/additional-documents/{fileId}/delete', [$clients, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->get('/clients/{id}/additional-documents/removed', [$clients, 'showRemovedAdditionalDocuments'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 // docs/schema.sql Section AV — the per-client flag is a manage_company_settings action (same tier as other
 // global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch
 // inside ClientController::impersonate(), on top of its own impersonate_client permission gate here.
@@ -382,6 +383,7 @@ $router->post('/orders/{id}/buyer-po/documents', [$orders, 'uploadBuyerPoDocumen
 // Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
 $router->post('/orders/{id}/additional-documents', [$orders, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/additional-documents/{fileId}/delete', [$orders, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->get('/orders/{id}/additional-documents/removed', [$orders, 'showRemovedAdditionalDocuments'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/products', [$orders, 'addProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}', [$orders, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/delete', [$orders, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);

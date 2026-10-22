@@ -107,7 +107,7 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
   <?php endif; ?>
 
   <div class="section">
-    <h2>Additional Documents</h2>
+    <h2>Additional Documents <a href="/clients/<?= (int) $client['id'] ?>/additional-documents/removed" class="muted small" style="font-weight:normal;">(show removed)</a></h2>
     <p class="muted small">Free-form extras attached to this client (not tied to one order) — e.g. a standing NDA, a general compliance certificate.</p>
     <table class="list">
       <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
@@ -119,9 +119,10 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
         <td><?= htmlspecialchars((string) $ad['uploaded_at']) ?><?php if (!empty($ad['uploaded_by_name'])): ?> <span class="muted small">by <?= htmlspecialchars($ad['uploaded_by_name']) ?></span><?php endif; ?></td>
         <td>
           <?php if ($canManageOrders): ?>
-          <form method="post" action="/clients/<?= (int) $client['id'] ?>/additional-documents/<?= (int) $ad['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove &quot;<?= htmlspecialchars(addslashes((string) $ad['document_type_label'])) ?>&quot;? The file itself is never deleted from disk.');">
+          <form method="post" action="/clients/<?= (int) $client['id'] ?>/additional-documents/<?= (int) $ad['id'] ?>/delete" style="display:inline" onsubmit="return confirmRemoveAdditionalDocument(this);">
             <?= Csrf::field() ?>
-            <button type="submit" class="btn-sm btn-danger">Remove</button>
+            <input type="hidden" name="reason" class="remove-additional-document-reason">
+            <button type="button" class="btn-sm btn-danger" onclick="promptRemoveAdditionalDocument(this)">Remove</button>
           </form>
           <?php endif; ?>
         </td>
@@ -131,6 +132,22 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
       <tr><td colspan="5" class="muted">No additional documents attached yet.</td></tr>
       <?php endif; ?>
     </table>
+    <script>
+      // External QA report L-18: same prompt()-for-reason pattern as
+      // views/orders/show.php's promptRemoveAdditionalDocument().
+      function promptRemoveAdditionalDocument(btn) {
+        var form = btn.closest('form');
+        var reason = prompt('Why is this document being removed? (required, at least 10 characters — recorded in the audit log)');
+        if (!reason || reason.trim().length < 10) { return; }
+        form.querySelector('.remove-additional-document-reason').value = reason.trim();
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      }
+      function confirmRemoveAdditionalDocument(form) {
+        var reason = form.querySelector('.remove-additional-document-reason').value;
+        if (!reason) { return false; }
+        return confirm('Remove this document? The file itself is never deleted from disk.');
+      }
+    </script>
     <?php if ($canManageOrders): ?>
     <form method="post" action="/clients/<?= (int) $client['id'] ?>/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <?= Csrf::field() ?>

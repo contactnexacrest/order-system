@@ -1,0 +1,20 @@
+<div class="card">
+  <h1>Removed Additional Documents — Order {{ order.order_reference }}</h1>
+  <p class="muted small">Soft-deleted only — the file itself is never removed from disk and can still be downloaded below.</p>
+  <table class="list">
+    <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th>Removed</th><th>Reason</th></tr>
+    {% for ad in removedDocuments %}
+    <tr>
+      <td>{{ ad.document_type_label }}</td>
+      <td class="muted small">{{ ad.notes }}</td>
+      <td><a href="/file-store/{{ ad.id }}/download">{{ ad.original_filename }}</a></td>
+      <td>{{ ad.uploaded_at }} {% if ad.uploaded_by_name %}<span class="muted small">by {{ ad.uploaded_by_name }}</span>{% endif %}</td>
+      <td>{{ ad.removed_at or '—' }} {% if ad.removed_by_name %}<span class="muted small">by {{ ad.removed_by_name }}</span>{% endif %}</td>
+      <td class="muted small">{{ ad.removal_reason or '—' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">No additional documents have been removed from this order.</td></tr>
+    {% endfor %}
+  </table>
+  <p><a href="/orders/{{ order.id }}">&larr; Back to order</a></p>
+</div>

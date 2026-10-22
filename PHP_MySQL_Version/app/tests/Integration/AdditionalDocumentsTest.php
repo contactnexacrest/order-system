@@ -130,12 +130,57 @@ final class AdditionalDocumentsTest extends DbTestCase
         $fileId = $this->createTestFile($orderId, null);
         FileStoreRepository::markAsAdditionalDocument($fileId, null);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        $_POST = ['reason' => 'No longer required by the buyer.'];
 
         ob_start();
         (new OrderController())->deleteAdditionalDocument(['id' => $orderId, 'fileId' => $fileId]);
         ob_end_clean();
 
         self::assertSame(0, (int) FileStoreRepository::find($fileId)['is_active']);
+    }
+
+    /** External QA report L-18: "deleteAdditionalDocument (order) still takes no reason". */
+    public function testOrderDeleteRefusesWithoutAReason(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $fileId = $this->createTestFile($orderId, null);
+        FileStoreRepository::markAsAdditionalDocument($fileId, null);
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        $_POST = ['reason' => 'too short'];
+
+        ob_start();
+        (new OrderController())->deleteAdditionalDocument(['id' => $orderId, 'fileId' => $fileId]);
+        ob_end_clean();
+
+        self::assertSame(1, (int) FileStoreRepository::find($fileId)['is_active'], 'a reason under the minimum length must never be accepted');
+        $flash = Flash::pull();
+        self::assertSame('error', $flash[0]['type']);
+    }
+
+    public function testOrderDeleteLogsTheReasonOnTheAuditEntryAndItAppearsOnTheRemovedView(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $fileId = $this->createTestFile($orderId, null);
+        FileStoreRepository::markAsAdditionalDocument($fileId, 'Special inspection note.');
+        $userId = $this->createTestUser('Admin');
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['reason' => 'Buyer withdrew the special inspection requirement.'];
+
+        ob_start();
+        (new OrderController())->deleteAdditionalDocument(['id' => $orderId, 'fileId' => $fileId]);
+        ob_end_clean();
+
+        $removed = FileStoreRepository::removedAdditionalDocumentsForOrder($orderId);
+        self::assertCount(1, $removed);
+        self::assertSame('Buyer withdrew the special inspection requirement.', $removed[0]['removal_reason']);
+        self::assertNotNull($removed[0]['removed_at']);
+
+        ob_start();
+        (new OrderController())->showRemovedAdditionalDocuments(['id' => $orderId]);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('Buyer withdrew the special inspection requirement.', $html);
+        self::assertStringContainsString('Special inspection note.', $html);
     }
 
     public function testClientUploadRequiresATitle(): void
@@ -172,12 +217,57 @@ final class AdditionalDocumentsTest extends DbTestCase
         $fileId = $this->createTestFile(null, $clientId);
         FileStoreRepository::markAsAdditionalDocument($fileId, null);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        $_POST = ['reason' => 'No longer required by the buyer.'];
 
         ob_start();
         (new ClientController())->deleteAdditionalDocument(['id' => $clientId, 'fileId' => $fileId]);
         ob_end_clean();
 
         self::assertSame(0, (int) FileStoreRepository::find($fileId)['is_active']);
+    }
+
+    /** External QA report L-18: "deleteAdditionalDocument (client) still takes no reason". */
+    public function testClientDeleteRefusesWithoutAReason(): void
+    {
+        $clientId = $this->createTestClient();
+        $fileId = $this->createTestFile(null, $clientId);
+        FileStoreRepository::markAsAdditionalDocument($fileId, null);
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        $_POST = ['reason' => 'too short'];
+
+        ob_start();
+        (new ClientController())->deleteAdditionalDocument(['id' => $clientId, 'fileId' => $fileId]);
+        ob_end_clean();
+
+        self::assertSame(1, (int) FileStoreRepository::find($fileId)['is_active'], 'a reason under the minimum length must never be accepted');
+        $flash = Flash::pull();
+        self::assertSame('error', $flash[0]['type']);
+    }
+
+    public function testClientDeleteLogsTheReasonOnTheAuditEntryAndItAppearsOnTheRemovedView(): void
+    {
+        $clientId = $this->createTestClient();
+        $fileId = $this->createTestFile(null, $clientId);
+        FileStoreRepository::markAsAdditionalDocument($fileId, 'Standing NDA.');
+        $userId = $this->createTestUser('Admin');
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['reason' => 'Superseded by a new NDA signed this quarter.'];
+
+        ob_start();
+        (new ClientController())->deleteAdditionalDocument(['id' => $clientId, 'fileId' => $fileId]);
+        ob_end_clean();
+
+        $removed = FileStoreRepository::removedAdditionalDocumentsForClient($clientId);
+        self::assertCount(1, $removed);
+        self::assertSame('Superseded by a new NDA signed this quarter.', $removed[0]['removal_reason']);
+        self::assertNotNull($removed[0]['removed_at']);
+
+        ob_start();
+        (new ClientController())->showRemovedAdditionalDocuments(['id' => $clientId]);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('Superseded by a new NDA signed this quarter.', $html);
+        self::assertStringContainsString('Standing NDA.', $html);
     }
 
     public function testOrderShowPagePassesAdditionalDocumentsToTheView(): void
@@ -214,5 +304,23 @@ final class AdditionalDocumentsTest extends DbTestCase
 
         self::assertStringContainsString('Additional Documents', $html);
         self::assertStringContainsString('Standing NDA.', $html);
+    }
+
+    /** External QA report L-18: "no screen to see removed files" — the order/client show pages must link to it. */
+    public function testOrderAndClientShowPagesLinkToTheRemovedAdditionalDocumentsView(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+
+        ob_start();
+        (new OrderController())->show(['id' => $orderId]);
+        $orderHtml = (string) ob_get_clean();
+        self::assertStringContainsString("/orders/{$orderId}/additional-documents/removed", $orderHtml);
+
+        ob_start();
+        (new ClientController())->show(['id' => $clientId]);
+        $clientHtml = (string) ob_get_clean();
+        self::assertStringContainsString("/clients/{$clientId}/additional-documents/removed", $clientHtml);
     }
 }

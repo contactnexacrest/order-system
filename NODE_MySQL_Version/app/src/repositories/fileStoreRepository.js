@@ -164,7 +164,44 @@ async function deactivate(id) {
   await db.execute('UPDATE file_store SET is_active = 0 WHERE id = :id', { id });
 }
 
+/**
+ * External QA report L-18: "no screen to see removed files" — the
+ * deactivated counterpart to additionalDocumentsForOrder() above. Joins
+ * audit_log for the removal reason/actor/timestamp; a document removed
+ * before this fix existed (reason column was always null) still shows
+ * up, just without that detail.
+ */
+async function removedAdditionalDocumentsForOrder(orderId) {
+  return db.query(
+    `SELECT fs.*, u.name AS uploaded_by_name,
+            al.reason AS removal_reason, al.created_at AS removed_at, ru.name AS removed_by_name
+     FROM file_store fs
+     LEFT JOIN users u ON u.id = fs.uploaded_by
+     LEFT JOIN audit_log al ON al.entity_type = 'file_store' AND al.entity_id = fs.id AND al.action_type = 'ORDER_ADDITIONAL_DOCUMENT_REMOVED'
+     LEFT JOIN users ru ON ru.id = al.user_id
+     WHERE fs.order_id = :order_id AND fs.is_active = 0 AND fs.is_additional_document = 1
+     ORDER BY al.created_at DESC, fs.uploaded_at DESC`,
+    { order_id: orderId }
+  );
+}
+
+/** External QA report L-18: client-side counterpart to removedAdditionalDocumentsForOrder() above. */
+async function removedAdditionalDocumentsForClient(clientId) {
+  return db.query(
+    `SELECT fs.*, u.name AS uploaded_by_name,
+            al.reason AS removal_reason, al.created_at AS removed_at, ru.name AS removed_by_name
+     FROM file_store fs
+     LEFT JOIN users u ON u.id = fs.uploaded_by
+     LEFT JOIN audit_log al ON al.entity_type = 'file_store' AND al.entity_id = fs.id AND al.action_type = 'CLIENT_ADDITIONAL_DOCUMENT_REMOVED'
+     LEFT JOIN users ru ON ru.id = al.user_id
+     WHERE fs.client_id = :client_id AND fs.is_active = 0 AND fs.is_additional_document = 1
+     ORDER BY al.created_at DESC, fs.uploaded_at DESC`,
+    { client_id: clientId }
+  );
+}
+
 module.exports = {
   insertGenerated, insertReceived, find, forOrder, forOrderExcludingInternalCaDocs,
   markAsAdditionalDocument, additionalDocumentsForOrder, additionalDocumentsForClient, deactivate,
+  removedAdditionalDocumentsForOrder, removedAdditionalDocumentsForClient,
 };

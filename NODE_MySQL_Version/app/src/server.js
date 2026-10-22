@@ -563,6 +563,7 @@ app.post('/clients/:id/toggle-active', requireAuth, requirePermission('manage_or
 // Batch 3 #13b — free-form extra documents attached to this client (schema.sql Section AZ).
 app.post('/clients/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(clientsController.uploadAdditionalDocument));
 app.post('/clients/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.deleteAdditionalDocument));
+app.get('/clients/:id/additional-documents/removed', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.showRemovedAdditionalDocuments));
 // docs/schema.sql Section AV — the per-client flag is a manage_company_settings action (same tier as other
 // global/client-config toggles); the impersonation action itself re-checks that flag plus the global switch
 // inside clientsController.impersonate(), on top of its own impersonate_client permission gate here.
@@ -603,6 +604,7 @@ app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manag
 // Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
 app.post('/orders/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadAdditionalDocument));
 app.post('/orders/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteAdditionalDocument));
+app.get('/orders/:id/additional-documents/removed', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.showRemovedAdditionalDocuments));
 app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.index));
 app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));

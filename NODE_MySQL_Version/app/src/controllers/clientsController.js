@@ -684,7 +684,16 @@ async function uploadAdditionalDocument(req, res) {
   res.redirect(`/clients/${clientId}`);
 }
 
-/** Soft delete only — the row is deactivated, the file on disk is never touched. */
+/**
+ * Soft delete only — the row is deactivated, the file on disk is never
+ * touched.
+ *
+ * External QA report L-18: "deleteAdditionalDocument (order + client)
+ * still takes no reason; no 'show removed' view." Now requires a reason
+ * (reasonValidator.MIN_LENGTH, same standing instruction as every other
+ * reason field in this app), logged on the audit entry — see
+ * showRemovedAdditionalDocuments() for the "show removed" half.
+ */
 async function deleteAdditionalDocument(req, res) {
   const clientId = parseInt(req.params.id, 10);
   const fileId = parseInt(req.params.fileId, 10);
@@ -695,15 +704,37 @@ async function deleteAdditionalDocument(req, res) {
     return;
   }
 
+  const reason = String(req.body.reason || '').trim();
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+
   await fileStoreRepository.deactivate(fileId);
-  await auditLogRepository.log(req.user.id, 'CLIENT_ADDITIONAL_DOCUMENT_REMOVED', 'file_store', fileId, 'document_type_label', file.document_type_label, null);
+  await auditLogRepository.log(req.user.id, 'CLIENT_ADDITIONAL_DOCUMENT_REMOVED', 'file_store', fileId, 'document_type_label', file.document_type_label, null, reason);
   flash.set(req, 'success', `"${file.document_type_label}" removed. The file itself is never deleted from disk.`);
   res.redirect(`/clients/${clientId}`);
 }
 
+/** External QA report L-18: "no screen to see removed files" — a read-only list of this client's deactivated additional documents, newest first. */
+async function showRemovedAdditionalDocuments(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+  res.renderView('clients/removed_additional_documents', {
+    client,
+    removedDocuments: await fileStoreRepository.removedAdditionalDocumentsForClient(clientId),
+  });
+}
+
 module.exports = {
   index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
-  setImpersonationAllowed, setOrderHistoryVisibilityOverride, impersonate, uploadAdditionalDocument, deleteAdditionalDocument,
+  setImpersonationAllowed, setOrderHistoryVisibilityOverride, impersonate, uploadAdditionalDocument, deleteAdditionalDocument, showRemovedAdditionalDocuments,
   uploadAgreement, forceExpireAgreement, renewAgreement, downloadAgreement,
   duplicateForm, duplicateStore,
 };
