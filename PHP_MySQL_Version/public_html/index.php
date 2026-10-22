@@ -58,6 +58,7 @@ use App\Controllers\UserController;
 use App\Helpers\Router;
 use App\Middleware\ClientAuth;
 use App\Middleware\CsrfCheck;
+use App\Middleware\OrderLockGuard;
 use App\Middleware\PermissionCheck;
 use App\Middleware\SessionAuth;
 
@@ -372,19 +373,19 @@ $router->get('/orders/create', [$orders, 'create'], [SessionAuth::required(), Pe
 $router->post('/orders', [$orders, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/orders/{id}', [$orders, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders'])]);
 $router->get('/orders/{id}/edit', [$orders, 'editDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
-$router->post('/orders/{id}/edit', [$orders, 'updateDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/edit', [$orders, 'updateDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/archive', [$orders, 'archive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/unarchive', [$orders, 'unarchive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/duplicate', [$orders, 'duplicateOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/buyer-po', [$orders, 'recordBuyerPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/buyer-po/documents', [$orders, 'uploadBuyerPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-po', [$orders, 'recordBuyerPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-po/documents', [$orders, 'uploadBuyerPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 // Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
-$router->post('/orders/{id}/additional-documents', [$orders, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/additional-documents/{fileId}/delete', [$orders, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/products', [$orders, 'addProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/products/{productId}', [$orders, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/products/{productId}/delete', [$orders, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/products/{productId}/duplicate', [$orders, 'duplicateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/additional-documents', [$orders, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/additional-documents/{fileId}/delete', [$orders, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/products', [$orders, 'addProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/products/{productId}', [$orders, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/products/{productId}/delete', [$orders, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/products/{productId}/duplicate', [$orders, 'duplicateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/ca', [$ca, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->get('/ca/reports', [$ca, 'reports'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->get('/ca/zoho-sync', [$ca, 'zohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
@@ -393,12 +394,12 @@ $router->get('/ca/expenses', [$ca, 'expenses'], [SessionAuth::required(), Permis
 $router->get('/ca/tds-summary', [$ca, 'tdsSummary'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/expenses/{id}/tds', [$ca, 'setExpenseTds'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/expenses/{id}/link-order', [$ca, 'linkExpenseToOrder'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/ca-internal-doc/toggle', [$ca, 'toggleInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/ca-internal-doc/generate', [$ca, 'generateInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/export-benefits', [$orderFinancials, 'addExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/export-benefits/{benefitId}/received', [$orderFinancials, 'markExportBenefitReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/cost-entries', [$orderFinancials, 'addCostEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/cost-entries/{entryId}/delete', [$orderFinancials, 'deleteCostEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/ca-internal-doc/toggle', [$ca, 'toggleInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/ca-internal-doc/generate', [$ca, 'generateInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/export-benefits', [$orderFinancials, 'addExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/export-benefits/{benefitId}/received', [$orderFinancials, 'markExportBenefitReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/cost-entries', [$orderFinancials, 'addCostEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/cost-entries/{entryId}/delete', [$orderFinancials, 'deleteCostEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/ca/bank-statement', [$ca, 'bankStatement'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/bank-statement/upload', [$ca, 'uploadBankStatement'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/bank-statement/{id}/match-revenue', [$ca, 'matchBankLineToRevenue'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
@@ -411,26 +412,26 @@ $router->post('/ca/export-benefits/{id}/mark-received', [$ca, 'markExportBenefit
 $router->get('/ca/fy-locks', [$ca, 'fyLocks'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 $router->post('/ca/fy-locks/lock', [$ca, 'lockFinancialYear'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->post('/ca/fy-locks/unlock', [$ca, 'unlockFinancialYear'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/advance/exchange-rate', [$orders, 'recordAdvanceExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/balance/exchange-rate', [$orders, 'recordBalanceExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight/exchange-rate', [$orders, 'recordFreightExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/advance/firc', [$orders, 'recordAdvanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/balance/firc', [$orders, 'recordBalanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight/firc', [$orders, 'recordFreightFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/advance/inr-actual', [$orders, 'recordAdvanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/advance/inr-actual/delete', [$orders, 'deleteAdvanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_delete'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/balance/inr-actual', [$orders, 'recordBalanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/balance/inr-actual/delete', [$orders, 'deleteBalanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_delete'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight/inr-actual', [$orders, 'recordFreightInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight/inr-actual/delete', [$orders, 'deleteFreightInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_delete'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/advance/exchange-rate', [$orders, 'recordAdvanceExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance/exchange-rate', [$orders, 'recordBalanceExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight/exchange-rate', [$orders, 'recordFreightExchangeRate'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/advance/firc', [$orders, 'recordAdvanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance/firc', [$orders, 'recordBalanceFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight/firc', [$orders, 'recordFreightFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/advance/inr-actual', [$orders, 'recordAdvanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/advance/inr-actual/delete', [$orders, 'deleteAdvanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_delete'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance/inr-actual', [$orders, 'recordBalanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance/inr-actual/delete', [$orders, 'deleteBalanceInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_delete'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight/inr-actual', [$orders, 'recordFreightInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight/inr-actual/delete', [$orders, 'deleteFreightInrActual'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_delete'), OrderLockGuard::check(), CsrfCheck::verify()]);
 // QA-5 RBAC-03/04: payment record/clear is Accounts' duty, split out of
 // manage_orders so a Logistics-only user can no longer mark a buyer
 // payment as cleared (see docs/seed.sql's manage_payments permission).
-$router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment-reports/{reportId}/reviewed', [$orders, 'markPaymentReportReviewed'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment-reports/{reportId}/reviewed', [$orders, 'markPaymentReportReviewed'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // docs/schema.sql Section AI — order progress chat.
 $router->post('/orders/{id}/comments', [$orderComments, 'post'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
@@ -439,51 +440,51 @@ $router->get('/orders/{id}/comment-attachments/{fileId}/download', [$orderCommen
 // Annexure A — Product Technical Specifications (schema tables shipped
 // with no screen ever built against them; this is that missing piece).
 $router->get('/orders/{id}/annexure', [$annexure, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
-$router->post('/orders/{id}/annexure/toggle', [$annexure, 'toggleInclude'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/annexure/mode', [$annexure, 'updateMode'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/annexure/terms', [$annexure, 'updateTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/annexure/products', [$annexure, 'createProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/annexure/products/{productId}', [$annexure, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/annexure/products/{productId}/delete', [$annexure, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/annexure/products/{productId}/images', [$annexure, 'uploadImage'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/annexure/images/{imageId}/remove', [$annexure, 'removeImage'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/toggle', [$annexure, 'toggleInclude'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/mode', [$annexure, 'updateMode'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/terms', [$annexure, 'updateTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/products', [$annexure, 'createProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/products/{productId}', [$annexure, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/products/{productId}/delete', [$annexure, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/products/{productId}/images', [$annexure, 'uploadImage'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/annexure/images/{imageId}/remove', [$annexure, 'removeImage'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // --- Phase C: Stages 4-9 ---
-$router->post('/orders/{id}/oc-acknowledgment', [$orders, 'recordOcAcknowledgment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/oc-acknowledgment', [$orders, 'recordOcAcknowledgment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/suppliers', [$orders, 'createSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/suppliers/{supplierId}/factory-addresses', [$orders, 'createSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/suppliers/factory-addresses/{addressId}/delete', [$orders, 'deleteSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/advance-paid', [$orders, 'markSupplierAdvancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/balance-paid', [$orders, 'markSupplierBalancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/suppliers', [$orders, 'createSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/suppliers/{supplierId}/factory-addresses', [$orders, 'createSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/suppliers/factory-addresses/{addressId}/delete', [$orders, 'deleteSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/advance-paid', [$orders, 'markSupplierAdvancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/balance-paid', [$orders, 'markSupplierBalancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // QA-5 RBAC-04: freight/packing/shipping/BL/closure are Logistics' duty,
 // split out of manage_orders so an Accounts-only user can no longer
 // record a BL or close an order (see docs/seed.sql's manage_shipping /
 // close_orders permissions).
-$router->post('/orders/{id}/freight-terms', [$orders, 'saveFreightTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight', [$orders, 'recordFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight/clear', [$orders, 'clearFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/freight-terms', [$orders, 'saveFreightTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight', [$orders, 'recordFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight/clear', [$orders, 'clearFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/packing', [$orders, 'savePacking'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/shipping', [$orders, 'saveShipping'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/bl-issued', [$orders, 'recordBlIssued'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/bl-copy', [$orders, 'attachBlCopy'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/packing', [$orders, 'savePacking'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/shipping', [$orders, 'saveShipping'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-issued', [$orders, 'recordBlIssued'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-copy', [$orders, 'attachBlCopy'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/payment/balance', [$orders, 'recordBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/balance/clear', [$orders, 'clearBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance', [$orders, 'recordBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance/clear', [$orders, 'clearBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/bl-originals-received', [$orders, 'recordBlOriginalsReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/bl-endorsement', [$orders, 'saveBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/bl-endorsement/generate', [$orders, 'generateBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-originals-received', [$orders, 'recordBlOriginalsReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-endorsement', [$orders, 'saveBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/bl-endorsement/generate', [$orders, 'generateBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/close', [$orders, 'closeOrder'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/mark-lost', [$orders, 'markLost'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/documents/{documentId}/delete', [$documents, 'delete'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
@@ -519,7 +520,7 @@ $router->post('/email-log/{emailLogId}/cancel', [$emailDispatch, 'cancel'], [Ses
 
 // Payment Terms Amendments (Section 8).
 $router->get('/orders/{id}/amendments', [$amendments, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
-$router->post('/orders/{id}/amendments', [$amendments, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/amendments', [$amendments, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/amendments/{amendmentId}/md-approve', [$amendments, 'mdApprove'], [SessionAuth::required(), PermissionCheck::requires('approve_documents'), CsrfCheck::verify()]);
 $router->post('/amendments/{amendmentId}/reject', [$amendments, 'reject'], [SessionAuth::required(), PermissionCheck::requires('approve_documents'), CsrfCheck::verify()]);
 $router->post('/amendments/{amendmentId}/generate-document', [$amendments, 'generateDocument'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
@@ -540,8 +541,8 @@ $router->post('/disputes/{disputeId}/replies', [$disputes, 'postReply'], [Sessio
 $router->get('/audit-log', [$auditLog, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
 $router->get('/orders/{id}/audit-log', [$auditLog, 'forOrder'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
 $router->get('/orders/{id}/dossier', [$orders, 'downloadDossier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
-$router->post('/orders/{id}/pi-form-link', [$orders, 'generatePiFormLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/buyer-action-link', [$orders, 'generateBuyerActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/pi-form-link', [$orders, 'generatePiFormLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-action-link', [$orders, 'generateBuyerActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // Notifications bell.
 $router->get('/notifications', [$notifications, 'index'], [SessionAuth::required()]);

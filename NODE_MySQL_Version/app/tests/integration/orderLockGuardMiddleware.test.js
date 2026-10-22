@@ -1,0 +1,85 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const db = require('../../src/config/db');
+const orderRepository = require('../../src/repositories/orderRepository');
+const orderLockGuard = require('../../src/middleware/orderLockGuard');
+const { createTestClient, createTestOrder } = require('../support/fixtures');
+
+/**
+ * Port of OrderLockGuardMiddlewareTest.php. External QA report L-28:
+ * "Closed (complete + locked) order: production status can still be
+ * edited — the new 'lock closed orders' does not cover every edit
+ * route." orderEditGuard (covered by orderLockedEditGuard.test.js) only
+ * ever protected the 5 routes that called it by hand; this middleware is
+ * the central guard registered on every other order-mutating POST
+ * /orders/:id/* route in src/server.js (see orderLockGuard's own
+ * docblock for the exact exclusion list).
+ */
+describe('orderLockGuard middleware (External QA report L-28)', () => {
+  afterAll(async () => {
+    await db.pool.end();
+  });
+
+  function fakeRes() {
+    const res = { redirectedTo: null };
+    res.redirect = (url) => { res.redirectedTo = url; };
+    return res;
+  }
+
+  it('blocks the action on a locked order without the override permission', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await orderRepository.markComplete(orderId);
+    const req = { params: { id: String(orderId) }, permissions: { edit_locked_data: false }, session: {} };
+    const res = fakeRes();
+    let reached = false;
+
+    await orderLockGuard.check()(req, res, () => { reached = true; });
+
+    expect(reached).toBe(false);
+    expect(res.redirectedTo).toBe(`/orders/${orderId}`);
+  });
+
+  it('allows the action on a locked order with the override permission', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await orderRepository.markComplete(orderId);
+    const req = { params: { id: String(orderId) }, permissions: { edit_locked_data: true }, session: {} };
+    const res = fakeRes();
+    let reached = false;
+
+    await orderLockGuard.check()(req, res, () => { reached = true; });
+
+    expect(reached).toBe(true);
+  });
+
+  it('allows the action on an active order regardless', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const req = { params: { id: String(orderId) }, permissions: { edit_locked_data: false }, session: {} };
+    const res = fakeRes();
+    let reached = false;
+
+    await orderLockGuard.check()(req, res, () => { reached = true; });
+
+    expect(reached).toBe(true);
+  });
+
+  it('every non-excluded order mutation route is registered with checkOrderLock', () => {
+    const source = fs.readFileSync(path.join(__dirname, '../../src/server.js'), 'utf8');
+    const excluded = new Set([
+      '/orders/:id/override-status-lock', '/orders/:id/close', '/orders/:id/mark-lost',
+      '/orders/:id/archive', '/orders/:id/unarchive', '/orders/:id/duplicate', '/orders/:id/comments',
+      '/orders/:id/documents/generate', '/orders/:id/documents/:documentId/delete',
+      '/orders/:id/documents/:documentId/send', '/orders/:id/email/send', '/orders/:id/disputes',
+    ]);
+    const lines = source.split('\n').filter((line) => /^app\.post\('\/orders\/:id/.test(line.trim()));
+    expect(lines.length).toBeGreaterThan(0);
+
+    for (const line of lines) {
+      const m = line.trim().match(/^app\.post\('([^']+)'/);
+      const routePath = m[1];
+      if (excluded.has(routePath)) continue;
+      expect(line).toContain('checkOrderLock');
+    }
+  });
+});

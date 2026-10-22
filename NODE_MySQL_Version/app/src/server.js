@@ -33,6 +33,7 @@ const sessionAuth = require('./middleware/sessionAuth');
 const permissionCheck = require('./middleware/permissionCheck');
 const csrfCheck = require('./middleware/csrfCheck');
 const testModeGate = require('./middleware/testModeGate');
+const orderLockGuard = require('./middleware/orderLockGuard');
 
 const authController = require('./controllers/authController');
 const dashboardController = require('./controllers/dashboardController');
@@ -328,6 +329,7 @@ function requirePermissionAny(keys) {
   return asyncHandler(permissionCheck.requiresAny(keys));
 }
 const verifyCsrf = csrfCheck.verify();
+const checkOrderLock = asyncHandler(orderLockGuard.check());
 
 // =========================================================================
 // Routes — mirrors public_html/index.php 1:1. Phases not yet built keep
@@ -588,19 +590,19 @@ app.get('/orders/create', requireAuth, requirePermission('manage_orders'), async
 app.post('/orders', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.store));
 app.get('/orders/:id', requireAuth, requirePermissionAny(['manage_orders', 'view_orders']), asyncHandler(ordersController.show));
 app.get('/orders/:id/edit', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.editDetails));
-app.post('/orders/:id/edit', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateDetails));
+app.post('/orders/:id/edit', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateDetails));
 app.post('/orders/:id/archive', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.archive));
 app.post('/orders/:id/unarchive', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.unarchive));
 app.post('/orders/:id/duplicate', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.duplicateOrder));
-app.post('/orders/:id/products', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.addProduct));
-app.post('/orders/:id/products/:productId', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateProduct));
-app.post('/orders/:id/products/:productId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.deleteProduct));
-app.post('/orders/:id/products/:productId/duplicate', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.duplicateProduct));
-app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
-app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
+app.post('/orders/:id/products', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.addProduct));
+app.post('/orders/:id/products/:productId', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProduct));
+app.post('/orders/:id/products/:productId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteProduct));
+app.post('/orders/:id/products/:productId/duplicate', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.duplicateProduct));
+app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
+app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
 // Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
-app.post('/orders/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadAdditionalDocument));
-app.post('/orders/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.deleteAdditionalDocument));
+app.post('/orders/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadAdditionalDocument));
+app.post('/orders/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteAdditionalDocument));
 app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.index));
 app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
@@ -609,12 +611,12 @@ app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), asyncH
 app.get('/ca/tds-summary', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.tdsSummary));
 app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
 app.post('/ca/expenses/:id/link-order', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.linkExpenseToOrder));
-app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('ca_internal_doc_manage'), verifyCsrf, asyncHandler(caController.toggleInternalDoc));
-app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), verifyCsrf, asyncHandler(caController.generateInternalDoc));
-app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
-app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
-app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));
-app.post('/orders/:id/cost-entries/:entryId/delete', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(orderFinancialsController.deleteCostEntry));
+app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.toggleInternalDoc));
+app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.generateInternalDoc));
+app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
+app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
+app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));
+app.post('/orders/:id/cost-entries/:entryId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.deleteCostEntry));
 app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));
 app.post('/ca/bank-statement/upload', requireAuth, requirePermission('inr_actual_edit'), upload.single('statement'), verifyCsrf, asyncHandler(caController.uploadBankStatement));
 app.post('/ca/bank-statement/:id/match-revenue', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.matchBankLineToRevenue));
@@ -627,23 +629,23 @@ app.post('/ca/export-benefits/:id/mark-received', requireAuth, requirePermission
 app.get('/ca/fy-locks', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.fyLocks));
 app.post('/ca/fy-locks/lock', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.lockFinancialYear));
 app.post('/ca/fy-locks/unlock', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.unlockFinancialYear));
-app.post('/orders/:id/payment/advance/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceExchangeRate));
-app.post('/orders/:id/payment/balance/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceExchangeRate));
-app.post('/orders/:id/payment/freight/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordFreightExchangeRate));
-app.post('/orders/:id/payment/advance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceFirc));
-app.post('/orders/:id/payment/balance/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceFirc));
-app.post('/orders/:id/payment/freight/firc', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordFreightFirc));
-app.post('/orders/:id/payment/advance/inr-actual', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordAdvanceInrActual));
-app.post('/orders/:id/payment/advance/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), verifyCsrf, asyncHandler(ordersController.deleteAdvanceInrActual));
-app.post('/orders/:id/payment/balance/inr-actual', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordBalanceInrActual));
-app.post('/orders/:id/payment/balance/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), verifyCsrf, asyncHandler(ordersController.deleteBalanceInrActual));
-app.post('/orders/:id/payment/freight/inr-actual', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(ordersController.recordFreightInrActual));
-app.post('/orders/:id/payment/freight/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), verifyCsrf, asyncHandler(ordersController.deleteFreightInrActual));
-app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(ordersController.recordAdvancePayment));
-app.post('/orders/:id/payment-reports/:reportId/reviewed', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(ordersController.markPaymentReportReviewed));
-app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
-app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
-app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
+app.post('/orders/:id/payment/advance/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordAdvanceExchangeRate));
+app.post('/orders/:id/payment/balance/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBalanceExchangeRate));
+app.post('/orders/:id/payment/freight/exchange-rate', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightExchangeRate));
+app.post('/orders/:id/payment/advance/firc', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordAdvanceFirc));
+app.post('/orders/:id/payment/balance/firc', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBalanceFirc));
+app.post('/orders/:id/payment/freight/firc', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightFirc));
+app.post('/orders/:id/payment/advance/inr-actual', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordAdvanceInrActual));
+app.post('/orders/:id/payment/advance/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteAdvanceInrActual));
+app.post('/orders/:id/payment/balance/inr-actual', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBalanceInrActual));
+app.post('/orders/:id/payment/balance/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteBalanceInrActual));
+app.post('/orders/:id/payment/freight/inr-actual', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightInrActual));
+app.post('/orders/:id/payment/freight/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteFreightInrActual));
+app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordAdvancePayment));
+app.post('/orders/:id/payment-reports/:reportId/reviewed', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markPaymentReportReviewed));
+app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
+app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
+app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 
 // docs/schema.sql Section AI — order progress chat.
 app.post('/orders/:id/comments', requireAuth, requirePermission('manage_orders'), uploadMedia.array('attachments'), verifyCsrf, asyncHandler(orderCommentController.post));
@@ -652,46 +654,46 @@ app.get('/orders/:id/comment-attachments/:fileId/download', requireAuth, require
 // Annexure A — Product Technical Specifications (schema tables shipped
 // with no screen ever built against them; this is that missing piece).
 app.get('/orders/:id/annexure', requireAuth, requirePermission('manage_orders'), asyncHandler(annexureController.index));
-app.post('/orders/:id/annexure/toggle', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.toggleInclude));
-app.post('/orders/:id/annexure/mode', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateMode));
-app.post('/orders/:id/annexure/terms', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateTerms));
-app.post('/orders/:id/annexure/products', requireAuth, requirePermission('manage_orders'), upload.single('image'), verifyCsrf, asyncHandler(annexureController.createProduct));
-app.post('/orders/:id/annexure/products/:productId', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.updateProduct));
-app.post('/orders/:id/annexure/products/:productId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.deleteProduct));
-app.post('/orders/:id/annexure/products/:productId/images', requireAuth, requirePermission('manage_orders'), upload.single('image'), verifyCsrf, asyncHandler(annexureController.uploadImage));
-app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(annexureController.removeImage));
+app.post('/orders/:id/annexure/toggle', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.toggleInclude));
+app.post('/orders/:id/annexure/mode', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.updateMode));
+app.post('/orders/:id/annexure/terms', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.updateTerms));
+app.post('/orders/:id/annexure/products', requireAuth, requirePermission('manage_orders'), upload.single('image'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.createProduct));
+app.post('/orders/:id/annexure/products/:productId', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.updateProduct));
+app.post('/orders/:id/annexure/products/:productId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.deleteProduct));
+app.post('/orders/:id/annexure/products/:productId/images', requireAuth, requirePermission('manage_orders'), upload.single('image'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.uploadImage));
+app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.removeImage));
 
-app.post('/orders/:id/oc-acknowledgment', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordOcAcknowledgment));
+app.post('/orders/:id/oc-acknowledgment', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordOcAcknowledgment));
 
-app.post('/orders/:id/suppliers', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.createSupplier));
-app.post('/orders/:id/suppliers/:supplierId/factory-addresses', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.createSupplierFactoryAddress));
-app.post('/orders/:id/suppliers/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.deleteSupplierFactoryAddress));
-app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
-app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
-app.post('/orders/:id/supplier-po/advance-paid', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(ordersController.markSupplierAdvancePaid));
-app.post('/orders/:id/supplier-po/balance-paid', requireAuth, requirePermission('manage_order_financials'), verifyCsrf, asyncHandler(ordersController.markSupplierBalancePaid));
-app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
+app.post('/orders/:id/suppliers', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.createSupplier));
+app.post('/orders/:id/suppliers/:supplierId/factory-addresses', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.createSupplierFactoryAddress));
+app.post('/orders/:id/suppliers/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteSupplierFactoryAddress));
+app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
+app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
+app.post('/orders/:id/supplier-po/advance-paid', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierAdvancePaid));
+app.post('/orders/:id/supplier-po/balance-paid', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierBalancePaid));
+app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
 
-app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.saveFreightTerms));
-app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordFreightPayment));
-app.post('/orders/:id/payment/freight/clear', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.clearFreightPayment));
+app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveFreightTerms));
+app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightPayment));
+app.post('/orders/:id/payment/freight/clear', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearFreightPayment));
 
-app.post('/orders/:id/packing', requireAuth, requirePermission('manage_shipping'), upload.single('buyer_approval'), verifyCsrf, asyncHandler(ordersController.savePacking));
-app.post('/orders/:id/shipping', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.saveShipping));
-app.post('/orders/:id/bl-issued', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), verifyCsrf, asyncHandler(ordersController.recordBlIssued));
-app.post('/orders/:id/bl-copy', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), verifyCsrf, asyncHandler(ordersController.attachBlCopy));
-app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordScannedBlSent));
+app.post('/orders/:id/packing', requireAuth, requirePermission('manage_shipping'), upload.single('buyer_approval'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.savePacking));
+app.post('/orders/:id/shipping', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveShipping));
+app.post('/orders/:id/bl-issued', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlIssued));
+app.post('/orders/:id/bl-copy', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.attachBlCopy));
+app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordScannedBlSent));
 
-app.post('/orders/:id/payment/balance', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(ordersController.recordBalancePayment));
-app.post('/orders/:id/payment/balance/clear', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(ordersController.clearBalancePayment));
+app.post('/orders/:id/payment/balance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBalancePayment));
+app.post('/orders/:id/payment/balance/clear', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearBalancePayment));
 
-app.post('/orders/:id/bl-originals-received', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordBlOriginalsReceived));
-app.post('/orders/:id/bl-endorsed', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.recordBlEndorsed));
-app.post('/orders/:id/bl-endorsement', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.saveBlEndorsement));
-app.post('/orders/:id/bl-endorsement/generate', requireAuth, requirePermission('manage_shipping'), verifyCsrf, asyncHandler(ordersController.generateBlEndorsement));
+app.post('/orders/:id/bl-originals-received', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlOriginalsReceived));
+app.post('/orders/:id/bl-endorsed', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlEndorsed));
+app.post('/orders/:id/bl-endorsement', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveBlEndorsement));
+app.post('/orders/:id/bl-endorsement/generate', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateBlEndorsement));
 app.post('/orders/:id/close', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.closeOrder));
 app.post('/orders/:id/mark-lost', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.markLost));
-app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.updateComplianceTask));
+app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('close_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateComplianceTask));
 
 app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));
 app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.deleteDraft));
@@ -753,7 +755,7 @@ app.post('/email-log/:emailLogId/send-now', requireAuth, requirePermission('appr
 app.post('/email-log/:emailLogId/cancel', requireAuth, verifyCsrf, asyncHandler(emailDispatchController.cancel));
 
 app.get('/orders/:id/amendments', requireAuth, requirePermission('manage_orders'), asyncHandler(amendmentController.index));
-app.post('/orders/:id/amendments', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(amendmentController.create));
+app.post('/orders/:id/amendments', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(amendmentController.create));
 app.post('/amendments/:amendmentId/md-approve', requireAuth, requirePermission('approve_documents'), verifyCsrf, asyncHandler(amendmentController.mdApprove));
 app.post('/amendments/:amendmentId/reject', requireAuth, requirePermission('approve_documents'), verifyCsrf, asyncHandler(amendmentController.reject));
 app.post('/amendments/:amendmentId/generate-document', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(amendmentController.generateDocument));
@@ -774,8 +776,8 @@ app.post('/disputes/:disputeId/replies', requireAuth, requirePermission('respond
 app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.index));
 app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));
 app.get('/orders/:id/dossier', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.downloadDossier));
-app.post('/orders/:id/pi-form-link', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.generatePiFormLink));
-app.post('/orders/:id/buyer-action-link', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.generateBuyerActionLink));
+app.post('/orders/:id/pi-form-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generatePiFormLink));
+app.post('/orders/:id/buyer-action-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateBuyerActionLink));
 
 app.get('/notifications', requireAuth, asyncHandler(notificationController.index));
 
