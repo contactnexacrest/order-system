@@ -250,7 +250,7 @@ INSERT INTO document_types (code, name, category, ref_format, never_shown_to_buy
 -- ================================================================
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (10, 'Natural Stone Characteristics', 'Natural Stone Characteristics: All granite supplied is Grade A quality, selected for colour consistency. As with all natural stone, minor variation in shade, grain and veining may occur between pieces — however, visible dramatic colour difference between components of the same order will not occur. Products will conform to the agreed specification.', 'active', 0);
+  (10, 'Natural Stone Characteristics', 'Natural Stone Characteristics: The quality of granite supplied is as agreed, selected for colour consistency. As with all natural stone, minor variation in shade, grain and veining may occur between pieces — however, visible dramatic colour difference between components of the same order will not occur. Products will conform to the agreed specification.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Natural Stone Characteristics' AND dt.code IN ('QT','PI','OC');
@@ -1545,7 +1545,7 @@ WHERE c.clause_title = 'Bill of Lading Policy' AND dt.code IN ('QT','PI','OC','C
 -- authoritative text (pre-shipment-sample-approval mechanism), replacing
 -- the shorter "no dramatic colour difference" promise that carried no
 -- such mechanism. Same clause_id, same linkage — text only. ---
-UPDATE tc_clauses SET clause_text = 'All granite supplied is Grade A quality, selected for colour consistency. As with all natural stone, minor variation in shade, grain and veining may occur between pieces — however, Natural Variation inherent to natural stone including colour, veining, and texture is not a defect. Any claim of colour non-conformance must be assessed against the agreed pre-shipment sample approved by the Buyer in writing prior to Loading. In the absence of an approved pre-shipment sample, the Buyer accepts all colour variation inherent to natural stone. Products will conform to the agreed specification.'
+UPDATE tc_clauses SET clause_text = 'The quality of granite supplied is as agreed, selected for colour consistency. As with all natural stone, minor variation in shade, grain and veining may occur between pieces — however, Natural Variation inherent to natural stone including colour, veining, and texture is not a defect. Any claim of colour non-conformance must be assessed against the agreed pre-shipment sample approved by the Buyer in writing prior to Loading. In the absence of an approved pre-shipment sample, the Buyer accepts all colour variation inherent to natural stone. Products will conform to the agreed specification.'
 WHERE clause_title = 'Natural Stone Characteristics';
 
 -- --- Old flat Cancellation bullet (clause_order 30, QT/PI/OC T&C body) —
