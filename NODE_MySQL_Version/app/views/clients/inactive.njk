@@ -16,7 +16,7 @@
       <td>{{ c.country_of_destination or '—' }}</td>
       <td>
         <a href="/clients/{{ c.id }}">View</a>
-        <form method="post" action="/clients/{{ c.id }}/toggle-active" style="display:inline" onsubmit="return confirm('Reactivate {{ c.company_legal_name }}?');">
+        <form method="post" action="/clients/{{ c.id }}/toggle-active" style="display:inline" data-confirm="Reactivate {{ c.company_legal_name }}?">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <button type="submit" class="btn-sm btn-success">Reactivate</button>
         </form>

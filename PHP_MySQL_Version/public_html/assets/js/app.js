@@ -99,13 +99,42 @@
     });
   }
 
+  // External QA report L-38: a form's confirmation message used to be
+  // built as a hand-escaped JS string literal INSIDE the onsubmit HTML
+  // attribute (e.g. `onsubmit="return confirm('Delete \"name\"?');"`) —
+  // a literal `\"` in that source has no escaping meaning to the HTML
+  // attribute parser (backslash isn't special in HTML), so it closes
+  // the attribute early the moment a name needed those decorative
+  // quote marks, breaking the whole handler. Reading the message from
+  // a data-confirm attribute instead sidesteps the problem entirely:
+  // the browser decodes it as a plain string (ordinary HTML-attribute
+  // escaping, already handled server-side by htmlspecialchars()/
+  // Nunjucks' own autoescaping), which is never re-parsed as JS source
+  // text, so no value anywhere needs a JS-string escape at all.
+  // Capture phase so this always runs before the bubble-phase listener
+  // below, matching the inline-onsubmit ordering it replaces.
+  function initConfirmDialogs() {
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      var message = form.dataset.confirm;
+      if (message === undefined) return;
+      if (!window.confirm(message)) {
+        e.preventDefault();
+      }
+    }, true);
+  }
+
   function init() {
+    initConfirmDialogs();
+
     // Bound on document, not per-form, so every current and future POST
     // form sitewide gets a disabled/"Working…" submit button for free —
-    // no per-page wiring needed. Runs after any inline onsubmit handler
-    // (e.g. confirm() prompts) because listeners on the form itself always
-    // fire before the event bubbles up here, so a cancelled confirm()
-    // leaves e.defaultPrevented true and this is skipped.
+    // no per-page wiring needed. Runs after any data-confirm dialog
+    // above (capture phase fires first) or inline onsubmit handler
+    // (listeners on the form itself always fire before the event
+    // bubbles up here), so a cancelled confirm() leaves
+    // e.defaultPrevented true and this is skipped.
     document.addEventListener('submit', function (e) {
       if (e.defaultPrevented) return;
       var form = e.target;

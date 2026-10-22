@@ -26,7 +26,7 @@
             <button type="submit" class="btn-sm">{{ 'Deactivate' if d.is_active else 'Reactivate' }}</button>
           </form>
           {% if d.usage_count == 0 %}
-            <form method="post" action="/signatories/designations/{{ d.id }}/delete" style="display:inline" onsubmit="return confirm('Delete the designation \'{{ d.title }}\'?');">
+            <form method="post" action="/signatories/designations/{{ d.id }}/delete" style="display:inline" data-confirm="Delete the designation '{{ d.title }}'?">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-danger">Delete</button>
             </form>

@@ -33,27 +33,27 @@
           {% if u.is_protected_account %}
             <span class="muted small">Protected — cannot be edited, deactivated, archived, deleted, or password-reset by anyone else. They can recover their own login via "Forgot password" on the login screen.</span>
           {% elif u.is_archived %}
-            <form method="post" action="/users/{{ u.id }}/unarchive" style="display:inline" onsubmit="return confirm('Unarchive {{ u.name }}? They will still need to be separately reactivated to log in again.');">
+            <form method="post" action="/users/{{ u.id }}/unarchive" style="display:inline" data-confirm="Unarchive {{ u.name }}? They will still need to be separately reactivated to log in again.">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-secondary">Unarchive</button>
             </form>
-            <form method="post" action="/users/{{ u.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete {{ u.name }}? This cannot be undone, and only succeeds if they have no order/document/audit history on file.');">
+            <form method="post" action="/users/{{ u.id }}/delete" style="display:inline" data-confirm="Permanently delete {{ u.name }}? This cannot be undone, and only succeeds if they have no order/document/audit history on file.">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-danger">Delete</button>
             </form>
           {% else %}
           <a href="/users/{{ u.id }}/edit" class="btn-sm btn-secondary">Edit</a>
-          <form method="post" action="/users/{{ u.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if u.is_active else 'Reactivate' }} {{ u.name }}?');">
+          <form method="post" action="/users/{{ u.id }}/toggle-active" style="display:inline" data-confirm="{{ 'Deactivate' if u.is_active else 'Reactivate' }} {{ u.name }}?">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm {{ 'btn-danger' if u.is_active else 'btn-success' }}">{{ 'Deactivate' if u.is_active else 'Reactivate' }}</button>
           </form>
-          <form method="post" action="/users/{{ u.id }}/archive" style="display:inline" onsubmit="return confirm('Archive {{ u.name }}? They will no longer be able to log in, and will move out of the Active/Inactive lists into Archived.');">
+          <form method="post" action="/users/{{ u.id }}/archive" style="display:inline" data-confirm="Archive {{ u.name }}? They will no longer be able to log in, and will move out of the Active/Inactive lists into Archived.">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm btn-secondary">Archive</button>
           </form>
           <details style="margin-top:0.4rem;">
             <summary class="muted small">Force password reset</summary>
-            <form method="post" action="/users/{{ u.id }}/force-reset-password" onsubmit="return confirmForceReset(this, '{{ u.name }}');">
+            <form method="post" action="/users/{{ u.id }}/force-reset-password" data-confirm-name="{{ u.name }}" onsubmit="return confirmForceReset(this);">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <textarea class="reset-reason" name="reason" rows="2" placeholder="Reason for this reset *" required></textarea>
               <button type="submit" class="btn-sm btn-danger">Force Reset</button>
@@ -89,12 +89,16 @@
   </div>
 </div>
 <script>
-function confirmForceReset(form, name) {
+function confirmForceReset(form) {
   var reasonEl = form.querySelector('.reset-reason');
   if (!reasonEl || reasonEl.value.trim() === '') {
     alert('A reason is required before resetting.');
     return false;
   }
+  // Read from a data attribute, not a JS-string-literal argument built
+  // server-side — see app.js's initConfirmDialogs() docblock (External
+  // QA report L-39) for why that would still break on an apostrophe.
+  var name = form.dataset.confirmName;
   return confirm('Force-reset the password for ' + name + '? A new one-time temporary password will be generated and shown once. This is logged.');
 }
 </script>

@@ -17,11 +17,11 @@
         <td><span class="badge <?= $t['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $t['is_active'] ? 'Active' : 'Inactive' ?></span></td>
         <td class="action-buttons">
           <a href="/compliance-task-types/<?= (int) $t['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
-          <form method="post" action="/compliance-task-types/<?= (int) $t['id'] ?>/toggle" style="display:inline" onsubmit="return confirm('<?= $t['is_active'] ? 'Deactivate' : 'Reactivate' ?> \"<?= htmlspecialchars(addslashes($t['name'])) ?>\"?');">
+          <form method="post" action="/compliance-task-types/<?= (int) $t['id'] ?>/toggle" style="display:inline" data-confirm="<?= htmlspecialchars(($t['is_active'] ? 'Deactivate' : 'Reactivate') . ' "' . $t['name'] . '"?', ENT_QUOTES) ?>">
             <?= Csrf::field() ?>
             <button type="submit" class="btn-sm <?= $t['is_active'] ? 'btn-danger' : 'btn-success' ?>"><?= $t['is_active'] ? 'Deactivate' : 'Reactivate' ?></button>
           </form>
-          <form method="post" action="/compliance-task-types/<?= (int) $t['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Permanently delete \"<?= htmlspecialchars(addslashes($t['name'])) ?>\"? This only works if no order has ever recorded a status against it — otherwise deactivate it instead.');">
+          <form method="post" action="/compliance-task-types/<?= (int) $t['id'] ?>/delete" style="display:inline" data-confirm="<?= htmlspecialchars('Permanently delete "' . $t['name'] . '"? This only works if no order has ever recorded a status against it — otherwise deactivate it instead.', ENT_QUOTES) ?>">
             <?= Csrf::field() ?>
             <button type="submit" class="btn-sm btn-danger">Delete</button>
           </form>

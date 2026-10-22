@@ -30,7 +30,7 @@
         <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
         <td>
           <a href="/ports/{{ p.id }}/edit" class="btn-sm btn-secondary">Edit</a>
-          <form method="post" action="/ports/{{ p.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if p.is_active else 'Reactivate' }} {{ p.name }}? {{ 'It will no longer be offered on new orders.' if p.is_active else '' }}');">
+          <form method="post" action="/ports/{{ p.id }}/toggle" style="display:inline" data-confirm="{{ 'Deactivate' if p.is_active else 'Reactivate' }} {{ p.name }}? {{ 'It will no longer be offered on new orders.' if p.is_active else '' }}">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm {{ 'btn-danger' if p.is_active else 'btn-success' }}">{{ 'Deactivate' if p.is_active else 'Reactivate' }}</button>
           </form>

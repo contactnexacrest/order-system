@@ -25,7 +25,7 @@
       </td>
       <td>{{ c.document_count }}</td>
       <td>
-        <form method="post" action="/reference-docs/categories/{{ c.id }}/delete" style="display:inline" onsubmit="return confirm('Delete category &quot;{{ c.name }}&quot;? Documents filed under it become uncategorized (visible to everyone) — nothing is deleted.');">
+        <form method="post" action="/reference-docs/categories/{{ c.id }}/delete" style="display:inline" data-confirm="Delete category &quot;{{ c.name }}&quot;? Documents filed under it become uncategorized (visible to everyone) — nothing is deleted.">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <button type="submit" class="btn-sm btn-danger">Delete</button>
         </form>

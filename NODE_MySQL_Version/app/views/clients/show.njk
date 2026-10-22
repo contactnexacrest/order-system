@@ -22,7 +22,7 @@
   <div class="btn-row">
     <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/edit">Edit</a>
     <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/duplicate" title="Re-onboard a near-identical but distinct entity (e.g. a sister company) under a brand-new Buyer Inquiry Ref">Duplicate</a>
-    <form method="post" action="/clients/{{ client.id }}/toggle-active" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if client.is_active else 'Reactivate' }} {{ client.company_legal_name }}?{{ ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' if client.is_active else '' }}');">
+    <form method="post" action="/clients/{{ client.id }}/toggle-active" style="display:inline" data-confirm="{{ 'Deactivate' if client.is_active else 'Reactivate' }} {{ client.company_legal_name }}?{{ ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' if client.is_active else '' }}">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm {{ 'btn-danger' if client.is_active else 'btn-success' }}">{{ 'Deactivate' if client.is_active else 'Reactivate' }}</button>
     </form>
@@ -92,7 +92,7 @@
         <td>{{ ad.uploaded_at }}{% if ad.uploaded_by_name %} <span class="muted small">by {{ ad.uploaded_by_name }}</span>{% endif %}</td>
         <td>
           {% if permissions.manage_orders %}
-          <form method="post" action="/clients/{{ client.id }}/additional-documents/{{ ad.id }}/delete" style="display:inline" onsubmit="return confirm('Remove &quot;{{ ad.document_type_label }}&quot;? The file itself is never deleted from disk.');">
+          <form method="post" action="/clients/{{ client.id }}/additional-documents/{{ ad.id }}/delete" style="display:inline" data-confirm="Remove &quot;{{ ad.document_type_label }}&quot;? The file itself is never deleted from disk.">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm btn-danger">Remove</button>
           </form>
@@ -163,7 +163,7 @@
     {% endif %}
     {% if permissions.impersonate_client %}
       {% if impersonationGloballyEnabled and client.allow_staff_impersonation and client.is_active %}
-        <form method="post" action="/clients/{{ client.id }}/impersonate" target="_blank" onsubmit="return confirm('Log in as {{ client.company_legal_name }}? This opens their client-portal view in a new tab, alongside your own session here. This is logged.');">
+        <form method="post" action="/clients/{{ client.id }}/impersonate" target="_blank" data-confirm="Log in as {{ client.company_legal_name }}? This opens their client-portal view in a new tab, alongside your own session here. This is logged.">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <button type="submit" class="btn-sm btn-secondary">Log in as this client &#8599;</button>
         </form>

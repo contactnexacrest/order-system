@@ -16,11 +16,11 @@
         <td><span class="badge {{ 'badge-active' if t.is_active else 'badge-inactive' }}">{{ 'Active' if t.is_active else 'Inactive' }}</span></td>
         <td class="action-buttons">
           <a href="/compliance-task-types/{{ t.id }}/edit" class="btn-sm btn-secondary">Edit</a>
-          <form method="post" action="/compliance-task-types/{{ t.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if t.is_active else 'Reactivate' }} &quot;{{ t.name }}&quot;?');">
+          <form method="post" action="/compliance-task-types/{{ t.id }}/toggle" style="display:inline" data-confirm="{{ 'Deactivate' if t.is_active else 'Reactivate' }} &quot;{{ t.name }}&quot;?">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm {{ 'btn-danger' if t.is_active else 'btn-success' }}">{{ 'Deactivate' if t.is_active else 'Reactivate' }}</button>
           </form>
-          <form method="post" action="/compliance-task-types/{{ t.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete &quot;{{ t.name }}&quot;? This only works if no order has ever recorded a status against it — otherwise deactivate it instead.');">
+          <form method="post" action="/compliance-task-types/{{ t.id }}/delete" style="display:inline" data-confirm="Permanently delete &quot;{{ t.name }}&quot;? This only works if no order has ever recorded a status against it — otherwise deactivate it instead.">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm btn-danger">Delete</button>
           </form>
