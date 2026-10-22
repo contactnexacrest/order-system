@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Config\Database;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\UserRepository;
 
@@ -54,7 +55,8 @@ final class ActionNotificationService
             return [];
         }
 
-        $message = self::buildMessage($user, $actionType, $entityType, $entityId, $fieldName, $oldValue, $newValue, $reason);
+        $entityReference = self::resolveEntityReference($entityType, $entityId);
+        $message = self::buildMessage($user, $actionType, $entityType, $entityId, $fieldName, $oldValue, $newValue, $reason, $entityReference);
         foreach ($recipients as $recipient) {
             try {
                 EmailService::sendPlainText($recipient, $message['subject'], $message['body']);
@@ -85,7 +87,62 @@ final class ActionNotificationService
     }
 
     /**
+     * External QA report L-46: action-notification subjects/bodies used
+     * the raw table name + numeric id ("Login Success — Users #37",
+     * "Reviewers Assigned — Documents #231") — unreadable without opening
+     * the record. Looks up a human-friendly reference for the handful of
+     * entity types that have one (orders.order_reference,
+     * documents.document_reference, a name/title column, etc.); any
+     * entity type not in this whitelist, or a row that no longer exists
+     * (e.g. since deleted), falls straight back to buildMessage()'s own
+     * "#id" formatting — this never throws and never blocks the action it
+     * reports on, matching notify()'s own fire-and-forget contract.
+     *
+     * @return array{0: string, 1: string, 2: string}|null [table, column, singular label]
+     */
+    private static function entityReferenceLookup(string $entityType): ?array
+    {
+        return match ($entityType) {
+            'order', 'orders' => ['orders', 'order_reference', 'Order'],
+            'documents' => ['documents', 'document_reference', 'Document'],
+            'clients' => ['clients', 'company_legal_name', 'Client'],
+            'users' => ['users', 'name', 'User'],
+            'roles' => ['roles', 'name', 'Role'],
+            'permissions' => ['permissions', 'name', 'Permission'],
+            'products' => ['products', 'name', 'Product'],
+            'ports' => ['ports', 'name', 'Port'],
+            'document_types' => ['document_types', 'name', 'Document Type'],
+            'compliance_task_types' => ['compliance_task_types', 'name', 'Compliance Task Type'],
+            'logistics_partners' => ['logistics_partners', 'partner_name', 'Logistics Partner'],
+            default => null,
+        };
+    }
+
+    /** @return array{label: string, reference: string}|null */
+    public static function resolveEntityReference(?string $entityType, ?int $entityId): ?array
+    {
+        if ($entityType === null || $entityId === null) {
+            return null;
+        }
+        $lookup = self::entityReferenceLookup($entityType);
+        if ($lookup === null) {
+            return null;
+        }
+        [$table, $column, $label] = $lookup;
+        try {
+            $stmt = Database::connection()->prepare("SELECT {$column} AS reference FROM {$table} WHERE id = :id");
+            $stmt->execute(['id' => $entityId]);
+            $row = $stmt->fetch();
+        } catch (\Throwable $e) {
+            return null;
+        }
+        $reference = trim((string) ($row['reference'] ?? ''));
+        return $reference !== '' ? ['label' => $label, 'reference' => $reference] : null;
+    }
+
+    /**
      * @param array<string,mixed>|null $user
+     * @param array{label: string, reference: string}|null $entityReference see resolveEntityReference() above
      * @return array{subject: string, body: string}
      */
     public static function buildMessage(
@@ -96,10 +153,14 @@ final class ActionNotificationService
         ?string $fieldName,
         ?string $oldValue,
         ?string $newValue,
-        ?string $reason
+        ?string $reason,
+        ?array $entityReference = null
     ): array {
         $actionLabel = ucwords(strtolower(str_replace('_', ' ', $actionType)));
         $entityLabel = $entityType !== null ? (ucfirst($entityType) . ($entityId !== null ? " #{$entityId}" : '')) : null;
+        if ($entityReference !== null) {
+            $entityLabel = $entityReference['label'] . ' ' . $entityReference['reference'];
+        }
 
         $subject = 'NexaCrest — ' . $actionLabel . ($entityLabel !== null ? " — {$entityLabel}" : '');
 

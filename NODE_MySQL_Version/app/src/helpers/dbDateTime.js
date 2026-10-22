@@ -63,4 +63,24 @@ function formatForDb(date) {
   return `${ymd(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
-module.exports = { parseDbDateTime, todayIst, ymd, formatForDb };
+const RFC2822_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const RFC2822_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * External QA report L-46: nodemailer's own Date header defaults to UTC
+ * (+0000) regardless of process.env.TZ, while PHPMailer's matches this
+ * process's date_default_timezone_set('Asia/Kolkata') and shows IST — so
+ * the same order's PHP-sent and Node-sent emails carried different-looking
+ * send times. getDay()/getDate()/getMonth()/.../getSeconds() are LOCAL-time
+ * getters, so (like formatForDb() above) they already follow
+ * process.env.TZ=Asia/Kolkata correctly; this just also appends the
+ * matching +0530 offset, the one this single-timezone business app always
+ * actually runs in.
+ */
+function toRfc2822Ist(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${RFC2822_DAY_NAMES[date.getDay()]}, ${pad(date.getDate())} ${RFC2822_MONTH_NAMES[date.getMonth()]} ${date.getFullYear()} `
+    + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} +0530`;
+}
+
+module.exports = { parseDbDateTime, todayIst, ymd, formatForDb, toRfc2822Ist };

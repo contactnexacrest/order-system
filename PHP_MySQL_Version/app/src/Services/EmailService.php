@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Config\Env;
+use App\Repositories\CompanySettingsRepository;
 
 /**
  * Thin wrapper so the rest of the app calls one method regardless of what's
@@ -19,6 +20,45 @@ use App\Config\Env;
  */
 final class EmailService
 {
+    /**
+     * External QA report L-43: customer emails had no Reply-To, so a
+     * buyer's reply to a QT/PI/OC (e.g. "we confirm the OC") went to the
+     * no-reply mailbox and was lost. Falls back to the general company
+     * contact email when no dedicated reply-to address is configured.
+     * Public (and split out from configureMailerIdentity() below) purely
+     * so it's unit-testable without a configured SMTP transport.
+     */
+    public static function resolveReplyToAddress(): string
+    {
+        $replyTo = trim((string) (CompanySettingsRepository::get('reply_to_email') ?? ''));
+        if ($replyTo === '') {
+            $replyTo = trim((string) (CompanySettingsRepository::get('email') ?? ''));
+        }
+        return $replyTo;
+    }
+
+    /**
+     * External QA report L-46: PHPMailer defaults Hostname to the server's
+     * own machine name (e.g. "vm"), so the Message-ID header reads
+     * <...@vm> instead of the company's own mail domain — a mismatch spam
+     * filters penalize. Derived from SMTP_FROM_ADDRESS's own domain.
+     */
+    public static function mailHostname(): string
+    {
+        $fromAddress = Env::get('SMTP_FROM_ADDRESS', 'no-reply@example.com');
+        $atPos = strrpos($fromAddress, '@');
+        return $atPos !== false ? substr($fromAddress, $atPos + 1) : 'example.com';
+    }
+
+    private static function configureMailerIdentity(\PHPMailer\PHPMailer\PHPMailer $mail): void
+    {
+        $replyTo = self::resolveReplyToAddress();
+        if ($replyTo !== '') {
+            $mail->addReplyTo($replyTo);
+        }
+        $mail->Hostname = self::mailHostname();
+    }
+
     /**
      * @return bool true if actually handed to a transport, false if only logged (dev fallback)
      */
@@ -54,6 +94,7 @@ final class EmailService
                     Env::get('SMTP_FROM_ADDRESS', 'no-reply@example.com'),
                     Env::get('SMTP_FROM_NAME', 'NexaCrest International Private Limited')
                 );
+                self::configureMailerIdentity($mail);
                 $mail->addAddress($to);
                 foreach ($cc as $ccAddress) {
                     $mail->addCC($ccAddress);
@@ -186,6 +227,7 @@ final class EmailService
                     Env::get('SMTP_FROM_ADDRESS', 'no-reply@example.com'),
                     Env::get('SMTP_FROM_NAME', 'NexaCrest International Private Limited')
                 );
+                self::configureMailerIdentity($mail);
                 $mail->addAddress($to);
                 foreach ($cc as $ccAddress) {
                     $mail->addCC($ccAddress);

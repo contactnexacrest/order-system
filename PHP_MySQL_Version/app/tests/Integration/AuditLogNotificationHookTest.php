@@ -53,6 +53,28 @@ final class AuditLogNotificationHookTest extends DbTestCase
         CompanySettingsRepository::set('notification_email', '');
     }
 
+    /** External QA report L-46: resolveEntityReference() is the DB-touching half of the subject-readability fix — see ActionNotificationServiceTest's buildMessage() tests for the pure-helper half. */
+    public function testResolveEntityReferenceReturnsTheOrdersOwnReferenceNumber(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+
+        $resolved = ActionNotificationService::resolveEntityReference('orders', $orderId);
+
+        self::assertNotNull($resolved);
+        self::assertSame('Order', $resolved['label']);
+        self::assertNotSame('', $resolved['reference']);
+    }
+
+    public function testResolveEntityReferenceReturnsNullForAnUnmappedEntityType(): void
+    {
+        self::assertNull(ActionNotificationService::resolveEntityReference('watermark_settings', 1));
+    }
+
+    public function testResolveEntityReferenceReturnsNullForAnIdThatNoLongerExists(): void
+    {
+        self::assertNull(ActionNotificationService::resolveEntityReference('orders', 999999999));
+    }
+
     public function testCallingLogDoesNotThrowWhenNotificationsAreFullyConfigured(): void
     {
         CompanySettingsRepository::set('notification_email', 'ops-notify@nexacrestinternational.test');

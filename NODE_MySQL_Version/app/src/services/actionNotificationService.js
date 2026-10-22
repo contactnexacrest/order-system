@@ -3,6 +3,7 @@
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const userRepository = require('../repositories/userRepository');
 const emailService = require('./emailService');
+const db = require('../config/db');
 
 /**
  * Port of App\Services\ActionNotificationService. User-reported batch
@@ -42,7 +43,8 @@ async function notify(userId, actionType, entityType, entityId, fieldName, oldVa
     return [];
   }
 
-  const message = buildMessage(user, actionType, entityType, entityId, fieldName, oldValue, newValue, reason);
+  const entityReference = await resolveEntityReference(entityType, entityId);
+  const message = buildMessage(user, actionType, entityType, entityId, fieldName, oldValue, newValue, reason, entityReference);
   for (const recipient of recipients) {
     try {
       await emailService.sendPlainText(recipient, message.subject, message.body);
@@ -70,12 +72,64 @@ async function resolveRecipients(user) {
   return [...new Set(recipients)];
 }
 
-/** @returns {{subject: string, body: string}} */
-function buildMessage(user, actionType, entityType, entityId, fieldName, oldValue, newValue, reason) {
+const ENTITY_REFERENCE_LOOKUP = {
+  order: ['orders', 'order_reference', 'Order'],
+  orders: ['orders', 'order_reference', 'Order'],
+  documents: ['documents', 'document_reference', 'Document'],
+  clients: ['clients', 'company_legal_name', 'Client'],
+  users: ['users', 'name', 'User'],
+  roles: ['roles', 'name', 'Role'],
+  permissions: ['permissions', 'name', 'Permission'],
+  products: ['products', 'name', 'Product'],
+  ports: ['ports', 'name', 'Port'],
+  document_types: ['document_types', 'name', 'Document Type'],
+  compliance_task_types: ['compliance_task_types', 'name', 'Compliance Task Type'],
+  logistics_partners: ['logistics_partners', 'partner_name', 'Logistics Partner'],
+};
+
+/**
+ * External QA report L-46: action-notification subjects/bodies used the raw
+ * table name + numeric id ("Login Success — Users #37", "Reviewers
+ * Assigned — Documents #231") — unreadable without opening the record.
+ * Looks up a human-friendly reference for the handful of entity types that
+ * have one; any entity type not in this whitelist, or a row that no longer
+ * exists (e.g. since deleted), returns null — buildMessage() then falls
+ * straight back to its own "#id" formatting. This never throws and never
+ * blocks the action it reports on, matching notify()'s own
+ * fire-and-forget contract.
+ *
+ * @returns {Promise<{label: string, reference: string}|null>}
+ */
+async function resolveEntityReference(entityType, entityId) {
+  if (entityType === null || entityType === undefined || entityId === null || entityId === undefined) {
+    return null;
+  }
+  const lookup = ENTITY_REFERENCE_LOOKUP[entityType];
+  if (!lookup) {
+    return null;
+  }
+  const [table, column, label] = lookup;
+  try {
+    const row = await db.queryOne(`SELECT ${column} AS reference FROM ${table} WHERE id = :id`, { id: entityId });
+    const reference = String((row && row.reference) || '').trim();
+    return reference !== '' ? { label, reference } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * @param {{label: string, reference: string}|null} [entityReference] see resolveEntityReference() above
+ * @returns {{subject: string, body: string}}
+ */
+function buildMessage(user, actionType, entityType, entityId, fieldName, oldValue, newValue, reason, entityReference = null) {
   const actionLabel = String(actionType).toLowerCase().split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  const entityLabel = entityType !== null && entityType !== undefined
+  let entityLabel = entityType !== null && entityType !== undefined
     ? `${entityType.charAt(0).toUpperCase()}${entityType.slice(1)}${entityId !== null && entityId !== undefined ? ` #${entityId}` : ''}`
     : null;
+  if (entityReference) {
+    entityLabel = `${entityReference.label} ${entityReference.reference}`;
+  }
 
   const subject = `NexaCrest — ${actionLabel}${entityLabel !== null ? ` — ${entityLabel}` : ''}`;
 
@@ -99,4 +153,4 @@ function buildMessage(user, actionType, entityType, entityId, fieldName, oldValu
   return { subject, body };
 }
 
-module.exports = { notify, resolveRecipients, buildMessage };
+module.exports = { notify, resolveRecipients, buildMessage, resolveEntityReference };

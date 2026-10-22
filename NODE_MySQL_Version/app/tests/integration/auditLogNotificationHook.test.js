@@ -7,6 +7,7 @@ const auditLogRepository = require('../../src/repositories/auditLogRepository');
 const companySettingsRepository = require('../../src/repositories/companySettingsRepository');
 const userRepository = require('../../src/repositories/userRepository');
 const actionNotificationService = require('../../src/services/actionNotificationService');
+const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 /**
  * Port of AuditLogNotificationHookTest.php. User-reported batch item 20
@@ -60,6 +61,27 @@ describe('auditLogRepository notification hook (90-item backlog item 20, non-neg
     expect(recipients).toContain(user.email);
 
     await companySettingsRepository.set('notification_email', '');
+  });
+
+  // External QA report L-46: resolveEntityReference() is the DB-touching
+  // half of the subject-readability fix — see actionNotificationService's
+  // buildMessage() unit tests for the pure-helper half.
+  it("resolveEntityReference returns the order's own reference number", async () => {
+    const orderId = await createTestOrder(await createTestClient());
+
+    const resolved = await actionNotificationService.resolveEntityReference('orders', orderId);
+
+    expect(resolved).not.toBeNull();
+    expect(resolved.label).toBe('Order');
+    expect(resolved.reference).not.toBe('');
+  });
+
+  it('resolveEntityReference returns null for an unmapped entity type', async () => {
+    expect(await actionNotificationService.resolveEntityReference('watermark_settings', 1)).toBeNull();
+  });
+
+  it('resolveEntityReference returns null for an id that no longer exists', async () => {
+    expect(await actionNotificationService.resolveEntityReference('orders', 999999999)).toBeNull();
   });
 
   it('calling log does not throw when notifications are fully configured', async () => {

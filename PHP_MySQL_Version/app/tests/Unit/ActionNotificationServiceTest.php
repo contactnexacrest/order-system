@@ -61,4 +61,49 @@ final class ActionNotificationServiceTest extends TestCase
 
         self::assertStringContainsString('By: System', $message['body']);
     }
+
+    /**
+     * External QA report L-46: "action-notification subjects use internal
+     * labels ('Login Success — Users #37', 'Reviewers Assigned —
+     * Documents #231')". When a resolved human-friendly reference is
+     * passed in (resolveEntityReference() — covered against a real DB in
+     * AuditLogNotificationHookTest), buildMessage() must use it instead of
+     * the raw table-name-plus-id.
+     */
+    public function testBuildMessageUsesAResolvedEntityReferenceWhenGiven(): void
+    {
+        $user = ['name' => 'Jane Staff'];
+        $message = ActionNotificationService::buildMessage(
+            $user,
+            'REVIEWERS_ASSIGNED',
+            'documents',
+            231,
+            null,
+            null,
+            null,
+            null,
+            ['label' => 'Document', 'reference' => 'SC/QT/2026/1234']
+        );
+
+        self::assertStringContainsString('Document SC/QT/2026/1234', $message['subject']);
+        self::assertStringNotContainsString('Documents #231', $message['subject']);
+        self::assertStringContainsString('On: Document SC/QT/2026/1234', $message['body']);
+    }
+
+    public function testBuildMessageFallsBackToTheRawLabelWhenNoReferenceResolved(): void
+    {
+        $message = ActionNotificationService::buildMessage(
+            ['name' => 'Jane Staff'],
+            'LOGIN_SUCCESS',
+            'users',
+            37,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        self::assertStringContainsString('Users #37', $message['subject']);
+    }
 }

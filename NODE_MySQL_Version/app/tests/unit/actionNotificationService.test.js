@@ -49,4 +49,30 @@ describe('actionNotificationService (90-item backlog item 20, non-negotiable)', 
 
     expect(message.body).toContain('By: System');
   });
+
+  // External QA report L-46: "action-notification subjects use internal
+  // labels ('Login Success — Users #37', 'Reviewers Assigned — Documents
+  // #231')". When a resolved human-friendly reference is passed in
+  // (resolveEntityReference() — covered against a real DB in
+  // auditLogNotificationHook.test.js), buildMessage() must use it instead
+  // of the raw table-name-plus-id.
+  it('buildMessage uses a resolved entity reference when given', () => {
+    const user = { name: 'Jane Staff' };
+    const message = actionNotificationService.buildMessage(
+      user, 'REVIEWERS_ASSIGNED', 'documents', 231, null, null, null, null,
+      { label: 'Document', reference: 'SC/QT/2026/1234' }
+    );
+
+    expect(message.subject).toContain('Document SC/QT/2026/1234');
+    expect(message.subject).not.toContain('Documents #231');
+    expect(message.body).toContain('On: Document SC/QT/2026/1234');
+  });
+
+  it('buildMessage falls back to the raw label when no reference resolved', () => {
+    const message = actionNotificationService.buildMessage(
+      { name: 'Jane Staff' }, 'LOGIN_SUCCESS', 'users', 37, null, null, null, null, null
+    );
+
+    expect(message.subject).toContain('Users #37');
+  });
 });

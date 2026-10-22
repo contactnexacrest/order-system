@@ -1,9 +1,12 @@
 'use strict';
 
+const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const env = require('../config/env');
 const testModeService = require('./testModeService');
 const mailRedirectService = require('./mailRedirectService');
+const companySettingsRepository = require('../repositories/companySettingsRepository');
+const { toRfc2822Ist } = require('../helpers/dbDateTime');
 
 /**
  * Port of App\Services\EmailService. The PHP version gated real sending on
@@ -34,6 +37,46 @@ function fromHeader() {
   };
 }
 
+function mailDomain() {
+  const fromAddress = env.get('SMTP_FROM_ADDRESS', 'no-reply@example.com');
+  const atPos = fromAddress.lastIndexOf('@');
+  return atPos !== -1 ? fromAddress.slice(atPos + 1) : 'example.com';
+}
+
+/**
+ * External QA report L-43: customer emails had no Reply-To, so a buyer's
+ * reply to a QT/PI/OC (e.g. "we confirm the OC") went to the no-reply
+ * mailbox and was lost. Falls back to the general company contact email
+ * when no dedicated reply-to address is configured.
+ */
+async function replyToAddress() {
+  const configured = (await companySettingsRepository.get('reply_to_email')) || '';
+  if (configured.trim() !== '') {
+    return configured.trim();
+  }
+  return ((await companySettingsRepository.get('email')) || '').trim() || undefined;
+}
+
+/**
+ * External QA report L-46: nodemailer defaults the Message-ID header's
+ * domain to the local machine's own hostname (e.g. <...@vm>) rather than
+ * the company's own mail domain — a mismatch spam filters penalize.
+ * Derived from SMTP_FROM_ADDRESS's own domain, matching the PHPMailer
+ * Hostname fix in the PHP stack's EmailService.
+ */
+function freshMessageId() {
+  return `<${crypto.randomBytes(16).toString('hex')}@${mailDomain()}>`;
+}
+
+/** Common nodemailer identity headers applied to every real (non-test) send — see replyToAddress()/freshMessageId()/toRfc2822Ist() above. */
+async function identityOptions() {
+  return {
+    replyTo: await replyToAddress(),
+    messageId: freshMessageId(),
+    date: toRfc2822Ist(),
+  };
+}
+
 /**
  * @param {{isSecurityEmail?: boolean}} [opts] — set true for staff 2FA/password-reset emails, which Test Mode never redirects.
  * @returns {Promise<boolean>} true if actually handed to a transport, false if only logged (dev fallback)
@@ -53,7 +96,7 @@ async function sendPlainText(toEmail, subject, body, opts = {}) {
     return false;
   }
   try {
-    await t.sendMail({ from: fromHeader(), to, cc: cc.length ? cc : undefined, subject, text: body });
+    await t.sendMail({ from: fromHeader(), to, cc: cc.length ? cc : undefined, subject, text: body, ...(await identityOptions()) });
     return true;
   } catch (e) {
     console.error('[EMAIL SEND FAILURE]', e.message);
@@ -117,6 +160,7 @@ async function deliverWithAttachments(to, subject, body, attachments, cc = []) {
       subject,
       text: body,
       attachments: attachments.map((a) => ({ filename: a.name, path: a.path })),
+      ...(await identityOptions()),
     });
     return true;
   } catch (e) {
@@ -149,4 +193,7 @@ async function sendTestEmail(toEmail, subject, body) {
   return true;
 }
 
-module.exports = { sendPlainText, sendWithAttachment, sendWithAttachments, deliverWithAttachments, sendTestEmail };
+module.exports = {
+  sendPlainText, sendWithAttachment, sendWithAttachments, deliverWithAttachments, sendTestEmail,
+  mailDomain, replyToAddress, freshMessageId,
+};
