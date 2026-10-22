@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const nunjucks = require('nunjucks');
 
 const env = require('../config/env');
+const documentImageOptimizer = require('../helpers/documentImageOptimizer');
 const db = require('../config/db');
 const amendmentRepository = require('../repositories/amendmentRepository');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
@@ -509,7 +510,7 @@ async function watermarkFromRow(row) {
   let imageDataUri = null;
   if ((mode === 'image' || mode === 'both') && row.image_asset_id) {
     const asset = await db.queryOne('SELECT * FROM assets WHERE id = :id', { id: row.image_asset_id });
-    imageDataUri = assetDataUri(asset);
+    imageDataUri = await assetDataUri(asset);
   }
   return {
     enabled: true,
@@ -527,7 +528,7 @@ async function watermarkFromRow(row) {
   };
 }
 
-function assetDataUri(asset) {
+async function assetDataUri(asset) {
   if (!asset) return null;
   if (!fs.existsSync(asset.server_path)) {
     // Point 8 fix — this used to fail silently: mode 'both' would quietly
@@ -539,8 +540,7 @@ function assetDataUri(asset) {
     console.error(`[WATERMARK] Asset id ${asset.id} references missing file: ${asset.server_path}`);
     return null;
   }
-  const buf = fs.readFileSync(asset.server_path);
-  return `data:${asset.mime_type || 'image/png'};base64,${buf.toString('base64')}`;
+  return documentImageOptimizer.dataUriForEmbed(asset.server_path, asset.mime_type || 'image/png');
 }
 
 /**

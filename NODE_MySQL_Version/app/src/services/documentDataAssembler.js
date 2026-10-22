@@ -3,6 +3,7 @@
 const fs = require('fs');
 
 const { parseDbDateTime } = require('../helpers/dbDateTime');
+const documentImageOptimizer = require('../helpers/documentImageOptimizer');
 const db = require('../config/db');
 const orderRepository = require('../repositories/orderRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
@@ -306,20 +307,20 @@ async function blBlock(companyLegalName, showBlInstructions) {
  */
 async function annexureProductsBlock(orderId) {
   const products = await orderAnnexureRepository.forOrder(orderId);
-  return products.map((p) => ({
+  return Promise.all(products.map(async (p) => ({
     name: p.name,
     description: p.description,
     dimensions: p.dimensions,
     finish: p.finish,
     components: p.components,
     technical_notes: p.technical_notes,
-    images: p.images.map((img) => {
+    images: await Promise.all(p.images.map(async (img) => {
       const dataUri = fs.existsSync(img.server_path)
-        ? `data:${img.mime_type || 'image/jpeg'};base64,${fs.readFileSync(img.server_path).toString('base64')}`
+        ? await documentImageOptimizer.dataUriForEmbed(img.server_path, img.mime_type || 'image/jpeg')
         : null;
       return { data_uri: dataUri };
-    }),
-  }));
+    })),
+  })));
 }
 
 /**
@@ -578,8 +579,7 @@ async function assetsBlock() {
     const asset = await assetRepository.findActiveByType(type);
     let dataUri = null;
     if (asset && asset.server_path && fs.existsSync(asset.server_path)) {
-      const buf = fs.readFileSync(asset.server_path);
-      dataUri = `data:${asset.mime_type || 'image/png'};base64,${buf.toString('base64')}`;
+      dataUri = await documentImageOptimizer.dataUriForEmbed(asset.server_path, asset.mime_type || 'image/png');
     }
     out[`${type}_data_uri`] = dataUri;
   }
@@ -608,7 +608,7 @@ async function assetsBlock() {
  */
 async function signatoryBlock(documentTypeId, overrideUserId = null) {
   const companySeal = await assetRepository.findActiveByType('seal');
-  const companySealDataUri = assetDataUri(companySeal);
+  const companySealDataUri = await assetDataUri(companySeal);
 
   let userId = overrideUserId;
 
@@ -659,10 +659,10 @@ async function signatoryBlock(documentTypeId, overrideUserId = null) {
   }
 
   const signatureAsset = await userSignatureAsset(userId, 'signature');
-  const signatureDataUri = assetDataUri(signatureAsset);
+  const signatureDataUri = await assetDataUri(signatureAsset);
 
   const sealAsset = await userSignatureAsset(userId, 'designation_seal');
-  const sealDataUri = assetDataUri(sealAsset);
+  const sealDataUri = await assetDataUri(sealAsset);
 
   return {
     user_id: user.id,
@@ -706,7 +706,7 @@ async function signatoryFromSnapshot(document) {
   let signatureDataUri = null;
   if (document.signature_asset_id_snapshot) {
     const asset = await db.queryOne('SELECT * FROM user_signature_assets WHERE id = :id', { id: document.signature_asset_id_snapshot });
-    signatureDataUri = assetDataUri(asset);
+    signatureDataUri = await assetDataUri(asset);
   }
 
   // The signatory's own designation seal — seal_asset_id_snapshot's
@@ -719,7 +719,7 @@ async function signatoryFromSnapshot(document) {
   if (document.seal_asset_id_snapshot) {
     const sealTable = document.used_designation_seal ? 'user_signature_assets' : 'assets';
     const asset = await db.queryOne(`SELECT * FROM ${sealTable} WHERE id = :id`, { id: document.seal_asset_id_snapshot });
-    sealDataUri = assetDataUri(asset);
+    sealDataUri = await assetDataUri(asset);
   }
 
   // The generic company seal, snapshotted separately (added 2026-09-25) —
@@ -728,7 +728,7 @@ async function signatoryFromSnapshot(document) {
   let companySealDataUri = null;
   if (document.company_seal_asset_id_snapshot) {
     const asset = await db.queryOne('SELECT * FROM assets WHERE id = :id', { id: document.company_seal_asset_id_snapshot });
-    companySealDataUri = assetDataUri(asset);
+    companySealDataUri = await assetDataUri(asset);
   }
 
   return {
@@ -750,12 +750,11 @@ async function userSignatureAsset(userId, kind) {
   );
 }
 
-function assetDataUri(asset) {
+async function assetDataUri(asset) {
   if (!asset || !asset.server_path || !fs.existsSync(asset.server_path)) {
     return null;
   }
-  const buf = fs.readFileSync(asset.server_path);
-  return `data:${asset.mime_type || 'image/png'};base64,${buf.toString('base64')}`;
+  return documentImageOptimizer.dataUriForEmbed(asset.server_path, asset.mime_type || 'image/png');
 }
 
 function formatMoney(value) {

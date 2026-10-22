@@ -148,4 +148,4 @@ async function closeBrowser() {
   }
 }
 
-module.exports = { renderPdfFromHtml, closeBrowser, buildPdfOptions };
+module.exports = { renderPdfFromHtml, closeBrowser, buildPdfOptions, getBrowser };

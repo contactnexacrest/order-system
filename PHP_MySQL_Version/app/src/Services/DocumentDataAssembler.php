@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Helpers\DocumentImageOptimizer;
 use App\Repositories\AmendmentRepository;
 use App\Repositories\AssetRepository;
 use App\Repositories\CompanySettingsRepository;
@@ -329,7 +330,7 @@ final class DocumentDataAssembler
                 'technical_notes' => $p['technical_notes'],
                 'images' => array_map(static function (array $img): array {
                     $dataUri = is_file($img['server_path'])
-                        ? 'data:' . ($img['mime_type'] ?: 'image/jpeg') . ';base64,' . base64_encode((string) file_get_contents($img['server_path']))
+                        ? DocumentImageOptimizer::dataUriForEmbed($img['server_path'], $img['mime_type'] ?: 'image/jpeg')
                         : null;
                     return ['data_uri' => $dataUri];
                 }, $p['images']),
@@ -596,7 +597,7 @@ final class DocumentDataAssembler
         foreach (['logo', 'signature', 'seal', 'watermark'] as $type) {
             $asset = AssetRepository::findActiveByType($type);
             $out[$type . '_data_uri'] = ($asset && is_file($asset['server_path']))
-                ? 'data:' . ($asset['mime_type'] ?: 'image/png') . ';base64,' . base64_encode((string) file_get_contents($asset['server_path']))
+                ? DocumentImageOptimizer::dataUriForEmbed($asset['server_path'], $asset['mime_type'] ?: 'image/png')
                 : null;
         }
         return $out;
@@ -788,7 +789,7 @@ final class DocumentDataAssembler
         if (!$asset || !is_file($asset['server_path'])) {
             return null;
         }
-        return 'data:' . ($asset['mime_type'] ?: 'image/png') . ';base64,' . base64_encode((string) file_get_contents($asset['server_path']));
+        return DocumentImageOptimizer::dataUriForEmbed($asset['server_path'], $asset['mime_type'] ?: 'image/png');
     }
 
     public static function formatMoney(string|int|float|null $value): string

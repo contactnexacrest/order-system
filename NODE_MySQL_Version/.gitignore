@@ -20,6 +20,13 @@ storage/internal/reference_library/*
 # Puppeteer's own browser download cache, if ever regenerated locally.
 app/.browser-cache/
 
+# External QA report L-45: documentImageOptimizer's resized/recompressed
+# copy of each embedded logo/signature/seal/watermark/Annexure-photo —
+# regenerated automatically (keyed by the source file's own path+mtime),
+# never hand-edited, not source.
+storage/pdf_image_cache/*
+!storage/pdf_image_cache/.gitkeep
+
 # OS/editor noise
 .DS_Store
 *.swp

@@ -23,6 +23,13 @@ storage/internal/reference_library/*
 storage/font_cache/*
 !storage/font_cache/.gitkeep
 
+# External QA report L-45: DocumentImageOptimizer's resized/recompressed
+# copy of each embedded logo/signature/seal/watermark/Annexure-photo —
+# regenerated automatically (keyed by the source file's own path+mtime),
+# never hand-edited, not source.
+storage/pdf_image_cache/*
+!storage/pdf_image_cache/.gitkeep
+
 # PHPUnit's own cache (test result/coverage cache, regenerated automatically)
 app/.phpunit.cache/
 

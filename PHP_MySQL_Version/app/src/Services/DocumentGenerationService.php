@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Config\Database;
 use App\Config\Env;
+use App\Helpers\DocumentImageOptimizer;
 use App\Helpers\MarkdownLite;
 use App\Repositories\AmendmentRepository;
 use App\Repositories\AuditLogRepository;
@@ -460,7 +461,7 @@ final class DocumentGenerationService
             error_log("[WATERMARK] Asset id {$asset['id']} references missing file: {$asset['server_path']}");
             return null;
         }
-        return 'data:' . ($asset['mime_type'] ?: 'image/png') . ';base64,' . base64_encode((string) file_get_contents($asset['server_path']));
+        return DocumentImageOptimizer::dataUriForEmbed($asset['server_path'], $asset['mime_type'] ?: 'image/png');
     }
 
     /**
