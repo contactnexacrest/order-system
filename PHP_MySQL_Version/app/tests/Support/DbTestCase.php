@@ -92,23 +92,65 @@ abstract class DbTestCase extends TestCase
      * the exact state a genuine new order is in: Stage 1 in_progress,
      * Stages 2-9 locked.
      */
-    protected function createTestOrder(int $clientId, string $incotermCode = 'FOB'): int
-    {
+    protected function createTestOrder(
+        int $clientId,
+        string $incotermCode = 'FOB',
+        string $presetName = 'Standard — New Buyer',
+        string $currencyCode = 'USD',
+        ?int $portOfLoadingId = null,
+        ?int $portOfDischargeId = null
+    ): int {
         $pdo = \App\Config\Database::connection();
 
-        $incotermStmt = $pdo->prepare('SELECT id FROM incoterms WHERE code = :code');
+        $incotermStmt = $pdo->prepare('SELECT id, code FROM incoterms WHERE code = :code');
         $incotermStmt->execute(['code' => $incotermCode]);
-        $incotermId = (int) $incotermStmt->fetchColumn();
-        $currencyId = (int) $pdo->query("SELECT id FROM currencies WHERE code = 'USD'")->fetchColumn();
-        $presetId = (int) $pdo->query("SELECT id FROM payment_presets WHERE preset_name = 'Standard — New Buyer'")->fetchColumn();
+        $incoterm = $incotermStmt->fetch();
+        $incotermId = (int) $incoterm['id'];
+        $currencyStmt = $pdo->prepare('SELECT id, code FROM currencies WHERE code = :code');
+        $currencyStmt->execute(['code' => $currencyCode]);
+        $currency = $currencyStmt->fetch();
+        $currencyId = (int) $currency['id'];
+        $presetStmt = $pdo->prepare(
+            "SELECT id, preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+                    balance_days, balance_trigger_wording, show_bl_instructions
+             FROM payment_presets WHERE preset_name = :preset_name"
+        );
+        $presetStmt->execute(['preset_name' => $presetName]);
+        $preset = $presetStmt->fetch();
+        $presetId = (int) $preset['id'];
 
+        $portOfLoading = ['name' => null, 'city' => null];
+        if ($portOfLoadingId !== null) {
+            $portStmt = $pdo->prepare('SELECT name, city FROM ports WHERE id = :id');
+            $portStmt->execute(['id' => $portOfLoadingId]);
+            $portOfLoading = $portStmt->fetch() ?: $portOfLoading;
+        }
+        $portOfDischarge = ['name' => null, 'city' => null];
+        if ($portOfDischargeId !== null) {
+            $portStmt = $pdo->prepare('SELECT name, city FROM ports WHERE id = :id');
+            $portStmt->execute(['id' => $portOfDischargeId]);
+            $portOfDischarge = $portStmt->fetch() ?: $portOfDischarge;
+        }
+
+        // 90-item backlog "standalone order": these columns mirror
+        // exactly what OrderRepository::insertRow()'s own resolveSnapshot()
+        // does in production, so a test-created order behaves identically
+        // to a real one — snapshotted once here, never re-joined.
         $stmt = $pdo->prepare(
             'INSERT INTO orders
                 (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
-                 currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status)
+                 currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
+                 port_of_loading_id, port_of_discharge_id,
+                 incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text,
+                 balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions,
+                 port_of_loading_name, port_of_loading_city, port_of_discharge_name, port_of_discharge_city)
              VALUES
                 (:ref, :client_id, 1, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, \'TBC\', \'NIL\',
-                 CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), \'active\')'
+                 CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), \'active\',
+                 :port_of_loading_id, :port_of_discharge_id,
+                 :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text,
+                 :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions,
+                 :port_of_loading_name, :port_of_loading_city, :port_of_discharge_name, :port_of_discharge_city)'
         );
         $stmt->execute([
             'ref'         => 'PHPUNIT-TEST-' . bin2hex(random_bytes(4)),
@@ -117,6 +159,22 @@ abstract class DbTestCase extends TestCase
             'preset_id'   => $presetId,
             'incoterm_id' => $incotermId,
             'currency_id' => $currencyId,
+            'port_of_loading_id'      => $portOfLoadingId,
+            'port_of_discharge_id'    => $portOfDischargeId,
+            'incoterm_code'           => $incoterm['code'],
+            'currency_code'           => $currency['code'],
+            'preset_name'             => $preset['preset_name'],
+            'advance_pct'             => $preset['advance_pct'],
+            'advance_trigger_text'    => $preset['advance_trigger_text'],
+            'balance_pct'             => $preset['balance_pct'],
+            'balance_trigger_option'  => $preset['balance_trigger_option'],
+            'balance_days'            => $preset['balance_days'],
+            'balance_trigger_wording' => $preset['balance_trigger_wording'],
+            'show_bl_instructions'    => $preset['show_bl_instructions'],
+            'port_of_loading_name'    => $portOfLoading['name'],
+            'port_of_loading_city'    => $portOfLoading['city'],
+            'port_of_discharge_name'  => $portOfDischarge['name'],
+            'port_of_discharge_city'  => $portOfDischarge['city'],
         ]);
         $orderId = (int) $pdo->lastInsertId();
 

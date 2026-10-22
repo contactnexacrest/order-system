@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Config\Database;
 use App\Repositories\PortRepository;
 use App\Services\DocumentDataAssembler;
 use App\Tests\Support\DbTestCase;
@@ -22,17 +21,10 @@ use App\Tests\Support\DbTestCase;
  */
 final class PortCityIncotermLabelTest extends DbTestCase
 {
-    private function setOrderLoadingPort(int $orderId, int $portId): void
-    {
-        Database::connection()->prepare('UPDATE orders SET port_of_loading_id = :port_id WHERE id = :id')
-            ->execute(['port_id' => $portId, 'id' => $orderId]);
-    }
-
     public function testIncotermLabelUsesThePortsCityNotItsTerminalName(): void
     {
         $portId = PortRepository::create('Nhava Sheva (JNPT)', 'Mumbai', 'India', 'loading', 99);
-        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB');
-        $this->setOrderLoadingPort($orderId, $portId);
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', $portId);
 
         $data = DocumentDataAssembler::assemble($orderId);
 
@@ -43,8 +35,7 @@ final class PortCityIncotermLabelTest extends DbTestCase
     public function testIncotermLabelFallsBackToThePortNameWhenCityIsBlank(): void
     {
         $portId = PortRepository::create('Nhava Sheva (JNPT)', null, 'India', 'loading', 98);
-        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB');
-        $this->setOrderLoadingPort($orderId, $portId);
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', $portId);
 
         $data = DocumentDataAssembler::assemble($orderId);
 

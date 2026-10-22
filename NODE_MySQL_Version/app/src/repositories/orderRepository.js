@@ -10,10 +10,13 @@ const referenceNumberService = require('../services/referenceNumberService');
  * all of these for its incoterm tag, 9-segment stage bar, and displayed
  * amount, none of which a plain o.* + one join used to expose.
  */
+// 90-item backlog "standalone order": incoterm_code/currency_code come
+// straight off o.* now — no join to incoterms/currencies needed, since
+// they're snapshotted on the order itself.
 async function all() {
   return db.query(
     `SELECT o.*, c.company_legal_name, sm.stage_name AS current_stage_name,
-            sm.stage_number AS current_stage_number, it.code AS incoterm_code, cur.code AS currency_code,
+            sm.stage_number AS current_stage_number,
             (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
             EXISTS (
                 SELECT 1 FROM order_payment_status ops
@@ -23,8 +26,6 @@ async function all() {
      FROM orders o
      JOIN clients c ON c.id = o.client_id
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     LEFT JOIN incoterms it ON it.id = o.incoterm_id
-     LEFT JOIN currencies cur ON cur.id = o.currency_id
      WHERE o.is_archived = 0
      ORDER BY o.created_at DESC`
   );
@@ -58,6 +59,20 @@ async function unarchive(orderId) {
   );
 }
 
+/**
+ * 90-item backlog "standalone order": incoterm_code, currency_code,
+ * port_of_loading_name/_city, port_of_discharge_name/_city, preset_name,
+ * advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+ * balance_days, balance_trigger_wording, and show_bl_instructions all
+ * come straight off o.* now — they're snapshotted onto the order at
+ * creation time (insertRow() below) and never re-read from incoterms/
+ * currencies/ports/payment_presets again, so editing or retiring one of
+ * those lookup rows later can never silently change what an existing
+ * order displays or prints. advance_pct/balance_pct/balance_trigger_option/
+ * balance_days are updated in place by an activated Amendment
+ * (applyAmendmentOverride() below) rather than read via a separate
+ * override column COALESCEd against the preset.
+ */
 async function find(id) {
   return db.queryOne(
     `SELECT o.*, c.company_legal_name, c.billing_address, c.consignee_name, c.consignee_address,
@@ -73,24 +88,10 @@ async function find(id) {
             c.notify_party_contact_person, c.notify_party_phone, c.notify_party_email,
             sm.stage_name AS current_stage_name, sm.stage_slug AS current_stage_slug,
             sm.stage_number AS current_stage_number,
-            i.code AS incoterm_code, cur.code AS currency_code,
-            pl.name AS port_of_loading_name, pd.name AS port_of_discharge_name,
-            pl.city AS port_of_loading_city, pd.city AS port_of_discharge_city,
-            pp.preset_name, pp.advance_trigger_text, pp.requires_md_approval,
-            pp.balance_trigger_wording, pp.show_bl_instructions,
-            COALESCE(o.advance_pct_override, pp.advance_pct) AS advance_pct,
-            COALESCE(o.balance_pct_override, pp.balance_pct) AS balance_pct,
-            COALESCE(o.balance_trigger_option_override, pp.balance_trigger_option) AS balance_trigger_option,
-            COALESCE(o.balance_days_override, pp.balance_days) AS balance_days,
             (o.active_amendment_id IS NOT NULL) AS has_active_amendment
      FROM orders o
      JOIN clients c ON c.id = o.client_id
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     JOIN incoterms i ON i.id = o.incoterm_id
-     JOIN currencies cur ON cur.id = o.currency_id
-     LEFT JOIN ports pl ON pl.id = o.port_of_loading_id
-     LEFT JOIN ports pd ON pd.id = o.port_of_discharge_id
-     JOIN payment_presets pp ON pp.id = o.payment_preset_id
      WHERE o.id = :id`,
     { id }
   );
@@ -152,7 +153,67 @@ async function createWithNextSequence(clientId, buildFields, createdBy, executor
   return { orderId, sequenceNo, orderReference: fields.order_reference };
 }
 
+/**
+ * 90-item backlog "standalone order": resolves incoterm_id/currency_id/
+ * port_of_loading_id/port_of_discharge_id/payment_preset_id to their
+ * CURRENT values exactly once, here, and snapshots them onto the new
+ * order row. This is the only place a new order's terms are ever read
+ * from the lookup tables — after this INSERT, the order never looks at
+ * incoterms/currencies/ports/payment_presets again for its own
+ * display/document content. Since orderDuplicationService.js passes
+ * the source order's *_id columns (not its old snapshot) into this same
+ * path, duplicating an order naturally re-resolves today's current
+ * values rather than freezing forward whatever the source order's own
+ * snapshot happened to say — a duplicate is a new commercial decision
+ * made today.
+ */
+async function resolveSnapshot(executor, data) {
+  const incoterm = await executor.queryOne('SELECT code FROM incoterms WHERE id = :id', { id: data.incoterm_id });
+  const currency = await executor.queryOne('SELECT code FROM currencies WHERE id = :id', { id: data.currency_id });
+
+  let portOfLoadingName = null;
+  let portOfLoadingCity = null;
+  if (data.port_of_loading_id) {
+    const port = await executor.queryOne('SELECT name, city FROM ports WHERE id = :id', { id: data.port_of_loading_id });
+    portOfLoadingName = port ? port.name : null;
+    portOfLoadingCity = port ? port.city : null;
+  }
+
+  let portOfDischargeName = null;
+  let portOfDischargeCity = null;
+  if (data.port_of_discharge_id) {
+    const port = await executor.queryOne('SELECT name, city FROM ports WHERE id = :id', { id: data.port_of_discharge_id });
+    portOfDischargeName = port ? port.name : null;
+    portOfDischargeCity = port ? port.city : null;
+  }
+
+  const preset = await executor.queryOne(
+    `SELECT preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+            balance_days, balance_trigger_wording, show_bl_instructions
+     FROM payment_presets WHERE id = :id`,
+    { id: data.payment_preset_id }
+  );
+
+  return {
+    incoterm_code: (incoterm && incoterm.code) || null,
+    currency_code: (currency && currency.code) || null,
+    port_of_loading_name: portOfLoadingName,
+    port_of_loading_city: portOfLoadingCity,
+    port_of_discharge_name: portOfDischargeName,
+    port_of_discharge_city: portOfDischargeCity,
+    preset_name: (preset && preset.preset_name) ?? null,
+    advance_pct: (preset && preset.advance_pct) ?? null,
+    advance_trigger_text: (preset && preset.advance_trigger_text) ?? null,
+    balance_pct: (preset && preset.balance_pct) ?? null,
+    balance_trigger_option: (preset && preset.balance_trigger_option) ?? null,
+    balance_days: (preset && preset.balance_days) ?? null,
+    balance_trigger_wording: (preset && preset.balance_trigger_wording) ?? null,
+    show_bl_instructions: preset ? preset.show_bl_instructions : 1,
+  };
+}
+
 async function insertOrderRow(executor, data, createdBy) {
+  const snapshot = await resolveSnapshot(executor, data);
   const result = await executor.execute(
     `INSERT INTO orders
         (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
@@ -163,7 +224,11 @@ async function insertOrderRow(executor, data, createdBy) {
          sailing_lead_time_min_days, sailing_lead_time_max_days,
          indicative_freight_amount,
          indicative_insurance_amount, buyers_po_ref, quotation_date, quotation_valid_until,
-         status, created_by, duplicated_from_order_id)
+         status, created_by, duplicated_from_order_id,
+         incoterm_code, currency_code, port_of_loading_name, port_of_loading_city,
+         port_of_discharge_name, port_of_discharge_city, preset_name, advance_pct,
+         advance_trigger_text, balance_pct, balance_trigger_option, balance_days,
+         balance_trigger_wording, show_bl_instructions)
      VALUES
         (:order_reference, :client_id, :sequence_no, :buyer_inquiry_ref, :payment_preset_id, :incoterm_id,
          :port_of_loading_id, :port_of_discharge_id, :port_of_discharge_text, :currency_id, :coo_type,
@@ -173,7 +238,11 @@ async function insertOrderRow(executor, data, createdBy) {
          :sailing_lead_time_min_days, :sailing_lead_time_max_days,
          :indicative_freight_amount,
          :indicative_insurance_amount, :buyers_po_ref, :quotation_date, :quotation_valid_until,
-         'active', :created_by, :duplicated_from_order_id)`,
+         'active', :created_by, :duplicated_from_order_id,
+         :incoterm_code, :currency_code, :port_of_loading_name, :port_of_loading_city,
+         :port_of_discharge_name, :port_of_discharge_city, :preset_name, :advance_pct,
+         :advance_trigger_text, :balance_pct, :balance_trigger_option, :balance_days,
+         :balance_trigger_wording, :show_bl_instructions)`,
     {
       order_reference: data.order_reference,
       client_id: data.client_id,
@@ -206,6 +275,20 @@ async function insertOrderRow(executor, data, createdBy) {
       quotation_valid_until: data.quotation_valid_until,
       created_by: createdBy,
       duplicated_from_order_id: data.duplicated_from_order_id ?? null,
+      incoterm_code: snapshot.incoterm_code,
+      currency_code: snapshot.currency_code,
+      port_of_loading_name: snapshot.port_of_loading_name,
+      port_of_loading_city: snapshot.port_of_loading_city,
+      port_of_discharge_name: snapshot.port_of_discharge_name,
+      port_of_discharge_city: snapshot.port_of_discharge_city,
+      preset_name: snapshot.preset_name,
+      advance_pct: snapshot.advance_pct,
+      advance_trigger_text: snapshot.advance_trigger_text,
+      balance_pct: snapshot.balance_pct,
+      balance_trigger_option: snapshot.balance_trigger_option,
+      balance_days: snapshot.balance_days,
+      balance_trigger_wording: snapshot.balance_trigger_wording,
+      show_bl_instructions: snapshot.show_bl_instructions,
     }
   );
   return result.insertId;
@@ -333,13 +416,20 @@ async function markLost(orderId, reason, userId) {
   );
 }
 
+/**
+ * 90-item backlog "standalone order": writes directly to the order's own
+ * base columns (advance_pct, balance_pct, balance_trigger_option,
+ * balance_days) rather than a separate *_override column — those are the
+ * order's own snapshotted values now, not a preset-derived default with
+ * a floor on top, so an activated amendment just updates them in place.
+ */
 async function applyAmendmentOverride(orderId, advancePct, balancePct, balanceTriggerOption, balanceDays, amendmentId) {
   await db.execute(
     `UPDATE orders
-     SET advance_pct_override = :advance_pct,
-         balance_pct_override = :balance_pct,
-         balance_trigger_option_override = :balance_trigger_option,
-         balance_days_override = :balance_days,
+     SET advance_pct = :advance_pct,
+         balance_pct = :balance_pct,
+         balance_trigger_option = :balance_trigger_option,
+         balance_days = :balance_days,
          active_amendment_id = :amendment_id
      WHERE id = :id`,
     {

@@ -39,11 +39,9 @@ async function perClient(clientId) {
 
   const orders = await db.query(
     `SELECT o.id, o.order_reference, o.status, o.created_at,
-            i.code AS incoterm_code, cur.code AS currency_code,
+            o.incoterm_code, o.currency_code,
             sm.stage_name AS current_stage_name
      FROM orders o
-     JOIN incoterms i ON i.id = o.incoterm_id
-     JOIN currencies cur ON cur.id = o.currency_id
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data
      ORDER BY o.created_at DESC`,
@@ -77,10 +75,9 @@ async function perClient(clientId) {
 
     payments = await db.query(
       `SELECT ops.order_id, ops.advance_amount, ops.advance_cleared_at, ops.balance_amount, ops.balance_cleared_at,
-              ops.freight_amount, ops.freight_cleared_at, cur.code AS currency_code
+              ops.freight_amount, ops.freight_cleared_at, o2.currency_code
        FROM order_payment_status ops
        JOIN orders o2 ON o2.id = ops.order_id
-       JOIN currencies cur ON cur.id = o2.currency_id
        WHERE ops.order_id IN (${placeholders})`,
       params
     );
@@ -95,10 +92,9 @@ async function perClient(clientId) {
     }
 
     products = await db.query(
-      `SELECT p.order_id, p.description, p.quantity, p.quantity_is_tbc, p.unit, p.unit_price, p.fob_value, cur.code AS currency_code
+      `SELECT p.order_id, p.description, p.quantity, p.quantity_is_tbc, p.unit, p.unit_price, p.fob_value, o2.currency_code
        FROM order_products p
        JOIN orders o2 ON o2.id = p.order_id
-       JOIN currencies cur ON cur.id = o2.currency_id
        WHERE p.order_id IN (${placeholders}) AND p.is_active = 1 ORDER BY p.order_id, p.line_no`,
       params
     );
@@ -210,13 +206,11 @@ async function aggregate(dateFrom, dateTo, stageId, incotermId, country) {
 
   let sql = `SELECT o.id, o.order_reference, o.status, o.created_at,
                     c.company_legal_name, c.country_of_destination,
-                    i.code AS incoterm_code, cur.code AS currency_code,
+                    o.incoterm_code, o.currency_code,
                     sm.stage_name AS current_stage_name,
                     (SELECT COALESCE(SUM(fob_value), 0) FROM order_products WHERE order_id = o.id AND is_active = 1) AS total_fob_value
              FROM orders o
              JOIN clients c ON c.id = o.client_id
-             JOIN incoterms i ON i.id = o.incoterm_id
-             JOIN currencies cur ON cur.id = o.currency_id
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id`;
   if (where.length) {
     sql += ' WHERE ' + where.join(' AND ');
@@ -610,13 +604,12 @@ async function paymentsReport(dateFrom, dateTo) {
     params.date_to = dateTo;
   }
 
-  const sql = `SELECT o.id, o.order_reference, o.status, o.created_at, c.company_legal_name, cur.code AS currency_code,
+  const sql = `SELECT o.id, o.order_reference, o.status, o.created_at, c.company_legal_name, o.currency_code,
                       ops.advance_amount, ops.advance_cleared_at,
                       ops.balance_amount, ops.balance_cleared_at,
                       ops.freight_amount, ops.freight_cleared_at
                FROM orders o
                JOIN clients c ON c.id = o.client_id
-               JOIN currencies cur ON cur.id = o.currency_id
                LEFT JOIN order_payment_status ops ON ops.order_id = o.id
                WHERE ${where.join(' AND ')}
                ORDER BY o.created_at DESC`;
@@ -763,11 +756,10 @@ async function amendmentsReport(dateFrom, dateTo) {
   const rows = await db.query(
     `SELECT a.id, a.amendment_reference, a.order_id, o.order_reference, c.company_legal_name,
             a.reason, a.requested_by, a.status, a.effective_from, a.created_at,
-            a.amended_advance_amount, a.amended_balance_amount, cur.code AS currency_code
+            a.amended_advance_amount, a.amended_balance_amount, o.currency_code
      FROM amendments a
      JOIN orders o ON o.id = a.order_id
      JOIN clients c ON c.id = o.client_id
-     JOIN currencies cur ON cur.id = o.currency_id
      WHERE ${where.join(' AND ')}
      ORDER BY a.created_at DESC`,
     params
@@ -849,9 +841,8 @@ async function monthlyTrends(months = 12) {
   }
 
   const fobRows = await db.query(
-    `SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS ym, cur.code AS cc, COALESCE(SUM(p.fob_value), 0) AS total
+    `SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS ym, o.currency_code AS cc, COALESCE(SUM(p.fob_value), 0) AS total
      FROM orders o
-     JOIN currencies cur ON cur.id = o.currency_id
      JOIN order_products p ON p.order_id = o.id AND p.is_active = 1
      WHERE o.is_test_data = :t AND o.created_at >= :from GROUP BY ym, cc`,
     { t: isTestMode, from: fromDate }
@@ -1019,13 +1010,12 @@ async function ageingReport() {
   const isTestMode = await isTestModeFlag();
 
   const orders = await db.query(
-    `SELECT o.id, o.order_reference, o.created_at, c.company_legal_name, cur.code AS currency_code,
+    `SELECT o.id, o.order_reference, o.created_at, c.company_legal_name, o.currency_code,
             ops.advance_amount, ops.advance_cleared_at,
             ops.balance_amount, ops.balance_cleared_at, ops.balance_due_date,
             ops.freight_amount, ops.freight_cleared_at
      FROM orders o
      JOIN clients c ON c.id = o.client_id
-     JOIN currencies cur ON cur.id = o.currency_id
      JOIN order_payment_status ops ON ops.order_id = o.id
      WHERE o.is_test_data = :is_test_data AND o.status NOT IN ('lost')
        AND (
@@ -1104,14 +1094,12 @@ async function freightCostReport(dateFrom, dateTo) {
   }
 
   const rows = await db.query(
-    `SELECT o.id, o.order_reference, o.created_at, c.company_legal_name, cur.code AS currency_code,
-            i.code AS incoterm_code,
+    `SELECT o.id, o.order_reference, o.created_at, c.company_legal_name, o.currency_code,
+            o.incoterm_code,
             fr.freight_forwarder_name, fr.confirmed_freight_rate, fr.insurance_amount, fr.freight_cleared_at,
             ops.freight_amount, ops.freight_cleared_at AS payment_cleared_at
      FROM orders o
      JOIN clients c ON c.id = o.client_id
-     JOIN currencies cur ON cur.id = o.currency_id
-     JOIN incoterms i ON i.id = o.incoterm_id
      JOIN order_freight fr ON fr.order_id = o.id
      LEFT JOIN order_payment_status ops ON ops.order_id = o.id
      WHERE ${where.join(' AND ')}
@@ -1157,15 +1145,14 @@ async function productSalesReport(dateFrom, dateTo) {
   }
 
   const rows = await db.query(
-    `SELECT p.description, p.hs_code, cur.code AS currency_code,
+    `SELECT p.description, p.hs_code, o.currency_code,
             COUNT(DISTINCT p.order_id) AS order_count,
             COALESCE(SUM(p.quantity), 0) AS total_quantity,
             COALESCE(SUM(p.fob_value), 0) AS total_fob_value
      FROM order_products p
      JOIN orders o ON o.id = p.order_id
-     JOIN currencies cur ON cur.id = o.currency_id
      WHERE ${where.join(' AND ')}
-     GROUP BY p.hs_code, p.description, cur.code
+     GROUP BY p.hs_code, p.description, o.currency_code
      ORDER BY total_fob_value DESC`,
     params
   );
@@ -1329,9 +1316,8 @@ async function fobWonByCurrency(dateFrom, dateTo) {
     params.date_to = dateTo;
   }
   const rows = await db.query(
-    `SELECT cur.code AS cc, (SELECT COALESCE(SUM(fob_value), 0) FROM order_products WHERE order_id = o.id AND is_active = 1) AS total_fob_value
+    `SELECT o.currency_code AS cc, (SELECT COALESCE(SUM(fob_value), 0) FROM order_products WHERE order_id = o.id AND is_active = 1) AS total_fob_value
        FROM orders o
-       JOIN currencies cur ON cur.id = o.currency_id
       WHERE ${clauses.join(' AND ')}`,
     params
   );

@@ -63,8 +63,8 @@ describe('Sales Performance report', () => {
   }
 
   /** A fresh order under its own fresh client, since a single client can't hold two orders with sequence_no 1. */
-  async function newOrder(incotermCode = 'FOB') {
-    return createTestOrder(await createTestClient(), incotermCode);
+  async function newOrder(incotermCode = 'FOB', currencyCode = 'USD') {
+    return createTestOrder(await createTestClient(), incotermCode, 'Standard — New Buyer', currencyCode);
   }
 
   it('won order counts and sums FOB by currency', async () => {
@@ -174,9 +174,7 @@ describe('Sales Performance report', () => {
     await addProduct(usdOrder, 1000.0);
     await markWon(usdOrder, '2031-07-10');
 
-    const eurCurrency = await db.queryOne("SELECT id FROM currencies WHERE code = 'EUR'");
-    const eurOrder = await newOrder('FOB');
-    await db.execute('UPDATE orders SET currency_id = :cid WHERE id = :id', { cid: eurCurrency.id, id: eurOrder });
+    const eurOrder = await newOrder('FOB', 'EUR');
     await addProduct(eurOrder, 2000.0);
     await markWon(eurOrder, '2031-07-11');
 

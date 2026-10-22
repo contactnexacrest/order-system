@@ -59,9 +59,9 @@ final class SalesPerformanceReportTest extends DbTestCase
     }
 
     /** A fresh order under its own fresh client, since a single client can't hold two orders with sequence_no 1. */
-    private function newOrder(string $incotermCode = 'FOB'): int
+    private function newOrder(string $incotermCode = 'FOB', string $currencyCode = 'USD'): int
     {
-        return $this->createTestOrder($this->createTestClient(), $incotermCode);
+        return $this->createTestOrder($this->createTestClient(), $incotermCode, 'Standard — New Buyer', $currencyCode);
     }
 
     public function testWonOrderCountsAndSumsFobByCurrency(): void
@@ -185,10 +185,7 @@ final class SalesPerformanceReportTest extends DbTestCase
         $this->addProduct($usdOrder, 1000.00);
         $this->markWon($usdOrder, '2031-07-10');
 
-        $eurCurrencyId = (int) Database::connection()->query("SELECT id FROM currencies WHERE code = 'EUR'")->fetchColumn();
-        $eurOrder = $this->newOrder();
-        Database::connection()->prepare('UPDATE orders SET currency_id = :cid WHERE id = :id')
-            ->execute(['cid' => $eurCurrencyId, 'id' => $eurOrder]);
+        $eurOrder = $this->newOrder('FOB', 'EUR');
         $this->addProduct($eurOrder, 2000.00);
         $this->markWon($eurOrder, '2031-07-11');
 

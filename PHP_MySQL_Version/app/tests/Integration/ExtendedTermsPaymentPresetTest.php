@@ -16,10 +16,10 @@ use App\Tests\Support\DbTestCase;
  * wanted as a standard, reusable option. Adds a third seeded preset,
  * "Extended Terms — 30/70", and proves the SOP's own claim
  * (docs/SOP/15-admin-settings.md: "Creating a new preset ... needs no
- * further code change anywhere") actually holds for it — an order's
- * advance_pct/balance_pct come from a live JOIN against whichever
- * preset it's assigned (OrderRepository::find()), never a hardcoded
- * 40/60 split.
+ * further code change anywhere") actually holds for it — an order
+ * created on this preset snapshots its own advance_pct/balance_pct from
+ * it (90-item backlog "standalone order" — OrderRepository::insertRow()),
+ * never a hardcoded 40/60 split.
  */
 final class ExtendedTermsPaymentPresetTest extends DbTestCase
 {
@@ -38,17 +38,19 @@ final class ExtendedTermsPaymentPresetTest extends DbTestCase
         self::assertSame(0, (int) $preset['is_protected'], 'a freshly-added preset has nothing historical to guard, unlike the two foundational ones');
     }
 
+    /**
+     * 90-item backlog "standalone order": an order's advance_pct/balance_pct
+     * are now snapshotted from whichever preset it's created with (never
+     * a hardcoded 40/60), not re-read from a live join afterward — so
+     * this proves the snapshot taken AT CREATION reflects the preset
+     * actually picked, rather than switching the preset post-creation
+     * (which, correctly, no longer has any effect — see
+     * OrderRepository::insertRow()'s docblock).
+     */
     public function testAnOrderOnThisPresetComputesItsOwnSplitWithNoHardcodedPercentage(): void
     {
-        $pdo = Database::connection();
-        $presetId = (int) $pdo->query(
-            "SELECT id FROM payment_presets WHERE preset_name = 'Extended Terms — 30/70'"
-        )->fetchColumn();
-
         $clientId = $this->createTestClient();
-        $orderId = $this->createTestOrder($clientId);
-        $pdo->prepare('UPDATE orders SET payment_preset_id = :preset_id WHERE id = :id')
-            ->execute(['preset_id' => $presetId, 'id' => $orderId]);
+        $orderId = $this->createTestOrder($clientId, 'FOB', 'Extended Terms — 30/70');
 
         $order = OrderRepository::find($orderId);
 

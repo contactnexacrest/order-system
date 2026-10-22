@@ -485,13 +485,54 @@ CREATE TABLE orders (
   client_id               BIGINT UNSIGNED NOT NULL,
   sequence_no             INT NOT NULL,                  -- per-client order sequence
   buyer_inquiry_ref        VARCHAR(50) NOT NULL,          -- NC/SC/YYYY/DDMMNNN — master tracking ref
-  payment_preset_id       BIGINT UNSIGNED NOT NULL,
-  incoterm_id             BIGINT UNSIGNED NOT NULL,
-  port_of_loading_id      BIGINT UNSIGNED NULL,
-  port_of_discharge_id    BIGINT UNSIGNED NULL,
+  payment_preset_id       BIGINT UNSIGNED NOT NULL,       -- 90-item backlog "standalone order": kept for admin
+                                                           -- traceability/reporting ("which orders used preset X")
+                                                           -- only — never read for display or document content.
+                                                           -- The actual terms live in the snapshot columns below.
+  incoterm_id             BIGINT UNSIGNED NOT NULL,       -- traceability only — see incoterm_code below
+  port_of_loading_id      BIGINT UNSIGNED NULL,           -- traceability only — see port_of_loading_name/_city below
+  port_of_discharge_id    BIGINT UNSIGNED NULL,           -- traceability only — see port_of_discharge_name/_city below
   port_of_discharge_text  VARCHAR(150) NULL,             -- free-text fallback if Admin allows non-dropdown
-  currency_id             BIGINT UNSIGNED NOT NULL,
+  currency_id             BIGINT UNSIGNED NOT NULL,       -- traceability only — see currency_code below
   coo_type                VARCHAR(50) NULL,               -- can be 'TBC' — blocks stage 1 gate until confirmed
+
+  -- ================================================================
+  -- "Standalone order" snapshot columns (90-item backlog). Resolved ONCE
+  -- at order creation (orderRepository.js's insertRow()) from whatever
+  -- the *_id columns above pointed to AT THAT MOMENT, then never re-read
+  -- from those lookup tables again. This is the whole point: incoterms,
+  -- currencies, ports, and payment_presets rows are all admin-editable
+  -- (paymentPresetController.js, portController.js) after orders already
+  -- reference them — without a snapshot, editing or retiring a lookup
+  -- row would silently rewrite the displayed/printed terms of every past
+  -- order that ever pointed at it, even one closed years ago. The *_id
+  -- columns above stay, but only for admin traceability/reporting —
+  -- orderRepository.js's find()/all() and every document/report read
+  -- these columns directly instead of joining. Duplicating an order
+  -- (orderDuplicationService.js) re-resolves these fresh from today's
+  -- current lookup-table values (a duplicate is a new commercial
+  -- decision made today, not a continuation of the original order's
+  -- possibly years-old terms) — see insertRow()'s own comment.
+  -- ================================================================
+  incoterm_code           VARCHAR(10) NULL,               -- incoterms.code at creation time
+  currency_code           VARCHAR(10) NULL,               -- currencies.code at creation time
+  port_of_loading_name    VARCHAR(150) NULL,              -- ports.name at creation time
+  port_of_loading_city    VARCHAR(100) NULL,              -- ports.city at creation time
+  port_of_discharge_name  VARCHAR(150) NULL,              -- ports.name at creation time
+  port_of_discharge_city  VARCHAR(100) NULL,              -- ports.city at creation time
+  preset_name             VARCHAR(100) NULL,              -- payment_presets.preset_name at creation time
+  advance_pct             DECIMAL(5,2) NULL,               -- payment_presets.advance_pct at creation time —
+                                                           -- an activated Amendment updates this column directly
+                                                           -- (orderRepository.js's applyAmendmentOverride()), so it
+                                                           -- is always this order's own current effective value
+  advance_trigger_text    VARCHAR(255) NULL,              -- payment_presets.advance_trigger_text at creation time —
+                                                           -- never changed by an Amendment (see payment_presets)
+  balance_pct             DECIMAL(5,2) NULL,               -- payment_presets.balance_pct — Amendment-updatable, as above
+  balance_trigger_option  ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NULL,  -- payment_presets.balance_trigger_option —
+                                                           -- Amendment-updatable, as above
+  balance_days            INT NULL,                       -- payment_presets.balance_days — Amendment-updatable, as above
+  balance_trigger_wording TEXT NULL,                       -- payment_presets.balance_trigger_wording at creation time
+  show_bl_instructions    TINYINT(1) NOT NULL DEFAULT 1,  -- payment_presets.show_bl_instructions at creation time
   include_annexure_a      TINYINT(1) NOT NULL DEFAULT 0,
   special_requirements    TEXT NULL,
 
@@ -543,24 +584,18 @@ CREATE TABLE orders (
   lost_at                 TIMESTAMP NULL,
   lost_by                 BIGINT UNSIGNED NULL,
 
-  -- Added in Phase D (Section 8 — Payment Terms Amendment System). An
-  -- order's advance/balance % normally come from its payment_preset_id
-  -- (joined live in OrderRepository::find()) — these three columns let an
-  -- ACTIVATED amendment override just that one order's terms without
-  -- touching the shared preset or fabricating a one-off preset row. NULL
-  -- means "no override — use the preset as normal", which is every order
-  -- until its first amendment is signed and activated. active_amendment_id
-  -- is set at the same time, purely for traceability (which amendment is
-  -- currently in force) — the FK is added by ALTER TABLE after the
-  -- amendments table exists, below, since amendments itself references
-  -- orders(id).
-  -- balance_trigger_option/balance_days (not free text) because the PI/CI
-  -- templates hardcode the sentence per enum value and only substitute the
-  -- day count — see app/templates/PI/proforma_invoice.html.twig.
-  advance_pct_override    DECIMAL(5,2) NULL,
-  balance_pct_override    DECIMAL(5,2) NULL,
-  balance_trigger_option_override ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NULL,
-  balance_days_override   INT NULL,
+  -- Added in Phase D (Section 8 — Payment Terms Amendment System).
+  -- Originally four separate *_override columns COALESCEd against the
+  -- live preset join in orderRepository.js's find() — superseded by the
+  -- "standalone order" snapshot columns above (90-item backlog): an
+  -- ACTIVATED amendment now updates advance_pct/balance_pct/
+  -- balance_trigger_option/balance_days directly (orderRepository.js's
+  -- applyAmendmentOverride()), since those are now the order's own base
+  -- values, not a preset-derived default with a separate override floor.
+  -- active_amendment_id remains, purely for traceability (which
+  -- amendment is currently in force) — the FK is added by ALTER TABLE
+  -- after the amendments table exists, below, since amendments itself
+  -- references orders(id).
   active_amendment_id     BIGINT UNSIGNED NULL,
 
   is_sample_data          TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real order

@@ -62,18 +62,26 @@ describe('Client order history visibility (90-item backlog Phase 6 Item B)', () 
 
   async function createTestOrder(clientId, sequenceNo = 1) {
     const [incoterm, currency, preset] = await Promise.all([
-      db.queryOne("SELECT id FROM incoterms WHERE code = 'FOB'"),
-      db.queryOne("SELECT id FROM currencies WHERE code = 'USD'"),
-      db.queryOne("SELECT id FROM payment_presets WHERE preset_name = 'Standard — New Buyer'"),
+      db.queryOne("SELECT id, code FROM incoterms WHERE code = 'FOB'"),
+      db.queryOne("SELECT id, code FROM currencies WHERE code = 'USD'"),
+      db.queryOne(
+        `SELECT id, preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+                balance_days, balance_trigger_wording, show_bl_instructions
+         FROM payment_presets WHERE preset_name = 'Standard — New Buyer'`
+      ),
     ]);
 
     const orderResult = await db.execute(
       `INSERT INTO orders
          (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
-          currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status)
+          currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
+          incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text,
+          balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions)
        VALUES
          (:ref, :client_id, :seq, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, 'TBC', 'NIL',
-          CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active')`,
+          CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active',
+          :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text,
+          :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions)`,
       {
         ref: `JEST-TEST-${Math.random().toString(16).slice(2, 10)}`,
         client_id: clientId,
@@ -82,6 +90,16 @@ describe('Client order history visibility (90-item backlog Phase 6 Item B)', () 
         preset_id: preset.id,
         incoterm_id: incoterm.id,
         currency_id: currency.id,
+        incoterm_code: incoterm.code,
+        currency_code: currency.code,
+        preset_name: preset.preset_name,
+        advance_pct: preset.advance_pct,
+        advance_trigger_text: preset.advance_trigger_text,
+        balance_pct: preset.balance_pct,
+        balance_trigger_option: preset.balance_trigger_option,
+        balance_days: preset.balance_days,
+        balance_trigger_wording: preset.balance_trigger_wording,
+        show_bl_instructions: preset.show_bl_instructions,
       }
     );
     const orderId = orderResult.insertId;

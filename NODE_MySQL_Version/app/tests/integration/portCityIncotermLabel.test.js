@@ -15,15 +15,10 @@ describe('Port city drives the Incoterms label (90-item backlog "ports city fiel
     await db.pool.end();
   });
 
-  async function setOrderLoadingPort(orderId, portId) {
-    await db.execute('UPDATE orders SET port_of_loading_id = :port_id WHERE id = :id', { port_id: portId, id: orderId });
-  }
-
   it("uses the port's city, not its terminal name", async () => {
     const portId = await portRepository.create('Nhava Sheva (JNPT)', 'Mumbai', 'India', 'loading', 99);
     const clientId = await createTestClient();
-    const orderId = await createTestOrder(clientId, 'FOB');
-    await setOrderLoadingPort(orderId, portId);
+    const orderId = await createTestOrder(clientId, 'FOB', 'Standard — New Buyer', 'USD', portId);
 
     const data = await documentDataAssembler.assemble(orderId);
 
@@ -34,8 +29,7 @@ describe('Port city drives the Incoterms label (90-item backlog "ports city fiel
   it('falls back to the port name when city is blank', async () => {
     const portId = await portRepository.create('Nhava Sheva (JNPT)', null, 'India', 'loading', 98);
     const clientId = await createTestClient();
-    const orderId = await createTestOrder(clientId, 'FOB');
-    await setOrderLoadingPort(orderId, portId);
+    const orderId = await createTestOrder(clientId, 'FOB', 'Standard — New Buyer', 'USD', portId);
 
     const data = await documentDataAssembler.assemble(orderId);
 

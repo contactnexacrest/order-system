@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Config\Database;
 use App\Controllers\OrderController;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPaymentStatusRepository;
@@ -29,22 +28,9 @@ final class RemittanceInputCurrencyLabelTest extends DbTestCase
         $_SESSION = [];
     }
 
-    /** createTestOrder() always seeds USD — switch it directly for these tests. */
-    private function setOrderCurrency(int $orderId, string $currencyCode): void
-    {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT id FROM currencies WHERE code = :code');
-        $stmt->execute(['code' => $currencyCode]);
-        $currencyId = (int) $stmt->fetchColumn();
-
-        $pdo->prepare('UPDATE orders SET currency_id = :currency_id WHERE id = :id')
-            ->execute(['currency_id' => $currencyId, 'id' => $orderId]);
-    }
-
     public function testAdvanceRemittanceFormLabelsTheInputWithTheOrdersCurrency(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->setOrderCurrency($orderId, 'GBP');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'GBP');
         StageGateService::passAndUnlockNext($orderId, 1, null);
         StageGateService::passAndUnlockNext($orderId, 2, null);
         OrderPaymentStatusRepository::initializeForOrder($orderId);
@@ -64,8 +50,7 @@ final class RemittanceInputCurrencyLabelTest extends DbTestCase
 
     public function testFreightRemittanceFormLabelsTheInputWithTheOrdersCurrency(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient(), 'CIF');
-        $this->setOrderCurrency($orderId, 'EUR');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'CIF', 'Standard — New Buyer', 'EUR');
         for ($stage = 1; $stage <= 5; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
         }
@@ -92,8 +77,7 @@ final class RemittanceInputCurrencyLabelTest extends DbTestCase
 
     public function testBalanceRemittanceFormLabelsTheInputWithTheOrdersCurrency(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->setOrderCurrency($orderId, 'EUR');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'EUR');
         for ($stage = 1; $stage <= 5; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
         }

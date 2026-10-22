@@ -18,9 +18,12 @@ final class OrderRepository
      */
     public static function all(): array
     {
+        // 90-item backlog "standalone order": incoterm_code/currency_code
+        // come straight off o.* (via o.*) now — no join to incoterms/
+        // currencies needed, since they're snapshotted on the order itself.
         return Database::connection()->query(
             "SELECT o.*, c.company_legal_name, sm.stage_name AS current_stage_name,
-                    sm.stage_number AS current_stage_number, it.code AS incoterm_code, cur.code AS currency_code,
+                    sm.stage_number AS current_stage_number,
                     (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
                     EXISTS (
                         SELECT 1 FROM order_payment_status ops
@@ -30,8 +33,6 @@ final class OrderRepository
              FROM orders o
              JOIN clients c ON c.id = o.client_id
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             LEFT JOIN incoterms it ON it.id = o.incoterm_id
-             LEFT JOIN currencies cur ON cur.id = o.currency_id
              WHERE o.is_archived = 0
              ORDER BY o.created_at DESC"
         )->fetchAll();
@@ -66,6 +67,21 @@ final class OrderRepository
         )->execute(['id' => $orderId]);
     }
 
+    /**
+     * 90-item backlog "standalone order": incoterm_code, currency_code,
+     * port_of_loading_name/_city, port_of_discharge_name/_city,
+     * preset_name, advance_pct, advance_trigger_text, balance_pct,
+     * balance_trigger_option, balance_days, balance_trigger_wording, and
+     * show_bl_instructions all come straight off o.* now — they're
+     * snapshotted onto the order at creation time (insertRow() below)
+     * and never re-read from incoterms/currencies/ports/payment_presets
+     * again, so editing or retiring one of those lookup rows later can
+     * never silently change what an existing order displays or prints.
+     * advance_pct/balance_pct/balance_trigger_option/balance_days are
+     * updated in place by an activated Amendment
+     * (applyAmendmentOverride() below) rather than read via a separate
+     * override column COALESCEd against the preset.
+     */
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare(
@@ -82,24 +98,10 @@ final class OrderRepository
                     c.notify_party_contact_person, c.notify_party_phone, c.notify_party_email,
                     sm.stage_name AS current_stage_name, sm.stage_slug AS current_stage_slug,
                     sm.stage_number AS current_stage_number,
-                    i.code AS incoterm_code, cur.code AS currency_code,
-                    pl.name AS port_of_loading_name, pd.name AS port_of_discharge_name,
-                    pl.city AS port_of_loading_city, pd.city AS port_of_discharge_city,
-                    pp.preset_name, pp.advance_trigger_text, pp.requires_md_approval,
-                    pp.balance_trigger_wording, pp.show_bl_instructions,
-                    COALESCE(o.advance_pct_override, pp.advance_pct) AS advance_pct,
-                    COALESCE(o.balance_pct_override, pp.balance_pct) AS balance_pct,
-                    COALESCE(o.balance_trigger_option_override, pp.balance_trigger_option) AS balance_trigger_option,
-                    COALESCE(o.balance_days_override, pp.balance_days) AS balance_days,
                     (o.active_amendment_id IS NOT NULL) AS has_active_amendment
              FROM orders o
              JOIN clients c ON c.id = o.client_id
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             JOIN incoterms i ON i.id = o.incoterm_id
-             JOIN currencies cur ON cur.id = o.currency_id
-             LEFT JOIN ports pl ON pl.id = o.port_of_loading_id
-             LEFT JOIN ports pd ON pd.id = o.port_of_discharge_id
-             JOIN payment_presets pp ON pp.id = o.payment_preset_id
              WHERE o.id = :id'
         );
         $stmt->execute(['id' => $id]);
@@ -156,9 +158,82 @@ final class OrderRepository
         return ['orderId' => $orderId, 'sequenceNo' => $sequenceNo, 'orderReference' => $fields['order_reference']];
     }
 
+    /**
+     * 90-item backlog "standalone order": resolves incoterm_id/
+     * currency_id/port_of_loading_id/port_of_discharge_id/
+     * payment_preset_id to their CURRENT values exactly once, here, and
+     * snapshots them onto the new order row. This is the only place a
+     * new order's terms are ever read from the lookup tables — after
+     * this INSERT, the order never looks at incoterms/currencies/ports/
+     * payment_presets again for its own display/document content. Since
+     * OrderDuplicationService passes the source order's *_id columns
+     * (not its old snapshot) into this same path, duplicating an order
+     * naturally re-resolves today's current values rather than freezing
+     * forward whatever the source order's own snapshot happened to say —
+     * a duplicate is a new commercial decision made today.
+     */
+    private static function resolveSnapshot(array $data): array
+    {
+        $pdo = Database::connection();
+
+        $incoterm = $pdo->prepare('SELECT code FROM incoterms WHERE id = :id');
+        $incoterm->execute(['id' => $data['incoterm_id']]);
+        $incotermCode = $incoterm->fetchColumn();
+
+        $currency = $pdo->prepare('SELECT code FROM currencies WHERE id = :id');
+        $currency->execute(['id' => $data['currency_id']]);
+        $currencyCode = $currency->fetchColumn();
+
+        $portOfLoadingName = null;
+        $portOfLoadingCity = null;
+        if (!empty($data['port_of_loading_id'])) {
+            $port = $pdo->prepare('SELECT name, city FROM ports WHERE id = :id');
+            $port->execute(['id' => $data['port_of_loading_id']]);
+            $row = $port->fetch();
+            $portOfLoadingName = $row['name'] ?? null;
+            $portOfLoadingCity = $row['city'] ?? null;
+        }
+
+        $portOfDischargeName = null;
+        $portOfDischargeCity = null;
+        if (!empty($data['port_of_discharge_id'])) {
+            $port = $pdo->prepare('SELECT name, city FROM ports WHERE id = :id');
+            $port->execute(['id' => $data['port_of_discharge_id']]);
+            $row = $port->fetch();
+            $portOfDischargeName = $row['name'] ?? null;
+            $portOfDischargeCity = $row['city'] ?? null;
+        }
+
+        $preset = $pdo->prepare(
+            'SELECT preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+                    balance_days, balance_trigger_wording, show_bl_instructions
+             FROM payment_presets WHERE id = :id'
+        );
+        $preset->execute(['id' => $data['payment_preset_id']]);
+        $presetRow = $preset->fetch();
+
+        return [
+            'incoterm_code'           => $incotermCode ?: null,
+            'currency_code'           => $currencyCode ?: null,
+            'port_of_loading_name'    => $portOfLoadingName,
+            'port_of_loading_city'    => $portOfLoadingCity,
+            'port_of_discharge_name'  => $portOfDischargeName,
+            'port_of_discharge_city'  => $portOfDischargeCity,
+            'preset_name'             => $presetRow['preset_name'] ?? null,
+            'advance_pct'             => $presetRow['advance_pct'] ?? null,
+            'advance_trigger_text'    => $presetRow['advance_trigger_text'] ?? null,
+            'balance_pct'             => $presetRow['balance_pct'] ?? null,
+            'balance_trigger_option'  => $presetRow['balance_trigger_option'] ?? null,
+            'balance_days'            => $presetRow['balance_days'] ?? null,
+            'balance_trigger_wording' => $presetRow['balance_trigger_wording'] ?? null,
+            'show_bl_instructions'    => $presetRow['show_bl_instructions'] ?? 1,
+        ];
+    }
+
     private static function insertRow(array $data, int $createdBy): int
     {
         $pdo = Database::connection();
+        $snapshot = self::resolveSnapshot($data);
         $stmt = $pdo->prepare(
             'INSERT INTO orders
                 (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
@@ -169,7 +244,11 @@ final class OrderRepository
                  sailing_lead_time_min_days, sailing_lead_time_max_days,
                  indicative_freight_amount,
                  indicative_insurance_amount, buyers_po_ref, quotation_date, quotation_valid_until,
-                 status, created_by, duplicated_from_order_id)
+                 status, created_by, duplicated_from_order_id,
+                 incoterm_code, currency_code, port_of_loading_name, port_of_loading_city,
+                 port_of_discharge_name, port_of_discharge_city, preset_name, advance_pct,
+                 advance_trigger_text, balance_pct, balance_trigger_option, balance_days,
+                 balance_trigger_wording, show_bl_instructions)
              VALUES
                 (:order_reference, :client_id, :sequence_no, :buyer_inquiry_ref, :payment_preset_id, :incoterm_id,
                  :port_of_loading_id, :port_of_discharge_id, :port_of_discharge_text, :currency_id, :coo_type,
@@ -179,7 +258,11 @@ final class OrderRepository
                  :sailing_lead_time_min_days, :sailing_lead_time_max_days,
                  :indicative_freight_amount,
                  :indicative_insurance_amount, :buyers_po_ref, :quotation_date, :quotation_valid_until,
-                 \'active\', :created_by, :duplicated_from_order_id)'
+                 \'active\', :created_by, :duplicated_from_order_id,
+                 :incoterm_code, :currency_code, :port_of_loading_name, :port_of_loading_city,
+                 :port_of_discharge_name, :port_of_discharge_city, :preset_name, :advance_pct,
+                 :advance_trigger_text, :balance_pct, :balance_trigger_option, :balance_days,
+                 :balance_trigger_wording, :show_bl_instructions)'
         );
         $stmt->execute([
             'order_reference'             => $data['order_reference'],
@@ -213,6 +296,20 @@ final class OrderRepository
             'quotation_valid_until'       => $data['quotation_valid_until'],
             'created_by'                  => $createdBy,
             'duplicated_from_order_id'    => $data['duplicated_from_order_id'] ?? null,
+            'incoterm_code'               => $snapshot['incoterm_code'],
+            'currency_code'               => $snapshot['currency_code'],
+            'port_of_loading_name'        => $snapshot['port_of_loading_name'],
+            'port_of_loading_city'        => $snapshot['port_of_loading_city'],
+            'port_of_discharge_name'      => $snapshot['port_of_discharge_name'],
+            'port_of_discharge_city'      => $snapshot['port_of_discharge_city'],
+            'preset_name'                 => $snapshot['preset_name'],
+            'advance_pct'                 => $snapshot['advance_pct'],
+            'advance_trigger_text'        => $snapshot['advance_trigger_text'],
+            'balance_pct'                 => $snapshot['balance_pct'],
+            'balance_trigger_option'      => $snapshot['balance_trigger_option'],
+            'balance_days'                => $snapshot['balance_days'],
+            'balance_trigger_wording'     => $snapshot['balance_trigger_wording'],
+            'show_bl_instructions'        => $snapshot['show_bl_instructions'],
         ]);
         return (int) $pdo->lastInsertId();
     }
@@ -362,6 +459,14 @@ final class OrderRepository
      * this order (a new PI revision, the CI, etc.) picks this up for
      * free, with no per-document-type special-casing.
      */
+    /**
+     * 90-item backlog "standalone order": writes directly to the order's
+     * own base columns (advance_pct, balance_pct, balance_trigger_option,
+     * balance_days) rather than a separate *_override column — those are
+     * the order's own snapshotted values now, not a preset-derived
+     * default with a floor on top, so an activated amendment just
+     * updates them in place.
+     */
     public static function applyAmendmentOverride(
         int $orderId,
         float $advancePct,
@@ -372,10 +477,10 @@ final class OrderRepository
     ): void {
         Database::connection()->prepare(
             'UPDATE orders
-             SET advance_pct_override = :advance_pct,
-                 balance_pct_override = :balance_pct,
-                 balance_trigger_option_override = :balance_trigger_option,
-                 balance_days_override = :balance_days,
+             SET advance_pct = :advance_pct,
+                 balance_pct = :balance_pct,
+                 balance_trigger_option = :balance_trigger_option,
+                 balance_days = :balance_days,
                  active_amendment_id = :amendment_id
              WHERE id = :id'
         )->execute([

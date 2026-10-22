@@ -228,7 +228,11 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   own name when it isn't. The plain "Port of Loading"/"Port of Discharge"
   informational fields on the Order Detail page and the Bill of Lading's
   own endorsement defaults are unaffected — those conventionally show the
-  specific terminal name, not the city.
+  specific terminal name, not the city. 90-item backlog "standalone
+  order": a port's name and city are copied onto the order the moment
+  it's picked — renaming a port, changing its city, or deactivating it
+  afterward only affects new orders; every order already created against
+  it keeps printing the name/city that were on file the day it was made.
 - **Port Routes** (`/port-routes`) — 90-item backlog item 15: a reference
   document of known port-to-port sailing times, gated by the same
   `manage_ports` permission as Ports itself (linked from the Ports
@@ -274,7 +278,12 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   its advance/balance amounts and prints the right percentages
   automatically, since the figures are computed purely from whatever
   `advance_pct`/`balance_pct` the assigned preset carries, never a
-  hardcoded 40/60 split.
+  hardcoded 40/60 split. 90-item backlog "standalone order": a preset's
+  terms are copied onto the order the moment it's created — editing a
+  preset's percentages, trigger wording, or BL Instruction Sheet flag
+  afterward only changes what a *new* order picks up; every order
+  already created on that preset keeps printing exactly what was true
+  the day it was made, even years later.
   Balance Trigger Wording is a free-text field holding the exact sentence
   printed on the Quotation, Proforma Invoice, and Buyer PO (the only
   three documents whose balance clause varies by preset — the Commercial
@@ -289,8 +298,10 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   **protected** — unlock via **Field Protection** before editing or
   deactivating, same as a protected Company Setting or T&C clause — since
   they drive where money is actually sent and received. A preset is never
-  hard-deleted: orders reference it by ID, so even a deactivated preset
-  stays readable on every document already generated against it.
+  hard-deleted: deactivating one only removes it from the picklist on new
+  orders — every order already created against it, active or closed,
+  already has its own copy of the preset's terms and is entirely
+  unaffected.
 - **Legal Terms & Definitions** — on every buyer-facing document except
   the BL Instruction Sheet, a final numbered section ("N. LEGAL TERMS &
   DEFINITIONS") prints a red **Legal Terms** box and a blue

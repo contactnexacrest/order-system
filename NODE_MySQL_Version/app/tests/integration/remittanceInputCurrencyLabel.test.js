@@ -46,16 +46,9 @@ describe('Remittance input currency label (90-item backlog #82)', () => {
     await db.pool.end();
   });
 
-  /** createTestOrder() always seeds USD — switch it directly for these tests. */
-  async function setOrderCurrency(orderId, currencyCode) {
-    const currency = await db.queryOne('SELECT id FROM currencies WHERE code = :code', { code: currencyCode });
-    await db.execute('UPDATE orders SET currency_id = :currency_id WHERE id = :id', { currency_id: currency.id, id: orderId });
-  }
-
   it('labels the advance remittance input with the order\'s own currency', async () => {
     const clientId = await createTestClient();
-    const orderId = await createTestOrder(clientId);
-    await setOrderCurrency(orderId, 'GBP');
+    const orderId = await createTestOrder(clientId, 'FOB', 'Standard — New Buyer', 'GBP');
     await stageGateService.passAndUnlockNext(orderId, 1, userId);
     await stageGateService.passAndUnlockNext(orderId, 2, userId);
     await orderPaymentStatusRepository.initializeForOrder(orderId);
@@ -68,8 +61,7 @@ describe('Remittance input currency label (90-item backlog #82)', () => {
 
   it('labels the freight remittance input with the order\'s own currency', async () => {
     const clientId = await createTestClient();
-    const orderId = await createTestOrder(clientId, 'CIF');
-    await setOrderCurrency(orderId, 'EUR');
+    const orderId = await createTestOrder(clientId, 'CIF', 'Standard — New Buyer', 'EUR');
     for (let stage = 1; stage <= 5; stage++) {
       await stageGateService.passAndUnlockNext(orderId, stage, userId);
     }
@@ -89,8 +81,7 @@ describe('Remittance input currency label (90-item backlog #82)', () => {
 
   it('labels the balance remittance input with the order\'s own currency', async () => {
     const clientId = await createTestClient();
-    const orderId = await createTestOrder(clientId);
-    await setOrderCurrency(orderId, 'EUR');
+    const orderId = await createTestOrder(clientId, 'FOB', 'Standard — New Buyer', 'EUR');
     for (let stage = 1; stage <= 5; stage++) {
       await stageGateService.passAndUnlockNext(orderId, stage, userId);
     }

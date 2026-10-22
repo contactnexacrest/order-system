@@ -37,26 +37,44 @@ final class ClientOrderHistoryVisibilityTest extends DbTestCase
     private function createTestOrderWithSequence(int $clientId, int $sequenceNo): int
     {
         $pdo = Database::connection();
-        $incotermId = (int) $pdo->query("SELECT id FROM incoterms WHERE code = 'FOB'")->fetchColumn();
-        $currencyId = (int) $pdo->query("SELECT id FROM currencies WHERE code = 'USD'")->fetchColumn();
-        $presetId = (int) $pdo->query("SELECT id FROM payment_presets WHERE preset_name = 'Standard — New Buyer'")->fetchColumn();
+        $incoterm = $pdo->query("SELECT id, code FROM incoterms WHERE code = 'FOB'")->fetch();
+        $currency = $pdo->query("SELECT id, code FROM currencies WHERE code = 'USD'")->fetch();
+        $preset = $pdo->query(
+            "SELECT id, preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+                    balance_days, balance_trigger_wording, show_bl_instructions
+             FROM payment_presets WHERE preset_name = 'Standard — New Buyer'"
+        )->fetch();
 
         $stmt = $pdo->prepare(
             'INSERT INTO orders
                 (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
-                 currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status)
+                 currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
+                 incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text,
+                 balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions)
              VALUES
                 (:ref, :client_id, :seq, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, \'TBC\', \'NIL\',
-                 CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), \'active\')'
+                 CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), \'active\',
+                 :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text,
+                 :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions)'
         );
         $stmt->execute([
             'ref'         => 'PHPUNIT-TEST-' . bin2hex(random_bytes(4)),
             'client_id'   => $clientId,
             'seq'         => $sequenceNo,
             'inquiry_ref' => 'PHPUNIT-' . bin2hex(random_bytes(3)),
-            'preset_id'   => $presetId,
-            'incoterm_id' => $incotermId,
-            'currency_id' => $currencyId,
+            'preset_id'   => $preset['id'],
+            'incoterm_id' => $incoterm['id'],
+            'currency_id' => $currency['id'],
+            'incoterm_code'           => $incoterm['code'],
+            'currency_code'           => $currency['code'],
+            'preset_name'             => $preset['preset_name'],
+            'advance_pct'             => $preset['advance_pct'],
+            'advance_trigger_text'    => $preset['advance_trigger_text'],
+            'balance_pct'             => $preset['balance_pct'],
+            'balance_trigger_option'  => $preset['balance_trigger_option'],
+            'balance_days'            => $preset['balance_days'],
+            'balance_trigger_wording' => $preset['balance_trigger_wording'],
+            'show_bl_instructions'    => $preset['show_bl_instructions'],
         ]);
         $orderId = (int) $pdo->lastInsertId();
         \App\Repositories\OrderStageRepository::initializeForOrder($orderId);

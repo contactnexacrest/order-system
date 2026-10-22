@@ -11,9 +11,9 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * (/payment-presets) already lets an admin create a custom one — but
  * nobody had actually added the 30/70 split staff wanted as a
  * standard, reusable option. Adds a third seeded preset, "Extended
- * Terms — 30/70", and proves an order's advance_pct/balance_pct come
- * from a live JOIN against whichever preset it's assigned
- * (orderRepository.find()), never a hardcoded 40/60 split.
+ * Terms — 30/70", and proves an order's advance_pct/balance_pct are
+ * snapshotted from whichever preset it's assigned at creation
+ * (orderRepository's resolveSnapshot()), never a hardcoded 40/60 split.
  */
 describe('Extended Terms 30/70 payment preset (90-item backlog "30/70 payment preset")', () => {
   afterAll(async () => {
@@ -32,11 +32,8 @@ describe('Extended Terms 30/70 payment preset (90-item backlog "30/70 payment pr
   });
 
   it('an order on this preset computes its own split with no hardcoded percentage', async () => {
-    const presetRow = await db.queryOne("SELECT id FROM payment_presets WHERE preset_name = 'Extended Terms — 30/70'");
-
     const clientId = await createTestClient();
-    const orderId = await createTestOrder(clientId);
-    await db.execute('UPDATE orders SET payment_preset_id = :preset_id WHERE id = :id', { preset_id: presetRow.id, id: orderId });
+    const orderId = await createTestOrder(clientId, 'FOB', 'Extended Terms — 30/70');
 
     const order = await orderRepository.find(orderId);
 

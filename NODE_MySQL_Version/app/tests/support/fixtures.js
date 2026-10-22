@@ -19,24 +19,73 @@ async function createTestClient(email = null) {
  * orderStageRepository.initializeForOrder(), not hand-crafted), in the
  * exact state a genuine new order is in: Stage 1 in_progress, Stages 2-9
  * locked.
+ *
+ * 90-item backlog "standalone order": the incoterm_code/currency_code/
+ * preset_name/advance_pct/etc. columns below mirror exactly what
+ * orderRepository.js's own insertOrderRow()/resolveSnapshot() does in
+ * production, so a test-created order behaves identically to a real
+ * one — snapshotted once here, never re-joined.
  */
-async function createTestOrder(clientId, incotermCode = 'FOB') {
-  const incoterm = await db.queryOne('SELECT id FROM incoterms WHERE code = :code', { code: incotermCode });
-  const currency = await db.queryOne("SELECT id FROM currencies WHERE code = 'USD'");
-  const preset = await db.queryOne("SELECT id FROM payment_presets WHERE preset_name = 'Standard — New Buyer'");
+async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Standard — New Buyer', currencyCode = 'USD', portOfLoadingId = null, portOfDischargeId = null) {
+  const incoterm = await db.queryOne('SELECT id, code FROM incoterms WHERE code = :code', { code: incotermCode });
+  const currency = await db.queryOne('SELECT id, code FROM currencies WHERE code = :code', { code: currencyCode });
+  const preset = await db.queryOne(
+    `SELECT id, preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+            balance_days, balance_trigger_wording, show_bl_instructions
+     FROM payment_presets WHERE preset_name = :preset_name`,
+    { preset_name: presetName }
+  );
+
+  let portOfLoadingName = null;
+  let portOfLoadingCity = null;
+  if (portOfLoadingId) {
+    const port = await db.queryOne('SELECT name, city FROM ports WHERE id = :id', { id: portOfLoadingId });
+    portOfLoadingName = port ? port.name : null;
+    portOfLoadingCity = port ? port.city : null;
+  }
+  let portOfDischargeName = null;
+  let portOfDischargeCity = null;
+  if (portOfDischargeId) {
+    const port = await db.queryOne('SELECT name, city FROM ports WHERE id = :id', { id: portOfDischargeId });
+    portOfDischargeName = port ? port.name : null;
+    portOfDischargeCity = port ? port.city : null;
+  }
 
   const ref = `JEST-TEST-${Math.random().toString(16).slice(2, 10)}`;
   const inquiryRef = `JEST-${Math.random().toString(16).slice(2, 8)}`;
   const result = await db.execute(
     `INSERT INTO orders
         (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
-         currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status)
+         currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
+         port_of_loading_id, port_of_discharge_id,
+         incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text,
+         balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions,
+         port_of_loading_name, port_of_loading_city, port_of_discharge_name, port_of_discharge_city)
      VALUES
         (:ref, :client_id, 1, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, 'TBC', 'NIL',
-         CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active')`,
+         CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active',
+         :port_of_loading_id, :port_of_discharge_id,
+         :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text,
+         :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions,
+         :port_of_loading_name, :port_of_loading_city, :port_of_discharge_name, :port_of_discharge_city)`,
     {
       ref, client_id: clientId, inquiry_ref: inquiryRef,
       preset_id: preset.id, incoterm_id: incoterm.id, currency_id: currency.id,
+      port_of_loading_id: portOfLoadingId, port_of_discharge_id: portOfDischargeId,
+      incoterm_code: incoterm.code,
+      currency_code: currency.code,
+      preset_name: preset.preset_name,
+      advance_pct: preset.advance_pct,
+      advance_trigger_text: preset.advance_trigger_text,
+      balance_pct: preset.balance_pct,
+      balance_trigger_option: preset.balance_trigger_option,
+      balance_days: preset.balance_days,
+      balance_trigger_wording: preset.balance_trigger_wording,
+      show_bl_instructions: preset.show_bl_instructions,
+      port_of_loading_name: portOfLoadingName,
+      port_of_loading_city: portOfLoadingCity,
+      port_of_discharge_name: portOfDischargeName,
+      port_of_discharge_city: portOfDischargeCity,
     }
   );
   const orderId = result.insertId;
