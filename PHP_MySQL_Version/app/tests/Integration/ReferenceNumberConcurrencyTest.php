@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Services\ReferenceNumberService;
 use App\Tests\Support\DbTestCase;
 
 /**
@@ -39,6 +40,28 @@ final class ReferenceNumberConcurrencyTest extends DbTestCase
         $outputs = $this->runConcurrentWorkers(20, ['order_seq', (string) $clientId]);
 
         self::assertCount(20, array_unique($outputs), 'every concurrently-generated order sequence number for one client must be distinct: ' . implode(', ', $outputs));
+    }
+
+    /**
+     * External QA report L-01: reference_sequences has no AUTO_INCREMENT
+     * column (scope_key is the PK), so the very first ON DUPLICATE KEY
+     * UPDATE upsert for a brand-new scope used to hit the plain INSERT
+     * branch, which never set the session's LAST_INSERT_ID() at all —
+     * PDO's lastInsertId() then returned 0 (or a stale value from some
+     * earlier unrelated auto-increment insert on the same connection),
+     * minting "000" as the first reference of a new client/day/type
+     * instead of "001". Every one of these three counters shares the same
+     * nextSeq()-style INSERT ... ON DUPLICATE KEY UPDATE shape, so a
+     * single representative check (the per-client order sequence, via a
+     * guaranteed-fresh client id) covers the fix for all of them.
+     */
+    public function testFirstOrderSequenceNumberForABrandNewClientIsOneNotZero(): void
+    {
+        $clientId = $this->createTestClient();
+
+        $first = ReferenceNumberService::nextOrderSequenceForClient($clientId);
+
+        self::assertSame(1, $first, 'the first-ever sequence number for a brand-new scope must be 1, not 0');
     }
 
     /**

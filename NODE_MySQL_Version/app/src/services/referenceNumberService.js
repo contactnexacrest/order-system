@@ -32,8 +32,15 @@ const testModeService = require('./testModeService');
  * separate read, so no gap for another caller's write to land in.
  */
 async function nextSeq(scopeKey) {
+  // reference_sequences has no AUTO_INCREMENT column (scope_key is the
+  // PK), so on this scope's very first-ever call the plain INSERT branch
+  // never sets the session's LAST_INSERT_ID() at all — the driver's
+  // insertId then comes back 0 (or stale), minting "000" as the first
+  // reference of a new day/type/client instead of "001". LAST_INSERT_ID(1)
+  // in the VALUES list makes MySQL explicitly set/report that value on the
+  // INSERT path too, exactly like the UPDATE branch already does.
   const result = await db.execute(
-    `INSERT INTO reference_sequences (scope_key, last_seq) VALUES (:key, 1)
+    `INSERT INTO reference_sequences (scope_key, last_seq) VALUES (:key, LAST_INSERT_ID(1))
      ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)`,
     { key: scopeKey }
   );
@@ -55,9 +62,12 @@ async function nextSeq(scopeKey) {
  * single point-lock on reference_sequences' unique scope_key index instead.
  */
 async function nextOrderSequenceForClient(clientId) {
+  // Same LAST_INSERT_ID() gap as nextSeq() above — wrap the SELECT's
+  // computed seed so the first order for a brand-new client reports 1,
+  // not 0.
   const result = await db.execute(
     `INSERT INTO reference_sequences (scope_key, last_seq)
-     SELECT :key, COALESCE(MAX(o.sequence_no), 0) + 1 FROM orders o WHERE o.client_id = :client_id
+     SELECT :key, LAST_INSERT_ID(COALESCE(MAX(o.sequence_no), 0) + 1) FROM orders o WHERE o.client_id = :client_id
      ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)`,
     { key: `order_seq:client:${clientId}`, client_id: clientId }
   );
@@ -80,9 +90,10 @@ async function nextOrderSequenceForClient(clientId) {
  * COALESCE(...,-1) + 1 rather than COALESCE(...,0) + 1.
  */
 async function nextDocumentRevisionNumber(orderId, documentTypeId) {
+  // Same LAST_INSERT_ID() gap as nextSeq() above.
   const result = await db.execute(
     `INSERT INTO reference_sequences (scope_key, last_seq)
-     SELECT :key, COALESCE(MAX(d.revision_number), -1) + 1 FROM documents d
+     SELECT :key, LAST_INSERT_ID(COALESCE(MAX(d.revision_number), -1) + 1) FROM documents d
      WHERE d.order_id = :order_id AND d.document_type_id = :document_type_id
      ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)`,
     { key: `document_revision:${orderId}:${documentTypeId}`, order_id: orderId, document_type_id: documentTypeId }
