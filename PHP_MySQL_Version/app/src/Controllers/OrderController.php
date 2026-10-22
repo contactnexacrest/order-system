@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Config\Database;
+use App\Helpers\DeadlockRetry;
 use App\Helpers\Flash;
 use App\Helpers\OrderLineValidator;
 use App\Helpers\ReasonValidator;
@@ -369,9 +370,21 @@ final class OrderController
         // the "no half-created order" property in general: any failure
         // anywhere in this block rolls back the order row itself along
         // with everything else.
-        $pdo = Database::connection();
-        $pdo->beginTransaction();
-        try {
+        // External QA report L-13 (CONC-03): under real concurrent load a
+        // few of these transactions still hit an InnoDB deadlock (SQLSTATE
+        // 40001) between this one and another running at the same time —
+        // see DeadlockRetry's own docblock for why the fix is retrying the
+        // whole attempt rather than shortening the transaction. MySQL's
+        // deadlock detector already guarantees this is always safe to
+        // retry: it only ever aborts a transaction that made no visible
+        // change (it rolls back everything the aborted side did).
+        ['orderId' => $orderId, 'orderReference' => $orderReference] = DeadlockRetry::run(function () use (
+            $orderRefFormat, $testModeEnabled, $clientId, $client, $paymentPresetId, $incotermId,
+            $portOfDischargeId, $portOfDischargeText, $currencyId, $descriptions, $user
+        ): array {
+            $pdo = Database::connection();
+            $pdo->beginTransaction();
+            try {
             // QA-5 CONC-03: sequence-number reservation and the order INSERT
             // now happen atomically inside createWithNextSequence() — see its
             // docblock in OrderRepository.php. order_reference embeds the
@@ -448,10 +461,12 @@ final class OrderController
             }
 
             $pdo->commit();
+            return ['orderId' => $orderId, 'orderReference' => $orderReference];
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
         }
+        });
 
         // External QA report L-23: order creation was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'ORDER_CREATED', 'orders', $orderId, 'order_reference', null, $orderReference);
