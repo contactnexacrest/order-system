@@ -208,8 +208,32 @@ final class PermissionAdminController
             (array) ($_POST['permission_ids'] ?? [])
         ), static fn(int $v): bool => $v > 0));
 
+        // External QA report L-37: saving with nothing ticked used to
+        // silently strip EVERY permission from the role — including the
+        // system Admin role itself — with no confirmation, no reason, and
+        // no record of what was actually removed (the audit entry only
+        // ever logged the new COUNT, never which permissions changed).
+        // A role that genuinely shouldn't exist anymore has its own
+        // protected delete flow (roleDelete(), blocked for system roles
+        // and any role still assigned to a user) — this form is for
+        // adjusting a role's grants, never for emptying it out.
+        if (empty($permissionIds)) {
+            Flash::set('error', "Refused: that would remove every permission from \"{$role['name']}\", including its own ability to log in and work. Select at least one permission, or delete the role instead (Admin \u{2192} Roles) if it should no longer exist.");
+            header("Location: /admin/roles/{$roleId}/permissions");
+            return;
+        }
+
+        $permissionKeysById = array_column(PermissionRepository::all(), 'permission_key', 'id');
+        $keysFor = static function (array $ids) use ($permissionKeysById): string {
+            $keys = array_values(array_intersect_key($permissionKeysById, array_flip($ids)));
+            sort($keys);
+            return implode(', ', $keys);
+        };
+        $beforeKeys = $keysFor(PermissionRepository::enabledForRole($roleId));
+        $afterKeys = $keysFor($permissionIds);
+
         PermissionRepository::setForRole($roleId, $permissionIds);
-        AuditLogRepository::log((int) $user['id'], 'ROLE_PERMISSIONS_UPDATED', 'roles', $roleId, 'permission_count', null, (string) count($permissionIds));
+        AuditLogRepository::log((int) $user['id'], 'ROLE_PERMISSIONS_UPDATED', 'roles', $roleId, 'permissions', $beforeKeys, $afterKeys);
         Flash::set('success', "Permissions updated for \"{$role['name']}\".");
         header('Location: /admin/permissions');
     }

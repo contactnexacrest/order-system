@@ -190,8 +190,35 @@ async function rolePermissionsUpdate(req, res) {
   }
   const permissionIds = [].concat(req.body.permission_ids || []).map((v) => parseInt(v, 10)).filter((v) => v > 0);
 
+  // External QA report L-37: saving with nothing ticked used to silently
+  // strip EVERY permission from the role — including the system Admin
+  // role itself — with no confirmation, no reason, and no record of what
+  // was actually removed (the audit entry only ever logged the new COUNT,
+  // never which permissions changed). A role that genuinely shouldn't
+  // exist anymore has its own protected delete flow (roleDelete(), blocked
+  // for system roles and any role still assigned to a user) — this form
+  // is for adjusting a role's grants, never for emptying it out.
+  if (permissionIds.length === 0) {
+    flash.set(
+      req,
+      'error',
+      `Refused: that would remove every permission from "${role.name}", including its own ability to log in and work. Select at least one permission, or delete the role instead (Admin → Roles) if it should no longer exist.`
+    );
+    res.redirect(`/admin/roles/${roleId}/permissions`);
+    return;
+  }
+
+  const allPermissions = await permissionRepository.all();
+  const permissionKeysById = {};
+  for (const p of allPermissions) {
+    permissionKeysById[p.id] = p.permission_key;
+  }
+  const keysFor = (ids) => ids.map((id) => permissionKeysById[id]).filter(Boolean).sort().join(', ');
+  const beforeKeys = keysFor(await permissionRepository.enabledForRole(roleId));
+  const afterKeys = keysFor(permissionIds);
+
   await permissionRepository.setForRole(roleId, permissionIds);
-  await auditLogRepository.log(user.id, 'ROLE_PERMISSIONS_UPDATED', 'roles', roleId, 'permission_count', null, String(permissionIds.length));
+  await auditLogRepository.log(user.id, 'ROLE_PERMISSIONS_UPDATED', 'roles', roleId, 'permissions', beforeKeys, afterKeys);
   flash.set(req, 'success', `Permissions updated for "${role.name}".`);
   res.redirect('/admin/permissions');
 }
