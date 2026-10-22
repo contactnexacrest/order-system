@@ -8,6 +8,7 @@ const buyerActionController = require('../../src/controllers/buyerActionControll
 const clientPortalController = require('../../src/controllers/clientPortalController');
 const ordersController = require('../../src/controllers/ordersController');
 const flash = require('../../src/helpers/flash');
+const encryptionService = require('../../src/services/encryptionService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 /**
@@ -308,6 +309,12 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
 
     const order = await orderRepository.find(orderId);
     expect(order.buyer_action_token_plain).toBeTruthy();
-    expect(await orderRepository.findByValidBuyerActionToken(order.buyer_action_token_plain)).not.toBeNull();
+    // QA-5 L-24: the column holds ciphertext now (encryptionService),
+    // never the raw token — decrypt it first, exactly as
+    // ordersController.js does before ever using it.
+    const decryptedToken = encryptionService.decrypt(order.buyer_action_token_plain);
+    expect(decryptedToken).not.toBeNull();
+    expect(decryptedToken).not.toBe(order.buyer_action_token_plain);
+    expect(await orderRepository.findByValidBuyerActionToken(decryptedToken)).not.toBeNull();
   });
 });

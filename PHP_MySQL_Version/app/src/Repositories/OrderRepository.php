@@ -770,7 +770,11 @@ final class OrderRepository
             ->prepare('UPDATE orders SET buyer_action_token_hash = :hash, buyer_action_token_plain = :plain, buyer_action_token_expires_at = :expires WHERE id = :id')
             ->execute([
                 'hash'    => hash('sha256', $rawToken),
-                'plain'   => $rawToken,
+                // QA-5 L-24: stored encrypted (EncryptionService), never
+                // raw — staff re-view/re-copy the live link from the order
+                // page at any time before it expires, so this can't just be
+                // shown once and discarded; see EncryptionService's docblock.
+                'plain'   => \App\Services\EncryptionService::encrypt($rawToken),
                 'expires' => date('Y-m-d H:i:s', time() + ($ttlDays * 86400)),
                 'id'      => $orderId,
             ]);

@@ -1227,13 +1227,17 @@ foreach ($stages as $s) {
       // stage's OC acknowledgement and the client-portal Buyer PO upload
       // — for a buyer who hasn't been provisioned a portal account yet
       // (or doesn't want to log in just for these two actions).
-      $buyerActionLinkValid = !empty($order['buyer_action_token_plain']) && !empty($order['buyer_action_token_expires_at']) && strtotime((string) $order['buyer_action_token_expires_at']) > time();
+      // QA-5 L-24: buyer_action_token_plain is encrypted at rest
+      // (EncryptionService) — decrypt it here, the one place it's ever
+      // rendered back to staff.
+      $buyerActionTokenPlain = \App\Services\EncryptionService::decrypt($order['buyer_action_token_plain'] ?? null);
+      $buyerActionLinkValid = !empty($buyerActionTokenPlain) && !empty($order['buyer_action_token_expires_at']) && strtotime((string) $order['buyer_action_token_expires_at']) > time();
     ?>
     <div class="section" style="margin-top:14px;">
       <h3 style="font-size:0.95em; margin-top:0;">Buyer Action Link (no portal login required)</h3>
       <p class="muted small">A direct link the buyer can use to acknowledge the Order Confirmation and/or upload their signed Buyer PO — without needing a client-portal account. Useful before portal access is provisioned (Stage 3 → 4), or for a buyer who'd rather not log in at all.</p>
       <?php if ($buyerActionLinkValid): ?>
-        <?php $buyerActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $order['buyer_action_token_plain']; ?>
+        <?php $buyerActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $buyerActionTokenPlain; ?>
         <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
           <span>Current link (valid until <?= htmlspecialchars(Dates::human($order['buyer_action_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
           <div style="display:flex;gap:6px;align-items:center">

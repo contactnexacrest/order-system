@@ -10,6 +10,7 @@ use App\Controllers\OrderController;
 use App\Helpers\Flash;
 use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderRepository;
+use App\Services\EncryptionService;
 use App\Services\StageGateService;
 use App\Tests\Support\DbTestCase;
 
@@ -297,6 +298,12 @@ final class BuyerActionLinkTest extends DbTestCase
 
         $order = OrderRepository::find($orderId);
         self::assertNotEmpty($order['buyer_action_token_plain']);
-        self::assertNotNull(OrderRepository::findByValidBuyerActionToken($order['buyer_action_token_plain']));
+        // QA-5 L-24: the column holds ciphertext now (EncryptionService),
+        // never the raw token — decrypt it first, exactly as
+        // views/orders/show.php does before ever using it.
+        $decryptedToken = EncryptionService::decrypt($order['buyer_action_token_plain']);
+        self::assertNotNull($decryptedToken);
+        self::assertNotSame($decryptedToken, $order['buyer_action_token_plain'], 'the stored value must not equal the raw token — it must actually be encrypted');
+        self::assertNotNull(OrderRepository::findByValidBuyerActionToken($decryptedToken));
     }
 }

@@ -3363,7 +3363,10 @@ ALTER TABLE clients
 -- ================================================================
 ALTER TABLE orders
   ADD COLUMN buyer_action_token_hash VARCHAR(64) NULL AFTER pi_valid_until,
-  ADD COLUMN buyer_action_token_plain VARCHAR(64) NULL AFTER buyer_action_token_hash,
+  -- QA-5 L-24: holds AES-256-GCM ciphertext (encryptionService), not the
+  -- raw token — base64(iv . tag . ciphertext) for a 64-char raw token
+  -- needs ~124 chars; 255 leaves headroom.
+  ADD COLUMN buyer_action_token_plain VARCHAR(255) NULL AFTER buyer_action_token_hash,
   ADD COLUMN buyer_action_token_expires_at DATETIME NULL AFTER buyer_action_token_plain;
 
 CREATE INDEX idx_orders_buyer_action_token_hash ON orders(buyer_action_token_hash);

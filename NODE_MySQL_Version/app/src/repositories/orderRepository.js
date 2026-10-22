@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 const referenceNumberService = require('../services/referenceNumberService');
+const encryptionService = require('../services/encryptionService');
 
 /**
  * Also carries incoterm_code, current_stage_number, currency_code, and
@@ -682,7 +683,11 @@ async function generateBuyerActionToken(orderId, ttlDays = 90) {
     'UPDATE orders SET buyer_action_token_hash = :hash, buyer_action_token_plain = :plain, buyer_action_token_expires_at = :expires WHERE id = :id',
     {
       hash: crypto.createHash('sha256').update(rawToken).digest('hex'),
-      plain: rawToken,
+      // QA-5 L-24: stored encrypted (encryptionService), never raw —
+      // staff re-view/re-copy the live link from the order page at any
+      // time before it expires, so this can't just be shown once and
+      // discarded; see encryptionService.js's docblock.
+      plain: encryptionService.encrypt(rawToken),
       expires: new Date(Date.now() + ttlDays * 86400000).toISOString().slice(0, 19).replace('T', ' '),
       id: orderId,
     }

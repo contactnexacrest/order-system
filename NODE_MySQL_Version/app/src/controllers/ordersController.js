@@ -16,6 +16,7 @@ const caExportBenefitRepository = require('../repositories/caExportBenefitReposi
 const caFyLockGuard = require('../services/caFyLockGuard');
 const orderDuplicationService = require('../services/orderDuplicationService');
 const orderEditGuard = require('../services/orderEditGuard');
+const encryptionService = require('../services/encryptionService');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderComplianceTaskRepository = require('../repositories/orderComplianceTaskRepository');
@@ -762,12 +763,16 @@ async function show(req, res) {
 
   // 90-item backlog #75: a public, no-login link covering both this
   // stage's OC acknowledgement and the client-portal Buyer PO upload.
+  // QA-5 L-24: buyer_action_token_plain is encrypted at rest
+  // (encryptionService) — decrypt it here, the one place it's ever
+  // rendered back to staff.
   let buyerActionFullLink = null;
-  const buyerActionLinkValid = !!order.buyer_action_token_plain
+  const buyerActionTokenPlain = encryptionService.decrypt(order.buyer_action_token_plain);
+  const buyerActionLinkValid = !!buyerActionTokenPlain
     && !!order.buyer_action_token_expires_at
     && parseDbDateTime(order.buyer_action_token_expires_at).getTime() > Date.now();
   if (buyerActionLinkValid) {
-    buyerActionFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${order.buyer_action_token_plain}`;
+    buyerActionFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${buyerActionTokenPlain}`;
   }
 
   const supplierFactoryAddressesBySupplier = await supplierFactoryAddressRepository.allGroupedBySupplier();
