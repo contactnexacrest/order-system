@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\Input;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\LookupRepository;
@@ -82,7 +83,7 @@ final class PermissionAdminController
     public function roleCreate(array $params): void
     {
         $user = AuthService::currentUser();
-        $name = trim((string) ($_POST['name'] ?? ''));
+        $name = Input::scalarString($_POST['name'] ?? '');
         $description = trim((string) ($_POST['description'] ?? '')) ?: null;
 
         if ($name === '') {
@@ -125,7 +126,7 @@ final class PermissionAdminController
             return;
         }
 
-        $name = trim((string) ($_POST['name'] ?? ''));
+        $name = Input::scalarString($_POST['name'] ?? '');
         $description = trim((string) ($_POST['description'] ?? '')) ?: null;
         if ($name === '') {
             Flash::set('error', 'Role name is required.');
@@ -244,7 +245,7 @@ final class PermissionAdminController
     {
         $user = AuthService::currentUser();
         $permissionKey = strtolower(trim((string) ($_POST['permission_key'] ?? '')));
-        $name = trim((string) ($_POST['name'] ?? ''));
+        $name = Input::scalarString($_POST['name'] ?? '');
         $description = trim((string) ($_POST['description'] ?? '')) ?: null;
         $category = trim((string) ($_POST['category'] ?? '')) ?: null;
 
@@ -293,7 +294,7 @@ final class PermissionAdminController
             return;
         }
 
-        $name = trim((string) ($_POST['name'] ?? ''));
+        $name = Input::scalarString($_POST['name'] ?? '');
         $description = trim((string) ($_POST['description'] ?? '')) ?: null;
         $category = trim((string) ($_POST['category'] ?? '')) ?: null;
         if ($name === '') {

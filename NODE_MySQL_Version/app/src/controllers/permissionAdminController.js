@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const { scalarString } = require('../helpers/input');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const permissionRepository = require('../repositories/permissionRepository');
 const roleRepository = require('../repositories/roleRepository');
@@ -72,7 +73,7 @@ async function removeOverride(req, res) {
 
 async function roleCreate(req, res) {
   const user = req.user;
-  const name = String(req.body.name || '').trim();
+  const name = scalarString(req.body.name);
   const description = String(req.body.description || '').trim() || null;
 
   if (name === '') {
@@ -113,7 +114,7 @@ async function roleUpdate(req, res) {
     return;
   }
 
-  const name = String(req.body.name || '').trim();
+  const name = scalarString(req.body.name);
   const description = String(req.body.description || '').trim() || null;
   if (name === '') {
     flash.set(req, 'error', 'Role name is required.');
@@ -228,7 +229,7 @@ async function rolePermissionsUpdate(req, res) {
 async function permissionCreate(req, res) {
   const user = req.user;
   const permissionKey = String(req.body.permission_key || '').trim().toLowerCase();
-  const name = String(req.body.name || '').trim();
+  const name = scalarString(req.body.name);
   const description = String(req.body.description || '').trim() || null;
   const category = String(req.body.category || '').trim() || null;
 
@@ -275,7 +276,7 @@ async function permissionUpdate(req, res) {
     return;
   }
 
-  const name = String(req.body.name || '').trim();
+  const name = scalarString(req.body.name);
   const description = String(req.body.description || '').trim() || null;
   const category = String(req.body.category || '').trim() || null;
   if (name === '') {

@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const { scalarString } = require('../helpers/input');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const complianceTaskTypeRepository = require('../repositories/complianceTaskTypeRepository');
 
@@ -23,7 +24,7 @@ async function createForm(req, res) {
 }
 
 async function create(req, res) {
-  const name = String(req.body.name || '').trim();
+  const name = scalarString(req.body.name);
   if (name === '') {
     flash.set(req, 'error', 'Task name is required.');
     res.redirect('/compliance-task-types/create');
@@ -54,7 +55,7 @@ async function update(req, res) {
     return;
   }
 
-  const name = String(req.body.name || '').trim();
+  const name = scalarString(req.body.name);
   if (name === '') {
     flash.set(req, 'error', 'Task name is required.');
     res.redirect(`/compliance-task-types/${id}/edit`);

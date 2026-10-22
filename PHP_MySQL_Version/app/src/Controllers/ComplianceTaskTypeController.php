@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\Input;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\ComplianceTaskTypeRepository;
@@ -34,7 +35,7 @@ final class ComplianceTaskTypeController
 
     public function create(array $params): void
     {
-        $name = trim((string) ($_POST['name'] ?? ''));
+        $name = Input::scalarString($_POST['name'] ?? '');
         if ($name === '') {
             Flash::set('error', 'Task name is required.');
             header('Location: /compliance-task-types/create');
@@ -70,7 +71,7 @@ final class ComplianceTaskTypeController
             return;
         }
 
-        $name = trim((string) ($_POST['name'] ?? ''));
+        $name = Input::scalarString($_POST['name'] ?? '');
         if ($name === '') {
             Flash::set('error', 'Task name is required.');
             header("Location: /compliance-task-types/{$id}/edit");
