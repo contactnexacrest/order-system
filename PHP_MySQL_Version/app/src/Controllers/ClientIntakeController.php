@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Config\Env;
+use App\Helpers\CountryList;
 use App\Helpers\Flash;
 use App\Helpers\RateLimiter;
 use App\Helpers\View;
@@ -28,6 +29,7 @@ final class ClientIntakeController
             'wrapClass' => 'intake-wrap',
             'containerTypes' => LookupRepository::dropdownOptions('container_type'),
             'incoterms' => LookupRepository::incoterms(),
+            'countries' => CountryList::names(),
         ], 'layout/bare');
     }
 
@@ -74,6 +76,7 @@ final class ClientIntakeController
             'wrapClass' => 'intake-wrap',
             'containerTypes' => LookupRepository::dropdownOptions('container_type'),
             'incoterms' => LookupRepository::incoterms(),
+            'countries' => CountryList::names(),
         ], 'layout/bare');
     }
 

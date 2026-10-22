@@ -1,4 +1,29 @@
-<?php use App\Helpers\Csrf; $containerTypes = $containerTypes ?? []; $incoterms = $incoterms ?? []; ?>
+<?php
+use App\Helpers\Csrf;
+$containerTypes = $containerTypes ?? [];
+$incoterms = $incoterms ?? [];
+$countries = $countries ?? [];
+
+// External QA report U-06: Country was free text, producing inconsistent
+// data ("UK", "United Kingdom", "uk"). Same select-plus-hidden-fallback
+// pattern already used above for Incoterm — a short id prefix is all that
+// differs between the three country fields on this form, so one closure
+// renders all three rather than repeating the markup with copy-paste risk.
+$countryField = function (string $idPrefix, string $name, bool $required, array $countries): void {
+    $req = $required ? 'required' : '';
+    ?>
+    <select id="<?= $idPrefix ?>_select">
+      <option value="">— Select —</option>
+      <option value="Not sure">Not sure</option>
+      <?php foreach ($countries as $c): ?>
+        <option value="<?= htmlspecialchars($c) ?>"><?= htmlspecialchars($c) ?></option>
+      <?php endforeach; ?>
+      <option value="__other__">Other (not listed) — specify</option>
+    </select>
+    <input type="text" id="<?= $idPrefix ?>_input" name="<?= $name ?>" placeholder="Type the country" style="display:none" readonly <?= $req ?>>
+    <?php
+};
+?>
 <div class="card">
   <h1>Quotation Details Form</h1>
   <p class="muted">Just your company and shipping details — no product information needed here. We'll review and send your Quotation within 24 hours.</p>
@@ -30,7 +55,7 @@
           <input type="text" name="billing_postcode" placeholder="e.g., 3011 AD">
         </label>
         <label>Country *
-          <input type="text" name="billing_country" placeholder="e.g., Netherlands" required>
+          <?php $countryField('billing_country', 'billing_country', true, $countries); ?>
         </label>
         <label>Contact Person *
           <input type="text" name="contact_person" placeholder="e.g., John Doe" required>
@@ -42,16 +67,18 @@
           <input type="text" name="phone" placeholder="e.g., +1 555 123 4567">
         </label>
         <label>VAT / EORI / Tax Reg. No. *
-          <input type="text" name="vat_eori_tax_no" placeholder="UK: EORI No. | Others: Tax Reg. No." required>
+          <input type="text" name="vat_eori_tax_no" placeholder="e.g., GB123456789" required>
+          <small class="muted">UK: EORI No. | Others: Tax Reg. No.</small>
         </label>
         <label>Country of Destination *
-          <input type="text" name="country_of_destination" placeholder="e.g., Hungary / UK / France" required>
+          <?php $countryField('country_of_destination', 'country_of_destination', true, $countries); ?>
         </label>
         <label>Port of Discharge
           <input type="text" name="port_of_discharge_text" placeholder="Optional — we'll advise">
         </label>
         <label class="full">Certificate of Origin Type
-          <input type="text" name="coo_type" placeholder="GSP Form A (preferential) / Non-preferential — confirm with your customs broker if unsure">
+          <input type="text" name="coo_type" placeholder="e.g., GSP Form A">
+          <small class="muted">GSP Form A (preferential) / Non-preferential — confirm with your customs broker if unsure</small>
         </label>
       </div>
     </fieldset>
@@ -77,10 +104,11 @@
           <input type="text" name="consignee_postcode" placeholder="e.g., 3011 AD">
         </label>
         <label>Country
-          <input type="text" name="consignee_country" placeholder="e.g., Netherlands">
+          <?php $countryField('consignee_country', 'consignee_country', false, $countries); ?>
         </label>
         <label>VAT / EORI / Tax Reg. No.
-          <input type="text" name="consignee_vat_eori_tax_no" placeholder="UK: EORI No. | Others: Tax Reg. No.">
+          <input type="text" name="consignee_vat_eori_tax_no" placeholder="e.g., GB123456789">
+          <small class="muted">UK: EORI No. | Others: Tax Reg. No.</small>
         </label>
         <label>Contact Person
           <input type="text" name="consignee_contact_person" placeholder="e.g., Jane Smith">
@@ -154,4 +182,20 @@
   select.addEventListener('change', apply);
   apply();
 })();
+function wireCountryField(idPrefix) {
+  var select = document.getElementById(idPrefix + '_select');
+  var input = document.getElementById(idPrefix + '_input');
+  if (!select || !input) { return; }
+  function apply() {
+    var isOther = select.value === '__other__';
+    input.style.display = isOther ? '' : 'none';
+    input.readOnly = !isOther;
+    if (!isOther) { input.value = select.value; }
+  }
+  select.addEventListener('change', apply);
+  apply();
+}
+wireCountryField('billing_country');
+wireCountryField('country_of_destination');
+wireCountryField('consignee_country');
 </script>

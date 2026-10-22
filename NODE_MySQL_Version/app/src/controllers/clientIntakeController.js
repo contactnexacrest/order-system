@@ -8,6 +8,7 @@ const rateLimiter = require('../helpers/rateLimiter');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const lookupRepository = require('../repositories/lookupRepository');
+const countryList = require('../helpers/countryList');
 const { formatForDb } = require('../helpers/dbDateTime');
 
 // QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order token
@@ -33,6 +34,7 @@ async function show(req, res) {
     wrapClass: 'intake-wrap',
     containerTypes: await lookupRepository.dropdownOptions('container_type'),
     incoterms: await lookupRepository.incoterms(),
+    countries: countryList.names(),
   }, 'layout/bare');
 }
 
@@ -63,6 +65,8 @@ async function showEdit(req, res) {
   }
   const incoterms = await lookupRepository.incoterms();
   const incotermValue = submission.incoterm_preference || '';
+  const countries = countryList.names();
+  const isOtherCountry = (value) => value !== '' && value !== 'Not sure' && !countries.includes(value);
   res.renderView('client_intake/edit_form', {
     submission,
     token: req.params.token,
@@ -70,6 +74,10 @@ async function showEdit(req, res) {
     containerTypes: await lookupRepository.dropdownOptions('container_type'),
     incoterms,
     incotermIsOther: incotermValue !== '' && !incoterms.some((i) => i.code === incotermValue),
+    countries,
+    billingCountryIsOther: isOtherCountry(submission.billing_country || ''),
+    countryOfDestinationIsOther: isOtherCountry(submission.country_of_destination || ''),
+    consigneeCountryIsOther: isOtherCountry(submission.consignee_country || ''),
   }, 'layout/bare');
 }
 
