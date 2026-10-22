@@ -8,7 +8,21 @@ use App\Config\Database;
 
 final class OrderStageRepository
 {
-    /** Creates all 9 order_stages rows for a new order. Stage 1 starts unlocked/in_progress, the rest locked. */
+    /**
+     * Creates all 9 order_stages rows for a new order. Stage 1 starts
+     * unlocked/in_progress, the rest locked.
+     *
+     * External QA report L-14: orders.current_stage_id — a separate
+     * column from these order_stages rows, read by the per-order/
+     * per-stage audit file_store folder layout — stayed NULL until the
+     * first gate actually passed (StageGateService::passAndUnlockNext()
+     * is the only other writer), so every brand-new order's own Stage 1
+     * documents filed into a generic fallback folder instead of its real
+     * Stage 1 folder. This is the one chokepoint all 3 "new order" call
+     * sites (OrderController::store(), OrderDuplicationService,
+     * SampleDataService) already go through, so setting it here closes
+     * the gap for all of them at once.
+     */
     public static function initializeForOrder(int $orderId): void
     {
         $pdo = Database::connection();
@@ -18,14 +32,21 @@ final class OrderStageRepository
             'INSERT INTO order_stages (order_id, stage_id, status, unlocked_at)
              VALUES (:order_id, :stage_id, :status, :unlocked_at)'
         );
+        $firstStageId = null;
         foreach ($stages as $stage) {
             $isFirst = (int) $stage['stage_number'] === 1;
+            if ($isFirst) {
+                $firstStageId = (int) $stage['id'];
+            }
             $stmt->execute([
                 'order_id'    => $orderId,
                 'stage_id'    => $stage['id'],
                 'status'      => $isFirst ? 'in_progress' : 'locked',
                 'unlocked_at' => $isFirst ? date('Y-m-d H:i:s') : null,
             ]);
+        }
+        if ($firstStageId !== null) {
+            OrderRepository::setCurrentStage($orderId, $firstStageId);
         }
     }
 

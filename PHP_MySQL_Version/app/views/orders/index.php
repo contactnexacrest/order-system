@@ -42,7 +42,7 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
         <span class="entity-card-title"><?= htmlspecialchars($o['order_reference']) ?></span>
         <?php if (!empty($o['incoterm_code'])): ?><span class="tag tag-gold"><?= htmlspecialchars($o['incoterm_code']) ?></span><?php endif; ?>
       </div>
-      <div class="entity-card-sub"><?= htmlspecialchars($o['company_legal_name']) ?></div>
+      <div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div>
       <div>
         <div class="mini-stage-track">
           <?php for ($i = 1; $i <= $stageTotal; $i++): ?>

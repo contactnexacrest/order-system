@@ -6,10 +6,30 @@ const { formatForDb } = require('../helpers/dbDateTime');
 // QA-5 ORD-05: optional executor lets this join the caller's transaction
 // (order creation — see ordersController.store()), defaulting to the plain
 // pool for every other existing call site.
+/**
+ * Creates all 9 order_stages rows for a new order. Stage 1 starts
+ * unlocked/in_progress, the rest locked.
+ *
+ * External QA report L-14: orders.current_stage_id — a separate column
+ * from these order_stages rows, read by the per-order/per-stage audit
+ * file_store folder layout — stayed NULL until the first gate actually
+ * passed (stageGateService.passAndUnlockNext() is the only other writer),
+ * so every brand-new order's own Stage 1 documents filed into a generic
+ * fallback folder instead of its real Stage 1 folder. This is the one
+ * chokepoint all 3 "new order" call sites (ordersController.store(),
+ * orderDuplicationService, sampleDataService) already go through, so
+ * setting it here (via the same `executor`, so it stays inside whichever
+ * transaction the caller is already running) closes the gap for all of
+ * them at once.
+ */
 async function initializeForOrder(orderId, executor = db) {
   const stages = await executor.query('SELECT id, stage_number FROM stages_master ORDER BY sequence');
+  let firstStageId = null;
   for (const stage of stages) {
     const isFirst = parseInt(stage.stage_number, 10) === 1;
+    if (isFirst) {
+      firstStageId = stage.id;
+    }
     await executor.execute(
       'INSERT INTO order_stages (order_id, stage_id, status, unlocked_at) VALUES (:order_id, :stage_id, :status, :unlocked_at)',
       {
@@ -21,6 +41,9 @@ async function initializeForOrder(orderId, executor = db) {
         unlocked_at: isFirst ? formatForDb(new Date()) : null,
       }
     );
+  }
+  if (firstStageId !== null) {
+    await executor.execute('UPDATE orders SET current_stage_id = :stage_id WHERE id = :id', { stage_id: firstStageId, id: orderId });
   }
 }
 
