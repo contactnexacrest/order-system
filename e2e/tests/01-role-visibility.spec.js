@@ -41,8 +41,31 @@ function navLink(page, href) {
 }
 
 test.describe('Role-based navigation visibility', () => {
-  test('Admin sees every module, including Admin/Settings', async ({ page }) => {
+  test('Managing Director (the seeded account) sees every module, including Admin/Settings', async ({ page }) => {
     await login(page, 'admin');
+    await expect(navLink(page, '/orders')).toBeAttached();
+    await expect(navLink(page, '/reports')).toBeAttached();
+    await expect(navLink(page, '/users')).toBeAttached();
+    await expect(navLink(page, '/audit-log')).toBeAttached();
+    await expect(page.getByRole('link', { name: 'CA / Accounting' })).toBeVisible();
+  });
+
+  // The 'Admin' role is a literal, distinct role (role_id 1) — it gets
+  // the same full CROSS JOIN permission grant as Managing Director and
+  // Executive Director in seed.sql, so it's expected to behave
+  // identically, but it had never actually been logged into or tested as
+  // its own account before — tested explicitly rather than assumed.
+  test('Admin (the literal role, not Managing Director) sees every module too', async ({ page }) => {
+    await login(page, 'adminRole');
+    await expect(navLink(page, '/orders')).toBeAttached();
+    await expect(navLink(page, '/reports')).toBeAttached();
+    await expect(navLink(page, '/users')).toBeAttached();
+    await expect(navLink(page, '/audit-log')).toBeAttached();
+    await expect(page.getByRole('link', { name: 'CA / Accounting' })).toBeVisible();
+  });
+
+  test('Executive Director sees every module too (same full grant as Admin/MD)', async ({ page }) => {
+    await login(page, 'executiveDirector');
     await expect(navLink(page, '/orders')).toBeAttached();
     await expect(navLink(page, '/reports')).toBeAttached();
     await expect(navLink(page, '/users')).toBeAttached();

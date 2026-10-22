@@ -9,8 +9,17 @@
 // each dev DB, same password, purely for this suite.
 const PASSWORD = 'PlaywrightTest#2026';
 
+// 'admin' is historical — it's actually the seeded Managing Director
+// account (role_id 2), not the distinct 'Admin' role (role_id 1).
+// adminRole/executiveDirector below are the two separate role accounts
+// that account's name never covered — Admin and Managing Director and
+// Executive Director all get every permission via seed.sql's CROSS JOIN,
+// so their *behavior* is identical, but each is still its own literal
+// role and login, tested as such rather than assumed from the others.
 const ROLES = {
   admin: { email: 'gulmohar.sontakke@nexacrestinternational.com', name: 'Gulmohar Sontakke' },
+  adminRole: { email: 'ui-test-admin@nexacrest.test', name: 'UI Test Admin' },
+  executiveDirector: { email: 'arti.sontakke@nexacrestinternational.com', name: 'Arti Sontakke' },
   exportExecutive: { email: 'ui-test-export-exec@nexacrest.test', name: 'UI Test Export Exec' },
   accountsExecutive: { email: 'ui-test-accounts-exec@nexacrest.test', name: 'UI Test Accounts Exec' },
   logisticsExecutive: { email: 'ui-test-logistics-exec@nexacrest.test', name: 'UI Test Logistics Exec' },

@@ -66,4 +66,24 @@ function resetClientPassword(email, password) {
   }
 }
 
-module.exports = { resetClientPassword };
+/**
+ * Creates (or resets, if one already exists) a client_logins row directly
+ * for a given client email — used by specs whose feature under test
+ * (e.g. Reorder Requests) has no stage requirement of its own but still
+ * needs a real client-portal login, without making the test walk an
+ * order all the way through the Stage 3 advance-cleared gate just to
+ * trigger ClientPortalService::provisionIfNeeded() as a side effect.
+ */
+function provisionClientLogin(email, password) {
+  const hash = bcryptHash(password);
+  const sql =
+    `INSERT INTO client_logins (client_id, password_hash, is_active, force_password_change) ` +
+    `SELECT id, '${hash}', 1, 0 FROM clients WHERE email='${email}' ` +
+    `ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), is_active=1, force_password_change=0`;
+  const result = spawnSync('mysql', ['-u', DB_USER, `-p${DB_PASSWORD}`, dbName(), '-e', sql]);
+  if (result.status !== 0) {
+    throw new Error(`client_logins provisioning failed: ${result.stderr.toString()}`);
+  }
+}
+
+module.exports = { resetClientPassword, provisionClientLogin };
