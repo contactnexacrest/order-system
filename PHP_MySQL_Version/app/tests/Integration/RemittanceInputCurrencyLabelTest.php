@@ -78,17 +78,18 @@ final class RemittanceInputCurrencyLabelTest extends DbTestCase
     public function testBalanceRemittanceFormLabelsTheInputWithTheOrdersCurrency(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'EUR');
+        $userId = $this->createTestUser('Admin');
         for ($stage = 1; $stage <= 5; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
         }
-        StageGateService::maybeAutoSkipFreightStage($orderId, 0);
+        StageGateService::maybeAutoSkipFreightStage($orderId, $userId);
         OrderShippingRepository::upsert($orderId, ['etd' => null, 'eta' => null]);
         OrderShippingRepository::recordBl($orderId, 'BL-CURRLABEL-TEST', '2026-01-01');
         StageGateService::passAndUnlockNext($orderId, 7, null);
         $this->createTestDocument($orderId, 'CI', 'approved');
         OrderPaymentStatusRepository::initializeForOrder($orderId);
 
-        $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        $_SESSION['_auth_user_id'] = $userId;
         ob_start();
         (new OrderController())->show(['id' => (string) $orderId]);
         $output = ob_get_clean();

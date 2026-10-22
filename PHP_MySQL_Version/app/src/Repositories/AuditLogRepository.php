@@ -141,6 +141,13 @@ final class AuditLogRepository
      */
     public static function forOrder(int $orderId): array
     {
+        // External QA report L-23: order_payment_status/order_supplier_po
+        // are logged against (CA_INR_ACTUAL_* already did before this fix;
+        // ADVANCE/BALANCE_PAYMENT_*, SUPPLIER_PO_SAVED/SIGNED are new), but
+        // this method never looked at either entity type — every one of
+        // those entries existed in audit_log yet was invisible on the
+        // order's own audit trail, the one place a "cannot be traced"
+        // defect actually gets fixed from a user's point of view.
         $sql = "SELECT al.*, u.name AS user_name
                 FROM audit_log al LEFT JOIN users u ON u.id = al.user_id
                 WHERE (al.entity_type = 'orders' AND al.entity_id = :order_id_1)
@@ -148,6 +155,8 @@ final class AuditLogRepository
                    OR (al.entity_type = 'disputes' AND al.entity_id IN (SELECT id FROM disputes WHERE order_id = :order_id_3))
                    OR (al.entity_type = 'amendments' AND al.entity_id IN (SELECT id FROM amendments WHERE order_id = :order_id_4))
                    OR (al.entity_type = 'email_log' AND al.entity_id IN (SELECT id FROM email_log WHERE order_id = :order_id_5))
+                   OR (al.entity_type = 'order_payment_status' AND al.entity_id = :order_id_6)
+                   OR (al.entity_type = 'order_supplier_po' AND al.entity_id IN (SELECT id FROM order_supplier_po WHERE order_id = :order_id_7))
                 ORDER BY al.created_at DESC";
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute([
@@ -156,6 +165,8 @@ final class AuditLogRepository
             'order_id_3' => $orderId,
             'order_id_4' => $orderId,
             'order_id_5' => $orderId,
+            'order_id_6' => $orderId,
+            'order_id_7' => $orderId,
         ]);
         return $stmt->fetchAll();
     }

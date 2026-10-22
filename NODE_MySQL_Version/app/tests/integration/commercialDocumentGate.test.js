@@ -46,18 +46,34 @@ describe('Commercial document gate — SUPPO/CI must exist before confirming (90
     return poResult.insertId;
   }
 
+  async function createTestUser(roleName = 'Admin') {
+    const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: roleName });
+    const result = await db.execute(
+      `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
+       VALUES ('Jest CommGate Test User', :email, NULL, 'x', :role_id, 1, 0, 0)`,
+      { email: `jest-commgate-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`, role_id: role.id }
+    );
+    return result.insertId;
+  }
+
+  // External QA report L-23: passAndUnlockNext()/maybeAutoSkipFreightStage()
+  // now audit-log against users(id) via a FOREIGN KEY — the literal
+  // placeholder `0` these helpers used (harmless before that fix, since
+  // nothing read userId) now violates the constraint. A real test user.
   async function unlockThroughStage5(orderId) {
+    const userId = await createTestUser();
     for (let stage = 1; stage <= 4; stage++) {
-      await stageGateService.passAndUnlockNext(orderId, stage, 0);
+      await stageGateService.passAndUnlockNext(orderId, stage, userId);
     }
   }
 
   async function unlockThroughStage8(orderId) {
+    const userId = await createTestUser();
     for (let stage = 1; stage <= 5; stage++) {
-      await stageGateService.passAndUnlockNext(orderId, stage, 0);
+      await stageGateService.passAndUnlockNext(orderId, stage, userId);
     }
-    await stageGateService.maybeAutoSkipFreightStage(orderId, 0);
-    await stageGateService.passAndUnlockNext(orderId, 7, 0);
+    await stageGateService.maybeAutoSkipFreightStage(orderId, userId);
+    await stageGateService.passAndUnlockNext(orderId, 7, userId);
   }
 
   function fakeReq(params, body = {}, user = null) {

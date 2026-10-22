@@ -115,7 +115,7 @@ final class CommercialDocumentGateTest extends DbTestCase
         for ($stage = 1; $stage <= 5; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
         }
-        StageGateService::maybeAutoSkipFreightStage($orderId, 0);
+        StageGateService::maybeAutoSkipFreightStage($orderId, $this->createTestUser('Admin'));
         StageGateService::passAndUnlockNext($orderId, 7, null);
     }
 

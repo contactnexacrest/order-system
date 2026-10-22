@@ -57,6 +57,8 @@ async function store(req, res) {
   if (await testModeService.isEnabled()) {
     await clientRepository.markTest(clientId);
   }
+  // External QA report L-23: client creation was never audit-logged.
+  await auditLogRepository.log(user.id, 'CLIENT_CREATED', 'clients', clientId, 'company_legal_name', null, companyLegalName);
 
   flash.set(req, 'success', `Client created — Buyer Inquiry Ref ${clientUniqueNumber}.`);
   res.redirect(`/clients/${clientId}`);

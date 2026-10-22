@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Repositories\AuditLogRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderStageRepository;
 
@@ -59,6 +60,15 @@ final class StageGateService
             return false; // still locked — the stage before this one hasn't passed yet
         }
         OrderStageRepository::passGate((int) $current['id'], $userId);
+        // External QA report L-23: this is the single choke point every
+        // stage-advancing controller action (advance cleared, OC
+        // acknowledged, Supplier PO signed, BL issued, balance cleared,
+        // COO received...) goes through — a full order journey used to
+        // log only document approvals/portal/OC-ack, with none of the 9
+        // stage gates themselves ever traced. One log call here covers
+        // every stage for every order, rather than repeating it at each
+        // of the ~8 call sites.
+        AuditLogRepository::log($userId, 'ORDER_STAGE_GATE_PASSED', 'orders', $orderId, 'stage_number', null, (string) $stageNumber);
 
         $next = OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber + 1);
         if ($next && $next['status'] === 'locked') {
@@ -86,6 +96,7 @@ final class StageGateService
             return; // already skipped/passed, or not yet unlocked — idempotent no-op
         }
         OrderStageRepository::skip((int) $freightStage['id'], 'FOB — freight stage auto-skipped, buyer arranges own freight');
+        AuditLogRepository::log($userId, 'ORDER_STAGE_GATE_SKIPPED', 'orders', $orderId, 'stage_number', null, '6', 'FOB — buyer arranges own freight');
 
         $next = OrderStageRepository::findByOrderAndStageNumber($orderId, 7);
         if ($next && $next['status'] === 'locked') {

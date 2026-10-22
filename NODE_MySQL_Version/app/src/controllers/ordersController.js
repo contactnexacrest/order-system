@@ -455,6 +455,9 @@ async function store(req, res) {
     return result;
   });
 
+  // External QA report L-23: order creation was never audit-logged.
+  await auditLogRepository.log(user.id, 'ORDER_CREATED', 'orders', orderId, 'order_reference', null, orderReference);
+
   flash.set(req, 'success', `Order ${orderReference} created for ${client.company_legal_name}.`);
   res.redirect(`/orders/${orderId}`);
 }
@@ -1165,6 +1168,8 @@ async function recordAdvancePayment(req, res) {
     return;
   }
   await orderPaymentStatusRepository.recordAdvanceReceived(orderId, amount, receivedAt);
+  // External QA report L-23: advance payment recording was never audit-logged.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'advance_amount', null, String(amount));
 
   // docs/schema.sql Section AC — fallback lock trigger. The PI-details
   // form (client's own consent) is the primary trigger; if a client never
@@ -1238,6 +1243,8 @@ async function clearAdvancePayment(req, res) {
 
   await orderPaymentStatusRepository.markAdvanceCleared(orderId, clearedAt, user.id);
   await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
+  // External QA report L-23: advance payment clearing was never audit-logged.
+  await auditLogRepository.log(user.id, 'ADVANCE_PAYMENT_CLEARED', 'order_payment_status', orderId, 'advance_cleared_at', null, clearedAt);
   await stageGateService.passAndUnlockNext(orderId, 3, user.id);
 
   // Client portal access is provisioned here, and only here — see
@@ -1412,6 +1419,8 @@ async function saveSupplierPo(req, res) {
     required_delivery_date: str(body.required_delivery_date) || null,
     packing_requirement: str(body.packing_requirement) || null,
   });
+  // External QA report L-23: saving Supplier PO terms was never audit-logged.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'SUPPLIER_PO_SAVED', 'orders', orderId, 'supplier_po_reference', null, supplierPoReference);
 
   flash.set(req, 'success', `Supplier PO terms saved (${supplierPoReference}). Generate the Supplier PO document below.`);
   res.redirect(`/orders/${orderId}`);
@@ -1504,6 +1513,8 @@ async function confirmSupplierSigned(req, res) {
     return;
   }
   await orderSupplierPoRepository.markSigned(supplierPo.id);
+  // External QA report L-23: supplier PO signature confirmation was never audit-logged.
+  await auditLogRepository.log(user.id, 'SUPPLIER_PO_SIGNED', 'order_supplier_po', supplierPo.id, 'supplier_po_reference', null, supplierPo.supplier_po_reference || null);
   await stageGateService.passAndUnlockNext(orderId, 5, user.id);
   await stageGateService.maybeAutoSkipFreightStage(orderId, user.id);
   flash.set(req, 'success', 'Supplier PO signature confirmed.');
@@ -1769,6 +1780,8 @@ async function recordBlIssued(req, res) {
     return;
   }
   await orderShippingRepository.recordBl(orderId, blNumber, blDate);
+  // External QA report L-23: BL issuance was never audit-logged.
+  await auditLogRepository.log(user.id, 'BL_ISSUED', 'orders', orderId, 'bl_number', null, blNumber);
 
   if (req.file && req.file.buffer) {
     const order = await orderRepository.find(orderId);
@@ -1860,6 +1873,8 @@ async function recordBalancePayment(req, res) {
     return;
   }
   await orderPaymentStatusRepository.recordBalanceReceived(orderId, amount, receivedAt);
+  // External QA report L-23: balance payment recording was never audit-logged.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'balance_amount', null, String(amount));
   flash.set(req, 'success', 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1886,6 +1901,8 @@ async function clearBalancePayment(req, res) {
   }
   const clearedAt = str(req.body.balance_cleared_at) || todayYmd();
   await orderPaymentStatusRepository.markBalanceCleared(orderId, clearedAt, user.id);
+  // External QA report L-23: balance payment clearing was never audit-logged.
+  await auditLogRepository.log(user.id, 'BALANCE_PAYMENT_CLEARED', 'order_payment_status', orderId, 'balance_cleared_at', null, clearedAt);
   await stageGateService.passAndUnlockNext(orderId, 8, user.id);
   flash.set(req, 'success', 'Balance payment cleared. Stage 9 (Document Despatch & Closure) unlocked.');
   res.redirect(`/orders/${orderId}`);

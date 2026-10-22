@@ -2,6 +2,7 @@
 
 const orderRepository = require('../repositories/orderRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
+const auditLogRepository = require('../repositories/auditLogRepository');
 
 // Port of App\Services\StageGateService. See StageGate.docx for the full
 // Stage 1-9 gate list (mirrored in the PHP source's class-level comment).
@@ -37,6 +38,14 @@ async function passAndUnlockNext(orderId, stageNumber, userId) {
     return false; // still locked — the stage before this one hasn't passed yet
   }
   await orderStageRepository.passGate(current.id, userId);
+  // External QA report L-23: this is the single choke point every
+  // stage-advancing controller action (advance cleared, OC acknowledged,
+  // Supplier PO signed, BL issued, balance cleared, COO received...) goes
+  // through — a full order journey used to log only document approvals/
+  // portal/OC-ack, with none of the 9 stage gates themselves ever traced.
+  // One log call here covers every stage for every order, rather than
+  // repeating it at each of the ~8 call sites.
+  await auditLogRepository.log(userId, 'ORDER_STAGE_GATE_PASSED', 'orders', orderId, 'stage_number', null, String(stageNumber));
 
   const next = await orderStageRepository.findByOrderAndStageNumber(orderId, stageNumber + 1);
   if (next && next.status === 'locked') {
@@ -84,6 +93,7 @@ async function maybeAutoSkipFreightStage(orderId, userId) {
     return; // already skipped/passed, or not yet unlocked — idempotent no-op
   }
   await orderStageRepository.skip(freightStage.id, 'FOB — freight stage auto-skipped, buyer arranges own freight');
+  await auditLogRepository.log(userId, 'ORDER_STAGE_GATE_SKIPPED', 'orders', orderId, 'stage_number', null, '6', 'FOB — buyer arranges own freight');
 
   const next = await orderStageRepository.findByOrderAndStageNumber(orderId, 7);
   if (next && next.status === 'locked') {

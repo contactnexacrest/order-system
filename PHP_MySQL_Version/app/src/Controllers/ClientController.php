@@ -63,6 +63,8 @@ final class ClientController
         if (TestModeService::isEnabled()) {
             ClientRepository::markTest($clientId);
         }
+        // External QA report L-23: client creation was never audit-logged.
+        AuditLogRepository::log((int) $user['id'], 'CLIENT_CREATED', 'clients', $clientId, 'company_legal_name', null, $companyLegalName);
 
         Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}.");
         header("Location: /clients/{$clientId}");

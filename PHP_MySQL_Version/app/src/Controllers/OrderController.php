@@ -453,6 +453,9 @@ final class OrderController
             throw $e;
         }
 
+        // External QA report L-23: order creation was never audit-logged.
+        AuditLogRepository::log((int) $user['id'], 'ORDER_CREATED', 'orders', $orderId, 'order_reference', null, $orderReference);
+
         Flash::set('success', "Order {$orderReference} created for {$client['company_legal_name']}.");
         header("Location: /orders/{$orderId}");
     }
@@ -1155,6 +1158,8 @@ final class OrderController
             return;
         }
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
+        // External QA report L-23: advance payment recording was never audit-logged.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'advance_amount', null, (string) $amount);
 
         // docs/schema.sql Section AC — fallback lock trigger. The PI-details
         // form (client's own consent) is the primary trigger; if a client
@@ -1226,6 +1231,8 @@ final class OrderController
 
         OrderPaymentStatusRepository::markAdvanceCleared($orderId, $clearedAt, (int) $user['id']);
         OrderPaymentStatusRepository::setBalanceAmount($orderId, $balanceAmount, $balanceDueDate);
+        // External QA report L-23: advance payment clearing was never audit-logged.
+        AuditLogRepository::log((int) $user['id'], 'ADVANCE_PAYMENT_CLEARED', 'order_payment_status', $orderId, 'advance_cleared_at', null, $clearedAt);
         StageGateService::passAndUnlockNext($orderId, 3, (int) $user['id']);
 
         // Client portal access is provisioned here, and only here — see
@@ -1403,6 +1410,8 @@ final class OrderController
             'required_delivery_date' => trim((string) ($_POST['required_delivery_date'] ?? '')) ?: null,
             'packing_requirement'   => trim((string) ($_POST['packing_requirement'] ?? '')) ?: null,
         ]);
+        // External QA report L-23: saving Supplier PO terms was never audit-logged.
+        AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_PO_SAVED', 'orders', $orderId, 'supplier_po_reference', null, $supplierPoReference);
 
         Flash::set('success', "Supplier PO terms saved ({$supplierPoReference}). Generate the Supplier PO document below.");
         header("Location: /orders/{$orderId}");
@@ -1499,6 +1508,8 @@ final class OrderController
             return;
         }
         OrderSupplierPoRepository::markSigned((int) $supplierPo['id']);
+        // External QA report L-23: supplier PO signature confirmation was never audit-logged.
+        AuditLogRepository::log((int) $user['id'], 'SUPPLIER_PO_SIGNED', 'order_supplier_po', (int) $supplierPo['id'], 'supplier_po_reference', null, $supplierPo['supplier_po_reference'] ?? null);
         StageGateService::passAndUnlockNext($orderId, 5, (int) $user['id']);
         StageGateService::maybeAutoSkipFreightStage($orderId, (int) $user['id']);
         Flash::set('success', 'Supplier PO signature confirmed.');
@@ -1766,6 +1777,8 @@ final class OrderController
             return;
         }
         OrderShippingRepository::recordBl($orderId, $blNumber, $blDate);
+        // External QA report L-23: BL issuance was never audit-logged.
+        AuditLogRepository::log((int) $user['id'], 'BL_ISSUED', 'orders', $orderId, 'bl_number', null, $blNumber);
 
         if (!empty($_FILES['bl_copy']['name'])) {
             $order = OrderRepository::find($orderId);
@@ -1860,6 +1873,8 @@ final class OrderController
             return;
         }
         OrderPaymentStatusRepository::recordBalanceReceived($orderId, $amount, $receivedAt);
+        // External QA report L-23: balance payment recording was never audit-logged.
+        AuditLogRepository::log(AuthService::currentUserId(), 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'balance_amount', null, (string) $amount);
         Flash::set('success', 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
@@ -1888,6 +1903,8 @@ final class OrderController
         }
         $clearedAt = trim((string) ($_POST['balance_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markBalanceCleared($orderId, $clearedAt, (int) $user['id']);
+        // External QA report L-23: balance payment clearing was never audit-logged.
+        AuditLogRepository::log((int) $user['id'], 'BALANCE_PAYMENT_CLEARED', 'order_payment_status', $orderId, 'balance_cleared_at', null, $clearedAt);
         StageGateService::passAndUnlockNext($orderId, 8, (int) $user['id']);
         Flash::set('success', 'Balance payment cleared. Stage 9 (Document Despatch & Closure) unlocked.');
         header("Location: /orders/{$orderId}");

@@ -76,6 +76,13 @@ async function distinctActionTypes() {
  * belong to this order.
  */
 async function forOrder(orderId) {
+  // External QA report L-23: order_payment_status/order_supplier_po are
+  // logged against (CA_INR_ACTUAL_* already did before this fix;
+  // ADVANCE/BALANCE_PAYMENT_*, SUPPLIER_PO_SAVED/SIGNED are new), but this
+  // never looked at either entity type — every one of those entries
+  // existed in audit_log yet was invisible on the order's own audit
+  // trail, the one place a "cannot be traced" defect actually gets fixed
+  // from a user's point of view.
   return db.query(
     `SELECT al.*, u.name AS user_name
      FROM audit_log al LEFT JOIN users u ON u.id = al.user_id
@@ -84,6 +91,8 @@ async function forOrder(orderId) {
         OR (al.entity_type = 'disputes' AND al.entity_id IN (SELECT id FROM disputes WHERE order_id = :order_id))
         OR (al.entity_type = 'amendments' AND al.entity_id IN (SELECT id FROM amendments WHERE order_id = :order_id))
         OR (al.entity_type = 'email_log' AND al.entity_id IN (SELECT id FROM email_log WHERE order_id = :order_id))
+        OR (al.entity_type = 'order_payment_status' AND al.entity_id = :order_id)
+        OR (al.entity_type = 'order_supplier_po' AND al.entity_id IN (SELECT id FROM order_supplier_po WHERE order_id = :order_id))
      ORDER BY al.created_at DESC`,
     { order_id: orderId }
   );

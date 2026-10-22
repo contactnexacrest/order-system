@@ -145,6 +145,7 @@ final class StageGateServiceTest extends DbTestCase
     /** QA-1 test-plan item P0.1(c): FOB auto-skips Stage 6; CIF does not. */
     public function testFobAutoSkipsFreightStageButCifDoesNot(): void
     {
+        $userId = $this->createTestUser('Admin');
         $fobClientId = $this->createTestClient();
         $fobOrderId = $this->createTestOrder($fobClientId, 'FOB');
         StageGateService::passAndUnlockNext($fobOrderId, 1, null);
@@ -152,7 +153,7 @@ final class StageGateServiceTest extends DbTestCase
         StageGateService::passAndUnlockNext($fobOrderId, 3, null);
         StageGateService::passAndUnlockNext($fobOrderId, 4, null);
         StageGateService::passAndUnlockNext($fobOrderId, 5, null);
-        StageGateService::maybeAutoSkipFreightStage($fobOrderId, 0);
+        StageGateService::maybeAutoSkipFreightStage($fobOrderId, $userId);
         $fobStages = $this->stageStatuses($fobOrderId);
         self::assertSame('skipped', $fobStages[6], 'FOB order should auto-skip Stage 6');
         self::assertSame('in_progress', $fobStages[7], 'Stage 7 should unlock immediately after the auto-skip');
@@ -164,7 +165,7 @@ final class StageGateServiceTest extends DbTestCase
         StageGateService::passAndUnlockNext($cifOrderId, 3, null);
         StageGateService::passAndUnlockNext($cifOrderId, 4, null);
         StageGateService::passAndUnlockNext($cifOrderId, 5, null);
-        StageGateService::maybeAutoSkipFreightStage($cifOrderId, 0);
+        StageGateService::maybeAutoSkipFreightStage($cifOrderId, $userId);
         $cifStages = $this->stageStatuses($cifOrderId);
         self::assertSame('in_progress', $cifStages[6], 'CIF order must NOT auto-skip Stage 6');
         self::assertSame('locked', $cifStages[7], 'Stage 7 must stay locked until Stage 6 genuinely passes on a CIF order');
