@@ -505,6 +505,7 @@ $router->post('/documents/{documentId}/cross-verify', [$reviews, 'crossVerify'],
 
 // Deferred email send (Section 10), 2-level approval.
 $router->get('/orders/{id}/email/compose', [$emailDispatch, 'composeGeneric'], [SessionAuth::required(), PermissionCheck::requires('generate_documents')]);
+$router->post('/orders/{id}/email/send', [$emailDispatch, 'requestSendGeneric'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->get('/orders/{id}/documents/{documentId}/send', [$emailDispatch, 'compose'], [SessionAuth::required(), PermissionCheck::requires('generate_documents')]);
 $router->post('/orders/{id}/documents/{documentId}/send', [$emailDispatch, 'requestSend'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->get('/email-approvals', [$emailDispatch, 'approvalQueue'], [SessionAuth::required(), PermissionCheck::requires('approve_email_send')]);

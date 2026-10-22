@@ -733,6 +733,7 @@ app.post('/reviews/:reviewId/reject', requireAuth, verifyCsrf, asyncHandler(revi
 app.post('/documents/:documentId/cross-verify', requireAuth, requirePermission('cross_verify_documents'), verifyCsrf, asyncHandler(reviewController.crossVerify));
 
 app.get('/orders/:id/email/compose', requireAuth, requirePermission('generate_documents'), asyncHandler(emailDispatchController.composeGeneric));
+app.post('/orders/:id/email/send', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(emailDispatchController.requestSendGeneric));
 app.get('/orders/:id/documents/:documentId/send', requireAuth, requirePermission('generate_documents'), asyncHandler(emailDispatchController.compose));
 app.post('/orders/:id/documents/:documentId/send', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(emailDispatchController.requestSend));
 app.get('/email-approvals', requireAuth, requirePermission('approve_email_send'), asyncHandler(emailDispatchController.approvalQueue));

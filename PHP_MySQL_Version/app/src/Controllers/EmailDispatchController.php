@@ -112,6 +112,37 @@ final class EmailDispatchController
         header("Location: /orders/{$orderId}");
     }
 
+    /**
+     * External QA report L-42: the generic counterpart to requestSend()
+     * above, for the 4 templates not tied to any document (payment
+     * reminder, shipment readiness, scanned BL copy, balance received) —
+     * composeGeneric()'s preview screen used to dead-end here with no
+     * submit route at all, so staff had to email these from outside the
+     * app with no record of when (EM-NODOC).
+     */
+    public function requestSendGeneric(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $templateKey = (string) ($_POST['template_key'] ?? '');
+        $scheduledAtRaw = trim((string) ($_POST['scheduled_at'] ?? ''));
+        $scheduledAt = $scheduledAtRaw !== '' ? str_replace('T', ' ', $scheduledAtRaw) . ':00' : null;
+
+        try {
+            $result = EmailDispatchService::requestSend($orderId, null, $templateKey, $scheduledAt, (int) AuthService::currentUser()['id']);
+            if ($result['dispatched']) {
+                Flash::set($result['sent'] ? 'success' : 'error', $result['sent']
+                    ? 'Sent immediately — the 2-level approval queue is currently switched off (Settings).'
+                    : 'Send attempted immediately (approval queue is off) but it failed — check Settings for the SMTP/mail configuration.');
+            } else {
+                Flash::set('success', 'Send submitted for approval.');
+            }
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+
+        header("Location: /orders/{$orderId}");
+    }
+
     /** Level 2 — approval queue. Shows both awaiting-approval and already-approved-but-not-yet-sent rows, since both are still cancellable. */
     public function approvalQueue(array $params): void
     {

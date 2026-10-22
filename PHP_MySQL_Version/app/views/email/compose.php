@@ -58,7 +58,19 @@ $isAnnexureResend = $documentId && ($document['document_type_code'] ?? null) ===
           <button type="submit" class="btn-sm btn-success">Submit for Level-2 Approval</button>
         </form>
       <?php else: ?>
-        <p class="muted" style="margin-top:0.75rem">This isn't tied to a document, so there's no attachment/approval-queue flow here — copy the subject/body above and send it yourself from your own mail client, addressed to <?= htmlspecialchars($preview['recipient_email']) ?>.</p>
+        <?php if ($templateKey === 'bl_copy_sent'): ?>
+          <p class="muted" style="margin-top:0.75rem">Attachment: the scanned Bill of Lading copy on file for this order (Shipping &rarr; attach it there first if you haven't yet).</p>
+        <?php else: ?>
+          <p class="muted" style="margin-top:0.75rem">This isn't tied to a specific document, so no attachment goes out with it.</p>
+        <?php endif; ?>
+        <form method="post" action="/orders/<?= (int) $orderId ?>/email/send">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="template_key" value="<?= htmlspecialchars($templateKey) ?>">
+          <label>Scheduled send time (leave blank for immediate)
+            <input type="datetime-local" name="scheduled_at">
+          </label>
+          <button type="submit" class="btn-sm btn-success">Submit for Level-2 Approval</button>
+        </form>
       <?php endif; ?>
     </div>
   <?php endif; ?>

@@ -10,6 +10,7 @@ const fileStoreRepository = require('../repositories/fileStoreRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderRepository = require('../repositories/orderRepository');
+const orderShippingRepository = require('../repositories/orderShippingRepository');
 const { formatForDb } = require('../helpers/dbDateTime');
 const permissionRepository = require('../repositories/permissionRepository');
 const signatoryRepository = require('../repositories/signatoryRepository');
@@ -155,8 +156,18 @@ async function buildPreview(orderId, documentId, templateKey, senderUserId) {
 async function requestSend(orderId, documentId, templateKey, scheduledAt, requestedByUserId) {
   const preview = await buildPreview(orderId, documentId, templateKey, requestedByUserId);
 
-  if (await emailLogRepository.hasActiveSendFor(documentId)) {
-    throw new Error('A send for this document is already awaiting approval or scheduled to go out — wait for it to send, be rejected, or fail before submitting another.');
+  // External QA report L-42: four generic templates (no document —
+  // payment_followup, shipment_readiness, bl_copy_sent,
+  // balance_receipt_confirmation) had no screen or route that ever
+  // actually submitted a send — hasActiveSendFor() is keyed on
+  // document_id, which is meaningless (and never matches NULL in SQL)
+  // for a generic send.
+  if (documentId !== null && documentId !== undefined) {
+    if (await emailLogRepository.hasActiveSendFor(documentId)) {
+      throw new Error('A send for this document is already awaiting approval or scheduled to go out — wait for it to send, be rejected, or fail before submitting another.');
+    }
+  } else if (await emailLogRepository.hasActiveGenericSendFor(orderId, templateKey)) {
+    throw new Error('A send of this email is already awaiting approval or scheduled to go out for this order — wait for it to send, be rejected, or fail before submitting another.');
   }
 
   const id = await emailLogRepository.create(
@@ -298,9 +309,12 @@ async function dispatch(emailLogRow) {
   if (!(await emailLogRepository.claimForSend(emailLogRow.id))) {
     return false;
   }
+  // External QA report L-42: a generic (document-less) send used to be
+  // marked failed unconditionally here — even once requestSend() above
+  // accepts one, dispatch() (called by both the background job and
+  // sendNowOverride()) would still refuse to ever actually send it.
   if (emailLogRow.document_id === null || emailLogRow.document_id === undefined) {
-    await emailLogRepository.markFailed(emailLogRow.id);
-    return false;
+    return dispatchGeneric(emailLogRow);
   }
   const document = await documentRepository.find(emailLogRow.document_id);
   if (!document || !document.pdf_file_id) {
@@ -352,6 +366,43 @@ async function dispatch(emailLogRow) {
       const due = new Date(now.getTime() + hours * 60 * 60 * 1000);
       await orderOcAcknowledgmentRepository.recordSent(document.order_id, document.id, formatForDb(now), formatForDb(due));
     }
+  } else {
+    await emailLogRepository.markFailed(emailLogRow.id);
+  }
+
+  return sent;
+}
+
+/**
+ * External QA report L-42: dispatch path for the 4 generic (no document)
+ * templates — payment_followup/shipment_readiness/
+ * balance_receipt_confirmation go out with no attachment; bl_copy_sent
+ * (the report's explicit named exception) attaches the order's scanned
+ * Bill of Lading copy (order_shipping.bl_copy_file_id — see
+ * orderShippingRepository.attachBlCopy(), the same file L-22 fixed the
+ * upload for) exactly like a document send attaches its PDF.
+ */
+async function dispatchGeneric(emailLogRow) {
+  const attachments = [];
+  if (emailLogRow.template_key === 'bl_copy_sent') {
+    const shipping = await orderShippingRepository.find(emailLogRow.order_id);
+    if (!shipping || !shipping.bl_copy_file_id) {
+      await emailLogRepository.markFailed(emailLogRow.id);
+      return false;
+    }
+    const file = await fileStoreRepository.find(shipping.bl_copy_file_id);
+    if (!file || !fs.existsSync(file.server_path)) {
+      await emailLogRepository.markFailed(emailLogRow.id);
+      return false;
+    }
+    attachments.push({ path: file.server_path, name: file.original_filename });
+  }
+
+  const sent = await mailSenderService.send(emailLogRow.recipient_email, emailLogRow.subject, emailLogRow.body_snapshot, attachments);
+
+  if (sent) {
+    await emailLogRepository.markSent(emailLogRow.id);
+    await auditLogRepository.log(null, 'EMAIL_SENT', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email);
   } else {
     await emailLogRepository.markFailed(emailLogRow.id);
   }

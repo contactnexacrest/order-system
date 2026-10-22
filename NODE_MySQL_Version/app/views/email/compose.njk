@@ -56,7 +56,19 @@
           <button type="submit" class="btn-sm btn-success">Submit for Level-2 Approval</button>
         </form>
       {% else %}
-        <p class="muted" style="margin-top:0.75rem">This isn't tied to a document, so there's no attachment/approval-queue flow here — copy the subject/body above and send it yourself from your own mail client, addressed to {{ preview.recipient_email }}.</p>
+        {% if templateKey == 'bl_copy_sent' %}
+          <p class="muted" style="margin-top:0.75rem">Attachment: the scanned Bill of Lading copy on file for this order (Shipping &rarr; attach it there first if you haven't yet).</p>
+        {% else %}
+          <p class="muted" style="margin-top:0.75rem">This isn't tied to a specific document, so no attachment goes out with it.</p>
+        {% endif %}
+        <form method="post" action="/orders/{{ orderId }}/email/send">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="template_key" value="{{ templateKey }}">
+          <label>Scheduled send time (leave blank for immediate)
+            <input type="datetime-local" name="scheduled_at">
+          </label>
+          <button type="submit" class="btn-sm btn-success">Submit for Level-2 Approval</button>
+        </form>
       {% endif %}
     </div>
   {% endif %}

@@ -79,6 +79,22 @@ final class EmailLogRepository
         return (bool) $stmt->fetchColumn();
     }
 
+    /**
+     * External QA report L-42: same "already in flight" guard as
+     * hasActiveSendFor(), for a generic (document_id IS NULL) template —
+     * keyed on (order, template_key) since there's no document id to key
+     * on. document_id = NULL never matches `= :document_id` in SQL, so
+     * this can't just reuse the query above with a null parameter.
+     */
+    public static function hasActiveGenericSendFor(int $orderId, string $templateKey): bool
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT 1 FROM email_log WHERE order_id = :order_id AND document_id IS NULL AND template_key = :template_key AND status IN ('pending_approval', 'approved') LIMIT 1"
+        );
+        $stmt->execute(['order_id' => $orderId, 'template_key' => $templateKey]);
+        return (bool) $stmt->fetchColumn();
+    }
+
     /** Level 2 approval queue. */
     public static function pendingApproval(): array
     {

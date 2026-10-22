@@ -105,6 +105,36 @@ async function requestSend(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * External QA report L-42: the generic counterpart to requestSend() above,
+ * for the 4 templates not tied to any document (payment reminder,
+ * shipment readiness, scanned BL copy, balance received) —
+ * composeGeneric()'s preview screen used to dead-end here with no submit
+ * route at all, so staff had to email these from outside the app with no
+ * record of when (EM-NODOC).
+ */
+async function requestSendGeneric(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const templateKey = String(req.body.template_key || '');
+  const scheduledAtRaw = String(req.body.scheduled_at || '').trim();
+  const scheduledAt = scheduledAtRaw !== '' ? `${scheduledAtRaw.replace('T', ' ')}:00` : null;
+
+  try {
+    const result = await emailDispatchService.requestSend(orderId, null, templateKey, scheduledAt, req.user.id);
+    if (result.dispatched) {
+      flash.set(req, result.sent ? 'success' : 'error', result.sent
+        ? 'Sent immediately — the 2-level approval queue is currently switched off (Settings).'
+        : 'Send attempted immediately (approval queue is off) but it failed — check Settings for the SMTP/mail configuration.');
+    } else {
+      flash.set(req, 'success', 'Send submitted for approval.');
+    }
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+
+  res.redirect(`/orders/${orderId}`);
+}
+
 /** Level 2 — approval queue. Shows both awaiting-approval and already-approved-but-not-yet-sent rows, since both are still cancellable. */
 async function approvalQueue(req, res) {
   res.renderView('email/approvals', { pending: await emailLogRepository.awaitingDispatch() }, 'layout/base');
@@ -173,4 +203,4 @@ async function cancel(req, res) {
   res.redirect(redirectTo);
 }
 
-module.exports = { compose, composeGeneric, requestSend, approvalQueue, approve, sendNow, reject, cancel };
+module.exports = { compose, composeGeneric, requestSend, requestSendGeneric, approvalQueue, approve, sendNow, reject, cancel };

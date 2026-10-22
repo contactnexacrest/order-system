@@ -102,15 +102,27 @@ final class EmailDispatchService
      */
     public static function requestSend(
         int $orderId,
-        int $documentId,
+        ?int $documentId,
         string $templateKey,
         ?string $scheduledAt,
         int $requestedByUserId
     ): array {
         $preview = self::buildPreview($orderId, $documentId, $templateKey, $requestedByUserId);
 
-        if (EmailLogRepository::hasActiveSendFor($documentId)) {
-            throw new \RuntimeException('A send for this document is already awaiting approval or scheduled to go out — wait for it to send, be rejected, or fail before submitting another.');
+        // External QA report L-42: four generic templates (no document —
+        // payment_followup, shipment_readiness, bl_copy_sent,
+        // balance_receipt_confirmation) had no way to actually submit a
+        // send at all — this method's own signature required a real
+        // documentId, so a document-less generic request could never even
+        // be constructed, let alone reach the "already in flight" check
+        // below. hasActiveSendFor() is keyed on document_id, which is
+        // meaningless (and never matches NULL in SQL) for a generic send.
+        if ($documentId !== null) {
+            if (EmailLogRepository::hasActiveSendFor($documentId)) {
+                throw new \RuntimeException('A send for this document is already awaiting approval or scheduled to go out — wait for it to send, be rejected, or fail before submitting another.');
+            }
+        } elseif (EmailLogRepository::hasActiveGenericSendFor($orderId, $templateKey)) {
+            throw new \RuntimeException('A send of this email is already awaiting approval or scheduled to go out for this order — wait for it to send, be rejected, or fail before submitting another.');
         }
 
         $id = EmailLogRepository::create(
@@ -254,9 +266,13 @@ final class EmailDispatchService
         if (!EmailLogRepository::claimForSend((int) $emailLogRow['id'])) {
             return false;
         }
+        // External QA report L-42: a generic (document-less) send used to
+        // be marked failed unconditionally here — even once requestSend()
+        // above is fixed to accept one, dispatch() (called by both the
+        // cron and sendNowOverride()) would still refuse to ever actually
+        // send it.
         if ($emailLogRow['document_id'] === null) {
-            EmailLogRepository::markFailed((int) $emailLogRow['id']);
-            return false;
+            return self::dispatchGeneric($emailLogRow);
         }
         $document = DocumentRepository::find((int) $emailLogRow['document_id']);
         if (!$document || !$document['pdf_file_id']) {
@@ -311,6 +327,49 @@ final class EmailDispatchService
                     $now->modify("+{$hours} hours")->format('Y-m-d H:i:s')
                 );
             }
+        } else {
+            EmailLogRepository::markFailed((int) $emailLogRow['id']);
+        }
+
+        return $sent;
+    }
+
+    /**
+     * External QA report L-42: dispatch path for the 4 generic (no
+     * document) templates — payment_followup/shipment_readiness/
+     * balance_receipt_confirmation go out with no attachment;
+     * bl_copy_sent (the report's explicit named exception) attaches
+     * orders' scanned Bill of Lading copy (order_shipping.bl_copy_file_id
+     * — see OrderShippingRepository::attachBlCopy(), the same file L-22
+     * fixed the upload for) exactly like a document send attaches its PDF.
+     */
+    private static function dispatchGeneric(array $emailLogRow): bool
+    {
+        $attachments = [];
+        if ($emailLogRow['template_key'] === 'bl_copy_sent') {
+            $shipping = \App\Repositories\OrderShippingRepository::find((int) $emailLogRow['order_id']);
+            if (!$shipping || !$shipping['bl_copy_file_id']) {
+                EmailLogRepository::markFailed((int) $emailLogRow['id']);
+                return false;
+            }
+            $file = FileStoreRepository::find((int) $shipping['bl_copy_file_id']);
+            if (!$file || !is_file($file['server_path'])) {
+                EmailLogRepository::markFailed((int) $emailLogRow['id']);
+                return false;
+            }
+            $attachments[] = ['path' => $file['server_path'], 'name' => $file['original_filename']];
+        }
+
+        $sent = MailSenderService::send(
+            $emailLogRow['recipient_email'],
+            $emailLogRow['subject'],
+            $emailLogRow['body_snapshot'],
+            $attachments
+        );
+
+        if ($sent) {
+            EmailLogRepository::markSent((int) $emailLogRow['id']);
+            AuditLogRepository::log(null, 'EMAIL_SENT', 'email_log', (int) $emailLogRow['id'], 'recipient_email', null, $emailLogRow['recipient_email']);
         } else {
             EmailLogRepository::markFailed((int) $emailLogRow['id']);
         }

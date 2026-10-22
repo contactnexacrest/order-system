@@ -48,6 +48,21 @@ async function hasActiveSendFor(documentId) {
   return !!row;
 }
 
+/**
+ * External QA report L-42: same "already in flight" guard as
+ * hasActiveSendFor(), for a generic (document_id IS NULL) template —
+ * keyed on (order, template_key) since there's no document id to key on.
+ * document_id = NULL never matches `= :document_id` in SQL, so this
+ * can't just reuse the query above with a null parameter.
+ */
+async function hasActiveGenericSendFor(orderId, templateKey) {
+  const row = await db.queryOne(
+    "SELECT 1 AS x FROM email_log WHERE order_id = :order_id AND document_id IS NULL AND template_key = :template_key AND status IN ('pending_approval', 'approved') LIMIT 1",
+    { order_id: orderId, template_key: templateKey }
+  );
+  return !!row;
+}
+
 /** Level 2 approval queue. */
 async function pendingApproval() {
   return db.query(
@@ -157,6 +172,7 @@ module.exports = {
   find,
   forOrder,
   hasActiveSendFor,
+  hasActiveGenericSendFor,
   pendingApproval,
   awaitingDispatch,
   awaitingDispatchCount,
