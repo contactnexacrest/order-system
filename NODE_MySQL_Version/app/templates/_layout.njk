@@ -19,6 +19,13 @@
 
   @page { margin: 0.5in 0.59in; }
   * { box-sizing: border-box; }
+  /* External QA report L-17: Chromium's default UA stylesheet gives <body>
+     an 8px margin that DOMPDF's own default stylesheet never applies —
+     left uncleared, it stacked on top of the @page margin above and
+     pushed every page's content in by an extra ~6pt versus the PHP
+     stack, accumulating into a real page-count mismatch over a long
+     document. */
+  html, body { margin: 0; padding: 0; }
   body { font-family: 'Aptos', sans-serif; font-size: 9.5pt; color: #000000; }
 
   table { border-collapse: collapse; }
