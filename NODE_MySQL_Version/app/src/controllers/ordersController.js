@@ -105,19 +105,32 @@ async function index(req, res) {
     if (Object.prototype.hasOwnProperty.call(counts, o.status)) counts[o.status]++;
   }
 
-  let orders = all;
+  let filtered = all;
   if (statusFilter === 'overdue') {
-    orders = all.filter((o) => !!o.is_overdue);
+    filtered = all.filter((o) => !!o.is_overdue);
   } else if (['active', 'complete', 'lost'].includes(statusFilter)) {
-    orders = all.filter((o) => o.status === statusFilter);
+    filtered = all.filter((o) => o.status === statusFilter);
   } else if (statusFilter !== 'all') {
-    orders = all.filter((o) => o.status === 'active');
+    filtered = all.filter((o) => o.status === 'active');
   }
+
+  // External QA report U-02: with ~200 orders this page was 17,600px tall
+  // on desktop (52,000px on a phone) — one unpaginated card-grid of every
+  // matching order at once, only getting worse as data grows. Paginated
+  // in-JS (not pushed down into the SQL itself) since orderRepository.all()
+  // already has to compute every status's own total count for the filter
+  // chips above regardless of which page is showing — the one query it
+  // already runs stays the single source of truth for both.
+  const ORDERS_PER_PAGE = 25;
+  const totalFiltered = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / ORDERS_PER_PAGE));
+  const page = Math.max(1, Math.min(totalPages, parseInt(req.query.page, 10) || 1));
+  const pageSlice = filtered.slice((page - 1) * ORDERS_PER_PAGE, page * ORDERS_PER_PAGE);
 
   // Precomputed here (not in the template) since Nunjucks has no min/max
   // filter — how many of the 9 mini-stage-track segments render filled.
   const stageTotal = 9;
-  orders = orders.map((o) => ({
+  const orders = pageSlice.map((o) => ({
     ...o,
     filled_segments: o.status === 'complete' ? stageTotal : (o.status === 'lost' ? Math.max(o.current_stage_number || 0, 1) : (o.current_stage_number || 0)),
   }));
@@ -126,6 +139,9 @@ async function index(req, res) {
     orders,
     statusFilter,
     counts,
+    page,
+    totalPages,
+    totalFiltered,
   }, 'layout/base');
 }
 

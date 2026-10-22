@@ -74,5 +74,12 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
     </a>
     <?php endforeach; ?>
   </div>
+  <?php if ($totalPages > 1): ?>
+  <div class="btn-row" style="justify-content:center; margin-top:16px;">
+    <?php if ($page > 1): ?><a class="btn-sm btn-secondary" href="/orders?status=<?= htmlspecialchars($statusFilter) ?>&amp;page=<?= $page - 1 ?>">&larr; Previous</a><?php endif; ?>
+    <span class="muted small">Page <?= $page ?> of <?= $totalPages ?> (<?= (int) $totalFiltered ?> orders)</span>
+    <?php if ($page < $totalPages): ?><a class="btn-sm btn-secondary" href="/orders?status=<?= htmlspecialchars($statusFilter) ?>&amp;page=<?= $page + 1 ?>">Next &rarr;</a><?php endif; ?>
+  </div>
+  <?php endif; ?>
   <?php endif; ?>
 </div>

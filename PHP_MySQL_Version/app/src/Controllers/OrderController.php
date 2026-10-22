@@ -66,6 +66,9 @@ use App\Services\WetSignatureGuardService;
 
 final class OrderController
 {
+    /** External QA report U-02. */
+    private const ORDERS_PER_PAGE = 25;
+
     /**
      * Card-grid list (2026-09-23 redesign) — the filter chips are plain
      * query-string links (?status=...), no JS, matching how every other
@@ -101,17 +104,33 @@ final class OrderController
             }
         }
 
-        $orders = match ($statusFilter) {
+        $filtered = match ($statusFilter) {
             'all' => $all,
             'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
             'active', 'complete', 'lost' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
             default => array_values(array_filter($all, static fn($o) => $o['status'] === 'active')),
         };
 
+        // External QA report U-02: with ~200 orders this page was 17,600px
+        // tall on desktop (52,000px on a phone) — one unpaginated
+        // card-grid of every matching order at once, only getting worse as
+        // data grows. Paginated in-PHP (not pushed down into the SQL
+        // itself) since OrderRepository::all() already has to compute
+        // every status's own total count for the filter chips above
+        // regardless of which page is showing — the one query it already
+        // runs stays the single source of truth for both.
+        $totalFiltered = count($filtered);
+        $totalPages = max(1, (int) ceil($totalFiltered / self::ORDERS_PER_PAGE));
+        $page = max(1, min($totalPages, (int) ($_GET['page'] ?? 1)));
+        $orders = array_slice($filtered, ($page - 1) * self::ORDERS_PER_PAGE, self::ORDERS_PER_PAGE);
+
         View::render('orders/index', [
             'orders' => $orders,
             'statusFilter' => $statusFilter,
             'counts' => $counts,
+            'page' => $page,
+            'totalPages' => $totalPages,
+            'totalFiltered' => $totalFiltered,
         ], 'layout/base');
     }
 
