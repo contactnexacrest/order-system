@@ -5,7 +5,8 @@
 
   <form method="post" action="/reference-docs/{{ doc.code }}">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <textarea name="content" rows="24" style="width:100%;font-family:monospace">{{ doc.content or '' }}</textarea>
+    <label for="reference-doc-content">Content</label>
+    <textarea id="reference-doc-content" name="content" rows="24" style="width:100%;font-family:monospace">{{ doc.content or '' }}</textarea>
     <p><button type="submit" class="btn-sm btn-success">Save</button></p>
   </form>
 </div>

@@ -6,9 +6,9 @@
   <form method="post" action="/admin/permission-definitions/<?= (int) $permission['id'] ?>/update">
     <?= Csrf::field() ?>
     <div class="kv-grid">
-      <label>Name * <input type="text" name="name" value="<?= htmlspecialchars($permission['name']) ?>" required></label>
-      <label>Category <input type="text" name="category" value="<?= htmlspecialchars($permission['category'] ?? '') ?>"></label>
-      <label>Description <input type="text" name="description" value="<?= htmlspecialchars($permission['description'] ?? '') ?>"></label>
+      <label>Name * <input type="text" name="name" value="<?= htmlspecialchars($permission['name']) ?>" placeholder="e.g., Manage Widgets" required></label>
+      <label>Category <input type="text" name="category" value="<?= htmlspecialchars($permission['category'] ?? '') ?>" placeholder="e.g., Orders"></label>
+      <label>Description <input type="text" name="description" value="<?= htmlspecialchars($permission['description'] ?? '') ?>" placeholder="e.g., Can create and edit widgets"></label>
     </div>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>

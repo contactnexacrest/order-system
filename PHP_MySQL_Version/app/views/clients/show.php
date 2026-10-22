@@ -229,8 +229,8 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
     <h2>Admin Override</h2>
     <form method="post" action="/clients/<?= (int) $client['id'] ?>/override-unique-number" onsubmit="return confirmFieldOverride(this, 'the Buyer Inquiry Ref');">
       <?= Csrf::field() ?>
-      <label>Buyer Inquiry Ref <input type="text" name="client_unique_number" value="<?= htmlspecialchars($client['client_unique_number']) ?>"></label>
-      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
+      <label>Buyer Inquiry Ref <input type="text" name="client_unique_number" value="<?= htmlspecialchars($client['client_unique_number']) ?>" placeholder="e.g., 00123"></label>
+      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" placeholder="e.g., Staff mistyped during intake — correcting to match buyer's PO" required></textarea></label>
       <button type="submit" class="btn-sm btn-danger">Override Buyer Inquiry Ref</button>
     </form>
   </div>

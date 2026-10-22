@@ -122,12 +122,12 @@
     <h3 style="margin-top:16px">Grant an extra permission</h3>
     <form method="post" action="/admin/permissions/grant" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <?= Csrf::field() ?>
-      <select name="user_id">
+      <select name="user_id" aria-label="User">
         <?php foreach ($allUsers as $u): ?>
           <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> — <?= htmlspecialchars($u['role_name'] ?? 'No role') ?></option>
         <?php endforeach; ?>
       </select>
-      <select name="permission_id">
+      <select name="permission_id" aria-label="Permission">
         <?php foreach ($allPermissions as $p): ?>
           <option value="<?= (int) $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
         <?php endforeach; ?>

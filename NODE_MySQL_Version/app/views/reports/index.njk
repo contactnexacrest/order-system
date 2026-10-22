@@ -136,8 +136,8 @@
           <td colspan="5">
             <form method="post" action="/reports/saved/{{ r.id }}/update" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <input type="text" name="name" value="{{ r.name }}" required style="width:200px">
-              <select name="visibility">
+              <input type="text" name="name" value="{{ r.name }}" placeholder="Report name" aria-label="Report name" required style="width:200px">
+              <select name="visibility" aria-label="Visibility">
                 <option value="private" {{ 'selected' if r.visibility == 'private' }}>Private</option>
                 <option value="shared" {{ 'selected' if r.visibility == 'shared' }}>Shared</option>
               </select>

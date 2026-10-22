@@ -4,8 +4,8 @@
   <form method="post" action="/admin/roles/{{ role.id }}/update">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <div class="kv-grid">
-      <label>Name * <input type="text" name="name" value="{{ role.name }}" required></label>
-      <label>Description <input type="text" name="description" value="{{ role.description or '' }}"></label>
+      <label>Name * <input type="text" name="name" value="{{ role.name }}" placeholder="e.g., Logistics Executive" required></label>
+      <label>Description <input type="text" name="description" value="{{ role.description or '' }}" placeholder="e.g., Handles shipment booking and tracking"></label>
     </div>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>

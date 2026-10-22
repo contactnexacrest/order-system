@@ -92,6 +92,7 @@
                 name="settings[{{ row.setting_key }}]"
                 data-key="{{ row.setting_key }}"
                 value="{{ row.setting_value or '' }}"
+                {{ 'placeholder="e.g., 30"' | safe if row.value_type == 'number' }}
                 data-sensitive="{{ '1' if row.is_sensitive else '0' }}"
                 data-protected="{{ '1' if row.is_protected else '0' }}"
                 {# 90-item backlog #33: storage_base_path is forced readonly here

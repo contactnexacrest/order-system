@@ -25,7 +25,7 @@ $quotationFormLink = rtrim(Env::get('APP_URL', ''), '/') . '/quotation-details';
   <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
     <span>Public Quotation Form — send this to a new lead so they can submit their own details (lands in Quotation Intake Review):</span>
     <div style="display:flex;gap:6px;align-items:center">
-      <input type="text" readonly value="<?= htmlspecialchars($quotationFormLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+      <input type="text" readonly aria-label="Public Quotation Form link" value="<?= htmlspecialchars($quotationFormLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
       <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($quotationFormLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
     </div>
   </div>

@@ -142,8 +142,8 @@ $__uid = $__u ? (int) $__u['id'] : 0;
           <td colspan="5">
             <form method="post" action="/reports/saved/<?= (int) $r['id'] ?>/update" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <?= Csrf::field() ?>
-              <input type="text" name="name" value="<?= htmlspecialchars($r['name']) ?>" required style="width:200px">
-              <select name="visibility">
+              <input type="text" name="name" value="<?= htmlspecialchars($r['name']) ?>" placeholder="Report name" aria-label="Report name" required style="width:200px">
+              <select name="visibility" aria-label="Visibility">
                 <option value="private" <?= $r['visibility'] === 'private' ? 'selected' : '' ?>>Private</option>
                 <option value="shared" <?= $r['visibility'] === 'shared' ? 'selected' : '' ?>>Shared</option>
               </select>

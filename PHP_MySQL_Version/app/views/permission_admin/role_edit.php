@@ -5,8 +5,8 @@
   <form method="post" action="/admin/roles/<?= (int) $role['id'] ?>/update">
     <?= Csrf::field() ?>
     <div class="kv-grid">
-      <label>Name * <input type="text" name="name" value="<?= htmlspecialchars($role['name']) ?>" required></label>
-      <label>Description <input type="text" name="description" value="<?= htmlspecialchars($role['description'] ?? '') ?>"></label>
+      <label>Name * <input type="text" name="name" value="<?= htmlspecialchars($role['name']) ?>" placeholder="e.g., Logistics Executive" required></label>
+      <label>Description <input type="text" name="description" value="<?= htmlspecialchars($role['description'] ?? '') ?>" placeholder="e.g., Handles shipment booking and tracking"></label>
     </div>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>

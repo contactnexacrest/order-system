@@ -14,7 +14,7 @@
         <td colspan="3">
           <form method="post" action="/holidays/<?= (int) $h['id'] ?>/update" style="display:flex;gap:8px;align-items:center">
             <?= Csrf::field() ?>
-            <input type="date" name="holiday_date" value="<?= htmlspecialchars($h['holiday_date']) ?>" required>
+            <input type="date" name="holiday_date" aria-label="Date" value="<?= htmlspecialchars($h['holiday_date']) ?>" required>
             <input type="text" name="description" value="<?= htmlspecialchars($h['description']) ?>" required style="width:240px">
             <button type="submit" class="btn-sm">Save</button>
             <button type="submit" formaction="/holidays/<?= (int) $h['id'] ?>/delete" formnovalidate class="btn-sm btn-danger" onclick="return confirm('Remove this holiday?');">Remove</button>
@@ -26,7 +26,7 @@
 
     <form method="post" action="/holidays" style="margin-top:8px;display:flex;gap:8px;align-items:center">
       <?= Csrf::field() ?>
-      <input type="date" name="holiday_date" required>
+      <input type="date" name="holiday_date" aria-label="Date" required>
       <input type="text" name="description" placeholder="e.g. Diwali" required style="width:240px">
       <button type="submit" class="btn-sm btn-accent">Add Holiday</button>
     </form>

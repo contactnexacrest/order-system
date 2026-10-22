@@ -15,7 +15,7 @@
           <?php else: ?>
             <form method="post" action="/signatories/designations/<?= (int) $d['id'] ?>/update" style="display:flex;gap:6px;align-items:center">
               <?= Csrf::field() ?>
-              <input type="text" name="title" value="<?= htmlspecialchars($d['title']) ?>" required style="width:220px">
+              <input type="text" name="title" value="<?= htmlspecialchars($d['title']) ?>" placeholder="e.g. Director" required style="width:220px">
               <button type="submit" class="btn-sm">Rename</button>
             </form>
           <?php endif; ?>
@@ -50,7 +50,7 @@
     <p class="muted small">Used whenever a document type has no specific default configured below.</p>
     <form method="post" action="/signatories/global-default">
       <?= Csrf::field() ?>
-      <select name="user_id">
+      <select name="user_id" aria-label="Signatory">
         <?php foreach ($eligible as $e): ?>
           <option value="<?= (int) $e['id'] ?>" <?= (int) $globalDefaultUserId === (int) $e['id'] ? 'selected' : '' ?>>
             <?= htmlspecialchars($e['name']) ?><?= $e['designation_title'] ? ' — ' . htmlspecialchars($e['designation_title']) : '' ?>
@@ -76,7 +76,7 @@
         <td>
           <form method="post" action="/signatories/document-types/<?= (int) $row['document_type_id'] ?>" style="display:flex;gap:4px;align-items:center">
             <?= Csrf::field() ?>
-            <select name="user_id" style="max-width:160px">
+            <select name="user_id" aria-label="Signatory" style="max-width:160px">
               <option value="">(global default)</option>
               <?php foreach ($eligible as $e): ?>
                 <option value="<?= (int) $e['id'] ?>" <?= (int) ($row['user_id'] ?? 0) === (int) $e['id'] ? 'selected' : '' ?>><?= htmlspecialchars($e['name']) ?></option>
@@ -105,7 +105,7 @@
           <?php else: ?>
           <form method="post" action="/signatories/users/<?= (int) $u['id'] ?>/eligibility" style="display:flex;gap:4px;align-items:center">
             <?= Csrf::field() ?>
-            <select name="designation_id">
+            <select name="designation_id" aria-label="Designation">
               <option value="">(none)</option>
               <?php foreach ($designations as $d): if (!$d['is_active'] && (int) $d['id'] !== (int) $u['designation_id']) continue; ?>
                 <option value="<?= (int) $d['id'] ?>" <?= (int) $u['designation_id'] === (int) $d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['title']) ?></option>

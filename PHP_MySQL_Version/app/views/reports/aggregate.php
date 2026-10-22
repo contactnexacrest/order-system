@@ -92,7 +92,7 @@
     <input type="hidden" name="incoterm_id" value="<?= htmlspecialchars((string) ($filters['incotermId'] ?? '')) ?>">
     <input type="hidden" name="country" value="<?= htmlspecialchars($filters['country'] ?? '') ?>">
     <label style="display:inline-block;width:auto;margin-right:0.5rem;">Save these filters as <input type="text" name="name" placeholder="Report name" style="display:inline-block;width:220px;"></label>
-    <label style="display:inline-block;width:auto;margin-right:0.5rem;">
+    <label style="display:inline-block;width:auto;margin-right:0.5rem;">Visibility
       <select name="visibility" style="display:inline-block;width:auto;">
         <option value="private">Private</option>
         <option value="shared">Shared</option>

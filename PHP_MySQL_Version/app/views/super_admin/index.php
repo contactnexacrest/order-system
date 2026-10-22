@@ -33,7 +33,7 @@
     <h3 style="margin-top:16px">Promote a user to permanent Super Admin</h3>
     <form method="post" action="/super-admin/set-permanent" style="display:flex;gap:4px;align-items:center">
       <?= Csrf::field() ?>
-      <select name="target_id">
+      <select name="target_id" aria-label="User to promote">
         <?php foreach ($allUsers as $u): if ($u['is_super_admin']) continue; ?>
           <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)</option>
         <?php endforeach; ?>
@@ -72,13 +72,13 @@
     <h3 style="margin-top:16px">Grant a new delegation</h3>
     <form method="post" action="/super-admin/delegations" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <?= Csrf::field() ?>
-      <select name="delegate_user_id">
+      <select name="delegate_user_id" aria-label="Delegate">
         <?php foreach ($allUsers as $u): if ($u['is_super_admin']) continue; ?>
           <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> — <?= htmlspecialchars($u['role_name'] ?? 'No role') ?></option>
         <?php endforeach; ?>
       </select>
       <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars) — e.g. covering approvals while MD is on leave" required minlength="<?= $minReasonLength ?>" style="width:320px">
-      <input type="datetime-local" name="expires_at" title="Leave blank for no fixed expiry — still revocable at any time">
+      <input type="datetime-local" name="expires_at" aria-label="Expiry" title="Leave blank for no fixed expiry — still revocable at any time">
       <button type="submit" class="btn-sm btn-success">Grant</button>
     </form>
   </div>

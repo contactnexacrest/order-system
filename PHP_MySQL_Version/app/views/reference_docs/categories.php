@@ -11,7 +11,7 @@
         <td>
           <form method="post" action="/reference-docs/categories/<?= (int) $c['id'] ?>/update" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <?= Csrf::field() ?>
-            <input type="text" name="name" value="<?= htmlspecialchars($c['name']) ?>" required style="width:200px">
+            <input type="text" name="name" value="<?= htmlspecialchars($c['name']) ?>" placeholder="e.g., CA Working Papers" required style="width:200px">
             <select name="required_permission" style="width:280px">
               <option value="">— None (visible to everyone) —</option>
               <?php foreach ($permissions as $p): ?>
@@ -39,7 +39,7 @@
     <h2>Add Category</h2>
     <form method="post" action="/reference-docs/categories">
       <?= Csrf::field() ?>
-      <label>Name * <input type="text" name="name" required style="width:100%"></label>
+      <label>Name * <input type="text" name="name" placeholder="e.g., CA Working Papers" required style="width:100%"></label>
       <label>Required Permission <small class="muted">(optional — leave blank to make it visible to everyone)</small>
         <select name="required_permission" style="width:100%">
           <option value="">— None (visible to everyone) —</option>

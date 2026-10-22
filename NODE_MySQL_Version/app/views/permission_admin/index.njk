@@ -121,12 +121,12 @@
     <h3 style="margin-top:16px">Grant an extra permission</h3>
     <form method="post" action="/admin/permissions/grant" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <select name="user_id">
+      <select name="user_id" aria-label="User">
         {% for u in allUsers %}
           <option value="{{ u.id }}">{{ u.name }} — {{ u.role_name if u.role_name else 'No role' }}</option>
         {% endfor %}
       </select>
-      <select name="permission_id">
+      <select name="permission_id" aria-label="Permission">
         {% for p in allPermissions %}
           <option value="{{ p.id }}">{{ p.name }}</option>
         {% endfor %}

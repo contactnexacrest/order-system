@@ -32,7 +32,7 @@
     <h3 style="margin-top:16px">Promote a user to permanent Super Admin</h3>
     <form method="post" action="/super-admin/set-permanent" style="display:flex;gap:4px;align-items:center">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <select name="target_id">
+      <select name="target_id" aria-label="User to promote">
         {% for u in allUsers %}
           {% if not u.is_super_admin %}
             <option value="{{ u.id }}">{{ u.name }} ({{ u.email }})</option>
@@ -73,7 +73,7 @@
     <h3 style="margin-top:16px">Grant a new delegation</h3>
     <form method="post" action="/super-admin/delegations" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <select name="delegate_user_id">
+      <select name="delegate_user_id" aria-label="Delegate">
         {% for u in allUsers %}
           {% if not u.is_super_admin %}
             <option value="{{ u.id }}">{{ u.name }} — {{ u.role_name if u.role_name else 'No role' }}</option>
@@ -81,7 +81,7 @@
         {% endfor %}
       </select>
       <input type="text" name="reason" placeholder="Reason (min {{ minReasonLength }} chars) — e.g. covering approvals while MD is on leave" required minlength="{{ minReasonLength }}" style="width:320px">
-      <input type="datetime-local" name="expires_at" title="Leave blank for no fixed expiry — still revocable at any time">
+      <input type="datetime-local" name="expires_at" aria-label="Expiry" title="Leave blank for no fixed expiry — still revocable at any time">
       <button type="submit" class="btn-sm btn-success">Grant</button>
     </form>
   </div>

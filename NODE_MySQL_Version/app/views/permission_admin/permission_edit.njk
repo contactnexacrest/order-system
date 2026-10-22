@@ -5,9 +5,9 @@
   <form method="post" action="/admin/permission-definitions/{{ permission.id }}/update">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <div class="kv-grid">
-      <label>Name * <input type="text" name="name" value="{{ permission.name }}" required></label>
-      <label>Category <input type="text" name="category" value="{{ permission.category or '' }}"></label>
-      <label>Description <input type="text" name="description" value="{{ permission.description or '' }}"></label>
+      <label>Name * <input type="text" name="name" value="{{ permission.name }}" placeholder="e.g., Manage Widgets" required></label>
+      <label>Category <input type="text" name="category" value="{{ permission.category or '' }}" placeholder="e.g., Orders"></label>
+      <label>Description <input type="text" name="description" value="{{ permission.description or '' }}" placeholder="e.g., Can create and edit widgets"></label>
     </div>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>

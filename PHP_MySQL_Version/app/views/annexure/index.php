@@ -57,12 +57,12 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products/<?= (int) $p['id'] ?>" <?= $annexureConfirmAttr() ?>>
           <?= Csrf::field() ?>
           <div class="field-grid">
-            <label>Name *<input type="text" name="name" value="<?= htmlspecialchars($p['name']) ?>" required></label>
-            <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
-            <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>"></label>
-            <label class="full">Description<textarea name="description" rows="2"><?= htmlspecialchars($p['description'] ?? '') ?></textarea></label>
-            <label class="full">Components<textarea name="components" rows="2"><?= htmlspecialchars($p['components'] ?? '') ?></textarea></label>
-            <label class="full">Technical Notes<textarea name="technical_notes" rows="2"><?= htmlspecialchars($p['technical_notes'] ?? '') ?></textarea></label>
+            <label>Name *<input type="text" name="name" value="<?= htmlspecialchars($p['name']) ?>" placeholder="e.g. Granite Countertop Slab" required></label>
+            <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 210 x 528 cm"></label>
+            <label>Finish<input type="text" name="finish" value="<?= htmlspecialchars($p['finish'] ?? '') ?>" placeholder="e.g. Mirror Polished"></label>
+            <label class="full">Description<textarea name="description" rows="2" placeholder="e.g. Premium grade polished slab for kitchen countertop use"><?= htmlspecialchars($p['description'] ?? '') ?></textarea></label>
+            <label class="full">Components<textarea name="components" rows="2" placeholder="e.g. 1. Left frame&#10;2. Right frame&#10;3. Base"><?= htmlspecialchars($p['components'] ?? '') ?></textarea></label>
+            <label class="full">Technical Notes<textarea name="technical_notes" rows="2" placeholder="e.g. Store flat, avoid moisture exposure"><?= htmlspecialchars($p['technical_notes'] ?? '') ?></textarea></label>
           </div>
           <button type="submit" class="btn-sm">Save</button>
         </form>
@@ -104,13 +104,13 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products" enctype="multipart/form-data" <?= $annexureConfirmAttr() ?>>
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Name *<input type="text" name="name" required></label>
+        <label>Name *<input type="text" name="name" placeholder="e.g. Granite Countertop Slab" required></label>
         <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 210 x 528 cm"></label>
         <label>Finish<input type="text" name="finish" placeholder="e.g. Mirror Polished"></label>
         <label>Image <small class="muted">(optional — can also be added after saving)</small><input type="file" name="image" accept=".jpg,.jpeg,.png,.webp"></label>
-        <label class="full">Description<textarea name="description" rows="2"></textarea></label>
+        <label class="full">Description<textarea name="description" rows="2" placeholder="e.g. Premium grade polished slab for kitchen countertop use"></textarea></label>
         <label class="full">Components<textarea name="components" rows="2" placeholder="e.g. 1. Left frame&#10;2. Right frame&#10;3. Base"></textarea></label>
-        <label class="full">Technical Notes<textarea name="technical_notes" rows="2"></textarea></label>
+        <label class="full">Technical Notes<textarea name="technical_notes" rows="2" placeholder="e.g. Store flat, avoid moisture exposure"></textarea></label>
       </div>
       <button type="submit">Add Product Entry</button>
     </form>
