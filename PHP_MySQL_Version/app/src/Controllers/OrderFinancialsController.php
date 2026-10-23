@@ -332,6 +332,71 @@ final class OrderFinancialsController
         header("Location: /orders/{$orderId}#order-financials");
     }
 
+    /**
+     * docs/schema.sql Section BW — export process step 11a. The
+     * distance-to-percentage mapping is a business judgement call
+     * (5/7/10/15%), not a fixed formula, so staff chooses the
+     * percentage themselves; this just computes and records the
+     * resulting amount against the order's own FOB value and keeps it
+     * synced into order_cost_entries.
+     */
+    public function saveTravelExpenses(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!OrderRepository::find($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+        $existing = \App\Repositories\OrderTravelExpenseRepository::find($orderId);
+
+        $selectedPct = trim((string) ($_POST['expense_pct'] ?? ''));
+        $rawPct = $selectedPct === 'other' ? trim((string) ($_POST['expense_pct_other'] ?? '')) : $selectedPct;
+        if ($rawPct === '' || !is_numeric($rawPct) || (float) $rawPct <= 0 || (float) $rawPct > 100) {
+            Flash::set('error', 'Enter a valid travel expense percentage (greater than 0, up to 100).');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        $expensePct = (float) $rawPct;
+
+        $rawDistance = trim((string) ($_POST['factory_distance_km'] ?? ''));
+        if ($rawDistance !== '' && (!is_numeric($rawDistance) || (float) $rawDistance < 0)) {
+            Flash::set('error', 'Enter a valid factory distance in km (or leave it blank).');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        $factoryDistanceKm = $rawDistance !== '' ? (float) $rawDistance : null;
+
+        $fobTotal = \App\Repositories\OrderProductRepository::totalFobValue($orderId);
+        $expenseAmount = round($expensePct / 100 * $fobTotal, 2);
+
+        $costEntryId = $existing['cost_entry_id'] ?? null;
+        if ($costEntryId) {
+            OrderCostEntryRepository::updateAmount($costEntryId, $expenseAmount, 'Travel expenses (factory visits)');
+        } else {
+            $costEntryId = OrderCostEntryRepository::create(
+                $orderId,
+                'travel_expenses',
+                'Travel expenses (factory visits)',
+                $expenseAmount,
+                date('Y-m-d'),
+                (int) $user['id']
+            );
+        }
+
+        \App\Repositories\OrderTravelExpenseRepository::upsert($orderId, [
+            'factory_distance_km' => $factoryDistanceKm,
+            'expense_pct' => $expensePct,
+            'expense_amount' => $expenseAmount,
+            'cost_entry_id' => $costEntryId,
+            'recorded_by' => (int) $user['id'],
+        ]);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_TRAVEL_EXPENSE_SAVED', 'order_travel_expenses', $orderId, 'expense_pct', null, (string) $expensePct);
+        Flash::set('success', 'Travel expenses saved.');
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
     public function deleteCostEntry(array $params): void
     {
         $orderId = (int) $params['id'];

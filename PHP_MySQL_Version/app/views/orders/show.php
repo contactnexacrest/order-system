@@ -1715,6 +1715,34 @@ foreach ($stages as $s) {
         </form>
       </details>
     <?php endif; ?>
+
+    <?php if ($canManageOrderFinancials): ?>
+      <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
+      <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
+      <div class="kv-grid">
+        <div><span class="k">Factory Distance</span><span class="v"><?= $orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? number_format((float) $orderTravelExpenses['factory_distance_km'], 2) . ' km' : '—' ?></span></div>
+        <div><span class="k">Percentage</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_pct'], 2) . '%' : 'Not yet recorded' ?></span></div>
+        <div><span class="k">Amount</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_amount'], 2) : '—' ?></span></div>
+      </div>
+      <details>
+        <summary><?= $orderTravelExpenses ? 'Edit travel expenses' : 'Record travel expenses' ?></summary>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/travel-expenses">
+          <?= Csrf::field() ?>
+          <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>"></label>
+          <label>Travel Expense % of FOB Value *
+            <select name="expense_pct" required>
+              <?php $savedPct = $orderTravelExpenses ? (string) (float) $orderTravelExpenses['expense_pct'] : ''; ?>
+              <?php foreach (['5', '7', '10', '15'] as $pct): ?>
+                <option value="<?= $pct ?>" <?= $savedPct === $pct ? 'selected' : '' ?>><?= $pct ?>%</option>
+              <?php endforeach; ?>
+              <option value="other" <?= !in_array($savedPct, ['5', '7', '10', '15'], true) && $savedPct !== '' ? 'selected' : '' ?>>Other — specify</option>
+            </select>
+          </label>
+          <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>"></label>
+          <button type="submit" class="btn-sm">Save</button>
+        </form>
+      </details>
+    <?php endif; ?>
   </div>
 
   <div class="section" data-stage="6">

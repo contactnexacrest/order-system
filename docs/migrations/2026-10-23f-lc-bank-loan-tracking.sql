@@ -36,10 +36,13 @@ CREATE TABLE IF NOT EXISTS order_lc_details (
 -- A plain MODIFY COLUMN is naturally idempotent (re-running the identical
 -- definition is a no-op, not an error), unlike ADD COLUMN/ADD CONSTRAINT —
 -- so this needs none of the information_schema existence-check dance.
+-- Forward-compatible with every later widening of this same ENUM
+-- (inspection_fee, travel_expenses) — see 2026-10-23k's own comment for
+-- why a replay of an earlier MODIFY COLUMN must never narrow it back.
 ALTER TABLE order_cost_entries
   MODIFY COLUMN category ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
                                'documentation','port_charges','bank_charges','commission',
-                               'packing_crates','bank_loan_interest','other') NOT NULL;
+                               'packing_crates','bank_loan_interest','inspection_fee','travel_expenses','other') NOT NULL;
 
 INSERT IGNORE INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description) VALUES
   ('order_lc_copy', 'pdf,jpg,jpeg,png', 10485760, 'Export process step 5-1a: the final Letter of Credit document for this order, when the client opted for LC payment.');

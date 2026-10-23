@@ -626,6 +626,7 @@ app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_o
 app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
 app.post('/orders/:id/lc-details', requireAuth, requirePermission('manage_order_financials'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveLcDetails));
 app.post('/orders/:id/inspection-fee', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveInspectionFee));
+app.post('/orders/:id/travel-expenses', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveTravelExpenses));
 app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));
 app.post('/orders/:id/cost-entries/:entryId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.deleteCostEntry));
 app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));

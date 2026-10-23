@@ -3636,7 +3636,7 @@ CREATE TABLE order_lc_details (
 ALTER TABLE order_cost_entries
   MODIFY COLUMN category ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
                                'documentation','port_charges','bank_charges','commission',
-                               'packing_crates','bank_loan_interest','other') NOT NULL;
+                               'packing_crates','bank_loan_interest','inspection_fee','travel_expenses','other') NOT NULL;
 
 -- ================================================================
 -- SECTION BS — CHA DRAFT BL REVIEW LOOP (added 2026-10-23)
@@ -3694,7 +3694,7 @@ ALTER TABLE orders
 ALTER TABLE order_cost_entries
   MODIFY COLUMN category ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
                                'documentation','port_charges','bank_charges','commission',
-                               'packing_crates','bank_loan_interest','inspection_fee','other') NOT NULL;
+                               'packing_crates','bank_loan_interest','inspection_fee','travel_expenses','other') NOT NULL;
 
 CREATE TABLE order_inspection_fees (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -3752,4 +3752,32 @@ CREATE TABLE order_feedback (
   FOREIGN KEY (order_id) REFERENCES orders(id),
   FOREIGN KEY (client_id) REFERENCES clients(id),
   CONSTRAINT chk_order_feedback_rating CHECK (rating BETWEEN 1 AND 5)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION BW — TRAVEL EXPENSE RECORDING (added 2026-10-23)
+-- ================================================================
+-- Export process step 11a: "Record 5/7/10% of the total order value
+-- as order expenses - it includes all the travelling expenses for
+-- that order - for every order we need to have 3-4 trip to factory
+-- which is min 175km away from office - if it is 500km then we will
+-- record as 15%." The exact distance-to-percentage boundaries are a
+-- business judgement call made per order, not a fixed formula, so
+-- staff records the factory distance (for reference) and chooses the
+-- percentage themselves; the system computes and records the expense
+-- amount against the order's own FOB value.
+-- See docs/migrations/2026-10-23k-travel-expense-recording.sql.
+-- ================================================================
+CREATE TABLE order_travel_expenses (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id            BIGINT UNSIGNED NOT NULL UNIQUE,
+  factory_distance_km DECIMAL(8,2) NULL,
+  expense_pct         DECIMAL(5,2) NOT NULL,
+  expense_amount       DECIMAL(14,2) NOT NULL,
+  cost_entry_id        BIGINT UNSIGNED NULL,
+  recorded_by          BIGINT UNSIGNED NULL,
+  updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (cost_entry_id) REFERENCES order_cost_entries(id),
+  FOREIGN KEY (recorded_by) REFERENCES users(id)
 ) ENGINE=InnoDB;

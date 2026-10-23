@@ -914,6 +914,7 @@ final class OrderController
             'orderCostEntries' => $canManageOrderFinancials ? OrderCostEntryRepository::forOrder($orderId) : [],
             'costEntryCategories' => OrderCostEntryRepository::CATEGORIES,
             'orderLcDetails' => $canManageOrderFinancials ? OrderLcDetailRepository::find($orderId) : null,
+            'orderTravelExpenses' => $canManageOrderFinancials ? \App\Repositories\OrderTravelExpenseRepository::find($orderId) : null,
             'profitability' => $canManageOrderFinancials ? OrderProfitabilityService::computeForOrder($orderId) : null,
             'exportBenefitSchemes' => LookupRepository::dropdownOptions('export_benefit_scheme'),
             'duplicatedFromOrder' => $duplicatedFromOrder,

@@ -36,6 +36,7 @@ const emailLogRepository = require('../repositories/emailLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
+const orderTravelExpenseRepository = require('../repositories/orderTravelExpenseRepository');
 const orderFeedbackRepository = require('../repositories/orderFeedbackRepository');
 const orderCrateRepository = require('../repositories/orderCrateRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
@@ -938,6 +939,7 @@ async function show(req, res) {
       orderCostEntries: req.permissions.manage_order_financials ? await orderCostEntryRepository.forOrder(orderId) : [],
       costEntryCategories: orderCostEntryRepository.CATEGORIES,
       orderLcDetails: req.permissions.manage_order_financials ? await orderLcDetailRepository.find(orderId) : null,
+      orderTravelExpenses: req.permissions.manage_order_financials ? await orderTravelExpenseRepository.find(orderId) : null,
       profitability: req.permissions.manage_order_financials ? await orderProfitabilityService.computeForOrder(orderId) : null,
       exportBenefitSchemes: await lookupRepository.dropdownOptions('export_benefit_scheme'),
       duplicatedFromOrder,

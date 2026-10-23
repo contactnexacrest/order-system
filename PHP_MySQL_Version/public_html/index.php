@@ -409,6 +409,7 @@ $router->post('/orders/{id}/export-benefits', [$orderFinancials, 'addExportBenef
 $router->post('/orders/{id}/export-benefits/{benefitId}/received', [$orderFinancials, 'markExportBenefitReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/lc-details', [$orderFinancials, 'saveLcDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/inspection-fee', [$orderFinancials, 'saveInspectionFee'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/travel-expenses', [$orderFinancials, 'saveTravelExpenses'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/cost-entries', [$orderFinancials, 'addCostEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/cost-entries/{entryId}/delete', [$orderFinancials, 'deleteCostEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/ca/bank-statement', [$ca, 'bankStatement'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);

@@ -26,6 +26,7 @@ final class OrderCostEntryRepository
         'packing_crates'   => 'Packing / Wooden Crates',
         'bank_loan_interest' => 'Bank Loan Interest (LC order)',
         'inspection_fee'   => 'Pre-Shipment Inspection Fee',
+        'travel_expenses'  => 'Travel Expenses (Factory Visits)',
         'other'            => 'Other',
     ];
 

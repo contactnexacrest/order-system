@@ -6,6 +6,8 @@ const caExportBenefitRepository = require('../repositories/caExportBenefitReposi
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderInspectionFeeRepository = require('../repositories/orderInspectionFeeRepository');
+const orderTravelExpenseRepository = require('../repositories/orderTravelExpenseRepository');
+const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
@@ -313,6 +315,62 @@ async function saveInspectionFee(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
+/**
+ * docs/schema.sql Section BW — export process step 11a. The
+ * distance-to-percentage mapping is a business judgement call
+ * (5/7/10/15%), not a fixed formula, so staff chooses the percentage
+ * themselves; this just computes and records the resulting amount
+ * against the order's own FOB value and keeps it synced into
+ * order_cost_entries.
+ */
+async function saveTravelExpenses(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await orderRepository.find(orderId))) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const user = req.user;
+  const existing = await orderTravelExpenseRepository.find(orderId);
+
+  const selectedPct = String(req.body.expense_pct || '').trim();
+  const rawPct = selectedPct === 'other' ? String(req.body.expense_pct_other || '').trim() : selectedPct;
+  if (rawPct === '' || Number.isNaN(Number(rawPct)) || Number(rawPct) <= 0 || Number(rawPct) > 100) {
+    flash.set(req, 'error', 'Enter a valid travel expense percentage (greater than 0, up to 100).');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  const expensePct = parseFloat(rawPct);
+
+  const rawDistance = String(req.body.factory_distance_km || '').trim();
+  if (rawDistance !== '' && (Number.isNaN(Number(rawDistance)) || Number(rawDistance) < 0)) {
+    flash.set(req, 'error', 'Enter a valid factory distance in km (or leave it blank).');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  const factoryDistanceKm = rawDistance !== '' ? parseFloat(rawDistance) : null;
+
+  const fobTotal = await orderProductRepository.totalFobValue(orderId);
+  const expenseAmount = Math.round((expensePct / 100) * fobTotal * 100) / 100;
+
+  let costEntryId = existing ? existing.cost_entry_id : null;
+  if (costEntryId) {
+    await orderCostEntryRepository.updateAmount(costEntryId, expenseAmount, 'Travel expenses (factory visits)');
+  } else {
+    costEntryId = await orderCostEntryRepository.create(orderId, 'travel_expenses', 'Travel expenses (factory visits)', expenseAmount, todayIst(), user.id);
+  }
+
+  await orderTravelExpenseRepository.upsert(orderId, {
+    factory_distance_km: factoryDistanceKm,
+    expense_pct: expensePct,
+    expense_amount: expenseAmount,
+    cost_entry_id: costEntryId,
+    recorded_by: user.id,
+  });
+  await auditLogRepository.log(user.id, 'ORDER_TRAVEL_EXPENSE_SAVED', 'order_travel_expenses', orderId, 'expense_pct', null, String(expensePct));
+  flash.set(req, 'success', 'Travel expenses saved.');
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
 async function deleteCostEntry(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const entryId = parseInt(req.params.entryId, 10);
@@ -334,4 +392,4 @@ async function deleteCostEntry(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
-module.exports = { addExportBenefit, markExportBenefitReceived, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee };
+module.exports = { addExportBenefit, markExportBenefitReceived, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };

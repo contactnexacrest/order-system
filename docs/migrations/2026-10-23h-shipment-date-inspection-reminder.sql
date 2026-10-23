@@ -30,10 +30,13 @@ DEALLOCATE PREPARE stmt;
 
 -- A plain MODIFY COLUMN is naturally idempotent (re-running the identical
 -- definition is a no-op, not an error), unlike ADD COLUMN/ADD CONSTRAINT.
+-- Forward-compatible with every later widening of this same ENUM
+-- (travel_expenses) — see 2026-10-23k's own comment for why a replay
+-- of an earlier MODIFY COLUMN must never narrow it back.
 ALTER TABLE order_cost_entries
   MODIFY COLUMN category ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
                                'documentation','port_charges','bank_charges','commission',
-                               'packing_crates','bank_loan_interest','inspection_fee','other') NOT NULL;
+                               'packing_crates','bank_loan_interest','inspection_fee','travel_expenses','other') NOT NULL;
 
 CREATE TABLE IF NOT EXISTS order_inspection_fees (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
