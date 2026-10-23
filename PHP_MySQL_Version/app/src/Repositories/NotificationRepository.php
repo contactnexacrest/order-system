@@ -8,10 +8,19 @@ use App\Config\Database;
 
 /**
  * In-app notification queue (spec Section 10 "AUTO-NOTIFICATIONS" + Section
- * 9 "System notifies assigned reviewers"). Deliberately not tied to email —
- * this is the bell-icon queue a logged-in user sees; the deferred-send
- * email pipeline (EmailLogRepository) is separate and only fires for
- * buyer-facing document sends.
+ * 9 "System notifies assigned reviewers"). The deferred-send email
+ * pipeline (EmailLogRepository) is separate and only fires for buyer-
+ * facing document sends.
+ *
+ * External QA report M-06: "In-app notifications also sent by e-mail."
+ * create() itself fans out to the targeted user's own email (same
+ * users.email_action_notifications_enabled toggle ActionNotificationService
+ * already gates its own, differently-sourced emails on — this is the same
+ * "does this user want notification emails" preference, just a second,
+ * independent trigger for it) rather than instrumenting each of this
+ * method's call sites separately. Fire-and-forget, same contract as
+ * ActionNotificationService::notify(): an email failure must never break
+ * the action that triggered the notification.
  */
 final class NotificationRepository
 {
@@ -29,7 +38,33 @@ final class NotificationRepository
             'related_order_id' => $relatedOrderId,
             'message'          => $message,
         ]);
-        return (int) $pdo->lastInsertId();
+        $id = (int) $pdo->lastInsertId();
+
+        if ($userId !== null) {
+            self::emailNotification($userId, $message);
+        }
+
+        return $id;
+    }
+
+    /**
+     * @return string|null the email address actually attempted — null
+     *   when the user doesn't exist, has no email, or has opted out.
+     *   Exposed (and non-void) purely for testability, same reasoning as
+     *   ActionNotificationService::notify()'s own return value.
+     */
+    public static function emailNotification(int $userId, string $message): ?string
+    {
+        $user = UserRepository::findById($userId);
+        if (!$user || (int) ($user['email_action_notifications_enabled'] ?? 1) !== 1 || empty($user['email'])) {
+            return null;
+        }
+        try {
+            \App\Services\EmailService::sendPlainText($user['email'], 'NexaCrest — New Notification', $message);
+        } catch (\Throwable $e) {
+            // Never let a notification-email failure break the action it's reporting on.
+        }
+        return $user['email'];
     }
 
     /** @return array<int, array<string,mixed>> */
