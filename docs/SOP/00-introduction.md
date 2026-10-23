@@ -1,5 +1,11 @@
 # NexaCrest Order System — Standard Operating Procedure
 
+> **Never used this application before?** Read [Getting
+> Started](./00-getting-started.md) first instead — a short, screenshot-led
+> walkthrough of logging in and finding your way around, written for
+> someone on their first day. This chapter is the deeper reference you'll
+> want once the application itself already feels familiar.
+
 This is the operational manual for the order-management system: what the
 system does on its own, what staff must do by hand, what the client (buyer)
 does or is asked to do, and what happens next — screen by screen, for every

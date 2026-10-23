@@ -1,9 +1,16 @@
 # NexaCrest Order System — Standard Operating Procedure
 
-Start with [00 — Introduction](./00-introduction.md) if this is your first
-time here: it explains how to read every chapter, the 9-stage pipeline at a
-glance, and one rule that applies throughout the whole system (stage gates
-and document approval are separate things — don't confuse them).
+**Brand new here?** Start with [Getting Started](./00-getting-started.md) —
+not this table of contents. It's a short, screenshot-led first-day guide
+to the application itself (logging in, finding your way around, what
+Standard vs Kanban means, where the client's own view differs from yours)
+written for someone who has never opened this system before. Everything
+below assumes you've already read it.
+
+Once you're oriented, [00 — Introduction](./00-introduction.md) is the
+next step up: it explains how to read every chapter, the 9-stage pipeline
+at a glance, and one rule that applies throughout the whole system (stage
+gates and document approval are separate things — don't confuse them).
 
 This is an **operations manual**, not a developer document — it describes
 what the system does, what staff do, and what the client does or doesn't,
