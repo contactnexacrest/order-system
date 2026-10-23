@@ -44,6 +44,7 @@ use App\Repositories\OrderRepository;
 use App\Repositories\OrderBlEndorsementRepository;
 use App\Repositories\OrderCancellationRepository;
 use App\Repositories\OrderDraftBlReviewRepository;
+use App\Repositories\OrderInspectionFeeRepository;
 use App\Repositories\OrderShippingRepository;
 use App\Repositories\OrderStageRepository;
 use App\Repositories\OrderSupplierPoDocumentRepository;
@@ -59,6 +60,7 @@ use App\Services\DocumentGenerationService;
 use App\Services\EmailService;
 use App\Services\FileUploadService;
 use App\Services\MakerCheckerGuard;
+use App\Services\OrderCommentService;
 use App\Services\OrderDuplicationService;
 use App\Services\OrderEditGuard;
 use App\Services\OrderProfitabilityService;
@@ -840,6 +842,20 @@ final class OrderController
 
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
 
+        // docs/schema.sql Section BT — export process step 8a: whether this
+        // order even has a 3rd-party inspection to track a fee for reuses
+        // the existing Compliance Checklist's own "Pre-Shipment Inspection"
+        // row rather than a second, duplicate flag — not yet marked
+        // 'skipped' (not applicable) means it's still relevant.
+        $complianceTasksForOrder = OrderComplianceTaskRepository::forOrder($orderId);
+        $pendingInspectionTask = false;
+        foreach ($complianceTasksForOrder as $task) {
+            if ($task['task_type_name'] === 'Pre-Shipment Inspection' && $task['status'] !== 'skipped') {
+                $pendingInspectionTask = true;
+                break;
+            }
+        }
+
         $duplicatedFromOrder = !empty($order['duplicated_from_order_id'])
             ? OrderRepository::find((int) $order['duplicated_from_order_id'])
             : null;
@@ -877,7 +893,9 @@ final class OrderController
             'dimensionalTolerances' => LookupRepository::dropdownOptions('dimensional_tolerance'),
             'supplierFactoryAddressesBySupplier' => SupplierFactoryAddressRepository::allGroupedBySupplier(),
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
-            'complianceTasks' => OrderComplianceTaskRepository::forOrder($orderId),
+            'complianceTasks' => $complianceTasksForOrder,
+            'pendingInspectionTask' => $pendingInspectionTask,
+            'orderInspectionFee' => $canManageOrderFinancials ? OrderInspectionFeeRepository::find($orderId) : null,
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
             'piIntake' => PiIntakeRepository::latestForOrder($orderId),
             'clientPaymentReports' => ClientPaymentReportRepository::forOrder($orderId),
@@ -1349,10 +1367,30 @@ final class OrderController
             OrderRepository::setProductionStatus($orderId, $text);
             AuditLogRepository::log((int) $user['id'], 'PRODUCTION_STATUS_UPDATED', 'orders', $orderId, 'production_status_text', $before['production_status_text'] ?? null, $text);
         }
-        $shipmentText = trim((string) ($_POST['est_shipment_date_text'] ?? ''));
-        if ($shipmentText !== '' && $shipmentText !== ($before['est_shipment_date_text'] ?? '')) {
-            OrderRepository::setEstShipmentDate($orderId, $shipmentText);
-            AuditLogRepository::log((int) $user['id'], 'EST_SHIPMENT_DATE_UPDATED', 'orders', $orderId, 'est_shipment_date_text', $before['est_shipment_date_text'] ?? null, $shipmentText);
+        $shipmentTextInput = trim((string) ($_POST['est_shipment_date_text'] ?? ''));
+        $shipmentDateInput = trim((string) ($_POST['est_shipment_date'] ?? ''));
+        $resolvedDate = $shipmentDateInput !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $shipmentDateInput)
+            ? $shipmentDateInput
+            : ($before['est_shipment_date'] ?? null);
+        $resolvedText = $shipmentTextInput !== '' ? $shipmentTextInput : ($before['est_shipment_date_text'] ?? '');
+        $textChanged = $resolvedText !== '' && $resolvedText !== ($before['est_shipment_date_text'] ?? '');
+        $dateChanged = $resolvedDate !== ($before['est_shipment_date'] ?? null);
+        if ($textChanged || $dateChanged) {
+            OrderRepository::setEstShipmentDate($orderId, $resolvedText, $resolvedDate);
+            AuditLogRepository::log((int) $user['id'], 'EST_SHIPMENT_DATE_UPDATED', 'orders', $orderId, 'est_shipment_date_text', $before['est_shipment_date_text'] ?? null, $resolvedText);
+
+            // Export process step 8: "client gets notified - he can able to
+            // see this in his portal" — reuses the existing order-comment-
+            // to-client channel (OrderCommentService::postAsStaff()), which
+            // already shows in the client's portal thread AND emails them
+            // when an address is on file, rather than building a second,
+            // parallel notification mechanism for this one field.
+            $dateDisplay = $resolvedDate ? date('d M Y', strtotime($resolvedDate)) : $resolvedText;
+            try {
+                OrderCommentService::postAsStaff($orderId, (int) $user['id'], "The estimated shipment date for your order has been updated to: {$dateDisplay}.", []);
+            } catch (\Throwable $e) {
+                // Never block the actual production/shipment-date update over a notification failure.
+            }
         }
         Flash::set('success', 'Production status updated.');
         header("Location: /orders/{$orderId}");

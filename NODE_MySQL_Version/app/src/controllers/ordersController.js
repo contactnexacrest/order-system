@@ -22,6 +22,7 @@ const orderCancellationRepository = require('../repositories/orderCancellationRe
 const makerCheckerGuard = require('../services/makerCheckerGuard');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderComplianceTaskRepository = require('../repositories/orderComplianceTaskRepository');
+const orderInspectionFeeRepository = require('../repositories/orderInspectionFeeRepository');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
@@ -42,6 +43,7 @@ const orderPaymentStatusRepository = require('../repositories/orderPaymentStatus
 const orderProductionRepository = require('../repositories/orderProductionRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
+const orderCommentService = require('../services/orderCommentService');
 const orderBlEndorsementRepository = require('../repositories/orderBlEndorsementRepository');
 const orderShippingRepository = require('../repositories/orderShippingRepository');
 const orderDraftBlReviewRepository = require('../repositories/orderDraftBlReviewRepository');
@@ -778,6 +780,15 @@ async function show(req, res) {
 
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
 
+  // docs/schema.sql Section BT — export process step 8a: whether this
+  // order even has a 3rd-party inspection to track a fee for reuses the
+  // existing Compliance Checklist's own "Pre-Shipment Inspection" row
+  // rather than a second, duplicate flag — not yet marked 'skipped'
+  // (not applicable) means it's still relevant.
+  const complianceTasksForOrder = await orderComplianceTaskRepository.forOrder(orderId);
+  const pendingInspectionTask = complianceTasksForOrder.some((t) => t.task_type_name === 'Pre-Shipment Inspection' && t.status !== 'skipped');
+  const canManageOrderFinancialsForInspection = !!req.permissions.manage_order_financials;
+
   const duplicatedFromOrder = order.duplicated_from_order_id
     ? await orderRepository.find(order.duplicated_from_order_id)
     : null;
@@ -883,8 +894,10 @@ async function show(req, res) {
       supplierFactoryAddressesBySupplier,
       supplierFactoryAddressTextsBySupplier,
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
-      complianceTasks: await orderComplianceTaskRepository.forOrder(orderId),
+      complianceTasks: complianceTasksForOrder,
       complianceStatuses: orderComplianceTaskRepository.STATUSES,
+      pendingInspectionTask,
+      orderInspectionFee: canManageOrderFinancialsForInspection ? await orderInspectionFeeRepository.find(orderId) : null,
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
       piIntake,
       piFormFullLink,
@@ -1354,11 +1367,35 @@ async function updateProductionStatus(req, res) {
     await orderRepository.setProductionStatus(orderId, text);
     await auditLogRepository.log(user.id, 'PRODUCTION_STATUS_UPDATED', 'orders', orderId, 'production_status_text', before.production_status_text || null, text);
   }
-  const shipmentText = str(req.body.est_shipment_date_text);
-  if (shipmentText !== '' && shipmentText !== (before.est_shipment_date_text || '')) {
-    await orderRepository.setEstShipmentDate(orderId, shipmentText);
-    await auditLogRepository.log(user.id, 'EST_SHIPMENT_DATE_UPDATED', 'orders', orderId, 'est_shipment_date_text', before.est_shipment_date_text || null, shipmentText);
+
+  const shipmentTextInput = str(req.body.est_shipment_date_text);
+  const shipmentDateInput = str(req.body.est_shipment_date);
+  const resolvedDate = shipmentDateInput !== '' && /^\d{4}-\d{2}-\d{2}$/.test(shipmentDateInput)
+    ? shipmentDateInput
+    : (before.est_shipment_date || null);
+  const resolvedText = shipmentTextInput !== '' ? shipmentTextInput : (before.est_shipment_date_text || '');
+  const textChanged = resolvedText !== '' && resolvedText !== (before.est_shipment_date_text || '');
+  const dateChanged = (resolvedDate || null) !== (before.est_shipment_date || null);
+  if (textChanged || dateChanged) {
+    await orderRepository.setEstShipmentDate(orderId, resolvedText, resolvedDate);
+    await auditLogRepository.log(user.id, 'EST_SHIPMENT_DATE_UPDATED', 'orders', orderId, 'est_shipment_date_text', before.est_shipment_date_text || null, resolvedText);
+
+    // Export process step 8: "client gets notified - he can able to see
+    // this in his portal" — reuses the existing order-comment-to-client
+    // channel (orderCommentService.postAsStaff()), which already shows
+    // in the client's portal thread AND emails them when an address is
+    // on file, rather than building a second, parallel notification
+    // mechanism for this one field.
+    const dateDisplay = resolvedDate
+      ? new Date(resolvedDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : resolvedText;
+    try {
+      await orderCommentService.postAsStaff(orderId, user.id, `The estimated shipment date for your order has been updated to: ${dateDisplay}.`, []);
+    } catch (e) {
+      // Never block the actual production/shipment-date update over a notification failure.
+    }
   }
+
   flash.set(req, 'success', 'Production status updated.');
   res.redirect(`/orders/${orderId}`);
 }

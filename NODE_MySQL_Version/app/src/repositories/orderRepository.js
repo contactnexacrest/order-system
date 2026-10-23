@@ -582,8 +582,17 @@ async function setBuyersPoRef(orderId, ref) {
   await db.execute('UPDATE orders SET buyers_po_ref = :ref WHERE id = :id', { ref, id: orderId });
 }
 
-async function setEstShipmentDate(orderId, text) {
-  await db.execute('UPDATE orders SET est_shipment_date_text = :text WHERE id = :id', { text, id: orderId });
+/**
+ * docs/schema.sql Section BT — est_shipment_date_text stays free text
+ * for documents (e.g. "Week of 15 October 2026"); the optional
+ * structured date is what the 7-day pre-shipment-inspection reminder
+ * actually computes against.
+ */
+async function setEstShipmentDate(orderId, text, date = null) {
+  await db.execute(
+    'UPDATE orders SET est_shipment_date_text = :text, est_shipment_date = :date WHERE id = :id',
+    { text, date, id: orderId }
+  );
 }
 
 /** docs/schema.sql Section AF — staff-controlled, per order, default off. */

@@ -5,6 +5,7 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
+const orderInspectionFeeRepository = require('../repositories/orderInspectionFeeRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
@@ -255,6 +256,63 @@ async function saveLcDetails(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
+/**
+ * Export process step 8a: who pays the 3rd-party pre-shipment
+ * inspection fee for this order. When NexaCrest pays, the amount is
+ * kept in sync with a single order_cost_entries row (category
+ * inspection_fee), same pattern as the LC bank loan interest sync
+ * above — if the client pays instead (or no amount is given), any
+ * previously-synced expense entry is removed, since NexaCrest no
+ * longer incurred that cost.
+ */
+async function saveInspectionFee(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await orderRepository.find(orderId))) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const user = req.user;
+  const existing = await orderInspectionFeeRepository.find(orderId);
+
+  const feePayer = String(req.body.fee_payer || '').trim();
+  if (!['nexacrest', 'client'].includes(feePayer)) {
+    flash.set(req, 'error', 'Select who pays the inspection fee.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  const rawAmount = String(req.body.fee_amount || '').trim();
+  if (rawAmount !== '' && (Number.isNaN(Number(rawAmount)) || Number(rawAmount) < 0)) {
+    flash.set(req, 'error', 'Enter a valid fee amount (or leave it blank).');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  const feeAmount = rawAmount !== '' ? parseFloat(rawAmount) : null;
+
+  let costEntryId = existing ? existing.cost_entry_id : null;
+  let staleCostEntryIdToDelete = null;
+  if (feePayer === 'nexacrest' && feeAmount !== null && feeAmount > 0) {
+    if (costEntryId) {
+      await orderCostEntryRepository.updateAmount(costEntryId, feeAmount, 'Pre-shipment inspection fee');
+    } else {
+      costEntryId = await orderCostEntryRepository.create(orderId, 'inspection_fee', 'Pre-shipment inspection fee', feeAmount, todayIst(), user.id);
+    }
+  } else if (costEntryId) {
+    // order_inspection_fees.cost_entry_id FK must stop pointing at this
+    // row BEFORE it's deleted, not after — same ordering as the LC
+    // interest sync above.
+    staleCostEntryIdToDelete = costEntryId;
+    costEntryId = null;
+  }
+
+  await orderInspectionFeeRepository.upsert(orderId, { fee_payer: feePayer, fee_amount: feeAmount, cost_entry_id: costEntryId, recorded_by: user.id });
+  if (staleCostEntryIdToDelete !== null) {
+    await orderCostEntryRepository.remove(staleCostEntryIdToDelete);
+  }
+  await auditLogRepository.log(user.id, 'ORDER_INSPECTION_FEE_SAVED', 'order_inspection_fees', orderId, 'fee_payer', null, feePayer);
+  flash.set(req, 'success', 'Inspection fee details saved.');
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
 async function deleteCostEntry(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const entryId = parseInt(req.params.entryId, 10);
@@ -276,4 +334,4 @@ async function deleteCostEntry(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
-module.exports = { addExportBenefit, markExportBenefitReceived, addCostEntry, deleteCostEntry, saveLcDetails };
+module.exports = { addExportBenefit, markExportBenefitReceived, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee };

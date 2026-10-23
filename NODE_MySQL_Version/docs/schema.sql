@@ -3667,3 +3667,43 @@ CREATE TABLE order_draft_bl_reviews (
   FOREIGN KEY (reviewed_by) REFERENCES users(id),
   UNIQUE KEY uq_order_draft_bl_round (order_id, round_number)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION BT — SHIPMENT DATE + PRE-SHIPMENT INSPECTION REMINDER
+-- (added 2026-10-23)
+-- ================================================================
+-- Export process step 8: a real DATE alongside the existing free-text
+-- est_shipment_date_text (documents keep using the text field exactly
+-- as before), so updating the estimate can both notify the client
+-- (reuses the existing order-comment-to-client channel, which already
+-- emails them and shows in their portal) and drive step 8a's 7-day
+-- pre-shipment-inspection reminder. The inspection fee payer/amount is
+-- its own one-to-one table — order_compliance_tasks' existing
+-- "Pre-Shipment Inspection" task row (status != 'skipped') is reused
+-- as the "does this order even have a 3rd-party inspection" signal,
+-- rather than duplicating that flag here. When NexaCrest pays the fee,
+-- it's kept in sync with a single order_cost_entries row (category
+-- 'inspection_fee'), the same pattern as the LC bank loan interest
+-- sync (Section BR). See
+-- docs/migrations/2026-10-23h-shipment-date-inspection-reminder.sql.
+-- ================================================================
+ALTER TABLE orders
+  ADD COLUMN est_shipment_date DATE NULL AFTER est_shipment_date_text;
+
+ALTER TABLE order_cost_entries
+  MODIFY COLUMN category ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
+                               'documentation','port_charges','bank_charges','commission',
+                               'packing_crates','bank_loan_interest','inspection_fee','other') NOT NULL;
+
+CREATE TABLE order_inspection_fees (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL UNIQUE,
+  fee_payer     ENUM('nexacrest','client') NOT NULL,
+  fee_amount    DECIMAL(14,2) NULL,
+  cost_entry_id BIGINT UNSIGNED NULL,
+  recorded_by   BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (cost_entry_id) REFERENCES order_cost_entries(id),
+  FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;

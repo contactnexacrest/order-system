@@ -185,6 +185,35 @@ function run(): int
         $created += notifyMdAndAdmin($mdAndAdminIds, 'pi_expired', "Proforma Invoice validity expired on order {$row['order_reference']} — was valid until {$row['pi_valid_until']}, Order Confirmation not yet reached.", (int) $row['order_id'], $activeUsersById);
     }
 
+    // --- Export process step 8a: 7-day pre-shipment inspection reminder ---
+    // Fires every day the estimated shipment date is within the next 7
+    // days (inclusive, not yet passed) for any non-locked order that
+    // still has a "Pre-Shipment Inspection" compliance task NOT marked
+    // skipped (not applicable) — reusing that existing checklist row as
+    // the "does this order even need 3rd-party inspection" signal, rather
+    // than a second, duplicate flag. Targets whoever manages orders
+    // (production/ops), not just Admin/MD, since this is squarely an
+    // operations coordination reminder.
+    $orderManagerIds = PermissionRepository::usersWithPermission('manage_orders');
+    $stmt = $pdo->query(
+        "SELECT o.id AS order_id, o.order_reference, o.est_shipment_date
+         FROM orders o
+         WHERE o.is_locked = 0
+           AND o.est_shipment_date IS NOT NULL
+           AND o.est_shipment_date >= CURDATE()
+           AND o.est_shipment_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+           AND EXISTS (
+             SELECT 1 FROM compliance_task_types tt
+             LEFT JOIN order_compliance_tasks oct ON oct.task_type_id = tt.id AND oct.order_id = o.id
+             WHERE tt.name = 'Pre-Shipment Inspection' AND tt.is_active = 1
+               AND COALESCE(oct.status, 'not_started') != 'skipped'
+           )"
+    );
+    foreach ($stmt->fetchAll() as $row) {
+        $daysLeft = $today->diff(new DateTimeImmutable($row['est_shipment_date']))->days;
+        $created += notifyMdAndAdmin($orderManagerIds, 'pre_shipment_inspection_reminder', "Pre-shipment inspection due soon on order {$row['order_reference']} — estimated shipment {$row['est_shipment_date']} ({$daysLeft} day(s) away). Confirm production completion and prepare for 3rd-party inspection.", (int) $row['order_id'], $activeUsersById);
+    }
+
     return $created;
 }
 

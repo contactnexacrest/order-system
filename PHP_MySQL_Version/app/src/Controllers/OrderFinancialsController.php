@@ -8,6 +8,7 @@ use App\Helpers\Flash;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\OrderCostEntryRepository;
+use App\Repositories\OrderInspectionFeeRepository;
 use App\Repositories\OrderLcDetailRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AuthService;
@@ -257,6 +258,77 @@ final class OrderFinancialsController
         }
         AuditLogRepository::log((int) $user['id'], 'ORDER_LC_DETAILS_SAVED', 'order_lc_details', $orderId, null, null, $lcNumber);
         Flash::set('success', 'LC / bank loan details saved.');
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
+    /**
+     * Export process step 8a: who pays the 3rd-party pre-shipment
+     * inspection fee for this order. When NexaCrest pays, the amount is
+     * kept in sync with a single order_cost_entries row (category
+     * inspection_fee), same pattern as the LC bank loan interest sync
+     * above — if the client pays instead (or no amount is given), any
+     * previously-synced expense entry is removed, since NexaCrest no
+     * longer incurred that cost.
+     */
+    public function saveInspectionFee(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!OrderRepository::find($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+        $existing = OrderInspectionFeeRepository::find($orderId);
+
+        $feePayer = trim((string) ($_POST['fee_payer'] ?? ''));
+        if (!in_array($feePayer, ['nexacrest', 'client'], true)) {
+            Flash::set('error', 'Select who pays the inspection fee.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        $rawAmount = trim((string) ($_POST['fee_amount'] ?? ''));
+        if ($rawAmount !== '' && (!is_numeric($rawAmount) || (float) $rawAmount < 0)) {
+            Flash::set('error', 'Enter a valid fee amount (or leave it blank).');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        $feeAmount = $rawAmount !== '' ? (float) $rawAmount : null;
+
+        $costEntryId = $existing['cost_entry_id'] ?? null;
+        $staleCostEntryIdToDelete = null;
+        if ($feePayer === 'nexacrest' && $feeAmount !== null && $feeAmount > 0) {
+            if ($costEntryId) {
+                OrderCostEntryRepository::updateAmount($costEntryId, $feeAmount, 'Pre-shipment inspection fee');
+            } else {
+                $costEntryId = OrderCostEntryRepository::create(
+                    $orderId,
+                    'inspection_fee',
+                    'Pre-shipment inspection fee',
+                    $feeAmount,
+                    date('Y-m-d'),
+                    (int) $user['id']
+                );
+            }
+        } elseif ($costEntryId) {
+            // order_inspection_fees.cost_entry_id FK must stop pointing at
+            // this row BEFORE it's deleted, not after — same ordering as
+            // the LC interest sync above.
+            $staleCostEntryIdToDelete = $costEntryId;
+            $costEntryId = null;
+        }
+
+        OrderInspectionFeeRepository::upsert($orderId, [
+            'fee_payer' => $feePayer,
+            'fee_amount' => $feeAmount,
+            'cost_entry_id' => $costEntryId,
+            'recorded_by' => (int) $user['id'],
+        ]);
+        if ($staleCostEntryIdToDelete !== null) {
+            OrderCostEntryRepository::delete($staleCostEntryIdToDelete);
+        }
+        AuditLogRepository::log((int) $user['id'], 'ORDER_INSPECTION_FEE_SAVED', 'order_inspection_fees', $orderId, 'fee_payer', null, $feePayer);
+        Flash::set('success', 'Inspection fee details saved.');
         header("Location: /orders/{$orderId}#order-financials");
     }
 

@@ -635,11 +635,17 @@ final class OrderRepository
         )->execute(['ref' => $ref, 'id' => $orderId]);
     }
 
-    public static function setEstShipmentDate(int $orderId, string $text): void
+    /**
+     * docs/schema.sql Section BT — est_shipment_date_text stays free text
+     * for documents (e.g. "Week of 15 October 2026"); the optional
+     * structured $date is what the 7-day pre-shipment-inspection reminder
+     * actually computes against.
+     */
+    public static function setEstShipmentDate(int $orderId, string $text, ?string $date = null): void
     {
         Database::connection()->prepare(
-            'UPDATE orders SET est_shipment_date_text = :text WHERE id = :id'
-        )->execute(['text' => $text, 'id' => $orderId]);
+            'UPDATE orders SET est_shipment_date_text = :text, est_shipment_date = :date WHERE id = :id'
+        )->execute(['text' => $text, 'date' => $date, 'id' => $orderId]);
     }
 
     /** docs/schema.sql Section AF — staff-controlled, per order, default off. */
