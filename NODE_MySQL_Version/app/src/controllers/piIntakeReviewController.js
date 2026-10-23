@@ -157,6 +157,9 @@ async function reject(req, res) {
 
   const user = req.user;
   await piIntakeRepository.markRejected(id, user.id, reason);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(user.id, 'PI_INTAKE_REJECTED', 'pi_intake_submissions', id, null, 'pending_review', 'rejected', reason);
   flash.set(req, 'success', 'PI-stage submission rejected — the client can resubmit via the same link.');
   res.redirect('/pi-intake-review');
 }

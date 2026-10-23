@@ -91,6 +91,9 @@ async function accept(req, res) {
   );
 
   await clientIntakeRepository.markConverted(id, clientId, user.id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(user.id, 'CLIENT_INTAKE_ACCEPTED', 'client_intake_submissions', id, null, 'pending', 'converted', null);
 
   flash.set(req, 'success', `Client created — Buyer Inquiry Ref ${clientUniqueNumber}. Proceed to create the order and generate the Quotation.`);
   res.redirect(`/clients/${clientId}`);
@@ -137,6 +140,9 @@ async function reject(req, res) {
   }
 
   await clientIntakeRepository.markRejected(id, user.id, reason);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(user.id, 'CLIENT_INTAKE_REJECTED', 'client_intake_submissions', id, null, 'pending', 'rejected', reason);
   flash.set(req, 'success', 'Request rejected.');
   res.redirect('/client-intake');
 }

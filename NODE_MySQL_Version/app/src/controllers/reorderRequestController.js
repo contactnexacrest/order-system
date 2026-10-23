@@ -2,6 +2,7 @@
 
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
+const auditLogRepository = require('../repositories/auditLogRepository');
 const hsCodeRepository = require('../repositories/hsCodeRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderReorderRequestRepository = require('../repositories/orderReorderRequestRepository');
@@ -121,6 +122,9 @@ async function reject(req, res) {
   }
 
   await orderReorderRequestRepository.markRejected(id, req.user.id, reason);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'REORDER_REQUEST_REJECTED', 'order_reorder_requests', id, null, 'pending', 'rejected', reason);
   flash.set(req, 'success', 'Reorder request rejected.');
   res.redirect('/reorder-requests');
 }

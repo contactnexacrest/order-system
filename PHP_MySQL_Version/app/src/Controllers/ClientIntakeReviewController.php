@@ -101,6 +101,9 @@ final class ClientIntakeReviewController
         ], (int) $user['id'], $clientUniqueNumber);
 
         ClientIntakeRepository::markConverted($id, $clientId, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'CLIENT_INTAKE_ACCEPTED', 'client_intake_submissions', $id, null, 'pending', 'converted', null);
 
         Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}. Proceed to create the order and generate the Quotation.");
         header("Location: /clients/{$clientId}");
@@ -148,6 +151,9 @@ final class ClientIntakeReviewController
         }
 
         ClientIntakeRepository::markRejected($id, (int) $user['id'], $reason);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'CLIENT_INTAKE_REJECTED', 'client_intake_submissions', $id, null, 'pending', 'rejected', $reason);
         Flash::set('success', 'Request rejected.');
         header('Location: /client-intake');
     }

@@ -9,6 +9,7 @@ use App\Helpers\CountryList;
 use App\Helpers\Flash;
 use App\Helpers\RateLimiter;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientIntakeRepository;
 use App\Repositories\EmailTemplateRepository;
 use App\Repositories\LookupRepository;
@@ -105,6 +106,9 @@ final class ClientIntakeController
         }
 
         ClientIntakeRepository::updateFromClient((int) $submission['id'], $data);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMISSION_UPDATED_BY_CLIENT', 'client_intake_submissions', (int) $submission['id'], null, null, null, 'Corrected by the client via the no-login edit link.');
         View::render('client_intake/thank_you', ['correctionLink' => null, 'updated' => true], 'layout/bare');
     }
 

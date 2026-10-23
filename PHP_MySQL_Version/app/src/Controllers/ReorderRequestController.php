@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\HsCodeRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\OrderReorderRequestRepository;
@@ -146,6 +147,9 @@ final class ReorderRequestController
 
         $user = AuthService::currentUser();
         OrderReorderRequestRepository::markRejected($id, (int) $user['id'], $reason);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'REORDER_REQUEST_REJECTED', 'order_reorder_requests', $id, null, 'pending', 'rejected', $reason);
         Flash::set('success', 'Reorder request rejected.');
         header('Location: /reorder-requests');
     }

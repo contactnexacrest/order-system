@@ -172,6 +172,9 @@ final class PiIntakeReviewController
 
         $user = AuthService::currentUser();
         PiIntakeRepository::markRejected($id, (int) $user['id'], $reason);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'PI_INTAKE_REJECTED', 'pi_intake_submissions', $id, null, 'pending_review', 'rejected', $reason);
         Flash::set('success', 'PI-stage submission rejected — the client can resubmit via the same link.');
         header('Location: /pi-intake-review');
     }
