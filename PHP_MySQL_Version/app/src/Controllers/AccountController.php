@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\UiTemplateRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
@@ -28,6 +29,9 @@ final class AccountController
         $userId = (int) AuthService::currentUser()['id'];
         $signature = trim((string) ($_POST['email_signature'] ?? ''));
         UserRepository::updateSignature($userId, $signature !== '' ? $signature : null);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log($userId, 'ACCOUNT_SIGNATURE_UPDATED', 'users', $userId, 'email_signature', null, null);
         Flash::set('success', 'Signature saved — it will be used on every email you send through the system from now on.');
         header('Location: /account');
     }
@@ -38,6 +42,9 @@ final class AccountController
         $userId = (int) AuthService::currentUser()['id'];
         $enabled = !empty($_POST['email_action_notifications_enabled']);
         UserRepository::updateNotificationPreference($userId, $enabled);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log($userId, 'ACCOUNT_NOTIFICATION_PREFERENCE_UPDATED', 'users', $userId, 'email_action_notifications_enabled', null, (string) (int) $enabled);
         Flash::set('success', 'Notification preference saved.');
         header('Location: /account');
     }
@@ -49,6 +56,9 @@ final class AccountController
         $raw = trim((string) ($_POST['ui_template_preference_id'] ?? ''));
         if ($raw === '') {
             UserRepository::updateUiTemplatePreference($userId, null);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log($userId, 'ACCOUNT_UI_TEMPLATE_PREFERENCE_UPDATED', 'users', $userId, 'ui_template_preference_id', null, null);
             Flash::set('success', 'UI template preference cleared — you will now follow the company default.');
             header('Location: /account');
             return;
@@ -61,6 +71,7 @@ final class AccountController
             return;
         }
         UserRepository::updateUiTemplatePreference($userId, $templateId);
+        AuditLogRepository::log($userId, 'ACCOUNT_UI_TEMPLATE_PREFERENCE_UPDATED', 'users', $userId, 'ui_template_preference_id', null, (string) $templateId);
         Flash::set('success', 'UI template preference saved.');
         header('Location: /account');
     }

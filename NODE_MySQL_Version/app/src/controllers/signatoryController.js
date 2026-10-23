@@ -8,6 +8,7 @@ const flash = require('../helpers/flash');
 const sniffMime = require('../helpers/sniffMime');
 const signatoryRepository = require('../repositories/signatoryRepository');
 const userRepository = require('../repositories/userRepository');
+const auditLogRepository = require('../repositories/auditLogRepository');
 
 /**
  * Port of App\Controllers\SignatoryController — admin screen for the
@@ -43,13 +44,20 @@ async function createDesignation(req, res) {
     res.redirect('/signatories');
     return;
   }
-  await signatoryRepository.createDesignation(title, req.user.id);
+  const designationId = await signatoryRepository.createDesignation(title, req.user.id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'SIGNATORY_DESIGNATION_CREATED', 'designations', designationId, null, null, title);
   flash.set(req, 'success', `Designation "${title}" added.`);
   res.redirect('/signatories');
 }
 
 async function toggleDesignation(req, res) {
-  await signatoryRepository.toggleDesignationActive(parseInt(req.params.id, 10) || 0);
+  const id = parseInt(req.params.id, 10) || 0;
+  await signatoryRepository.toggleDesignationActive(id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'SIGNATORY_DESIGNATION_TOGGLED', 'designations', id, null, null, null);
   flash.set(req, 'success', 'Designation updated.');
   res.redirect('/signatories');
 }
@@ -74,6 +82,9 @@ async function updateDesignation(req, res) {
     return;
   }
   await signatoryRepository.updateDesignationTitle(id, title);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'SIGNATORY_DESIGNATION_RENAMED', 'designations', id, 'title', designation.title, title);
   flash.set(req, 'success', `Designation renamed to "${title}".`);
   res.redirect('/signatories');
 }
@@ -93,6 +104,9 @@ async function deleteDesignation(req, res) {
     return;
   }
   await signatoryRepository.deleteDesignation(id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'SIGNATORY_DESIGNATION_DELETED', 'designations', id, null, designation.title, null);
   flash.set(req, 'success', `Designation "${designation.title}" deleted.`);
   res.redirect('/signatories');
 }
@@ -161,13 +175,20 @@ async function uploadUserAsset(req, res) {
   const targetPath = path.join(targetDir, filename);
   fs.writeFileSync(targetPath, file.buffer);
 
-  await signatoryRepository.addUserAsset(userId, kind, label, targetPath, mime, req.user.id);
+  const assetId = await signatoryRepository.addUserAsset(userId, kind, label, targetPath, mime, req.user.id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'SIGNATORY_USER_ASSET_UPLOADED', 'user_signature_assets', assetId, null, null, kind);
   flash.set(req, 'success', `${kind.replace(/_/g, ' ')} uploaded.`);
   res.redirect('/signatories');
 }
 
 async function deactivateUserAsset(req, res) {
-  await signatoryRepository.deactivateUserAsset(parseInt(req.params.id, 10) || 0);
+  const id = parseInt(req.params.id, 10) || 0;
+  await signatoryRepository.deactivateUserAsset(id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'SIGNATORY_USER_ASSET_DEACTIVATED', 'user_signature_assets', id, null, null, null);
   flash.set(req, 'success', 'Asset removed.');
   res.redirect('/signatories');
 }

@@ -6,7 +6,9 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\UiTemplateRepository;
+use App\Services\AuthService;
 use App\Services\UiTemplateService;
 
 /**
@@ -40,6 +42,10 @@ final class UiTemplateController
             return;
         }
         UiTemplateRepository::setActive($id, !$template['is_active']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        $user = AuthService::currentUser();
+        AuditLogRepository::log($user ? (int) $user['id'] : null, 'UI_TEMPLATE_TOGGLED_ACTIVE', 'ui_templates', $id, 'is_active', (string) (int) $template['is_active'], (string) (int) !$template['is_active']);
         Flash::set('success', $template['is_active'] ? 'Template deactivated — anyone using it (by preference or as the company default) now falls back automatically.' : 'Template reactivated.');
         header('Location: /ui-templates');
     }

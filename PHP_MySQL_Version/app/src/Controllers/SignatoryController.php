@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Config\Env;
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\SignatoryRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
@@ -53,14 +54,22 @@ final class SignatoryController
             header('Location: /signatories');
             return;
         }
-        SignatoryRepository::createDesignation($title, (int) $user['id']);
+        $designationId = SignatoryRepository::createDesignation($title, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'SIGNATORY_DESIGNATION_CREATED', 'designations', $designationId, null, null, $title);
         Flash::set('success', "Designation \"{$title}\" added.");
         header('Location: /signatories');
     }
 
     public function toggleDesignation(array $params): void
     {
-        SignatoryRepository::toggleDesignationActive((int) ($params['id'] ?? 0));
+        $id = (int) ($params['id'] ?? 0);
+        SignatoryRepository::toggleDesignationActive($id);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        $user = AuthService::currentUser();
+        AuditLogRepository::log($user ? (int) $user['id'] : null, 'SIGNATORY_DESIGNATION_TOGGLED', 'designations', $id, null, null, null);
         Flash::set('success', 'Designation updated.');
         header('Location: /signatories');
     }
@@ -86,6 +95,10 @@ final class SignatoryController
             return;
         }
         SignatoryRepository::updateDesignationTitle($id, $title);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        $user = AuthService::currentUser();
+        AuditLogRepository::log($user ? (int) $user['id'] : null, 'SIGNATORY_DESIGNATION_RENAMED', 'designations', $id, 'title', $designation['title'], $title);
         Flash::set('success', "Designation renamed to \"{$title}\".");
         header('Location: /signatories');
     }
@@ -106,6 +119,10 @@ final class SignatoryController
             return;
         }
         SignatoryRepository::deleteDesignation($id);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        $user = AuthService::currentUser();
+        AuditLogRepository::log($user ? (int) $user['id'] : null, 'SIGNATORY_DESIGNATION_DELETED', 'designations', $id, null, $designation['title'], null);
         Flash::set('success', "Designation \"{$designation['title']}\" deleted.");
         header('Location: /signatories');
     }
@@ -188,14 +205,22 @@ final class SignatoryController
             return;
         }
 
-        SignatoryRepository::addUserAsset($userId, $kind, $label, $targetPath, $mime, (int) $user['id']);
+        $assetId = SignatoryRepository::addUserAsset($userId, $kind, $label, $targetPath, $mime, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'SIGNATORY_USER_ASSET_UPLOADED', 'user_signature_assets', $assetId, null, null, $kind);
         Flash::set('success', ucfirst(str_replace('_', ' ', $kind)) . ' uploaded.');
         header('Location: /signatories');
     }
 
     public function deactivateUserAsset(array $params): void
     {
-        SignatoryRepository::deactivateUserAsset((int) ($params['id'] ?? 0));
+        $id = (int) ($params['id'] ?? 0);
+        SignatoryRepository::deactivateUserAsset($id);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        $user = AuthService::currentUser();
+        AuditLogRepository::log($user ? (int) $user['id'] : null, 'SIGNATORY_USER_ASSET_DEACTIVATED', 'user_signature_assets', $id, null, null, null);
         Flash::set('success', 'Asset removed.');
         header('Location: /signatories');
     }

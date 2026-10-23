@@ -2,6 +2,7 @@
 
 const flash = require('../helpers/flash');
 const testModeService = require('../services/testModeService');
+const auditLogRepository = require('../repositories/auditLogRepository');
 
 // Test Mode admin screen (docs/schema.sql Section V) — Super Admin only,
 // wired via requireSuperAdmin in server.js, same as /super-admin itself.
@@ -17,6 +18,9 @@ async function index(req, res) {
 
 async function enable(req, res) {
   await testModeService.enable(req.user.id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'TEST_MODE_ENABLED', 'test_mode_settings', 1, 'is_enabled', '0', '1');
   flash.set(req, 'success', 'Test Mode enabled. Client access is suspended and outbound mail is now redirected.');
   res.redirect('/test-mode');
 }
@@ -24,6 +28,9 @@ async function enable(req, res) {
 async function disable(req, res) {
   try {
     await testModeService.disable();
+    // External QA report N-08: this action never reached the audit log,
+    // so it never notified anyone either.
+    await auditLogRepository.log(req.user ? req.user.id : null, 'TEST_MODE_DISABLED', 'test_mode_settings', 1, 'is_enabled', '1', '0');
     flash.set(req, 'success', 'Test Mode disabled.');
   } catch (e) {
     flash.setErrorFromException(req, e);
@@ -39,12 +46,18 @@ async function updateTestEmail(req, res) {
     return;
   }
   await testModeService.setTestEmail(email);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'TEST_MODE_TEST_EMAIL_UPDATED', 'test_mode_settings', 1, 'test_email', null, email);
   flash.set(req, 'success', 'Test email updated.');
   res.redirect('/test-mode');
 }
 
 async function deleteTestData(req, res) {
   const result = await testModeService.deleteAllTestData();
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'TEST_MODE_TEST_DATA_DELETED', 'test_mode_settings', 1, null, null, `clients=${result.clients}, orders=${result.orders}, files=${result.files}`);
   flash.set(
     req,
     'success',

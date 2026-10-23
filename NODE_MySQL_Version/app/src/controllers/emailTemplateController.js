@@ -2,6 +2,7 @@
 
 const flash = require('../helpers/flash');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
+const auditLogRepository = require('../repositories/auditLogRepository');
 
 /** docs/schema.sql Section AI — email template CRUD, gated by manage_email_templates. Never delete. */
 
@@ -67,7 +68,10 @@ async function store(req, res) {
     return;
   }
 
-  await emailTemplateRepository.create(templateKey, subject, body, footer !== '' ? footer : null, req.user.id);
+  const templateId = await emailTemplateRepository.create(templateKey, subject, body, footer !== '' ? footer : null, req.user.id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'EMAIL_TEMPLATE_CREATED', 'email_templates', templateId, null, null, templateKey);
   flash.set(req, 'success', 'Template created.');
   res.redirect('/email-templates');
 }
@@ -99,6 +103,9 @@ async function update(req, res) {
   }
 
   await emailTemplateRepository.update(id, subject, body, footer !== '' ? footer : null, req.user.id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'EMAIL_TEMPLATE_UPDATED', 'email_templates', id, 'subject', template.subject, subject);
   flash.set(req, 'success', 'Template updated. Every email already sent from it keeps exactly what it said at send time — this only affects new sends.');
   res.redirect('/email-templates');
 }
@@ -111,6 +118,9 @@ async function toggleActive(req, res) {
     return;
   }
   await emailTemplateRepository.setActive(id, !template.is_active, req.user.id);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'EMAIL_TEMPLATE_TOGGLED_ACTIVE', 'email_templates', id, 'is_active', String(Number(template.is_active)), String(Number(!template.is_active)));
   flash.set(req, 'success', template.is_active ? 'Template deactivated — no longer offered for new sends.' : 'Template reactivated.');
   res.redirect('/email-templates');
 }

@@ -255,6 +255,9 @@ final class SettingsController
                 "This is a test email sent from the NexaCrest order system's Zoho Mail integration.\n\nIf you received this, the connection is working.\n\nSent by {$user['name']}."
             );
             Flash::set('success', "Test email sent via Zoho Mail to {$to}.");
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) $user['id'], 'SETTINGS_TEST_ZOHO_EMAIL_SENT', 'company_settings', null, null, null, $to);
         } catch (\Throwable $e) {
             Flash::set('error', 'Zoho test send failed: ' . $e->getMessage());
         }
@@ -285,6 +288,9 @@ final class SettingsController
                 "This is a test email sent from the NexaCrest order system's SMTP connection.\n\nIf you received this, the connection is working.\n\nSent by {$user['name']}."
             );
             Flash::set('success', "Test email sent via SMTP to {$to}.");
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) $user['id'], 'SETTINGS_TEST_SMTP_EMAIL_SENT', 'company_settings', null, null, null, $to);
         } catch (\Throwable $e) {
             Flash::set('error', 'SMTP test send failed: ' . $e->getMessage());
         }

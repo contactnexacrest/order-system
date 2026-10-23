@@ -3,6 +3,7 @@
 const flash = require('../helpers/flash');
 const uiTemplateRepository = require('../repositories/uiTemplateRepository');
 const uiTemplateService = require('../services/uiTemplateService');
+const auditLogRepository = require('../repositories/auditLogRepository');
 
 /**
  * docs/schema.sql Section BQ — admin on/off switch per UI template,
@@ -29,6 +30,9 @@ async function toggleActive(req, res) {
     return;
   }
   await uiTemplateRepository.setActive(id, !template.is_active);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'UI_TEMPLATE_TOGGLED_ACTIVE', 'ui_templates', id, 'is_active', String(Number(template.is_active)), String(Number(!template.is_active)));
   flash.set(req, 'success', template.is_active ? 'Template deactivated — anyone using it (by preference or as the company default) now falls back automatically.' : 'Template reactivated.');
   res.redirect('/ui-templates');
 }

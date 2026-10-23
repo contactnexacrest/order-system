@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\AuditLogRepository;
 use App\Repositories\EmailTemplateRepository;
 use App\Services\AuthService;
 
@@ -51,7 +52,10 @@ final class EmailTemplateController
         }
 
         $user = AuthService::currentUser();
-        EmailTemplateRepository::create($templateKey, $subject, $body, $footer !== '' ? $footer : null, (int) $user['id']);
+        $templateId = EmailTemplateRepository::create($templateKey, $subject, $body, $footer !== '' ? $footer : null, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'EMAIL_TEMPLATE_CREATED', 'email_templates', $templateId, null, null, $templateKey);
         Flash::set('success', 'Template created.');
         header('Location: /email-templates');
     }
@@ -91,6 +95,9 @@ final class EmailTemplateController
 
         $user = AuthService::currentUser();
         EmailTemplateRepository::update($id, $subject, $body, $footer !== '' ? $footer : null, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'EMAIL_TEMPLATE_UPDATED', 'email_templates', $id, 'subject', $template['subject'], $subject);
         Flash::set('success', 'Template updated. Every email already sent from it keeps exactly what it said at send time — this only affects new sends.');
         header('Location: /email-templates');
     }
@@ -106,6 +113,9 @@ final class EmailTemplateController
         }
         $user = AuthService::currentUser();
         EmailTemplateRepository::setActive($id, !$template['is_active'], (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'EMAIL_TEMPLATE_TOGGLED_ACTIVE', 'email_templates', $id, 'is_active', (string) (int) $template['is_active'], (string) (int) !$template['is_active']);
         Flash::set('success', $template['is_active'] ? 'Template deactivated — no longer offered for new sends.' : 'Template reactivated.');
         header('Location: /email-templates');
     }

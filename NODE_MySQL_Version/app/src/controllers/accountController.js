@@ -6,6 +6,7 @@ const uiTemplateRepository = require('../repositories/uiTemplateRepository');
 const passwordHash = require('../helpers/passwordHash');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const authService = require('../services/authService');
+const auditLogRepository = require('../repositories/auditLogRepository');
 
 /** docs/schema.sql Section AI — self-service staff account page (email signature, self-service password change — a natural home for other self-service settings later). */
 
@@ -17,6 +18,9 @@ async function edit(req, res) {
 async function updateSignature(req, res) {
   const signature = String(req.body.email_signature || '').trim();
   await userRepository.updateSignature(req.user.id, signature !== '' ? signature : null);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ACCOUNT_SIGNATURE_UPDATED', 'users', req.user.id, 'email_signature', null, null);
   flash.set(req, 'success', 'Signature saved — it will be used on every email you send through the system from now on.');
   res.redirect('/account');
 }
@@ -25,6 +29,9 @@ async function updateSignature(req, res) {
 async function updateNotificationPreference(req, res) {
   const enabled = !!req.body.email_action_notifications_enabled;
   await userRepository.updateNotificationPreference(req.user.id, enabled);
+  // External QA report N-08: this action never reached the audit log, so
+  // it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ACCOUNT_NOTIFICATION_PREFERENCE_UPDATED', 'users', req.user.id, 'email_action_notifications_enabled', null, String(Number(enabled)));
   flash.set(req, 'success', 'Notification preference saved.');
   res.redirect('/account');
 }
@@ -35,6 +42,9 @@ async function updateUiTemplate(req, res) {
   const raw = String(req.body.ui_template_preference_id || '').trim();
   if (raw === '') {
     await userRepository.updateUiTemplatePreference(userId, null);
+    // External QA report N-08: this action never reached the audit log,
+    // so it never notified anyone either.
+    await auditLogRepository.log(userId, 'ACCOUNT_UI_TEMPLATE_PREFERENCE_UPDATED', 'users', userId, 'ui_template_preference_id', null, null);
     flash.set(req, 'success', 'UI template preference cleared — you will now follow the company default.');
     res.redirect('/account');
     return;
@@ -47,6 +57,7 @@ async function updateUiTemplate(req, res) {
     return;
   }
   await userRepository.updateUiTemplatePreference(userId, templateId);
+  await auditLogRepository.log(userId, 'ACCOUNT_UI_TEMPLATE_PREFERENCE_UPDATED', 'users', userId, 'ui_template_preference_id', null, String(templateId));
   flash.set(req, 'success', 'UI template preference saved.');
   res.redirect('/account');
 }
