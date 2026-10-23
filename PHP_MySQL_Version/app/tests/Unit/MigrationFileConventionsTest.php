@@ -89,12 +89,13 @@ final class MigrationFileConventionsTest extends TestCase
                     break;
                 }
             }
-            // A migration whose only statement type is UPDATE is safe to
-            // re-run by construction: its own WHERE clause changes FROM a
-            // specific old value, so a second run simply finds no rows
-            // left to match and is a clean no-op — the same property
-            // these explicit guards exist to provide for INSERT/CREATE/
-            // ALTER. (SET NAMES is not a statement that can conflict.)
+            // A migration whose only statement type is UPDATE or DELETE
+            // is safe to re-run by construction: its own WHERE clause
+            // matches a specific row/value, so a second run simply finds
+            // nothing left to match and is a clean no-op — the same
+            // property these explicit guards exist to provide for
+            // INSERT/CREATE/ALTER. (SET NAMES is not a statement that
+            // can conflict.)
             if (!$hasGuard) {
                 // Strip every comment line BEFORE splitting on ';' — a
                 // header comment's own prose can easily contain a
@@ -110,7 +111,7 @@ final class MigrationFileConventionsTest extends TestCase
                 );
                 $hasGuard = $statements !== [] && array_reduce(
                     $statements,
-                    static fn (bool $carry, string $s): bool => $carry && (bool) preg_match('/^\s*UPDATE\b/i', $s),
+                    static fn (bool $carry, string $s): bool => $carry && (bool) preg_match('/^\s*(UPDATE|DELETE)\b/i', $s),
                     true
                 );
             }

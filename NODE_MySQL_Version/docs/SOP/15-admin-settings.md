@@ -285,13 +285,14 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   already created on that preset keeps printing exactly what was true
   the day it was made, even years later.
   Balance Trigger Wording is a free-text field holding the exact sentence
-  printed on the Quotation, Proforma Invoice, and Buyer PO (the only
-  three documents whose balance clause varies by preset — the Commercial
-  Invoice's own Section 7 balance clause is fixed at a company-wide
-  "Calendar Days after NexaCrest emails the scanned BL copy" wording
-  regardless of preset, driven by Company Settings' own
-  `ci_balance_days_post_bl` value instead). It must contain the literal
-  token `{days}`, substituted with that preset's own Balance Days value
+  printed on the Quotation, Proforma Invoice, Buyer PO, and Commercial
+  Invoice — every document whose balance clause varies by preset
+  (external QA report L-06: the Commercial Invoice used to print a
+  hardcoded, company-wide "Calendar Days after NexaCrest emails the
+  scanned BL copy" wording regardless of preset; it now follows the
+  order's own preset like the other three always did). It must contain
+  the literal token `{days}`, substituted with that preset's own Balance
+  Days value
   at render time; leaving it blank falls back to one of two built-in
   sentences depending on the Balance Trigger Option, so an admin never
   needs to backfill older preset rows. Both seeded presets ship

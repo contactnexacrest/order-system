@@ -239,14 +239,16 @@ final class DocumentDataAssembler
                 'balance_amount'   => self::formatMoney($balanceAmount),
                 'balance_trigger_option' => $order['balance_trigger_option'],
                 'balance_days'     => $order['balance_days'],
+                // External QA report L-06: the Commercial Invoice's own
+                // "BALANCE DUE NOW" clause (Section 7) used to hardcode
+                // the Tier 2 (against-BL-copy) trigger wording and a
+                // separate, order-independent `ci_balance_days_post_bl`
+                // company setting, regardless of which payment preset the
+                // order was actually on — a Tier 1 ("before shipment")
+                // order's CI wrongly claimed its balance was due against
+                // a scanned BL copy. Now reuses this same balance_terms_text,
+                // exactly like QT/PI/BuyerPO already correctly do.
                 'balance_terms_text' => self::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null, $order['balance_trigger_wording'] ?? null),
-                // Fixed regardless of the order's own preset — see
-                // ci_balance_days_post_bl's seed.sql comment and
-                // NexaCrest_Change_Log.txt Addendum Section 11 item 4:
-                // the Commercial Invoice's own balance clause (Section 7)
-                // never varies by tier/preset, unlike balance_terms_text
-                // above (which QT/PI/BuyerPO use and which DOES vary).
-                'ci_balance_days_post_bl' => (int) (CompanySettingsRepository::get('ci_balance_days_post_bl') ?? '7'),
                 'total_value'      => self::formatMoney($fobValue), // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
                 // 90-item backlog item #18 (BLOCKER) — see this
                 // function's own freightForTotal/totalCommercialInvoiceValue

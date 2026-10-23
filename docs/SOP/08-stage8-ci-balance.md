@@ -45,16 +45,16 @@ unaffected — freight is still paid separately via its own Debit Note, not
 folded into the advance/balance schedule. On an FOB order, Total
 Commercial Invoice Value is simply the FOB Value, same as before.
 
-The CI's own Section 7 "Balance Due Now" clause always states payment is
-due within a fixed number of **Calendar Days of the date NexaCrest emails
-the scanned BL copy** — this is deliberately **not** the order's own
-payment-preset wording that the Quotation/Proforma Invoice/Buyer PO use
-(which can vary by preset, e.g. "before shipment" vs. "against BL"): by
-the time the CI is generated the goods have already shipped, so every CI
-states the same tier-invariant trigger regardless of which preset the
-order was on. The day count itself comes from a single company-wide
-setting (**Company Settings → `ci_balance_days_post_bl`**, default 7),
-never from the order's own preset.
+The CI's own Section 7 "Balance Due Now" clause states the order's own
+payment-preset balance wording — the same sentence the Quotation,
+Proforma Invoice, and Buyer PO already print (e.g. "before shipment"
+for a Tier 1 preset, "against scanned copy of Bill of Lading" for a
+Tier 2 one), including that preset's own day count. External QA report
+L-06: this used to hardcode the Tier 2 (against-BL-copy) wording and a
+separate company-wide day count on every CI regardless of which preset
+the order was actually on, so a Tier 1 order's CI wrongly told the buyer
+their balance was due against a scanned BL copy — a term they never
+agreed to.
 
 Recording and clearing the balance payment follows the same two-step
 pattern as every other payment in this pipeline:
