@@ -223,9 +223,45 @@ async function dashboard(req, res) {
   const historyHidden = !(await clientRepository.orderHistoryVisible(client));
   res.renderView('client_portal/dashboard', {
     client,
-    orders: await orderRepository.forClient(clientId, historyHidden),
+    orderGroups: groupOrdersByClientFacingStatus(await orderRepository.forClient(clientId, historyHidden)),
     historyHidden,
   }, 'layout/client');
+}
+
+/**
+ * A lightweight "group by status" split for the client's own My Orders
+ * list — not a full Kanban board (the client portal stays the simple
+ * list it is), just a quick visual split once a client has more than a
+ * couple of orders on file. Grouped by the client-FACING label
+ * (docs/schema.sql Section BU), not the raw status, so shipped_docs_sent
+ * and complete share one "Complete" group rather than rendering as two
+ * separate ones — the client was never meant to see that internal
+ * distinction at all, let alone as two buckets. Only labels that
+ * actually have an order are returned, in this fixed, most-relevant-
+ * first order; a future status not in this list still renders, appended
+ * at the end.
+ */
+function groupOrdersByClientFacingStatus(orders) {
+  const clientStatusLabels = { shipped_docs_sent: 'Complete' };
+  const labelOrder = ['Active', 'Complete', 'Disputed', 'Lost', 'Cancelled'];
+
+  const grouped = {};
+  for (const o of orders) {
+    const label = clientStatusLabels[o.status] || (o.status.charAt(0).toUpperCase() + o.status.slice(1));
+    if (!grouped[label]) grouped[label] = [];
+    grouped[label].push(o);
+  }
+
+  const seen = new Set();
+  const orderedLabels = [];
+  for (const label of labelOrder) {
+    if (grouped[label] && !seen.has(label)) { orderedLabels.push(label); seen.add(label); }
+  }
+  for (const label of Object.keys(grouped)) {
+    if (!seen.has(label)) { orderedLabels.push(label); seen.add(label); }
+  }
+
+  return orderedLabels.map((label) => ({ label, orders: grouped[label] }));
 }
 
 async function showOrder(req, res) {

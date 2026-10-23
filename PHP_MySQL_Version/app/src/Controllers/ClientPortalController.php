@@ -217,9 +217,45 @@ final class ClientPortalController
         $historyHidden = !ClientRepository::orderHistoryVisible($client);
         View::render('client_portal/dashboard', [
             'client' => $client,
-            'orders' => OrderRepository::forClient($clientId, $historyHidden),
+            'orderGroups' => self::groupOrdersByClientFacingStatus(OrderRepository::forClient($clientId, $historyHidden)),
             'historyHidden' => $historyHidden,
         ], 'layout/client');
+    }
+
+    /**
+     * A lightweight "group by status" split for the client's own My
+     * Orders list — not a full Kanban board (the client portal stays
+     * the simple list it is), just a quick visual split once a client
+     * has more than a couple of orders on file. Grouped by the
+     * client-FACING label (docs/schema.sql Section BU), not the raw
+     * status, so shipped_docs_sent and complete share one "Complete"
+     * group rather than rendering as two separate ones — the client was
+     * never meant to see that internal distinction at all, let alone as
+     * two buckets. Only labels that actually have an order are
+     * returned, in this fixed, most-relevant-first order; a future
+     * status not in this list still renders, appended at the end.
+     *
+     * @param array<int, array<string,mixed>> $orders
+     * @return array<int, array{label: string, orders: array<int, array<string,mixed>>}>
+     */
+    private static function groupOrdersByClientFacingStatus(array $orders): array
+    {
+        $clientStatusLabels = ['shipped_docs_sent' => 'Complete'];
+        $labelOrder = ['Active', 'Complete', 'Disputed', 'Lost', 'Cancelled'];
+
+        $grouped = [];
+        foreach ($orders as $o) {
+            $label = $clientStatusLabels[$o['status']] ?? ucfirst((string) $o['status']);
+            $grouped[$label][] = $o;
+        }
+
+        $orderedLabels = array_unique(array_merge(array_intersect($labelOrder, array_keys($grouped)), array_keys($grouped)));
+
+        $groups = [];
+        foreach ($orderedLabels as $label) {
+            $groups[] = ['label' => $label, 'orders' => $grouped[$label]];
+        }
+        return $groups;
     }
 
     public function showOrder(array $params): void

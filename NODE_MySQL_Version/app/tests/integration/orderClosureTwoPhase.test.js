@@ -245,7 +245,7 @@ describe('Two-phase order closure (Section BU)', () => {
   // View data — client-facing status label
   // ---------------------------------------------------------------
 
-  it('client dashboard shows Complete for a shipped_docs_sent order', async () => {
+  it('client dashboard groups a shipped_docs_sent order under the Complete label', async () => {
     const clientId = await createTestClient('client-dashboard-test@example.test');
     const orderId = await createTestOrder(clientId);
     const userId = await createTestUser();
@@ -255,17 +255,15 @@ describe('Two-phase order closure (Section BU)', () => {
     const res = fakeRes();
     await clientPortalController.dashboard(req, res);
 
-    const order = res.locals.orders.find((o) => Number(o.id) === orderId);
+    // docs/schema.sql Section BU — shipped_docs_sent is staff-only
+    // wording; the client-facing dashboard groups it under "Complete"
+    // (clientPortalController.groupOrdersByClientFacingStatus), never as
+    // its own separate group.
+    const completeGroup = res.locals.orderGroups.find((g) => g.label === 'Complete');
+    expect(completeGroup).toBeDefined();
+    const order = completeGroup.orders.find((o) => Number(o.id) === orderId);
+    expect(order).toBeDefined();
     expect(order.status).toBe('shipped_docs_sent');
-    // The template (not exercised directly here) maps this to "Complete"
-    // via clientStatusLabels — confirmed by the template-source check below.
-  });
-
-  it('the dashboard template maps shipped_docs_sent to Complete for the client', () => {
-    const fs = require('fs');
-    const path = require('path');
-    const source = fs.readFileSync(path.join(__dirname, '..', '..', 'views', 'client_portal', 'dashboard.njk'), 'utf8');
-    expect(source).toContain('shipped_docs_sent');
-    expect(source).toContain('Complete');
+    expect(res.locals.orderGroups.some((g) => g.label === 'Shipped_docs_sent' || g.label === 'shipped_docs_sent')).toBe(false);
   });
 });

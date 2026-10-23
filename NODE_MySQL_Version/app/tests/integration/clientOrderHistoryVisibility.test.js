@@ -166,7 +166,7 @@ describe('Client order history visibility (90-item backlog Phase 6 Item B)', () 
     await clientPortalController.dashboard(req, res);
 
     expect(res.locals.historyHidden).toBe(true);
-    expect(res.locals.orders.length).toBe(1);
+    expect(res.locals.orderGroups.reduce((n, g) => n + g.orders.length, 0)).toBe(1);
   });
 
   it('portal dashboard shows full history when visible', async () => {
@@ -181,7 +181,7 @@ describe('Client order history visibility (90-item backlog Phase 6 Item B)', () 
     await clientPortalController.dashboard(req, res);
 
     expect(res.locals.historyHidden).toBe(false);
-    expect(res.locals.orders.length).toBe(2);
+    expect(res.locals.orderGroups.reduce((n, g) => n + g.orders.length, 0)).toBe(2);
   });
 
   it('setOrderHistoryVisibilityOverride 404s for a missing client', async () => {
