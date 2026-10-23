@@ -1,0 +1,67 @@
+{% macro kanbanCard(s) %}
+<div class="entity-card kanban-card">
+  <div class="entity-card-header">
+    <span class="entity-card-title">{{ s.company_legal_name }}</span>
+  </div>
+  <div class="entity-card-sub">{{ s.contact_person }}</div>
+  <div class="muted small">{{ s.country_of_destination }}</div>
+  <div class="entity-card-footer">
+    {% if s.status == 'converted' and s.client_unique_number %}
+      <a href="/clients/{{ s.converted_client_id }}" class="muted small">&rarr; {{ s.client_unique_number }}</a>
+    {% elif s.status == 'rejected' %}
+      <span class="muted small">{{ (s.rejection_reason or '') | truncate(40, true, '…') }}</span>
+    {% else %}
+      <span class="muted small">Submitted {{ s.submitted_at }}</span>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Quotation Intake Review — Kanban Board</h1>
+      <p class="muted" style="margin:0;">Submissions from the public quotation-details form.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <a class="btn-sm btn-secondary" href="/client-intake?view=list">Switch to list view</a>
+    </div>
+  </div>
+
+  <div class="kanban-board">
+    <div class="kanban-column">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">Pending</span>
+        <span class="kanban-column-count">{{ pending.length }}</span>
+      </div>
+      {% if pending.length == 0 %}
+        <p class="kanban-column-empty">Nothing pending</p>
+      {% else %}
+        {% for s in pending %}{{ kanbanCard(s) }}{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="kanban-column">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">Converted</span>
+        <span class="kanban-column-count">{{ converted.length }}</span>
+      </div>
+      {% if converted.length == 0 %}
+        <p class="kanban-column-empty">Nothing here</p>
+      {% else %}
+        {% for s in converted %}{{ kanbanCard(s) }}{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="kanban-column">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">Rejected</span>
+        <span class="kanban-column-count">{{ rejected.length }}</span>
+      </div>
+      {% if rejected.length == 0 %}
+        <p class="kanban-column-empty">Nothing here</p>
+      {% else %}
+        {% for s in rejected %}{{ kanbanCard(s) }}{% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</div>

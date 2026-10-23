@@ -12,6 +12,7 @@ use App\Repositories\ClientIntakeRepository;
 use App\Repositories\ClientRepository;
 use App\Services\AuthService;
 use App\Services\ReferenceNumberService;
+use App\Services\UiTemplateService;
 
 /**
  * Staff review queue for public quotation-details submissions
@@ -27,9 +28,30 @@ final class ClientIntakeReviewController
 {
     public function index(array $params): void
     {
+        $actor = AuthService::currentUser();
+        if (UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
+            $this->indexKanban();
+            return;
+        }
+
         View::render('client_intake_review/index', [
             'pending' => ClientIntakeRepository::pending(),
             'resolved' => ClientIntakeRepository::recentResolved(),
+        ], 'layout/base');
+    }
+
+    /** The Kanban UI template's Client Intake Review board: Pending / Converted / Rejected columns. */
+    private function indexKanban(): void
+    {
+        $pending = ClientIntakeRepository::pending();
+        $resolved = ClientIntakeRepository::recentResolved();
+        $converted = array_values(array_filter($resolved, static fn(array $s): bool => $s['status'] === 'converted'));
+        $rejected = array_values(array_filter($resolved, static fn(array $s): bool => $s['status'] === 'rejected'));
+
+        View::render('client_intake_review/index_kanban', [
+            'pending'   => $pending,
+            'converted' => $converted,
+            'rejected'  => $rejected,
         ], 'layout/base');
     }
 

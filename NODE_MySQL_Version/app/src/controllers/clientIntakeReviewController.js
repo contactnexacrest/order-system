@@ -6,6 +6,7 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const clientRepository = require('../repositories/clientRepository');
 const referenceNumberService = require('../services/referenceNumberService');
+const uiTemplateService = require('../services/uiTemplateService');
 const clientIntakeController = require('./clientIntakeController');
 
 /**
@@ -20,10 +21,25 @@ const clientIntakeController = require('./clientIntakeController');
  */
 
 async function index(req, res) {
+  if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
+    await indexKanban(req, res);
+    return;
+  }
+
   res.renderView('client_intake_review/index', {
     pending: await clientIntakeRepository.pending(),
     resolved: await clientIntakeRepository.recentResolved(),
   }, 'layout/base');
+}
+
+/** The Kanban UI template's Client Intake Review board: Pending / Converted / Rejected columns. */
+async function indexKanban(req, res) {
+  const pending = await clientIntakeRepository.pending();
+  const resolved = await clientIntakeRepository.recentResolved();
+  const converted = resolved.filter((s) => s.status === 'converted');
+  const rejected = resolved.filter((s) => s.status === 'rejected');
+
+  res.renderView('client_intake_review/index_kanban', { pending, converted, rejected }, 'layout/base');
 }
 
 async function accept(req, res) {
