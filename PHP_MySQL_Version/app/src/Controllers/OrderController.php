@@ -1214,7 +1214,10 @@ final class OrderController
                 'buyer',
                 'Buyer PO copy'
             );
-            OrderBuyerPoDocumentRepository::attach($orderId, $fileId);
+            $documentId = OrderBuyerPoDocumentRepository::attach($orderId, $fileId);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'ORDER_BUYER_PO_DOCUMENT_UPLOADED', 'order_buyer_po_documents', $documentId, null, null, null);
             Flash::set('success', 'Buyer PO copy attached.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
@@ -1366,6 +1369,9 @@ final class OrderController
         }
         $user = AuthService::currentUser();
         ClientPaymentReportRepository::markReviewed($reportId, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'CLIENT_PAYMENT_REPORT_REVIEWED', 'client_payment_reports', $reportId, null, null, null);
         Flash::set('success', 'Payment report marked reviewed.');
         header("Location: /orders/{$orderId}");
     }
@@ -1630,6 +1636,9 @@ final class OrderController
         if (TestModeService::isEnabled()) {
             SupplierRepository::markTest($supplierId);
         }
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_CREATED', 'suppliers', $supplierId, null, null, $name);
         Flash::set('success', "Supplier \"{$name}\" added.");
         header("Location: /orders/{$orderId}");
     }
@@ -1655,7 +1664,10 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        SupplierFactoryAddressRepository::create($supplierId, $address, trim((string) ($_POST['label'] ?? '')) ?: null);
+        $addressId = SupplierFactoryAddressRepository::create($supplierId, $address, trim((string) ($_POST['label'] ?? '')) ?: null);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_FACTORY_ADDRESS_CREATED', 'supplier_factory_addresses', $addressId, null, null, $address);
         Flash::set('success', 'Factory address added.');
         header("Location: /orders/{$orderId}");
     }
@@ -1665,6 +1677,9 @@ final class OrderController
         $orderId = (int) $params['id'];
         $addressId = (int) $params['addressId'];
         SupplierFactoryAddressRepository::delete($addressId);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_FACTORY_ADDRESS_DELETED', 'supplier_factory_addresses', $addressId, null, null, null);
         Flash::set('success', 'Factory address removed.');
         header("Location: /orders/{$orderId}");
     }
@@ -1720,6 +1735,9 @@ final class OrderController
         }
         $date = trim((string) ($_POST['paid_date'] ?? '')) ?: date('Y-m-d');
         OrderSupplierPoRepository::markAdvancePaid((int) $supplierPo['id'], $date, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'SUPPLIER_ADVANCE_PAID', 'order_supplier_po', (int) $supplierPo['id'], 'advance_paid_date', null, $date);
         Flash::set('success', 'Supplier advance payment recorded.');
         header("Location: /orders/{$orderId}");
     }
@@ -1736,6 +1754,9 @@ final class OrderController
         }
         $date = trim((string) ($_POST['paid_date'] ?? '')) ?: date('Y-m-d');
         OrderSupplierPoRepository::markBalancePaid((int) $supplierPo['id'], $date, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'SUPPLIER_BALANCE_PAID', 'order_supplier_po', (int) $supplierPo['id'], 'balance_paid_date', null, $date);
         Flash::set('success', 'Supplier balance payment recorded.');
         header("Location: /orders/{$orderId}");
     }
@@ -1773,7 +1794,10 @@ final class OrderController
                 'supplier',
                 'Supplier PO acknowledgment'
             );
-            OrderSupplierPoDocumentRepository::attach((int) $supplierPo['id'], $fileId);
+            $documentId = OrderSupplierPoDocumentRepository::attach((int) $supplierPo['id'], $fileId);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'SUPPLIER_PO_DOCUMENT_UPLOADED', 'order_supplier_po_documents', $documentId, null, null, null);
             Flash::set('success', 'Supplier PO acknowledgment attached.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
@@ -1791,6 +1815,9 @@ final class OrderController
             'freight_forwarder_name'    => trim((string) ($_POST['freight_forwarder_name'] ?? '')) ?: null,
             'freight_forwarder_contact' => trim((string) ($_POST['freight_forwarder_contact'] ?? '')) ?: null,
         ]);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_FREIGHT_TERMS_SAVED', 'order_freight', $orderId, null, null, null);
         Flash::set('success', 'Freight & insurance terms saved. Generate the Debit Note below.');
         header("Location: /orders/{$orderId}");
     }
@@ -1817,6 +1844,9 @@ final class OrderController
             return;
         }
         OrderPaymentStatusRepository::recordFreightReceived($orderId, $amount, $receivedAt);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'freight_amount', null, (string) $amount);
         Flash::set('success', 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
@@ -1948,6 +1978,9 @@ final class OrderController
         }
         OrderCrateRepository::replaceForOrder($orderId, $crates);
 
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_PACKING_SAVED', 'order_packing', $orderId, null, null, null);
         Flash::set('success', 'Packing figures and crate breakdown saved. Generate the Packing List below.');
         header("Location: /orders/{$orderId}");
     }
@@ -1980,6 +2013,9 @@ final class OrderController
             'container_no'    => trim((string) ($_POST['container_no'] ?? '')) ?: null,
             'seal_no'         => trim((string) ($_POST['seal_no'] ?? '')) ?: null,
         ]);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_SHIPPING_DETAILS_SAVED', 'order_shipping', $orderId, null, null, null);
         Flash::set('success', 'Shipping details saved. Generate the BL Instruction Sheet below.');
         header("Location: /orders/{$orderId}");
     }
@@ -2153,6 +2189,9 @@ final class OrderController
                 'Scanned Bill of Lading'
             );
             OrderShippingRepository::attachBlCopy($orderId, $fileId);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) $user['id'], 'ORDER_BL_COPY_ATTACHED', 'order_shipping', $orderId, null, null, null);
             Flash::set('success', 'Scanned BL copy attached.');
         } catch (\Throwable $e) {
             Flash::set('error', 'Could not attach the scanned BL copy: ' . Flash::describeException($e, 'upload failed — check the server error log.'));
@@ -2164,6 +2203,9 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         OrderShippingRepository::recordScannedBlSent($orderId);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_SCANNED_BL_SENT', 'order_shipping', $orderId, null, null, null);
         Flash::set('success', 'Scanned BL copy marked as sent to buyer.');
         header("Location: /orders/{$orderId}");
     }
@@ -2519,6 +2561,9 @@ final class OrderController
         $orderId = (int) $params['id'];
         $count = (int) ($_POST['bl_originals_count'] ?? 3);
         OrderShippingRepository::recordBlOriginalsReceived($orderId, $count ?: 3);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_BL_ORIGINALS_RECEIVED', 'order_shipping', $orderId, 'bl_originals_received_count', null, (string) ($count ?: 3));
         Flash::set('success', 'Original BL copies recorded as received from CHA.');
         header("Location: /orders/{$orderId}");
     }
@@ -2528,6 +2573,9 @@ final class OrderController
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
         OrderShippingRepository::recordBlEndorsed($orderId, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'ORDER_BL_ENDORSED', 'order_shipping', $orderId, null, null, null);
         Flash::set('success', 'Original BLs marked as endorsed by NexaCrest.');
         header("Location: /orders/{$orderId}");
     }
@@ -2550,6 +2598,9 @@ final class OrderController
             'port_of_discharge'   => trim((string) ($_POST['port_of_discharge'] ?? '')) ?: null,
             'date_of_endorsement' => trim((string) ($_POST['date_of_endorsement'] ?? '')) ?: null,
         ], (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'ORDER_BL_ENDORSEMENT_SAVED', 'order_bl_endorsements', $orderId, null, null, null);
         Flash::set('success', 'BL Endorsement details saved.');
         header("Location: /orders/{$orderId}");
     }
@@ -2560,6 +2611,9 @@ final class OrderController
         $user = AuthService::currentUser();
         try {
             \App\Services\DocumentGenerationService::generateBlEndorsement($orderId, (int) $user['id']);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) $user['id'], 'ORDER_BL_ENDORSEMENT_GENERATED', 'orders', $orderId, null, null, null);
             Flash::set('success', 'BL Endorsement generated — print it and physically endorse all 3 original BLs.');
         } catch (\RuntimeException $e) {
             Flash::set('error', $e->getMessage());

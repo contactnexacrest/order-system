@@ -1221,7 +1221,10 @@ async function uploadBuyerPoDocument(req, res) {
       'buyer',
       'Buyer PO copy'
     );
-    await orderBuyerPoDocumentRepository.attach(orderId, fileId);
+    const documentId = await orderBuyerPoDocumentRepository.attach(orderId, fileId);
+    // External QA report N-08: this action never reached the audit log,
+    // so it never notified anyone either.
+    await auditLogRepository.log(req.user.id, 'ORDER_BUYER_PO_DOCUMENT_UPLOADED', 'order_buyer_po_documents', documentId, null, null, null);
     flash.set(req, 'success', 'Buyer PO copy attached.');
   } catch (e) {
     flash.setErrorFromException(req, e);
@@ -1370,6 +1373,9 @@ async function markPaymentReportReviewed(req, res) {
   }
   const user = req.user;
   await clientPaymentReportRepository.markReviewed(reportId, user.id);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(user.id, 'CLIENT_PAYMENT_REPORT_REVIEWED', 'client_payment_reports', reportId, null, null, null);
   flash.set(req, 'success', 'Payment report marked reviewed.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1635,6 +1641,9 @@ async function createSupplier(req, res) {
   if (await testModeService.isEnabled()) {
     await supplierRepository.markTest(supplierId);
   }
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_CREATED', 'suppliers', supplierId, null, null, name);
   flash.set(req, 'success', `Supplier "${name}" added.`);
   res.redirect(`/orders/${orderId}`);
 }
@@ -1659,7 +1668,10 @@ async function createSupplierFactoryAddress(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  await supplierFactoryAddressRepository.create(supplierId, address, str(req.body.label) || null);
+  const addressId = await supplierFactoryAddressRepository.create(supplierId, address, str(req.body.label) || null);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_FACTORY_ADDRESS_CREATED', 'supplier_factory_addresses', addressId, null, null, address);
   flash.set(req, 'success', 'Factory address added.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1668,6 +1680,9 @@ async function deleteSupplierFactoryAddress(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const addressId = parseInt(req.params.addressId, 10);
   await supplierFactoryAddressRepository.remove(addressId);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_FACTORY_ADDRESS_DELETED', 'supplier_factory_addresses', addressId, null, null, null);
   flash.set(req, 'success', 'Factory address removed.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1720,6 +1735,9 @@ async function markSupplierAdvancePaid(req, res) {
   }
   const date = str(req.body.paid_date) || todayYmd();
   await orderSupplierPoRepository.markAdvancePaid(supplierPo.id, date, req.user.id);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_ADVANCE_PAID', 'order_supplier_po', supplierPo.id, 'advance_paid_date', null, date);
   flash.set(req, 'success', 'Supplier advance payment recorded.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1734,6 +1752,9 @@ async function markSupplierBalancePaid(req, res) {
   }
   const date = str(req.body.paid_date) || todayYmd();
   await orderSupplierPoRepository.markBalancePaid(supplierPo.id, date, req.user.id);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_BALANCE_PAID', 'order_supplier_po', supplierPo.id, 'balance_paid_date', null, date);
   flash.set(req, 'success', 'Supplier balance payment recorded.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1771,7 +1792,10 @@ async function uploadSupplierPoDocument(req, res) {
       'supplier',
       'Supplier PO acknowledgment'
     );
-    await orderSupplierPoDocumentRepository.attach(supplierPo.id, fileId);
+    const documentId = await orderSupplierPoDocumentRepository.attach(supplierPo.id, fileId);
+    // External QA report N-08: this action never reached the audit
+    // log, so it never notified anyone either.
+    await auditLogRepository.log(req.user.id, 'SUPPLIER_PO_DOCUMENT_UPLOADED', 'order_supplier_po_documents', documentId, null, null, null);
     flash.set(req, 'success', 'Supplier PO acknowledgment attached.');
   } catch (e) {
     flash.setErrorFromException(req, e);
@@ -1789,6 +1813,9 @@ async function saveFreightTerms(req, res) {
     freight_forwarder_name: str(body.freight_forwarder_name) || null,
     freight_forwarder_contact: str(body.freight_forwarder_contact) || null,
   });
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ORDER_FREIGHT_TERMS_SAVED', 'order_freight', orderId, null, null, null);
   flash.set(req, 'success', 'Freight & insurance terms saved. Generate the Debit Note below.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1814,6 +1841,9 @@ async function recordFreightPayment(req, res) {
     return;
   }
   await orderPaymentStatusRepository.recordFreightReceived(orderId, amount, receivedAt);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', orderId, 'freight_amount', null, String(amount));
   flash.set(req, 'success', 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1949,6 +1979,9 @@ async function savePacking(req, res) {
   }
   await orderCrateRepository.replaceForOrder(orderId, crates);
 
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ORDER_PACKING_SAVED', 'order_packing', orderId, null, null, null);
   flash.set(req, 'success', 'Packing figures and crate breakdown saved. Generate the Packing List below.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1981,6 +2014,9 @@ async function saveShipping(req, res) {
     container_no: str(body.container_no) || null,
     seal_no: str(body.seal_no) || null,
   });
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ORDER_SHIPPING_DETAILS_SAVED', 'order_shipping', orderId, null, null, null);
   flash.set(req, 'success', 'Shipping details saved. Generate the BL Instruction Sheet below.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -2151,6 +2187,9 @@ async function attachBlCopy(req, res) {
       'Scanned Bill of Lading'
     );
     await orderShippingRepository.attachBlCopy(orderId, fileId);
+    // External QA report N-08: this action never reached the audit
+    // log, so it never notified anyone either.
+    await auditLogRepository.log(req.user.id, 'ORDER_BL_COPY_ATTACHED', 'order_shipping', orderId, null, null, null);
     flash.set(req, 'success', 'Scanned BL copy attached.');
   } catch (e) {
     flash.set(req, 'error', `Could not attach the scanned BL copy: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
@@ -2161,6 +2200,9 @@ async function attachBlCopy(req, res) {
 async function recordScannedBlSent(req, res) {
   const orderId = parseInt(req.params.id, 10);
   await orderShippingRepository.recordScannedBlSent(orderId);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ORDER_SCANNED_BL_SENT', 'order_shipping', orderId, null, null, null);
   flash.set(req, 'success', 'Scanned BL copy marked as sent to buyer.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -2485,6 +2527,9 @@ async function recordBlOriginalsReceived(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const count = parseInt(req.body.bl_originals_count || 3, 10);
   await orderShippingRepository.recordBlOriginalsReceived(orderId, count || 3);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ORDER_BL_ORIGINALS_RECEIVED', 'order_shipping', orderId, 'bl_originals_received_count', null, String(count || 3));
   flash.set(req, 'success', 'Original BL copies recorded as received from CHA.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -2493,6 +2538,9 @@ async function recordBlEndorsed(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
   await orderShippingRepository.recordBlEndorsed(orderId, user.id);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(user.id, 'ORDER_BL_ENDORSED', 'order_shipping', orderId, null, null, null);
   flash.set(req, 'success', 'Original BLs marked as endorsed by NexaCrest.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -2518,6 +2566,9 @@ async function saveBlEndorsement(req, res) {
     },
     user.id
   );
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(user.id, 'ORDER_BL_ENDORSEMENT_SAVED', 'order_bl_endorsements', orderId, null, null, null);
   flash.set(req, 'success', 'BL Endorsement details saved.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -2527,6 +2578,9 @@ async function generateBlEndorsement(req, res) {
   const user = req.user;
   try {
     await documentGenerationService.generateBlEndorsement(orderId, user.id);
+    // External QA report N-08: this action never reached the audit
+    // log, so it never notified anyone either.
+    await auditLogRepository.log(user.id, 'ORDER_BL_ENDORSEMENT_GENERATED', 'orders', orderId, null, null, null);
     flash.set(req, 'success', 'BL Endorsement generated — print it and physically endorse all 3 original BLs.');
   } catch (err) {
     flash.setErrorFromException(req, err);
