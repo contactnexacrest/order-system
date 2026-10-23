@@ -30,20 +30,21 @@
   <div class="section">
     <h2>Disputes</h2>
     <table class="list">
-      <tr><th>Order Ref</th><th>Client</th><th>Notice Date</th><th>From</th><th>Status</th><th>Response Due</th><th>Resolved At</th><th>Days Open</th></tr>
+      <tr><th>Order Ref</th><th>Client</th><th>Notice Date</th><th>From</th><th>Type</th><th>Status</th><th>Response Due</th><th>Resolved At</th><th>Days Open</th></tr>
       <?php foreach ($rows as $r): ?>
       <tr>
         <td><a href="/orders/<?= (int) $r['order_id'] ?>"><?= htmlspecialchars($r['order_reference']) ?></a></td>
         <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
         <td><?= htmlspecialchars($r['notice_date']) ?></td>
         <td><?= htmlspecialchars($r['from_party'] ?? '—') ?></td>
+        <td><?= $r['dispute_type'] === 'complaint_damage' ? 'Complaint / Damage' : 'Dispute' ?></td>
         <td><?= htmlspecialchars($r['status']) ?></td>
         <td><?= htmlspecialchars($r['response_due_date'] ?? '—') ?></td>
         <td><?= htmlspecialchars($r['resolved_at'] ?? '—') ?></td>
         <td><?= (int) $r['days_open'] ?></td>
       </tr>
       <?php endforeach; ?>
-      <?php if (empty($rows)): ?><tr><td colspan="8" class="muted">No disputes match these filters.</td></tr><?php endif; ?>
+      <?php if (empty($rows)): ?><tr><td colspan="9" class="muted">No disputes match these filters.</td></tr><?php endif; ?>
     </table>
   </div>
 </div>

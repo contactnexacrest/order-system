@@ -730,7 +730,7 @@ final class ReportRepository
         }
 
         $sql = "SELECT d.id, d.order_id, o.order_reference, o.company_legal_name, d.notice_date, d.from_party,
-                       d.status, d.response_due_date, d.resolved_at, d.created_at,
+                       d.dispute_type, d.status, d.response_due_date, d.resolved_at, d.created_at,
                        DATEDIFF(COALESCE(d.resolved_at, NOW()), d.notice_date) AS days_open
                 FROM disputes d
                 JOIN orders o ON o.id = d.order_id

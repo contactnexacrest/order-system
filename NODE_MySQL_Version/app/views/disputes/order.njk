@@ -9,6 +9,12 @@
     <form method="post" action="/orders/{{ order.id }}/disputes">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
+        <label>Type *
+          <select name="dispute_type" required>
+            <option value="dispute">Dispute</option>
+            <option value="complaint_damage">Complaint / Damage Report</option>
+          </select>
+        </label>
         <label>Notice Date *
           <input type="date" name="notice_date" value="{{ today() }}" required>
         </label>
@@ -36,8 +42,9 @@
     <h2>Dispute Log</h2>
     {% for d in disputes %}
       <details>
-        <summary>{{ d.notice_date }} — {{ d.status }} — {{ d.description | truncate(80, true, '…') }}</summary>
+        <summary>{{ d.notice_date }} — {{ 'Complaint / Damage' if d.dispute_type == 'complaint_damage' else 'Dispute' }} — {{ d.status }} — {{ d.description | truncate(80, true, '…') }}</summary>
         <div class="kv-grid">
+          <div><span class="k">Type</span><span class="v">{{ 'Complaint / Damage Report' if d.dispute_type == 'complaint_damage' else 'Dispute' }}</span></div>
           <div><span class="k">From</span><span class="v">{{ d.from_party or '—' }}</span></div>
           <div><span class="k">Response Due</span><span class="v">{{ d.response_due_date or '—' }}</span></div>
           <div><span class="k">Resolved At</span><span class="v">{{ d.resolved_at or '—' }}</span></div>

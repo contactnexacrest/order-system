@@ -3725,3 +3725,30 @@ CREATE TABLE order_inspection_fees (
 -- ================================================================
 ALTER TABLE orders
   MODIFY COLUMN status ENUM('active','shipped_docs_sent','complete','disputed','lost','cancelled') NOT NULL DEFAULT 'active';
+
+-- ================================================================
+-- SECTION BV — ORDER FEEDBACK + DISPUTE TYPE (added 2026-10-23)
+-- ================================================================
+-- Export process step 14: a 1-5 star rating + free-text comments the
+-- client can leave per order (one row per order; resubmission allowed,
+-- upserted). Steps 15-16: the existing Disputes workflow (Section I)
+-- now also covers a "Complaint / Damage Report" — same response-due-
+-- date tracking, status workflow and resolution notes, tagged instead
+-- of duplicated into a second table.
+-- See docs/migrations/2026-10-23j-order-feedback-dispute-type.sql.
+-- ================================================================
+ALTER TABLE disputes
+  ADD COLUMN dispute_type ENUM('dispute','complaint_damage') NOT NULL DEFAULT 'dispute' AFTER description;
+
+CREATE TABLE order_feedback (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL,
+  client_id     BIGINT UNSIGNED NOT NULL,
+  rating        TINYINT UNSIGNED NOT NULL,
+  comments      TEXT NULL,
+  submitted_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_order_feedback_order (order_id),
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (client_id) REFERENCES clients(id),
+  CONSTRAINT chk_order_feedback_rating CHECK (rating BETWEEN 1 AND 5)
+) ENGINE=InnoDB;

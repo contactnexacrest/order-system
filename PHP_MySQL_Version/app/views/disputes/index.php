@@ -6,6 +6,9 @@ $statusBadgeClass = static function (string $status): string {
         default => 'badge-protected',
     };
 };
+$disputeTypeLabel = static function (string $type): string {
+    return $type === 'complaint_damage' ? 'Complaint / Damage' : 'Dispute';
+};
 ?>
 <div class="card page-wide">
   <div class="page-header-row">
@@ -32,7 +35,7 @@ $statusBadgeClass = static function (string $status): string {
         <span class="entity-card-title"><?= htmlspecialchars($d['order_reference']) ?></span>
         <span class="badge <?= $statusBadgeClass($d['status']) ?>"><?= htmlspecialchars($d['status']) ?></span>
       </div>
-      <div class="entity-card-sub"><?= htmlspecialchars($d['company_legal_name']) ?></div>
+      <div class="entity-card-sub"><?= htmlspecialchars($d['company_legal_name']) ?> &middot; <span class="tag"><?= htmlspecialchars($disputeTypeLabel($d['dispute_type'])) ?></span></div>
       <div class="muted small"><?= htmlspecialchars(mb_strimwidth($d['description'], 0, 110, '…')) ?></div>
       <div class="entity-card-footer">
         <span class="muted small">Notice: <?= htmlspecialchars($d['notice_date']) ?></span>

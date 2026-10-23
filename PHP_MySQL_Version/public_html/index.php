@@ -643,6 +643,7 @@ $router->post('/client/orders/{id}/report-payment', [$clientPortal, 'reportPayme
 $router->post('/client/orders/{id}/buyer-po', [$clientPortal, 'uploadBuyerPo'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/acknowledge-oc', [$clientPortal, 'acknowledgeOc'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/disputes', [$clientPortal, 'raiseDispute'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->post('/client/orders/{id}/feedback', [$clientPortal, 'submitFeedback'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/comments', [$clientPortal, 'postComment'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->get('/client/orders/{id}/comment-attachments/{fileId}/download', [$clientPortal, 'downloadCommentAttachment'], [ClientAuth::required()]);
 $router->get('/client/orders/{id}/payment-reports/{reportId}/screenshot', [$clientPortal, 'downloadPaymentScreenshot'], [ClientAuth::required()]);

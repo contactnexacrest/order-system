@@ -133,6 +133,18 @@ describe('Client portal cross-tenant isolation (QA-4 P0.2)', () => {
     expect(after).toBe(before);
   });
 
+  it('submitFeedback blocks Client A and creates no feedback', async () => {
+    const before = (await db.query('SELECT COUNT(*) AS c FROM order_feedback'))[0].c;
+    const csrf = await validCsrf();
+    const res = await agentA
+      .post(`/client/orders/${orderB}/feedback`)
+      .type('form')
+      .send({ _csrf: csrf, rating: '5', comments: 'Attempted cross-tenant feedback' });
+    expect(res.status).toBe(404);
+    const after = (await db.query('SELECT COUNT(*) AS c FROM order_feedback'))[0].c;
+    expect(after).toBe(before);
+  });
+
   it('postComment blocks Client A and creates no comment', async () => {
     const before = (await db.query('SELECT COUNT(*) AS c FROM order_comments'))[0].c;
     const csrf = await validCsrf();

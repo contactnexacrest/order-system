@@ -181,9 +181,36 @@
     <p class="muted">If something about this order isn't right, let us know here — our team will respond within the timeframe set out in your order terms.</p>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/disputes">
       <?= Csrf::field() ?>
+      <label>Type *
+        <select name="dispute_type" required>
+          <option value="dispute">Dispute</option>
+          <option value="complaint_damage">Complaint / Damage Report</option>
+        </select>
+      </label>
       <label>Describe the issue *<textarea name="description" rows="4" required></textarea></label>
       <button type="submit">Raise a Dispute</button>
     </form>
   </div>
   <?php endif; ?>
+
+  <div class="section">
+    <h2>Order Feedback</h2>
+    <p class="muted">Let us know how we did on this order — your rating and comments are visible to our team.</p>
+    <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/feedback">
+      <?= Csrf::field() ?>
+      <label>Rating *
+        <select name="rating" required>
+          <option value="">Choose a rating</option>
+          <?php for ($i = 5; $i >= 1; $i--): ?>
+            <option value="<?= $i ?>" <?= (!empty($orderFeedback) && (int) $orderFeedback['rating'] === $i) ? 'selected' : '' ?>><?= str_repeat('★', $i) ?><?= str_repeat('☆', 5 - $i) ?> (<?= $i ?>/5)</option>
+          <?php endfor; ?>
+        </select>
+      </label>
+      <label>Comments<textarea name="comments" rows="3" placeholder="Optional"><?= htmlspecialchars($orderFeedback['comments'] ?? '') ?></textarea></label>
+      <button type="submit"><?= !empty($orderFeedback) ? 'Update Feedback' : 'Submit Feedback' ?></button>
+    </form>
+    <?php if (!empty($orderFeedback)): ?>
+      <p class="muted small">Last submitted: <?= htmlspecialchars(Dates::human($orderFeedback['submitted_at'])) ?></p>
+    <?php endif; ?>
+  </div>
 </div>

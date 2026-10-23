@@ -14,6 +14,7 @@ const clientPaymentReportRepository = require('../repositories/clientPaymentRepo
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const disputeRepository = require('../repositories/disputeRepository');
+const orderFeedbackRepository = require('../repositories/orderFeedbackRepository');
 const documentRepository = require('../repositories/documentRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
@@ -272,6 +273,7 @@ async function showOrder(req, res) {
     // advance has cleared — see buyerActionService.uploadBuyerPo(), which
     // this page's own form submits to.
     advanceCleared: !!paymentStatus && paymentStatus.advance_cleared_at !== null,
+    orderFeedback: await orderFeedbackRepository.find(orderId),
   }, 'layout/client');
 }
 
@@ -564,13 +566,42 @@ async function raiseDispute(req, res) {
     return;
   }
 
+  const disputeType = req.body.dispute_type === 'complaint_damage' ? 'complaint_damage' : 'dispute';
   const noticeDate = todayYmd();
   const responseDays = parseInt((await companySettingsRepository.get('dispute_response_days_n')) || '10', 10);
   const responseDueDate = await workingDaysCalculator.addWorkingDays(noticeDate, responseDays);
-  const disputeId = await disputeRepository.create(orderId, noticeDate, 'Buyer (via client portal)', description, null, responseDueDate);
+  const disputeId = await disputeRepository.create(orderId, noticeDate, 'Buyer (via client portal)', description, null, responseDueDate, disputeType);
   await auditLogRepository.log(null, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description, 'Raised by the client via the client portal.');
 
   flash.set(req, 'success', `Your dispute has been logged — our team will respond by ${responseDueDate}.`);
+  res.redirect(`/client/orders/${orderId}`);
+}
+
+/**
+ * docs/schema.sql Section BV — export process step 14. Resubmission is
+ * allowed (upsert), not a one-shot submission — there's no stated reason
+ * to stop a client revising their own rating/comments.
+ */
+async function submitFeedback(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const rating = parseInt(req.body.rating, 10);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    flash.set(req, 'error', 'Please choose a rating between 1 and 5 stars.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+  const comments = String(req.body.comments || '').trim() || null;
+
+  await orderFeedbackRepository.upsert(orderId, clientId, rating, comments);
+
+  flash.set(req, 'success', 'Thank you — your feedback has been recorded.');
   res.redirect(`/client/orders/${orderId}`);
 }
 
@@ -660,5 +691,5 @@ module.exports = {
   showLogin, login, logout, endImpersonation, showForgotPassword, forgotPassword, showSetPassword, setPassword, dashboard, showOrder,
   showReorderForm, submitReorder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
-  postComment, downloadCommentAttachment, downloadPaymentScreenshot, uploadBuyerPo,
+  postComment, downloadCommentAttachment, downloadPaymentScreenshot, uploadBuyerPo, submitFeedback,
 };

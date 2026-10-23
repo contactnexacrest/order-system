@@ -36,6 +36,7 @@ const emailLogRepository = require('../repositories/emailLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
+const orderFeedbackRepository = require('../repositories/orderFeedbackRepository');
 const orderCrateRepository = require('../repositories/orderCrateRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPackingRepository = require('../repositories/orderPackingRepository');
@@ -945,6 +946,9 @@ async function show(req, res) {
       blEndorsement: await orderBlEndorsementRepository.find(orderId),
       blEndorsementDoc: await documentRepository.findLatestForOrderAndTypeCode(orderId, 'BLE'),
       containerTypes: await lookupRepository.dropdownOptions('container_type'),
+      // docs/schema.sql Section BV — rating/comments aren't financial
+      // data, so this isn't gated behind manage_order_financials.
+      orderFeedback: await orderFeedbackRepository.find(orderId),
     },
     'layout/base'
   );

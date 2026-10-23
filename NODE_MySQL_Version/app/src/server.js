@@ -875,6 +875,7 @@ app.post('/client/orders/:id/report-payment', requireClientAuth, uploadLarge.sin
 app.post('/client/orders/:id/buyer-po', requireClientAuth, uploadLarge.single('document'), verifyCsrf, asyncHandler(clientPortalController.uploadBuyerPo));
 app.post('/client/orders/:id/acknowledge-oc', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.acknowledgeOc));
 app.post('/client/orders/:id/disputes', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.raiseDispute));
+app.post('/client/orders/:id/feedback', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.submitFeedback));
 app.get('/client/documents/:id/download', requireClientAuth, asyncHandler(clientPortalController.downloadDocument));
 
 // --- 404 fallback (mirrors the PHP Router's default) ---

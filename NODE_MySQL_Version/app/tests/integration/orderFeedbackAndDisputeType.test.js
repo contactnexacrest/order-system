@@ -1,0 +1,360 @@
+'use strict';
+
+const request = require('supertest');
+const app = require('../../src/server');
+const db = require('../../src/config/db');
+const flash = require('../../src/helpers/flash');
+const ordersController = require('../../src/controllers/ordersController');
+const disputeController = require('../../src/controllers/disputeController');
+const clientPortalController = require('../../src/controllers/clientPortalController');
+const orderFeedbackRepository = require('../../src/repositories/orderFeedbackRepository');
+const disputeRepository = require('../../src/repositories/disputeRepository');
+const { createTestClient, createTestOrder, createTestClientLogin } = require('../support/fixtures');
+const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
+
+function extractCsrf(html) {
+  const m = html.match(/name="_csrf"\s+value="([^"]+)"/);
+  if (!m) throw new Error('CSRF token not found in response HTML');
+  return m[1];
+}
+
+/**
+ * Port of OrderFeedbackAndDisputeTypeTest.php. docs/schema.sql Section
+ * BV — export process step 14 (client Order Feedback: a 1-5 star rating
+ * + comments, one row per order) and steps 15-16 (the existing Disputes
+ * workflow now tags a dispute_type of 'dispute' or 'complaint_damage'
+ * instead of duplicating a whole second table/workflow for complaints
+ * and damage reports).
+ */
+describe('Order Feedback + Disputes type field (Section BV)', () => {
+  afterAll(async () => {
+    await db.pool.end();
+  });
+
+  async function createTestUser(roleName = 'Admin') {
+    const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: roleName });
+    const result = await db.execute(
+      `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
+       VALUES ('Jest Feedback Test User', :email, NULL, 'x', :role_id, 1, 0, 0)`,
+      { email: `jest-feedback-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`, role_id: role.id }
+    );
+    return result.insertId;
+  }
+
+  function fakeRes() {
+    const res = { statusCode: 200, body: null, redirectedTo: null, view: null, locals: null };
+    res.status = (code) => { res.statusCode = code; return res; };
+    res.send = (body) => { res.body = body; };
+    res.redirect = (url) => { res.redirectedTo = url; };
+    res.renderView = (view, locals) => { res.view = view; res.locals = locals; };
+    return res;
+  }
+
+  function fakeReq(overrides = {}) {
+    return { params: {}, body: {}, session: {}, permissions: {}, ...overrides };
+  }
+
+  // ---------------------------------------------------------------
+  // orderFeedbackRepository
+  // ---------------------------------------------------------------
+
+  it('find returns null when no feedback yet', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    expect(await orderFeedbackRepository.find(orderId)).toBeNull();
+  });
+
+  it('upsert creates then updates the same row', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+
+    await orderFeedbackRepository.upsert(orderId, clientId, 4, 'Good service overall.');
+    const first = await orderFeedbackRepository.find(orderId);
+    expect(Number(first.rating)).toBe(4);
+    expect(first.comments).toBe('Good service overall.');
+
+    await orderFeedbackRepository.upsert(orderId, clientId, 5, 'Actually, excellent.');
+    const second = await orderFeedbackRepository.find(orderId);
+    expect(Number(second.rating)).toBe(5);
+    expect(second.comments).toBe('Actually, excellent.');
+    expect(second.id).toBe(first.id);
+
+    const count = (await db.query('SELECT COUNT(*) AS c FROM order_feedback WHERE order_id = :id', { id: orderId }))[0].c;
+    expect(Number(count)).toBe(1);
+  });
+
+  it('upsert allows null comments', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+
+    await orderFeedbackRepository.upsert(orderId, clientId, 3, null);
+    const row = await orderFeedbackRepository.find(orderId);
+    expect(Number(row.rating)).toBe(3);
+    expect(row.comments).toBeNull();
+  });
+
+  it('rating outside one to five violates the DB CHECK constraint', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+
+    await expect(orderFeedbackRepository.upsert(orderId, clientId, 6, 'Should never reach the DB.')).rejects.toThrow();
+  });
+
+  // ---------------------------------------------------------------
+  // clientPortalController.submitFeedback()
+  // ---------------------------------------------------------------
+
+  it('submitFeedback saves a valid rating', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '5', comments: 'Excellent handling of our shipment.' } });
+
+    await clientPortalController.submitFeedback(req, fakeRes());
+
+    const row = await orderFeedbackRepository.find(orderId);
+    expect(Number(row.rating)).toBe(5);
+    expect(row.comments).toBe('Excellent handling of our shipment.');
+    expect(flash.pull(req)[0].type).toBe('success');
+  });
+
+  it('submitFeedback rejects a rating of zero', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '0' } });
+
+    await clientPortalController.submitFeedback(req, fakeRes());
+
+    expect(await orderFeedbackRepository.find(orderId)).toBeNull();
+    expect(flash.pull(req)[0].type).toBe('error');
+  });
+
+  it('submitFeedback rejects a rating of six', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '6' } });
+
+    await clientPortalController.submitFeedback(req, fakeRes());
+
+    expect(await orderFeedbackRepository.find(orderId)).toBeNull();
+    expect(flash.pull(req)[0].type).toBe('error');
+  });
+
+  it('submitFeedback rejects a non-numeric rating', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: 'five' } });
+
+    await clientPortalController.submitFeedback(req, fakeRes());
+
+    expect(await orderFeedbackRepository.find(orderId)).toBeNull();
+    expect(flash.pull(req)[0].type).toBe('error');
+  });
+
+  it('submitFeedback can be resubmitted and updates the same row', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+
+    await clientPortalController.submitFeedback(fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '2', comments: 'Initial impression — slow replies.' } }), fakeRes());
+    await clientPortalController.submitFeedback(fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '5', comments: 'Updating — issue was resolved quickly.' } }), fakeRes());
+
+    const row = await orderFeedbackRepository.find(orderId);
+    expect(Number(row.rating)).toBe(5);
+    expect(row.comments).toBe('Updating — issue was resolved quickly.');
+  });
+
+  it('submitFeedback returns 404 for an unknown order', async () => {
+    const clientId = await createTestClient();
+    const req = fakeReq({ params: { id: '999999999' }, session: { _client_portal_client_id: clientId }, body: { rating: '5' } });
+    const res = fakeRes();
+
+    await clientPortalController.submitFeedback(req, res);
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  // ---------------------------------------------------------------
+  // ordersController.show() — orderFeedback is populated regardless of
+  // manage_order_financials (rating/comments aren't financial data)
+  // ---------------------------------------------------------------
+
+  it('show() populates orderFeedback even without manage_order_financials', async () => {
+    const userId = await createTestUser('Admin');
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    await orderFeedbackRepository.upsert(orderId, clientId, 3, 'Average — packaging could improve.');
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, permissions: { manage_order_financials: false } });
+    const res = fakeRes();
+
+    await ordersController.show(req, res);
+
+    expect(res.locals.orderFeedback).not.toBeNull();
+    expect(Number(res.locals.orderFeedback.rating)).toBe(3);
+  });
+
+  // ---------------------------------------------------------------
+  // disputeRepository.create() — dispute_type
+  // ---------------------------------------------------------------
+
+  it('create defaults to dispute type when omitted', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const disputeId = await disputeRepository.create(orderId, '2026-10-23', 'Buyer', 'Legacy call site, no type arg', null, null);
+
+    const row = (await db.query('SELECT dispute_type FROM disputes WHERE id = :id', { id: disputeId }))[0];
+    expect(row.dispute_type).toBe('dispute');
+  });
+
+  it('create stores an explicit complaint_damage type', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const disputeId = await disputeRepository.create(orderId, '2026-10-23', 'Buyer', 'Carton arrived crushed', null, null, 'complaint_damage');
+
+    const row = (await db.query('SELECT dispute_type FROM disputes WHERE id = :id', { id: disputeId }))[0];
+    expect(row.dispute_type).toBe('complaint_damage');
+  });
+
+  // ---------------------------------------------------------------
+  // disputeController.create() (staff) — reads dispute_type from POST
+  // ---------------------------------------------------------------
+
+  it('staff create stores the submitted complaint_damage type', async () => {
+    const userId = await createTestUser('Admin');
+    const orderId = await createTestOrder(await createTestClient());
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { notice_date: '2026-10-23', description: 'Goods damaged in transit', dispute_type: 'complaint_damage' } });
+
+    await disputeController.create(req, fakeRes());
+
+    const disputes = await disputeRepository.forOrder(orderId);
+    expect(disputes.length).toBe(1);
+    expect(disputes[0].dispute_type).toBe('complaint_damage');
+  });
+
+  it('staff create defaults to dispute for an unrecognised type', async () => {
+    const userId = await createTestUser('Admin');
+    const orderId = await createTestOrder(await createTestClient());
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { notice_date: '2026-10-23', description: 'Something went wrong', dispute_type: 'not_a_real_type' } });
+
+    await disputeController.create(req, fakeRes());
+
+    const disputes = await disputeRepository.forOrder(orderId);
+    expect(disputes[0].dispute_type).toBe('dispute');
+  });
+
+  // ---------------------------------------------------------------
+  // clientPortalController.raiseDispute() — dispute_type from the portal
+  // ---------------------------------------------------------------
+
+  it('client raiseDispute stores the submitted complaint_damage type', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    await db.execute('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id', { id: orderId });
+    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { description: 'Box arrived damaged', dispute_type: 'complaint_damage' } });
+
+    await clientPortalController.raiseDispute(req, fakeRes());
+
+    const disputes = await disputeRepository.forOrder(orderId);
+    expect(disputes.length).toBe(1);
+    expect(disputes[0].dispute_type).toBe('complaint_damage');
+  });
+
+  it('client raiseDispute defaults to dispute type when not submitted', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    await db.execute('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id', { id: orderId });
+    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { description: 'Payment terms disagreement' } });
+
+    await clientPortalController.raiseDispute(req, fakeRes());
+
+    const disputes = await disputeRepository.forOrder(orderId);
+    expect(disputes[0].dispute_type).toBe('dispute');
+  });
+
+  // ---------------------------------------------------------------
+  // View rendering — real HTTP, through the live app (supertest)
+  // ---------------------------------------------------------------
+
+  describe('rendered markup', () => {
+    let agent;
+    const clientEmail = `jest-feedback-client-${Math.random().toString(16).slice(2, 8)}@nexacrest.test`;
+    const clientPassword = 'JestFeedbackTest123!';
+    let clientId;
+    let orderId;
+
+    beforeAll(async () => {
+      clientId = await createTestClient(clientEmail);
+      await createTestClientLogin(clientId, clientPassword);
+      orderId = await createTestOrder(clientId);
+      await db.execute('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id', { id: orderId });
+
+      agent = request.agent(app);
+      const loginPage = await agent.get('/client/login');
+      const csrf = extractCsrf(loginPage.text);
+      const loginRes = await agent.post('/client/login').type('form').send({ _csrf: csrf, email: clientEmail, password: clientPassword });
+      expect(loginRes.status).toBe(302);
+    });
+
+    it('client order page shows the feedback form with no prior submission', async () => {
+      const res = await agent.get(`/client/orders/${orderId}`);
+      expect(res.status).toBe(200);
+      expect(res.text).toContain(`action="/client/orders/${orderId}/feedback"`);
+      expect(res.text).toContain('name="rating"');
+      expect(res.text).toContain('Submit Feedback');
+    });
+
+    it('client order page offers both dispute types', async () => {
+      const res = await agent.get(`/client/orders/${orderId}`);
+      expect(res.text).toContain('name="dispute_type"');
+      expect(res.text).toContain('Complaint / Damage Report');
+    });
+
+    it('client order page prefills an existing submission and offers update', async () => {
+      await orderFeedbackRepository.upsert(orderId, clientId, 4, 'Already submitted once.');
+
+      const res = await agent.get(`/client/orders/${orderId}`);
+      expect(res.text).toContain('value="4" selected');
+      expect(res.text).toContain('Already submitted once.');
+      expect(res.text).toContain('Update Feedback');
+    });
+
+    it('staff order page shows the Order Feedback section', async () => {
+      const staffAgent = request.agent(app);
+      const loginPage = await staffAgent.get('/login');
+      const csrf = extractCsrf(loginPage.text);
+      const loginRes = await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
+      expect(loginRes.status).toBe(302);
+
+      const noFeedbackOrderId = await createTestOrder(await createTestClient());
+      const res = await staffAgent.get(`/orders/${noFeedbackOrderId}`);
+      expect(res.status).toBe(200);
+      expect(res.text).toContain('Order Feedback');
+      expect(res.text).toContain("hasn't submitted feedback");
+    });
+
+    it('global dispute log shows the type tag per card', async () => {
+      const staffAgent = request.agent(app);
+      const loginPage = await staffAgent.get('/login');
+      const csrf = extractCsrf(loginPage.text);
+      const loginRes = await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
+      expect(loginRes.status).toBe(302);
+
+      await disputeRepository.create(orderId, '2026-10-23', 'Buyer', 'Carton crushed', null, null, 'complaint_damage');
+
+      const res = await staffAgent.get('/disputes');
+      expect(res.status).toBe(200);
+      expect(res.text).toContain('Complaint / Damage');
+    });
+
+    it('staff order disputes page offers both types and shows a logged complaint\'s type', async () => {
+      const staffAgent = request.agent(app);
+      const loginPage = await staffAgent.get('/login');
+      const csrf = extractCsrf(loginPage.text);
+      const loginRes = await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
+      expect(loginRes.status).toBe(302);
+
+      const complaintOrderId = await createTestOrder(await createTestClient());
+      await disputeRepository.create(complaintOrderId, '2026-10-23', 'Buyer', 'Crate was wet on arrival', null, null, 'complaint_damage');
+
+      const res = await staffAgent.get(`/orders/${complaintOrderId}/disputes`);
+      expect(res.status).toBe(200);
+      expect(res.text).toContain('name="dispute_type"');
+      expect(res.text).toContain('Complaint / Damage');
+    });
+  });
+});

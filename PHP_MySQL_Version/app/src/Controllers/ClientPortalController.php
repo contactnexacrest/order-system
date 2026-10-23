@@ -274,6 +274,7 @@ final class ClientPortalController
             // the advance has cleared — see BuyerActionService::uploadBuyerPo(),
             // which this page's own form submits to.
             'advanceCleared' => $paymentStatus !== null && $paymentStatus['advance_cleared_at'] !== null,
+            'orderFeedback' => \App\Repositories\OrderFeedbackRepository::find($orderId),
         ], 'layout/client');
     }
 
@@ -532,13 +533,44 @@ final class ClientPortalController
             return;
         }
 
+        $disputeType = ($_POST['dispute_type'] ?? '') === 'complaint_damage' ? 'complaint_damage' : 'dispute';
         $noticeDate = date('Y-m-d');
         $responseDays = (int) (\App\Repositories\CompanySettingsRepository::get('dispute_response_days_n') ?? '10');
         $responseDueDate = \App\Services\WorkingDaysCalculator::addWorkingDays($noticeDate, $responseDays);
-        $disputeId = \App\Repositories\DisputeRepository::create($orderId, $noticeDate, 'Buyer (via client portal)', $description, null, $responseDueDate);
+        $disputeId = \App\Repositories\DisputeRepository::create($orderId, $noticeDate, 'Buyer (via client portal)', $description, null, $responseDueDate, $disputeType);
         \App\Repositories\AuditLogRepository::log(null, 'DISPUTE_RAISED', 'disputes', $disputeId, null, null, $description, 'Raised by the client via the client portal.');
 
         Flash::set('success', 'Your dispute has been logged — our team will respond by ' . $responseDueDate . '.');
+        header("Location: /client/orders/{$orderId}");
+    }
+
+    /**
+     * docs/schema.sql Section BV — export process step 14. Resubmission is
+     * allowed (upsert), not a one-shot submission — there's no stated
+     * reason to stop a client revising their own rating/comments.
+     */
+    public function submitFeedback(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $rating = (int) ($_POST['rating'] ?? 0);
+        if ($rating < 1 || $rating > 5) {
+            Flash::set('error', 'Please choose a rating between 1 and 5 stars.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
+        $comments = trim((string) ($_POST['comments'] ?? '')) ?: null;
+
+        \App\Repositories\OrderFeedbackRepository::upsert($orderId, $clientId, $rating, $comments);
+
+        Flash::set('success', 'Thank you — your feedback has been recorded.');
         header("Location: /client/orders/{$orderId}");
     }
 

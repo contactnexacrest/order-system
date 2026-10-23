@@ -2,11 +2,12 @@
 
 const db = require('../config/db');
 
-async function create(orderId, noticeDate, fromParty, description, assignedTo, responseDueDate) {
+/** docs/schema.sql Section BV — disputeType is 'dispute' or 'complaint_damage'. */
+async function create(orderId, noticeDate, fromParty, description, assignedTo, responseDueDate, disputeType = 'dispute') {
   const result = await db.execute(
-    `INSERT INTO disputes (order_id, notice_date, from_party, description, assigned_to, response_due_date, status)
-     VALUES (:order_id, :notice_date, :from_party, :description, :assigned_to, :response_due_date, 'Open')`,
-    { order_id: orderId, notice_date: noticeDate, from_party: fromParty, description, assigned_to: assignedTo, response_due_date: responseDueDate }
+    `INSERT INTO disputes (order_id, notice_date, from_party, description, dispute_type, assigned_to, response_due_date, status)
+     VALUES (:order_id, :notice_date, :from_party, :description, :dispute_type, :assigned_to, :response_due_date, 'Open')`,
+    { order_id: orderId, notice_date: noticeDate, from_party: fromParty, description, dispute_type: disputeType, assigned_to: assignedTo, response_due_date: responseDueDate }
   );
   return result.insertId;
 }

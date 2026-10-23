@@ -97,6 +97,7 @@ final class DisputeController
         $fromParty = trim((string) ($_POST['from_party'] ?? '')) ?: null;
         $description = trim((string) ($_POST['description'] ?? ''));
         $assignedTo = ($_POST['assigned_to'] ?? '') !== '' ? (int) $_POST['assigned_to'] : null;
+        $disputeType = ($_POST['dispute_type'] ?? '') === 'complaint_damage' ? 'complaint_damage' : 'dispute';
 
         if ($description === '') {
             Flash::set('error', 'A description is mandatory to raise a dispute.');
@@ -111,7 +112,7 @@ final class DisputeController
         $responseDays = (int) (CompanySettingsRepository::get('dispute_response_days_n') ?? '10');
         $responseDueDate = WorkingDaysCalculator::addWorkingDays($noticeDate, $responseDays);
 
-        $disputeId = DisputeRepository::create($orderId, $noticeDate, $fromParty, $description, $assignedTo, $responseDueDate);
+        $disputeId = DisputeRepository::create($orderId, $noticeDate, $fromParty, $description, $assignedTo, $responseDueDate, $disputeType);
         AuditLogRepository::log((int) AuthService::currentUser()['id'], 'DISPUTE_RAISED', 'disputes', $disputeId, null, null, $description);
 
         Flash::set('success', "Dispute logged — response due by {$responseDueDate}.");

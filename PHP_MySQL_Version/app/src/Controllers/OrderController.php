@@ -922,6 +922,9 @@ final class OrderController
             'blEndorsement' => OrderBlEndorsementRepository::find($orderId),
             'blEndorsementDoc' => DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'BLE'),
             'containerTypes' => LookupRepository::dropdownOptions('container_type'),
+            // docs/schema.sql Section BV — rating/comments aren't financial
+            // data, so this isn't gated behind manage_order_financials.
+            'orderFeedback' => \App\Repositories\OrderFeedbackRepository::find($orderId),
         ], 'layout/base');
     }
 

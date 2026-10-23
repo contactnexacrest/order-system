@@ -97,6 +97,7 @@ async function create(req, res) {
   const fromParty = String(req.body.from_party || '').trim() || null;
   const description = String(req.body.description || '').trim();
   const assignedTo = req.body.assigned_to !== undefined && req.body.assigned_to !== '' ? parseInt(req.body.assigned_to, 10) : null;
+  const disputeType = req.body.dispute_type === 'complaint_damage' ? 'complaint_damage' : 'dispute';
 
   if (description === '') {
     flash.set(req, 'error', 'A description is mandatory to raise a dispute.');
@@ -111,7 +112,7 @@ async function create(req, res) {
   const responseDays = parseInt((await companySettingsRepository.get('dispute_response_days_n')) || '10', 10);
   const responseDueDate = await workingDaysCalculator.addWorkingDays(noticeDate, responseDays);
 
-  const disputeId = await disputeRepository.create(orderId, noticeDate, fromParty, description, assignedTo, responseDueDate);
+  const disputeId = await disputeRepository.create(orderId, noticeDate, fromParty, description, assignedTo, responseDueDate, disputeType);
   await auditLogRepository.log(req.user.id, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description);
 
   flash.set(req, 'success', `Dispute logged — response due by ${responseDueDate}.`);

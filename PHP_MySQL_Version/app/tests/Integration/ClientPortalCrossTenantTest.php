@@ -132,6 +132,19 @@ final class ClientPortalCrossTenantTest extends DbTestCase
         self::assertSame($before, $after, 'a blocked cross-tenant dispute attempt must create nothing');
     }
 
+    public function testSubmitFeedbackBlocksAnotherClientsOrderAndCreatesNoFeedback(): void
+    {
+        $pdo = Database::connection();
+        $before = (int) $pdo->query('SELECT COUNT(*) FROM order_feedback')->fetchColumn();
+
+        $_POST = ['rating' => '5', 'comments' => 'Attempted cross-tenant feedback'];
+        $this->call('submitFeedback', ['id' => $this->orderB]);
+
+        self::assertSame(404, http_response_code());
+        $after = (int) $pdo->query('SELECT COUNT(*) FROM order_feedback')->fetchColumn();
+        self::assertSame($before, $after, 'a blocked cross-tenant feedback attempt must create nothing');
+    }
+
     public function testPostCommentBlocksAnotherClientsOrderAndCreatesNoComment(): void
     {
         $pdo = Database::connection();

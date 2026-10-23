@@ -2203,6 +2203,19 @@
     </p>
   </div>
 
+  <div class="section" id="order-feedback">
+    <h2>Order Feedback</h2>
+    {% if not orderFeedback %}
+      <p class="muted">The client hasn't submitted feedback for this order yet.</p>
+    {% else %}
+      <div class="kv-grid">
+        <div><span class="k">Rating</span><span class="v">{% for s in range(0, orderFeedback.rating) %}★{% endfor %}{% for s in range(0, 5 - orderFeedback.rating) %}☆{% endfor %} ({{ orderFeedback.rating }}/5)</span></div>
+        <div><span class="k">Submitted</span><span class="v">{{ orderFeedback.submitted_at | humanDate }}</span></div>
+        <div class="full"><span class="k">Comments</span><span class="v">{{ orderFeedback.comments | nl2br if orderFeedback.comments else '—' }}</span></div>
+      </div>
+    {% endif %}
+  </div>
+
   {% if permissions.edit_locked_data %}
   <div class="section">
     <h2>Admin Override</h2>

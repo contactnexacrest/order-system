@@ -2367,6 +2367,19 @@ foreach ($stages as $s) {
     </p>
   </div>
 
+  <div class="section" id="order-feedback">
+    <h2>Order Feedback</h2>
+    <?php if (empty($orderFeedback)): ?>
+      <p class="muted">The client hasn't submitted feedback for this order yet.</p>
+    <?php else: ?>
+      <div class="kv-grid">
+        <div><span class="k">Rating</span><span class="v"><?= str_repeat('★', (int) $orderFeedback['rating']) ?><?= str_repeat('☆', 5 - (int) $orderFeedback['rating']) ?> (<?= (int) $orderFeedback['rating'] ?>/5)</span></div>
+        <div><span class="k">Submitted</span><span class="v"><?= htmlspecialchars(Dates::human($orderFeedback['submitted_at'])) ?></span></div>
+        <div class="full"><span class="k">Comments</span><span class="v"><?= $orderFeedback['comments'] ? nl2br(htmlspecialchars($orderFeedback['comments'])) : '—' ?></span></div>
+      </div>
+    <?php endif; ?>
+  </div>
+
   <?php if ($canEditLockedData): ?>
   <div class="section">
     <h2>Admin Override</h2>
