@@ -11,6 +11,7 @@ use App\Repositories\OrderRepository;
 use App\Services\AuthService;
 use App\Services\OrderComplaintService;
 use App\Services\PermissionService;
+use App\Services\UiTemplateService;
 
 /** docs/schema.sql Section BX — Complaint / Process Issue management (distinct from Disputes). */
 final class ComplaintController
@@ -20,10 +21,29 @@ final class ComplaintController
     /** Global complaint log, filterable by status. */
     public function index(array $params): void
     {
+        $actor = AuthService::currentUser();
+        if (UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
+            $this->indexKanban();
+            return;
+        }
+
         $status = trim((string) ($_GET['status'] ?? '')) ?: null;
         \App\Helpers\View::render('complaints/index', [
             'complaints'   => OrderComplaintRepository::all($status),
             'statusFilter' => $status,
+        ], 'layout/base');
+    }
+
+    /** The Kanban UI template's Complaints board: Open / Acknowledged / Resolved columns. */
+    private function indexKanban(): void
+    {
+        $columns = [];
+        foreach (self::STATUSES as $status) {
+            $columns[$status] = OrderComplaintRepository::all($status);
+        }
+
+        \App\Helpers\View::render('complaints/index_kanban', [
+            'columns' => $columns,
         ], 'layout/base');
     }
 

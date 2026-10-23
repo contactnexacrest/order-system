@@ -1,0 +1,40 @@
+{% macro statusLabel(status) %}{% if status == 'acknowledged' %}Acknowledged{% elif status == 'resolved' %}Resolved{% else %}Open{% endif %}{% endmacro %}
+{% macro kanbanCard(c) %}
+<a class="entity-card kanban-card" href="/orders/{{ c.order_id }}/complaints">
+  <div class="entity-card-header">
+    <span class="entity-card-title">{{ c.order_reference }}</span>
+  </div>
+  <div class="entity-card-sub">{{ c.company_legal_name }}</div>
+  <div class="muted small">{{ c.description | truncate(90, true, '…') }}</div>
+  <div class="entity-card-footer">
+    <span class="muted small">Raised: {{ c.created_at }}</span>
+  </div>
+</a>
+{% endmacro %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Complaints — Kanban Board</h1>
+      <p class="muted" style="margin:0;">A process issue or flaw the client flagged for us to fix next time — not a Dispute.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <a class="btn-sm btn-secondary" href="/complaints?view=list">Switch to list view</a>
+    </div>
+  </div>
+
+  <div class="kanban-board">
+    {% for statusValue, complaints in columns %}
+      <div class="kanban-column">
+        <div class="kanban-column-header">
+          <span class="kanban-column-title">{{ statusLabel(statusValue) }}</span>
+          <span class="kanban-column-count">{{ complaints.length }}</span>
+        </div>
+        {% if complaints.length == 0 %}
+          <p class="kanban-column-empty">No complaints here</p>
+        {% else %}
+          {% for c in complaints %}{{ kanbanCard(c) }}{% endfor %}
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</div>

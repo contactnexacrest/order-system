@@ -5,6 +5,7 @@ const orderComplaintRepository = require('../repositories/orderComplaintReposito
 const orderComplaintReplyRepository = require('../repositories/orderComplaintReplyRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderComplaintService = require('../services/orderComplaintService');
+const uiTemplateService = require('../services/uiTemplateService');
 
 // Port of App\Controllers\ComplaintController. docs/schema.sql Section
 // BX — Complaint / Process Issue management (distinct from Disputes).
@@ -13,6 +14,11 @@ const STATUSES = ['open', 'acknowledged', 'resolved'];
 
 /** Global complaint log, filterable by status. */
 async function index(req, res) {
+  if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
+    await indexKanban(req, res);
+    return;
+  }
+
   const status = String(req.query.status || '').trim() || null;
   res.renderView(
     'complaints/index',
@@ -22,6 +28,16 @@ async function index(req, res) {
     },
     'layout/base'
   );
+}
+
+/** The Kanban UI template's Complaints board: Open / Acknowledged / Resolved columns. */
+async function indexKanban(req, res) {
+  const columns = {};
+  for (const status of STATUSES) {
+    columns[status] = await orderComplaintRepository.all(status);
+  }
+
+  res.renderView('complaints/index_kanban', { columns }, 'layout/base');
 }
 
 async function forOrder(req, res) {
