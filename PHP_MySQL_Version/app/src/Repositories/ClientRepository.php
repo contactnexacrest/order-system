@@ -303,6 +303,28 @@ final class ClientRepository
     }
 
     /**
+     * External QA report M-02: "Portal visibility of history/downloads
+     * configurable globally and per client, independently." Same NULL-
+     * means-inherit pattern as orderHistoryVisible() above, for a
+     * client's ability to download their own order's documents from the
+     * portal (company_settings client_portal_show_document_downloads).
+     */
+    public static function documentDownloadsVisible(array $client): bool
+    {
+        if ($client['document_downloads_visibility_override'] !== null) {
+            return (bool) $client['document_downloads_visibility_override'];
+        }
+        return CompanySettingsRepository::get('client_portal_show_document_downloads') !== '0';
+    }
+
+    /** NULL = inherit the global switch; true/false = force this client's own setting regardless of the global one. */
+    public static function setDocumentDownloadsVisibilityOverride(int $id, ?bool $value): void
+    {
+        Database::connection()->prepare('UPDATE clients SET document_downloads_visibility_override = :value WHERE id = :id')
+            ->execute(['value' => $value === null ? null : ($value ? 1 : 0), 'id' => $id]);
+    }
+
+    /**
      * Permanent — nothing in this app ever sets is_data_locked back to 0.
      * Called once, from whichever of the two trigger points happens first:
      * the client's own PI-details consent, or staff recording the advance

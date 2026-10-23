@@ -1488,6 +1488,14 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
   ('client_portal_show_order_history', '1', 'boolean', 'clients', 'On (default) = every client sees their full order history, including completed/lost orders, on their portal dashboard. Off = clients see active/disputed orders only, unless an individual client''s own override says otherwise.', 0, 0);
 
+-- External QA report M-02: same global + per-client override pattern as
+-- client_portal_show_order_history above, for document-download
+-- visibility. Any individual client's own
+-- document_downloads_visibility_override (clients table) takes
+-- precedence over this when set.
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
+  ('client_portal_show_document_downloads', '1', 'boolean', 'clients', 'On (default) = every client can download their own order''s approved/sent customer-facing documents from the portal. Off = the Documents section is hidden and direct download links are refused, unless an individual client''s own override says otherwise.', 0, 0);
+
 -- ================================================================
 -- SECTION BA — LEGAL TERMS & DEFINITIONS clauses (admin-editable via
 -- tc_clauses, same table/CRUD pattern as every other T&C clause — see

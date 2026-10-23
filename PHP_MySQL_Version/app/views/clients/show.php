@@ -13,6 +13,8 @@ $__canImpersonate = $__u && PermissionService::can((int) $__u['id'], $__u['role_
 $__impersonationGloballyEnabled = CompanySettingsRepository::get('client_impersonation_enabled') === '1';
 // 90-item backlog Phase 6 Item B
 $__orderHistoryGlobalDefault = CompanySettingsRepository::get('client_portal_show_order_history') !== '0';
+// External QA report M-02
+$__documentDownloadsGlobalDefault = CompanySettingsRepository::get('client_portal_show_document_downloads') !== '0';
 // docs/schema.sql Section AY — view_clients admits a read-only visitor to this page; only
 // manage_orders may actually edit/deactivate the client or create a new order for them.
 $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_orders');
@@ -204,6 +206,17 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
         </label>
       </form>
       <p class="muted small">Controls what this client sees on their own "My Orders" dashboard — never affects staff's own view of their orders.</p>
+      <form method="post" action="/clients/<?= (int) $client['id'] ?>/document-downloads-visibility" style="margin-top:10px">
+        <?= Csrf::field() ?>
+        <label>Document downloads visible to this client in the portal
+          <select name="document_downloads_visibility_override" onchange="this.form.submit()">
+            <option value="" <?= $client['document_downloads_visibility_override'] === null ? 'selected' : '' ?>>Inherit global default (currently <?= $__documentDownloadsGlobalDefault ? 'downloads allowed' : 'downloads hidden' ?>)</option>
+            <option value="1" <?= $client['document_downloads_visibility_override'] !== null && (int) $client['document_downloads_visibility_override'] === 1 ? 'selected' : '' ?>>Always allow document downloads</option>
+            <option value="0" <?= $client['document_downloads_visibility_override'] !== null && (int) $client['document_downloads_visibility_override'] === 0 ? 'selected' : '' ?>>Always hide document downloads</option>
+          </select>
+        </label>
+      </form>
+      <p class="muted small">Controls whether this client sees the Documents section and can download their order's PDFs on their own order pages — independent of the order-history setting above.</p>
     <?php endif; ?>
     <?php if ($__canImpersonate): ?>
       <?php if ($__impersonationGloballyEnabled && !empty($client['allow_staff_impersonation']) && (int) $client['is_active'] === 1): ?>

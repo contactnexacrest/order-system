@@ -663,6 +663,40 @@ final class ClientController
     }
 
     /**
+     * External QA report M-02: same global + per-client override pattern
+     * as setOrderHistoryVisibilityOverride() above, for document-download
+     * visibility (company_settings client_portal_show_document_downloads
+     * / clients.document_downloads_visibility_override).
+     */
+    public function setDocumentDownloadsVisibilityOverride(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        $raw = $_POST['document_downloads_visibility_override'] ?? '';
+        $newValue = $raw === '' ? null : ($raw === '1');
+        ClientRepository::setDocumentDownloadsVisibilityOverride($clientId, $newValue);
+        $user = AuthService::currentUser();
+        $oldOverride = $client['document_downloads_visibility_override'];
+        AuditLogRepository::log(
+            (int) $user['id'],
+            'CLIENT_DOCUMENT_DOWNLOADS_VISIBILITY_CHANGED',
+            'clients',
+            $clientId,
+            'document_downloads_visibility_override',
+            $oldOverride === null ? null : (string) (int) $oldOverride,
+            $newValue === null ? null : (string) (int) $newValue
+        );
+        Flash::set('success', "Document download visibility for {$client['company_legal_name']} updated.");
+        header("Location: /clients/{$clientId}");
+    }
+
+    /**
      * docs/schema.sql Section AV — staff-initiated client-portal session,
      * for a client who cannot use the portal themselves. Three gates, all
      * re-checked here (defense in depth — the button itself is only shown

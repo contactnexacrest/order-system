@@ -434,6 +434,9 @@ CREATE TABLE clients (
   order_history_visibility_override TINYINT(1) NULL,    -- 90-item backlog Phase 6 Item B: NULL = inherit company_settings
                                                          -- client_portal_show_order_history; 1 = always show this client's
                                                          -- full order history incl. completed/lost; 0 = active/disputed only
+  document_downloads_visibility_override TINYINT(1) NULL, -- External QA report M-02: NULL = inherit company_settings
+                                                         -- client_portal_show_document_downloads; 1 = always allow this
+                                                         -- client to download documents; 0 = never, regardless of the global switch
   is_active             TINYINT(1) NOT NULL DEFAULT 1,  -- contact fields never hard-deleted; this soft-flags whole record
   is_sample_data        TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real client
   created_by            BIGINT UNSIGNED NULL,

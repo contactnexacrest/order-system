@@ -15,7 +15,7 @@
       <tr><th>Incoterm</th><td>{{ order.incoterm_code or '—' }}</td></tr>
       <tr><th>Port of Discharge</th><td>{{ order.port_of_discharge_name or '—' }}</td></tr>
     </table>
-    <p class="muted small">The full Order Confirmation document is available to download above under Documents.</p>
+    {% if not downloadsHidden %}<p class="muted small">The full Order Confirmation document is available to download above under Documents.</p>{% endif %}
     <form method="post" action="/client/orders/{{ order.id }}/acknowledge-oc">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-success">I acknowledge and confirm to proceed</button>
@@ -23,6 +23,8 @@
   </div>
   {% endif %}
 
+  {# External QA report M-02: global + per-client document-download visibility. #}
+  {% if not downloadsHidden %}
   <div class="section">
     <h2>Documents</h2>
     <table class="list">
@@ -39,6 +41,7 @@
       {% endfor %}
     </table>
   </div>
+  {% endif %}
 
   <div class="section">
     <h2>Buyer PO</h2>

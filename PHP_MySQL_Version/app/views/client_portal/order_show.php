@@ -20,7 +20,7 @@
       <tr><th>Incoterm</th><td><?= htmlspecialchars($order['incoterm_code'] ?? '—') ?></td></tr>
       <tr><th>Port of Discharge</th><td><?= htmlspecialchars($order['port_of_discharge_name'] ?? '—') ?></td></tr>
     </table>
-    <p class="muted small">The full Order Confirmation document is available to download above under Documents.</p>
+    <?php if (!$downloadsHidden): ?><p class="muted small">The full Order Confirmation document is available to download above under Documents.</p><?php endif; ?>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/acknowledge-oc">
       <?= Csrf::field() ?>
       <button type="submit" class="btn-success">I acknowledge and confirm to proceed</button>
@@ -28,6 +28,8 @@
   </div>
   <?php endif; ?>
 
+  <?php /* External QA report M-02: global + per-client document-download visibility. */ ?>
+  <?php if (!$downloadsHidden): ?>
   <div class="section">
     <h2>Documents</h2>
     <table class="list">
@@ -45,6 +47,7 @@
       <?php endif; ?>
     </table>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Buyer PO</h2>

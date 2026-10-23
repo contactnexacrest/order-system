@@ -169,6 +169,8 @@ async function show(req, res) {
   const impersonationUnavailableReason = impersonationReasons.join(', ');
   // 90-item backlog Phase 6 Item B
   const orderHistoryGlobalDefault = (await companySettingsRepository.get('client_portal_show_order_history')) !== '0';
+  // External QA report M-02
+  const documentDownloadsGlobalDefault = (await companySettingsRepository.get('client_portal_show_document_downloads')) !== '0';
   const additionalDocuments = await fileStoreRepository.additionalDocumentsForClient(client.id);
 
   // Item 2 — agreement status: never once force-expired, and (when an
@@ -183,7 +185,7 @@ async function show(req, res) {
   const agreementRenewEligible = !!(agreementExpiryDate && new Date(agreementExpiryDate).getTime() <= Date.now() + 30 * 86400000);
 
   res.renderView('clients/show', {
-    client, orders, impersonationGloballyEnabled, orderHistoryGlobalDefault, impersonationUnavailableReason, additionalDocuments,
+    client, orders, impersonationGloballyEnabled, orderHistoryGlobalDefault, documentDownloadsGlobalDefault, impersonationUnavailableReason, additionalDocuments,
     agreementForceExpired, agreementExpiryDate, agreementExpired, agreementActive, agreementRenewEligible,
     duplicateOfClient: client.duplicate_of_client_id ? await clientRepository.find(client.duplicate_of_client_id) : null,
     duplicatedInto: await clientRepository.findDuplicatesOf(client.id),
@@ -606,6 +608,35 @@ async function setOrderHistoryVisibilityOverride(req, res) {
 }
 
 /**
+ * External QA report M-02: same global + per-client override pattern as
+ * setOrderHistoryVisibilityOverride() above, for document-download
+ * visibility (company_settings client_portal_show_document_downloads /
+ * clients.document_downloads_visibility_override).
+ */
+async function setDocumentDownloadsVisibilityOverride(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const raw = req.body.document_downloads_visibility_override ?? '';
+  const newValue = raw === '' ? null : raw === '1';
+  await clientRepository.setDocumentDownloadsVisibilityOverride(clientId, newValue);
+  const user = req.user;
+  const oldOverride = client.document_downloads_visibility_override;
+  await auditLogRepository.log(
+    user.id, 'CLIENT_DOCUMENT_DOWNLOADS_VISIBILITY_CHANGED', 'clients', clientId,
+    'document_downloads_visibility_override',
+    oldOverride === null || oldOverride === undefined ? null : String(Number(oldOverride)),
+    newValue === null ? null : String(Number(newValue))
+  );
+  flash.set(req, 'success', `Document download visibility for ${client.company_legal_name} updated.`);
+  res.redirect(`/clients/${clientId}`);
+}
+
+/**
  * docs/schema.sql Section AV — re-checks all three gates itself (global
  * switch, per-client flag, client active state) rather than relying
  * solely on the route-level impersonate_client permission check, matching
@@ -734,7 +765,7 @@ async function showRemovedAdditionalDocuments(req, res) {
 
 module.exports = {
   index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
-  setImpersonationAllowed, setOrderHistoryVisibilityOverride, impersonate, uploadAdditionalDocument, deleteAdditionalDocument, showRemovedAdditionalDocuments,
+  setImpersonationAllowed, setOrderHistoryVisibilityOverride, setDocumentDownloadsVisibilityOverride, impersonate, uploadAdditionalDocument, deleteAdditionalDocument, showRemovedAdditionalDocuments,
   uploadAgreement, forceExpireAgreement, renewAgreement, downloadAgreement,
   duplicateForm, duplicateStore,
 };

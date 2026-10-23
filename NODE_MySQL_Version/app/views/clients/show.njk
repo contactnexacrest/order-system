@@ -177,6 +177,17 @@
         </label>
       </form>
       <p class="muted small">Controls what this client sees on their own "My Orders" dashboard — never affects staff's own view of their orders.</p>
+      <form method="post" action="/clients/{{ client.id }}/document-downloads-visibility" style="margin-top:10px">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Document downloads visible to this client in the portal
+          <select name="document_downloads_visibility_override" onchange="this.form.submit()">
+            <option value="" {{ 'selected' if client.document_downloads_visibility_override == null }}>Inherit global default (currently {{ 'downloads allowed' if documentDownloadsGlobalDefault else 'downloads hidden' }})</option>
+            <option value="1" {{ 'selected' if client.document_downloads_visibility_override == 1 }}>Always allow document downloads</option>
+            <option value="0" {{ 'selected' if client.document_downloads_visibility_override == 0 }}>Always hide document downloads</option>
+          </select>
+        </label>
+      </form>
+      <p class="muted small">Controls whether this client sees the Documents section and can download their order's PDFs on their own order pages — independent of the order-history setting above.</p>
     {% endif %}
     {% if permissions.impersonate_client %}
       {% if impersonationGloballyEnabled and client.allow_staff_impersonation and client.is_active %}

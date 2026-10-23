@@ -258,6 +258,26 @@ async function setOrderHistoryVisibilityOverride(id, value) {
   await db.execute('UPDATE clients SET order_history_visibility_override = :value WHERE id = :id', { value: dbValue, id });
 }
 
+/**
+ * External QA report M-02: "Portal visibility of history/downloads
+ * configurable globally and per client, independently." Same null-
+ * means-inherit pattern as orderHistoryVisible() above, for a client's
+ * ability to download their own order's documents from the portal
+ * (company_settings client_portal_show_document_downloads).
+ */
+async function documentDownloadsVisible(client) {
+  if (client.document_downloads_visibility_override !== null && client.document_downloads_visibility_override !== undefined) {
+    return Boolean(client.document_downloads_visibility_override);
+  }
+  return (await companySettingsRepository.get('client_portal_show_document_downloads')) !== '0';
+}
+
+/** null = inherit the global switch; true/false = force this client's own setting regardless of the global one. */
+async function setDocumentDownloadsVisibilityOverride(id, value) {
+  const dbValue = value === null || value === undefined ? null : (value ? 1 : 0);
+  await db.execute('UPDATE clients SET document_downloads_visibility_override = :value WHERE id = :id', { value: dbValue, id });
+}
+
 async function markSample(id) {
   await db.execute('UPDATE clients SET is_sample_data = 1 WHERE id = :id', { id });
 }
@@ -287,4 +307,5 @@ module.exports = {
   updateAgreementFooterText, setAgreementFile, setAgreementForceExpired, renewAgreement,
   markDuplicateOf, findDuplicatesOf,
   orderHistoryVisible, setOrderHistoryVisibilityOverride,
+  documentDownloadsVisible, setDocumentDownloadsVisibilityOverride,
 };

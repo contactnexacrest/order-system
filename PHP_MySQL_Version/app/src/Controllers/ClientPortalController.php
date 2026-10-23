@@ -255,12 +255,17 @@ final class ClientPortalController
             }
         }
 
+        $client = ClientPortalService::currentClient();
+
         View::render('client_portal/order_show', [
-            'client' => ClientPortalService::currentClient(),
+            'client' => $client,
             'order' => $order,
             'products' => OrderProductRepository::forOrder($orderId),
             'totalFobValue' => OrderProductRepository::totalFobValue($orderId),
             'documents' => DocumentRepository::customerFacingForOrder($orderId),
+            // External QA report M-02: global + per-client download
+            // visibility, independent of the order-history one above.
+            'downloadsHidden' => !ClientRepository::documentDownloadsVisible($client),
             'paymentReports' => ClientPaymentReportRepository::forOrder($orderId),
             'ocAcknowledgment' => $ocAcknowledgment,
             'comments' => OrderCommentRepository::forOrder($orderId),
@@ -616,6 +621,15 @@ final class ClientPortalController
         }
         $order = OrderRepository::find((int) $document['order_id']);
         if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Document not found.';
+            return;
+        }
+        // External QA report M-02: the "Download PDF" link is hidden on
+        // the page itself when downloads are off, but a client could
+        // still guess/replay this exact URL — so it's refused here too,
+        // not just hidden client-side.
+        if (!ClientRepository::documentDownloadsVisible(ClientPortalService::currentClient())) {
             http_response_code(404);
             echo 'Document not found.';
             return;

@@ -253,12 +253,17 @@ async function showOrder(req, res) {
     }
   }
 
+  const client = await clientPortalService.currentClient(req);
+
   res.renderView('client_portal/order_show', {
-    client: await clientPortalService.currentClient(req),
+    client,
     order,
     products: await orderProductRepository.forOrder(orderId),
     totalFobValue: await orderProductRepository.totalFobValue(orderId),
     documents: await documentRepository.customerFacingForOrder(orderId),
+    // External QA report M-02: global + per-client download visibility,
+    // independent of the order-history one above.
+    downloadsHidden: !(await clientRepository.documentDownloadsVisible(client)),
     paymentReports: await clientPaymentReportRepository.forOrder(orderId),
     ocAcknowledgment,
     comments: await orderCommentRepository.forOrder(orderId),
@@ -580,6 +585,14 @@ async function downloadDocument(req, res) {
   }
   const order = await orderRepository.find(document.order_id);
   if (!order || order.client_id !== clientId) {
+    res.status(404).send('Document not found.');
+    return;
+  }
+  // External QA report M-02: the "Download PDF" link is hidden on the
+  // page itself when downloads are off, but a client could still
+  // guess/replay this exact URL — so it's refused here too, not just
+  // hidden client-side.
+  if (!(await clientRepository.documentDownloadsVisible(await clientPortalService.currentClient(req)))) {
     res.status(404).send('Document not found.');
     return;
   }
