@@ -212,7 +212,7 @@ describe('Order cancellation workflow (External QA report M-09)', () => {
   it('orders index counts and filters a cancelled order correctly', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await orderRepository.cancel(orderId);
-    const req = { query: { status: 'cancelled' }, permissions: new Proxy({}, { get: () => true }) };
+    const req = { query: { status: 'cancelled' }, user: { ui_template_preference_id: null }, permissions: new Proxy({}, { get: () => true }) };
     const res = fakeRes();
 
     await ordersController.index(req, res);

@@ -84,6 +84,12 @@ final class OrderController
      */
     public function index(array $params): void
     {
+        $actor = AuthService::currentUser();
+        if (\App\Services\UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
+            $this->indexKanban();
+            return;
+        }
+
         $all = OrderRepository::all();
         // Default to the Active tab, not All — most orders in the system
         // at any time are still in play, and staff opening this screen
@@ -139,6 +145,60 @@ final class OrderController
             'page' => $page,
             'totalPages' => $totalPages,
             'totalFiltered' => $totalFiltered,
+        ], 'layout/base');
+    }
+
+    /**
+     * docs/schema.sql Section BQ — the Kanban UI template's Orders list:
+     * every active order as a card in its own Stage 1-9 column (the
+     * pipeline staff actually work through), plus a "Docs Sent" and a
+     * "Complete" column for the two closure phases. Lost/Cancelled orders
+     * aren't given full board columns of their own — they're dead ends,
+     * not pipeline stages — so they're rolled up into a compact summary
+     * instead, same as every other real Kanban board treats a "won/lost"
+     * outcome. Deliberately unpaginated and unfiltered by status: the
+     * whole point of a board is seeing the entire active pipeline at a
+     * glance, which the existing card-grid list already offers filtered/
+     * paginated for anyone who wants that instead.
+     */
+    private function indexKanban(): void
+    {
+        $all = OrderRepository::all();
+        $stages = LookupRepository::stagesMaster();
+
+        $columns = [];
+        foreach ($stages as $s) {
+            $columns[(int) $s['stage_number']] = ['name' => $s['stage_name'], 'orders' => []];
+        }
+        $shippedDocsSent = [];
+        $complete = [];
+        $lostCount = 0;
+        $cancelledCount = 0;
+
+        foreach ($all as $o) {
+            if ($o['status'] === 'active') {
+                $stageNum = (int) ($o['current_stage_number'] ?? 1) ?: 1;
+                if (isset($columns[$stageNum])) {
+                    $columns[$stageNum]['orders'][] = $o;
+                }
+            } elseif ($o['status'] === 'shipped_docs_sent') {
+                $shippedDocsSent[] = $o;
+            } elseif ($o['status'] === 'complete') {
+                $complete[] = $o;
+            } elseif ($o['status'] === 'lost') {
+                $lostCount++;
+            } elseif ($o['status'] === 'cancelled') {
+                $cancelledCount++;
+            }
+        }
+
+        View::render('orders/index_kanban', [
+            'columns' => $columns,
+            'shippedDocsSent' => $shippedDocsSent,
+            'complete' => $complete,
+            'lostCount' => $lostCount,
+            'cancelledCount' => $cancelledCount,
+            'totalActive' => count(array_filter($all, static fn($o) => $o['status'] === 'active')),
         ], 'layout/base');
     }
 

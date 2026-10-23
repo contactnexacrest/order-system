@@ -34,6 +34,7 @@ const documentRepository = require('../repositories/documentRepository');
 const documentReviewRepository = require('../repositories/documentReviewRepository');
 const emailLogRepository = require('../repositories/emailLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
+const uiTemplateService = require('../services/uiTemplateService');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderTravelExpenseRepository = require('../repositories/orderTravelExpenseRepository');
@@ -98,6 +99,11 @@ function str(v, fallback = '') {
  * clicked to know its count.
  */
 async function index(req, res) {
+  if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
+    await indexKanban(req, res);
+    return;
+  }
+
   const all = await orderRepository.all();
   // Default to the Active tab, not All — most orders in the system at
   // any time are still in play, and staff opening this screen want to
@@ -150,6 +156,59 @@ async function index(req, res) {
     page,
     totalPages,
     totalFiltered,
+  }, 'layout/base');
+}
+
+/**
+ * docs/schema.sql Section BQ — the Kanban UI template's Orders list:
+ * every active order as a card in its own Stage 1-9 column (the
+ * pipeline staff actually work through), plus a "Docs Sent" and a
+ * "Complete" column for the two closure phases. Lost/Cancelled orders
+ * aren't given full board columns of their own — they're dead ends,
+ * not pipeline stages — so they're rolled up into a compact summary
+ * instead, same as every other real Kanban board treats a "won/lost"
+ * outcome. Deliberately unpaginated and unfiltered by status: the
+ * whole point of a board is seeing the entire active pipeline at a
+ * glance, which the existing card-grid list already offers filtered/
+ * paginated for anyone who wants that instead.
+ */
+async function indexKanban(req, res) {
+  const all = await orderRepository.all();
+  const stages = await lookupRepository.stagesMaster();
+
+  const columns = {};
+  for (const s of stages) {
+    columns[s.stage_number] = { name: s.stage_name, orders: [] };
+  }
+  const shippedDocsSent = [];
+  const complete = [];
+  let lostCount = 0;
+  let cancelledCount = 0;
+
+  for (const o of all) {
+    if (o.status === 'active') {
+      const stageNum = (o.current_stage_number || 1) || 1;
+      if (columns[stageNum]) {
+        columns[stageNum].orders.push(o);
+      }
+    } else if (o.status === 'shipped_docs_sent') {
+      shippedDocsSent.push(o);
+    } else if (o.status === 'complete') {
+      complete.push(o);
+    } else if (o.status === 'lost') {
+      lostCount++;
+    } else if (o.status === 'cancelled') {
+      cancelledCount++;
+    }
+  }
+
+  res.renderView('orders/index_kanban', {
+    columns,
+    shippedDocsSent,
+    complete,
+    lostCount,
+    cancelledCount,
+    totalActive: all.filter((o) => o.status === 'active').length,
   }, 'layout/base');
 }
 
