@@ -10,6 +10,7 @@ const lookupRepository = require('../repositories/lookupRepository');
 const orderRepository = require('../repositories/orderRepository');
 const userRepository = require('../repositories/userRepository');
 const fileUploadService = require('../services/fileUploadService');
+const uiTemplateService = require('../services/uiTemplateService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
 
 // Port of App\Controllers\DisputeController. Spec Section 16 — Dispute
@@ -26,6 +27,11 @@ function todayYmd() {
 
 /** Global dispute log, filterable by status. */
 async function index(req, res) {
+  if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
+    await indexKanban(req, res);
+    return;
+  }
+
   const status = String(req.query.status || '').trim() || null;
   res.renderView(
     'disputes/index',
@@ -36,6 +42,29 @@ async function index(req, res) {
     },
     'layout/base'
   );
+}
+
+/**
+ * docs/schema.sql Section BQ — the Kanban UI template's Disputes board:
+ * one column per dispute_status dropdown option, in the admin's own
+ * configured order, plus a column for any legacy status value that no
+ * longer appears in that list so nothing is dropped.
+ */
+async function indexKanban(req, res) {
+  const all = await disputeRepository.all();
+  const statusOptions = await lookupRepository.dropdownOptions('dispute_status');
+  const columns = {};
+  for (const opt of statusOptions) {
+    columns[opt.option_value] = { disputes: [] };
+  }
+  for (const d of all) {
+    if (!columns[d.status]) {
+      columns[d.status] = { disputes: [] };
+    }
+    columns[d.status].disputes.push(d);
+  }
+
+  res.renderView('disputes/index_kanban', { columns, totalCount: all.length }, 'layout/base');
 }
 
 async function forOrder(req, res) {

@@ -17,6 +17,7 @@ use App\Repositories\UserRepository;
 use App\Services\AuthService;
 use App\Services\FileUploadService;
 use App\Services\PermissionService;
+use App\Services\UiTemplateService;
 use App\Services\WorkingDaysCalculator;
 
 /** Spec Section 16 — Dispute Management. */
@@ -25,11 +26,44 @@ final class DisputeController
     /** Global dispute log, filterable by status. */
     public function index(array $params): void
     {
+        $actor = AuthService::currentUser();
+        if (UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
+            $this->indexKanban();
+            return;
+        }
+
         $status = trim((string) ($_GET['status'] ?? '')) ?: null;
         View::render('disputes/index', [
             'disputes'      => DisputeRepository::all($status),
             'statusFilter'  => $status,
             'statusOptions' => LookupRepository::dropdownOptions('dispute_status'),
+        ], 'layout/base');
+    }
+
+    /**
+     * docs/schema.sql Section BQ — the Kanban UI template's Disputes
+     * board: one column per dispute_status dropdown option, in the
+     * admin's own configured order, plus a column for any legacy status
+     * value that no longer appears in that list so nothing is dropped.
+     */
+    private function indexKanban(): void
+    {
+        $all = DisputeRepository::all();
+        $statusOptions = LookupRepository::dropdownOptions('dispute_status');
+        $columns = [];
+        foreach ($statusOptions as $opt) {
+            $columns[$opt['option_value']] = ['disputes' => []];
+        }
+        foreach ($all as $d) {
+            if (!isset($columns[$d['status']])) {
+                $columns[$d['status']] = ['disputes' => []];
+            }
+            $columns[$d['status']]['disputes'][] = $d;
+        }
+
+        View::render('disputes/index_kanban', [
+            'columns'    => $columns,
+            'totalCount' => count($all),
         ], 'layout/base');
     }
 
