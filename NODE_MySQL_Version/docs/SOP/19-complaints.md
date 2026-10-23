@@ -66,7 +66,11 @@ permission above) opens the **global complaint log** — every complaint
 across every order, filterable by status — the same pattern as the global
 Disputes log. This is deliberately its own page rather than folded into
 Disputes: a complaint has nothing to do with cancellation, so mixing the
-two logs would make neither one easy to scan.
+two logs would make neither one easy to scan. On the Kanban UI template
+(see [Admin & Settings](./15-admin-settings.md#ui-template-preference--standard-vs-kanban)),
+this same list renders as a board instead, columned by status:
+
+![Complaints — Kanban board, Open / Acknowledged / Resolved](./images/complaints_kanban.png)
 
 From **Complaints** on the order page itself:
 
@@ -98,7 +102,9 @@ direction), a Complaint's thread is genuinely two-way:
 Because the thread lives on the complaint, and the complaint itself is
 reached from the order's own Complaints screen, a complaint's entire
 history — the original description, every status change, and every reply
-in both directions — is always part of that order's record.
+in both directions — is always part of that order's record:
+
+![An order's Complaints screen — Log Complaint, per-complaint Status, and the Conversation thread](./images/complaint_staff_panel.png)
 
 ## Who gets notified
 
@@ -129,7 +135,9 @@ If staff or the client has already posted a reply, the client sees the
 full conversation on their own portal page and can reply again themselves
 — there's no limit on how many messages either side can send, and no
 status visible to the client (Open/Acknowledged/Resolved is an internal
-staff field; the client just sees the conversation itself).
+staff field; the client just sees the conversation itself):
+
+![Client portal — Report a Process Issue, with the full conversation so far](./images/portal_complaint_form.png)
 
 ## What happens next
 

@@ -179,6 +179,8 @@ Opening an order (**View documents**) shows, top to bottom:
    page, and everyone holding `manage_orders` gets an in-app notification
    the moment feedback comes in.
 
+   ![Client portal — Order Feedback](./images/portal_feedback.png)
+
 ### My Account
 
 The only self-service screen outside a specific order — the buyer can

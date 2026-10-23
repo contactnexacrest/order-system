@@ -436,7 +436,9 @@ screens used everywhere in this manual's screenshots) and **Kanban** (the
 same underlying data, shown as a board of cards in columns instead). This
 is purely a different way of looking at the same records — switching
 templates never changes what data exists, who can act on it, or any
-permission check; it only changes how a handful of list screens render.
+permission check; it only changes how a handful of list screens render:
+
+![The Orders list under the Kanban template — one column per stage, with a status-bucket filter row above](./images/kanban_orders.png)
 
 Three places control this, and they resolve in order — a person's own
 choice wins if they made one, otherwise the company default applies,
