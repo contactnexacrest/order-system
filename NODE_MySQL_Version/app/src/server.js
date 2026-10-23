@@ -41,6 +41,7 @@ const settingsController = require('./controllers/settingsController');
 const holidayController = require('./controllers/holidayController');
 const referenceDocController = require('./controllers/referenceDocController');
 const sopController = require('./controllers/sopController');
+const gettingStartedController = require('./controllers/gettingStartedController');
 const caController = require('./controllers/caController');
 const orderFinancialsController = require('./controllers/orderFinancialsController');
 const assetController = require('./controllers/assetController');
@@ -497,6 +498,7 @@ app.get('/reference-docs/:code/edit', requireAuth, requirePermission('manage_com
 app.post('/reference-docs/:code', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(referenceDocController.update));
 
 // SOP viewer — reads docs/SOP/*.md live off disk, any logged-in staff member can view.
+app.get('/getting-started', requireAuth, asyncHandler(gettingStartedController.show));
 app.get('/sop', requireAuth, asyncHandler(sopController.index));
 app.get('/sop-assets/:file', requireAuth, asyncHandler(sopController.asset));
 app.get('/sop/:chapter', requireAuth, asyncHandler(sopController.show));

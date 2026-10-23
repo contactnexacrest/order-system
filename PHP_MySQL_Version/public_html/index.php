@@ -38,6 +38,7 @@ use App\Controllers\PaymentPresetController;
 use App\Controllers\WatermarkController;
 use App\Controllers\ReferenceDocController;
 use App\Controllers\SopController;
+use App\Controllers\GettingStartedController;
 use App\Controllers\NotificationController;
 use App\Controllers\AccountController;
 use App\Controllers\EmailTemplateController;
@@ -105,6 +106,7 @@ $complianceTaskTypes = new ComplianceTaskTypeController();
 $watermarks = new WatermarkController();
 $referenceDocs = new ReferenceDocController();
 $sop = new SopController();
+$gettingStarted = new GettingStartedController();
 $ca = new CaController();
 $orderFinancials = new OrderFinancialsController();
 $auditLog = new AuditLogController();
@@ -276,6 +278,7 @@ $router->get('/reference-docs/{code}/edit', [$referenceDocs, 'edit'], [SessionAu
 $router->post('/reference-docs/{code}', [$referenceDocs, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 
 // SOP viewer — reads docs/SOP/*.md live off disk, any logged-in staff member can view.
+$router->get('/getting-started', [$gettingStarted, 'show'], [SessionAuth::required()]);
 $router->get('/sop', [$sop, 'index'], [SessionAuth::required()]);
 $router->get('/sop-assets/{file}', [$sop, 'asset'], [SessionAuth::required()]);
 $router->get('/sop/{chapter}', [$sop, 'show'], [SessionAuth::required()]);
