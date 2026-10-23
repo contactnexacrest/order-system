@@ -6,6 +6,7 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const clientRepository = require('../repositories/clientRepository');
 const orderRepository = require('../repositories/orderRepository');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
+const uiTemplateService = require('../services/uiTemplateService');
 
 /**
  * Port of App\Controllers\PiIntakeReviewController. Staff review queue
@@ -30,11 +31,26 @@ const piIntakeRepository = require('../repositories/piIntakeRepository');
  */
 
 async function index(req, res) {
+  if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
+    await indexKanban(req, res);
+    return;
+  }
+
   const [pending, resolved] = await Promise.all([
     piIntakeRepository.pendingReview(),
     piIntakeRepository.recentResolved(),
   ]);
   res.renderView('pi_intake_review/index', { pending, resolved }, 'layout/base');
+}
+
+/** The Kanban UI template's PI Intake Review board: Pending Review / Applied / Rejected columns. */
+async function indexKanban(req, res) {
+  const pending = await piIntakeRepository.pendingReview();
+  const resolved = await piIntakeRepository.recentResolved();
+  const applied = resolved.filter((s) => s.status === 'applied');
+  const rejected = resolved.filter((s) => s.status === 'rejected');
+
+  res.renderView('pi_intake_review/index_kanban', { pending, applied, rejected }, 'layout/base');
 }
 
 async function accept(req, res) {

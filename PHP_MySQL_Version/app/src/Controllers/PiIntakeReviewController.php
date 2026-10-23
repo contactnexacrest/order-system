@@ -12,6 +12,7 @@ use App\Repositories\ClientRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\PiIntakeRepository;
 use App\Services\AuthService;
+use App\Services\UiTemplateService;
 
 /**
  * Staff review queue for PI-stage intake submissions (schema.sql Section
@@ -37,9 +38,30 @@ final class PiIntakeReviewController
 {
     public function index(array $params): void
     {
+        $actor = AuthService::currentUser();
+        if (UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
+            $this->indexKanban();
+            return;
+        }
+
         View::render('pi_intake_review/index', [
             'pending' => PiIntakeRepository::pendingReview(),
             'resolved' => PiIntakeRepository::recentResolved(),
+        ], 'layout/base');
+    }
+
+    /** The Kanban UI template's PI Intake Review board: Pending Review / Applied / Rejected columns. */
+    private function indexKanban(): void
+    {
+        $pending = PiIntakeRepository::pendingReview();
+        $resolved = PiIntakeRepository::recentResolved();
+        $applied = array_values(array_filter($resolved, static fn(array $s): bool => $s['status'] === 'applied'));
+        $rejected = array_values(array_filter($resolved, static fn(array $s): bool => $s['status'] === 'rejected'));
+
+        View::render('pi_intake_review/index_kanban', [
+            'pending'  => $pending,
+            'applied'  => $applied,
+            'rejected' => $rejected,
         ], 'layout/base');
     }
 
