@@ -51,8 +51,12 @@ final class AnnexureController
     public function toggleInclude(array $params): void
     {
         $orderId = (int) $params['id'];
-        OrderRepository::setIncludeAnnexureA($orderId, !empty($_POST['include_annexure_a']));
-        Flash::set('success', 'Annexure A ' . (!empty($_POST['include_annexure_a']) ? 'enabled' : 'disabled') . ' for this order.');
+        $included = !empty($_POST['include_annexure_a']);
+        OrderRepository::setIncludeAnnexureA($orderId, $included);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ANNEXURE_INCLUDE_TOGGLED', 'orders', $orderId, 'include_annexure_a', null, (string) (int) $included);
+        Flash::set('success', 'Annexure A ' . ($included ? 'enabled' : 'disabled') . ' for this order.');
         header("Location: /orders/{$orderId}/annexure");
     }
 
@@ -125,6 +129,9 @@ final class AnnexureController
             }
         }
 
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ANNEXURE_PRODUCT_CREATED', 'order_annexure_products', $productId, null, null, $name);
         Flash::set('success', 'Product entry added.');
         header("Location: /orders/{$orderId}/annexure");
     }
@@ -148,6 +155,9 @@ final class AnnexureController
             'components' => trim((string) ($_POST['components'] ?? '')),
             'technical_notes' => trim((string) ($_POST['technical_notes'] ?? '')),
         ]);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ANNEXURE_PRODUCT_UPDATED', 'order_annexure_products', $productId, 'name', null, $name);
         Flash::set('success', 'Product entry updated.');
         header("Location: /orders/{$orderId}/annexure");
     }
@@ -157,6 +167,9 @@ final class AnnexureController
         $orderId = (int) $params['id'];
         $productId = (int) $params['productId'];
         OrderAnnexureRepository::deleteProduct($productId);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ANNEXURE_PRODUCT_DELETED', 'order_annexure_products', $productId, null, null, null);
         Flash::set('success', 'Product entry removed.');
         header("Location: /orders/{$orderId}/annexure");
     }
@@ -182,7 +195,10 @@ final class AnnexureController
                 $orderId,
                 (int) AuthService::currentUser()['id']
             );
-            OrderAnnexureRepository::addImage($productId, $fileId);
+            $imageId = OrderAnnexureRepository::addImage($productId, $fileId);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'ANNEXURE_IMAGE_UPLOADED', 'order_annexure_images', $imageId, null, null, null);
             Flash::set('success', 'Image uploaded.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
@@ -195,6 +211,9 @@ final class AnnexureController
         $orderId = (int) $params['id'];
         $imageId = (int) $params['imageId'];
         OrderAnnexureRepository::removeImage($imageId);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log(AuthService::currentUserId(), 'ANNEXURE_IMAGE_REMOVED', 'order_annexure_images', $imageId, null, null, null);
         Flash::set('success', 'Image removed.');
         header("Location: /orders/{$orderId}/annexure");
     }

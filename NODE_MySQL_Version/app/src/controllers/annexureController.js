@@ -48,6 +48,9 @@ async function toggleInclude(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const include = !!req.body.include_annexure_a;
   await orderRepository.setIncludeAnnexureA(orderId, include);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user ? req.user.id : null, 'ANNEXURE_INCLUDE_TOGGLED', 'orders', orderId, 'include_annexure_a', null, String(Number(include)));
   flash.set(req, 'success', `Annexure A ${include ? 'enabled' : 'disabled'} for this order.`);
   res.redirect(`/orders/${orderId}/annexure`);
 }
@@ -115,6 +118,9 @@ async function createProduct(req, res) {
     }
   }
 
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ANNEXURE_PRODUCT_CREATED', 'order_annexure_products', productId, null, null, name);
   flash.set(req, 'success', 'Product entry added.');
   res.redirect(`/orders/${orderId}/annexure`);
 }
@@ -137,6 +143,9 @@ async function updateProduct(req, res) {
     components: String(req.body.components || '').trim(),
     technical_notes: String(req.body.technical_notes || '').trim(),
   });
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ANNEXURE_PRODUCT_UPDATED', 'order_annexure_products', productId, 'name', null, name);
   flash.set(req, 'success', 'Product entry updated.');
   res.redirect(`/orders/${orderId}/annexure`);
 }
@@ -145,6 +154,9 @@ async function deleteProduct(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const productId = parseInt(req.params.productId, 10);
   await orderAnnexureRepository.deleteProduct(productId);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ANNEXURE_PRODUCT_DELETED', 'order_annexure_products', productId, null, null, null);
   flash.set(req, 'success', 'Product entry removed.');
   res.redirect(`/orders/${orderId}/annexure`);
 }
@@ -169,7 +181,10 @@ async function uploadImage(req, res) {
       orderId,
       req.user.id
     );
-    await orderAnnexureRepository.addImage(productId, fileId);
+    const imageId = await orderAnnexureRepository.addImage(productId, fileId);
+    // External QA report N-08: this action never reached the audit
+    // log, so it never notified anyone either.
+    await auditLogRepository.log(req.user.id, 'ANNEXURE_IMAGE_UPLOADED', 'order_annexure_images', imageId, null, null, null);
     flash.set(req, 'success', 'Image uploaded.');
   } catch (e) {
     flash.setErrorFromException(req, e);
@@ -181,6 +196,9 @@ async function removeImage(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const imageId = parseInt(req.params.imageId, 10);
   await orderAnnexureRepository.removeImage(imageId);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(req.user.id, 'ANNEXURE_IMAGE_REMOVED', 'order_annexure_images', imageId, null, null, null);
   flash.set(req, 'success', 'Image removed.');
   res.redirect(`/orders/${orderId}/annexure`);
 }
