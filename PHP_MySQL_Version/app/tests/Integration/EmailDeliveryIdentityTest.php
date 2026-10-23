@@ -42,9 +42,27 @@ final class EmailDeliveryIdentityTest extends DbTestCase
         self::assertSame($companyEmail, EmailService::resolveReplyToAddress());
     }
 
+    /**
+     * External QA report TI-09: this test used to rely on whatever
+     * SMTP_FROM_ADDRESS happened to be in the developer's own app/.env
+     * (the comment claiming "tests/.env pins it" was simply wrong — no
+     * such file exists), so it passed or failed by accident depending on
+     * a value this test never actually controlled. Env::get() reads
+     * $_ENV ahead of getenv(), so setting $_ENV directly here pins the
+     * value regardless of .env, with no change needed to Env itself.
+     */
     public function testMailHostnameIsDerivedFromTheFromAddressDomainNotTheServerMachineName(): void
     {
-        // tests/.env pins SMTP_FROM_ADDRESS=dev@nexacrest.test.
-        self::assertSame('nexacrest.test', EmailService::mailHostname());
+        $original = $_ENV['SMTP_FROM_ADDRESS'] ?? null;
+        $_ENV['SMTP_FROM_ADDRESS'] = 'dev@nexacrest.test';
+        try {
+            self::assertSame('nexacrest.test', EmailService::mailHostname());
+        } finally {
+            if ($original === null) {
+                unset($_ENV['SMTP_FROM_ADDRESS']);
+            } else {
+                $_ENV['SMTP_FROM_ADDRESS'] = $original;
+            }
+        }
     }
 }

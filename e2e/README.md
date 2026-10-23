@@ -90,6 +90,22 @@ node -e "console.log(require('bcrypt').hashSync('<password>', 12))"
 Update `ADMIN_EMAIL`/`ADMIN_PASSWORD` in `tests/support/auth.js` to match
 whatever you set.
 
+`tests/support/auth.js`'s `ROLES` map also needs one account per role
+other than `admin`/`executiveDirector` (the two real seeded people) —
+`seed-ui-test-users.sql` creates all 6 (External QA report TI-10: these
+used to be created by hand, with no committed script and nothing said
+here, so a fresh clone's e2e run failed at login for 6 of 8 roles with
+no clue why):
+
+```bash
+mysql -u nexacrest_app -p<password> <db_name> < e2e/seed-ui-test-users.sql
+```
+
+The script's `@pw` hash is for the PHP stack (`password_hash()`,
+`$2y$`) — for the Node stack, open the file and swap it for the `$2b$`
+hash named in its own header comment (`bcrypt`'s output), or regenerate
+either with the commands the file documents.
+
 The critical-path spec generates real documents, which on the Node stack
 means Puppeteer actually launches a browser — `NODE_MySQL_Version/app/.env`'s
 `PUPPETEER_EXECUTABLE_PATH` has to point at a real Chromium/Chrome binary on

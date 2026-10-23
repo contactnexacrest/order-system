@@ -56,11 +56,15 @@ function docForm(page, orderId, typeCode) {
   );
 }
 
-// Every document type's Generate button lives in the "Documents &
-// Approvals" panel (data-stage=1) EXCEPT BLI and COOPREP, which are
-// embedded directly in the Stage 7 / Stage 9 panels they belong to
-// instead (the real markup, not the TEST_PLAN's simplified summary).
-const DOC_GENERATE_STAGE = { BLI: 7, COOPREP: 9 };
+// Every document type's Generate button lives in its own stage panel,
+// not uniformly in a single "Documents & Approvals" panel — only QT
+// and ANNEXA actually sit in data-stage="1". External QA report TI-10:
+// this map had drifted (missing SUPPO/CI entirely, both silently
+// defaulting to the now-wrong ?? 1 below; OC also moved to Stage 4
+// after the order page's stage re-sequencing) — re-derived directly
+// from views/orders/show.php's own data-stage sections rather than
+// assumed from the TEST_PLAN's simplified summary.
+const DOC_GENERATE_STAGE = { OC: 4, SUPPO: 5, BLI: 7, CI: 8, COOPREP: 9 };
 
 async function generateDocument(page, orderId, typeCode, expectedBannerSubstring) {
   await openStage(page, DOC_GENERATE_STAGE[typeCode] ?? 1);
@@ -297,7 +301,18 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     const closeForm = page.locator(`form[action="/orders/${orderId}/close"]`);
     await closeForm.locator('input[name="courier_tracking_number"]').fill(`SMOKE-COURIER-${UNIQUE}`);
     await closeForm.getByRole('button', { name: /Close Order/ }).click();
-    await expect(page.locator('.alert')).toContainText('Order closed');
+    // External QA report TI-10: closeOrder() is now phase 1 of the
+    // two-phase closure (Phase 1d) — it moves the order to
+    // 'shipped_docs_sent', not 'complete' directly, so the flash is no
+    // longer "Order closed".
+    await expect(page.locator('.alert')).toContainText('Documents sent to buyer');
+  });
+
+  await test.step('Mark Fully Settled — phase 2 of closure, the real completion', async () => {
+    await openStage(page, 9);
+    const settleForm = page.locator(`form[action="/orders/${orderId}/mark-fully-settled"]`);
+    await settleForm.getByRole('button', { name: 'Mark Fully Settled' }).click();
+    await expect(page.locator('.alert')).toContainText('Order fully settled and closed');
   });
 
   await test.step('Order is genuinely complete — all 9 stages resolved', async () => {

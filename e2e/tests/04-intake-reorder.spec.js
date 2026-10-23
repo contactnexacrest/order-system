@@ -73,11 +73,16 @@ test.describe.serial('Client Intake -> PI Intake -> Reorder Request, one client 
     await page.locator('input[name="company_legal_name"]').fill(`Intake Journey Buyer ${UNIQUE}`);
     await page.locator('input[name="billing_address_line1"]').fill('1 Intake Test Street');
     await page.locator('input[name="billing_city"]').fill('Rotterdam');
-    await page.locator('input[name="billing_country"]').fill('Netherlands');
+    // External QA report U-06: Country was free text — now a select
+    // (#<field>_select) that syncs into the actual submitted field
+    // (input[name="billing_country"], readonly/hidden unless "Other")
+    // via its own change-event JS, same pattern as #incoterm_select
+    // below, so select it rather than filling the readonly input directly.
+    await page.locator('#billing_country_select').selectOption({ label: 'Netherlands' });
     await page.locator('input[name="contact_person"]').fill('Intake Test Contact');
     await page.locator('input[name="email"]').fill(INTAKE_EMAIL);
     await page.locator('input[name="vat_eori_tax_no"]').fill('NL123456789B01');
-    await page.locator('input[name="country_of_destination"]').fill('Netherlands');
+    await page.locator('#country_of_destination_select').selectOption({ label: 'Netherlands' });
     await page.locator('input[name="port_of_discharge_text"]').fill('Rotterdam, Netherlands');
     await page.locator('#incoterm_select').selectOption({ label: 'CIF' });
     await page.getByRole('button', { name: 'Submit Request' }).click();
@@ -140,6 +145,9 @@ test.describe.serial('Client Intake -> PI Intake -> Reorder Request, one client 
     await page.goto(`/pi-details/${token}`);
     await page.locator('input[name="billing_address_line1"]').fill('1 PI Confirmed Street');
     await page.locator('input[name="billing_city"]').fill('Rotterdam');
+    // Unlike the client_intake form above, views/pi_intake/form.php's
+    // billing_country is still a plain free-text input — U-06's
+    // dropdown conversion was never applied here.
     await page.locator('input[name="billing_country"]').fill('Netherlands');
     await page.locator('input[name="email"]').fill(clientEmailFinal);
     // Required but never pre-filled on a fresh PI intake submission row
@@ -155,6 +163,8 @@ test.describe.serial('Client Intake -> PI Intake -> Reorder Request, one client 
     await page.locator('input[name="phone"]').fill('+31 10 555 1234');
     await page.locator('#incoterm_select').selectOption({ label: 'CIF' });
     await expect(page.locator('input[name="incoterm_confirmed"]')).toHaveValue('CIF');
+    // Unlike the client_intake form above, country_of_destination here is
+    // also still a plain free-text input.
     await page.locator('input[name="country_of_destination"]').fill('Netherlands');
     await page.locator('label').filter({ hasText: 'I confirm the above is correct' }).locator('input').check();
     await page.getByRole('button', { name: 'Submit PI Details' }).click();

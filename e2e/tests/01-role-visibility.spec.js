@@ -77,7 +77,12 @@ test.describe('Role-based navigation visibility', () => {
     await login(page, 'exportExecutive');
     await expect(navLink(page, '/orders')).toBeAttached();
     await expect(navLink(page, '/clients')).toBeAttached();
-    await expect(navLink(page, '/disputes')).toBeAttached();
+    // External QA report U-01: the /disputes nav link is gated on
+    // manage_disputes only (the list route's own real gate) —
+    // respond_to_disputes alone (Export Executive's grant) lets them
+    // reply on an order they're already looking at, but never shows the
+    // cross-order list link.
+    await expect(navLink(page, '/disputes')).toHaveCount(0);
     await expect(navLink(page, '/reports')).toBeAttached();
     await expect(page.getByRole('link', { name: 'CA / Accounting' })).toHaveCount(0);
     await expect(navLink(page, '/users')).toHaveCount(0);
@@ -101,15 +106,20 @@ test.describe('Role-based navigation visibility', () => {
     await expect(navLink(page, '/disputes')).toHaveCount(0);
   });
 
-  test('Viewer/Auditor is read-only: Reports and Audit Log, never Orders or Clients', async ({ page }) => {
+  test('Viewer/Auditor is read-only: sees Orders/Clients/Reports/Audit Log, but can never create or edit', async ({ page }) => {
     await login(page, 'viewerAuditor');
     await expect(navLink(page, '/reports')).toBeAttached();
     await expect(navLink(page, '/audit-log')).toBeAttached();
-    await expect(navLink(page, '/orders')).toHaveCount(0);
-    await expect(navLink(page, '/clients')).toHaveCount(0);
+    // External QA report U-18: /orders and /clients each also accept
+    // their own narrower view_orders/view_clients permission — Viewer/
+    // Auditor holds exactly these two, so the Operations group (and
+    // both links) now renders, where it used to never render at all
+    // even though both routes worked fine by direct URL.
+    await expect(navLink(page, '/orders')).toBeAttached();
+    await expect(navLink(page, '/clients')).toBeAttached();
 
-    // Not just hidden from the nav — the route itself must refuse a
-    // direct hit too (a hidden link is not a security boundary).
+    // The real read-only boundary: viewing is allowed, creating is not —
+    // /orders/create requires manage_orders, which view_orders does not grant.
     const res = await page.request.get('/orders/create');
     expect(res.status()).toBe(403);
   });

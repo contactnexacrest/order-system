@@ -37,12 +37,36 @@ describe('emailService delivery identity (External QA report L-43/L-46)', () => 
     expect(await emailService.replyToAddress()).toBe(companyEmail);
   });
 
-  it('mailDomain is derived from the from-address domain, not the local machine hostname', () => {
-    // .env pins SMTP_FROM_ADDRESS=dev@nexacrest.test.
-    expect(emailService.mailDomain()).toBe('nexacrest.test');
-  });
+  /**
+   * External QA report TI-09: these two tests used to rely on whatever
+   * SMTP_FROM_ADDRESS happened to be in the developer's own .env (the
+   * comment claiming ".env pins it" wasn't wrong about the mechanism,
+   * but it meant the test's outcome depended on a value the test itself
+   * never controlled). env.get() reads process.env directly, so pinning
+   * it here guarantees the assertion regardless of the real .env.
+   */
+  describe('with SMTP_FROM_ADDRESS pinned', () => {
+    let original;
 
-  it('freshMessageId uses the from-address domain, never the local machine hostname', () => {
-    expect(emailService.freshMessageId()).toMatch(/^<[0-9a-f]+@nexacrest\.test>$/);
+    beforeEach(() => {
+      original = process.env.SMTP_FROM_ADDRESS;
+      process.env.SMTP_FROM_ADDRESS = 'dev@nexacrest.test';
+    });
+
+    afterEach(() => {
+      if (original === undefined) {
+        delete process.env.SMTP_FROM_ADDRESS;
+      } else {
+        process.env.SMTP_FROM_ADDRESS = original;
+      }
+    });
+
+    it('mailDomain is derived from the from-address domain, not the local machine hostname', () => {
+      expect(emailService.mailDomain()).toBe('nexacrest.test');
+    });
+
+    it('freshMessageId uses the from-address domain, never the local machine hostname', () => {
+      expect(emailService.freshMessageId()).toMatch(/^<[0-9a-f]+@nexacrest\.test>$/);
+    });
   });
 });
