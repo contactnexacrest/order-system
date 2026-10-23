@@ -589,6 +589,14 @@ final class ClientPortalController
         $responseDays = (int) (\App\Repositories\CompanySettingsRepository::get('dispute_response_days_n') ?? '10');
         $responseDueDate = \App\Services\WorkingDaysCalculator::addWorkingDays($noticeDate, $responseDays);
         $disputeId = \App\Repositories\DisputeRepository::create($orderId, $noticeDate, 'Buyer (via client portal)', $description, null, $responseDueDate);
+        // External QA report N-07: this only ever wrote the audit log
+        // (the catch-all notification email), so the one team actually
+        // responsible for disputes — manage_disputes holders — never got
+        // a targeted in-app alert, same dual-channel pattern
+        // submitFeedback() above already uses for manage_orders.
+        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_disputes') as $staffUserId) {
+            \App\Repositories\NotificationRepository::create($staffUserId, null, 'dispute_raised', $orderId, "Client raised a dispute on order {$order['order_reference']}.");
+        }
         \App\Repositories\AuditLogRepository::log(null, 'DISPUTE_RAISED', 'disputes', $disputeId, null, null, $description, 'Raised by the client via the client portal.');
 
         Flash::set('success', 'Your dispute has been logged — our team will respond by ' . $responseDueDate . '.');

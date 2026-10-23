@@ -2820,6 +2820,13 @@ final class OrderController
         }
 
         $cancellationId = OrderCancellationRepository::create($orderId, $reason, (int) $user['id']);
+        // External QA report N-07: nobody who can actually approve a
+        // cancellation (edit_locked_data, the same tier the approval
+        // decision itself is gated on) was ever told one was pending —
+        // only the catch-all notification email below fired.
+        foreach (\App\Repositories\PermissionRepository::usersWithPermission('edit_locked_data') as $approverUserId) {
+            \App\Repositories\NotificationRepository::create($approverUserId, null, 'order_cancellation_requested', $orderId, "Cancellation requested for order {$order['order_reference']} — awaiting approval.");
+        }
         AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REQUESTED', 'order_cancellations', $cancellationId, null, null, $reason);
         Flash::set('success', 'Cancellation requested — awaiting approval.');
         header("Location: /orders/{$orderId}");
@@ -2857,6 +2864,10 @@ final class OrderController
         OrderCancellationRepository::approve($cancellationId, (int) $user['id'], $decisionNotes, $refundAmount, $refundStatus);
         $order = OrderRepository::find($orderId);
         OrderRepository::cancel($orderId);
+        // External QA report N-07: the requester was never told what
+        // happened to their own request — only the catch-all notification
+        // email below fired.
+        \App\Repositories\NotificationRepository::create((int) $cancellation['requested_by'], null, 'order_cancellation_approved', $orderId, "Your cancellation request for order {$order['order_reference']} was approved.");
         AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_APPROVED', 'orders', $orderId, 'status', $order['status'], 'cancelled', $decisionNotes);
         Flash::set('success', 'Cancellation approved — order is now cancelled.');
         header("Location: /orders/{$orderId}");
@@ -2886,6 +2897,11 @@ final class OrderController
         }
 
         OrderCancellationRepository::reject($cancellationId, (int) $user['id'], $decisionNotes);
+        // External QA report N-07: the requester was never told what
+        // happened to their own request — only the catch-all notification
+        // email below fired.
+        $order = OrderRepository::find($orderId);
+        \App\Repositories\NotificationRepository::create((int) $cancellation['requested_by'], null, 'order_cancellation_rejected', $orderId, "Your cancellation request for order {$order['order_reference']} was rejected: {$decisionNotes}");
         AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REJECTED', 'order_cancellations', $cancellationId, null, 'pending', 'rejected', $decisionNotes);
         Flash::set('success', 'Cancellation request rejected — order is unaffected.');
         header("Location: /orders/{$orderId}");

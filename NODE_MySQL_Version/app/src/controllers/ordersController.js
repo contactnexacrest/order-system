@@ -43,6 +43,8 @@ const orderFeedbackRepository = require('../repositories/orderFeedbackRepository
 const orderCrateRepository = require('../repositories/orderCrateRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPackingRepository = require('../repositories/orderPackingRepository');
+const notificationRepository = require('../repositories/notificationRepository');
+const permissionRepository = require('../repositories/permissionRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderProductionRepository = require('../repositories/orderProductionRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
@@ -2823,6 +2825,13 @@ async function requestCancellation(req, res) {
   }
 
   const cancellationId = await orderCancellationRepository.create(orderId, reason, user.id);
+  // External QA report N-07: nobody who can actually approve a
+  // cancellation (edit_locked_data, the same tier the approval decision
+  // itself is gated on) was ever told one was pending — only the
+  // catch-all notification email below fired.
+  for (const approverUserId of await permissionRepository.usersWithPermission('edit_locked_data')) {
+    await notificationRepository.create(approverUserId, null, 'order_cancellation_requested', orderId, `Cancellation requested for order ${order.order_reference} — awaiting approval.`);
+  }
   await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REQUESTED', 'order_cancellations', cancellationId, null, null, reason);
   flash.set(req, 'success', 'Cancellation requested — awaiting approval.');
   res.redirect(`/orders/${orderId}`);
@@ -2859,6 +2868,10 @@ async function approveCancellation(req, res) {
   await orderCancellationRepository.approve(cancellationId, user.id, decisionNotes, refundAmount, refundStatus);
   const freshOrder = await orderRepository.find(orderId);
   await orderRepository.cancel(orderId);
+  // External QA report N-07: the requester was never told what happened
+  // to their own request — only the catch-all notification email below
+  // fired.
+  await notificationRepository.create(cancellation.requested_by, null, 'order_cancellation_approved', orderId, `Your cancellation request for order ${freshOrder.order_reference} was approved.`);
   await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_APPROVED', 'orders', orderId, 'status', freshOrder.status, 'cancelled', decisionNotes);
   flash.set(req, 'success', 'Cancellation approved — order is now cancelled.');
   res.redirect(`/orders/${orderId}`);
@@ -2888,6 +2901,11 @@ async function rejectCancellation(req, res) {
   }
 
   await orderCancellationRepository.reject(cancellationId, user.id, decisionNotes);
+  // External QA report N-07: the requester was never told what happened
+  // to their own request — only the catch-all notification email below
+  // fired.
+  const freshOrder = await orderRepository.find(orderId);
+  await notificationRepository.create(cancellation.requested_by, null, 'order_cancellation_rejected', orderId, `Your cancellation request for order ${freshOrder.order_reference} was rejected: ${decisionNotes}`);
   await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REJECTED', 'order_cancellations', cancellationId, null, 'pending', 'rejected', decisionNotes);
   flash.set(req, 'success', 'Cancellation request rejected — order is unaffected.');
   res.redirect(`/orders/${orderId}`);

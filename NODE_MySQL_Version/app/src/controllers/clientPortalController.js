@@ -626,6 +626,14 @@ async function raiseDispute(req, res) {
   const responseDays = parseInt((await companySettingsRepository.get('dispute_response_days_n')) || '10', 10);
   const responseDueDate = await workingDaysCalculator.addWorkingDays(noticeDate, responseDays);
   const disputeId = await disputeRepository.create(orderId, noticeDate, 'Buyer (via client portal)', description, null, responseDueDate);
+  // External QA report N-07: this only ever wrote the audit log (the
+  // catch-all notification email), so the one team actually responsible
+  // for disputes — manage_disputes holders — never got a targeted
+  // in-app alert, same dual-channel pattern submitFeedback() above
+  // already uses for manage_orders.
+  for (const staffUserId of await permissionRepository.usersWithPermission('manage_disputes')) {
+    await notificationRepository.create(staffUserId, null, 'dispute_raised', orderId, `Client raised a dispute on order ${order.order_reference}.`);
+  }
   await auditLogRepository.log(null, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description, 'Raised by the client via the client portal.');
 
   flash.set(req, 'success', `Your dispute has been logged — our team will respond by ${responseDueDate}.`);
