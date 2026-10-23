@@ -679,6 +679,16 @@ final class ClientPortalController
             return;
         }
 
+        // External QA report N-12: step 14 is a post-shipment step —
+        // feedback on an order that's still active (production/shipping
+        // in progress) asks the client to rate work that isn't finished
+        // yet. Same status pair addExportBenefit() already gates on.
+        if (!in_array($order['status'], ['shipped_docs_sent', 'complete'], true)) {
+            Flash::set('error', "Feedback can be submitted once this order's documents have been sent to you.");
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
+
         $rating = (int) ($_POST['rating'] ?? 0);
         if ($rating < 1 || $rating > 5) {
             Flash::set('error', 'Please choose a rating between 1 and 5 stars.');

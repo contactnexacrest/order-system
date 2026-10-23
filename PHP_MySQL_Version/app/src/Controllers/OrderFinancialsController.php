@@ -194,6 +194,20 @@ final class OrderFinancialsController
         $interestRate = trim((string) ($_POST['bank_loan_interest_rate'] ?? '')) !== '' ? (float) $_POST['bank_loan_interest_rate'] : null;
         $interestPaid = trim((string) ($_POST['bank_loan_interest_paid'] ?? '')) !== '' ? (float) $_POST['bank_loan_interest_paid'] : null;
 
+        // External QA report N-11: an interest rate is a percentage, so
+        // anything above 100 (the report's example: 250%) is never
+        // plausible — refused outright, same as the negative-value check
+        // above. Interest paid exceeding the loan amount is merely
+        // unusual, not impossible (e.g. cumulative interest across
+        // renewed years), so that one is only ever a warning, never a
+        // block, and is shown after the save below.
+        if ($interestRate !== null && $interestRate > 100) {
+            Flash::set('error', 'Enter a valid interest rate — it cannot exceed 100%.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        $interestExceedsLoan = $interestPaid !== null && $bankLoanAmount !== null && $interestPaid > $bankLoanAmount;
+
         $lcFileId = $existing['lc_file_id'] ?? null;
         if (!empty($_FILES['lc_file']['name'])) {
             try {
@@ -257,7 +271,11 @@ final class OrderFinancialsController
             OrderCostEntryRepository::delete($staleCostEntryIdToDelete);
         }
         AuditLogRepository::log((int) $user['id'], 'ORDER_LC_DETAILS_SAVED', 'order_lc_details', $orderId, null, null, $lcNumber);
-        Flash::set('success', 'LC / bank loan details saved.');
+        if ($interestExceedsLoan) {
+            Flash::set('warning', 'LC / bank loan details saved — but the interest paid is more than the loan amount itself. Double-check this is correct.');
+        } else {
+            Flash::set('success', 'LC / bank loan details saved.');
+        }
         header("Location: /orders/{$orderId}#order-financials");
     }
 

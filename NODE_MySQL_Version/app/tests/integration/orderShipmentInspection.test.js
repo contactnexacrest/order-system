@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const db = require('../../src/config/db');
 const flash = require('../../src/helpers/flash');
 const ordersController = require('../../src/controllers/ordersController');
@@ -292,5 +294,21 @@ describe('Shipment date + pre-shipment inspection (Section BT)', () => {
     await run();
 
     expect(await notificationRepository.existsToday(adminId, 'pre_shipment_inspection_reminder', orderId)).toBe(false);
+  });
+
+  /**
+   * External QA report N-09: notifyMdAndAdmin() used to call
+   * emailService.sendPlainText() directly right after
+   * notificationRepository.create(), which already sends its own email
+   * via emailNotification() internally — every recipient of every alert
+   * type in this job (not just this one reminder) got two differently-
+   * worded emails for the same event. Whitebox — not otherwise
+   * observable without mocking emailService.
+   */
+  it('notifyMdAndAdmin no longer sends a duplicate email directly', () => {
+    const source = fs.readFileSync(path.join(__dirname, '../../src/jobs/checkAlerts.js'), 'utf8');
+    const functionBody = source.slice(source.indexOf('async function notifyMdAndAdmin'), source.indexOf('async function notifyMdAndAdmin') + 400);
+
+    expect(functionBody).not.toContain('emailService.sendPlainText');
   });
 });

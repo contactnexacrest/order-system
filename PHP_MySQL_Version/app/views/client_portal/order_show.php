@@ -217,22 +217,27 @@
 
   <div class="section">
     <h2>Order Feedback</h2>
-    <p class="muted">Let us know how we did on this order — your rating and comments are visible to our team.</p>
-    <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/feedback">
-      <?= Csrf::field() ?>
-      <label>Rating *
-        <select name="rating" required>
-          <option value="">Choose a rating</option>
-          <?php for ($i = 5; $i >= 1; $i--): ?>
-            <option value="<?= $i ?>" <?= (!empty($orderFeedback) && (int) $orderFeedback['rating'] === $i) ? 'selected' : '' ?>><?= str_repeat('★', $i) ?><?= str_repeat('☆', 5 - $i) ?> (<?= $i ?>/5)</option>
-          <?php endfor; ?>
-        </select>
-      </label>
-      <label>Comments<textarea name="comments" rows="3" placeholder="Optional"><?= htmlspecialchars($orderFeedback['comments'] ?? '') ?></textarea></label>
-      <button type="submit"><?= !empty($orderFeedback) ? 'Update Feedback' : 'Submit Feedback' ?></button>
-    </form>
-    <?php if (!empty($orderFeedback)): ?>
-      <p class="muted small">Last submitted: <?= htmlspecialchars(Dates::human($orderFeedback['submitted_at'])) ?></p>
+    <?php // External QA report N-12: step 14 is a post-shipment step — rating work that isn't finished yet doesn't make sense. ?>
+    <?php if (in_array($order['status'], ['shipped_docs_sent', 'complete'], true)): ?>
+      <p class="muted">Let us know how we did on this order — your rating and comments are visible to our team.</p>
+      <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/feedback">
+        <?= Csrf::field() ?>
+        <label>Rating *
+          <select name="rating" required>
+            <option value="">Choose a rating</option>
+            <?php for ($i = 5; $i >= 1; $i--): ?>
+              <option value="<?= $i ?>" <?= (!empty($orderFeedback) && (int) $orderFeedback['rating'] === $i) ? 'selected' : '' ?>><?= str_repeat('★', $i) ?><?= str_repeat('☆', 5 - $i) ?> (<?= $i ?>/5)</option>
+            <?php endfor; ?>
+          </select>
+        </label>
+        <label>Comments<textarea name="comments" rows="3" placeholder="Optional"><?= htmlspecialchars($orderFeedback['comments'] ?? '') ?></textarea></label>
+        <button type="submit"><?= !empty($orderFeedback) ? 'Update Feedback' : 'Submit Feedback' ?></button>
+      </form>
+      <?php if (!empty($orderFeedback)): ?>
+        <p class="muted small">Last submitted: <?= htmlspecialchars(Dates::human($orderFeedback['submitted_at'])) ?></p>
+      <?php endif; ?>
+    <?php else: ?>
+      <p class="muted">Feedback will be available once this order's documents have been sent to you.</p>
     <?php endif; ?>
   </div>
 </div>

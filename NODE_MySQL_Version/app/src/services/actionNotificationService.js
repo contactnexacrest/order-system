@@ -85,6 +85,26 @@ const ENTITY_REFERENCE_LOOKUP = {
   document_types: ['document_types', 'name', 'Document Type'],
   compliance_task_types: ['compliance_task_types', 'name', 'Compliance Task Type'],
   logistics_partners: ['logistics_partners', 'partner_name', 'Logistics Partner'],
+  // External QA report N-10: these "one row per order" tables
+  // (auditLogRepository.forOrder()'s own UNION query convention from
+  // L-23) are logged with the ORDER's own id as entity_id, never a
+  // separate row id of their own, so the readable reference is just
+  // that order's own reference.
+  order_lc_details: ['orders', 'order_reference', 'Order'],
+  order_freight: ['orders', 'order_reference', 'Order'],
+  order_shipping: ['orders', 'order_reference', 'Order'],
+  order_packing: ['orders', 'order_reference', 'Order'],
+  order_payment_status: ['orders', 'order_reference', 'Order'],
+};
+
+// External QA report N-10: unlike ENTITY_REFERENCE_LOOKUP's tables,
+// these log the CHILD row's own id as entity_id (several rows can
+// exist per order), so the readable reference needs a join back to
+// the order that owns it. { childTable, label }
+const ENTITY_REFERENCE_VIA_ORDER_LOOKUP = {
+  disputes: { childTable: 'disputes', label: 'Dispute' },
+  order_cancellations: { childTable: 'order_cancellations', label: 'Cancellation' },
+  order_complaints: { childTable: 'order_complaints', label: 'Complaint' },
 };
 
 /**
@@ -105,17 +125,33 @@ async function resolveEntityReference(entityType, entityId) {
     return null;
   }
   const lookup = ENTITY_REFERENCE_LOOKUP[entityType];
-  if (!lookup) {
-    return null;
+  if (lookup) {
+    const [table, column, label] = lookup;
+    try {
+      const row = await db.queryOne(`SELECT ${column} AS reference FROM ${table} WHERE id = :id`, { id: entityId });
+      const reference = String((row && row.reference) || '').trim();
+      return reference !== '' ? { label, reference } : null;
+    } catch (e) {
+      return null;
+    }
   }
-  const [table, column, label] = lookup;
-  try {
-    const row = await db.queryOne(`SELECT ${column} AS reference FROM ${table} WHERE id = :id`, { id: entityId });
-    const reference = String((row && row.reference) || '').trim();
-    return reference !== '' ? { label, reference } : null;
-  } catch (e) {
-    return null;
+
+  const joinLookup = ENTITY_REFERENCE_VIA_ORDER_LOOKUP[entityType];
+  if (joinLookup) {
+    const { childTable, label } = joinLookup;
+    try {
+      const row = await db.queryOne(
+        `SELECT o.order_reference AS reference FROM ${childTable} c JOIN orders o ON o.id = c.order_id WHERE c.id = :id`,
+        { id: entityId }
+      );
+      const reference = String((row && row.reference) || '').trim();
+      return reference !== '' ? { label, reference: `Order ${reference}` } : null;
+    } catch (e) {
+      return null;
+    }
   }
+
+  return null;
 }
 
 /**

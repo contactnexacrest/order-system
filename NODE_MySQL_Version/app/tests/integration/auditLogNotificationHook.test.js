@@ -7,6 +7,9 @@ const auditLogRepository = require('../../src/repositories/auditLogRepository');
 const companySettingsRepository = require('../../src/repositories/companySettingsRepository');
 const userRepository = require('../../src/repositories/userRepository');
 const actionNotificationService = require('../../src/services/actionNotificationService');
+const disputeRepository = require('../../src/repositories/disputeRepository');
+const orderCancellationRepository = require('../../src/repositories/orderCancellationRepository');
+const orderComplaintRepository = require('../../src/repositories/orderComplaintRepository');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 /**
@@ -82,6 +85,63 @@ describe('auditLogRepository notification hook (90-item backlog item 20, non-neg
 
   it('resolveEntityReference returns null for an id that no longer exists', async () => {
     expect(await actionNotificationService.resolveEntityReference('orders', 999999999)).toBeNull();
+  });
+
+  /**
+   * External QA report N-10: 'order_lc_details' is logged with the
+   * ORDER's own id as entity_id (L-23's "one row per order" convention),
+   * so this must resolve against orders.order_reference directly —
+   * never order_lc_details' own (nonexistent, since no row was ever
+   * created here) id.
+   */
+  it("resolveEntityReference resolves order_lc_details to the order's own reference", async () => {
+    const orderId = await createTestOrder(await createTestClient());
+
+    const resolved = await actionNotificationService.resolveEntityReference('order_lc_details', orderId);
+
+    expect(resolved).not.toBeNull();
+    expect(resolved.label).toBe('Order');
+    expect(resolved.reference).not.toBe('');
+  });
+
+  /**
+   * External QA report N-10: 'disputes'/'order_cancellations'/
+   * 'order_complaints' are logged with the CHILD row's own id as
+   * entity_id — these must join back to the order that owns it.
+   */
+  it('resolveEntityReference joins disputes back to their owning order', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const disputeId = await disputeRepository.create(orderId, '2026-10-23', 'Buyer', 'N-10 test dispute', null, '2026-11-05');
+
+    const resolved = await actionNotificationService.resolveEntityReference('disputes', disputeId);
+
+    expect(resolved).not.toBeNull();
+    expect(resolved.label).toBe('Dispute');
+    expect(resolved.reference).toMatch(/^Order /);
+  });
+
+  it('resolveEntityReference joins order_cancellations back to their owning order', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const requester = await createTestUser();
+    const cancellationId = await orderCancellationRepository.create(orderId, 'N-10 test cancellation request.', requester);
+
+    const resolved = await actionNotificationService.resolveEntityReference('order_cancellations', cancellationId);
+
+    expect(resolved).not.toBeNull();
+    expect(resolved.label).toBe('Cancellation');
+    expect(resolved.reference).toMatch(/^Order /);
+  });
+
+  it('resolveEntityReference joins order_complaints back to their owning order', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    const complaintId = await orderComplaintRepository.create(orderId, clientId, 'N-10 test complaint.');
+
+    const resolved = await actionNotificationService.resolveEntityReference('order_complaints', complaintId);
+
+    expect(resolved).not.toBeNull();
+    expect(resolved.label).toBe('Complaint');
+    expect(resolved.reference).toMatch(/^Order /);
   });
 
   it('calling log does not throw when notifications are fully configured', async () => {

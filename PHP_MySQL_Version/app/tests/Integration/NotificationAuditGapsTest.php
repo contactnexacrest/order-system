@@ -134,6 +134,9 @@ final class NotificationAuditGapsTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        // External QA report N-12: feedback is only accepted once an order
+        // has reached this status.
+        Database::connection()->prepare("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id")->execute(['id' => $orderId]);
         $_SESSION['_client_portal_client_id'] = $clientId;
         $_POST = ['rating' => '4', 'comments' => 'Great communication throughout.'];
 
@@ -189,6 +192,11 @@ final class NotificationAuditGapsTest extends DbTestCase
         $viewerId = $this->createTestUser('Viewer / Auditor');
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        // External QA report N-12: feedback is only accepted once an order
+        // has reached this status — set here so this test's "no
+        // notification" assertion is about the permission gate, not a
+        // vacuous pass from the submission being refused outright.
+        Database::connection()->prepare("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id")->execute(['id' => $orderId]);
         $_SESSION['_client_portal_client_id'] = $clientId;
         $_POST = ['rating' => '5'];
 

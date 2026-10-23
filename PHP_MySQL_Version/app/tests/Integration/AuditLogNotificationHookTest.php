@@ -6,6 +6,9 @@ namespace App\Tests\Integration;
 
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
+use App\Repositories\DisputeRepository;
+use App\Repositories\OrderCancellationRepository;
+use App\Repositories\OrderComplaintRepository;
 use App\Repositories\UserRepository;
 use App\Services\ActionNotificationService;
 use App\Tests\Support\DbTestCase;
@@ -73,6 +76,67 @@ final class AuditLogNotificationHookTest extends DbTestCase
     public function testResolveEntityReferenceReturnsNullForAnIdThatNoLongerExists(): void
     {
         self::assertNull(ActionNotificationService::resolveEntityReference('orders', 999999999));
+    }
+
+    /**
+     * External QA report N-10: 'order_lc_details' is logged with the
+     * ORDER's own id as entity_id (L-23's "one row per order" convention),
+     * so this must resolve against orders.order_reference directly —
+     * never order_lc_details' own (nonexistent, since no row was ever
+     * created here) id.
+     */
+    public function testResolveEntityReferenceResolvesOrderLcDetailsToTheOrdersOwnReference(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+
+        $resolved = ActionNotificationService::resolveEntityReference('order_lc_details', $orderId);
+
+        self::assertNotNull($resolved);
+        self::assertSame('Order', $resolved['label']);
+        self::assertNotSame('', $resolved['reference']);
+    }
+
+    /**
+     * External QA report N-10: 'disputes'/'order_cancellations'/
+     * 'order_complaints' are logged with the CHILD row's own id as
+     * entity_id — these must join back to the order that owns it.
+     */
+    public function testResolveEntityReferenceJoinsDisputesBackToTheirOwningOrder(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $disputeId = DisputeRepository::create($orderId, '2026-10-23', 'Buyer', 'N-10 test dispute', null, '2026-11-05');
+
+        $resolved = ActionNotificationService::resolveEntityReference('disputes', $disputeId);
+
+        self::assertNotNull($resolved);
+        self::assertSame('Dispute', $resolved['label']);
+        self::assertStringStartsWith('Order ', $resolved['reference']);
+    }
+
+    public function testResolveEntityReferenceJoinsOrderCancellationsBackToTheirOwningOrder(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $requester = $this->createTestUser('Export Executive');
+        $cancellationId = OrderCancellationRepository::create($orderId, 'N-10 test cancellation request.', $requester);
+
+        $resolved = ActionNotificationService::resolveEntityReference('order_cancellations', $cancellationId);
+
+        self::assertNotNull($resolved);
+        self::assertSame('Cancellation', $resolved['label']);
+        self::assertStringStartsWith('Order ', $resolved['reference']);
+    }
+
+    public function testResolveEntityReferenceJoinsOrderComplaintsBackToTheirOwningOrder(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $complaintId = OrderComplaintRepository::create($orderId, $clientId, 'N-10 test complaint.');
+
+        $resolved = ActionNotificationService::resolveEntityReference('order_complaints', $complaintId);
+
+        self::assertNotNull($resolved);
+        self::assertSame('Complaint', $resolved['label']);
+        self::assertStringStartsWith('Order ', $resolved['reference']);
     }
 
     public function testCallingLogDoesNotThrowWhenNotificationsAreFullyConfigured(): void

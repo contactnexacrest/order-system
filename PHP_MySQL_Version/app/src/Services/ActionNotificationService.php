@@ -114,6 +114,30 @@ final class ActionNotificationService
             'document_types' => ['document_types', 'name', 'Document Type'],
             'compliance_task_types' => ['compliance_task_types', 'name', 'Compliance Task Type'],
             'logistics_partners' => ['logistics_partners', 'partner_name', 'Logistics Partner'],
+            // External QA report N-10: these "one row per order" tables
+            // (AuditLogRepository::forOrder()'s own UNION query convention
+            // from L-23) are logged with the ORDER's own id as entity_id,
+            // never a separate row id of their own, so the readable
+            // reference is just that order's own reference.
+            'order_lc_details', 'order_freight', 'order_shipping', 'order_packing', 'order_payment_status' => ['orders', 'order_reference', 'Order'],
+            default => null,
+        };
+    }
+
+    /**
+     * External QA report N-10: unlike entityReferenceLookup()'s tables,
+     * these log the CHILD row's own id as entity_id (several rows can
+     * exist per order), so the readable reference needs a join back to
+     * the order that owns it.
+     *
+     * @return array{0: string, 1: string}|null [child table, label]
+     */
+    private static function entityReferenceViaOrderLookup(string $entityType): ?array
+    {
+        return match ($entityType) {
+            'disputes' => ['disputes', 'Dispute'],
+            'order_cancellations' => ['order_cancellations', 'Cancellation'],
+            'order_complaints' => ['order_complaints', 'Complaint'],
             default => null,
         };
     }
@@ -124,20 +148,38 @@ final class ActionNotificationService
         if ($entityType === null || $entityId === null) {
             return null;
         }
+
         $lookup = self::entityReferenceLookup($entityType);
-        if ($lookup === null) {
-            return null;
+        if ($lookup !== null) {
+            [$table, $column, $label] = $lookup;
+            try {
+                $stmt = Database::connection()->prepare("SELECT {$column} AS reference FROM {$table} WHERE id = :id");
+                $stmt->execute(['id' => $entityId]);
+                $row = $stmt->fetch();
+            } catch (\Throwable $e) {
+                return null;
+            }
+            $reference = trim((string) ($row['reference'] ?? ''));
+            return $reference !== '' ? ['label' => $label, 'reference' => $reference] : null;
         }
-        [$table, $column, $label] = $lookup;
-        try {
-            $stmt = Database::connection()->prepare("SELECT {$column} AS reference FROM {$table} WHERE id = :id");
-            $stmt->execute(['id' => $entityId]);
-            $row = $stmt->fetch();
-        } catch (\Throwable $e) {
-            return null;
+
+        $joinLookup = self::entityReferenceViaOrderLookup($entityType);
+        if ($joinLookup !== null) {
+            [$childTable, $label] = $joinLookup;
+            try {
+                $stmt = Database::connection()->prepare(
+                    "SELECT o.order_reference AS reference FROM {$childTable} c JOIN orders o ON o.id = c.order_id WHERE c.id = :id"
+                );
+                $stmt->execute(['id' => $entityId]);
+                $row = $stmt->fetch();
+            } catch (\Throwable $e) {
+                return null;
+            }
+            $reference = trim((string) ($row['reference'] ?? ''));
+            return $reference !== '' ? ['label' => $label, 'reference' => "Order {$reference}"] : null;
         }
-        $reference = trim((string) ($row['reference'] ?? ''));
-        return $reference !== '' ? ['label' => $label, 'reference' => $reference] : null;
+
+        return null;
     }
 
     /**

@@ -190,6 +190,20 @@ async function saveLcDetails(req, res) {
   const interestRate = String(req.body.bank_loan_interest_rate || '').trim() !== '' ? parseFloat(req.body.bank_loan_interest_rate) : null;
   const interestPaid = String(req.body.bank_loan_interest_paid || '').trim() !== '' ? parseFloat(req.body.bank_loan_interest_paid) : null;
 
+  // External QA report N-11: an interest rate is a percentage, so
+  // anything above 100 (the report's example: 250%) is never plausible
+  // — refused outright, same as the negative-value check above.
+  // Interest paid exceeding the loan amount is merely unusual, not
+  // impossible (e.g. cumulative interest across renewed years), so
+  // that one is only ever a warning, never a block, shown after the
+  // save below.
+  if (interestRate !== null && interestRate > 100) {
+    flash.set(req, 'error', 'Enter a valid interest rate — it cannot exceed 100%.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  const interestExceedsLoan = interestPaid !== null && bankLoanAmount !== null && interestPaid > bankLoanAmount;
+
   let lcFileId = existing ? existing.lc_file_id : null;
   if (req.file && req.file.buffer) {
     try {
@@ -254,7 +268,11 @@ async function saveLcDetails(req, res) {
     await orderCostEntryRepository.remove(staleCostEntryIdToDelete);
   }
   await auditLogRepository.log(user.id, 'ORDER_LC_DETAILS_SAVED', 'order_lc_details', orderId, null, null, lcNumber);
-  flash.set(req, 'success', 'LC / bank loan details saved.');
+  if (interestExceedsLoan) {
+    flash.set(req, 'warning', 'LC / bank loan details saved — but the interest paid is more than the loan amount itself. Double-check this is correct.');
+  } else {
+    flash.set(req, 'success', 'LC / bank loan details saved.');
+  }
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 

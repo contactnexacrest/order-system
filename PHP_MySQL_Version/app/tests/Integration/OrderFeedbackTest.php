@@ -29,6 +29,12 @@ final class OrderFeedbackTest extends DbTestCase
         Flash::pull();
     }
 
+    /** External QA report N-12: feedback is only offered once an order has reached this status. */
+    private function markShippedDocsSent(int $orderId): void
+    {
+        Database::connection()->prepare("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id")->execute(['id' => $orderId]);
+    }
+
     // ---------------------------------------------------------------
     // OrderFeedbackRepository
     // ---------------------------------------------------------------
@@ -88,6 +94,7 @@ final class OrderFeedbackTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
         $_SESSION['_client_portal_client_id'] = $clientId;
         $_POST = ['rating' => '5', 'comments' => 'Excellent handling of our shipment.'];
 
@@ -106,6 +113,7 @@ final class OrderFeedbackTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
         $_SESSION['_client_portal_client_id'] = $clientId;
         $_POST = ['rating' => '0'];
 
@@ -121,6 +129,7 @@ final class OrderFeedbackTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
         $_SESSION['_client_portal_client_id'] = $clientId;
         $_POST = ['rating' => '6'];
 
@@ -136,6 +145,7 @@ final class OrderFeedbackTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
         $_SESSION['_client_portal_client_id'] = $clientId;
         $_POST = ['rating' => 'five'];
 
@@ -151,6 +161,7 @@ final class OrderFeedbackTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
         $_SESSION['_client_portal_client_id'] = $clientId;
 
         $_POST = ['rating' => '2', 'comments' => 'Initial impression — slow replies.'];
@@ -166,6 +177,27 @@ final class OrderFeedbackTest extends DbTestCase
         $row = OrderFeedbackRepository::find($orderId);
         self::assertSame(5, (int) $row['rating']);
         self::assertSame('Updating — issue was resolved quickly.', $row['comments']);
+    }
+
+    /**
+     * External QA report N-12: step 14 is a post-shipment step — a
+     * client could previously rate an order still in production/
+     * shipping. createTestOrder() defaults to status 'active', so this
+     * exercises that default directly (no markShippedDocsSent() call).
+     */
+    public function testSubmitFeedbackRefusedOnAnActiveOrder(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $_SESSION['_client_portal_client_id'] = $clientId;
+        $_POST = ['rating' => '5', 'comments' => 'Too early to say.'];
+
+        ob_start();
+        (new ClientPortalController())->submitFeedback(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        self::assertNull(OrderFeedbackRepository::find($orderId));
+        self::assertSame('error', Flash::pull()[0]['type']);
     }
 
     public function testSubmitFeedbackReturns404ForAnUnknownOrder(): void
@@ -189,6 +221,7 @@ final class OrderFeedbackTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
         $_SESSION['_client_portal_client_id'] = $clientId;
 
         ob_start();
@@ -204,6 +237,7 @@ final class OrderFeedbackTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
         OrderFeedbackRepository::upsert($orderId, $clientId, 4, 'Already submitted once.');
         $_SESSION['_client_portal_client_id'] = $clientId;
 
@@ -214,6 +248,21 @@ final class OrderFeedbackTest extends DbTestCase
         self::assertStringContainsString('value="4" selected', $output);
         self::assertStringContainsString('Already submitted once.', $output);
         self::assertStringContainsString('Update Feedback', $output);
+    }
+
+    /** External QA report N-12: the form itself must not even be offered on an active order. */
+    public function testClientOrderPageHidesTheFeedbackFormOnAnActiveOrder(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $_SESSION['_client_portal_client_id'] = $clientId;
+
+        ob_start();
+        (new ClientPortalController())->showOrder(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertStringNotContainsString('action="/client/orders/' . $orderId . '/feedback"', $output);
+        self::assertStringContainsString('Feedback will be available once', $output);
     }
 
     // ---------------------------------------------------------------

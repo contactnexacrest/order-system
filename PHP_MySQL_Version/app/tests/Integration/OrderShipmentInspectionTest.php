@@ -339,4 +339,27 @@ final class OrderShipmentInspectionTest extends DbTestCase
 
         self::assertFalse(NotificationRepository::existsToday($adminId, 'pre_shipment_inspection_reminder', $orderId));
     }
+
+    /**
+     * External QA report N-09: notifyMdAndAdmin() used to call
+     * EmailService::sendPlainText() directly right after
+     * NotificationRepository::create(), which already sends its own
+     * email via emailNotification() internally — every recipient of
+     * every alert type in this cron job (not just this one reminder)
+     * got two differently-worded emails for the same event. Whitebox,
+     * same technique AuditLogNotificationHookTest already uses for
+     * "is this wiring actually gone" checks that aren't otherwise
+     * observable without mocking EmailService.
+     */
+    public function testNotifyMdAndAdminNoLongerSendsADuplicateEmailDirectly(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/cron/check_alerts.php');
+        $functionBody = substr($source, (int) strpos($source, 'function notifyMdAndAdmin'), 400);
+
+        self::assertStringNotContainsString(
+            'EmailService::sendPlainText',
+            $functionBody,
+            'notifyMdAndAdmin() must rely solely on NotificationRepository::create()\'s own email, not also send one directly'
+        );
+    }
 }

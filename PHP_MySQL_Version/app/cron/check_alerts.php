@@ -7,19 +7,20 @@ declare(strict_types=1);
  * overdue) plus Section 16's dispute response timer. Run once daily on a
  * cPanel Cron Job (README has the exact setup).
  *
- * Every alert here also goes out by email now (previously this only
- * created the in-app notification — this file's own prior docblock
- * flagged that as a known, deliberately deferred follow-up: "wiring the
- * same conditions to outbound email is a small, mechanical follow-up
- * against EmailService::sendPlainText() whenever that's wanted"). A
- * compliance/financial deadline (LUT/RCMC expiry, an overdue freight or
- * dispute deadline) sitting unread in a bell icon nobody happened to
- * check is exactly the kind of risk this alert system exists to prevent
- * — email doesn't depend on someone being logged in that day.
- * EmailService::sendPlainText() degrades safely (logs instead of
- * throwing) if SMTP isn't configured, so this never breaks the cron job
- * itself; existsToday()'s same-day dedup covers the email too, so this
- * never sends more than one email per user per condition per day.
+ * Every alert here also goes out by email — via NotificationRepository::
+ * create()'s own built-in emailNotification() hook, which every in-app
+ * notification already triggers. A compliance/financial deadline
+ * (LUT/RCMC expiry, an overdue freight or dispute deadline) sitting
+ * unread in a bell icon nobody happened to check is exactly the kind of
+ * risk this alert system exists to prevent — email doesn't depend on
+ * someone being logged in that day. External QA report N-09: this used
+ * to ALSO send a second, separately-worded email directly via
+ * EmailService::sendPlainText() right after create() — every recipient
+ * of every alert type here got two emails for the same event, one
+ * "NexaCrest — New Notification" and one "NexaCrest Alert: ...". Removed
+ * — create()'s own email is enough, and existsToday()'s same-day dedup
+ * already covers it, so this never sends more than one email per user
+ * per condition per day.
  *
  * Usage: php /path/to/app/cron/check_alerts.php
  *
@@ -35,11 +36,9 @@ use App\Config\Database;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\NotificationRepository;
 use App\Repositories\PermissionRepository;
-use App\Repositories\UserRepository;
-use App\Services\EmailService;
 use App\Services\WorkingDaysCalculator;
 
-function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $relatedOrderId = null, array $activeUsersById = []): int
+function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $relatedOrderId = null): int
 {
     $count = 0;
     foreach ($userIds as $userId) {
@@ -47,10 +46,6 @@ function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $r
             continue; // already alerted this same condition today — don't spam the bell (or the inbox)
         }
         NotificationRepository::create($userId, null, $type, $relatedOrderId, $message);
-        $email = $activeUsersById[$userId]['email'] ?? null;
-        if ($email) {
-            EmailService::sendPlainText($email, 'NexaCrest Alert: ' . str_replace('_', ' ', $type), $message);
-        }
         $count++;
     }
     return $count;
@@ -61,11 +56,6 @@ function run(): int
     $pdo = Database::connection();
     $today = new DateTimeImmutable('today');
     $created = 0;
-
-    $activeUsersById = [];
-    foreach (UserRepository::listActive() as $u) {
-        $activeUsersById[(int) $u['id']] = $u;
-    }
 
     // Whoever can manage company settings is who these compliance-deadline
     // escalations are for — checked by permission, not a hardcoded role name,
@@ -79,9 +69,9 @@ function run(): int
         $alertDays = (int) (CompanySettingsRepository::get('lut_alert_days_x') ?? '30');
         $escalationDays = (int) (CompanySettingsRepository::get('lut_escalation_days_y') ?? '15');
         if ($daysLeft <= $escalationDays && $daysLeft >= 0) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_escalation', "ESCALATION: LUT expires in {$daysLeft} day(s) ({$lutExpiry}). Renew before 1 April or document generation will be blocked.", null, $activeUsersById);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_escalation', "ESCALATION: LUT expires in {$daysLeft} day(s) ({$lutExpiry}). Renew before 1 April or document generation will be blocked.", null);
         } elseif ($daysLeft <= $alertDays && $daysLeft >= 0) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_expiry', "LUT expires in {$daysLeft} day(s) ({$lutExpiry}).", null, $activeUsersById);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_expiry', "LUT expires in {$daysLeft} day(s) ({$lutExpiry}).", null);
         }
     }
 
@@ -92,9 +82,9 @@ function run(): int
         $alertDays = (int) (CompanySettingsRepository::get('rcmc_alert_days_a') ?? '60');
         $escalationDays = (int) (CompanySettingsRepository::get('rcmc_escalation_days_b') ?? '30');
         if ($daysLeft <= $escalationDays && $daysLeft >= 0) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_escalation', "ESCALATION: RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}). Renew with CAPEXIL.", null, $activeUsersById);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_escalation', "ESCALATION: RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}). Renew with CAPEXIL.", null);
         } elseif ($daysLeft <= $alertDays && $daysLeft >= 0) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_expiry', "RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}).", null, $activeUsersById);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_expiry', "RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}).", null);
         }
     }
 
@@ -124,7 +114,7 @@ function run(): int
     foreach ($stmt->fetchAll() as $row) {
         $dueDate = WorkingDaysCalculator::addWorkingDays(substr((string) $row['generated_at'], 0, 10), $fdnOverdueDays);
         if ($dueDate < $today->format('Y-m-d')) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN issued {$row['generated_at']}, still not cleared.", (int) $row['order_id'], $activeUsersById);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN issued {$row['generated_at']}, still not cleared.", (int) $row['order_id']);
         }
     }
 
@@ -141,7 +131,7 @@ function run(): int
         if ($row['assigned_to']) {
             $targets[] = (int) $row['assigned_to'];
         }
-        $created += notifyMdAndAdmin(array_unique($targets), 'dispute_overdue', "Dispute response overdue on order {$row['order_reference']} — was due {$row['response_due_date']}.", (int) $row['order_id'], $activeUsersById);
+        $created += notifyMdAndAdmin(array_unique($targets), 'dispute_overdue', "Dispute response overdue on order {$row['order_reference']} — was due {$row['response_due_date']}.", (int) $row['order_id']);
     }
 
     // --- Quotation/PI validity expired, order still stuck at that stage ---
@@ -168,7 +158,7 @@ function run(): int
            AND o.pi_date IS NULL"
     );
     foreach ($stmt->fetchAll() as $row) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'quotation_expired', "Quotation validity expired on order {$row['order_reference']} — was valid until {$row['quotation_valid_until']}, still no PI issued.", (int) $row['order_id'], $activeUsersById);
+        $created += notifyMdAndAdmin($mdAndAdminIds, 'quotation_expired', "Quotation validity expired on order {$row['order_reference']} — was valid until {$row['quotation_valid_until']}, still no PI issued.", (int) $row['order_id']);
     }
 
     $stmt = $pdo->query(
@@ -182,7 +172,7 @@ function run(): int
            AND (sm.stage_number IS NULL OR sm.stage_number < 4)"
     );
     foreach ($stmt->fetchAll() as $row) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'pi_expired', "Proforma Invoice validity expired on order {$row['order_reference']} — was valid until {$row['pi_valid_until']}, Order Confirmation not yet reached.", (int) $row['order_id'], $activeUsersById);
+        $created += notifyMdAndAdmin($mdAndAdminIds, 'pi_expired', "Proforma Invoice validity expired on order {$row['order_reference']} — was valid until {$row['pi_valid_until']}, Order Confirmation not yet reached.", (int) $row['order_id']);
     }
 
     // --- Export process step 8a: 7-day pre-shipment inspection reminder ---
@@ -211,7 +201,7 @@ function run(): int
     );
     foreach ($stmt->fetchAll() as $row) {
         $daysLeft = $today->diff(new DateTimeImmutable($row['est_shipment_date']))->days;
-        $created += notifyMdAndAdmin($orderManagerIds, 'pre_shipment_inspection_reminder', "Pre-shipment inspection due soon on order {$row['order_reference']} — estimated shipment {$row['est_shipment_date']} ({$daysLeft} day(s) away). Confirm production completion and prepare for 3rd-party inspection.", (int) $row['order_id'], $activeUsersById);
+        $created += notifyMdAndAdmin($orderManagerIds, 'pre_shipment_inspection_reminder', "Pre-shipment inspection due soon on order {$row['order_reference']} — estimated shipment {$row['est_shipment_date']} ({$daysLeft} day(s) away). Confirm production completion and prepare for 3rd-party inspection.", (int) $row['order_id']);
     }
 
     return $created;

@@ -131,6 +131,9 @@ describe('Notification audit gaps (Task #35)', () => {
     const userId = await createTestUser('Admin');
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
+    // External QA report N-12: feedback is only accepted once an order
+    // has reached this status.
+    await db.execute("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id", { id: orderId });
     const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '4', comments: 'Great communication throughout.' } });
 
     await clientPortalController.submitFeedback(req, fakeRes());
@@ -172,6 +175,11 @@ describe('Notification audit gaps (Task #35)', () => {
     const viewerId = await createTestUser('Viewer / Auditor');
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
+    // External QA report N-12: feedback is only accepted once an order
+    // has reached this status — set here so this test's "no
+    // notification" assertion is about the permission gate, not a
+    // vacuous pass from the submission being refused outright.
+    await db.execute("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id", { id: orderId });
     const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '5' } });
 
     await clientPortalController.submitFeedback(req, fakeRes());

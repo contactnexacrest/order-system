@@ -53,6 +53,11 @@ describe('Order Feedback (Section BV)', () => {
     return { params: {}, body: {}, session: {}, permissions: {}, ...overrides };
   }
 
+  /** External QA report N-12: feedback is only offered once an order has reached this status. */
+  async function markShippedDocsSent(orderId) {
+    await db.execute("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id", { id: orderId });
+  }
+
   // ---------------------------------------------------------------
   // orderFeedbackRepository
   // ---------------------------------------------------------------
@@ -105,6 +110,7 @@ describe('Order Feedback (Section BV)', () => {
   it('submitFeedback saves a valid rating', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
+    await markShippedDocsSent(orderId);
     const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '5', comments: 'Excellent handling of our shipment.' } });
 
     await clientPortalController.submitFeedback(req, fakeRes());
@@ -118,6 +124,7 @@ describe('Order Feedback (Section BV)', () => {
   it('submitFeedback rejects a rating of zero', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
+    await markShippedDocsSent(orderId);
     const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '0' } });
 
     await clientPortalController.submitFeedback(req, fakeRes());
@@ -129,6 +136,7 @@ describe('Order Feedback (Section BV)', () => {
   it('submitFeedback rejects a rating of six', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
+    await markShippedDocsSent(orderId);
     const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '6' } });
 
     await clientPortalController.submitFeedback(req, fakeRes());
@@ -140,6 +148,7 @@ describe('Order Feedback (Section BV)', () => {
   it('submitFeedback rejects a non-numeric rating', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
+    await markShippedDocsSent(orderId);
     const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: 'five' } });
 
     await clientPortalController.submitFeedback(req, fakeRes());
@@ -151,6 +160,7 @@ describe('Order Feedback (Section BV)', () => {
   it('submitFeedback can be resubmitted and updates the same row', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
+    await markShippedDocsSent(orderId);
 
     await clientPortalController.submitFeedback(fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '2', comments: 'Initial impression — slow replies.' } }), fakeRes());
     await clientPortalController.submitFeedback(fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '5', comments: 'Updating — issue was resolved quickly.' } }), fakeRes());
@@ -158,6 +168,23 @@ describe('Order Feedback (Section BV)', () => {
     const row = await orderFeedbackRepository.find(orderId);
     expect(Number(row.rating)).toBe(5);
     expect(row.comments).toBe('Updating — issue was resolved quickly.');
+  });
+
+  /**
+   * External QA report N-12: step 14 is a post-shipment step — a client
+   * could previously rate an order still in production/shipping.
+   * createTestOrder() defaults to status 'active', so this exercises
+   * that default directly (no markShippedDocsSent() call).
+   */
+  it('submitFeedback is refused on an active order', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { rating: '5', comments: 'Too early to say.' } });
+
+    await clientPortalController.submitFeedback(req, fakeRes());
+
+    expect(await orderFeedbackRepository.find(orderId)).toBeNull();
+    expect(flash.pull(req)[0].type).toBe('error');
   });
 
   it('submitFeedback returns 404 for an unknown order', async () => {
@@ -204,6 +231,7 @@ describe('Order Feedback (Section BV)', () => {
       clientId = await createTestClient(clientEmail);
       await createTestClientLogin(clientId, clientPassword);
       orderId = await createTestOrder(clientId);
+      await markShippedDocsSent(orderId);
 
       agent = request.agent(app);
       const loginPage = await agent.get('/client/login');
@@ -227,6 +255,31 @@ describe('Order Feedback (Section BV)', () => {
       expect(res.text).toContain('value="4" selected');
       expect(res.text).toContain('Already submitted once.');
       expect(res.text).toContain('Update Feedback');
+    });
+
+    /**
+     * External QA report N-12: the form itself must not even be offered
+     * on an active order. A separate client/order (not the shared one
+     * above, already moved to shipped_docs_sent) — createTestOrder()
+     * hardcodes sequence_no=1, so a second order for the SAME client
+     * would collide on uq_client_sequence.
+     */
+    it('client order page hides the feedback form on an active order', async () => {
+      const activeClientEmail = `jest-feedback-active-client-${Math.random().toString(16).slice(2, 8)}@nexacrest.test`;
+      const activeClientId = await createTestClient(activeClientEmail);
+      await createTestClientLogin(activeClientId, clientPassword);
+      const activeOrderId = await createTestOrder(activeClientId);
+
+      const activeAgent = request.agent(app);
+      const loginPage = await activeAgent.get('/client/login');
+      const csrf = extractCsrf(loginPage.text);
+      await activeAgent.post('/client/login').type('form').send({ _csrf: csrf, email: activeClientEmail, password: clientPassword });
+
+      const res = await activeAgent.get(`/client/orders/${activeOrderId}`);
+
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain(`action="/client/orders/${activeOrderId}/feedback"`);
+      expect(res.text).toContain('Feedback will be available once');
     });
 
     it('staff order page shows the Order Feedback section', async () => {

@@ -709,6 +709,16 @@ async function submitFeedback(req, res) {
     return;
   }
 
+  // External QA report N-12: step 14 is a post-shipment step — feedback
+  // on an order that's still active (production/shipping in progress)
+  // asks the client to rate work that isn't finished yet. Same status
+  // pair addExportBenefit() already gates on.
+  if (!['shipped_docs_sent', 'complete'].includes(order.status)) {
+    flash.set(req, 'error', "Feedback can be submitted once this order's documents have been sent to you.");
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+
   const rating = parseInt(req.body.rating, 10);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
     flash.set(req, 'error', 'Please choose a rating between 1 and 5 stars.');

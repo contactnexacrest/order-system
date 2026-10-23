@@ -96,6 +96,42 @@ final class OrderLcDetailTest extends DbTestCase
         self::assertSame('error', $flash[0]['type']);
     }
 
+    /** External QA report N-11: an interest rate is a percentage — anything above 100% (the report's own example: 250%) is never plausible. */
+    public function testSaveLcDetailsRejectsAnInterestRateOver100Percent(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['bank_loan_interest_rate' => '250'];
+
+        ob_start();
+        (new OrderFinancialsController())->saveLcDetails(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        $flash = Flash::pull();
+        self::assertSame('error', $flash[0]['type']);
+        self::assertNull(OrderLcDetailRepository::find($orderId));
+    }
+
+    /** External QA report N-11: interest paid larger than the loan amount is unusual, not impossible — warned about, saved either way. */
+    public function testSaveLcDetailsWarnsButStillSavesWhenInterestPaidExceedsTheLoanAmount(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['lc_number' => 'LC-OVER', 'bank_loan_amount' => '1000', 'bank_loan_interest_paid' => '1500'];
+
+        ob_start();
+        (new OrderFinancialsController())->saveLcDetails(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        $flash = Flash::pull();
+        self::assertSame('warning', $flash[0]['type']);
+        self::assertStringContainsString('more than the loan amount', $flash[0]['message']);
+        $saved = OrderLcDetailRepository::find($orderId);
+        self::assertSame('1500.00', $saved['bank_loan_interest_paid']);
+    }
+
     public function testSaveLcDetailsSavesLcNumberAndLoanFieldsWithNoFileUploaded(): void
     {
         $userId = $this->createTestUser('Admin');

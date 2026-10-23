@@ -98,6 +98,39 @@ describe('Order LC details + bank loan interest (Section BR)', () => {
     expect(flash.pull(req)[0].type).toBe('error');
   });
 
+  // External QA report N-11: an interest rate is a percentage — anything
+  // above 100% (the report's own example: 250%) is never plausible.
+  it('rejects an interest rate over 100%', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    const req = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { bank_loan_interest_rate: '250' } });
+
+    await orderFinancialsController.saveLcDetails(req, fakeRes());
+
+    expect(flash.pull(req)[0].type).toBe('error');
+    expect(await orderLcDetailRepository.find(orderId)).toBeNull();
+  });
+
+  // External QA report N-11: interest paid larger than the loan amount
+  // is unusual, not impossible — warned about, saved either way.
+  it('warns but still saves when interest paid exceeds the loan amount', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    const req = fakeReq({
+      user: { id: userId },
+      params: { id: String(orderId) },
+      body: { lc_number: 'LC-OVER', bank_loan_amount: '1000', bank_loan_interest_paid: '1500' },
+    });
+
+    await orderFinancialsController.saveLcDetails(req, fakeRes());
+
+    const msgs = flash.pull(req);
+    expect(msgs[0].type).toBe('warning');
+    expect(msgs[0].message).toMatch(/more than the loan amount/);
+    const saved = await orderLcDetailRepository.find(orderId);
+    expect(Number(saved.bank_loan_interest_paid)).toBe(1500);
+  });
+
   it('saves LC number and loan fields with no file uploaded', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
