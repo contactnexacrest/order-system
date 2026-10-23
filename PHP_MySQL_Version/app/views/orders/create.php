@@ -116,7 +116,7 @@
       <legend>Indicative Freight / Insurance <small class="muted">(printed on the Quotation only for CFR/CIF)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">order currency</span></span>)<input type="text" name="indicative_freight_amount" value="<?= htmlspecialchars((string) ($old['indicative_freight_amount'] ?? '')) ?>" placeholder="e.g. 950"></label>
-        <label class="full">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($old['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g. 120"></label>
+        <label>Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($old['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g. 120"></label>
       </div>
       <p class="muted small">Ocean freight isn't booked yet at this stage, so rates can move before the actual booking. This is the current indicative rate only — the real rate is confirmed by Debit Note once cargo is packed and ready (Stage 6). Ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against the Debit Note, before the vessel is booked.</p>
     </fieldset>

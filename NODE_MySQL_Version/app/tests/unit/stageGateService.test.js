@@ -2,6 +2,17 @@
 
 jest.mock('../../src/repositories/orderStageRepository');
 jest.mock('../../src/repositories/orderRepository');
+// This file was relying on a real audit_log insert against a hardcoded
+// userId=42 — it only ever worked by coincidence of exactly how many
+// other users other test files had created first against the shared
+// disposable DB by the time this file's worker ran, which drifts with
+// every new user-creating test added anywhere in the suite (it just
+// started failing with a FK violation once that drift reached this
+// file). A unit test shouldn't depend on real DB rows at all, and every
+// other repository this file touches is already mocked, so mocking this
+// one too removes the dependency instead of papering over it with yet
+// another specific id.
+jest.mock('../../src/repositories/auditLogRepository');
 
 const orderStageRepository = require('../../src/repositories/orderStageRepository');
 const orderRepository = require('../../src/repositories/orderRepository');

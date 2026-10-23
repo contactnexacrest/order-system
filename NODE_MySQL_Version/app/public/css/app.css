@@ -38,6 +38,17 @@ a{color:var(--navy)}
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible{
   outline:2px solid var(--gold);outline-offset:2px;
 }
+/* External QA report U-22: Safari 14-15.3 (iOS 14-15.3) never shipped
+   :focus-visible, so a keyboard user there got no focus outline at all
+   on any of the selectors above. @supports selector() itself IS
+   supported back to Safari 14, so this fallback reaches exactly the
+   browsers that need it without changing the nicer mouse-click-vs-
+   keyboard behavior :focus-visible already gives everyone else. */
+@supports not selector(:focus-visible){
+  a:focus, button:focus, input:focus, select:focus, textarea:focus, summary:focus, [tabindex]:focus{
+    outline:2px solid var(--gold);outline-offset:2px;
+  }
+}
 button, a.btn, input, select, textarea{transition:background-color .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease, transform .15s ease;}
 button:disabled, a.btn[aria-disabled="true"]{opacity:0.55;cursor:not-allowed;}
 .btn-spinner{display:inline-block;width:0.85em;height:0.85em;border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;vertical-align:-0.15em;animation:btn-spin 0.6s linear infinite;}
@@ -64,7 +75,12 @@ a.js-slow-download.is-loading{pointer-events:none;opacity:0.7;}
 .sidebar-nav > a.active{background:rgba(255,255,255,0.16);color:#fff;font-weight:700;box-shadow:inset 3px 0 0 0 var(--gold);}
 .nav-ico{display:inline-flex;flex:0 0 auto;width:16px;height:16px;}
 .nav-ico svg{display:block;}
-.nav-badge{display:inline-block;background:var(--gold);color:var(--navy);font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:2px;line-height:1.5;}
+/* External QA report U-20: ~340 text elements across the tested screens
+   were smaller than 11px (badges, helper text), hard to read on phones.
+   Minimum 11px for badge-shaped pill elements, 12px for everything else
+   that's genuine readable text (labels, captions) — applied here and at
+   .product-row label / .stage-chip-num / .process-step-label below. */
+.nav-badge{display:inline-block;background:var(--gold);color:var(--navy);font-size:11px;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:2px;line-height:1.5;}
 /* 90-item backlog #80: a small sub-step number next to a stage's own primary
    action buttons — e.g. "5a" before "Confirm Supplier Signed" — so staff see
    the literal order of operations within a stage, not just which of the 9
@@ -289,14 +305,14 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
    into two readable rows (Description/Dimensions/Finish/Qty, then
    Unit/Unit Price/HS Code/Actions) instead of one cramped one. */
 .product-row{display:grid;grid-template-columns:repeat(4, minmax(150px, 1fr));gap:0.5rem;align-items:end;margin-bottom:0.6rem;}
-.product-row label{margin-bottom:0.2rem;font-size:0.72rem;}
+.product-row label{margin-bottom:0.2rem;font-size:0.75rem;}
 .product-row input{margin-top:0;}
 .product-row-actions{display:flex;gap:0.35rem;}
 .remove-row{background:var(--danger);padding:0.5rem 0.7rem;}
 .remove-row:hover{background:#7e3221;}
 .stage-track{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.65rem;margin-bottom:1.25rem;}
 .stage-chip{border:1px solid var(--line);border-top:3px solid var(--line);border-radius:12px;padding:0.7rem 0.85rem;background:#fff;}
-.stage-chip .stage-chip-num{font-size:0.68rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+.stage-chip .stage-chip-num{font-size:0.75rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
 .stage-chip .stage-chip-name{font-size:0.84rem;font-weight:700;color:var(--ink);margin:0.2rem 0 0.5rem;line-height:1.3;min-height:2.2em;}
 .stage-chip .stage-chip-status{display:inline-flex;align-items:center;font-size:0.7rem;font-weight:600;padding:2px 9px;border-radius:999px;}
 .stage-chip.locked{border-top-color:var(--line);}
@@ -321,7 +337,7 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .process-step.in_progress .process-step-dot{border-color:var(--gold);background:var(--gold-soft);color:var(--gold-strong);}
 .process-step.gate_passed .process-step-dot{border-color:var(--success);background:var(--success);color:#fff;}
 .process-step.skipped .process-step-dot{border-color:var(--line);background:var(--bg);color:var(--ink-soft);}
-.process-step-label{margin-top:0.4rem;font-size:0.66rem;line-height:1.25;color:var(--ink-soft);font-weight:500;padding:0 3px;}
+.process-step-label{margin-top:0.4rem;font-size:0.75rem;line-height:1.25;color:var(--ink-soft);font-weight:500;padding:0 3px;}
 .process-step.in_progress .process-step-label{color:var(--gold-strong);font-weight:700;}
 .process-step.gate_passed .process-step-label{color:var(--ink);}
 /* External QA report U-12: on a phone the stepper only shows the first

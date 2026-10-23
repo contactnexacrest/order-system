@@ -16,7 +16,8 @@
   <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
 {% endif %}
 {% set canDisputes = permissions.manage_disputes or permissions.respond_to_disputes %}
-{% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes %}
+{# External QA report U-18: /clients and /orders each also accept their own narrower view_clients/view_orders permission (server.js) — a Viewer/Auditor holds exactly these two and nothing else in this group, so without them here the whole Operations dropdown never rendered at all, even though both routes worked fine by direct URL. #}
+{% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes or permissions.view_clients or permissions.view_orders %}
 {# External QA report U-01: the main /disputes LIST route requires manage_disputes only (see server.js) — respond_to_disputes alone (e.g. Export Executive) never grants the cross-order list page. canDisputes above stays as the Ops group's own broader visibility check. #}
 {% set canViewDisputesList = permissions.manage_disputes %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log %}
@@ -56,8 +57,8 @@
       <details class="nav-group" {{ 'open' if opsGroupActive else '' }}>
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>Operations</summary>
         <div class="nav-dropdown">
-          <a href="/clients" class="{{ 'active' if (currentPath | startswith('/clients')) else '' }}">Clients</a>
-          <a href="/orders" class="{{ 'active' if ordersActive else '' }}">Orders</a>
+          {% if permissions.manage_orders or permissions.view_clients %}<a href="/clients" class="{{ 'active' if (currentPath | startswith('/clients')) else '' }}">Clients</a>{% endif %}
+          {% if permissions.manage_orders or permissions.view_orders %}<a href="/orders" class="{{ 'active' if ordersActive else '' }}">Orders</a>{% endif %}
           {% if permissions.view_archived_orders %}<a href="/orders/archived" class="{{ 'active' if (currentPath | startswith('/orders/archived')) else '' }}">Archived Orders</a>{% endif %}
           <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Quotation Intake Review{% if clientIntakePendingCount > 0 %} <span class="nav-badge">{{ clientIntakePendingCount }}</span>{% endif %}</a>
           <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review{% if piIntakePendingCount > 0 %} <span class="nav-badge">{{ piIntakePendingCount }}</span>{% endif %}</a>

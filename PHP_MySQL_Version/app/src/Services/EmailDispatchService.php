@@ -65,6 +65,18 @@ final class EmailDispatchService
             if (!empty($document['document_type_never_shown_to_buyer'])) {
                 throw new \RuntimeException("{$document['document_type_name']} is an internal document and can never be sent to the buyer.");
             }
+            // External QA report L-41: any active template could be picked
+            // for any document — a Supplier PO going out under the subject
+            // "Quotation SC/SPO/…" — because nothing tied templateKey to
+            // the document actually being sent. Every buyer-facing document
+            // type has exactly one seeded template, send_<lowercase code>
+            // (docs/schema.sql Section AU's own convention, also what
+            // EmailDispatchController::renderCompose() guesses from), so a
+            // document-bound send must use exactly that one.
+            $expectedTemplateKey = 'send_' . strtolower((string) $document['document_type_code']);
+            if ($templateKey !== $expectedTemplateKey) {
+                throw new \RuntimeException("Wrong template for this document: a {$document['document_type_name']} must be sent with the \"{$expectedTemplateKey}\" template, not \"{$templateKey}\".");
+            }
         }
         if (empty($order['client_email'])) {
             throw new \RuntimeException('This client has no email address on file.');

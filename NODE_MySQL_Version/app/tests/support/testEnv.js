@@ -14,3 +14,14 @@ process.env.DB_DATABASE = 'nexacrest_node_jest';
 process.env.PORT = '0'; // let the OS pick an ephemeral port if server.js's app.listen() runs at require-time
 process.env.RUN_JOBS_IN_PROCESS = 'false';
 process.env.SESSION_SECRET_KEY = process.env.SESSION_SECRET_KEY || 'jest-test-session-secret';
+
+// External QA report TI-05: the suite was never isolated from a
+// developer's own .env — with real SMTP credentials configured there,
+// emailService's transport() would actually attempt to send mail during
+// a test run (and several tests failed outright because they assert the
+// "no SMTP configured" dev-fallback path). dotenv.config() in
+// src/config/env.js never overrides an already-set process.env value, so
+// setting this here, before any app code (and therefore env.js) is
+// required, is what makes it win and every test run deterministic
+// regardless of the machine it runs on.
+process.env.SMTP_HOST = '';

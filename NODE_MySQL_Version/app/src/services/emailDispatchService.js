@@ -131,6 +131,17 @@ async function buildPreview(orderId, documentId, templateKey, senderUserId) {
     if (document.document_type_never_shown_to_buyer) {
       throw new Error(`${document.document_type_name} is an internal document and can never be sent to the buyer.`);
     }
+    // External QA report L-41: any active template could be picked for
+    // any document — a Supplier PO going out under the subject "Quotation
+    // SC/SPO/…" — because nothing tied templateKey to the document
+    // actually being sent. Every buyer-facing document type has exactly
+    // one seeded template, send_<lowercase code> (docs/schema.sql Section
+    // AU's own convention, also what ordersController's compose-screen
+    // guess uses), so a document-bound send must use exactly that one.
+    const expectedTemplateKey = `send_${String(document.document_type_code).toLowerCase()}`;
+    if (templateKey !== expectedTemplateKey) {
+      throw new Error(`Wrong template for this document: a ${document.document_type_name} must be sent with the "${expectedTemplateKey}" template, not "${templateKey}".`);
+    }
   }
   if (!order.client_email) {
     throw new Error('This client has no email address on file.');

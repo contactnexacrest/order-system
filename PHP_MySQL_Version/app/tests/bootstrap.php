@@ -53,6 +53,18 @@ putenv('DB_DATABASE=nexacrest_phpunit_test');
 $_ENV['DB_DATABASE'] = 'nexacrest_phpunit_test';
 $_SERVER['DB_DATABASE'] = 'nexacrest_phpunit_test';
 
+// External QA report TI-05: the suite was never isolated from a
+// developer's own .env — with real SMTP credentials configured there,
+// EmailService::sendPlainText() would actually attempt to send mail
+// during a test run (and several tests failed outright because they
+// assert the "no SMTP configured" dev-fallback path). Env::load() above
+// already read whatever the real .env has, so this has to run after it
+// to actually win; forcing it blank here is what makes every test run
+// deterministic regardless of the machine it runs on.
+putenv('SMTP_HOST=');
+$_ENV['SMTP_HOST'] = '';
+$_SERVER['SMTP_HOST'] = '';
+
 \App\Tests\Support\DbTestCase::rebuildDatabase();
 
 register_shutdown_function(function (): void {

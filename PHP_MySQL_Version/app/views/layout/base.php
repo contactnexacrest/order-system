@@ -64,8 +64,16 @@ $canDisputes = $can('manage_disputes') || $can('respond_to_disputes');
 // visibility check — that's just "is there a disputes-shaped doorway
 // into this group's worth of nav," not a doorway of its own.
 $canViewDisputesList = $can('manage_disputes');
+// External QA report U-18: /clients and /orders each also accept their
+// own narrower view_clients/view_orders permission (see
+// PermissionCheck::requiresAny() on both routes) — a Viewer/Auditor holds
+// exactly these two and nothing else in this group, so without them here
+// the whole Operations dropdown never rendered at all, even though both
+// routes worked fine by direct URL.
+$canViewClients = $can('view_clients');
+$canViewOrders = $can('view_orders');
 
-$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes;
+$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canViewClients || $canViewOrders;
 $insightsGroupVisible = $canReports || $canAudit;
 // 90-item backlog #34: $canManageHsCodes/$canManageComplianceTaskTypes/
 // $canManageDropdownOptions/$canManageEmailTemplates each gate their own
@@ -136,8 +144,8 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
       <details class="nav-group"<?= $opsGroupActive ? ' open' : '' ?>>
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>Operations</summary>
         <div class="nav-dropdown">
-          <a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a>
-          <a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a>
+          <?php if ($canOrders || $canViewClients): ?><a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a><?php endif; ?>
+          <?php if ($canOrders || $canViewOrders): ?><a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a><?php endif; ?>
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
           <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review<?= $clientIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $clientIntakePendingCount . '</span>' : '' ?></a>
           <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review<?= $piIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $piIntakePendingCount . '</span>' : '' ?></a>
