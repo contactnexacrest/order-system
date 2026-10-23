@@ -334,7 +334,10 @@ final class ReportController
             'country' => trim((string) ($_POST['country'] ?? '')) ?: null,
         ];
 
-        ReportDefinitionRepository::create($name, $reportType, (int) $user['id'], $visibility, $filters, []);
+        $reportId = ReportDefinitionRepository::create($name, $reportType, (int) $user['id'], $visibility, $filters, []);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'REPORT_DEFINITION_SAVED', 'report_definitions', $reportId, null, null, $name);
         Flash::set('success', "Report \"{$name}\" saved.");
         header('Location: /reports');
     }
@@ -385,6 +388,9 @@ final class ReportController
         $visibility = ($_POST['visibility'] ?? '') === 'shared' ? 'shared' : 'private';
 
         ReportDefinitionRepository::updateNameVisibility($id, $name, $visibility);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'REPORT_DEFINITION_UPDATED', 'report_definitions', $id, 'name', $def['name'], $name);
         Flash::set('success', "\"{$name}\" updated.");
         header('Location: /reports');
     }
@@ -396,6 +402,9 @@ final class ReportController
         $def = ReportDefinitionRepository::find($id);
         if ($def && (int) $def['owner_user_id'] === (int) $user['id']) {
             ReportDefinitionRepository::delete($id);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) $user['id'], 'REPORT_DEFINITION_DELETED', 'report_definitions', $id, null, $def['name'], null);
             Flash::set('success', 'Saved report deleted.');
         } else {
             Flash::set('error', 'You can only delete your own saved reports.');

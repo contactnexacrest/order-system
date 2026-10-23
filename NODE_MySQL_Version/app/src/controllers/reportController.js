@@ -4,6 +4,7 @@ const querystring = require('querystring');
 
 const flash = require('../helpers/flash');
 const csv = require('../helpers/csv');
+const auditLogRepository = require('../repositories/auditLogRepository');
 const clientRepository = require('../repositories/clientRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const reportDefinitionRepository = require('../repositories/reportDefinitionRepository');
@@ -532,7 +533,10 @@ async function saveDefinition(req, res) {
     country: str(req.body.country) || null,
   };
 
-  await reportDefinitionRepository.create(name, reportType, user.id, visibility, filters, []);
+  const reportId = await reportDefinitionRepository.create(name, reportType, user.id, visibility, filters, []);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(user.id, 'REPORT_DEFINITION_SAVED', 'report_definitions', reportId, null, null, name);
   flash.set(req, 'success', `Report "${name}" saved.`);
   res.redirect('/reports');
 }
@@ -580,6 +584,9 @@ async function updateDefinition(req, res) {
   const visibility = String(req.body.visibility || '') === 'shared' ? 'shared' : 'private';
 
   await reportDefinitionRepository.updateNameVisibility(id, name, visibility);
+  // External QA report N-08: this action never reached the audit log,
+  // so it never notified anyone either.
+  await auditLogRepository.log(user.id, 'REPORT_DEFINITION_UPDATED', 'report_definitions', id, 'name', def.name, name);
   flash.set(req, 'success', `"${name}" updated.`);
   res.redirect('/reports');
 }
@@ -590,6 +597,9 @@ async function deleteDefinition(req, res) {
   const def = await reportDefinitionRepository.find(id);
   if (def && parseInt(def.owner_user_id, 10) === parseInt(user.id, 10)) {
     await reportDefinitionRepository.delete(id);
+    // External QA report N-08: this action never reached the audit
+    // log, so it never notified anyone either.
+    await auditLogRepository.log(user.id, 'REPORT_DEFINITION_DELETED', 'report_definitions', id, null, def.name, null);
     flash.set(req, 'success', 'Saved report deleted.');
   } else {
     flash.set(req, 'error', 'You can only delete your own saved reports.');
