@@ -127,6 +127,7 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->createTestSupplierPo($orderId);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        $_POST = ['amount_paid_inr' => '20000'];
 
         ob_start();
         (new OrderController())->markSupplierAdvancePaid(['id' => (string) $orderId]);
@@ -140,6 +141,7 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->createTestSupplierPo($orderId);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        $_POST = ['amount_paid_inr' => '30000'];
 
         ob_start();
         (new OrderController())->markSupplierBalancePaid(['id' => (string) $orderId]);

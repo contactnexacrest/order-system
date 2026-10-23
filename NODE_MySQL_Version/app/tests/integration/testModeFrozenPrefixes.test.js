@@ -45,6 +45,12 @@ describe('Test Mode admin freeze covers HS codes / email templates / roles / per
     '/admin/roles/2/update',
     '/admin/permission-definitions',
     '/admin/permission-definitions/1/update',
+    // External QA report TM-06 (regression retest of this same Owner
+    // Decision #4): /reports/save and /reports/saved/{id}/update|delete
+    // were also missing.
+    '/reports/save',
+    '/reports/saved/7/update',
+    '/reports/saved/7/delete',
   ];
 
   it.each(NEWLY_FROZEN_PATHS)('blocks a POST to %s while Test Mode is on', async (path) => {
@@ -62,6 +68,23 @@ describe('Test Mode admin freeze covers HS codes / email templates / roles / per
     await db.execute('UPDATE test_mode_settings SET is_enabled = 0 WHERE id = 1');
     const mw = testModeGate.blockAdminWritesInTestMode();
     const { req, res } = fakeReqRes('POST', path);
+
+    const nextCalled = await runMiddleware(mw, req, res);
+
+    expect(nextCalled).toBe(true);
+    expect(res.redirectedTo).toBeNull();
+  });
+
+  it('lets a GET to /reports/saved/7/run through even while Test Mode is on', async () => {
+    // External QA report TM-06: running an existing saved report is a
+    // read (gated on view_reports, not manage_report_definitions) — it
+    // must stay available in Test Mode, unlike save/update/delete above,
+    // even though it shares their /reports/saved prefix. What actually
+    // keeps it unfrozen is blockAdminWritesInTestMode()'s own GET
+    // short-circuit, checked before the prefix match.
+    await db.execute('UPDATE test_mode_settings SET is_enabled = 1 WHERE id = 1');
+    const mw = testModeGate.blockAdminWritesInTestMode();
+    const { req, res } = fakeReqRes('GET', '/reports/saved/7/run');
 
     const nextCalled = await runMiddleware(mw, req, res);
 

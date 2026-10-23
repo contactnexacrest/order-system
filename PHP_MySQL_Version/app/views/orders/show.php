@@ -1545,20 +1545,22 @@ foreach ($stages as $s) {
       <?php if ($supplierPo && $canManageSupplierPayments): ?>
         <h3 style="font-size:0.95em; margin-top:14px;">Supplier Payments</h3>
         <div class="kv-grid">
-          <div><span class="k">Advance (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['advance_amount_inr'] ?? '—') ?><?= !empty($supplierPo['advance_paid_at']) ? ' — paid ' . htmlspecialchars($supplierPo['advance_paid_at']) : '' ?></span></div>
-          <div><span class="k">Balance (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['balance_amount_inr'] ?? '—') ?><?= !empty($supplierPo['balance_paid_at']) ? ' — paid ' . htmlspecialchars($supplierPo['balance_paid_at']) : '' ?></span></div>
+          <div><span class="k">Advance (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['advance_amount_inr'] ?? '—') ?><?= !empty($supplierPo['advance_paid_at']) ? ' — paid ' . htmlspecialchars((string) ($supplierPo['advance_paid_amount_inr'] ?? $supplierPo['advance_amount_inr'])) . ' on ' . htmlspecialchars($supplierPo['advance_paid_at']) : '' ?></span></div>
+          <div><span class="k">Balance (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['balance_amount_inr'] ?? '—') ?><?= !empty($supplierPo['balance_paid_at']) ? ' — paid ' . htmlspecialchars((string) ($supplierPo['balance_paid_amount_inr'] ?? $supplierPo['balance_amount_inr'])) . ' on ' . htmlspecialchars($supplierPo['balance_paid_at']) : '' ?></span></div>
         </div>
         <?php if (empty($supplierPo['advance_paid_at'])): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/advance-paid" style="display:inline-block; margin-right:8px;">
             <?= Csrf::field() ?>
-            <label>Date<input type="date" name="paid_date" value="<?= date('Y-m-d') ?>"></label>
+            <label>Date<input type="date" name="paid_date" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
+            <label>Amount Paid (INR)<input type="number" step="0.01" min="0.01" name="amount_paid_inr" value="<?= htmlspecialchars((string) ($supplierPo['advance_amount_inr'] ?? '')) ?>" required></label>
             <button type="submit" class="btn-sm">Mark Advance Paid</button>
           </form>
         <?php endif; ?>
         <?php if (empty($supplierPo['balance_paid_at'])): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/balance-paid" style="display:inline-block;">
             <?= Csrf::field() ?>
-            <label>Date<input type="date" name="paid_date" value="<?= date('Y-m-d') ?>"></label>
+            <label>Date<input type="date" name="paid_date" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
+            <label>Amount Paid (INR)<input type="number" step="0.01" min="0.01" name="amount_paid_inr" value="<?= htmlspecialchars((string) ($supplierPo['balance_amount_inr'] ?? '')) ?>" required></label>
             <button type="submit" class="btn-sm">Mark Balance Paid</button>
           </form>
         <?php endif; ?>

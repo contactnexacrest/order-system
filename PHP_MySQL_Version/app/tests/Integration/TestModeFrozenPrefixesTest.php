@@ -37,6 +37,12 @@ final class TestModeFrozenPrefixesTest extends DbTestCase
             ['/admin/roles/2/update'],
             ['/admin/permission-definitions'],
             ['/admin/permission-definitions/1/update'],
+            // External QA report TM-06 (regression retest of this same
+            // Owner Decision #4): /reports/save and /reports/saved/{id}/
+            // update|delete were also missing.
+            ['/reports/save'],
+            ['/reports/saved/7/update'],
+            ['/reports/saved/7/delete'],
         ];
     }
 
@@ -44,6 +50,23 @@ final class TestModeFrozenPrefixesTest extends DbTestCase
     public function testFrozenPrefixesNowCoverThePath(string $path): void
     {
         self::assertTrue(self::matchesFrozenPrefix($path), "{$path} must match TestModeGate::FROZEN_PREFIXES");
+    }
+
+    /**
+     * External QA report TM-06: /reports/saved/{id}/run just runs an
+     * existing saved report (a read, gated on view_reports, not
+     * manage_report_definitions) — it must stay available in Test Mode,
+     * unlike save/update/delete above. It does share the /reports/saved
+     * prefix with those (there's no narrower prefix that would exclude
+     * it without also excluding update/delete), so what actually keeps it
+     * unfrozen is blockAdminWritesInTestMode()'s own GET short-circuit —
+     * this confirms that still holds for this exact path, without ever
+     * reaching (and needing to mock) TestModeService::isEnabled().
+     */
+    public function testRunningASavedReportStaysUnfrozen(): void
+    {
+        TestModeGate::blockAdminWritesInTestMode('GET', '/reports/saved/7/run');
+        self::assertTrue(true, 'a GET request must never be blocked, matching prefix or not');
     }
 
     private static function matchesFrozenPrefix(string $path): bool

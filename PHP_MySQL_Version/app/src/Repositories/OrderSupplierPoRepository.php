@@ -114,26 +114,38 @@ final class OrderSupplierPoRepository
         )->execute(['id' => $id]);
     }
 
-    public static function markAdvancePaid(int $id, string $date, int $userId): void
+    // External QA report R-11: the amount actually paid is now captured
+    // alongside the date — it can differ from the PO's own planned
+    // advance_amount_inr/balance_amount_inr (a partial payment, a
+    // bank-charge deduction, a rate adjustment).
+    public static function markAdvancePaid(int $id, string $date, int $userId, float $amount): void
     {
         Database::connection()->prepare(
-            'UPDATE order_supplier_po SET advance_paid_at = :date, advance_paid_by = :user_id WHERE id = :id'
-        )->execute(['date' => $date, 'user_id' => $userId, 'id' => $id]);
+            'UPDATE order_supplier_po SET advance_paid_at = :date, advance_paid_by = :user_id, advance_paid_amount_inr = :amount WHERE id = :id'
+        )->execute(['date' => $date, 'user_id' => $userId, 'amount' => $amount, 'id' => $id]);
     }
 
-    public static function markBalancePaid(int $id, string $date, int $userId): void
+    public static function markBalancePaid(int $id, string $date, int $userId, float $amount): void
     {
         Database::connection()->prepare(
-            'UPDATE order_supplier_po SET balance_paid_at = :date, balance_paid_by = :user_id WHERE id = :id'
-        )->execute(['date' => $date, 'user_id' => $userId, 'id' => $id]);
+            'UPDATE order_supplier_po SET balance_paid_at = :date, balance_paid_by = :user_id, balance_paid_amount_inr = :amount WHERE id = :id'
+        )->execute(['date' => $date, 'user_id' => $userId, 'amount' => $amount, 'id' => $id]);
     }
 
-    /** @return array<int,array<string,mixed>> every supplier PO leg (advance/balance) paid on the given date, for the "today's supplier payments" report. */
+    /**
+     * @return array<int,array<string,mixed>> every supplier PO leg
+     *   (advance/balance) paid on the given date, for the "today's
+     *   supplier payments" report. External QA report R-11: amount is
+     *   the actually-captured paid amount, falling back to the PO's
+     *   planned amount for any row paid before that was captured.
+     */
     public static function paidOnDate(string $date): array
     {
         $stmt = Database::connection()->prepare(
-            "SELECT sp.id, sp.order_id, sp.supplier_po_reference, sp.advance_amount_inr, sp.advance_paid_at,
-                    sp.balance_amount_inr, sp.balance_paid_at, sp.supplier_legal_name, o.order_reference
+            "SELECT sp.id, sp.order_id, sp.supplier_po_reference,
+                    COALESCE(sp.advance_paid_amount_inr, sp.advance_amount_inr) AS advance_amount_inr, sp.advance_paid_at,
+                    COALESCE(sp.balance_paid_amount_inr, sp.balance_amount_inr) AS balance_amount_inr, sp.balance_paid_at,
+                    sp.supplier_legal_name, o.order_reference
              FROM order_supplier_po sp
              JOIN orders o ON o.id = sp.order_id
              WHERE sp.advance_paid_at = :date OR sp.balance_paid_at = :date2"

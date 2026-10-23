@@ -3823,3 +3823,17 @@ CREATE TABLE order_complaint_replies (
   FOREIGN KEY (author_user_id) REFERENCES users(id),
   FOREIGN KEY (author_client_id) REFERENCES clients(id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION BY — SUPPLIER PO PAYMENT AMOUNT CAPTURE (External QA report R-11)
+-- ================================================================
+-- Marking a Supplier PO's advance/balance payment as "paid" (Section
+-- BM above) only ever recorded a date — the amount actually paid
+-- (which can differ from the PO's own planned advance_amount_inr/
+-- balance_amount_inr: a partial payment, a bank-charge deduction, a
+-- rate adjustment) was never captured. See
+-- docs/migrations/2026-10-23n-supplier-po-payment-amount-capture.sql.
+-- ================================================================
+ALTER TABLE order_supplier_po
+  ADD COLUMN advance_paid_amount_inr DECIMAL(14,2) NULL,
+  ADD COLUMN balance_paid_amount_inr DECIMAL(14,2) NULL;

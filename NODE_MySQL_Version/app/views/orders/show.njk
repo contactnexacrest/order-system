@@ -1397,20 +1397,22 @@
       {% if supplierPo and permissions.manage_supplier_payments %}
         <h3 style="font-size:0.95em; margin-top:14px;">Supplier Payments</h3>
         <div class="kv-grid">
-          <div><span class="k">Advance (INR)</span><span class="v">{{ supplierPo.advance_amount_inr or '—' }}{% if supplierPo.advance_paid_at %} — paid {{ supplierPo.advance_paid_at }}{% endif %}</span></div>
-          <div><span class="k">Balance (INR)</span><span class="v">{{ supplierPo.balance_amount_inr or '—' }}{% if supplierPo.balance_paid_at %} — paid {{ supplierPo.balance_paid_at }}{% endif %}</span></div>
+          <div><span class="k">Advance (INR)</span><span class="v">{{ supplierPo.advance_amount_inr or '—' }}{% if supplierPo.advance_paid_at %} — paid {{ supplierPo.advance_paid_amount_inr or supplierPo.advance_amount_inr }} on {{ supplierPo.advance_paid_at }}{% endif %}</span></div>
+          <div><span class="k">Balance (INR)</span><span class="v">{{ supplierPo.balance_amount_inr or '—' }}{% if supplierPo.balance_paid_at %} — paid {{ supplierPo.balance_paid_amount_inr or supplierPo.balance_amount_inr }} on {{ supplierPo.balance_paid_at }}{% endif %}</span></div>
         </div>
         {% if not supplierPo.advance_paid_at %}
           <form method="post" action="/orders/{{ order.id }}/supplier-po/advance-paid" style="display:inline-block; margin-right:8px;">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Date<input type="date" name="paid_date"></label>
+            <label>Date<input type="date" name="paid_date" max="{{ today() }}"></label>
+            <label>Amount Paid (INR)<input type="number" step="0.01" min="0.01" name="amount_paid_inr" value="{{ supplierPo.advance_amount_inr or '' }}" required></label>
             <button type="submit" class="btn-sm">Mark Advance Paid</button>
           </form>
         {% endif %}
         {% if not supplierPo.balance_paid_at %}
           <form method="post" action="/orders/{{ order.id }}/supplier-po/balance-paid" style="display:inline-block;">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Date<input type="date" name="paid_date"></label>
+            <label>Date<input type="date" name="paid_date" max="{{ today() }}"></label>
+            <label>Amount Paid (INR)<input type="number" step="0.01" min="0.01" name="amount_paid_inr" value="{{ supplierPo.balance_amount_inr or '' }}" required></label>
             <button type="submit" class="btn-sm">Mark Balance Paid</button>
           </form>
         {% endif %}

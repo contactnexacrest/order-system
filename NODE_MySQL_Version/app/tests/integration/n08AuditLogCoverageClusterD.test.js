@@ -127,7 +127,7 @@ describe('Audit log coverage, N-08 Cluster D', () => {
     await createTestSupplierPo(orderId);
     const userId = await createTestUser();
 
-    await ordersController.markSupplierAdvancePaid(fakeReq(orderId, userId), fakeRes());
+    await ordersController.markSupplierAdvancePaid(fakeReq(orderId, userId, { amount_paid_inr: '20000' }), fakeRes());
 
     expect((await lastAuditLogAction()).action_type).toBe('SUPPLIER_ADVANCE_PAID');
   });
@@ -137,7 +137,7 @@ describe('Audit log coverage, N-08 Cluster D', () => {
     await createTestSupplierPo(orderId);
     const userId = await createTestUser();
 
-    await ordersController.markSupplierBalancePaid(fakeReq(orderId, userId), fakeRes());
+    await ordersController.markSupplierBalancePaid(fakeReq(orderId, userId, { amount_paid_inr: '30000' }), fakeRes());
 
     expect((await lastAuditLogAction()).action_type).toBe('SUPPLIER_BALANCE_PAID');
   });

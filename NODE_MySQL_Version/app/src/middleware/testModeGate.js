@@ -25,6 +25,15 @@ const flash = require('../helpers/flash');
 // edited while Test Mode was supposedly frozen. All four are decision-
 // making configuration in the same sense as /settings or /signatories, not
 // day-to-day operational data like /products.
+//
+// External QA report TM-06 (regression retest of the same Owner Decision
+// #4): /reports/save and /reports/saved/{id}/update|delete were also
+// missing — a saved report definition is reusable configuration (who
+// sees it, what filters it runs), not a one-off query, so creating/
+// editing/deleting one is decision-making in the same sense as the rest
+// of this list. /reports/saved/{id}/run (just running an existing saved
+// report) is left out on purpose — it reads data, it doesn't change
+// configuration.
 const FROZEN_PREFIXES = [
   '/settings',
   '/holidays',
@@ -40,6 +49,8 @@ const FROZEN_PREFIXES = [
   '/users',
   '/hs-codes',
   '/email-templates',
+  '/reports/save',
+  '/reports/saved',
 ];
 
 // Client-facing surfaces — blocked entirely (every method, not just

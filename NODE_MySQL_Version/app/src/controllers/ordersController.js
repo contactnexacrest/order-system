@@ -1725,6 +1725,48 @@ async function confirmSupplierSigned(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * External QA report R-11 (SPO-PAY-01): validates the paid date is a
+ * real calendar date, not more than today, and resolves the amount
+ * actually paid (required, must be positive) — before this, neither
+ * was checked at all: 2026-02-30 crashed, a date in 2099 was silently
+ * accepted, and no amount was ever captured.
+ *
+ * @returns {{date: string, amount: number}|null} null after already
+ *   setting an error flash + redirecting.
+ */
+function validateSupplierPoPayment(req, res, orderId) {
+  let date = str(req.body.paid_date);
+  if (date === '') {
+    date = todayYmd();
+  } else {
+    const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const isRealDate = m && new Date(`${date}T00:00:00Z`).getUTCFullYear() === Number(m[1])
+      && new Date(`${date}T00:00:00Z`).getUTCMonth() + 1 === Number(m[2])
+      && new Date(`${date}T00:00:00Z`).getUTCDate() === Number(m[3]);
+    if (!isRealDate) {
+      flash.set(req, 'error', 'Enter a valid paid date.');
+      res.redirect(`/orders/${orderId}`);
+      return null;
+    }
+    if (date > todayYmd()) {
+      flash.set(req, 'error', 'The paid date cannot be in the future.');
+      res.redirect(`/orders/${orderId}`);
+      return null;
+    }
+  }
+
+  const amountRaw = str(req.body.amount_paid_inr);
+  const amount = Number(amountRaw);
+  if (amountRaw === '' || Number.isNaN(amount) || amount <= 0) {
+    flash.set(req, 'error', 'Enter the amount actually paid.');
+    res.redirect(`/orders/${orderId}`);
+    return null;
+  }
+
+  return { date, amount };
+}
+
 async function markSupplierAdvancePaid(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
@@ -1733,8 +1775,12 @@ async function markSupplierAdvancePaid(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const date = str(req.body.paid_date) || todayYmd();
-  await orderSupplierPoRepository.markAdvancePaid(supplierPo.id, date, req.user.id);
+  const validated = validateSupplierPoPayment(req, res, orderId);
+  if (!validated) {
+    return;
+  }
+  const { date, amount } = validated;
+  await orderSupplierPoRepository.markAdvancePaid(supplierPo.id, date, req.user.id, amount);
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
   await auditLogRepository.log(req.user.id, 'SUPPLIER_ADVANCE_PAID', 'order_supplier_po', supplierPo.id, 'advance_paid_date', null, date);
@@ -1750,8 +1796,12 @@ async function markSupplierBalancePaid(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const date = str(req.body.paid_date) || todayYmd();
-  await orderSupplierPoRepository.markBalancePaid(supplierPo.id, date, req.user.id);
+  const validated = validateSupplierPoPayment(req, res, orderId);
+  if (!validated) {
+    return;
+  }
+  const { date, amount } = validated;
+  await orderSupplierPoRepository.markBalancePaid(supplierPo.id, date, req.user.id, amount);
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
   await auditLogRepository.log(req.user.id, 'SUPPLIER_BALANCE_PAID', 'order_supplier_po', supplierPo.id, 'balance_paid_date', null, date);

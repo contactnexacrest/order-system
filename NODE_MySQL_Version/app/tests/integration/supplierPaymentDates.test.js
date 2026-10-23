@@ -57,14 +57,88 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
     }, 'issued');
     const userId = await createTestUser('Admin');
 
-    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2026-10-20', userId);
-    await orderSupplierPoRepository.markBalancePaid(supplierPoId, '2026-10-21', userId);
+    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2026-10-20', userId, 20000.0);
+    await orderSupplierPoRepository.markBalancePaid(supplierPoId, '2026-10-21', userId, 30000.0);
 
     const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
     expect(supplierPo.advance_paid_at).toBe('2026-10-20');
     expect(Number(supplierPo.advance_paid_by)).toBe(userId);
+    expect(Number(supplierPo.advance_paid_amount_inr)).toBe(20000);
     expect(supplierPo.balance_paid_at).toBe('2026-10-21');
     expect(Number(supplierPo.balance_paid_by)).toBe(userId);
+    expect(Number(supplierPo.balance_paid_amount_inr)).toBe(30000);
+  });
+
+  /**
+   * External QA report R-11 (SPO-PAY-01): through the real controller
+   * action (not the repository call above, which has no validation of
+   * its own) — an impossible date like 2026-02-30 must be refused, not
+   * crash.
+   */
+  it('markSupplierAdvancePaid refuses an impossible date', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
+    await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-6', { advance_amount_inr: '20000' }, 'issued');
+    const userId = await createTestUser('Admin');
+    const req = fakeReq({ id: String(orderId) }, { paid_date: '2026-02-30', amount_paid_inr: '20000' }, userId);
+    const res = fakeRes();
+
+    await ordersController.markSupplierAdvancePaid(req, res);
+
+    expect((await orderSupplierPoRepository.findLatestForOrder(orderId)).advance_paid_at).toBeFalsy();
+    const flash = require('../../src/helpers/flash').pull(req);
+    expect(flash.length).toBeGreaterThan(0);
+    expect(flash[0].type).toBe('error');
+  });
+
+  /** External QA report R-11: a future-dated payment (2099) must be refused, not silently accepted. */
+  it('markSupplierAdvancePaid refuses a future date', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
+    await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-7', { advance_amount_inr: '20000' }, 'issued');
+    const userId = await createTestUser('Admin');
+    const req = fakeReq({ id: String(orderId) }, { paid_date: '2099-01-01', amount_paid_inr: '20000' }, userId);
+    const res = fakeRes();
+
+    await ordersController.markSupplierAdvancePaid(req, res);
+
+    expect((await orderSupplierPoRepository.findLatestForOrder(orderId)).advance_paid_at).toBeFalsy();
+    const flash = require('../../src/helpers/flash').pull(req);
+    expect(flash.length).toBeGreaterThan(0);
+    expect(flash[0].message).toMatch(/future/);
+  });
+
+  /** External QA report R-11: the amount actually paid must now be required — this used to capture nothing at all. */
+  it('markSupplierBalancePaid refuses a missing amount', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
+    await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-8', { balance_amount_inr: '30000' }, 'issued');
+    const userId = await createTestUser('Admin');
+    const req = fakeReq({ id: String(orderId) }, { paid_date: '2026-10-20' }, userId);
+    const res = fakeRes();
+
+    await ordersController.markSupplierBalancePaid(req, res);
+
+    expect((await orderSupplierPoRepository.findLatestForOrder(orderId)).balance_paid_at).toBeFalsy();
+    const flash = require('../../src/helpers/flash').pull(req);
+    expect(flash.length).toBeGreaterThan(0);
+    expect(flash[0].message).toMatch(/amount/);
+  });
+
+  /** External QA report R-11: a valid date + amount through the real controller action persists both, including when the amount differs from the PO's own planned amount. */
+  it('markSupplierAdvancePaid persists a different actually-paid amount', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
+    await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-9', { advance_amount_inr: '20000' }, 'issued');
+    const userId = await createTestUser('Admin');
+    const req = fakeReq({ id: String(orderId) }, { paid_date: '2026-10-20', amount_paid_inr: '19500.50' }, userId);
+    const res = fakeRes();
+
+    await ordersController.markSupplierAdvancePaid(req, res);
+
+    const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+    expect(supplierPo.advance_paid_at).toBe('2026-10-20');
+    expect(Number(supplierPo.advance_paid_amount_inr)).toBe(19500.5);
   });
 
   it('paidOnDate finds both legs on their own date', async () => {
@@ -76,8 +150,8 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
     const userId = await createTestUser('Admin');
     // Distinct, otherwise-unused dates — other tests in this suite also
     // write real rows with real dates.
-    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2031-03-11', userId);
-    await orderSupplierPoRepository.markBalancePaid(supplierPoId, '2031-03-12', userId);
+    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2031-03-11', userId, 20000.0);
+    await orderSupplierPoRepository.markBalancePaid(supplierPoId, '2031-03-12', userId, 30000.0);
 
     const onThe11th = (await orderSupplierPoRepository.paidOnDate('2031-03-11')).map((r) => r.id);
     const onThe12th = (await orderSupplierPoRepository.paidOnDate('2031-03-12')).map((r) => r.id);
@@ -103,7 +177,7 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
     expect(resBefore.renderedData.supplierPo.advance_paid_at).toBeFalsy();
     expect(resBefore.renderedData.supplierPo.balance_paid_at).toBeFalsy();
 
-    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2026-10-20', userId);
+    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2026-10-20', userId, 20000.0);
 
     const resAfter = fakeRes();
     await ordersController.show(fakeReq({ id: String(orderId) }, null, userId), resAfter);
@@ -122,7 +196,7 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
     const supplierPoId = await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-4', {
       advance_amount_inr: '20000',
     }, 'issued');
-    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2026-10-21', clearUserId);
+    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2026-10-21', clearUserId, 20000.0);
 
     const res = fakeRes();
     await reportController.todaysPayments({ query: { date: '2026-10-21' }, permissions: new Proxy({}, { get: () => true }) }, res);
@@ -147,7 +221,7 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
     const supplierPoId = await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-5', {
       advance_amount_inr: '45000',
     }, 'issued');
-    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2031-05-05', adminId);
+    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2031-05-05', adminId, 45000.0);
 
     async function loadRealPermissions(roleName) {
       const userId = await createTestUser(roleName);

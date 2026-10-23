@@ -1723,6 +1723,41 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /**
+     * External QA report R-11 (SPO-PAY-01): validates the paid date is a
+     * real calendar date, not more than today, and resolves the amount
+     * actually paid (required, must be positive) — before this, neither
+     * was checked at all: 2026-02-30 crashed with an HTTP 500, a date in
+     * 2099 was silently accepted, and no amount was ever captured.
+     *
+     * @return array{0:string,1:float}|null [date, amount] on success, or
+     *   null after already setting an error flash + redirecting.
+     */
+    private function validateSupplierPoPayment(int $orderId): ?array
+    {
+        $date = trim((string) ($_POST['paid_date'] ?? ''));
+        if ($date === '') {
+            $date = date('Y-m-d');
+        } elseif (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+            Flash::set('error', 'Enter a valid paid date.');
+            header("Location: /orders/{$orderId}");
+            return null;
+        } elseif ($date > date('Y-m-d')) {
+            Flash::set('error', 'The paid date cannot be in the future.');
+            header("Location: /orders/{$orderId}");
+            return null;
+        }
+
+        $amountRaw = trim((string) ($_POST['amount_paid_inr'] ?? ''));
+        if ($amountRaw === '' || !is_numeric($amountRaw) || (float) $amountRaw <= 0) {
+            Flash::set('error', 'Enter the amount actually paid.');
+            header("Location: /orders/{$orderId}");
+            return null;
+        }
+
+        return [$date, (float) $amountRaw];
+    }
+
     public function markSupplierAdvancePaid(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -1733,8 +1768,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $date = trim((string) ($_POST['paid_date'] ?? '')) ?: date('Y-m-d');
-        OrderSupplierPoRepository::markAdvancePaid((int) $supplierPo['id'], $date, (int) $user['id']);
+        $validated = $this->validateSupplierPoPayment($orderId);
+        if ($validated === null) {
+            return;
+        }
+        [$date, $amount] = $validated;
+        OrderSupplierPoRepository::markAdvancePaid((int) $supplierPo['id'], $date, (int) $user['id'], $amount);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
         AuditLogRepository::log((int) $user['id'], 'SUPPLIER_ADVANCE_PAID', 'order_supplier_po', (int) $supplierPo['id'], 'advance_paid_date', null, $date);
@@ -1752,8 +1791,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $date = trim((string) ($_POST['paid_date'] ?? '')) ?: date('Y-m-d');
-        OrderSupplierPoRepository::markBalancePaid((int) $supplierPo['id'], $date, (int) $user['id']);
+        $validated = $this->validateSupplierPoPayment($orderId);
+        if ($validated === null) {
+            return;
+        }
+        [$date, $amount] = $validated;
+        OrderSupplierPoRepository::markBalancePaid((int) $supplierPo['id'], $date, (int) $user['id'], $amount);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
         AuditLogRepository::log((int) $user['id'], 'SUPPLIER_BALANCE_PAID', 'order_supplier_po', (int) $supplierPo['id'], 'balance_paid_date', null, $date);

@@ -94,19 +94,36 @@ async function markSigned(id) {
   await db.execute("UPDATE order_supplier_po SET status = 'signed', signed_at = NOW() WHERE id = :id", { id });
 }
 
-async function markAdvancePaid(id, date, userId) {
-  await db.execute('UPDATE order_supplier_po SET advance_paid_at = :date, advance_paid_by = :user_id WHERE id = :id', { date, user_id: userId, id });
+// External QA report R-11: the amount actually paid is now captured
+// alongside the date — it can differ from the PO's own planned
+// advance_amount_inr/balance_amount_inr (a partial payment, a
+// bank-charge deduction, a rate adjustment).
+async function markAdvancePaid(id, date, userId, amount) {
+  await db.execute(
+    'UPDATE order_supplier_po SET advance_paid_at = :date, advance_paid_by = :user_id, advance_paid_amount_inr = :amount WHERE id = :id',
+    { date, user_id: userId, amount, id }
+  );
 }
 
-async function markBalancePaid(id, date, userId) {
-  await db.execute('UPDATE order_supplier_po SET balance_paid_at = :date, balance_paid_by = :user_id WHERE id = :id', { date, user_id: userId, id });
+async function markBalancePaid(id, date, userId, amount) {
+  await db.execute(
+    'UPDATE order_supplier_po SET balance_paid_at = :date, balance_paid_by = :user_id, balance_paid_amount_inr = :amount WHERE id = :id',
+    { date, user_id: userId, amount, id }
+  );
 }
 
-/** Every supplier PO leg (advance/balance) paid on the given date, for the "today's supplier payments" report. */
+/**
+ * Every supplier PO leg (advance/balance) paid on the given date, for
+ * the "today's supplier payments" report. External QA report R-11:
+ * amount is the actually-captured paid amount, falling back to the
+ * PO's planned amount for any row paid before that was captured.
+ */
 async function paidOnDate(date) {
   return db.query(
-    `SELECT sp.id, sp.order_id, sp.supplier_po_reference, sp.advance_amount_inr, sp.advance_paid_at,
-            sp.balance_amount_inr, sp.balance_paid_at, sp.supplier_legal_name, o.order_reference
+    `SELECT sp.id, sp.order_id, sp.supplier_po_reference,
+            COALESCE(sp.advance_paid_amount_inr, sp.advance_amount_inr) AS advance_amount_inr, sp.advance_paid_at,
+            COALESCE(sp.balance_paid_amount_inr, sp.balance_amount_inr) AS balance_amount_inr, sp.balance_paid_at,
+            sp.supplier_legal_name, o.order_reference
      FROM order_supplier_po sp
      JOIN orders o ON o.id = sp.order_id
      WHERE sp.advance_paid_at = :date OR sp.balance_paid_at = :date2`,
