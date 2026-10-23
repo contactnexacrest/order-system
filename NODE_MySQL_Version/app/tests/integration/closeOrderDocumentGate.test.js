@@ -113,7 +113,11 @@ describe('Close order document gate (90-item backlog Phase 6 Item 3)', () => {
 
     await ordersController.closeOrder(req, fakeRes());
 
-    expect((await orderRepository.find(orderId)).status).toBe('complete');
+    // docs/schema.sql Section BU — closeOrder() now only reaches the
+    // intermediate 'shipped_docs_sent' phase (documents couriered,
+    // still open internally for government export benefits); the real
+    // final lock is markFullySettled(), tested separately.
+    expect((await orderRepository.find(orderId)).status).toBe('shipped_docs_sent');
   });
 
   it('closeOrder override requires edit_locked_data permission', async () => {
@@ -161,7 +165,7 @@ describe('Close order document gate (90-item backlog Phase 6 Item 3)', () => {
 
     await ordersController.closeOrder(req, fakeRes());
 
-    expect((await orderRepository.find(orderId)).status).toBe('complete');
+    expect((await orderRepository.find(orderId)).status).toBe('shipped_docs_sent');
 
     const log = await db.queryOne(
       "SELECT * FROM audit_log WHERE action_type = 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE' AND entity_type = 'orders' AND entity_id = :id",

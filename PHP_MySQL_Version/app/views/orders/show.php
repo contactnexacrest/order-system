@@ -1996,7 +1996,7 @@ foreach ($stages as $s) {
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
 
     <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
-    <?php $govtBenefitsApplicable = $order['status'] === 'complete' && !empty($payment['balance_remittance_received_at']); ?>
+    <?php $govtBenefitsApplicable = in_array($order['status'], ['shipped_docs_sent', 'complete'], true) && !empty($payment['balance_remittance_received_at']); ?>
     <?php if (!$govtBenefitsApplicable): ?>
       <p class="muted">Not applicable until the order is complete and the CI (balance) remittance has been received — government benefit schemes only come into play once the full proceeds have actually landed.</p>
     <?php else: ?>
@@ -2182,7 +2182,31 @@ foreach ($stages as $s) {
   <div class="section" data-stage="9">
     <h2>Stage 9 — Document Despatch &amp; Closure</h2>
     <?php if ($orderClosed): ?>
-      <p><strong>&#10003; Order closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
+      <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
+    <?php elseif ($order['status'] === 'shipped_docs_sent'): ?>
+      <p><strong>&#10003; Documents sent to buyer.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — this order now shows as done to the client, but stays open internally for government export benefits (see Order Financials below).</p>
+      <?php if ($canCloseOrders): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
+        <?= Csrf::field() ?>
+        <?= $stepBadge('11e') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
+      </form>
+      <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials below).</p>
+      <?php if ($canEditLockedData): ?>
+      <details>
+        <summary class="small">Override &amp; fully settle anyway (benefit genuinely never arriving)</summary>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirmFieldOverride(this, 'fully settling this order with a benefit claim still outstanding');" style="border:1px solid #D9822B; padding:10px; border-radius:4px;">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="override_gate" value="1">
+          <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+          </label>
+          <button type="submit" class="btn-sm btn-danger">Override &amp; Mark Fully Settled</button>
+        </form>
+      </details>
+      <?php endif; ?>
+      <?php else: ?>
+      <p class="muted">Only Export/Logistics can mark this order fully settled.</p>
+      <?php endif; ?>
     <?php elseif (!$stage9 || $stage9['status'] === 'locked'): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php else: ?>
@@ -2351,6 +2375,7 @@ foreach ($stages as $s) {
       <label>Status
         <select name="status">
           <option value="active" <?= $order['status'] === 'active' ? 'selected' : '' ?>>Active</option>
+          <option value="shipped_docs_sent" <?= $order['status'] === 'shipped_docs_sent' ? 'selected' : '' ?>>Shipped &mdash; Docs Sent</option>
           <option value="complete" <?= $order['status'] === 'complete' ? 'selected' : '' ?>>Complete</option>
           <option value="disputed" <?= $order['status'] === 'disputed' ? 'selected' : '' ?>>Disputed</option>
           <option value="lost" <?= $order['status'] === 'lost' ? 'selected' : '' ?>>Lost</option>

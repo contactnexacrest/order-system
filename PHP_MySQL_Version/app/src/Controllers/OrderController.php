@@ -98,6 +98,7 @@ final class OrderController
             'all' => count($all),
             'active' => 0,
             'overdue' => 0,
+            'shipped_docs_sent' => 0,
             'complete' => 0,
             'lost' => 0,
             'cancelled' => 0,
@@ -114,7 +115,7 @@ final class OrderController
         $filtered = match ($statusFilter) {
             'all' => $all,
             'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
-            'active', 'complete', 'lost', 'cancelled' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
+            'active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
             default => array_values(array_filter($all, static fn($o) => $o['status'] === 'active')),
         };
 
@@ -2556,11 +2557,74 @@ final class OrderController
         }
         OrderShippingRepository::recordCourierSent($orderId, $trackingNumber);
         StageGateService::passAndUnlockNext($orderId, 9, (int) $user['id']);
-        OrderRepository::markComplete($orderId);
+        OrderRepository::markShippedDocsSent($orderId);
         if ($allowOverride) {
-            AuditLogRepository::log((int) $user['id'], 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE', 'orders', $orderId, 'status', null, 'complete', $overrideReason);
+            AuditLogRepository::log((int) $user['id'], 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE', 'orders', $orderId, 'status', null, 'shipped_docs_sent', $overrideReason);
         }
-        Flash::set('success', "Order closed — complete document set couriered to buyer (tracking: {$trackingNumber}).");
+        Flash::set('success', "Documents sent to buyer (tracking: {$trackingNumber}) — this order now shows as done to the client. Apply for any government export benefits, then use \"Mark Fully Settled\" below once there's nothing left outstanding.");
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * docs/schema.sql Section BU — export process step 11e, the real
+     * final lock. Only reachable from 'shipped_docs_sent' (documents
+     * must already be out — see closeOrder() above). Blocks on any
+     * government export benefit claim linked to this order that's
+     * still awaiting receipt (step 11d: "once we receive the benefits —
+     * record in system — then we mark the order a complete close"),
+     * with the same edit_locked_data + reason escape hatch as the
+     * closeOrder() document-gate override, for the rare case a benefit
+     * genuinely never arrives and the order needs closing anyway.
+     */
+    public function markFullySettled(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        if ($order['status'] !== 'shipped_docs_sent') {
+            Flash::set('error', 'This order must be in "Documents Sent" status (closeOrder, Stage 9) before it can be marked fully settled.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $overrideRequested = !empty($_POST['override_gate']);
+        $overrideReason = trim((string) ($_POST['override_reason'] ?? ''));
+        $allowOverride = false;
+        if ($overrideRequested) {
+            if (!PermissionService::can((int) $user['id'], $roleId, 'edit_locked_data')) {
+                Flash::set('error', 'You do not have permission to override the outstanding-benefits requirement.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            if ($overrideReason === '' || mb_strlen($overrideReason) < 10) {
+                Flash::set('error', 'A reason (at least 10 characters) is required to fully settle an order with a benefit claim still outstanding.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            $allowOverride = true;
+        }
+
+        if (!$allowOverride) {
+            $pendingBenefits = array_filter(
+                CaExportBenefitRepository::forOrder($orderId),
+                static fn(array $b): bool => $b['received_amount'] === null
+            );
+            if (!empty($pendingBenefits)) {
+                Flash::set('error', 'This order has a government export benefit claim still awaiting receipt — record it as received first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
+                header("Location: /orders/{$orderId}#order-financials");
+                return;
+            }
+        }
+
+        OrderRepository::markComplete($orderId);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_FULLY_SETTLED', 'orders', $orderId, 'status', 'shipped_docs_sent', 'complete', $allowOverride ? $overrideReason : null);
+        Flash::set('success', 'Order fully settled and closed.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -2673,7 +2737,7 @@ final class OrderController
             echo 'Order not found.';
             return;
         }
-        if (in_array($order['status'], ['complete', 'lost', 'cancelled'], true)) {
+        if (in_array($order['status'], ['shipped_docs_sent', 'complete', 'lost', 'cancelled'], true)) {
             Flash::set('error', "An order that is already \"{$order['status']}\" cannot have a cancellation requested.");
             header("Location: /orders/{$orderId}");
             return;
@@ -2810,7 +2874,7 @@ final class OrderController
         $newIsLocked = isset($_POST['is_locked']);
         $reason = trim((string) ($_POST['reason'] ?? ''));
 
-        if (!in_array($newStatus, ['active', 'complete', 'disputed', 'lost', 'cancelled'], true)) {
+        if (!in_array($newStatus, ['active', 'shipped_docs_sent', 'complete', 'disputed', 'lost', 'cancelled'], true)) {
             Flash::set('error', 'Invalid status value.');
             header("Location: /orders/{$orderId}");
             return;

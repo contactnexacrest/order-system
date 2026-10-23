@@ -3708,3 +3708,21 @@ CREATE TABLE order_inspection_fees (
   FOREIGN KEY (cost_entry_id) REFERENCES order_cost_entries(id),
   FOREIGN KEY (recorded_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION BU — TWO-PHASE ORDER CLOSURE (added 2026-10-23)
+-- ================================================================
+-- Export process steps 11a-11e: closing an order used to be one step
+-- (couriering the full document set immediately marked it 'complete'
+-- AND locked it) — but government export benefits are claimed and
+-- received AFTER that point, and locking the order right then meant
+-- staff needed the "Override locked data" permission just to record an
+-- entirely normal part of closing out an order. Split into
+-- 'shipped_docs_sent' (documents couriered — the client now sees this
+-- order as done, but it stays UNLOCKED internally so benefit claims/
+-- receipts can still be recorded freely) -> 'complete' (benefits
+-- received, nothing left to do — the real final lock, same as before).
+-- See docs/migrations/2026-10-23i-two-phase-order-closure.sql.
+-- ================================================================
+ALTER TABLE orders
+  MODIFY COLUMN status ENUM('active','shipped_docs_sent','complete','disputed','lost','cancelled') NOT NULL DEFAULT 'active';

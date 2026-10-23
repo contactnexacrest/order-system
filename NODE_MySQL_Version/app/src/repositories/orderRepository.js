@@ -604,10 +604,34 @@ async function setDisputeButtonVisible(orderId, visible) {
 }
 
 /**
- * Stage 9 closure gate: full document set couriered to buyer —
- * order.status='complete' and locked (Business Rule #17).
- * External QA report L-25: clear any live Buyer Action Link on close too —
- * see markLost()'s matching comment.
+ * docs/schema.sql Section BU — Stage 9 closure gate, phase 1: full
+ * document set couriered to buyer. The client now sees this order as
+ * done, but it stays UNLOCKED internally (status='shipped_docs_sent',
+ * is_locked unchanged) — export process steps 11b-11d (apply for
+ * government export benefits, record them once received) still need to
+ * happen before the real final lock (markComplete() below).
+ * External QA report L-25's Buyer Action Link cleanup happens here too,
+ * same as before — the buyer has nothing further to action once
+ * documents are sent, whichever closure phase comes next.
+ */
+async function markShippedDocsSent(orderId) {
+  await db.execute(
+    `UPDATE orders
+        SET status = 'shipped_docs_sent',
+            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+      WHERE id = :id`,
+    { id: orderId }
+  );
+}
+
+/**
+ * docs/schema.sql Section BU — Stage 9 closure gate, phase 2 (export
+ * process step 11e): the real final lock, now reached from
+ * 'shipped_docs_sent' once there's nothing left to do (government
+ * export benefits received, or never applicable) rather than directly
+ * from couriering the documents — see markShippedDocsSent() above.
+ * Business Rule #17. External QA report L-25: clear any live Buyer
+ * Action Link on close too — see markLost()'s matching comment.
  */
 async function markComplete(orderId) {
   await db.execute(
@@ -774,7 +798,7 @@ async function findByValidBuyerActionToken(rawToken) {
 
 module.exports = {
   all, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
-  setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
+  setProductionStatus, setBuyersPoRef, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot,
 };

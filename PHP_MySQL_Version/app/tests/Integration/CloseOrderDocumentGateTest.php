@@ -99,7 +99,11 @@ final class CloseOrderDocumentGateTest extends DbTestCase
         (new OrderController())->closeOrder(['id' => (string) $orderId]);
         ob_end_clean();
 
-        self::assertSame('complete', OrderRepository::find($orderId)['status']);
+        // docs/schema.sql Section BU — closeOrder() now only reaches the
+        // intermediate 'shipped_docs_sent' phase (documents couriered,
+        // still open internally for government export benefits); the
+        // real final lock is markFullySettled(), tested separately.
+        self::assertSame('shipped_docs_sent', OrderRepository::find($orderId)['status']);
     }
 
     public function testCloseOrderOverrideRequiresEditLockedDataPermission(): void
@@ -148,7 +152,7 @@ final class CloseOrderDocumentGateTest extends DbTestCase
         (new OrderController())->closeOrder(['id' => (string) $orderId]);
         ob_end_clean();
 
-        self::assertSame('complete', OrderRepository::find($orderId)['status']);
+        self::assertSame('shipped_docs_sent', OrderRepository::find($orderId)['status']);
 
         $stmt = Database::connection()->prepare(
             "SELECT * FROM audit_log WHERE action_type = 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE' AND entity_type = 'orders' AND entity_id = :id"

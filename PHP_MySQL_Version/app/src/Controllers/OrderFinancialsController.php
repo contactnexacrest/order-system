@@ -37,7 +37,7 @@ final class OrderFinancialsController
             return;
         }
         $payment = \App\Repositories\OrderPaymentStatusRepository::find($orderId);
-        if ($order['status'] !== 'complete' || empty($payment['balance_remittance_received_at'])) {
+        if (!in_array($order['status'], ['shipped_docs_sent', 'complete'], true) || empty($payment['balance_remittance_received_at'])) {
             Flash::set('error', 'Government export benefits only apply once the order is complete and the CI (balance) remittance has been received.');
             header("Location: /orders/{$orderId}");
             return;

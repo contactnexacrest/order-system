@@ -105,7 +105,7 @@ async function index(req, res) {
   // is remembered for that pageview exactly like every other tab.
   const statusFilter = String(req.query.status || '').trim() || 'active';
 
-  const counts = { all: all.length, active: 0, overdue: 0, complete: 0, lost: 0, cancelled: 0 };
+  const counts = { all: all.length, active: 0, overdue: 0, shipped_docs_sent: 0, complete: 0, lost: 0, cancelled: 0 };
   for (const o of all) {
     if (o.is_overdue) counts.overdue++;
     if (Object.prototype.hasOwnProperty.call(counts, o.status)) counts[o.status]++;
@@ -114,7 +114,7 @@ async function index(req, res) {
   let filtered = all;
   if (statusFilter === 'overdue') {
     filtered = all.filter((o) => !!o.is_overdue);
-  } else if (['active', 'complete', 'lost', 'cancelled'].includes(statusFilter)) {
+  } else if (['active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled'].includes(statusFilter)) {
     filtered = all.filter((o) => o.status === statusFilter);
   } else if (statusFilter !== 'all') {
     filtered = all.filter((o) => o.status === 'active');
@@ -138,7 +138,7 @@ async function index(req, res) {
   const stageTotal = 9;
   const orders = pageSlice.map((o) => ({
     ...o,
-    filled_segments: o.status === 'complete' ? stageTotal : ((o.status === 'lost' || o.status === 'cancelled') ? Math.max(o.current_stage_number || 0, 1) : (o.current_stage_number || 0)),
+    filled_segments: (o.status === 'complete' || o.status === 'shipped_docs_sent') ? stageTotal : ((o.status === 'lost' || o.status === 'cancelled') ? Math.max(o.current_stage_number || 0, 1) : (o.current_stage_number || 0)),
   }));
 
   res.renderView('orders/index', {
@@ -2517,11 +2517,69 @@ async function closeOrder(req, res) {
   }
   await orderShippingRepository.recordCourierSent(orderId, trackingNumber);
   await stageGateService.passAndUnlockNext(orderId, 9, user.id);
-  await orderRepository.markComplete(orderId);
+  await orderRepository.markShippedDocsSent(orderId);
   if (allowOverride) {
-    await auditLogRepository.log(user.id, 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE', 'orders', orderId, 'status', null, 'complete', overrideReason);
+    await auditLogRepository.log(user.id, 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE', 'orders', orderId, 'status', null, 'shipped_docs_sent', overrideReason);
   }
-  flash.set(req, 'success', `Order closed — complete document set couriered to buyer (tracking: ${trackingNumber}).`);
+  flash.set(req, 'success', `Documents sent to buyer (tracking: ${trackingNumber}) — this order now shows as done to the client. Apply for any government export benefits, then use "Mark Fully Settled" below once there's nothing left outstanding.`);
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * docs/schema.sql Section BU — export process step 11e, the real final
+ * lock. Only reachable from 'shipped_docs_sent' (documents must already
+ * be out — see closeOrder() above). Blocks on any government export
+ * benefit claim linked to this order that's still awaiting receipt
+ * (step 11d: "once we receive the benefits — record in system — then
+ * we mark the order a complete close"), with the same edit_locked_data
+ * + reason escape hatch as the closeOrder() document-gate override, for
+ * the rare case a benefit genuinely never arrives and the order needs
+ * closing anyway.
+ */
+async function markFullySettled(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  if (order.status !== 'shipped_docs_sent') {
+    flash.set(req, 'error', 'This order must be in "Documents Sent" status (closeOrder, Stage 9) before it can be marked fully settled.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const overrideRequested = !!req.body.override_gate;
+  const overrideReason = str(req.body.override_reason).trim();
+  let allowOverride = false;
+  if (overrideRequested) {
+    if (!req.permissions || !req.permissions.edit_locked_data) {
+      flash.set(req, 'error', 'You do not have permission to override the outstanding-benefits requirement.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    if (overrideReason.length < 10) {
+      flash.set(req, 'error', 'A reason (at least 10 characters) is required to fully settle an order with a benefit claim still outstanding.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    allowOverride = true;
+  }
+
+  if (!allowOverride) {
+    const benefits = await caExportBenefitRepository.forOrder(orderId);
+    const pendingBenefits = benefits.filter((b) => b.received_amount === null);
+    if (pendingBenefits.length > 0) {
+      flash.set(req, 'error', 'This order has a government export benefit claim still awaiting receipt — record it as received first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
+      res.redirect(`/orders/${orderId}#order-financials`);
+      return;
+    }
+  }
+
+  await orderRepository.markComplete(orderId);
+  await auditLogRepository.log(user.id, 'ORDER_FULLY_SETTLED', 'orders', orderId, 'status', 'shipped_docs_sent', 'complete', allowOverride ? overrideReason : null);
+  flash.set(req, 'success', 'Order fully settled and closed.');
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -2582,7 +2640,7 @@ async function overrideStatusLock(req, res) {
   const newIsLocked = req.body.is_locked !== undefined;
   const reason = str(req.body.reason);
 
-  if (!['active', 'complete', 'disputed', 'lost', 'cancelled'].includes(newStatus)) {
+  if (!['active', 'shipped_docs_sent', 'complete', 'disputed', 'lost', 'cancelled'].includes(newStatus)) {
     flash.set(req, 'error', 'Invalid status value.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2678,7 +2736,7 @@ async function requestCancellation(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
-  if (['complete', 'lost', 'cancelled'].includes(order.status)) {
+  if (['shipped_docs_sent', 'complete', 'lost', 'cancelled'].includes(order.status)) {
     flash.set(req, 'error', `An order that is already "${order.status}" cannot have a cancellation requested.`);
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2801,7 +2859,7 @@ module.exports = {
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   saveBlEndorsement, generateBlEndorsement,
-  closeOrder, overrideStatusLock, markLost, updateComplianceTask,
+  closeOrder, markFullySettled, overrideStatusLock, markLost, updateComplianceTask,
   requestCancellation, approveCancellation, rejectCancellation, completeCancellationRefund,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,

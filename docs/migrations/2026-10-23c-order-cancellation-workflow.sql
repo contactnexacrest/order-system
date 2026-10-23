@@ -12,8 +12,16 @@ SET NAMES utf8mb4;
 -- MODIFY COLUMN is naturally safe to re-run (re-stating the same ENUM is
 -- a no-op); CREATE TABLE IF NOT EXISTS below is the same External QA
 -- report L-32 convention for the new table.
+--
+-- Includes 'shipped_docs_sent' (added later by
+-- 2026-10-23i-two-phase-order-closure.sql / docs/schema.sql Section BU)
+-- so that re-running THIS file after that one has gone live never
+-- narrows the column back down and truncates real data using that
+-- value — MigrationIdempotencyTest replays every migration file in
+-- order against the already-fully-migrated database, which is exactly
+-- that scenario.
 ALTER TABLE orders
-  MODIFY COLUMN status ENUM('active','complete','disputed','lost','cancelled') NOT NULL DEFAULT 'active';
+  MODIFY COLUMN status ENUM('active','shipped_docs_sent','complete','disputed','lost','cancelled') NOT NULL DEFAULT 'active';
 
 CREATE TABLE IF NOT EXISTS order_cancellations (
   id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

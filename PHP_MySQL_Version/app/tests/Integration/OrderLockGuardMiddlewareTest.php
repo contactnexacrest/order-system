@@ -85,7 +85,7 @@ final class OrderLockGuardMiddlewareTest extends DbTestCase
     {
         $source = (string) file_get_contents(dirname(__DIR__, 3) . '/public_html/index.php');
         $excluded = [
-            '/orders/{id}/override-status-lock', '/orders/{id}/close', '/orders/{id}/mark-lost',
+            '/orders/{id}/override-status-lock', '/orders/{id}/close', '/orders/{id}/mark-fully-settled', '/orders/{id}/mark-lost',
             '/orders/{id}/archive', '/orders/{id}/unarchive', '/orders/{id}/duplicate', '/orders/{id}/comments',
             '/orders/{id}/documents/generate', '/orders/{id}/documents/{documentId}/delete',
             '/orders/{id}/documents/{documentId}/send', '/orders/{id}/email/send', '/orders/{id}/disputes',

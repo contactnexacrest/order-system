@@ -1,4 +1,12 @@
-<?php use App\Helpers\Dates; ?>
+<?php
+use App\Helpers\Dates;
+// docs/schema.sql Section BU — the client sees "Complete" the moment
+// documents are sent (export process step 11b: "Mark the order almost
+// close - client close"); whether government export benefits are still
+// outstanding internally (status='shipped_docs_sent' vs 'complete') is
+// staff-only information with no bearing on what the buyer needs to know.
+$clientStatusLabels = ['shipped_docs_sent' => 'Complete'];
+?>
 <div class="card page-wide">
   <h1>My Orders</h1>
   <?php if ($historyHidden): ?>
@@ -12,7 +20,7 @@
     <tr>
       <td><?= htmlspecialchars($o['order_reference'] ?? ('#' . $o['id'])) ?></td>
       <td><?= htmlspecialchars($o['current_stage_name'] ?? '—') ?></td>
-      <td><?= htmlspecialchars(ucfirst($o['status'])) ?></td>
+      <td><?= htmlspecialchars($clientStatusLabels[$o['status']] ?? ucfirst($o['status'])) ?></td>
       <td><?= htmlspecialchars(Dates::human($o['created_at'])) ?></td>
       <td><a href="/client/orders/<?= (int) $o['id'] ?>">View documents</a></td>
     </tr>

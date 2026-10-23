@@ -712,6 +712,7 @@ app.post('/orders/:id/bl-endorsed', requireAuth, requirePermission('manage_shipp
 app.post('/orders/:id/bl-endorsement', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveBlEndorsement));
 app.post('/orders/:id/bl-endorsement/generate', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateBlEndorsement));
 app.post('/orders/:id/close', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.closeOrder));
+app.post('/orders/:id/mark-fully-settled', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.markFullySettled));
 app.post('/orders/:id/mark-lost', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.markLost));
 // External QA report M-09: formal cancellation workflow, distinct from mark-lost above.
 app.post('/orders/:id/cancellation/request', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.requestCancellation));

@@ -67,7 +67,7 @@ describe('orderLockGuard middleware (External QA report L-28)', () => {
   it('every non-excluded order mutation route is registered with checkOrderLock', () => {
     const source = fs.readFileSync(path.join(__dirname, '../../src/server.js'), 'utf8');
     const excluded = new Set([
-      '/orders/:id/override-status-lock', '/orders/:id/close', '/orders/:id/mark-lost',
+      '/orders/:id/override-status-lock', '/orders/:id/close', '/orders/:id/mark-fully-settled', '/orders/:id/mark-lost',
       '/orders/:id/archive', '/orders/:id/unarchive', '/orders/:id/duplicate', '/orders/:id/comments',
       '/orders/:id/documents/generate', '/orders/:id/documents/:documentId/delete',
       '/orders/:id/documents/:documentId/send', '/orders/:id/email/send', '/orders/:id/disputes',

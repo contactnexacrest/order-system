@@ -36,7 +36,7 @@ async function addExportBenefit(req, res) {
     return;
   }
   const payment = await orderPaymentStatusRepository.find(orderId);
-  if (order.status !== 'complete' || !payment || !payment.balance_remittance_received_at) {
+  if (!['shipped_docs_sent', 'complete'].includes(order.status) || !payment || !payment.balance_remittance_received_at) {
     flash.set(req, 'error', 'Government export benefits only apply once the order is complete and the CI (balance) remittance has been received.');
     res.redirect(`/orders/${orderId}`);
     return;

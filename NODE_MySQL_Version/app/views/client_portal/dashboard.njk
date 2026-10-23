@@ -1,3 +1,11 @@
+{#
+  docs/schema.sql Section BU — the client sees "Complete" the moment
+  documents are sent (export process step 11b: "Mark the order almost
+  close - client close"); whether government export benefits are still
+  outstanding internally (status='shipped_docs_sent' vs 'complete') is
+  staff-only information with no bearing on what the buyer needs to know.
+#}
+{% set clientStatusLabels = { shipped_docs_sent: 'Complete' } %}
 <div class="card page-wide">
   <h1>My Orders</h1>
   {% if historyHidden %}
@@ -11,7 +19,7 @@
     <tr>
       <td>{{ o.order_reference or ('#' ~ o.id) }}</td>
       <td>{{ o.current_stage_name or '—' }}</td>
-      <td>{{ o.status | capitalize }}</td>
+      <td>{{ clientStatusLabels[o.status] or (o.status | capitalize) }}</td>
       <td>{{ o.created_at | humanDate }}</td>
       <td><a href="/client/orders/{{ o.id }}">View documents</a></td>
     </tr>

@@ -4,7 +4,7 @@ use App\Services\PermissionService;
 $currentUser = AuthService::currentUser();
 $canViewArchivedOrders = $currentUser && PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_archived_orders');
 
-$statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', 'complete' => 'Complete', 'lost' => 'Lost', 'cancelled' => 'Cancelled'];
+$statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', 'shipped_docs_sent' => 'Docs Sent', 'complete' => 'Complete', 'lost' => 'Lost', 'cancelled' => 'Cancelled'];
 ?>
 <div class="card page-wide">
   <div class="page-header-row">
@@ -32,9 +32,10 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
       $stageTotal = 9;
       $stageNumber = (int) ($o['current_stage_number'] ?? 0);
       $isLost = $o['status'] === 'lost';
+      $isShippedDocsSent = $o['status'] === 'shipped_docs_sent';
       $isComplete = $o['status'] === 'complete';
       $isCancelled = $o['status'] === 'cancelled';
-      $filledSegments = $isComplete ? $stageTotal : (($isLost || $isCancelled) ? min(1, max($stageNumber, 1)) : $stageNumber);
+      $filledSegments = ($isComplete || $isShippedDocsSent) ? $stageTotal : (($isLost || $isCancelled) ? min(1, max($stageNumber, 1)) : $stageNumber);
       $currency = $o['currency_code'] ?? '';
       $amount = $currency . ' ' . number_format((float) $o['total_fob_value'], 2);
     ?>
@@ -57,6 +58,8 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
             <?= htmlspecialchars($o['lost_reason'] ? mb_strimwidth($o['lost_reason'], 0, 46, '…') : 'Marked lost') ?>
           <?php elseif ($isComplete): ?>
             Stage 9 of 9 &middot; Closed
+          <?php elseif ($isShippedDocsSent): ?>
+            Stage 9 of 9 &middot; Docs Sent &mdash; Awaiting Benefits
           <?php else: ?>
             Stage <?= $stageNumber ?: 1 ?> of <?= $stageTotal ?> &middot; <?= htmlspecialchars($o['current_stage_name'] ?? 'Quotation') ?>
           <?php endif; ?>
@@ -71,6 +74,8 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
           <span class="badge badge-lost">Lost</span>
         <?php elseif ($isComplete): ?>
           <span class="badge badge-complete">Complete</span>
+        <?php elseif ($isShippedDocsSent): ?>
+          <span class="badge badge-complete">Docs Sent</span>
         <?php else: ?>
           <span class="badge badge-active">Active</span>
         <?php endif; ?>

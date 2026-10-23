@@ -1,4 +1,4 @@
-{% set statusLabels = [['all', 'All'], ['active', 'Active'], ['overdue', 'Overdue'], ['complete', 'Complete'], ['lost', 'Lost'], ['cancelled', 'Cancelled']] %}
+{% set statusLabels = [['all', 'All'], ['active', 'Active'], ['overdue', 'Overdue'], ['shipped_docs_sent', 'Docs Sent'], ['complete', 'Complete'], ['lost', 'Lost'], ['cancelled', 'Cancelled']] %}
 <div class="card page-wide">
   <div class="page-header-row">
     <div>
@@ -25,6 +25,7 @@
       {% set stageTotal = 9 %}
       {% set stageNumber = o.current_stage_number or 0 %}
       {% set isLost = o.status == 'lost' %}
+      {% set isShippedDocsSent = o.status == 'shipped_docs_sent' %}
       {% set isComplete = o.status == 'complete' %}
       {% set isCancelled = o.status == 'cancelled' %}
       {% set filledSegments = o.filled_segments %}
@@ -47,6 +48,8 @@
             {{ (o.lost_reason | truncate(46)) if o.lost_reason else 'Marked lost' }}
           {% elif isComplete %}
             Stage 9 of 9 &middot; Closed
+          {% elif isShippedDocsSent %}
+            Stage 9 of 9 &middot; Docs Sent &mdash; Awaiting Benefits
           {% else %}
             Stage {{ stageNumber or 1 }} of {{ stageTotal }} &middot; {{ o.current_stage_name or 'Quotation' }}
           {% endif %}
@@ -61,6 +64,8 @@
           <span class="badge badge-lost">Lost</span>
         {% elif isComplete %}
           <span class="badge badge-complete">Complete</span>
+        {% elif isShippedDocsSent %}
+          <span class="badge badge-complete">Docs Sent</span>
         {% else %}
           <span class="badge badge-active">Active</span>
         {% endif %}
