@@ -1,0 +1,67 @@
+{% macro kanbanCard(r) %}
+<a class="entity-card kanban-card" href="/reorder-requests/{{ r.id }}">
+  <div class="entity-card-header">
+    <span class="entity-card-title">{{ r.company_legal_name }}</span>
+  </div>
+  <div class="entity-card-sub">From {{ r.source_order_reference }}</div>
+  {% if r.notes %}<div class="muted small">{{ r.notes | truncate(90, true, '…') }}</div>{% endif %}
+  <div class="entity-card-footer">
+    {% if r.status == 'approved' and r.new_order_reference %}
+      <span class="muted small">&rarr; {{ r.new_order_reference }}</span>
+    {% elif r.status == 'rejected' %}
+      <span class="muted small">{{ (r.rejection_reason or '') | truncate(40, true, '…') }}</span>
+    {% else %}
+      <span class="muted small">Submitted {{ r.submitted_at }}</span>
+    {% endif %}
+  </div>
+</a>
+{% endmacro %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Reorder Requests — Kanban Board</h1>
+      <p class="muted" style="margin:0;">Repeat-order requests submitted by clients from an order already on file.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <a class="btn-sm btn-secondary" href="/reorder-requests?view=list">Switch to list view</a>
+    </div>
+  </div>
+
+  <div class="kanban-board">
+    <div class="kanban-column">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">Pending</span>
+        <span class="kanban-column-count">{{ pending.length }}</span>
+      </div>
+      {% if pending.length == 0 %}
+        <p class="kanban-column-empty">Nothing pending</p>
+      {% else %}
+        {% for r in pending %}{{ kanbanCard(r) }}{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="kanban-column">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">Approved</span>
+        <span class="kanban-column-count">{{ approved.length }}</span>
+      </div>
+      {% if approved.length == 0 %}
+        <p class="kanban-column-empty">Nothing here</p>
+      {% else %}
+        {% for r in approved %}{{ kanbanCard(r) }}{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="kanban-column">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">Rejected</span>
+        <span class="kanban-column-count">{{ rejected.length }}</span>
+      </div>
+      {% if rejected.length == 0 %}
+        <p class="kanban-column-empty">Nothing here</p>
+      {% else %}
+        {% for r in rejected %}{{ kanbanCard(r) }}{% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</div>

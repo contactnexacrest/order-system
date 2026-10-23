@@ -6,6 +6,7 @@ const hsCodeRepository = require('../repositories/hsCodeRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderReorderRequestRepository = require('../repositories/orderReorderRequestRepository');
 const orderDuplicationService = require('../services/orderDuplicationService');
+const uiTemplateService = require('../services/uiTemplateService');
 
 /**
  * Port of App\Controllers\ReorderRequestController — staff review queue
@@ -14,10 +15,25 @@ const orderDuplicationService = require('../services/orderDuplicationService');
  */
 
 async function index(req, res) {
+  if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
+    await indexKanban(req, res);
+    return;
+  }
+
   res.renderView('reorder_requests/index', {
     pending: await orderReorderRequestRepository.pendingReview(),
     resolved: await orderReorderRequestRepository.recentResolved(),
   }, 'layout/base');
+}
+
+/** The Kanban UI template's Reorder Requests board: Pending / Approved / Rejected columns. */
+async function indexKanban(req, res) {
+  const pending = await orderReorderRequestRepository.pendingReview();
+  const resolved = await orderReorderRequestRepository.recentResolved();
+  const approved = resolved.filter((r) => r.status === 'approved');
+  const rejected = resolved.filter((r) => r.status === 'rejected');
+
+  res.renderView('reorder_requests/index_kanban', { pending, approved, rejected }, 'layout/base');
 }
 
 async function show(req, res) {

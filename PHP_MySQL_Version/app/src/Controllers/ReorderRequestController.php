@@ -12,6 +12,7 @@ use App\Repositories\LookupRepository;
 use App\Repositories\OrderReorderRequestRepository;
 use App\Services\AuthService;
 use App\Services\OrderDuplicationService;
+use App\Services\UiTemplateService;
 
 /**
  * Staff review queue for client-initiated reorder requests (schema.sql
@@ -28,9 +29,30 @@ final class ReorderRequestController
 {
     public function index(array $params): void
     {
+        $actor = AuthService::currentUser();
+        if (UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
+            $this->indexKanban();
+            return;
+        }
+
         View::render('reorder_requests/index', [
             'pending'  => OrderReorderRequestRepository::pendingReview(),
             'resolved' => OrderReorderRequestRepository::recentResolved(),
+        ], 'layout/base');
+    }
+
+    /** The Kanban UI template's Reorder Requests board: Pending / Approved / Rejected columns. */
+    private function indexKanban(): void
+    {
+        $pending = OrderReorderRequestRepository::pendingReview();
+        $resolved = OrderReorderRequestRepository::recentResolved();
+        $approved = array_values(array_filter($resolved, static fn(array $r): bool => $r['status'] === 'approved'));
+        $rejected = array_values(array_filter($resolved, static fn(array $r): bool => $r['status'] === 'rejected'));
+
+        View::render('reorder_requests/index_kanban', [
+            'pending'  => $pending,
+            'approved' => $approved,
+            'rejected' => $rejected,
         ], 'layout/base');
     }
 
