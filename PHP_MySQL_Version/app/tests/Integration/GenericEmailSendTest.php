@@ -31,13 +31,19 @@ final class GenericEmailSendTest extends DbTestCase
             ->execute(['email' => 'jane@buyer.example', 'id' => $clientId]);
     }
 
-    /** @return array<string, array{0:string}> */
+    /**
+     * bl_copy_sent is deliberately excluded here — since N-06, it also
+     * requires a scanned BL on file before requestSend() will accept it
+     * (see testRequestSendAcceptsBlCopySentOnceAScannedBlIsOnFile below),
+     * unlike the other 3 purely document-less templates.
+     *
+     * @return array<string, array{0:string}>
+     */
     public static function genericTemplateProvider(): array
     {
         return [
             'payment_followup' => ['payment_followup'],
             'shipment_readiness' => ['shipment_readiness'],
-            'bl_copy_sent' => ['bl_copy_sent'],
             'balance_receipt_confirmation' => ['balance_receipt_confirmation'],
         ];
     }
@@ -89,6 +95,51 @@ final class GenericEmailSendTest extends DbTestCase
         $result = EmailDispatchService::requestSend($orderId, null, 'shipment_readiness', null, $userId);
 
         self::assertArrayHasKey('id', $result);
+    }
+
+    /**
+     * External QA report N-06: bl_copy_sent used to be requestable (and
+     * approvable) with no scanned BL on file at all — it then failed
+     * silently at dispatch time (see
+     * testDispatchGenericFailsGracefullyWithoutCrashingWhenBlCopyHasNoAttachment
+     * below), with nobody told. Refused up front now, instead.
+     */
+    public function testRequestSendRefusesBlCopySentWithNoScannedBlOnFile(): void
+    {
+        $clientId = $this->createTestClient();
+        $this->setClientEmail($clientId);
+        $orderId = $this->createTestOrder($clientId);
+        $userId = $this->createTestUser('Export Executive');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Upload the scanned Bill of Lading copy');
+        EmailDispatchService::requestSend($orderId, null, 'bl_copy_sent', null, $userId);
+    }
+
+    public function testRequestSendAcceptsBlCopySentOnceAScannedBlIsOnFile(): void
+    {
+        $clientId = $this->createTestClient();
+        $this->setClientEmail($clientId);
+        $orderId = $this->createTestOrder($clientId);
+        $userId = $this->createTestUser('Export Executive');
+        $tmpPath = tempnam(sys_get_temp_dir(), 'n06-bl-copy-');
+        file_put_contents($tmpPath, '%PDF-1.4 fake scanned BL for test');
+        $pdo = Database::connection();
+        $fileStmt = $pdo->prepare(
+            "INSERT INTO file_store (order_id, file_origin, server_path, uuid_filename, original_filename, file_size_bytes, mime_type)
+             VALUES (:order_id, 'RECEIVED', :path, :uuid, 'bl-scan.pdf', :size, 'application/pdf')"
+        );
+        $fileStmt->execute(['order_id' => $orderId, 'path' => $tmpPath, 'uuid' => bin2hex(random_bytes(16)) . '.pdf', 'size' => filesize($tmpPath)]);
+        $fileId = (int) $pdo->lastInsertId();
+        OrderShippingRepository::upsert($orderId, ['shipping_line' => 'Maersk']);
+        OrderShippingRepository::attachBlCopy($orderId, $fileId);
+
+        try {
+            $result = EmailDispatchService::requestSend($orderId, null, 'bl_copy_sent', null, $userId);
+            self::assertArrayHasKey('id', $result);
+        } finally {
+            @unlink($tmpPath);
+        }
     }
 
     public function testDispatchGenericFailsGracefullyWithoutCrashingWhenBlCopyHasNoAttachment(): void

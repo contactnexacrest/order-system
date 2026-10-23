@@ -157,6 +157,27 @@ final class OrderCancellationWorkflowTest extends DbTestCase
         self::assertSame('pending', OrderCancellationRepository::find($cancellationId)['status']);
     }
 
+    public function testApproveCancellationBlocksSelfApprovalEvenForAManagePermissionsHolder(): void
+    {
+        // External QA report N-04: Admin holds manage_permissions via
+        // seed.sql's wildcard grant (and is one of the only roles that can
+        // approve a cancellation at all), but must still be blocked from
+        // approving their own request — only Super Admin is exempt here.
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $requester = $this->createTestUser('Admin');
+        $cancellationId = OrderCancellationRepository::create($orderId, 'Requesting and trying to approve my own cancellation as Admin.', $requester);
+
+        $_SESSION['_auth_user_id'] = $requester;
+        $_POST = ['refund_status' => 'not_applicable'];
+
+        ob_start();
+        (new OrderController())->approveCancellation(['id' => (string) $orderId, 'cancellationId' => (string) $cancellationId]);
+        ob_end_clean();
+
+        self::assertSame('active', OrderRepository::find($orderId)['status'], 'a manage_permissions holder must still be blocked from self-approving a cancellation');
+        self::assertSame('pending', OrderCancellationRepository::find($cancellationId)['status']);
+    }
+
     public function testApproveCancellationAllowsSelfApprovalForASuperAdmin(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());

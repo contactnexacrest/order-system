@@ -2258,6 +2258,18 @@ async function clearBalancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // External QA report N-05: clearAdvancePayment() pre-fills balance_amount
+  // automatically, so the check above alone lets a user clear the balance
+  // without ever actually recording the remittance via
+  // recordBalancePayment() — balance_remittance_received_at then stays
+  // NULL forever, and every later export-benefit claim is refused with a
+  // misleading message (see orderFinancialsController.addExportBenefit's
+  // own gate on that field).
+  if (existingPayment.balance_remittance_received_at === null) {
+    flash.set(req, 'error', 'Record the balance remittance before marking it cleared.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const clearedAt = str(req.body.balance_cleared_at) || todayYmd();
   await orderPaymentStatusRepository.markBalanceCleared(orderId, clearedAt, user.id);
   // External QA report L-23: balance payment clearing was never audit-logged.
@@ -2902,10 +2914,12 @@ async function approveCancellation(req, res) {
     return;
   }
   // QA-5 maker-checker: the person who requested the cancellation must
-  // not also be the one who approves it, unless Super Admin or
-  // manage_permissions — same choke point as document review assignment,
-  // email-send approval, and amendment MD-approval.
-  if (cancellation.requested_by === user.id && !(await makerCheckerGuard.selfApprovalAllowed(user.id))) {
+  // not also be the one who approves it. External QA report N-04: unlike
+  // other maker-checker checks, this one does NOT exempt
+  // manage_permissions holders — only Super Admin — because every default
+  // role that can approve a cancellation (Admin, MD, ED) also holds
+  // manage_permissions, which made the rule a no-op.
+  if (cancellation.requested_by === user.id && !(await makerCheckerGuard.selfApprovalAllowedStrict(user.id))) {
     flash.set(req, 'error', 'You requested this cancellation — a different privileged person must approve it.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2941,7 +2955,9 @@ async function rejectCancellation(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (cancellation.requested_by === user.id && !(await makerCheckerGuard.selfApprovalAllowed(user.id))) {
+  // External QA report N-04: strict variant, no manage_permissions
+  // exemption — see approveCancellation() above.
+  if (cancellation.requested_by === user.id && !(await makerCheckerGuard.selfApprovalAllowedStrict(user.id))) {
     flash.set(req, 'error', 'You requested this cancellation — a different privileged person must decide on it.');
     res.redirect(`/orders/${orderId}`);
     return;

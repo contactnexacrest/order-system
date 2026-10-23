@@ -100,13 +100,43 @@ describe('Payment clearance guard (QA-5)', () => {
     for (let stage = 1; stage <= 7; stage++) {
       await stageGateService.passAndUnlockNext(orderId, stage, null);
     }
-    await orderPaymentStatusRepository.setBalanceAmount(orderId, 1500.0, '2026-03-01');
+    // recordBalanceReceived() (not setBalanceAmount(), which only sets the
+    // amount — see the N-05 test below) stamps both balance_amount AND
+    // balance_remittance_received_at, as the real clearBalancePayment()
+    // action does.
+    await orderPaymentStatusRepository.recordBalanceReceived(orderId, 1500.0, '2026-03-01');
 
     const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, session: {} };
     await ordersController.clearBalancePayment(req, fakeRes());
 
     expect((await orderPaymentStatusRepository.find(orderId)).balance_cleared_at).not.toBeNull();
     expect(await stageGateService.isUnlocked(orderId, 9)).toBe(true);
+  });
+
+  it('clearBalancePayment refuses a balance pre-filled but never actually recorded', async () => {
+    // External QA report N-05: clearAdvancePayment() pre-fills
+    // balance_amount automatically (see setBalanceAmount() above), but
+    // that must not be enough to clear the balance — the remittance
+    // itself must have been recorded via recordBalancePayment() first, or
+    // balance_remittance_received_at stays NULL forever and every later
+    // export-benefit claim is refused with a misleading message.
+    const orderId = await createTestOrder(await createTestClient());
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    const userId = await createTestUser('Accounts Executive');
+    for (let stage = 1; stage <= 7; stage++) {
+      await stageGateService.passAndUnlockNext(orderId, stage, null);
+    }
+    await orderPaymentStatusRepository.setBalanceAmount(orderId, 1500.0, '2026-03-01');
+    expect((await orderPaymentStatusRepository.find(orderId)).balance_remittance_received_at).toBeNull();
+
+    const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, session: {} };
+    await ordersController.clearBalancePayment(req, fakeRes());
+
+    expect((await orderPaymentStatusRepository.find(orderId)).balance_cleared_at).toBeNull();
+    expect(await stageGateService.isUnlocked(orderId, 9)).toBe(false);
+    const messages = flash.pull(req);
+    expect(messages.length).toBeGreaterThan(0);
+    expect(messages[0].type).toBe('error');
   });
 
   it('clearAdvancePayment on a nonexistent order never crashes', async () => {

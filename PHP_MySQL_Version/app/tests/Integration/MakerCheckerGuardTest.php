@@ -56,6 +56,19 @@ final class MakerCheckerGuardTest extends DbTestCase
         self::assertTrue(MakerCheckerGuard::selfApprovalAllowed($adminRoleUser));
     }
 
+    /**
+     * External QA report N-04: the strict variant used by cancellations
+     * must NOT grant the manage_permissions exemption — only Super Admin.
+     */
+    public function testSelfApprovalAllowedStrictDeniesManagePermissionsHolderButAllowsSuperAdmin(): void
+    {
+        $adminRoleUser = $this->createTestUser('Admin');
+        self::assertFalse(MakerCheckerGuard::selfApprovalAllowedStrict($adminRoleUser));
+
+        $this->makeSuperAdmin($adminRoleUser);
+        self::assertTrue(MakerCheckerGuard::selfApprovalAllowedStrict($adminRoleUser));
+    }
+
     // ---------------------------------------------------------------
     // REV-05 — document review self-approval
     // ---------------------------------------------------------------

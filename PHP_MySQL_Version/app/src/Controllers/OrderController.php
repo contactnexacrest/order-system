@@ -2265,6 +2265,19 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // External QA report N-05: clearAdvancePayment() pre-fills
+        // balance_amount automatically, so the check above alone lets a
+        // user clear the balance without ever actually recording the
+        // remittance via recordBalancePayment() — balance_remittance_
+        // received_at then stays NULL forever, and every later export-
+        // benefit claim is refused with a misleading message (see
+        // OrderFinancialsController::addExportBenefit's own gate on
+        // that field).
+        if ($existingPayment['balance_remittance_received_at'] === null) {
+            Flash::set('error', 'Record the balance remittance before marking it cleared.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['balance_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markBalanceCleared($orderId, $clearedAt, (int) $user['id']);
         // External QA report L-23: balance payment clearing was never audit-logged.
@@ -2898,10 +2911,12 @@ final class OrderController
             return;
         }
         // QA-5 maker-checker: the person who requested the cancellation
-        // must not also be the one who approves it, unless Super Admin
-        // or manage_permissions — same choke point as document review
-        // assignment, email-send approval, and amendment MD-approval.
-        if ((int) $cancellation['requested_by'] === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowed((int) $user['id'])) {
+        // must not also be the one who approves it. External QA report
+        // N-04: unlike other maker-checker checks, this one does NOT
+        // exempt manage_permissions holders — only Super Admin — because
+        // every default role that can approve a cancellation (Admin, MD,
+        // ED) also holds manage_permissions, which made the rule a no-op.
+        if ((int) $cancellation['requested_by'] === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowedStrict((int) $user['id'])) {
             Flash::set('error', 'You requested this cancellation — a different privileged person must approve it.');
             header("Location: /orders/{$orderId}");
             return;
@@ -2938,7 +2953,9 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        if ((int) $cancellation['requested_by'] === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowed((int) $user['id'])) {
+        // External QA report N-04: strict variant, no manage_permissions
+        // exemption — see approveCancellation() above.
+        if ((int) $cancellation['requested_by'] === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowedStrict((int) $user['id'])) {
             Flash::set('error', 'You requested this cancellation — a different privileged person must decide on it.');
             header("Location: /orders/{$orderId}");
             return;

@@ -81,6 +81,17 @@ final class EmailDispatchService
         if (empty($order['client_email'])) {
             throw new \RuntimeException('This client has no email address on file.');
         }
+        // External QA report N-06: bl_copy_sent could be requested and
+        // approved with no scanned BL on file — dispatchGeneric() then
+        // failed silently at send time (status 'failed', nobody told).
+        // Refuse up front instead, with a clear message, at the same
+        // point L-42 added this template's own document-less branch.
+        if ($templateKey === 'bl_copy_sent') {
+            $shipping = \App\Repositories\OrderShippingRepository::find($orderId);
+            if (!$shipping || !$shipping['bl_copy_file_id']) {
+                throw new \RuntimeException('Upload the scanned Bill of Lading copy for this order before requesting this email.');
+            }
+        }
 
         $template = EmailTemplateRepository::find($templateKey);
         if (!$template || !$template['is_active']) {

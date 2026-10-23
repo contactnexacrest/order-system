@@ -96,6 +96,16 @@ describe('Maker-checker guard (QA-5)', () => {
     expect(await makerCheckerGuard.selfApprovalAllowed(adminRoleUser)).toBe(true);
   });
 
+  it('strict self-approval denies a manage_permissions holder but allows a Super Admin', async () => {
+    // External QA report N-04: the strict variant used by cancellations
+    // must NOT grant the manage_permissions exemption — only Super Admin.
+    const adminRoleUser = await createTestUser('Admin');
+    expect(await makerCheckerGuard.selfApprovalAllowedStrict(adminRoleUser)).toBe(false);
+
+    await makeSuperAdmin(adminRoleUser);
+    expect(await makerCheckerGuard.selfApprovalAllowedStrict(adminRoleUser)).toBe(true);
+  });
+
   // ---------------------------------------------------------------
   // REV-05 — document review self-approval
   // ---------------------------------------------------------------

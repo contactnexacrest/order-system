@@ -102,7 +102,11 @@ final class PaymentClearanceGuardTest extends DbTestCase
         for ($stage = 1; $stage <= 7; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
         }
-        OrderPaymentStatusRepository::setBalanceAmount($orderId, 1500.00, '2026-03-01');
+        // recordBalanceReceived() (not setBalanceAmount(), which only sets
+        // the amount — see the N-05 test below) stamps both balance_amount
+        // AND balance_remittance_received_at, as the real
+        // recordBalancePayment() action does.
+        OrderPaymentStatusRepository::recordBalanceReceived($orderId, 1500.00, '2026-03-01');
         $_SESSION['_auth_user_id'] = $userId;
 
         ob_start();
@@ -111,6 +115,37 @@ final class PaymentClearanceGuardTest extends DbTestCase
 
         self::assertNotNull(OrderPaymentStatusRepository::find($orderId)['balance_cleared_at']);
         self::assertTrue(StageGateService::isUnlocked($orderId, 9));
+    }
+
+    /**
+     * External QA report N-05: clearAdvancePayment() pre-fills
+     * balance_amount automatically (see setBalanceAmount() above), but
+     * that must not be enough to clear the balance — the remittance
+     * itself must have been recorded via recordBalancePayment() first, or
+     * balance_remittance_received_at stays NULL forever and every later
+     * export-benefit claim is refused with a misleading message.
+     */
+    public function testClearBalancePaymentRefusesABalancePreFilledButNeverActuallyRecorded(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        \App\Repositories\OrderPaymentStatusRepository::initializeForOrder($orderId);
+        $userId = $this->createTestUser('Accounts Executive');
+        for ($stage = 1; $stage <= 7; $stage++) {
+            StageGateService::passAndUnlockNext($orderId, $stage, null);
+        }
+        OrderPaymentStatusRepository::setBalanceAmount($orderId, 1500.00, '2026-03-01');
+        self::assertNull(OrderPaymentStatusRepository::find($orderId)['balance_remittance_received_at']);
+        $_SESSION['_auth_user_id'] = $userId;
+
+        ob_start();
+        (new OrderController())->clearBalancePayment(['id' => $orderId]);
+        ob_end_clean();
+
+        self::assertNull(OrderPaymentStatusRepository::find($orderId)['balance_cleared_at']);
+        self::assertFalse(StageGateService::isUnlocked($orderId, 9), 'Stage 9 must not unlock from a pre-filled-but-never-recorded balance');
+        $flash = Flash::pull();
+        self::assertNotEmpty($flash);
+        self::assertSame('error', $flash[0]['type']);
     }
 
     public function testClearAdvancePaymentOnANonexistentOrderNeverCrashes(): void

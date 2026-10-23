@@ -28,4 +28,17 @@ final class MakerCheckerGuard
         }
         return PermissionService::can($userId, $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_permissions');
     }
+
+    /**
+     * External QA report N-04: order cancellations approve/reject through
+     * this stricter variant instead of selfApprovalAllowed(), because the
+     * default roles that can approve a cancellation (Admin, MD, ED) all
+     * hold manage_permissions — so the general exemption made the
+     * cancellation maker-checker rule a no-op for every role that can
+     * actually use it. Only a Super Admin is exempt here.
+     */
+    public static function selfApprovalAllowedStrict(int $userId): bool
+    {
+        return SuperAdminService::isEffective($userId);
+    }
 }

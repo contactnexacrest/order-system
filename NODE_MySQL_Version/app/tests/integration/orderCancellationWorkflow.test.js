@@ -150,6 +150,24 @@ describe('Order cancellation workflow (External QA report M-09)', () => {
     expect((await orderCancellationRepository.find(cancellationId)).status).toBe('pending');
   });
 
+  it('approveCancellation blocks self-approval even for a manage_permissions holder', async () => {
+    // External QA report N-04: Admin holds manage_permissions via
+    // seed.sql's wildcard grant (and is one of the only roles that can
+    // approve a cancellation at all), but must still be blocked from
+    // approving their own request — only Super Admin is exempt here.
+    const orderId = await createTestOrder(await createTestClient());
+    const requester = await createTestUser('Admin');
+    const cancellationId = await orderCancellationRepository.create(orderId, 'Requesting and trying to approve my own cancellation as Admin.', requester);
+
+    await ordersController.approveCancellation(
+      fakeReq(orderId, requester, { refund_status: 'not_applicable' }, { cancellationId: String(cancellationId) }),
+      fakeRes()
+    );
+
+    expect((await orderRepository.find(orderId)).status).toBe('active');
+    expect((await orderCancellationRepository.find(cancellationId)).status).toBe('pending');
+  });
+
   it('approveCancellation allows self-approval for a Super Admin', async () => {
     const orderId = await createTestOrder(await createTestClient());
     const requester = await createTestUser();

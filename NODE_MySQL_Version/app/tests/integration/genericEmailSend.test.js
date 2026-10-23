@@ -34,7 +34,11 @@ describe('Generic (document-less) email send (External QA report L-42)', () => {
     return { redirect: () => {} };
   }
 
-  const genericTemplates = ['payment_followup', 'shipment_readiness', 'bl_copy_sent', 'balance_receipt_confirmation'];
+  // bl_copy_sent is deliberately excluded here — since N-06, it also
+  // requires a scanned BL on file before requestSend() will accept it
+  // (see the dedicated bl_copy_sent tests below), unlike the other 3
+  // purely document-less templates.
+  const genericTemplates = ['payment_followup', 'shipment_readiness', 'balance_receipt_confirmation'];
 
   it.each(genericTemplates)('requestSendGeneric accepts the %s template and creates a document-less row', async (templateKey) => {
     const clientId = await createTestClient();
@@ -75,6 +79,42 @@ describe('Generic (document-less) email send (External QA report L-42)', () => {
     const result = await emailDispatchService.requestSend(orderId, null, 'shipment_readiness', null, 1);
 
     expect(result.id).toBeTruthy();
+  });
+
+  // External QA report N-06: bl_copy_sent used to be requestable (and
+  // approvable) with no scanned BL on file at all — it then failed
+  // silently at dispatch time (see the next test below), with nobody
+  // told. Refused up front now, instead.
+  it('requestSend refuses bl_copy_sent with no scanned BL on file', async () => {
+    const clientId = await createTestClient();
+    await setClientEmail(clientId);
+    const orderId = await createTestOrder(clientId);
+
+    await expect(emailDispatchService.requestSend(orderId, null, 'bl_copy_sent', null, 1)).rejects.toThrow(
+      /Upload the scanned Bill of Lading copy/
+    );
+  });
+
+  it('requestSend accepts bl_copy_sent once a scanned BL is on file', async () => {
+    const clientId = await createTestClient();
+    await setClientEmail(clientId);
+    const orderId = await createTestOrder(clientId);
+    const tmpPath = path.join(os.tmpdir(), `jest-n06-bl-copy-${Math.random().toString(16).slice(2, 10)}.pdf`);
+    fs.writeFileSync(tmpPath, '%PDF-1.4 fake scanned BL for test');
+    const fileResult = await db.execute(
+      `INSERT INTO file_store (order_id, file_origin, server_path, uuid_filename, original_filename, file_size_bytes, mime_type)
+       VALUES (:order_id, 'RECEIVED', :path, :uuid, 'bl-scan.pdf', :size, 'application/pdf')`,
+      { order_id: orderId, path: tmpPath, uuid: `${Math.random().toString(16).slice(2, 18)}.pdf`, size: fs.statSync(tmpPath).size }
+    );
+    await orderShippingRepository.upsert(orderId, { shipping_line: 'Maersk' });
+    await orderShippingRepository.attachBlCopy(orderId, fileResult.insertId);
+
+    try {
+      const result = await emailDispatchService.requestSend(orderId, null, 'bl_copy_sent', null, 1);
+      expect(result.id).toBeTruthy();
+    } finally {
+      fs.unlinkSync(tmpPath);
+    }
   });
 
   it('dispatch fails gracefully without crashing when bl_copy_sent has no attachment', async () => {
