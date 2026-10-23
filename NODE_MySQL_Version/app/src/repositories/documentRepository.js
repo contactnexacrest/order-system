@@ -111,6 +111,21 @@ async function markInReview(id) {
   await db.execute("UPDATE documents SET status = 'in_review' WHERE id = :id", { id });
 }
 
+/**
+ * External QA report M-08: an earlier-stage document was just
+ * regenerated after this later-stage one already existed — this
+ * document's own data may now be out of step with it (see
+ * documentGenerationService.downstreamDocumentsAtRisk()'s docblock). A
+ * persistent flag rather than a one-time flash message: it stays
+ * visible on the order page until this exact document is itself
+ * superseded by a fresh regeneration, which naturally stops pointing at
+ * this (now-superseded) row — see findLatestForOrderAndTypeCode(),
+ * which only ever returns the current, non-superseded revision.
+ */
+async function flagDrift(id, reason) {
+  await db.execute('UPDATE documents SET drift_flagged_at = NOW(), drift_flagged_reason = :reason WHERE id = :id', { reason, id });
+}
+
 async function markDraft(id) {
   await db.execute("UPDATE documents SET status = 'draft' WHERE id = :id", { id });
 }
@@ -192,4 +207,5 @@ async function deleteDraft(id) {
 module.exports = {
   customerFacingForOrder, forOrder, find, findLatestForOrderAndType, findLatestForOrderAndTypeCode,
   allForOrderAndType, countPriorSent, markApproved, markSuperseded, markInReview, markDraft, markSent, create, deleteDraft,
+  flagDrift,
 };

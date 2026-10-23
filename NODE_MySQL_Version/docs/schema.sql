@@ -3525,3 +3525,21 @@ ALTER TABLE users
   ADD COLUMN archived_at TIMESTAMP NULL,
   ADD COLUMN archived_by BIGINT UNSIGNED NULL,
   ADD CONSTRAINT fk_users_archived_by FOREIGN KEY (archived_by) REFERENCES users(id);
+
+-- ================================================================
+-- SECTION BO — DOCUMENT DRIFT FLAG (External QA report M-08)
+-- ================================================================
+-- "Regenerating an earlier-stage document after later stages passed:
+-- mandatory confirmation, automatic cancellation of later stages, and
+-- 'drift' notices on affected stages. App only warns." Set on an
+-- already-existing later-stage document when an earlier-stage one it
+-- depends on is regenerated — stays visible until this exact document
+-- is itself superseded by a fresh regeneration (see
+-- documentRepository.flagDrift()'s own docblock for why no explicit
+-- "clear" step is needed). "Automatic cancellation of later stages" is
+-- deliberately not covered here — see the fix commit for why that part
+-- needs an owner decision.
+-- ================================================================
+ALTER TABLE documents
+  ADD COLUMN drift_flagged_at TIMESTAMP NULL,
+  ADD COLUMN drift_flagged_reason VARCHAR(255) NULL;

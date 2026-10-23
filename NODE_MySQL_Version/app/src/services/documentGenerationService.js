@@ -326,6 +326,26 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     clientRevisionNumber
   );
 
+  // External QA report M-08: "Regenerating an earlier-stage document
+  // after later stages passed: ... 'drift' notices on affected stages."
+  // A persistent flag on each already-existing later-stage document,
+  // rather than only the one-time flash message the controller already
+  // showed — see documentRepository.flagDrift()'s own docblock for why
+  // no explicit "clear" step is needed. Only on an actual regeneration
+  // (revisionNumber > 0), same condition as downstreamDocumentsAtRisk()
+  // itself.
+  if (revisionNumber > 0) {
+    for (const downstreamCode of await downstreamDocumentsAtRisk(orderId, documentTypeCode)) {
+      const downstreamDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, downstreamCode);
+      if (downstreamDoc) {
+        await documentRepository.flagDrift(
+          downstreamDoc.id,
+          `${documentTypeCode} was revised (Rev.${revisionNumber}) after this document was generated — its data may be out of step.`
+        );
+      }
+    }
+  }
+
   return {
     document_id: documentId,
     document_reference: documentReference,

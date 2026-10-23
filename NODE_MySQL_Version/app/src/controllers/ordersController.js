@@ -734,6 +734,20 @@ async function show(req, res) {
     crossVerificationsByDocument[d.id] = await documentCrossVerificationRepository.forDocument(d.id);
   }
 
+  // External QA report M-08: "Regenerating an earlier-stage document
+  // after later stages passed: mandatory confirmation ... App only
+  // warns." Precomputed once per already-generated type (clicking its
+  // Generate button would be a regeneration) so the page's own JS can
+  // show a specific, named confirm() dialog before the POST even goes
+  // out, instead of only warning after the fact.
+  const regenerationRisk = {};
+  for (const existingCode of [...new Set(documents.map((d) => d.document_type_code))]) {
+    const downstream = await documentGenerationService.downstreamDocumentsAtRisk(orderId, existingCode);
+    if (downstream.length) {
+      regenerationRisk[existingCode] = downstream;
+    }
+  }
+
   const disputes = await disputeRepository.forOrder(orderId);
 
   // Real gap this closes: emailLogRepository.forOrder() already existed
@@ -829,6 +843,7 @@ async function show(req, res) {
       stageByNumber,
       payment: await orderPaymentStatusRepository.find(orderId),
       documents,
+      regenerationRisk,
       reviewsByDocument,
       crossVerificationsByDocument,
       emailLogByDocument,

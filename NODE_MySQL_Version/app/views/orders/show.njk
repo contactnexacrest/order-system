@@ -494,6 +494,9 @@
           {% else %}
           {{ d.status | replace('_', ' ') }}
           {% endif %}
+          {% if d.drift_flagged_at %}
+          <br><span class="badge badge-sensitive" title="{{ d.drift_flagged_reason or '' }}">&#9888; DATA MAY BE STALE</span>
+          {% endif %}
         </td>
         <td>
           {% if d.pdf_file_id %}<a href="/documents/{{ d.id }}/download?format=pdf">PDF</a>{% endif %}
@@ -582,7 +585,7 @@
 
     <div class="btn-row">
       {% if stage1 and stage1.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="QT">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -595,7 +598,7 @@
          stage order (QT/1, BUYERPO/2, PI/3, OC/4, SUPPO/5, FDN/6, CI/8) to
          match the stepBadge sequence below each one. #}
       {% if stage2 and stage2.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="BUYERPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -605,7 +608,7 @@
       {% endif %}
 
       {% if stage3 and stage3.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="PI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -615,7 +618,7 @@
       {% endif %}
 
       {% if stage4 and stage4.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="OC">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -625,7 +628,7 @@
       {% endif %}
 
       {% if stage5 and stage5.status != 'locked' and supplierPo %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="SUPPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -635,7 +638,7 @@
       {% endif %}
 
       {% if not isFob and stage6 and stage6.status != 'locked' and freight %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="FDN">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -645,7 +648,7 @@
       {% endif %}
 
       {% if stage7 and stage7.status != 'locked' and packing %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="PL">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -662,7 +665,7 @@
          data it actually reads (see below). #}
 
       {% if stage8 and stage8.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="CI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -677,7 +680,7 @@
          where staff actually prepare the Chamber of Commerce filing. #}
 
       {% if order.include_annexure_a %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="document_type" value="ANNEXA">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -1589,7 +1592,7 @@
       {% if shipping %}
       <h3 style="font-size:0.95em; margin-top:14px;">BL Instruction Sheet (for your CHA / shipping line)</h3>
       <p class="muted small">Generates the shipping-booking worksheet your CHA or shipping line needs before confirming the BL booking — shipper, consignee/notify party, shipment and container details from above, cargo description from the order's products, and the mandatory BL-type instruction from Settings. Review the Shipping and Packing details above first; anything left blank there shows as "To Be Confirmed" on the sheet.</p>
-      <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline">
+      <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="document_type" value="BLI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -1843,7 +1846,7 @@
     {% else %}
       <h3 style="font-size:0.95em; margin-top:0;">COO Prep Sheet (internal — for the Chamber of Commerce application)</h3>
       <p class="muted small">Generates an internal worksheet summarizing everything needed to apply for the Certificate of Origin with the Chamber of Commerce — shipper, consignee, shipment, and cargo details, the same source data as the BL Instruction Sheet. Never shown to the client.</p>
-      <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline; margin-bottom:14px;">
+      <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline; margin-bottom:14px;" onsubmit="return confirmDocumentRegeneration(this);">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="document_type" value="COOPREP">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -2024,7 +2027,7 @@
   <div class="section" style="border-color:#D9822B;">
     <h2 data-tab-label="Force-Generate Document">Force-Generate a Document (privileged override)</h2>
     <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
-    <form method="post" action="/orders/{{ order.id }}/documents/generate" onsubmit="return confirmFieldOverride(this, 'generating this document out of sequence');">
+    <form method="post" action="/orders/{{ order.id }}/documents/generate" onsubmit="return confirmDocumentRegeneration(this) && confirmFieldOverride(this, 'generating this document out of sequence');">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <input type="hidden" name="override_gate" value="1">
       <label>Document Type
@@ -2045,6 +2048,28 @@
 
     </div>
   </div>
+  <script>
+  // External QA report M-08: "Regenerating an earlier-stage document after
+  // later stages passed: mandatory confirmation ... App only warns." Named,
+  // specific confirm() before the POST goes out — not a server-side hard
+  // block (same convention this page's own confirmFieldOverride() already
+  // uses elsewhere), reading the submitting form's own document_type field
+  // (a fixed hidden input on every button except the privileged
+  // Force-Generate form, where it's a <select> the staff member just
+  // chose — either way, this reads whatever value is about to be posted).
+  var regenerationRisk = {{ regenerationRisk | dump | safe }};
+  function confirmDocumentRegeneration(form) {
+    var typeEl = form.querySelector('[name="document_type"]');
+    var downstream = typeEl ? regenerationRisk[typeEl.value] : null;
+    if (downstream && downstream.length) {
+      return confirm(
+        'Regenerating ' + typeEl.value + ' may leave ' + downstream.join(', ') +
+        ' out of step with the new data — those documents were generated before this change. Continue?'
+      );
+    }
+    return true;
+  }
+  </script>
   <script>
   (function () {
     var layout = document.getElementById('order-layout');

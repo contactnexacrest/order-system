@@ -596,6 +596,9 @@ foreach ($stages as $s) {
           <?php else: ?>
           <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?>
           <?php endif; ?>
+          <?php if (!empty($d['drift_flagged_at'])): ?>
+            <br><span class="badge badge-sensitive" title="<?= htmlspecialchars($d['drift_flagged_reason'] ?? '') ?>">&#9888; DATA MAY BE STALE</span>
+          <?php endif; ?>
         </td>
         <td>
           <?php if ($d['pdf_file_id']): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf">PDF</a><?php endif; ?>
@@ -689,7 +692,7 @@ foreach ($stages as $s) {
     ?>
     <div class="btn-row">
       <?php if ($stage1 && $stage1['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="QT">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -705,7 +708,7 @@ foreach ($stages as $s) {
         // BUYERPO rendered after PI/OC despite being Stage 2's own action.
       ?>
       <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="BUYERPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -715,7 +718,7 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="PI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -725,7 +728,7 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="OC">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -735,7 +738,7 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if ($stage5 && $stage5['status'] !== 'locked' && $supplierPo): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="SUPPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -745,7 +748,7 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if (!$isFob && $stage6 && $stage6['status'] !== 'locked' && $freight): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="FDN">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -755,7 +758,7 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if ($stage7 && $stage7['status'] !== 'locked' && $packing): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="PL">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -772,7 +775,7 @@ foreach ($stages as $s) {
              // Packing data it actually reads (see below). ?>
 
       <?php if ($stage8 && $stage8['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="CI">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -787,7 +790,7 @@ foreach ($stages as $s) {
              // where staff actually prepare the Chamber of Commerce filing. ?>
 
       <?php if ($order['include_annexure_a']): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="ANNEXA">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -1728,7 +1731,7 @@ foreach ($stages as $s) {
       <?php if ($shipping): ?>
       <h3 style="font-size:0.95em; margin-top:14px;">BL Instruction Sheet (for your CHA / shipping line)</h3>
       <p class="muted small">Generates the shipping-booking worksheet your CHA or shipping line needs before confirming the BL booking — shipper, consignee/notify party, shipment and container details from above, cargo description from the order's products, and the mandatory BL-type instruction from Settings. Review the Shipping and Packing details above first; anything left blank there shows as "To Be Confirmed" on the sheet.</p>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline">
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="BLI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -1993,7 +1996,7 @@ foreach ($stages as $s) {
       ?>
       <h3 style="font-size:0.95em; margin-top:0;">COO Prep Sheet (internal — for the Chamber of Commerce application)</h3>
       <p class="muted small">Generates an internal worksheet summarizing everything needed to apply for the Certificate of Origin with the Chamber of Commerce — shipper, consignee, shipment, and cargo details, the same source data as the BL Instruction Sheet. Never shown to the client.</p>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline; margin-bottom:14px;">
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline; margin-bottom:14px;" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="COOPREP">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
@@ -2174,7 +2177,7 @@ foreach ($stages as $s) {
   <div class="section" style="border-color:#D9822B;">
     <h2 data-tab-label="Force-Generate Document">Force-Generate a Document (privileged override)</h2>
     <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" onsubmit="return confirmFieldOverride(this, 'generating this document out of sequence');">
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" onsubmit="return confirmDocumentRegeneration(this) && confirmFieldOverride(this, 'generating this document out of sequence');">
       <?= Csrf::field() ?>
       <input type="hidden" name="override_gate" value="1">
       <label>Document Type
@@ -2195,6 +2198,28 @@ foreach ($stages as $s) {
 
     </div>
   </div>
+  <script>
+  // External QA report M-08: "Regenerating an earlier-stage document after
+  // later stages passed: mandatory confirmation ... App only warns." Named,
+  // specific confirm() before the POST goes out — not a server-side hard
+  // block (same convention this page's own confirmFieldOverride() already
+  // uses elsewhere), reading the submitting form's own document_type field
+  // (a fixed hidden input on every button except the privileged
+  // Force-Generate form, where it's a <select> the staff member just
+  // chose — either way, this reads whatever value is about to be posted).
+  var regenerationRisk = <?= json_encode($regenerationRisk) ?>;
+  function confirmDocumentRegeneration(form) {
+    var typeEl = form.querySelector('[name="document_type"]');
+    var downstream = typeEl ? regenerationRisk[typeEl.value] : null;
+    if (downstream && downstream.length) {
+      return confirm(
+        'Regenerating ' + typeEl.value + ' may leave ' + downstream.join(', ') +
+        ' out of step with the new data — those documents were generated before this change. Continue?'
+      );
+    }
+    return true;
+  }
+  </script>
   <script>
   (function () {
     var layout = document.getElementById('order-layout');

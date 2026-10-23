@@ -225,6 +225,27 @@ final class DocumentGenerationService
             $clientRevisionNumber
         );
 
+        // External QA report M-08: "Regenerating an earlier-stage document
+        // after later stages passed: ... 'drift' notices on affected
+        // stages." A persistent flag on each already-existing
+        // later-stage document, rather than only the one-time flash
+        // message DocumentController::generate() already showed — see
+        // DocumentRepository::flagDrift()'s own docblock for why no
+        // explicit "clear" step is needed. Only on an actual regeneration
+        // (revisionNumber > 0), same condition as
+        // downstreamDocumentsAtRisk() itself.
+        if ($revisionNumber > 0) {
+            foreach (self::downstreamDocumentsAtRisk($orderId, $documentTypeCode) as $downstreamCode) {
+                $downstreamDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, $downstreamCode);
+                if ($downstreamDoc) {
+                    DocumentRepository::flagDrift(
+                        (int) $downstreamDoc['id'],
+                        "{$documentTypeCode} was revised (Rev.{$revisionNumber}) after this document was generated — its data may be out of step."
+                    );
+                }
+            }
+        }
+
         return [
             'document_id'        => $documentId,
             'document_reference' => $documentReference,

@@ -804,6 +804,20 @@ final class OrderController
             $crossVerificationsByDocument[(int) $d['id']] = DocumentCrossVerificationRepository::forDocument((int) $d['id']);
         }
 
+        // External QA report M-08: "Regenerating an earlier-stage document
+        // after later stages passed: mandatory confirmation ... App only
+        // warns." Precomputed once per already-generated type (clicking
+        // its Generate button would be a regeneration) so the page's own
+        // JS can show a specific, named confirm() dialog before the POST
+        // even goes out, instead of only warning after the fact.
+        $regenerationRisk = [];
+        foreach (array_unique(array_column($documents, 'document_type_code')) as $existingCode) {
+            $downstream = DocumentGenerationService::downstreamDocumentsAtRisk($orderId, $existingCode);
+            if (!empty($downstream)) {
+                $regenerationRisk[$existingCode] = $downstream;
+            }
+        }
+
         // Real gap this closes: EmailLogRepository::forOrder() already
         // existed but nothing on this page ever called it, so the "Send to
         // Buyer" link would silently reappear after a Level-2 rejection or
@@ -835,6 +849,7 @@ final class OrderController
             'stageByNumber' => $stageByNumber,
             'payment'  => OrderPaymentStatusRepository::find($orderId),
             'documents' => $documents,
+            'regenerationRisk' => $regenerationRisk,
             'reviewsByDocument' => $reviewsByDocument,
             'crossVerificationsByDocument' => $crossVerificationsByDocument,
             'emailLogByDocument' => $emailLogByDocument,

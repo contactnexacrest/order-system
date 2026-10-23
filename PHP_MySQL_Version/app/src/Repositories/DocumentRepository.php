@@ -155,6 +155,24 @@ final class DocumentRepository
         )->execute(['pdf_file_id' => $pdfFileId, 'id' => $id]);
     }
 
+    /**
+     * External QA report M-08: an earlier-stage document was just
+     * regenerated after this later-stage one already existed — this
+     * document's own data may now be out of step with it (see
+     * DocumentGenerationService::downstreamDocumentsAtRisk()'s docblock).
+     * A persistent flag rather than a one-time flash message: it stays
+     * visible on the order page until this exact document is itself
+     * superseded by a fresh regeneration, which naturally stops pointing
+     * at this (now-superseded) row — see findLatestForOrderAndTypeCode(),
+     * which only ever returns the current, non-superseded revision.
+     */
+    public static function flagDrift(int $id, string $reason): void
+    {
+        Database::connection()->prepare(
+            'UPDATE documents SET drift_flagged_at = NOW(), drift_flagged_reason = :reason WHERE id = :id'
+        )->execute(['reason' => $reason, 'id' => $id]);
+    }
+
     public static function markInReview(int $id): void
     {
         Database::connection()->prepare(
