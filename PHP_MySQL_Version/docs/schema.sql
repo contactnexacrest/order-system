@@ -3582,3 +3582,24 @@ CREATE TABLE order_cancellations (
   FOREIGN KEY (decided_by) REFERENCES users(id),
   FOREIGN KEY (refund_recorded_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION BQ — UI TEMPLATE SELECTION (added 2026-10-23)
+-- ================================================================
+-- Owner decision: a per-user choice of UI template (Standard /
+-- Kanban), a company-wide default for new users and anyone who never
+-- chose, and an admin on/off switch per template. See
+-- docs/migrations/2026-10-23e-ui-template-selection.sql for the
+-- resolution order.
+-- ================================================================
+CREATE TABLE ui_templates (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  template_key  VARCHAR(40) NOT NULL UNIQUE,
+  name          VARCHAR(100) NOT NULL,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+ALTER TABLE users
+  ADD COLUMN ui_template_preference_id BIGINT UNSIGNED NULL AFTER email_action_notifications_enabled,
+  ADD CONSTRAINT fk_users_ui_template FOREIGN KEY (ui_template_preference_id) REFERENCES ui_templates(id);

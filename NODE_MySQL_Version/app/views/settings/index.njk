@@ -49,6 +49,28 @@
                   <option value="{{ row.setting_value }}" selected>{{ row.setting_value }} (not in admin list)</option>
                 {% endif %}
               </select>
+            {% elif row.setting_key == 'default_ui_template' %}
+              {# docs/schema.sql Section BQ — same by-setting_key special case as the
+                 RBI purpose codes above, sourced from the active ui_templates rows
+                 rather than a lookup list. Only active templates are offered, and
+                 the validation in settingsController.update() rejects anything
+                 else server-side too. #}
+              <input type="hidden" name="settings[{{ row.setting_key }}]" value="{{ row.setting_value or '' }}">
+              <select
+                data-key="{{ row.setting_key }}"
+                data-initial-value="{{ row.setting_value or '' }}"
+                data-sensitive="{{ '1' if row.is_sensitive else '0' }}"
+                data-protected="{{ '1' if row.is_protected else '0' }}"
+                {{ 'disabled' if row.is_protected or lockedToSuperAdmin }}
+                onchange="this.previousElementSibling.value = this.value;"
+              >
+                {% for opt in activeUiTemplates %}
+                  <option value="{{ opt.template_key }}" {{ 'selected' if opt.template_key == row.setting_value }}>{{ opt.name }}</option>
+                {% endfor %}
+                {% if row.setting_value and not (row.setting_value in activeUiTemplateKeys) %}
+                  <option value="{{ row.setting_value }}" selected>{{ row.setting_value }} (inactive)</option>
+                {% endif %}
+              </select>
             {% elif row.setting_key == 'lead_time_display_unit' %}
               {# 90-item backlog item 16: a fixed, non-admin-configurable 2-option
                  choice — special-cased by key, same reasoning as the RBI purpose

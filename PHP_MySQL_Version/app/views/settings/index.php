@@ -55,6 +55,29 @@
                   <option value="<?= htmlspecialchars($currentValue) ?>" selected><?= htmlspecialchars($currentValue) ?> (not in admin list)</option>
                 <?php endif; ?>
               </select>
+            <?php elseif ($row['setting_key'] === 'default_ui_template'): ?>
+              <?php /* docs/schema.sql Section BQ — same by-setting_key special case as the
+                 RBI purpose codes above, sourced from the active ui_templates rows rather
+                 than a lookup list. Only active templates are offered, and the validation
+                 in SettingsController::update() rejects anything else server-side too. */ ?>
+              <?php $currentValue = (string) ($row['setting_value'] ?? ''); $seenCurrent = false; ?>
+              <input type="hidden" name="settings[<?= htmlspecialchars($row['setting_key']) ?>]" value="<?= htmlspecialchars($currentValue) ?>">
+              <select
+                data-key="<?= htmlspecialchars($row['setting_key']) ?>"
+                data-initial-value="<?= htmlspecialchars($currentValue) ?>"
+                data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
+                data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
+                <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'disabled' : '' ?>
+                onchange="this.previousElementSibling.value = this.value;"
+              >
+                <?php foreach ($activeUiTemplates as $opt): ?>
+                  <?php if ($opt['template_key'] === $currentValue) { $seenCurrent = true; } ?>
+                  <option value="<?= htmlspecialchars($opt['template_key']) ?>" <?= $opt['template_key'] === $currentValue ? 'selected' : '' ?>><?= htmlspecialchars($opt['name']) ?></option>
+                <?php endforeach; ?>
+                <?php if (!$seenCurrent && $currentValue !== ''): ?>
+                  <option value="<?= htmlspecialchars($currentValue) ?>" selected><?= htmlspecialchars($currentValue) ?> (inactive)</option>
+                <?php endif; ?>
+              </select>
             <?php elseif ($row['setting_key'] === 'lead_time_display_unit'): ?>
               <?php /* 90-item backlog item 16: a fixed, non-admin-configurable 2-option
                  choice — special-cased by key, same reasoning as the RBI purpose

@@ -1,0 +1,28 @@
+<div class="card page-wide">
+  <h1>UI Templates</h1>
+  <p class="muted">Each user picks one of these for themselves on their own Account page, or leaves it unset to follow the company default (<a href="/settings">Settings &gt; UI</a>). Deactivating a template here doesn't delete anything — anyone currently using it (by personal preference or as the company default) automatically falls back to the company default, or to Standard if that's also inactive.</p>
+  <p class="muted small">"Standard" can never be deactivated — it's the one template that's always available, so nobody can ever be locked out.</p>
+
+  <div class="section">
+    <table class="list">
+      <tr><th>Key</th><th>Name</th><th>Status</th><th>Action</th></tr>
+      {% for t in templates %}
+      <tr>
+        <td><code>{{ t.template_key }}</code></td>
+        <td>{{ t.name }}</td>
+        <td><span class="badge {{ 'badge-active' if t.is_active else 'badge-inactive' }}">{{ 'Active' if t.is_active else 'Inactive' }}</span></td>
+        <td>
+          {% if t.template_key == 'standard' and t.is_active %}
+            <button type="button" class="btn-sm" disabled title="Standard can never be deactivated">Deactivate</button>
+          {% else %}
+            <form method="post" action="/ui-templates/{{ t.id }}/toggle-active" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm">{{ 'Deactivate' if t.is_active else 'Reactivate' }}</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

@@ -2,6 +2,7 @@
 
 const flash = require('../helpers/flash');
 const userRepository = require('../repositories/userRepository');
+const uiTemplateRepository = require('../repositories/uiTemplateRepository');
 const passwordHash = require('../helpers/passwordHash');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const authService = require('../services/authService');
@@ -10,7 +11,7 @@ const authService = require('../services/authService');
 
 async function edit(req, res) {
   const user = await userRepository.findById(req.user.id);
-  res.renderView('account/edit', { user }, 'layout/base');
+  res.renderView('account/edit', { user, activeUiTemplates: await uiTemplateRepository.active() }, 'layout/base');
 }
 
 async function updateSignature(req, res) {
@@ -25,6 +26,28 @@ async function updateNotificationPreference(req, res) {
   const enabled = !!req.body.email_action_notifications_enabled;
   await userRepository.updateNotificationPreference(req.user.id, enabled);
   flash.set(req, 'success', 'Notification preference saved.');
+  res.redirect('/account');
+}
+
+/** docs/schema.sql Section BQ — self-service pick of which UI template to see; empty value clears the preference back to "follow the company default." */
+async function updateUiTemplate(req, res) {
+  const userId = req.user.id;
+  const raw = String(req.body.ui_template_preference_id || '').trim();
+  if (raw === '') {
+    await userRepository.updateUiTemplatePreference(userId, null);
+    flash.set(req, 'success', 'UI template preference cleared — you will now follow the company default.');
+    res.redirect('/account');
+    return;
+  }
+  const templateId = parseInt(raw, 10);
+  const template = await uiTemplateRepository.findById(templateId);
+  if (!template || Number(template.is_active) !== 1) {
+    flash.set(req, 'error', 'That template is not available. Nothing was saved.');
+    res.redirect('/account');
+    return;
+  }
+  await userRepository.updateUiTemplatePreference(userId, templateId);
+  flash.set(req, 'success', 'UI template preference saved.');
   res.redirect('/account');
 }
 
@@ -66,4 +89,4 @@ async function updatePassword(req, res) {
   res.redirect('/account');
 }
 
-module.exports = { edit, updateSignature, updateNotificationPreference, updatePassword };
+module.exports = { edit, updateSignature, updateNotificationPreference, updateUiTemplate, updatePassword };

@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Helpers\Flash;
 use App\Helpers\View;
+use App\Repositories\UiTemplateRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
 use App\Services\PasswordPolicyService;
@@ -16,7 +17,10 @@ final class AccountController
     public function edit(array $params): void
     {
         $user = UserRepository::findById((int) AuthService::currentUser()['id']);
-        View::render('account/edit', ['user' => $user], 'layout/base');
+        View::render('account/edit', [
+            'user' => $user,
+            'activeUiTemplates' => UiTemplateRepository::active(),
+        ], 'layout/base');
     }
 
     public function updateSignature(array $params): void
@@ -35,6 +39,29 @@ final class AccountController
         $enabled = !empty($_POST['email_action_notifications_enabled']);
         UserRepository::updateNotificationPreference($userId, $enabled);
         Flash::set('success', 'Notification preference saved.');
+        header('Location: /account');
+    }
+
+    /** docs/schema.sql Section BQ — self-service pick of which UI template to see; empty value clears the preference back to "follow the company default." */
+    public function updateUiTemplate(array $params): void
+    {
+        $userId = (int) AuthService::currentUser()['id'];
+        $raw = trim((string) ($_POST['ui_template_preference_id'] ?? ''));
+        if ($raw === '') {
+            UserRepository::updateUiTemplatePreference($userId, null);
+            Flash::set('success', 'UI template preference cleared — you will now follow the company default.');
+            header('Location: /account');
+            return;
+        }
+        $templateId = (int) $raw;
+        $template = UiTemplateRepository::findById($templateId);
+        if (!$template || (int) $template['is_active'] !== 1) {
+            Flash::set('error', 'That template is not available. Nothing was saved.');
+            header('Location: /account');
+            return;
+        }
+        UserRepository::updateUiTemplatePreference($userId, $templateId);
+        Flash::set('success', 'UI template preference saved.');
         header('Location: /account');
     }
 

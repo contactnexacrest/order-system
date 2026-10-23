@@ -24,6 +24,23 @@
   </div>
 
   <div class="section">
+    <h2>UI Template</h2>
+    <p class="muted">Choose which UI template you see across the app. Leave on "Use company default" to automatically follow whatever the company default is set to (Admin &gt; Settings), even if it changes later.</p>
+    <form method="post" action="/account/ui-template">
+      <?= Csrf::field() ?>
+      <label>Template
+        <select name="ui_template_preference_id">
+          <option value="" <?= empty($user['ui_template_preference_id']) ? 'selected' : '' ?>>Use company default</option>
+          <?php foreach ($activeUiTemplates as $t): ?>
+            <option value="<?= (int) $t['id'] ?>" <?= (int) ($user['ui_template_preference_id'] ?? 0) === (int) $t['id'] ? 'selected' : '' ?>><?= htmlspecialchars($t['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <button type="submit" class="btn-sm btn-accent">Save UI Template</button>
+    </form>
+  </div>
+
+  <div class="section">
     <h2>Change Password</h2>
     <form method="post" action="/account/password">
       <?= Csrf::field() ?>

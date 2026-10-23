@@ -13,6 +13,7 @@ use App\Middleware\CsrfCheck;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\LookupRepository;
+use App\Repositories\UiTemplateRepository;
 use App\Services\AuthService;
 use App\Services\EmailService;
 use App\Services\SuperAdminService;
@@ -45,6 +46,10 @@ final class SettingsController
             // was scoped as a 3-key special case rather than a new generic
             // settings field type).
             'rbiPurposeCodes' => LookupRepository::dropdownOptions('rbi_purpose_code'),
+            // docs/schema.sql Section BQ — default_ui_template gets the same
+            // by-setting_key dropdown special-case as the RBI codes above,
+            // sourced from the active UI templates rather than a lookup list.
+            'activeUiTemplates' => UiTemplateRepository::active(),
         ], 'layout/base');
     }
 
@@ -155,6 +160,20 @@ final class SettingsController
             Flash::set('error', 'storage_base_path is read-only here and has no effect on the app — change STORAGE_BASE_PATH in .env instead. Nothing was saved.');
             header('Location: /settings');
             return;
+        }
+
+        // docs/schema.sql Section BQ — unlike the freely-trusted RBI-code/
+        // lead_time_display_unit dropdowns, this setting has wider blast
+        // radius (it's what every user with no personal preference actually
+        // sees), so a submitted value that isn't among the currently-active
+        // template keys is rejected outright rather than silently saved.
+        if (isset($toApply['default_ui_template'])) {
+            $activeKeys = array_column(UiTemplateRepository::active(), 'template_key');
+            if (!in_array($toApply['default_ui_template']['new'], $activeKeys, true)) {
+                Flash::set('error', 'default_ui_template must be one of the currently active UI templates. Nothing was saved.');
+                header('Location: /settings');
+                return;
+            }
         }
 
         // Server-side enforcement of the unlock gesture — independent of

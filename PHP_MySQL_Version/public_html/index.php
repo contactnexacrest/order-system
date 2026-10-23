@@ -40,6 +40,7 @@ use App\Controllers\SopController;
 use App\Controllers\NotificationController;
 use App\Controllers\AccountController;
 use App\Controllers\EmailTemplateController;
+use App\Controllers\UiTemplateController;
 use App\Controllers\OrderCommentController;
 use App\Controllers\OrderController;
 use App\Controllers\ReorderRequestController;
@@ -82,6 +83,7 @@ $clientPortal = new ClientPortalController();
 $orders = new OrderController();
 $orderComments = new OrderCommentController();
 $emailTemplates = new EmailTemplateController();
+$uiTemplates = new UiTemplateController();
 $account = new AccountController();
 $annexure = new AnnexureController();
 $documents = new DocumentController();
@@ -243,9 +245,13 @@ $router->get('/email-templates/{id}/edit', [$emailTemplates, 'edit'], [SessionAu
 $router->post('/email-templates/{id}/update', [$emailTemplates, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates'), CsrfCheck::verify()]);
 $router->post('/email-templates/{id}/toggle-active', [$emailTemplates, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_email_templates'), CsrfCheck::verify()]);
 
+$router->get('/ui-templates', [$uiTemplates, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/ui-templates/{id}/toggle-active', [$uiTemplates, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+
 $router->get('/account', [$account, 'edit'], [SessionAuth::required()]);
 $router->post('/account/signature', [$account, 'updateSignature'], [SessionAuth::required(), CsrfCheck::verify()]);
 $router->post('/account/notifications', [$account, 'updateNotificationPreference'], [SessionAuth::required(), CsrfCheck::verify()]);
+$router->post('/account/ui-template', [$account, 'updateUiTemplate'], [SessionAuth::required(), CsrfCheck::verify()]);
 $router->post('/account/password', [$account, 'updatePassword'], [SessionAuth::required(), CsrfCheck::verify()]);
 
 $router->get('/watermarks', [$watermarks, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);

@@ -84,6 +84,7 @@ const complianceTaskTypeController = require('./controllers/complianceTaskTypeCo
 const watermarkController = require('./controllers/watermarkController');
 const orderCommentController = require('./controllers/orderCommentController');
 const emailTemplateController = require('./controllers/emailTemplateController');
+const uiTemplateController = require('./controllers/uiTemplateController');
 const accountController = require('./controllers/accountController');
 const superAdminOnly = require('./middleware/superAdminOnly');
 const clientAuth = require('./middleware/clientAuth');
@@ -411,9 +412,14 @@ app.get('/email-templates/:id/edit', requireAuth, requirePermission('manage_emai
 app.post('/email-templates/:id/update', requireAuth, requirePermission('manage_email_templates'), verifyCsrf, asyncHandler(emailTemplateController.update));
 app.post('/email-templates/:id/toggle-active', requireAuth, requirePermission('manage_email_templates'), verifyCsrf, asyncHandler(emailTemplateController.toggleActive));
 
+// docs/schema.sql Section BQ — admin on/off switch per UI template.
+app.get('/ui-templates', requireAuth, requirePermission('manage_company_settings'), asyncHandler(uiTemplateController.index));
+app.post('/ui-templates/:id/toggle-active', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(uiTemplateController.toggleActive));
+
 app.get('/account', requireAuth, asyncHandler(accountController.edit));
 app.post('/account/signature', requireAuth, verifyCsrf, asyncHandler(accountController.updateSignature));
 app.post('/account/notifications', requireAuth, verifyCsrf, asyncHandler(accountController.updateNotificationPreference));
+app.post('/account/ui-template', requireAuth, verifyCsrf, asyncHandler(accountController.updateUiTemplate));
 app.post('/account/password', requireAuth, verifyCsrf, asyncHandler(accountController.updatePassword));
 app.get('/holidays', requireAuth, requirePermission('manage_company_settings'), asyncHandler(holidayController.index));
 app.post('/holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.create));

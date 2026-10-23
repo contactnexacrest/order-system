@@ -1589,6 +1589,16 @@ UPDATE document_types SET name = 'Debit Note', ref_format = 'SC/DN/{YYYY}/{DDMM}
 -- other customer-facing document type. ---
 UPDATE document_types SET ref_format = 'SC/ANX/{YYYY}/{DDMM}{NNN}' WHERE code = 'ANNEXA';
 
+-- ================================================================
+-- SECTION BQ — UI TEMPLATE SELECTION (added 2026-10-23)
+-- ================================================================
+INSERT INTO ui_templates (template_key, name, is_active) VALUES
+  ('standard', 'Standard', 1),
+  ('kanban', 'Kanban Board', 1);
+
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('default_ui_template', 'standard', 'string', 'ui', 'Which UI template (see Admin > UI Templates) a user sees when they have not chosen one for themselves on their own Account page. Must be an active template — picking it from the dropdown on this screen enforces that.', 0);
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ================================================================

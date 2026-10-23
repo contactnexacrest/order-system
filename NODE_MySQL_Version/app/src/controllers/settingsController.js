@@ -6,6 +6,7 @@ const settingValueValidator = require('../helpers/settingValueValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const lookupRepository = require('../repositories/lookupRepository');
+const uiTemplateRepository = require('../repositories/uiTemplateRepository');
 const zohoMailService = require('../services/zohoMailService');
 const emailService = require('../services/emailService');
 const superAdminService = require('../services/superAdminService');
@@ -31,11 +32,17 @@ async function index(req, res) {
   // that check is done with the `in` operator against a plain array
   // instead of a loop-tracked boolean.
   const rbiPurposeCodes = await lookupRepository.dropdownOptions('rbi_purpose_code');
+  // docs/schema.sql Section BQ — default_ui_template gets the same
+  // by-setting_key dropdown special-case as the RBI codes above, sourced
+  // from the active UI templates rather than a lookup list.
+  const activeUiTemplates = await uiTemplateRepository.active();
   res.renderView('settings/index', {
     grouped,
     isSuperAdmin,
     rbiPurposeCodes,
     rbiPurposeCodeValues: rbiPurposeCodes.map((o) => o.option_value),
+    activeUiTemplates,
+    activeUiTemplateKeys: activeUiTemplates.map((t) => t.template_key),
   }, 'layout/base');
 }
 
@@ -107,6 +114,20 @@ async function update(req, res) {
     flash.set(req, 'error', 'storage_base_path is read-only here and has no effect on the app — change STORAGE_BASE_PATH in .env instead. Nothing was saved.');
     res.redirect('/settings');
     return;
+  }
+
+  // docs/schema.sql Section BQ — unlike the freely-trusted RBI-code/
+  // lead_time_display_unit dropdowns, this setting has wider blast radius
+  // (it's what every user with no personal preference actually sees), so
+  // a submitted value that isn't among the currently-active template keys
+  // is rejected outright rather than silently saved.
+  if (toApply.default_ui_template) {
+    const activeKeys = (await uiTemplateRepository.active()).map((t) => t.template_key);
+    if (!activeKeys.includes(toApply.default_ui_template.new)) {
+      flash.set(req, 'error', 'default_ui_template must be one of the currently active UI templates. Nothing was saved.');
+      res.redirect('/settings');
+      return;
+    }
   }
 
   // Server-side enforcement of the unlock gesture — independent of the

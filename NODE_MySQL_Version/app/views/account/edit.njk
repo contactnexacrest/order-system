@@ -23,6 +23,23 @@
   </div>
 
   <div class="section">
+    <h2>UI Template</h2>
+    <p class="muted">Choose which UI template you see across the app. Leave on "Use company default" to automatically follow whatever the company default is set to (Admin &gt; Settings), even if it changes later.</p>
+    <form method="post" action="/account/ui-template">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Template
+        <select name="ui_template_preference_id">
+          <option value="" {{ 'selected' if not user.ui_template_preference_id }}>Use company default</option>
+          {% for t in activeUiTemplates %}
+            <option value="{{ t.id }}" {{ 'selected' if user.ui_template_preference_id == t.id }}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn-sm btn-accent">Save UI Template</button>
+    </form>
+  </div>
+
+  <div class="section">
     <h2>Change Password</h2>
     <form method="post" action="/account/password">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">

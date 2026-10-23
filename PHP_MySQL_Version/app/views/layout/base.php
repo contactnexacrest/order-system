@@ -98,7 +98,7 @@ $isActive = static function (string $path) use ($currentPath): bool {
 $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes');
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
-    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates')
+    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
     || $isActive('/logistics-partners') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports');
 ?>
 <!DOCTYPE html>
@@ -176,6 +176,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canManageComplianceTaskTypes): ?><a href="/compliance-task-types" class="<?= $isActive('/compliance-task-types') ? 'active' : '' ?>">Compliance Task Types</a><?php endif; ?>
           <?php if ($canManageDropdownOptions): ?><a href="/admin/dropdown-options" class="<?= $isActive('/admin/dropdown-options') ? 'active' : '' ?>">Dropdown Option Lists</a><?php endif; ?>
           <?php if ($canManageEmailTemplates): ?><a href="/email-templates" class="<?= $isActive('/email-templates') ? 'active' : '' ?>">Email Templates</a><?php endif; ?>
+          <?php if ($canSettings): ?><a href="/ui-templates" class="<?= $isActive('/ui-templates') ? 'active' : '' ?>">UI Templates</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/watermarks" class="<?= $isActive('/watermarks') ? 'active' : '' ?>">Watermarks</a><?php endif; ?>
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
           <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>

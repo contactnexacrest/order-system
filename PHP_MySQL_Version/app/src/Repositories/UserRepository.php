@@ -278,4 +278,16 @@ final class UserRepository
             'UPDATE users SET email_action_notifications_enabled = :enabled WHERE id = :id'
         )->execute(['enabled' => $enabled ? 1 : 0, 'id' => $userId]);
     }
+
+    /**
+     * docs/schema.sql Section BQ — a null preference means "follow the
+     * company default, whatever it currently is" rather than freezing in
+     * whatever the default was at the time this was set to null.
+     */
+    public static function updateUiTemplatePreference(int $userId, ?int $templateId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE users SET ui_template_preference_id = :template_id WHERE id = :id'
+        )->execute(['template_id' => $templateId, 'id' => $userId]);
+    }
 }
