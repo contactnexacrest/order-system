@@ -1,4 +1,4 @@
-{% set statusLabels = [['all', 'All'], ['active', 'Active'], ['overdue', 'Overdue'], ['complete', 'Complete'], ['lost', 'Lost']] %}
+{% set statusLabels = [['all', 'All'], ['active', 'Active'], ['overdue', 'Overdue'], ['complete', 'Complete'], ['lost', 'Lost'], ['cancelled', 'Cancelled']] %}
 <div class="card page-wide">
   <div class="page-header-row">
     <div>
@@ -26,6 +26,7 @@
       {% set stageNumber = o.current_stage_number or 0 %}
       {% set isLost = o.status == 'lost' %}
       {% set isComplete = o.status == 'complete' %}
+      {% set isCancelled = o.status == 'cancelled' %}
       {% set filledSegments = o.filled_segments %}
     <a class="entity-card{{ ' entity-card-overdue' if o.is_overdue else '' }}" href="/orders/{{ o.id }}">
       <div class="entity-card-header">
@@ -36,11 +37,13 @@
       <div>
         <div class="mini-stage-track">
           {% for i in range(1, stageTotal + 1) %}
-            <div class="mini-stage-seg{{ ' filled' if i <= filledSegments else '' }}{{ ' lost' if (isLost and i <= filledSegments) else '' }}"></div>
+            <div class="mini-stage-seg{{ ' filled' if i <= filledSegments else '' }}{{ ' lost' if ((isLost or isCancelled) and i <= filledSegments) else '' }}"></div>
           {% endfor %}
         </div>
         <div class="mini-stage-label">
-          {% if isLost %}
+          {% if isCancelled %}
+            Cancelled
+          {% elif isLost %}
             {{ (o.lost_reason | truncate(46)) if o.lost_reason else 'Marked lost' }}
           {% elif isComplete %}
             Stage 9 of 9 &middot; Closed
@@ -52,6 +55,8 @@
       <div class="entity-card-footer">
         {% if o.is_overdue %}
           <span class="badge badge-lost">Overdue</span>
+        {% elif isCancelled %}
+          <span class="badge badge-lost">Cancelled</span>
         {% elif isLost %}
           <span class="badge badge-lost">Lost</span>
         {% elif isComplete %}

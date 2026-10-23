@@ -487,6 +487,11 @@ $router->post('/orders/{id}/bl-endorsement', [$orders, 'saveBlEndorsement'], [Se
 $router->post('/orders/{id}/bl-endorsement/generate', [$orders, 'generateBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/close', [$orders, 'closeOrder'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/mark-lost', [$orders, 'markLost'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
+// External QA report M-09: formal cancellation workflow, distinct from mark-lost above.
+$router->post('/orders/{id}/cancellation/request', [$orders, 'requestCancellation'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/cancellation/{cancellationId}/approve', [$orders, 'approveCancellation'], [SessionAuth::required(), PermissionCheck::requires('edit_locked_data'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/cancellation/{cancellationId}/reject', [$orders, 'rejectCancellation'], [SessionAuth::required(), PermissionCheck::requires('edit_locked_data'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/cancellation/{cancellationId}/complete-refund', [$orders, 'completeCancellationRefund'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);

@@ -246,6 +246,83 @@
   </script>
   {% endif %}
 
+  {# External QA report M-09: formal cancellation workflow, distinct from
+     Mark as Lost above (which only ever applies pre-money, while this
+     order is still 'active' with no BL on file). A request here never
+     changes the order's own status; only an approval does. #}
+  {% if order.status == 'cancelled' %}
+    <p class="muted small">
+      Cancelled{% if approvedCancellation and approvedCancellation.decided_at %} on {{ approvedCancellation.decided_at }} by {{ approvedCancellation.decided_by_name or 'unknown' }}{% endif %}
+      {% if approvedCancellation %} — reason: {{ approvedCancellation.reason }}{% endif %}
+      {% if approvedCancellation and approvedCancellation.refund_status != 'not_applicable' %}
+        <br>Refund: {{ approvedCancellation.refund_status | replace('_', ' ') }}{% if approvedCancellation.refund_amount != null %} — {{ order.currency_code }} {{ approvedCancellation.refund_amount | money }}{% endif %}
+        {% if approvedCancellation.refund_status == 'pending' and permissions.close_orders %}
+          <form method="post" action="/orders/{{ order.id }}/cancellation/{{ approvedCancellation.id }}/complete-refund" style="display:inline" onsubmit="return confirm('Mark this refund as completed? Record this only once the money has actually been sent back.');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="text" name="refund_notes" placeholder="Refund reference / notes (optional)" style="width:260px">
+            <button type="submit" class="btn-sm btn-secondary">Mark Refund Completed</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </p>
+  {% elif pendingCancellation %}
+    <div class="review-banner" style="flex-direction:column;align-items:stretch;gap:6px">
+      <span>Cancellation requested by {{ pendingCancellation.requested_by_name or 'unknown' }} on {{ pendingCancellation.requested_at }} — awaiting approval.<br>Reason: {{ pendingCancellation.reason }}</span>
+      {% if permissions.edit_locked_data %}
+        <form method="post" action="/orders/{{ order.id }}/cancellation/{{ pendingCancellation.id }}/approve" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('Approve this cancellation? The order will be locked as CANCELLED and this cannot be undone from this screen.');">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <select name="refund_status">
+            <option value="not_applicable">No refund applicable</option>
+            <option value="pending">Refund pending</option>
+            <option value="completed">Refund already completed</option>
+          </select>
+          <input type="text" name="refund_amount" placeholder="Refund amount (optional)" style="width:160px">
+          <input type="text" name="decision_notes" placeholder="Approval notes (optional)" style="width:220px">
+          <button type="submit" class="btn-sm btn-success">Approve Cancellation</button>
+        </form>
+        <form method="post" action="/orders/{{ order.id }}/cancellation/{{ pendingCancellation.id }}/reject" style="display:flex;gap:6px;align-items:center" onsubmit="return confirmRejectCancellation(this);">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="decision_notes" class="reject-cancellation-notes">
+          <button type="button" class="btn-sm btn-danger" onclick="promptRejectCancellation(this)">Reject Cancellation</button>
+        </form>
+        <script>
+          function promptRejectCancellation(btn) {
+            var form = btn.closest('form');
+            var notes = prompt('Why is this cancellation request being rejected? (required — recorded in the audit log)');
+            if (!notes || !notes.trim()) { return; }
+            form.querySelector('.reject-cancellation-notes').value = notes.trim();
+            form.requestSubmit ? form.requestSubmit() : form.submit();
+          }
+          function confirmRejectCancellation(form) {
+            var notes = form.querySelector('.reject-cancellation-notes').value;
+            if (!notes) { return false; }
+            return confirm('Reject this cancellation request? The order is unaffected.');
+          }
+        </script>
+      {% endif %}
+    </div>
+  {% elif permissions.close_orders and order.status not in ['complete', 'lost'] %}
+    <form method="post" action="/orders/{{ order.id }}/cancellation/request" style="display:inline" onsubmit="return confirmRequestCancellation(this);">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="reason" class="request-cancellation-reason">
+      <button type="button" class="btn-sm btn-danger" onclick="promptRequestCancellation(this)">Request Cancellation</button>
+    </form>
+    <script>
+      function promptRequestCancellation(btn) {
+        var form = btn.closest('form');
+        var reason = prompt('Why is cancellation being requested? (required — recorded in the audit log; a privileged second person still has to approve this)');
+        if (!reason || !reason.trim()) { return; }
+        form.querySelector('.request-cancellation-reason').value = reason.trim();
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      }
+      function confirmRequestCancellation(form) {
+        var reason = form.querySelector('.request-cancellation-reason').value;
+        if (!reason) { return false; }
+        return confirm('Request cancellation for {{ order.order_reference }}? This does not cancel the order by itself — a privileged second person still has to approve it.');
+      }
+    </script>
+  {% endif %}
+
   {# Point 2 (2026-10-01): a quick-glance horizontal line-with-dots
      indicator of where this order stands in the 9-stage pipeline, above
      the existing detailed stage-chip grid below — that grid still carries
@@ -2004,6 +2081,7 @@
           <option value="complete" {{ 'selected' if order.status == 'complete' else '' }}>Complete</option>
           <option value="disputed" {{ 'selected' if order.status == 'disputed' else '' }}>Disputed</option>
           <option value="lost" {{ 'selected' if order.status == 'lost' else '' }}>Lost</option>
+          <option value="cancelled" {{ 'selected' if order.status == 'cancelled' else '' }}>Cancelled</option>
         </select>
       </label>
       <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" {{ 'checked' if order.is_locked else '' }}> Locked (normally set automatically once status = complete)</label>

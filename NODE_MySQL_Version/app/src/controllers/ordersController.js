@@ -18,6 +18,8 @@ const orderDuplicationService = require('../services/orderDuplicationService');
 const orderEditGuard = require('../services/orderEditGuard');
 const encryptionService = require('../services/encryptionService');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
+const orderCancellationRepository = require('../repositories/orderCancellationRepository');
+const makerCheckerGuard = require('../services/makerCheckerGuard');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderComplianceTaskRepository = require('../repositories/orderComplianceTaskRepository');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
@@ -99,7 +101,7 @@ async function index(req, res) {
   // is remembered for that pageview exactly like every other tab.
   const statusFilter = String(req.query.status || '').trim() || 'active';
 
-  const counts = { all: all.length, active: 0, overdue: 0, complete: 0, lost: 0 };
+  const counts = { all: all.length, active: 0, overdue: 0, complete: 0, lost: 0, cancelled: 0 };
   for (const o of all) {
     if (o.is_overdue) counts.overdue++;
     if (Object.prototype.hasOwnProperty.call(counts, o.status)) counts[o.status]++;
@@ -108,7 +110,7 @@ async function index(req, res) {
   let filtered = all;
   if (statusFilter === 'overdue') {
     filtered = all.filter((o) => !!o.is_overdue);
-  } else if (['active', 'complete', 'lost'].includes(statusFilter)) {
+  } else if (['active', 'complete', 'lost', 'cancelled'].includes(statusFilter)) {
     filtered = all.filter((o) => o.status === statusFilter);
   } else if (statusFilter !== 'all') {
     filtered = all.filter((o) => o.status === 'active');
@@ -132,7 +134,7 @@ async function index(req, res) {
   const stageTotal = 9;
   const orders = pageSlice.map((o) => ({
     ...o,
-    filled_segments: o.status === 'complete' ? stageTotal : (o.status === 'lost' ? Math.max(o.current_stage_number || 0, 1) : (o.current_stage_number || 0)),
+    filled_segments: o.status === 'complete' ? stageTotal : ((o.status === 'lost' || o.status === 'cancelled') ? Math.max(o.current_stage_number || 0, 1) : (o.current_stage_number || 0)),
   }));
 
   res.renderView('orders/index', {
@@ -750,6 +752,14 @@ async function show(req, res) {
 
   const disputes = await disputeRepository.forOrder(orderId);
 
+  // External QA report M-09: formal cancellation workflow, distinct from
+  // Mark as Lost (which only ever applies pre-money, while the order is
+  // still 'active' with no BL on file). A request here never changes the
+  // order's own status; only an approval does.
+  const pendingCancellation = await orderCancellationRepository.findPendingForOrder(orderId);
+  const cancellationHistory = await orderCancellationRepository.forOrder(orderId);
+  const approvedCancellation = cancellationHistory.find((c) => c.status === 'approved') || cancellationHistory[0] || null;
+
   // Real gap this closes: emailLogRepository.forOrder() already existed
   // but nothing on this page ever called it, so the "Send to Buyer" link
   // would silently reappear after a Level-2 rejection or a cron dispatch
@@ -844,6 +854,8 @@ async function show(req, res) {
       payment: await orderPaymentStatusRepository.find(orderId),
       documents,
       regenerationRisk,
+      pendingCancellation,
+      approvedCancellation,
       reviewsByDocument,
       crossVerificationsByDocument,
       emailLogByDocument,
@@ -2434,7 +2446,7 @@ async function overrideStatusLock(req, res) {
   const newIsLocked = req.body.is_locked !== undefined;
   const reason = str(req.body.reason);
 
-  if (!['active', 'complete', 'disputed', 'lost'].includes(newStatus)) {
+  if (!['active', 'complete', 'disputed', 'lost', 'cancelled'].includes(newStatus)) {
     flash.set(req, 'error', 'Invalid status value.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2512,6 +2524,138 @@ async function markLost(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * External QA report M-09: "Formal order cancellation workflow (reason,
+ * approval, money/refund handling, audit) distinct from 'mark lost'."
+ * markLost() above only covers a pre-money walk-away (status must still
+ * be 'active', no BL yet) — this covers cancelling an order that's
+ * already further along. A request here never changes the order's own
+ * status by itself; only approveCancellation() does, once a privileged
+ * second person signs off (close_orders to request, edit_locked_data to
+ * decide — same maker-checker separation as every other approval here).
+ */
+async function requestCancellation(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  if (['complete', 'lost', 'cancelled'].includes(order.status)) {
+    flash.set(req, 'error', `An order that is already "${order.status}" cannot have a cancellation requested.`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (await orderCancellationRepository.findPendingForOrder(orderId)) {
+    flash.set(req, 'error', 'This order already has a cancellation request awaiting a decision.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const reason = str(req.body.reason);
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const cancellationId = await orderCancellationRepository.create(orderId, reason, user.id);
+  await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REQUESTED', 'order_cancellations', cancellationId, null, null, reason);
+  flash.set(req, 'success', 'Cancellation requested — awaiting approval.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function approveCancellation(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const cancellationId = parseInt(req.params.cancellationId, 10);
+  const user = req.user;
+  const cancellation = await orderCancellationRepository.find(cancellationId);
+  if (!cancellation || cancellation.order_id !== orderId || cancellation.status !== 'pending') {
+    flash.set(req, 'error', 'That cancellation request is no longer pending.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // QA-5 maker-checker: the person who requested the cancellation must
+  // not also be the one who approves it, unless Super Admin or
+  // manage_permissions — same choke point as document review assignment,
+  // email-send approval, and amendment MD-approval.
+  if (cancellation.requested_by === user.id && !(await makerCheckerGuard.selfApprovalAllowed(user.id))) {
+    flash.set(req, 'error', 'You requested this cancellation — a different privileged person must approve it.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  let refundStatus = String(req.body.refund_status || 'not_applicable');
+  if (!['not_applicable', 'pending', 'completed'].includes(refundStatus)) {
+    refundStatus = 'not_applicable';
+  }
+  const refundAmountRaw = str(req.body.refund_amount);
+  const refundAmount = refundAmountRaw !== '' && !Number.isNaN(Number(refundAmountRaw)) ? Number(refundAmountRaw) : null;
+  const decisionNotes = str(req.body.decision_notes) || null;
+
+  await orderCancellationRepository.approve(cancellationId, user.id, decisionNotes, refundAmount, refundStatus);
+  const freshOrder = await orderRepository.find(orderId);
+  await orderRepository.cancel(orderId);
+  await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_APPROVED', 'orders', orderId, 'status', freshOrder.status, 'cancelled', decisionNotes);
+  flash.set(req, 'success', 'Cancellation approved — order is now cancelled.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+async function rejectCancellation(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const cancellationId = parseInt(req.params.cancellationId, 10);
+  const user = req.user;
+  const cancellation = await orderCancellationRepository.find(cancellationId);
+  if (!cancellation || cancellation.order_id !== orderId || cancellation.status !== 'pending') {
+    flash.set(req, 'error', 'That cancellation request is no longer pending.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (cancellation.requested_by === user.id && !(await makerCheckerGuard.selfApprovalAllowed(user.id))) {
+    flash.set(req, 'error', 'You requested this cancellation — a different privileged person must decide on it.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const decisionNotes = str(req.body.decision_notes);
+  const reasonError = reasonValidator.check(decisionNotes);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  await orderCancellationRepository.reject(cancellationId, user.id, decisionNotes);
+  await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REJECTED', 'order_cancellations', cancellationId, null, 'pending', 'rejected', decisionNotes);
+  flash.set(req, 'success', 'Cancellation request rejected — order is unaffected.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Recording that the refund money has actually moved is a separate,
+ * lower-bar step from the approval decision itself (the bank transfer
+ * happens outside this system on its own timeline) — gated on
+ * close_orders, same tier as requesting the cancellation, not the
+ * stricter edit_locked_data the approval decision itself needs.
+ */
+async function completeCancellationRefund(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const cancellationId = parseInt(req.params.cancellationId, 10);
+  const user = req.user;
+  const cancellation = await orderCancellationRepository.find(cancellationId);
+  if (!cancellation || cancellation.order_id !== orderId || cancellation.status !== 'approved' || cancellation.refund_status !== 'pending') {
+    flash.set(req, 'error', 'There is no pending refund to complete for this cancellation.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const refundNotes = str(req.body.refund_notes) || null;
+
+  await orderCancellationRepository.completeRefund(cancellationId, user.id, refundNotes);
+  await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REFUND_COMPLETED', 'order_cancellations', cancellationId, 'refund_status', 'pending', 'completed', refundNotes);
+  flash.set(req, 'success', 'Refund marked as completed.');
+  res.redirect(`/orders/${orderId}`);
+}
+
 module.exports = {
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, downloadDossier, generatePiFormLink, generateBuyerActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
@@ -2522,6 +2666,7 @@ module.exports = {
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   saveBlEndorsement, generateBlEndorsement,
   closeOrder, overrideStatusLock, markLost, updateComplianceTask,
+  requestCancellation, approveCancellation, rejectCancellation, completeCancellationRefund,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,
   recordAdvanceExchangeRate, recordBalanceExchangeRate, recordFreightExchangeRate, recordAdvanceFirc, recordBalanceFirc, recordFreightFirc,

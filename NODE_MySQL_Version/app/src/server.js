@@ -696,6 +696,11 @@ app.post('/orders/:id/bl-endorsement', requireAuth, requirePermission('manage_sh
 app.post('/orders/:id/bl-endorsement/generate', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateBlEndorsement));
 app.post('/orders/:id/close', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.closeOrder));
 app.post('/orders/:id/mark-lost', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.markLost));
+// External QA report M-09: formal cancellation workflow, distinct from mark-lost above.
+app.post('/orders/:id/cancellation/request', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.requestCancellation));
+app.post('/orders/:id/cancellation/:cancellationId/approve', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(ordersController.approveCancellation));
+app.post('/orders/:id/cancellation/:cancellationId/reject', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(ordersController.rejectCancellation));
+app.post('/orders/:id/cancellation/:cancellationId/complete-refund', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.completeCancellationRefund));
 app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('close_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateComplianceTask));
 
 app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));

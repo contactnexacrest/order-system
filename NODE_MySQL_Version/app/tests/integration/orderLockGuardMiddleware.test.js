@@ -71,6 +71,15 @@ describe('orderLockGuard middleware (External QA report L-28)', () => {
       '/orders/:id/archive', '/orders/:id/unarchive', '/orders/:id/duplicate', '/orders/:id/comments',
       '/orders/:id/documents/generate', '/orders/:id/documents/:documentId/delete',
       '/orders/:id/documents/:documentId/send', '/orders/:id/email/send', '/orders/:id/disputes',
+      // External QA report M-09: the cancellation workflow is mark-lost's
+      // sibling (a terminal action ending the order's active life, not a
+      // routine edit), excluded for the same reason mark-lost is above.
+      // completeCancellationRefund in particular MUST stay excluded: by
+      // the time it runs, cancel() has already set is_locked=1, so
+      // guarding it would make it permanently unreachable for the
+      // close_orders-only tier it's deliberately gated on.
+      '/orders/:id/cancellation/request', '/orders/:id/cancellation/:cancellationId/approve',
+      '/orders/:id/cancellation/:cancellationId/reject', '/orders/:id/cancellation/:cancellationId/complete-refund',
     ]);
     const lines = source.split('\n').filter((line) => /^app\.post\('\/orders\/:id/.test(line.trim()));
     expect(lines.length).toBeGreaterThan(0);

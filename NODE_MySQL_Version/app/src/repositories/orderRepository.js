@@ -629,6 +629,24 @@ async function markLost(orderId, reason, userId) {
 }
 
 /**
+ * External QA report M-09 — the formal cancellation workflow's own
+ * approval step (ordersController.approveCancellation()) calls this
+ * once an order_cancellations request is approved. Same locking and
+ * buyer-action-token revocation as markLost(); full reason/approval/
+ * refund detail lives on the order_cancellations row itself, not
+ * duplicated onto this table.
+ */
+async function cancel(orderId) {
+  await db.execute(
+    `UPDATE orders
+        SET status = 'cancelled', is_locked = 1,
+            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+      WHERE id = :id`,
+    { id: orderId }
+  );
+}
+
+/**
  * 90-item backlog "standalone order": writes directly to the order's own
  * base columns (advance_pct, balance_pct, balance_trigger_option,
  * balance_days) rather than a separate *_override column — those are the
@@ -747,7 +765,7 @@ async function findByValidBuyerActionToken(rawToken) {
 
 module.exports = {
   all, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
-  setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, applyAmendmentOverride, forClient,
+  setProductionStatus, setBuyersPoRef, setEstShipmentDate, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot,
 };

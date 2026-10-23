@@ -4,7 +4,7 @@ use App\Services\PermissionService;
 $currentUser = AuthService::currentUser();
 $canViewArchivedOrders = $currentUser && PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_archived_orders');
 
-$statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', 'complete' => 'Complete', 'lost' => 'Lost'];
+$statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', 'complete' => 'Complete', 'lost' => 'Lost', 'cancelled' => 'Cancelled'];
 ?>
 <div class="card page-wide">
   <div class="page-header-row">
@@ -33,7 +33,8 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
       $stageNumber = (int) ($o['current_stage_number'] ?? 0);
       $isLost = $o['status'] === 'lost';
       $isComplete = $o['status'] === 'complete';
-      $filledSegments = $isComplete ? $stageTotal : ($isLost ? min(1, max($stageNumber, 1)) : $stageNumber);
+      $isCancelled = $o['status'] === 'cancelled';
+      $filledSegments = $isComplete ? $stageTotal : (($isLost || $isCancelled) ? min(1, max($stageNumber, 1)) : $stageNumber);
       $currency = $o['currency_code'] ?? '';
       $amount = $currency . ' ' . number_format((float) $o['total_fob_value'], 2);
     ?>
@@ -46,11 +47,13 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
       <div>
         <div class="mini-stage-track">
           <?php for ($i = 1; $i <= $stageTotal; $i++): ?>
-            <div class="mini-stage-seg<?= $i <= $filledSegments ? ' filled' . ($isLost ? ' lost' : '') : '' ?>"></div>
+            <div class="mini-stage-seg<?= $i <= $filledSegments ? ' filled' . (($isLost || $isCancelled) ? ' lost' : '') : '' ?>"></div>
           <?php endfor; ?>
         </div>
         <div class="mini-stage-label">
-          <?php if ($isLost): ?>
+          <?php if ($isCancelled): ?>
+            Cancelled
+          <?php elseif ($isLost): ?>
             <?= htmlspecialchars($o['lost_reason'] ? mb_strimwidth($o['lost_reason'], 0, 46, '…') : 'Marked lost') ?>
           <?php elseif ($isComplete): ?>
             Stage 9 of 9 &middot; Closed
@@ -62,6 +65,8 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
       <div class="entity-card-footer">
         <?php if (!empty($o['is_overdue'])): ?>
           <span class="badge badge-lost">Overdue</span>
+        <?php elseif ($isCancelled): ?>
+          <span class="badge badge-lost">Cancelled</span>
         <?php elseif ($isLost): ?>
           <span class="badge badge-lost">Lost</span>
         <?php elseif ($isComplete): ?>

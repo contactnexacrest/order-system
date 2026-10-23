@@ -4,6 +4,7 @@ use App\Helpers\Csrf;
 use App\Helpers\Dates;
 use App\Helpers\LeadTimeDisplay;
 use App\Repositories\CaFyLockRepository;
+use App\Repositories\OrderCancellationRepository;
 use App\Services\AuthService;
 use App\Services\DocumentGenerationService;
 use App\Services\OrderEditGuard;
@@ -339,6 +340,87 @@ foreach ($stages as $s) {
       return confirm('Mark <?= htmlspecialchars(addslashes($order['order_reference'])) ?> as LOST? This locks the order (same as closing it) and cannot be undone from this screen.');
     }
   </script>
+  <?php endif; ?>
+
+  <?php
+    // External QA report M-09: formal cancellation workflow, distinct
+    // from Mark as Lost above (which only ever applies pre-money, while
+    // this order is still 'active' with no BL on file). A request here
+    // never changes the order's own status; only an approval does.
+    $__pendingCancellation = OrderCancellationRepository::findPendingForOrder((int) $order['id']);
+  ?>
+  <?php if ($order['status'] === 'cancelled'): ?>
+    <?php $__cancellationHistory = OrderCancellationRepository::forOrder((int) $order['id']); $__approvedCancellation = $__cancellationHistory[0] ?? null; foreach ($__cancellationHistory as $__c) { if ($__c['status'] === 'approved') { $__approvedCancellation = $__c; break; } } ?>
+    <p class="muted small">
+      Cancelled<?php if ($__approvedCancellation && $__approvedCancellation['decided_at']): ?> on <?= htmlspecialchars($__approvedCancellation['decided_at']) ?> by <?= htmlspecialchars($__approvedCancellation['decided_by_name'] ?? 'unknown') ?><?php endif; ?>
+      <?php if ($__approvedCancellation): ?> — reason: <?= htmlspecialchars($__approvedCancellation['reason']) ?><?php endif; ?>
+      <?php if ($__approvedCancellation && $__approvedCancellation['refund_status'] !== 'not_applicable'): ?>
+        <br>Refund: <?= htmlspecialchars(str_replace('_', ' ', $__approvedCancellation['refund_status'])) ?><?php if ($__approvedCancellation['refund_amount'] !== null): ?> — <?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $__approvedCancellation['refund_amount'], 2) ?><?php endif; ?>
+        <?php if ($__approvedCancellation['refund_status'] === 'pending' && $canCloseOrders): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__approvedCancellation['id'] ?>/complete-refund" style="display:inline" onsubmit="return confirm('Mark this refund as completed? Record this only once the money has actually been sent back.');">
+            <?= Csrf::field() ?>
+            <input type="text" name="refund_notes" placeholder="Refund reference / notes (optional)" style="width:260px">
+            <button type="submit" class="btn-sm btn-secondary">Mark Refund Completed</button>
+          </form>
+        <?php endif; ?>
+      <?php endif; ?>
+    </p>
+  <?php elseif ($__pendingCancellation): ?>
+    <div class="review-banner" style="flex-direction:column;align-items:stretch;gap:6px">
+      <span>Cancellation requested by <?= htmlspecialchars($__pendingCancellation['requested_by_name'] ?? 'unknown') ?> on <?= htmlspecialchars($__pendingCancellation['requested_at']) ?> — awaiting approval.<br>Reason: <?= htmlspecialchars($__pendingCancellation['reason']) ?></span>
+      <?php if ($canEditLockedData): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__pendingCancellation['id'] ?>/approve" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('Approve this cancellation? The order will be locked as CANCELLED and this cannot be undone from this screen.');">
+          <?= Csrf::field() ?>
+          <select name="refund_status">
+            <option value="not_applicable">No refund applicable</option>
+            <option value="pending">Refund pending</option>
+            <option value="completed">Refund already completed</option>
+          </select>
+          <input type="text" name="refund_amount" placeholder="Refund amount (optional)" style="width:160px">
+          <input type="text" name="decision_notes" placeholder="Approval notes (optional)" style="width:220px">
+          <button type="submit" class="btn-sm btn-success">Approve Cancellation</button>
+        </form>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__pendingCancellation['id'] ?>/reject" style="display:flex;gap:6px;align-items:center" onsubmit="return confirmRejectCancellation(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="decision_notes" class="reject-cancellation-notes">
+          <button type="button" class="btn-sm btn-danger" onclick="promptRejectCancellation(this)">Reject Cancellation</button>
+        </form>
+        <script>
+          function promptRejectCancellation(btn) {
+            var form = btn.closest('form');
+            var notes = prompt('Why is this cancellation request being rejected? (required — recorded in the audit log)');
+            if (!notes || !notes.trim()) { return; }
+            form.querySelector('.reject-cancellation-notes').value = notes.trim();
+            form.requestSubmit ? form.requestSubmit() : form.submit();
+          }
+          function confirmRejectCancellation(form) {
+            var notes = form.querySelector('.reject-cancellation-notes').value;
+            if (!notes) { return false; }
+            return confirm('Reject this cancellation request? The order is unaffected.');
+          }
+        </script>
+      <?php endif; ?>
+    </div>
+  <?php elseif ($canCloseOrders && !in_array($order['status'], ['complete', 'lost'], true)): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/request" style="display:inline" onsubmit="return confirmRequestCancellation(this);">
+      <?= Csrf::field() ?>
+      <input type="hidden" name="reason" class="request-cancellation-reason">
+      <button type="button" class="btn-sm btn-danger" onclick="promptRequestCancellation(this)">Request Cancellation</button>
+    </form>
+    <script>
+      function promptRequestCancellation(btn) {
+        var form = btn.closest('form');
+        var reason = prompt('Why is cancellation being requested? (required — recorded in the audit log; a privileged second person still has to approve this)');
+        if (!reason || !reason.trim()) { return; }
+        form.querySelector('.request-cancellation-reason').value = reason.trim();
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      }
+      function confirmRequestCancellation(form) {
+        var reason = form.querySelector('.request-cancellation-reason').value;
+        if (!reason) { return false; }
+        return confirm('Request cancellation for <?= htmlspecialchars(addslashes($order['order_reference'])) ?>? This does not cancel the order by itself — a privileged second person still has to approve it.');
+      }
+    </script>
   <?php endif; ?>
 
   <?php
@@ -2154,6 +2236,7 @@ foreach ($stages as $s) {
           <option value="complete" <?= $order['status'] === 'complete' ? 'selected' : '' ?>>Complete</option>
           <option value="disputed" <?= $order['status'] === 'disputed' ? 'selected' : '' ?>>Disputed</option>
           <option value="lost" <?= $order['status'] === 'lost' ? 'selected' : '' ?>>Lost</option>
+          <option value="cancelled" <?= $order['status'] === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
         </select>
       </label>
       <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" <?= $order['is_locked'] ? 'checked' : '' ?>> Locked (normally set automatically once status = complete)</label>

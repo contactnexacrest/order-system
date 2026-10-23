@@ -736,6 +736,23 @@ final class OrderRepository
     }
 
     /**
+     * External QA report M-09 — the formal cancellation workflow's own
+     * approval step (OrderController::approveCancellation()) calls this
+     * once an order_cancellations request is approved. Same locking and
+     * buyer-action-token revocation as markLost(); full reason/approval/
+     * refund detail lives on the order_cancellations row itself, not
+     * duplicated onto this table.
+     */
+    public static function cancel(int $orderId): void
+    {
+        Database::connection()->prepare(
+            "UPDATE orders SET status = 'cancelled', is_locked = 1,
+                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+             WHERE id = :id"
+        )->execute(['id' => $orderId]);
+    }
+
+    /**
      * @return array<int, array<string,mixed>> orders for one client, most recent first
      * 90-item backlog Phase 6 Item B: $activeOnly=true restricts to
      * in-progress orders (active/disputed), hiding finished ones

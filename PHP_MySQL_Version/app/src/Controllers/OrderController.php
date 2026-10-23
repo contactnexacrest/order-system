@@ -41,6 +41,7 @@ use App\Repositories\OrderProductionRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderBlEndorsementRepository;
+use App\Repositories\OrderCancellationRepository;
 use App\Repositories\OrderShippingRepository;
 use App\Repositories\OrderStageRepository;
 use App\Repositories\OrderSupplierPoDocumentRepository;
@@ -55,6 +56,7 @@ use App\Services\CaFyLockGuard;
 use App\Services\DocumentGenerationService;
 use App\Services\EmailService;
 use App\Services\FileUploadService;
+use App\Services\MakerCheckerGuard;
 use App\Services\OrderDuplicationService;
 use App\Services\OrderEditGuard;
 use App\Services\OrderProfitabilityService;
@@ -94,6 +96,7 @@ final class OrderController
             'overdue' => 0,
             'complete' => 0,
             'lost' => 0,
+            'cancelled' => 0,
         ];
         foreach ($all as $o) {
             if (!empty($o['is_overdue'])) {
@@ -107,7 +110,7 @@ final class OrderController
         $filtered = match ($statusFilter) {
             'all' => $all,
             'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
-            'active', 'complete', 'lost' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
+            'active', 'complete', 'lost', 'cancelled' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
             default => array_values(array_filter($all, static fn($o) => $o['status'] === 'active')),
         };
 
@@ -2511,6 +2514,142 @@ final class OrderController
     }
 
     /**
+     * External QA report M-09: "Formal order cancellation workflow
+     * (reason, approval, money/refund handling, audit) distinct from
+     * 'mark lost'." markLost() above only covers a pre-money walk-away
+     * (status must still be 'active', no BL yet) — this covers
+     * cancelling an order that's already further along. A request here
+     * never changes the order's own status by itself; only
+     * approveCancellation() does, once a privileged second person signs
+     * off (close_orders to request, edit_locked_data to decide — same
+     * maker-checker separation as every other approval in this app).
+     */
+    public function requestCancellation(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        if (in_array($order['status'], ['complete', 'lost', 'cancelled'], true)) {
+            Flash::set('error', "An order that is already \"{$order['status']}\" cannot have a cancellation requested.");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if (OrderCancellationRepository::findPendingForOrder($orderId)) {
+            Flash::set('error', 'This order already has a cancellation request awaiting a decision.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $cancellationId = OrderCancellationRepository::create($orderId, $reason, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REQUESTED', 'order_cancellations', $cancellationId, null, null, $reason);
+        Flash::set('success', 'Cancellation requested — awaiting approval.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function approveCancellation(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $cancellationId = (int) ($params['cancellationId'] ?? 0);
+        $user = AuthService::currentUser();
+        $cancellation = OrderCancellationRepository::find($cancellationId);
+        if (!$cancellation || (int) $cancellation['order_id'] !== $orderId || $cancellation['status'] !== 'pending') {
+            Flash::set('error', 'That cancellation request is no longer pending.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // QA-5 maker-checker: the person who requested the cancellation
+        // must not also be the one who approves it, unless Super Admin
+        // or manage_permissions — same choke point as document review
+        // assignment, email-send approval, and amendment MD-approval.
+        if ((int) $cancellation['requested_by'] === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowed((int) $user['id'])) {
+            Flash::set('error', 'You requested this cancellation — a different privileged person must approve it.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $refundStatus = (string) ($_POST['refund_status'] ?? 'not_applicable');
+        if (!in_array($refundStatus, ['not_applicable', 'pending', 'completed'], true)) {
+            $refundStatus = 'not_applicable';
+        }
+        $refundAmountRaw = trim((string) ($_POST['refund_amount'] ?? ''));
+        $refundAmount = $refundAmountRaw !== '' && is_numeric($refundAmountRaw) ? (float) $refundAmountRaw : null;
+        $decisionNotes = trim((string) ($_POST['decision_notes'] ?? '')) ?: null;
+
+        OrderCancellationRepository::approve($cancellationId, (int) $user['id'], $decisionNotes, $refundAmount, $refundStatus);
+        $order = OrderRepository::find($orderId);
+        OrderRepository::cancel($orderId);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_APPROVED', 'orders', $orderId, 'status', $order['status'], 'cancelled', $decisionNotes);
+        Flash::set('success', 'Cancellation approved — order is now cancelled.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    public function rejectCancellation(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $cancellationId = (int) ($params['cancellationId'] ?? 0);
+        $user = AuthService::currentUser();
+        $cancellation = OrderCancellationRepository::find($cancellationId);
+        if (!$cancellation || (int) $cancellation['order_id'] !== $orderId || $cancellation['status'] !== 'pending') {
+            Flash::set('error', 'That cancellation request is no longer pending.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if ((int) $cancellation['requested_by'] === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowed((int) $user['id'])) {
+            Flash::set('error', 'You requested this cancellation — a different privileged person must decide on it.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $decisionNotes = trim((string) ($_POST['decision_notes'] ?? ''));
+        if ($error = ReasonValidator::check($decisionNotes)) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        OrderCancellationRepository::reject($cancellationId, (int) $user['id'], $decisionNotes);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REJECTED', 'order_cancellations', $cancellationId, null, 'pending', 'rejected', $decisionNotes);
+        Flash::set('success', 'Cancellation request rejected — order is unaffected.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Recording that the refund money has actually moved is a separate,
+     * lower-bar step from the approval decision itself (the bank
+     * transfer happens outside this system on its own timeline) — gated
+     * on close_orders, same tier as requesting the cancellation, not the
+     * stricter edit_locked_data the approval decision itself needs.
+     */
+    public function completeCancellationRefund(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $cancellationId = (int) ($params['cancellationId'] ?? 0);
+        $user = AuthService::currentUser();
+        $cancellation = OrderCancellationRepository::find($cancellationId);
+        if (!$cancellation || (int) $cancellation['order_id'] !== $orderId || $cancellation['status'] !== 'approved' || $cancellation['refund_status'] !== 'pending') {
+            Flash::set('error', 'There is no pending refund to complete for this cancellation.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $refundNotes = trim((string) ($_POST['refund_notes'] ?? '')) ?: null;
+
+        OrderCancellationRepository::completeRefund($cancellationId, (int) $user['id'], $refundNotes);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REFUND_COMPLETED', 'order_cancellations', $cancellationId, 'refund_status', 'pending', 'completed', $refundNotes);
+        Flash::set('success', 'Refund marked as completed.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
      * Spec Section 13 — "Stage/lock/order status flags" is explicitly
      * named as an Admin-editable field, distinct from the normal stage-
      * gate progression (StageGateService) which is the non-override path
@@ -2532,7 +2671,7 @@ final class OrderController
         $newIsLocked = isset($_POST['is_locked']);
         $reason = trim((string) ($_POST['reason'] ?? ''));
 
-        if (!in_array($newStatus, ['active', 'complete', 'disputed', 'lost'], true)) {
+        if (!in_array($newStatus, ['active', 'complete', 'disputed', 'lost', 'cancelled'], true)) {
             Flash::set('error', 'Invalid status value.');
             header("Location: /orders/{$orderId}");
             return;
