@@ -510,50 +510,6 @@
     {% endif %}
   </div>
 
-  <div class="section" id="order-updates">
-    <h2>Order Communication</h2>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.{% if permissions.generate_documents %} Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.{% endif %}</p>
-    <div class="chat-thread">
-      {% if comments.length == 0 %}
-        <p class="chat-empty">No updates posted yet.</p>
-      {% endif %}
-      {% for c in comments %}
-        {% set isStaff = c.author_type == 'staff' %}
-        <div class="chat-bubble-row {{ 'staff' if isStaff else 'client' }}">
-          <div class="chat-bubble {{ 'staff' if isStaff else 'client' }}">
-            <div class="chat-bubble-meta">
-              <span class="who">{{ 'Staff' if isStaff else 'Client' }} — {{ (c.staff_name if isStaff else c.client_name) or 'Unknown' }}</span>
-              <span>{{ c.created_at | humanDate }}{% if isStaff %}{{ ' · emailed' if c.email_sent else ' · not emailed (no client email on file)' }}{% endif %}</span>
-            </div>
-            {% if c.body %}<div class="chat-bubble-body">{{ c.body }}</div>{% endif %}
-            {% if c.attachments.length > 0 %}
-              <div class="chat-attachments">
-                {% for att in c.attachments %}
-                  {% set url = '/orders/' ~ order.id ~ '/comment-attachments/' ~ att.file_id ~ '/download' %}
-                  {% if att.mime_type and (att.mime_type | startswith('image/')) %}
-                    <a href="{{ url }}" target="_blank"><img class="chat-attachment-image" src="{{ url }}" alt="{{ att.original_filename }}"></a>
-                  {% elif att.mime_type and (att.mime_type | startswith('video/')) %}
-                    <video class="chat-attachment-video" controls src="{{ url }}"></video>
-                  {% else %}
-                    <a class="chat-attachment-file" href="{{ url }}">{{ att.original_filename }}</a>
-                  {% endif %}
-                {% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-    <form class="chat-post-form" method="post" action="/orders/{{ order.id }}/comments#order-updates" enctype="multipart/form-data">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <textarea name="body" placeholder="Write an update for the client…"></textarea>
-      <div class="chat-post-form-row">
-        <input type="file" name="attachments" multiple accept="image/*,video/*,.pdf">
-        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
-      </div>
-    </form>
-  </div>
-
   <div class="section" id="documents-approvals" data-stage="1">
     <h2>Documents &amp; Approvals</h2>
     <h3 style="font-size:0.95em;">All Documents</h3>
@@ -671,90 +627,12 @@
         </form>
       {% endif %}
 
-      {# 90-item backlog #80: this panel's Generate buttons now run in
-         stage order (QT/1, BUYERPO/2, PI/3, OC/4, SUPPO/5, FDN/6, CI/8) to
-         match the stepBadge sequence below each one. #}
-      {% if stage2 and stage2.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="document_type" value="BUYERPO">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('2a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'BUYERPO') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Buyer PO</button>
-        </form>
-      {% endif %}
-
-      {% if stage3 and stage3.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="document_type" value="PI">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('3a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'PI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Proforma Invoice</button>
-        </form>
-      {% endif %}
-
-      {% if stage4 and stage4.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="document_type" value="OC">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('4a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'OC') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Order Confirmation</button>
-        </form>
-      {% endif %}
-
-      {% if stage5 and stage5.status != 'locked' and supplierPo %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="document_type" value="SUPPO">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('5b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'SUPPO') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Supplier PO</button>
-        </form>
-      {% endif %}
-
-      {% if not isFob and stage6 and stage6.status != 'locked' and freight %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="document_type" value="FDN">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('6b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'FDN') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Debit Note</button>
-        </form>
-      {% endif %}
-
-      {% if stage7 and stage7.status != 'locked' and packing %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="document_type" value="PL">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('7e') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'PL') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Packing List</button>
-        </form>
-      {% endif %}
-
-      {# 90-item backlog #38/#55: BL Instruction Sheet's trigger used to
-         live here, indistinguishable from every other generic
-         "Generate X" button, with no indication of where its data comes
-         from. Moved to its own explained section under Stage 7 —
-         Packing & BL Instruction — right next to the Shipping/Packing
-         data it actually reads (see below). #}
-
-      {% if stage8 and stage8.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="document_type" value="CI">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('8b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>
-        </form>
-      {% endif %}
-
-      {# 90-item backlog #38/#55: COO Prep Sheet's trigger moved for the
-         same reason as BL Instruction Sheet above — its own explained
-         section now lives under Stage 9, Document Despatch & Closure,
-         where staff actually prepare the Chamber of Commerce filing. #}
+      {# Task #36 — each stage's own "Generate X" button now lives inside
+         that stage's own section (right next to its other actions), not
+         bunched here — the user's own "no back and forth, every step
+         generates its own document" ask. Only Quotation (step 1,
+         genuinely first) and the optional Annexure A stay in this
+         top-of-page spot. #}
 
       {% if order.include_annexure_a %}
         <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
@@ -976,6 +854,15 @@
 
   <div class="section" data-stage="2">
     <h2>Stage 2 — Buyer PO</h2>
+    {% if stage2 and stage2.status != 'locked' %}
+      <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="document_type" value="BUYERPO">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        {{ stepBadge('2a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'BUYERPO') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Buyer PO</button>
+      </form>
+    {% endif %}
     {% if hasBuyerPo %}
       <p>Buyer PO recorded: <strong>{{ order.buyers_po_ref }}</strong></p>
     {% elif stage2 and stage2.status != 'locked' %}
@@ -1011,6 +898,15 @@
 
   <div class="section" data-stage="3">
     <h2>PI-Stage Intake</h2>
+    {% if stage3 and stage3.status != 'locked' %}
+      <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="document_type" value="PI">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        {{ stepBadge('3a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'PI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Proforma Invoice</button>
+      </form>
+    {% endif %}
     <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
     {% if piIntake %}
       <p>
@@ -1184,6 +1080,15 @@
 
   <div class="section" data-stage="4">
     <h2 data-tab-label="Stage 4 — OC Ack">Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
+    {% if stage4 and stage4.status != 'locked' %}
+      <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="document_type" value="OC">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        {{ stepBadge('4a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'OC') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Order Confirmation</button>
+      </form>
+    {% endif %}
     {% if buyerAcknowledged %}
       {% if ocAcknowledgment and ocAcknowledgment.acknowledged_via == 'client_portal' %}
         <p>Buyer acknowledged the Order Confirmation themselves in the client portal on {{ ocAcknowledgment.acknowledged_at | humanDate }}.</p>
@@ -1266,6 +1171,13 @@
           <div><span class="k">Total Payable (INR)</span><span class="v">{{ supplierPo.total_payable_inr or '—' }}</span></div>
           <div><span class="k">Status</span><span class="v">{{ supplierPo.status }}</span></div>
         </div>
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="SUPPO">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          {{ stepBadge('5b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'SUPPO') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Supplier PO</button>
+        </form>
       {% else %}
         <details open>
           <summary>Add a new supplier</summary>
@@ -1566,34 +1478,6 @@
       </details>
     {% endif %}
 
-    {% if canManageOrderFinancials %}
-      {% set savedPct = (orderTravelExpenses.expense_pct | string) if orderTravelExpenses else '' %}
-      <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
-      <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
-      <div class="kv-grid">
-        <div><span class="k">Factory Distance</span><span class="v">{{ (orderTravelExpenses.factory_distance_km ~ ' km') if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '—' }}</span></div>
-        <div><span class="k">Percentage</span><span class="v">{{ (orderTravelExpenses.expense_pct ~ '%') if orderTravelExpenses else 'Not yet recorded' }}</span></div>
-        <div><span class="k">Amount</span><span class="v">{{ orderTravelExpenses.expense_amount | money if orderTravelExpenses else '—' }}</span></div>
-      </div>
-      <details>
-        <summary>{{ 'Edit travel expenses' if orderTravelExpenses else 'Record travel expenses' }}</summary>
-        <form method="post" action="/orders/{{ order.id }}/travel-expenses">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="{{ orderTravelExpenses.factory_distance_km if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '' }}"></label>
-          <label>Travel Expense % of FOB Value *
-            <select name="expense_pct" required>
-              {% for pct in ['5', '7', '10', '15'] %}
-                <option value="{{ pct }}" {{ 'selected' if savedPct == pct }}>{{ pct }}%</option>
-              {% endfor %}
-              <option value="other" {{ 'selected' if savedPct and savedPct not in ['5', '7', '10', '15'] }}>Other — specify</option>
-            </select>
-          </label>
-          <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="{{ savedPct if savedPct and savedPct not in ['5', '7', '10', '15'] else '' }}"></label>
-          <button type="submit" class="btn-sm">Save</button>
-        </form>
-      </details>
-    {% endif %}
-  </div>
 
   <div class="section" data-stage="6">
     <h2>Stage 6 — Freight Payment{{ ' (skipped — FOB)' if isFob else '' }}</h2>
@@ -1618,6 +1502,13 @@
           <div><span class="k">Insurance</span><span class="v">{{ (freight.insurance_amount ~ ' ' ~ (order.currency_code or '')) if freight.insurance_amount != null else 'NIL' }}</span></div>
           <div><span class="k">Forwarder</span><span class="v">{{ freight.freight_forwarder_name or '—' }}</span></div>
         </div>
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="FDN">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          {{ stepBadge('6b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'FDN') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Debit Note</button>
+        </form>
         {% if not freightCleared %}
           {% if not payment or payment.freight_remittance_received_at == null %}
             <form method="post" action="/orders/{{ order.id }}/payment/freight">
@@ -1698,6 +1589,15 @@
         </table>
         {{ stepBadge('7a') | safe }}<button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
       </form>
+      {% if packing %}
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="PL">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          {{ stepBadge('7e') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'PL') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Packing List</button>
+        </form>
+      {% endif %}
 
       <h3>Shipping / Vessel Details</h3>
       <form method="post" action="/orders/{{ order.id }}/shipping">
@@ -1820,6 +1720,13 @@
       {% if ciBlDateMismatch %}
         <p class="alert alert-warning">&#9888; Recorded BL date is <strong>{{ shipping.bl_date }}</strong>, not today. The Commercial Invoice is conventionally dated to match the BL — double-check before generating it if that's not intentional here.</p>
       {% endif %}
+      <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="document_type" value="CI">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        {{ stepBadge('8b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>
+      </form>
       {% if shipping and not shipping.scanned_bl_sent_to_buyer_at %}
         <form method="post" action="/orders/{{ order.id }}/scanned-bl-sent">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -1963,6 +1870,32 @@
       </form>
     </details>
 
+      {% set savedPct = (orderTravelExpenses.expense_pct | string) if orderTravelExpenses else '' %}
+      <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
+      <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
+      <div class="kv-grid">
+        <div><span class="k">Factory Distance</span><span class="v">{{ (orderTravelExpenses.factory_distance_km ~ ' km') if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '—' }}</span></div>
+        <div><span class="k">Percentage</span><span class="v">{{ (orderTravelExpenses.expense_pct ~ '%') if orderTravelExpenses else 'Not yet recorded' }}</span></div>
+        <div><span class="k">Amount</span><span class="v">{{ orderTravelExpenses.expense_amount | money if orderTravelExpenses else '—' }}</span></div>
+      </div>
+      <details>
+        <summary>{{ 'Edit travel expenses' if orderTravelExpenses else 'Record travel expenses' }}</summary>
+        <form method="post" action="/orders/{{ order.id }}/travel-expenses">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="{{ orderTravelExpenses.factory_distance_km if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '' }}"></label>
+          <label>Travel Expense % of FOB Value *
+            <select name="expense_pct" required>
+              {% for pct in ['5', '7', '10', '15'] %}
+                <option value="{{ pct }}" {{ 'selected' if savedPct == pct }}>{{ pct }}%</option>
+              {% endfor %}
+              <option value="other" {{ 'selected' if savedPct and savedPct not in ['5', '7', '10', '15'] }}>Other — specify</option>
+            </select>
+          </label>
+          <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="{{ savedPct if savedPct and savedPct not in ['5', '7', '10', '15'] else '' }}"></label>
+          <button type="submit" class="btn-sm">Save</button>
+        </form>
+      </details>
+
     <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
     <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
     {% if orderCostEntries.length == 0 %}
@@ -2056,13 +1989,13 @@
     {% if orderClosed %}
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }}</p>
     {% elif order.status == 'shipped_docs_sent' %}
-      <p><strong>&#10003; Documents sent to buyer.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }} — this order now shows as done to the client, but stays open internally for government export benefits (see Order Financials below).</p>
+      <p><strong>&#10003; Documents sent to buyer.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }} — this order now shows as done to the client, but stays open internally for government export benefits (see Order Financials above).</p>
       {% if permissions.close_orders %}
       <form method="post" action="/orders/{{ order.id }}/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         {{ stepBadge('11e') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
-      <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials below).</p>
+      <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials above).</p>
       {% if permissions.edit_locked_data %}
       <details>
         <summary class="small">Override &amp; fully settle anyway (benefit genuinely never arriving)</summary>
@@ -2209,6 +2142,63 @@
   </div>
   {% endif %}
 
+  <div class="section" id="order-updates">
+    <h2>Order Communication</h2>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.{% if permissions.generate_documents %} Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.{% endif %}</p>
+    <div class="chat-thread">
+      {% if comments.length == 0 %}
+        <p class="chat-empty">No updates posted yet.</p>
+      {% endif %}
+      {% for c in comments %}
+        {% set isStaff = c.author_type == 'staff' %}
+        <div class="chat-bubble-row {{ 'staff' if isStaff else 'client' }}">
+          <div class="chat-bubble {{ 'staff' if isStaff else 'client' }}">
+            <div class="chat-bubble-meta">
+              <span class="who">{{ 'Staff' if isStaff else 'Client' }} — {{ (c.staff_name if isStaff else c.client_name) or 'Unknown' }}</span>
+              <span>{{ c.created_at | humanDate }}{% if isStaff %}{{ ' · emailed' if c.email_sent else ' · not emailed (no client email on file)' }}{% endif %}</span>
+            </div>
+            {% if c.body %}<div class="chat-bubble-body">{{ c.body }}</div>{% endif %}
+            {% if c.attachments.length > 0 %}
+              <div class="chat-attachments">
+                {% for att in c.attachments %}
+                  {% set url = '/orders/' ~ order.id ~ '/comment-attachments/' ~ att.file_id ~ '/download' %}
+                  {% if att.mime_type and (att.mime_type | startswith('image/')) %}
+                    <a href="{{ url }}" target="_blank"><img class="chat-attachment-image" src="{{ url }}" alt="{{ att.original_filename }}"></a>
+                  {% elif att.mime_type and (att.mime_type | startswith('video/')) %}
+                    <video class="chat-attachment-video" controls src="{{ url }}"></video>
+                  {% else %}
+                    <a class="chat-attachment-file" href="{{ url }}">{{ att.original_filename }}</a>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <form class="chat-post-form" method="post" action="/orders/{{ order.id }}/comments#order-updates" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <textarea name="body" placeholder="Write an update for the client…"></textarea>
+      <div class="chat-post-form-row">
+        <input type="file" name="attachments" multiple accept="image/*,video/*,.pdf">
+        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section" id="order-feedback">
+    <h2>Order Feedback</h2>
+    {% if not orderFeedback %}
+      <p class="muted">The client hasn't submitted feedback for this order yet.</p>
+    {% else %}
+      <div class="kv-grid">
+        <div><span class="k">Rating</span><span class="v">{% for s in range(0, orderFeedback.rating) %}★{% endfor %}{% for s in range(0, 5 - orderFeedback.rating) %}☆{% endfor %} ({{ orderFeedback.rating }}/5)</span></div>
+        <div><span class="k">Submitted</span><span class="v">{{ orderFeedback.submitted_at | humanDate }}</span></div>
+        <div class="full"><span class="k">Comments</span><span class="v">{{ orderFeedback.comments | nl2br if orderFeedback.comments else '—' }}</span></div>
+      </div>
+    {% endif %}
+  </div>
+
   <div class="section" id="disputes">
     <h2>Disputes</h2>
     <p class="muted">A buyer complaint or claim raised against this order or shipment — separate from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
@@ -2229,19 +2219,6 @@
        &nbsp;&middot;&nbsp;
        <a href="/orders/{{ order.id }}/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
     </p>
-  </div>
-
-  <div class="section" id="order-feedback">
-    <h2>Order Feedback</h2>
-    {% if not orderFeedback %}
-      <p class="muted">The client hasn't submitted feedback for this order yet.</p>
-    {% else %}
-      <div class="kv-grid">
-        <div><span class="k">Rating</span><span class="v">{% for s in range(0, orderFeedback.rating) %}★{% endfor %}{% for s in range(0, 5 - orderFeedback.rating) %}☆{% endfor %} ({{ orderFeedback.rating }}/5)</span></div>
-        <div><span class="k">Submitted</span><span class="v">{{ orderFeedback.submitted_at | humanDate }}</span></div>
-        <div class="full"><span class="k">Comments</span><span class="v">{{ orderFeedback.comments | nl2br if orderFeedback.comments else '—' }}</span></div>
-      </div>
-    {% endif %}
   </div>
 
   {% if permissions.edit_locked_data %}

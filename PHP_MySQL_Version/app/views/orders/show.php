@@ -623,53 +623,6 @@ foreach ($stages as $s) {
     <?php endif; ?>
   </div>
 
-  <div class="section" id="order-updates">
-    <h2>Order Communication</h2>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
-    <div class="chat-thread">
-      <?php if (empty($comments)): ?>
-        <p class="chat-empty">No updates posted yet.</p>
-      <?php endif; ?>
-      <?php foreach ($comments as $c): ?>
-        <?php $isStaff = $c['author_type'] === 'staff'; ?>
-        <div class="chat-bubble-row <?= $isStaff ? 'staff' : 'client' ?>">
-          <div class="chat-bubble <?= $isStaff ? 'staff' : 'client' ?>">
-            <div class="chat-bubble-meta">
-              <span class="who"><?= $isStaff ? 'Staff' : 'Client' ?> — <?= htmlspecialchars($isStaff ? ($c['staff_name'] ?? 'Unknown') : ($c['client_name'] ?? 'Unknown')) ?></span>
-              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?= $isStaff ? ($c['email_sent'] ? ' · emailed' : ' · not emailed (no client email on file)') : '' ?></span>
-            </div>
-            <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
-            <?php if (!empty($c['attachments'])): ?>
-              <div class="chat-attachments">
-                <?php foreach ($c['attachments'] as $att): ?>
-                  <?php
-                    $mime = (string) ($att['mime_type'] ?? '');
-                    $url = "/orders/{$order['id']}/comment-attachments/{$att['file_id']}/download";
-                  ?>
-                  <?php if (str_starts_with($mime, 'image/')): ?>
-                    <a href="<?= $url ?>" target="_blank"><img class="chat-attachment-image" src="<?= $url ?>" alt="<?= htmlspecialchars($att['original_filename']) ?>"></a>
-                  <?php elseif (str_starts_with($mime, 'video/')): ?>
-                    <video class="chat-attachment-video" controls src="<?= $url ?>"></video>
-                  <?php else: ?>
-                    <a class="chat-attachment-file" href="<?= $url ?>"><?= htmlspecialchars($att['original_filename']) ?></a>
-                  <?php endif; ?>
-                <?php endforeach; ?>
-              </div>
-            <?php endif; ?>
-          </div>
-        </div>
-      <?php endforeach; ?>
-    </div>
-    <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
-      <?= Csrf::field() ?>
-      <textarea name="body" placeholder="Write an update for the client…"></textarea>
-      <div class="chat-post-form-row">
-        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
-        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
-      </div>
-    </form>
-  </div>
-
   <div class="section" id="documents-approvals" data-stage="1">
     <h2>Documents &amp; Approvals</h2>
     <h3 style="font-size:0.95em;">All Documents</h3>
@@ -792,93 +745,12 @@ foreach ($stages as $s) {
         </form>
       <?php endif; ?>
 
-      <?php
-        // 90-item backlog #80: this panel's Generate buttons now run in
-        // stage order (QT/1, BUYERPO/2, PI/3, OC/4, SUPPO/5, FDN/6, CI/8) to
-        // match the $stepBadge sequence below each one — previously
-        // BUYERPO rendered after PI/OC despite being Stage 2's own action.
-      ?>
-      <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="BUYERPO">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('2a') ?><button type="submit" class="<?= $__docBtnClass('BUYERPO') ?>" data-loading-text="Generating…">Generate Buyer PO</button>
-        </form>
-      <?php endif; ?>
-
-      <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="PI">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('3a') ?><button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
-        </form>
-      <?php endif; ?>
-
-      <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="OC">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('4a') ?><button type="submit" class="<?= $__docBtnClass('OC') ?>" data-loading-text="Generating…">Generate Order Confirmation</button>
-        </form>
-      <?php endif; ?>
-
-      <?php if ($stage5 && $stage5['status'] !== 'locked' && $supplierPo): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="SUPPO">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('5b') ?><button type="submit" class="<?= $__docBtnClass('SUPPO') ?>" data-loading-text="Generating…">Generate Supplier PO</button>
-        </form>
-      <?php endif; ?>
-
-      <?php if (!$isFob && $stage6 && $stage6['status'] !== 'locked' && $freight): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="FDN">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('6b') ?><button type="submit" class="<?= $__docBtnClass('FDN') ?>" data-loading-text="Generating…">Generate Debit Note</button>
-        </form>
-      <?php endif; ?>
-
-      <?php if ($stage7 && $stage7['status'] !== 'locked' && $packing): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="PL">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('7e') ?><button type="submit" class="<?= $__docBtnClass('PL') ?>" data-loading-text="Generating…">Generate Packing List</button>
-        </form>
-      <?php endif; ?>
-
-      <?php // 90-item backlog #38/#55: BL Instruction Sheet's trigger used to
-             // live here, indistinguishable from every other generic
-             // "Generate X" button, with no indication of where its data
-             // comes from. Moved to its own explained section under Stage 7
-             // — Packing & BL Instruction — right next to the Shipping/
-             // Packing data it actually reads (see below). ?>
-
-      <?php if ($stage8 && $stage8['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="CI">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('8b') ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button>
-        </form>
-      <?php endif; ?>
-
-      <?php // 90-item backlog #38/#55: COO Prep Sheet's trigger moved for the
-             // same reason as BL Instruction Sheet above — its own explained
-             // section now lives under Stage 9, Document Despatch & Closure,
-             // where staff actually prepare the Chamber of Commerce filing. ?>
+      <?php // docs/schema.sql Task #36 — each stage's own "Generate X"
+             // button now lives inside that stage's own section (right
+             // next to its other actions), not bunched here — the user's
+             // own "no back and forth, every step generates its own
+             // document" ask. Only Quotation (step 1, genuinely first)
+             // and the optional Annexure A stay in this top-of-page spot. ?>
 
       <?php if ($order['include_annexure_a']): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
@@ -1112,6 +984,15 @@ foreach ($stages as $s) {
 
   <div class="section" data-stage="2">
     <h2>Stage 2 — Buyer PO</h2>
+    <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="document_type" value="BUYERPO">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        <?= $stepBadge('2a') ?><button type="submit" class="<?= $__docBtnClass('BUYERPO') ?>" data-loading-text="Generating…">Generate Buyer PO</button>
+      </form>
+    <?php endif; ?>
     <?php if ($hasBuyerPo): ?>
       <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
     <?php elseif ($stage2 && $stage2['status'] !== 'locked'): ?>
@@ -1147,6 +1028,15 @@ foreach ($stages as $s) {
 
   <div class="section" data-stage="3">
     <h2>PI-Stage Intake</h2>
+    <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="document_type" value="PI">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        <?= $stepBadge('3a') ?><button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
+      </form>
+    <?php endif; ?>
     <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
     <?php if ($piIntake): ?>
       <p>
@@ -1321,6 +1211,15 @@ foreach ($stages as $s) {
 
   <div class="section" data-stage="4">
     <h2 data-tab-label="Stage 4 — OC Ack">Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
+    <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="document_type" value="OC">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        <?= $stepBadge('4a') ?><button type="submit" class="<?= $__docBtnClass('OC') ?>" data-loading-text="Generating…">Generate Order Confirmation</button>
+      </form>
+    <?php endif; ?>
     <?php if ($buyerAcknowledged): ?>
       <?php if ($ocAcknowledgment && $ocAcknowledgment['acknowledged_via'] === 'client_portal'): ?>
         <p>Buyer acknowledged the Order Confirmation themselves in the client portal on <?= htmlspecialchars(Dates::human($ocAcknowledgment['acknowledged_at'])) ?>.</p>
@@ -1415,6 +1314,13 @@ foreach ($stages as $s) {
           <div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div>
           <div><span class="k">Status</span><span class="v"><?= htmlspecialchars($supplierPo['status']) ?></span></div>
         </div>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="SUPPO">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <?= $stepBadge('5b') ?><button type="submit" class="<?= $__docBtnClass('SUPPO') ?>" data-loading-text="Generating…">Generate Supplier PO</button>
+        </form>
       <?php else: ?>
         <details open>
           <summary>Add a new supplier</summary>
@@ -1715,34 +1621,6 @@ foreach ($stages as $s) {
         </form>
       </details>
     <?php endif; ?>
-
-    <?php if ($canManageOrderFinancials): ?>
-      <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
-      <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
-      <div class="kv-grid">
-        <div><span class="k">Factory Distance</span><span class="v"><?= $orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? number_format((float) $orderTravelExpenses['factory_distance_km'], 2) . ' km' : '—' ?></span></div>
-        <div><span class="k">Percentage</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_pct'], 2) . '%' : 'Not yet recorded' ?></span></div>
-        <div><span class="k">Amount</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_amount'], 2) : '—' ?></span></div>
-      </div>
-      <details>
-        <summary><?= $orderTravelExpenses ? 'Edit travel expenses' : 'Record travel expenses' ?></summary>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/travel-expenses">
-          <?= Csrf::field() ?>
-          <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>"></label>
-          <label>Travel Expense % of FOB Value *
-            <select name="expense_pct" required>
-              <?php $savedPct = $orderTravelExpenses ? (string) (float) $orderTravelExpenses['expense_pct'] : ''; ?>
-              <?php foreach (['5', '7', '10', '15'] as $pct): ?>
-                <option value="<?= $pct ?>" <?= $savedPct === $pct ? 'selected' : '' ?>><?= $pct ?>%</option>
-              <?php endforeach; ?>
-              <option value="other" <?= !in_array($savedPct, ['5', '7', '10', '15'], true) && $savedPct !== '' ? 'selected' : '' ?>>Other — specify</option>
-            </select>
-          </label>
-          <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>"></label>
-          <button type="submit" class="btn-sm">Save</button>
-        </form>
-      </details>
-    <?php endif; ?>
   </div>
 
   <div class="section" data-stage="6">
@@ -1768,6 +1646,13 @@ foreach ($stages as $s) {
           <div><span class="k">Insurance</span><span class="v"><?= $freight['insurance_amount'] !== null ? htmlspecialchars($freight['insurance_amount']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : 'NIL' ?></span></div>
           <div><span class="k">Forwarder</span><span class="v"><?= htmlspecialchars($freight['freight_forwarder_name'] ?? '—') ?></span></div>
         </div>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="FDN">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <?= $stepBadge('6b') ?><button type="submit" class="<?= $__docBtnClass('FDN') ?>" data-loading-text="Generating…">Generate Debit Note</button>
+        </form>
         <?php if (!$freightCleared): ?>
           <?php if (!$payment || $payment['freight_remittance_received_at'] === null): ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight">
@@ -1851,6 +1736,15 @@ foreach ($stages as $s) {
         </table>
         <?= $stepBadge('7a') ?><button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
       </form>
+      <?php if ($packing): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="PL">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <?= $stepBadge('7e') ?><button type="submit" class="<?= $__docBtnClass('PL') ?>" data-loading-text="Generating…">Generate Packing List</button>
+        </form>
+      <?php endif; ?>
 
       <h3>Shipping / Vessel Details</h3>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/shipping">
@@ -1976,6 +1870,13 @@ foreach ($stages as $s) {
       <?php if ($__ciBlDateMismatch): ?>
         <p class="alert alert-warning">&#9888; Recorded BL date is <strong><?= htmlspecialchars($shipping['bl_date']) ?></strong>, not today. The Commercial Invoice is conventionally dated to match the BL — double-check before generating it if that's not intentional here.</p>
       <?php endif; ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="document_type" value="CI">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        <?= $stepBadge('8b') ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button>
+      </form>
       <?php if ($shipping && !$shipping['scanned_bl_sent_to_buyer_at']): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/scanned-bl-sent">
           <?= Csrf::field() ?>
@@ -2119,6 +2020,32 @@ foreach ($stages as $s) {
       </form>
     </details>
 
+    <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
+      <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
+      <div class="kv-grid">
+        <div><span class="k">Factory Distance</span><span class="v"><?= $orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? number_format((float) $orderTravelExpenses['factory_distance_km'], 2) . ' km' : '—' ?></span></div>
+        <div><span class="k">Percentage</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_pct'], 2) . '%' : 'Not yet recorded' ?></span></div>
+        <div><span class="k">Amount</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_amount'], 2) : '—' ?></span></div>
+      </div>
+      <details>
+        <summary><?= $orderTravelExpenses ? 'Edit travel expenses' : 'Record travel expenses' ?></summary>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/travel-expenses">
+          <?= Csrf::field() ?>
+          <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>"></label>
+          <label>Travel Expense % of FOB Value *
+            <select name="expense_pct" required>
+              <?php $savedPct = $orderTravelExpenses ? (string) (float) $orderTravelExpenses['expense_pct'] : ''; ?>
+              <?php foreach (['5', '7', '10', '15'] as $pct): ?>
+                <option value="<?= $pct ?>" <?= $savedPct === $pct ? 'selected' : '' ?>><?= $pct ?>%</option>
+              <?php endforeach; ?>
+              <option value="other" <?= !in_array($savedPct, ['5', '7', '10', '15'], true) && $savedPct !== '' ? 'selected' : '' ?>>Other — specify</option>
+            </select>
+          </label>
+          <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>"></label>
+          <button type="submit" class="btn-sm">Save</button>
+        </form>
+      </details>
+
     <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
     <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
     <?php if (empty($orderCostEntries)): ?>
@@ -2212,13 +2139,13 @@ foreach ($stages as $s) {
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
     <?php elseif ($order['status'] === 'shipped_docs_sent'): ?>
-      <p><strong>&#10003; Documents sent to buyer.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — this order now shows as done to the client, but stays open internally for government export benefits (see Order Financials below).</p>
+      <p><strong>&#10003; Documents sent to buyer.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — this order now shows as done to the client, but stays open internally for government export benefits (see Order Financials above).</p>
       <?php if ($canCloseOrders): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <?= Csrf::field() ?>
         <?= $stepBadge('11e') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
-      <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials below).</p>
+      <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials above).</p>
       <?php if ($canEditLockedData): ?>
       <details>
         <summary class="small">Override &amp; fully settle anyway (benefit genuinely never arriving)</summary>
@@ -2373,6 +2300,66 @@ foreach ($stages as $s) {
   </div>
   <?php endif; ?>
 
+  <div class="section" id="order-updates">
+    <h2>Order Communication</h2>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
+    <div class="chat-thread">
+      <?php if (empty($comments)): ?>
+        <p class="chat-empty">No updates posted yet.</p>
+      <?php endif; ?>
+      <?php foreach ($comments as $c): ?>
+        <?php $isStaff = $c['author_type'] === 'staff'; ?>
+        <div class="chat-bubble-row <?= $isStaff ? 'staff' : 'client' ?>">
+          <div class="chat-bubble <?= $isStaff ? 'staff' : 'client' ?>">
+            <div class="chat-bubble-meta">
+              <span class="who"><?= $isStaff ? 'Staff' : 'Client' ?> — <?= htmlspecialchars($isStaff ? ($c['staff_name'] ?? 'Unknown') : ($c['client_name'] ?? 'Unknown')) ?></span>
+              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?= $isStaff ? ($c['email_sent'] ? ' · emailed' : ' · not emailed (no client email on file)') : '' ?></span>
+            </div>
+            <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
+            <?php if (!empty($c['attachments'])): ?>
+              <div class="chat-attachments">
+                <?php foreach ($c['attachments'] as $att): ?>
+                  <?php
+                    $mime = (string) ($att['mime_type'] ?? '');
+                    $url = "/orders/{$order['id']}/comment-attachments/{$att['file_id']}/download";
+                  ?>
+                  <?php if (str_starts_with($mime, 'image/')): ?>
+                    <a href="<?= $url ?>" target="_blank"><img class="chat-attachment-image" src="<?= $url ?>" alt="<?= htmlspecialchars($att['original_filename']) ?>"></a>
+                  <?php elseif (str_starts_with($mime, 'video/')): ?>
+                    <video class="chat-attachment-video" controls src="<?= $url ?>"></video>
+                  <?php else: ?>
+                    <a class="chat-attachment-file" href="<?= $url ?>"><?= htmlspecialchars($att['original_filename']) ?></a>
+                  <?php endif; ?>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
+      <?= Csrf::field() ?>
+      <textarea name="body" placeholder="Write an update for the client…"></textarea>
+      <div class="chat-post-form-row">
+        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
+        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section" id="order-feedback">
+    <h2>Order Feedback</h2>
+    <?php if (empty($orderFeedback)): ?>
+      <p class="muted">The client hasn't submitted feedback for this order yet.</p>
+    <?php else: ?>
+      <div class="kv-grid">
+        <div><span class="k">Rating</span><span class="v"><?= str_repeat('★', (int) $orderFeedback['rating']) ?><?= str_repeat('☆', 5 - (int) $orderFeedback['rating']) ?> (<?= (int) $orderFeedback['rating'] ?>/5)</span></div>
+        <div><span class="k">Submitted</span><span class="v"><?= htmlspecialchars(Dates::human($orderFeedback['submitted_at'])) ?></span></div>
+        <div class="full"><span class="k">Comments</span><span class="v"><?= $orderFeedback['comments'] ? nl2br(htmlspecialchars($orderFeedback['comments'])) : '—' ?></span></div>
+      </div>
+    <?php endif; ?>
+  </div>
+
   <div class="section" id="disputes">
     <h2>Disputes</h2>
     <p class="muted">A buyer complaint or claim raised against this order or shipment — separate from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
@@ -2393,19 +2380,6 @@ foreach ($stages as $s) {
        &nbsp;·&nbsp;
        <a href="/orders/<?= (int) $order['id'] ?>/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
     </p>
-  </div>
-
-  <div class="section" id="order-feedback">
-    <h2>Order Feedback</h2>
-    <?php if (empty($orderFeedback)): ?>
-      <p class="muted">The client hasn't submitted feedback for this order yet.</p>
-    <?php else: ?>
-      <div class="kv-grid">
-        <div><span class="k">Rating</span><span class="v"><?= str_repeat('★', (int) $orderFeedback['rating']) ?><?= str_repeat('☆', 5 - (int) $orderFeedback['rating']) ?> (<?= (int) $orderFeedback['rating'] ?>/5)</span></div>
-        <div><span class="k">Submitted</span><span class="v"><?= htmlspecialchars(Dates::human($orderFeedback['submitted_at'])) ?></span></div>
-        <div class="full"><span class="k">Comments</span><span class="v"><?= $orderFeedback['comments'] ? nl2br(htmlspecialchars($orderFeedback['comments'])) : '—' ?></span></div>
-      </div>
-    <?php endif; ?>
   </div>
 
   <?php if ($canEditLockedData): ?>
