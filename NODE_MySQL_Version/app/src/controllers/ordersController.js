@@ -29,6 +29,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const hsCodeRepository = require('../repositories/hsCodeRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const disputeRepository = require('../repositories/disputeRepository');
+const orderComplaintRepository = require('../repositories/orderComplaintRepository');
 const documentCrossVerificationRepository = require('../repositories/documentCrossVerificationRepository');
 const documentRepository = require('../repositories/documentRepository');
 const documentReviewRepository = require('../repositories/documentReviewRepository');
@@ -816,6 +817,7 @@ async function show(req, res) {
   }
 
   const disputes = await disputeRepository.forOrder(orderId);
+  const complaints = await orderComplaintRepository.forOrder(orderId);
 
   // External QA report M-09: formal cancellation workflow, distinct from
   // Mark as Lost (which only ever applies pre-money, while the order is
@@ -960,6 +962,7 @@ async function show(req, res) {
       pendingInspectionTask,
       orderInspectionFee: canManageOrderFinancialsForInspection ? await orderInspectionFeeRepository.find(orderId) : null,
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
+      openComplaintCount: complaints.filter((c) => c.status !== 'resolved').length,
       piIntake,
       piFormFullLink,
       buyerActionLinkValid,

@@ -71,6 +71,10 @@ describe('orderLockGuard middleware (External QA report L-28)', () => {
       '/orders/:id/archive', '/orders/:id/unarchive', '/orders/:id/duplicate', '/orders/:id/comments',
       '/orders/:id/documents/generate', '/orders/:id/documents/:documentId/delete',
       '/orders/:id/documents/:documentId/send', '/orders/:id/email/send', '/orders/:id/disputes',
+      // docs/schema.sql Section BX — a Complaint, like a Dispute, is never
+      // a routine edit gated behind the order's own lock state; it must
+      // stay reachable on any order, locked or not.
+      '/orders/:id/complaints',
       // External QA report M-09: the cancellation workflow is mark-lost's
       // sibling (a terminal action ending the order's active life, not a
       // routine edit), excluded for the same reason mark-lost is above.

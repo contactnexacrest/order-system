@@ -1,0 +1,72 @@
+{% macro statusLabel(status) %}{% if status == 'acknowledged' %}Acknowledged{% elif status == 'resolved' %}Resolved{% else %}Open{% endif %}{% endmacro %}
+<div class="card page-wide">
+  <p class="muted small"><a href="/orders/{{ order.id }}">&larr; Back to Order</a></p>
+  <h1>Complaints — {{ order.order_reference }}</h1>
+  <p class="muted">{{ order.company_legal_name }}</p>
+  <p class="muted small">A process issue or flaw the client flagged for us to fix next time — not a Dispute (the client isn't canceling or asking for a refund on this order).</p>
+
+  {% if canManage %}
+  <div class="section">
+    <h2>Log a Complaint</h2>
+    <p class="muted small">For a complaint the client raised by phone or email instead of through the portal.</p>
+    <form method="post" action="/orders/{{ order.id }}/complaints">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label class="full">Description *
+        <textarea name="description" required rows="3" placeholder="Describe the issue the client raised" style="width:100%"></textarea>
+      </label>
+      <button type="submit" class="btn-sm">Log Complaint</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="section">
+    <h2>Complaint Log</h2>
+    {% for c in complaints %}
+      <details>
+        <summary>{{ c.created_at | humanDate }} — {{ statusLabel(c.status) }} — {{ c.description | truncate(80, true, '…') }}</summary>
+        <p>{{ c.description | nl2br }}</p>
+        {% if c.resolved_at %}<p class="muted small">Resolved: {{ c.resolved_at | humanDate }}</p>{% endif %}
+
+        {% if canManage %}
+        <form method="post" action="/complaints/{{ c.id }}/status">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <div class="field-grid">
+            <label>Status
+              <select name="status">
+                <option value="open" {{ 'selected' if c.status == 'open' }}>Open</option>
+                <option value="acknowledged" {{ 'selected' if c.status == 'acknowledged' }}>Acknowledged</option>
+                <option value="resolved" {{ 'selected' if c.status == 'resolved' }}>Resolved</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="btn-sm">Update</button>
+        </form>
+        {% endif %}
+
+        <div class="section-nested" style="margin-top:0.75rem">
+          <h3>Conversation</h3>
+          {% for r in replies[c.id] %}
+            <div class="reply-item" style="border-top:1px solid var(--line, #EFE6D2);padding:0.5rem 0">
+              <p class="muted small">{{ r.staff_author_name if r.author_type == 'staff' else 'Client' }} — {{ r.created_at | humanDate }}</p>
+              <p>{{ r.body | nl2br }}</p>
+            </div>
+          {% endfor %}
+          {% if not replies[c.id] or replies[c.id].length == 0 %}
+            <p class="muted small">No replies yet.</p>
+          {% endif %}
+
+          {% if canRespond %}
+          <form method="post" action="/complaints/{{ c.id }}/replies">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Reply<textarea name="body" required rows="2" placeholder="Type your reply…" style="width:100%"></textarea></label>
+            <button type="submit" class="btn-sm">Post Reply</button>
+          </form>
+          {% endif %}
+        </div>
+      </details>
+    {% endfor %}
+    {% if not complaints or complaints.length == 0 %}
+      <p class="muted">No complaints on this order.</p>
+    {% endif %}
+  </div>
+</div>

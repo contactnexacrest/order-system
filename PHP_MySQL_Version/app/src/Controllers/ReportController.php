@@ -417,7 +417,6 @@ final class ReportController
                 'Client' => $r['company_legal_name'],
                 'Notice Date' => $r['notice_date'],
                 'From Party' => $r['from_party'] ?? '',
-                'Type' => $r['dispute_type'] === 'complaint_damage' ? 'Complaint / Damage' : 'Dispute',
                 'Status' => $r['status'],
                 'Response Due' => $r['response_due_date'] ?? '',
                 'Resolved At' => $r['resolved_at'] ?? '',

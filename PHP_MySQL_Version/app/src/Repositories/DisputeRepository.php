@@ -8,27 +8,25 @@ use App\Config\Database;
 
 final class DisputeRepository
 {
-    /** docs/schema.sql Section BV — $disputeType is 'dispute' or 'complaint_damage'. */
+    /** docs/schema.sql Section BX — Dispute means the client wants to cancel/not proceed; a process Complaint is a separate table/feature entirely. */
     public static function create(
         int $orderId,
         string $noticeDate,
         ?string $fromParty,
         string $description,
         ?int $assignedTo,
-        ?string $responseDueDate,
-        string $disputeType = 'dispute'
+        ?string $responseDueDate
     ): int {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
-            'INSERT INTO disputes (order_id, notice_date, from_party, description, dispute_type, assigned_to, response_due_date, status)
-             VALUES (:order_id, :notice_date, :from_party, :description, :dispute_type, :assigned_to, :response_due_date, \'Open\')'
+            'INSERT INTO disputes (order_id, notice_date, from_party, description, assigned_to, response_due_date, status)
+             VALUES (:order_id, :notice_date, :from_party, :description, :assigned_to, :response_due_date, \'Open\')'
         );
         $stmt->execute([
             'order_id'          => $orderId,
             'notice_date'       => $noticeDate,
             'from_party'        => $fromParty,
             'description'       => $description,
-            'dispute_type'      => $disputeType,
             'assigned_to'       => $assignedTo,
             'response_due_date' => $responseDueDate,
         ]);

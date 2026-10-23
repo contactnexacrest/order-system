@@ -10,12 +10,6 @@
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/disputes">
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Type *
-          <select name="dispute_type" required>
-            <option value="dispute">Dispute</option>
-            <option value="complaint_damage">Complaint / Damage Report</option>
-          </select>
-        </label>
         <label>Notice Date *
           <input type="date" name="notice_date" value="<?= date('Y-m-d') ?>" required>
         </label>
@@ -43,9 +37,8 @@
     <h2>Dispute Log</h2>
     <?php foreach ($disputes as $d): ?>
       <details>
-        <summary><?= htmlspecialchars($d['notice_date']) ?> — <?= $d['dispute_type'] === 'complaint_damage' ? 'Complaint / Damage' : 'Dispute' ?> — <?= htmlspecialchars($d['status']) ?> — <?= htmlspecialchars(mb_strimwidth($d['description'], 0, 80, '…')) ?></summary>
+        <summary><?= htmlspecialchars($d['notice_date']) ?> — <?= htmlspecialchars($d['status']) ?> — <?= htmlspecialchars(mb_strimwidth($d['description'], 0, 80, '…')) ?></summary>
         <div class="kv-grid">
-          <div><span class="k">Type</span><span class="v"><?= $d['dispute_type'] === 'complaint_damage' ? 'Complaint / Damage Report' : 'Dispute' ?></span></div>
           <div><span class="k">From</span><span class="v"><?= htmlspecialchars($d['from_party'] ?? '—') ?></span></div>
           <div><span class="k">Response Due</span><span class="v"><?= htmlspecialchars($d['response_due_date'] ?? '—') ?></span></div>
           <div><span class="k">Resolved At</span><span class="v"><?= htmlspecialchars($d['resolved_at'] ?? '—') ?></span></div>

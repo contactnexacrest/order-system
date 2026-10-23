@@ -77,6 +77,8 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('ca_internal_doc_manage',      'Manage internal CA financial annexure', 'Toggle the internal-only CA Financial Annexure (govt export benefits + expenses) for an order and generate it. Not auto-granted to Accounts Executive/CA roles — only Admin/MD/ED and Super Admin get it by default.', 'ca'),
   ('manage_disputes',             'Manage disputes',                'View/raise/update a dispute''s status, attach evidence, and enable/disable the client-facing dispute button. Not auto-inherited from manage_orders — only Admin/MD/ED and Super Admin get it by default.', 'orders'),
   ('respond_to_disputes',         'Respond to disputes',            'Post a reply in a dispute''s reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button.', 'orders'),
+  ('manage_complaints',           'Manage complaints',              'View complaints, acknowledge/resolve them, and log one on a client''s behalf. Not auto-inherited from manage_orders — only Admin/MD/ED and Super Admin get it by default, same tier as manage_disputes.', 'orders'),
+  ('respond_to_complaints',       'Respond to complaints',          'Post a reply in a complaint''s conversation thread — kept separate from manage_complaints so sales roles can answer without also managing its status, same split as respond_to_disputes.', 'orders'),
   ('manage_order_financials',     'Manage order financials',        'View/add/edit an order''s export benefit claims, other costs, and its profitability summary. Stricter than ca_module_view/inr_actual_edit: not auto-granted to Accounts/CA, only Admin/MD/ED and Super Admin by default.', 'ca'),
   ('manage_supplier_payments',    'Manage supplier payments',       'Mark a supplier payment as paid, and see the Outgoing (Supplier) side of Today''s Payments — split out of manage_order_financials so Accounts can confirm supplier payments without the broader financials/profitability access.', 'orders'),
   ('manage_logistics_partners',   'Manage logistics partners',      'Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. Same tier as manage_hs_codes: Admin/MD/ED and Super Admin only by default.', 'catalog'),
@@ -100,7 +102,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Export Executive'
-  AND p.permission_key IN ('manage_orders','manage_payments','manage_shipping','close_orders','generate_documents','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','respond_to_disputes','override_buyer_acknowledgment');
+  AND p.permission_key IN ('manage_orders','manage_payments','manage_shipping','close_orders','generate_documents','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','respond_to_disputes','respond_to_complaints','override_buyer_acknowledgment');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1

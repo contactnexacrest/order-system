@@ -14,6 +14,8 @@ const clientPaymentReportRepository = require('../repositories/clientPaymentRepo
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const disputeRepository = require('../repositories/disputeRepository');
+const orderComplaintRepository = require('../repositories/orderComplaintRepository');
+const orderComplaintReplyRepository = require('../repositories/orderComplaintReplyRepository');
 const orderFeedbackRepository = require('../repositories/orderFeedbackRepository');
 const documentRepository = require('../repositories/documentRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
@@ -32,6 +34,7 @@ const notificationRepository = require('../repositories/notificationRepository')
 const clientPortalService = require('../services/clientPortalService');
 const buyerActionService = require('../services/buyerActionService');
 const orderCommentService = require('../services/orderCommentService');
+const orderComplaintService = require('../services/orderComplaintService');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const fileUploadService = require('../services/fileUploadService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
@@ -276,7 +279,17 @@ async function showOrder(req, res) {
     // this page's own form submits to.
     advanceCleared: !!paymentStatus && paymentStatus.advance_cleared_at !== null,
     orderFeedback: await orderFeedbackRepository.find(orderId),
+    orderComplaints: await complaintsWithReplies(orderId),
   }, 'layout/client');
+}
+
+/** each complaint plus its 'replies' array. */
+async function complaintsWithReplies(orderId) {
+  const complaints = await orderComplaintRepository.forOrder(orderId);
+  for (const c of complaints) {
+    c.replies = await orderComplaintReplyRepository.forComplaint(c.id);
+  }
+  return complaints;
 }
 
 /**
@@ -573,14 +586,68 @@ async function raiseDispute(req, res) {
     return;
   }
 
-  const disputeType = req.body.dispute_type === 'complaint_damage' ? 'complaint_damage' : 'dispute';
   const noticeDate = todayYmd();
   const responseDays = parseInt((await companySettingsRepository.get('dispute_response_days_n')) || '10', 10);
   const responseDueDate = await workingDaysCalculator.addWorkingDays(noticeDate, responseDays);
-  const disputeId = await disputeRepository.create(orderId, noticeDate, 'Buyer (via client portal)', description, null, responseDueDate, disputeType);
+  const disputeId = await disputeRepository.create(orderId, noticeDate, 'Buyer (via client portal)', description, null, responseDueDate);
   await auditLogRepository.log(null, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description, 'Raised by the client via the client portal.');
 
   flash.set(req, 'success', `Your dispute has been logged — our team will respond by ${responseDueDate}.`);
+  res.redirect(`/client/orders/${orderId}`);
+}
+
+/**
+ * docs/schema.sql Section BX — a Complaint / Process Issue, not a
+ * Dispute: no refund/cancellation intent, always available on any
+ * order regardless of the dispute_button_visible_to_client toggle.
+ */
+async function raiseComplaint(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const description = String(req.body.description || '').trim();
+  if (description === '') {
+    flash.set(req, 'error', 'Please describe the issue before submitting.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+
+  await orderComplaintService.raiseAsClient(orderId, clientId, description);
+
+  flash.set(req, 'success', 'Thank you — your feedback has been logged and our team will follow up.');
+  res.redirect(`/client/orders/${orderId}`);
+}
+
+async function postComplaintReply(req, res) {
+  const clientId = clientPortalService.currentClientId(req);
+  const orderId = parseInt(req.params.id, 10) || 0;
+  const complaintId = parseInt(req.params.complaintId, 10) || 0;
+  const order = await orderRepository.find(orderId);
+  if (!order || order.client_id !== clientId) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const complaint = await orderComplaintRepository.find(complaintId);
+  if (!complaint || complaint.order_id !== orderId || complaint.client_id !== clientId) {
+    res.status(404).send('Complaint not found.');
+    return;
+  }
+
+  const body = String(req.body.body || '').trim();
+  if (body === '') {
+    flash.set(req, 'error', 'Write a message before posting.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+
+  await orderComplaintService.replyAsClient(complaintId, clientId, body);
+
+  flash.set(req, 'success', 'Your message has been sent.');
   res.redirect(`/client/orders/${orderId}`);
 }
 
@@ -707,5 +774,6 @@ module.exports = {
   showLogin, login, logout, endImpersonation, showForgotPassword, forgotPassword, showSetPassword, setPassword, dashboard, showOrder,
   showReorderForm, submitReorder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
+  raiseComplaint, postComplaintReply,
   postComment, downloadCommentAttachment, downloadPaymentScreenshot, uploadBuyerPo, submitFeedback,
 };

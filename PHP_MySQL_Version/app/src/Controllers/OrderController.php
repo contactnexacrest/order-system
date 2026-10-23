@@ -958,6 +958,7 @@ final class OrderController
             'pendingInspectionTask' => $pendingInspectionTask,
             'orderInspectionFee' => $canManageOrderFinancials ? OrderInspectionFeeRepository::find($orderId) : null,
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
+            'openComplaintCount' => count(array_filter(\App\Repositories\OrderComplaintRepository::forOrder($orderId), static fn(array $c): bool => $c['status'] !== 'resolved')),
             'piIntake' => PiIntakeRepository::latestForOrder($orderId),
             'clientPaymentReports' => ClientPaymentReportRepository::forOrder($orderId),
             'ocAcknowledgment' => OrderOcAcknowledgmentRepository::find($orderId),

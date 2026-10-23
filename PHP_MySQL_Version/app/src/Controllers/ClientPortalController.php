@@ -275,7 +275,18 @@ final class ClientPortalController
             // which this page's own form submits to.
             'advanceCleared' => $paymentStatus !== null && $paymentStatus['advance_cleared_at'] !== null,
             'orderFeedback' => \App\Repositories\OrderFeedbackRepository::find($orderId),
+            'orderComplaints' => self::complaintsWithReplies($orderId),
         ], 'layout/client');
+    }
+
+    /** @return array<int, array<string,mixed>> each complaint plus its 'replies' key. */
+    private static function complaintsWithReplies(int $orderId): array
+    {
+        $complaints = \App\Repositories\OrderComplaintRepository::forOrder($orderId);
+        foreach ($complaints as &$c) {
+            $c['replies'] = \App\Repositories\OrderComplaintReplyRepository::forComplaint((int) $c['id']);
+        }
+        return $complaints;
     }
 
     /**
@@ -538,14 +549,73 @@ final class ClientPortalController
             return;
         }
 
-        $disputeType = ($_POST['dispute_type'] ?? '') === 'complaint_damage' ? 'complaint_damage' : 'dispute';
         $noticeDate = date('Y-m-d');
         $responseDays = (int) (\App\Repositories\CompanySettingsRepository::get('dispute_response_days_n') ?? '10');
         $responseDueDate = \App\Services\WorkingDaysCalculator::addWorkingDays($noticeDate, $responseDays);
-        $disputeId = \App\Repositories\DisputeRepository::create($orderId, $noticeDate, 'Buyer (via client portal)', $description, null, $responseDueDate, $disputeType);
+        $disputeId = \App\Repositories\DisputeRepository::create($orderId, $noticeDate, 'Buyer (via client portal)', $description, null, $responseDueDate);
         \App\Repositories\AuditLogRepository::log(null, 'DISPUTE_RAISED', 'disputes', $disputeId, null, null, $description, 'Raised by the client via the client portal.');
 
         Flash::set('success', 'Your dispute has been logged — our team will respond by ' . $responseDueDate . '.');
+        header("Location: /client/orders/{$orderId}");
+    }
+
+    /**
+     * docs/schema.sql Section BX — a Complaint / Process Issue, not a
+     * Dispute: no refund/cancellation intent, always available on any
+     * order regardless of the dispute_button_visible_to_client toggle.
+     */
+    public function raiseComplaint(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $description = trim((string) ($_POST['description'] ?? ''));
+        if ($description === '') {
+            Flash::set('error', 'Please describe the issue before submitting.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
+
+        \App\Services\OrderComplaintService::raiseAsClient($orderId, $clientId, $description);
+
+        Flash::set('success', 'Thank you — your feedback has been logged and our team will follow up.');
+        header("Location: /client/orders/{$orderId}");
+    }
+
+    public function postComplaintReply(array $params): void
+    {
+        $clientId = (int) ClientPortalService::currentClientId();
+        $orderId = (int) ($params['id'] ?? 0);
+        $complaintId = (int) ($params['complaintId'] ?? 0);
+        $order = OrderRepository::find($orderId);
+        if (!$order || (int) $order['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $complaint = \App\Repositories\OrderComplaintRepository::find($complaintId);
+        if (!$complaint || (int) $complaint['order_id'] !== $orderId || (int) $complaint['client_id'] !== $clientId) {
+            http_response_code(404);
+            echo 'Complaint not found.';
+            return;
+        }
+
+        $body = trim((string) ($_POST['body'] ?? ''));
+        if ($body === '') {
+            Flash::set('error', 'Write a message before posting.');
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
+
+        \App\Services\OrderComplaintService::replyAsClient($complaintId, $clientId, $body);
+
+        Flash::set('success', 'Your message has been sent.');
         header("Location: /client/orders/{$orderId}");
     }
 

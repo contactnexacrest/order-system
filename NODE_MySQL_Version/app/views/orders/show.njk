@@ -2199,6 +2199,12 @@
     {% endif %}
   </div>
 
+  <div class="section" id="complaints">
+    <h2>Complaints</h2>
+    <p class="muted">A process issue or flaw the client flagged for us to fix next time — not a refund/cancellation request, and always available to the client regardless of the Dispute toggle below.</p>
+    <p>{% if permissions.manage_complaints or permissions.respond_to_complaints %}<a href="/orders/{{ order.id }}/complaints">Complaints ({{ openComplaintCount }} open)</a>{% else %}Complaints ({{ openComplaintCount }} open){% endif %}</p>
+  </div>
+
   <div class="section" id="disputes">
     <h2>Disputes</h2>
     <p class="muted">A buyer complaint or claim raised against this order or shipment — separate from an Amendment, which is a planned, mutually-agreed change to order terms.</p>

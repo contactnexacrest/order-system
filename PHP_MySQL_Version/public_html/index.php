@@ -21,6 +21,7 @@ use App\Controllers\ClientPortalController;
 use App\Controllers\PiIntakeController;
 use App\Controllers\PiIntakeReviewController;
 use App\Controllers\DashboardController;
+use App\Controllers\ComplaintController;
 use App\Controllers\DisputeController;
 use App\Controllers\DocumentController;
 use App\Controllers\FileStoreController;
@@ -92,6 +93,7 @@ $reviews = new ReviewController();
 $emailDispatch = new EmailDispatchController();
 $amendments = new AmendmentController();
 $disputes = new DisputeController();
+$complaints = new ComplaintController();
 $holidays = new HolidayController();
 $hsCodes = new HsCodeController();
 $logisticsPartners = new LogisticsPartnerController();
@@ -566,6 +568,16 @@ $router->post('/disputes/{disputeId}/status', [$disputes, 'updateStatus'], [Sess
 $router->post('/disputes/{disputeId}/documents', [$disputes, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), CsrfCheck::verify()]);
 $router->post('/disputes/{disputeId}/replies', [$disputes, 'postReply'], [SessionAuth::required(), PermissionCheck::requires('respond_to_disputes'), CsrfCheck::verify()]);
 
+// Complaint / Process Issue management (docs/schema.sql Section BX) — a
+// separate feature from Disputes: always available on any order (never
+// gated by dispute_button_visible_to_client), and a two-way conversation
+// rather than a staff-only resolution log.
+$router->get('/complaints', [$complaints, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_complaints')]);
+$router->get('/orders/{id}/complaints', [$complaints, 'forOrder'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_complaints', 'respond_to_complaints'])]);
+$router->post('/orders/{id}/complaints', [$complaints, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_complaints'), CsrfCheck::verify()]);
+$router->post('/complaints/{complaintId}/status', [$complaints, 'updateStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_complaints'), CsrfCheck::verify()]);
+$router->post('/complaints/{complaintId}/replies', [$complaints, 'postReply'], [SessionAuth::required(), PermissionCheck::requires('respond_to_complaints'), CsrfCheck::verify()]);
+
 // Audit log viewer (Section 14/17) — read-only, no delete route exists anywhere.
 $router->get('/audit-log', [$auditLog, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
 $router->get('/orders/{id}/audit-log', [$auditLog, 'forOrder'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
@@ -644,6 +656,8 @@ $router->post('/client/orders/{id}/report-payment', [$clientPortal, 'reportPayme
 $router->post('/client/orders/{id}/buyer-po', [$clientPortal, 'uploadBuyerPo'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/acknowledge-oc', [$clientPortal, 'acknowledgeOc'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/disputes', [$clientPortal, 'raiseDispute'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->post('/client/orders/{id}/complaints', [$clientPortal, 'raiseComplaint'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->post('/client/orders/{id}/complaints/{complaintId}/replies', [$clientPortal, 'postComplaintReply'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/feedback', [$clientPortal, 'submitFeedback'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->post('/client/orders/{id}/comments', [$clientPortal, 'postComment'], [ClientAuth::required(), CsrfCheck::verify()]);
 $router->get('/client/orders/{id}/comment-attachments/{fileId}/download', [$clientPortal, 'downloadCommentAttachment'], [ClientAuth::required()]);

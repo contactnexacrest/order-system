@@ -60,6 +60,7 @@ const fileStoreController = require('./controllers/fileStoreController');
 const reviewController = require('./controllers/reviewController');
 const amendmentController = require('./controllers/amendmentController');
 const disputeController = require('./controllers/disputeController');
+const complaintController = require('./controllers/complaintController');
 const emailDispatchController = require('./controllers/emailDispatchController');
 const auditLogController = require('./controllers/auditLogController');
 const notificationController = require('./controllers/notificationController');
@@ -800,6 +801,16 @@ app.post('/disputes/:disputeId/status', requireAuth, requirePermission('manage_d
 app.post('/disputes/:disputeId/documents', requireAuth, requirePermission('manage_disputes'), uploadLarge.single('document'), verifyCsrf, asyncHandler(disputeController.uploadDocument));
 app.post('/disputes/:disputeId/replies', requireAuth, requirePermission('respond_to_disputes'), verifyCsrf, asyncHandler(disputeController.postReply));
 
+// Complaint / Process Issue management (docs/schema.sql Section BX) — a
+// separate feature from Disputes: always available on any order (never
+// gated by dispute_button_visible_to_client), and a two-way conversation
+// rather than a staff-only resolution log.
+app.get('/complaints', requireAuth, requirePermission('manage_complaints'), asyncHandler(complaintController.index));
+app.get('/orders/:id/complaints', requireAuth, requirePermissionAny(['manage_complaints', 'respond_to_complaints']), asyncHandler(complaintController.forOrder));
+app.post('/orders/:id/complaints', requireAuth, requirePermission('manage_complaints'), verifyCsrf, asyncHandler(complaintController.create));
+app.post('/complaints/:complaintId/status', requireAuth, requirePermission('manage_complaints'), verifyCsrf, asyncHandler(complaintController.updateStatus));
+app.post('/complaints/:complaintId/replies', requireAuth, requirePermission('respond_to_complaints'), verifyCsrf, asyncHandler(complaintController.postReply));
+
 app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.index));
 app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));
 app.get('/orders/:id/dossier', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.downloadDossier));
@@ -876,6 +887,8 @@ app.post('/client/orders/:id/report-payment', requireClientAuth, uploadLarge.sin
 app.post('/client/orders/:id/buyer-po', requireClientAuth, uploadLarge.single('document'), verifyCsrf, asyncHandler(clientPortalController.uploadBuyerPo));
 app.post('/client/orders/:id/acknowledge-oc', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.acknowledgeOc));
 app.post('/client/orders/:id/disputes', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.raiseDispute));
+app.post('/client/orders/:id/complaints', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.raiseComplaint));
+app.post('/client/orders/:id/complaints/:complaintId/replies', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.postComplaintReply));
 app.post('/client/orders/:id/feedback', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.submitFeedback));
 app.get('/client/documents/:id/download', requireClientAuth, asyncHandler(clientPortalController.downloadDocument));
 

@@ -16,8 +16,11 @@
   <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
 {% endif %}
 {% set canDisputes = permissions.manage_disputes or permissions.respond_to_disputes %}
+{# docs/schema.sql Section BX — a Complaint is not a Dispute; same visibility split. #}
+{% set canComplaints = permissions.manage_complaints or permissions.respond_to_complaints %}
+{% set canViewComplaintsList = permissions.manage_complaints %}
 {# External QA report U-18: /clients and /orders each also accept their own narrower view_clients/view_orders permission (server.js) — a Viewer/Auditor holds exactly these two and nothing else in this group, so without them here the whole Operations dropdown never rendered at all, even though both routes worked fine by direct URL. #}
-{% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes or permissions.view_clients or permissions.view_orders %}
+{% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes or canComplaints or permissions.view_clients or permissions.view_orders %}
 {# External QA report U-01: the main /disputes LIST route requires manage_disputes only (see server.js) — respond_to_disputes alone (e.g. Export Executive) never grants the cross-order list page. canDisputes above stays as the Ops group's own broader visibility check. #}
 {% set canViewDisputesList = permissions.manage_disputes %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log %}
@@ -27,7 +30,7 @@
    check — a role whose ONLY Admin-section permission was one of these
    four saw no "Admin" dropdown at all. #}
 {% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data or permissions.data_export_run or permissions.manage_logistics_partners or permissions.manage_ports or permissions.manage_payment_presets or permissions.manage_hs_codes or permissions.manage_compliance_task_types or permissions.manage_dropdown_options or permissions.manage_email_templates %}
-{% set opsGroupActive = (currentPath | startswith('/clients')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/reorder-requests')) or (currentPath | startswith('/disputes')) %}
+{% set opsGroupActive = (currentPath | startswith('/clients')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/reorder-requests')) or (currentPath | startswith('/disputes')) or (currentPath | startswith('/complaints')) %}
 {% set insightsGroupActive = (currentPath | startswith('/reports')) or (currentPath | startswith('/audit-log')) %}
 {% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/hs-codes')) or (currentPath | startswith('/watermarks')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) or (currentPath | startswith('/email-templates')) or (currentPath | startswith('/ui-templates')) or (currentPath | startswith('/logistics-partners')) or (currentPath | startswith('/ports')) or (currentPath | startswith('/payment-presets')) or (currentPath | startswith('/compliance-task-types')) %}
 {% set ordersActive = currentPath === '/orders' or ((currentPath | startswith('/orders/')) and not (currentPath | startswith('/orders/archived'))) %}
@@ -64,6 +67,7 @@
           <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review{% if piIntakePendingCount > 0 %} <span class="nav-badge">{{ piIntakePendingCount }}</span>{% endif %}</a>
           <a href="/reorder-requests" class="{{ 'active' if (currentPath | startswith('/reorder-requests')) else '' }}">Reorder Requests</a>
           {% if canViewDisputesList %}<a href="/disputes" class="{{ 'active' if (currentPath | startswith('/disputes')) else '' }}">Disputes</a>{% endif %}
+          {% if canViewComplaintsList %}<a href="/complaints" class="{{ 'active' if (currentPath | startswith('/complaints')) else '' }}">Complaints</a>{% endif %}
         </div>
       </details>
     {% endif %}

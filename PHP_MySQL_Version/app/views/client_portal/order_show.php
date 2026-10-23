@@ -178,20 +178,41 @@
   <?php if ((int) $order['dispute_button_visible_to_client'] === 1): ?>
   <div class="section">
     <h2>Raise a Dispute</h2>
-    <p class="muted">If something about this order isn't right, let us know here — our team will respond within the timeframe set out in your order terms.</p>
+    <p class="muted">If you want to cancel this order and not proceed with us, let us know here — our team will respond within the timeframe set out in your order terms.</p>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/disputes">
       <?= Csrf::field() ?>
-      <label>Type *
-        <select name="dispute_type" required>
-          <option value="dispute">Dispute</option>
-          <option value="complaint_damage">Complaint / Damage Report</option>
-        </select>
-      </label>
       <label>Describe the issue *<textarea name="description" rows="4" required></textarea></label>
       <button type="submit">Raise a Dispute</button>
     </form>
   </div>
   <?php endif; ?>
+
+  <div class="section" id="order-complaints">
+    <h2>Report a Process Issue</h2>
+    <p class="muted">Not happy with something about how we handled this order, but don't need a refund or cancellation? Tell us here so we can fix it next time — a NexaCrest team member will reply.</p>
+    <?php foreach ($orderComplaints as $c): ?>
+      <div class="card-nested" style="margin-bottom:0.75rem">
+        <p class="muted small" style="margin:0 0 0.4rem;">Raised <?= htmlspecialchars(Dates::human($c['created_at'])) ?> — <?= htmlspecialchars(ucfirst($c['status'])) ?></p>
+        <p style="margin:0 0 0.5rem;"><?= nl2br(htmlspecialchars($c['description'])) ?></p>
+        <?php foreach ($c['replies'] as $r): ?>
+          <div style="border-top:1px solid var(--line, #EFE6D2);padding:0.4rem 0;">
+            <p class="muted small" style="margin:0;"><?= $r['author_type'] === 'staff' ? 'Our Team' : 'You' ?> — <?= htmlspecialchars(Dates::human($r['created_at'])) ?></p>
+            <p style="margin:0;"><?= nl2br(htmlspecialchars($r['body'])) ?></p>
+          </div>
+        <?php endforeach; ?>
+        <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/complaints/<?= (int) $c['id'] ?>/replies" style="margin-top:0.5rem">
+          <?= Csrf::field() ?>
+          <textarea name="body" rows="2" placeholder="Reply…" required></textarea>
+          <button type="submit" class="btn-sm">Send</button>
+        </form>
+      </div>
+    <?php endforeach; ?>
+    <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/complaints">
+      <?= Csrf::field() ?>
+      <label>Describe the issue *<textarea name="description" rows="3" required placeholder="e.g. packaging could be sturdier, or a delay in replies"></textarea></label>
+      <button type="submit">Report This Issue</button>
+    </form>
+  </div>
 
   <div class="section">
     <h2>Order Feedback</h2>

@@ -3727,19 +3727,18 @@ ALTER TABLE orders
   MODIFY COLUMN status ENUM('active','shipped_docs_sent','complete','disputed','lost','cancelled') NOT NULL DEFAULT 'active';
 
 -- ================================================================
--- SECTION BV — ORDER FEEDBACK + DISPUTE TYPE (added 2026-10-23)
+-- SECTION BV — ORDER FEEDBACK (added 2026-10-23)
 -- ================================================================
 -- Export process step 14: a 1-5 star rating + free-text comments the
 -- client can leave per order (one row per order; resubmission allowed,
--- upserted). Steps 15-16: the existing Disputes workflow (Section I)
--- now also covers a "Complaint / Damage Report" — same response-due-
--- date tracking, status workflow and resolution notes, tagged instead
--- of duplicated into a second table.
+-- upserted).
+--
+-- Steps 15-16 originally tagged a "Complaint / Damage Report" onto the
+-- Disputes table (dispute_type) instead of a second table — reverted in
+-- Section BX below: a Complaint is not a Dispute and needed its own
+-- table/conversation, not a tag on this one.
 -- See docs/migrations/2026-10-23j-order-feedback-dispute-type.sql.
 -- ================================================================
-ALTER TABLE disputes
-  ADD COLUMN dispute_type ENUM('dispute','complaint_damage') NOT NULL DEFAULT 'dispute' AFTER description;
-
 CREATE TABLE order_feedback (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id      BIGINT UNSIGNED NOT NULL,
@@ -3779,4 +3778,47 @@ CREATE TABLE order_travel_expenses (
   FOREIGN KEY (order_id) REFERENCES orders(id),
   FOREIGN KEY (cost_entry_id) REFERENCES order_cost_entries(id),
   FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION BX — SPLIT COMPLAINT FROM DISPUTE (added 2026-10-23)
+-- ================================================================
+-- Business owner feedback: a Complaint / Process Issue is NOT a
+-- Dispute. A Dispute means the client wants to cancel/not proceed with
+-- THIS order, and only ever appears in the portal when staff enable
+-- the "Raise a Dispute" button for that order — unchanged by this
+-- section. A Complaint means the opposite: the client does NOT want a
+-- refund or cancellation (the order is proceeding or already
+-- succeeded) and just wants something fixed next time — always
+-- available on any order, never gated by the dispute toggle, and a
+-- genuine two-way conversation (so author_type/author_user_id/
+-- author_client_id, like order_comments — not the staff-only
+-- dispute_replies thread). dispute_type (Section BV) is reverted: see
+-- docs/migrations/2026-10-23l-split-complaint-from-dispute.sql, which
+-- also adds the manage_complaints/respond_to_complaints permissions
+-- (seed.sql) and moves across any existing complaint_damage rows.
+-- ================================================================
+CREATE TABLE order_complaints (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL,
+  client_id     BIGINT UNSIGNED NOT NULL,
+  description   TEXT NOT NULL,
+  status        ENUM('open','acknowledged','resolved') NOT NULL DEFAULT 'open',
+  resolved_at   TIMESTAMP NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (client_id) REFERENCES clients(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_complaint_replies (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  complaint_id      BIGINT UNSIGNED NOT NULL,
+  author_type       ENUM('staff','client') NOT NULL,
+  author_user_id    BIGINT UNSIGNED NULL,
+  author_client_id  BIGINT UNSIGNED NULL,
+  body              TEXT NOT NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (complaint_id) REFERENCES order_complaints(id),
+  FOREIGN KEY (author_user_id) REFERENCES users(id),
+  FOREIGN KEY (author_client_id) REFERENCES clients(id)
 ) ENGINE=InnoDB;

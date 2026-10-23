@@ -6,21 +6,20 @@ namespace App\Tests\Integration;
 
 use App\Config\Database;
 use App\Controllers\ClientPortalController;
-use App\Controllers\DisputeController;
 use App\Controllers\OrderController;
 use App\Helpers\Flash;
-use App\Repositories\DisputeRepository;
 use App\Repositories\OrderFeedbackRepository;
 use App\Tests\Support\DbTestCase;
 
 /**
- * docs/schema.sql Section BV — export process step 14 (client Order
- * Feedback: a 1-5 star rating + comments, one row per order) and steps
- * 15-16 (the existing Disputes workflow now tags a dispute_type of
- * 'dispute' or 'complaint_damage' instead of duplicating a whole second
- * table/workflow for complaints and damage reports).
+ * docs/schema.sql Section BV — export process step 14: client Order
+ * Feedback, a 1-5 star rating + comments, one row per order.
+ *
+ * (Steps 15-16, the Complaint/Process-Issue feature that originally
+ * tagged this same migration's Disputes table, moved to its own
+ * OrderComplaintTest — see docs/schema.sql Section BX.)
  */
-final class OrderFeedbackAndDisputeTypeTest extends DbTestCase
+final class OrderFeedbackTest extends DbTestCase
 {
     protected function setUp(): void
     {
@@ -252,162 +251,5 @@ final class OrderFeedbackAndDisputeTypeTest extends DbTestCase
 
         self::assertStringContainsString('★★★☆☆', $output);
         self::assertStringContainsString('Average — packaging could improve.', $output);
-    }
-
-    // ---------------------------------------------------------------
-    // DisputeRepository::create() — dispute_type
-    // ---------------------------------------------------------------
-
-    public function testCreateDefaultsToDisputeTypeWhenOmitted(): void
-    {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $disputeId = DisputeRepository::create($orderId, date('Y-m-d'), 'Buyer', 'Legacy call site, no type arg', null, null);
-
-        $row = Database::connection()->prepare('SELECT dispute_type FROM disputes WHERE id = :id');
-        $row->execute(['id' => $disputeId]);
-        self::assertSame('dispute', $row->fetch()['dispute_type']);
-    }
-
-    public function testCreateStoresAnExplicitComplaintDamageType(): void
-    {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $disputeId = DisputeRepository::create($orderId, date('Y-m-d'), 'Buyer', 'Carton arrived crushed', null, null, 'complaint_damage');
-
-        $row = Database::connection()->prepare('SELECT dispute_type FROM disputes WHERE id = :id');
-        $row->execute(['id' => $disputeId]);
-        self::assertSame('complaint_damage', $row->fetch()['dispute_type']);
-    }
-
-    // ---------------------------------------------------------------
-    // DisputeController::create() (staff) — reads dispute_type from POST
-    // ---------------------------------------------------------------
-
-    public function testStaffCreateStoresTheSubmittedComplaintDamageType(): void
-    {
-        $userId = $this->createTestUser('Admin');
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['notice_date' => date('Y-m-d'), 'description' => 'Goods damaged in transit', 'dispute_type' => 'complaint_damage'];
-
-        ob_start();
-        (new DisputeController())->create(['id' => (string) $orderId]);
-        ob_end_clean();
-
-        $disputes = DisputeRepository::forOrder($orderId);
-        self::assertCount(1, $disputes);
-        self::assertSame('complaint_damage', $disputes[0]['dispute_type']);
-    }
-
-    public function testStaffCreateDefaultsToDisputeForAnUnrecognisedType(): void
-    {
-        $userId = $this->createTestUser('Admin');
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['notice_date' => date('Y-m-d'), 'description' => 'Something went wrong', 'dispute_type' => 'not_a_real_type'];
-
-        ob_start();
-        (new DisputeController())->create(['id' => (string) $orderId]);
-        ob_end_clean();
-
-        $disputes = DisputeRepository::forOrder($orderId);
-        self::assertSame('dispute', $disputes[0]['dispute_type']);
-    }
-
-    // ---------------------------------------------------------------
-    // ClientPortalController::raiseDispute() — dispute_type from the portal
-    // ---------------------------------------------------------------
-
-    public function testClientRaiseDisputeStoresTheSubmittedComplaintDamageType(): void
-    {
-        $clientId = $this->createTestClient();
-        $orderId = $this->createTestOrder($clientId);
-        Database::connection()->prepare('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id')->execute(['id' => $orderId]);
-        $_SESSION['_client_portal_client_id'] = $clientId;
-        $_POST = ['description' => 'Box arrived damaged', 'dispute_type' => 'complaint_damage'];
-
-        ob_start();
-        (new ClientPortalController())->raiseDispute(['id' => (string) $orderId]);
-        ob_end_clean();
-
-        $disputes = DisputeRepository::forOrder($orderId);
-        self::assertCount(1, $disputes);
-        self::assertSame('complaint_damage', $disputes[0]['dispute_type']);
-    }
-
-    public function testClientRaiseDisputeDefaultsToDisputeTypeWhenNotSubmitted(): void
-    {
-        $clientId = $this->createTestClient();
-        $orderId = $this->createTestOrder($clientId);
-        Database::connection()->prepare('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id')->execute(['id' => $orderId]);
-        $_SESSION['_client_portal_client_id'] = $clientId;
-        $_POST = ['description' => 'Payment terms disagreement'];
-
-        ob_start();
-        (new ClientPortalController())->raiseDispute(['id' => (string) $orderId]);
-        ob_end_clean();
-
-        $disputes = DisputeRepository::forOrder($orderId);
-        self::assertSame('dispute', $disputes[0]['dispute_type']);
-    }
-
-    // ---------------------------------------------------------------
-    // View rendering — type selector + badges
-    // ---------------------------------------------------------------
-
-    public function testClientPortalRaiseDisputeFormOffersBothTypes(): void
-    {
-        $clientId = $this->createTestClient();
-        $orderId = $this->createTestOrder($clientId);
-        Database::connection()->prepare('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id')->execute(['id' => $orderId]);
-        $_SESSION['_client_portal_client_id'] = $clientId;
-
-        ob_start();
-        (new ClientPortalController())->showOrder(['id' => (string) $orderId]);
-        $output = ob_get_clean();
-
-        self::assertStringContainsString('name="dispute_type"', $output);
-        self::assertStringContainsString('Complaint / Damage Report', $output);
-    }
-
-    public function testStaffOrderDisputeFormOffersBothTypes(): void
-    {
-        $userId = $this->createTestUser('Admin');
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $_SESSION['_auth_user_id'] = $userId;
-
-        ob_start();
-        (new DisputeController())->forOrder(['id' => (string) $orderId]);
-        $output = ob_get_clean();
-
-        self::assertStringContainsString('name="dispute_type"', $output);
-        self::assertStringContainsString('Complaint / Damage Report', $output);
-    }
-
-    public function testStaffOrderDisputeLogShowsTheTypeOfALoggedComplaint(): void
-    {
-        $userId = $this->createTestUser('Admin');
-        $orderId = $this->createTestOrder($this->createTestClient());
-        DisputeRepository::create($orderId, date('Y-m-d'), 'Buyer', 'Crate was wet on arrival', null, null, 'complaint_damage');
-        $_SESSION['_auth_user_id'] = $userId;
-
-        ob_start();
-        (new DisputeController())->forOrder(['id' => (string) $orderId]);
-        $output = ob_get_clean();
-
-        self::assertStringContainsString('Complaint / Damage', $output);
-    }
-
-    public function testGlobalDisputeLogShowsTheTypeTagPerCard(): void
-    {
-        $userId = $this->createTestUser('Admin');
-        $orderId = $this->createTestOrder($this->createTestClient());
-        DisputeRepository::create($orderId, date('Y-m-d'), 'Buyer', 'Carton crushed', null, null, 'complaint_damage');
-        $_SESSION['_auth_user_id'] = $userId;
-
-        ob_start();
-        (new DisputeController())->index([]);
-        $output = ob_get_clean();
-
-        self::assertStringContainsString('Complaint / Damage', $output);
     }
 }

@@ -72,8 +72,12 @@ $canViewDisputesList = $can('manage_disputes');
 // routes worked fine by direct URL.
 $canViewClients = $can('view_clients');
 $canViewOrders = $can('view_orders');
+// docs/schema.sql Section BX — a Complaint is not a Dispute; same visibility
+// split as $canDisputes/$canViewDisputesList above.
+$canComplaints = $can('manage_complaints') || $can('respond_to_complaints');
+$canViewComplaintsList = $can('manage_complaints');
 
-$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canViewClients || $canViewOrders;
+$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders;
 $insightsGroupVisible = $canReports || $canAudit;
 // 90-item backlog #34: $canManageHsCodes/$canManageComplianceTaskTypes/
 // $canManageDropdownOptions/$canManageEmailTemplates each gate their own
@@ -95,7 +99,7 @@ $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH
 $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
-$opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes');
+$opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
@@ -151,6 +155,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review<?= $piIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $piIntakePendingCount . '</span>' : '' ?></a>
           <a href="/reorder-requests" class="<?= $isActive('/reorder-requests') ? 'active' : '' ?>">Reorder Requests</a>
           <?php if ($canViewDisputesList): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
+          <?php if ($canViewComplaintsList): ?><a href="/complaints" class="<?= $isActive('/complaints') ? 'active' : '' ?>">Complaints</a><?php endif; ?>
         </div>
       </details>
     <?php endif; ?>

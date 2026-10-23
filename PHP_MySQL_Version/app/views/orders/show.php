@@ -43,6 +43,10 @@ $canManageDisputes = PermissionService::can((int) $currentUser['id'], $currentUs
 // that 403s.
 $canRespondToDisputes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'respond_to_disputes');
 $canViewOrderDisputes = $canManageDisputes || $canRespondToDisputes;
+// docs/schema.sql Section BX — a Complaint is not a Dispute: same split, own permissions.
+$canManageComplaints = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_complaints');
+$canRespondToComplaints = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'respond_to_complaints');
+$canViewOrderComplaints = $canManageComplaints || $canRespondToComplaints;
 // External QA report U-01: /compliance-task-types is Admin-only (the
 // close_orders permission that gates the section around this link below
 // is a much broader grant).
@@ -2358,6 +2362,12 @@ foreach ($stages as $s) {
         <div class="full"><span class="k">Comments</span><span class="v"><?= $orderFeedback['comments'] ? nl2br(htmlspecialchars($orderFeedback['comments'])) : '—' ?></span></div>
       </div>
     <?php endif; ?>
+  </div>
+
+  <div class="section" id="complaints">
+    <h2>Complaints</h2>
+    <p class="muted">A process issue or flaw the client flagged for us to fix next time — not a refund/cancellation request, and always available to the client regardless of the Dispute toggle below.</p>
+    <p><?= $canViewOrderComplaints ? '<a href="/orders/' . (int) $order['id'] . '/complaints">Complaints (' . (int) $openComplaintCount . ' open)</a>' : 'Complaints (' . (int) $openComplaintCount . ' open)' ?></p>
   </div>
 
   <div class="section" id="disputes">

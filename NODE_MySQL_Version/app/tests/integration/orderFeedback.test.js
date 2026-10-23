@@ -5,10 +5,8 @@ const app = require('../../src/server');
 const db = require('../../src/config/db');
 const flash = require('../../src/helpers/flash');
 const ordersController = require('../../src/controllers/ordersController');
-const disputeController = require('../../src/controllers/disputeController');
 const clientPortalController = require('../../src/controllers/clientPortalController');
 const orderFeedbackRepository = require('../../src/repositories/orderFeedbackRepository');
-const disputeRepository = require('../../src/repositories/disputeRepository');
 const { createTestClient, createTestOrder, createTestClientLogin } = require('../support/fixtures');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
 
@@ -19,14 +17,15 @@ function extractCsrf(html) {
 }
 
 /**
- * Port of OrderFeedbackAndDisputeTypeTest.php. docs/schema.sql Section
- * BV — export process step 14 (client Order Feedback: a 1-5 star rating
- * + comments, one row per order) and steps 15-16 (the existing Disputes
- * workflow now tags a dispute_type of 'dispute' or 'complaint_damage'
- * instead of duplicating a whole second table/workflow for complaints
- * and damage reports).
+ * Port of OrderFeedbackTest.php. docs/schema.sql Section BV — export
+ * process step 14: client Order Feedback, a 1-5 star rating + comments,
+ * one row per order.
+ *
+ * (Steps 15-16, the Complaint/Process-Issue feature that originally
+ * tagged this same migration's Disputes table, moved to its own
+ * orderComplaint.test.js — see docs/schema.sql Section BX.)
  */
-describe('Order Feedback + Disputes type field (Section BV)', () => {
+describe('Order Feedback (Section BV)', () => {
   afterAll(async () => {
     await db.pool.end();
   });
@@ -191,82 +190,6 @@ describe('Order Feedback + Disputes type field (Section BV)', () => {
   });
 
   // ---------------------------------------------------------------
-  // disputeRepository.create() — dispute_type
-  // ---------------------------------------------------------------
-
-  it('create defaults to dispute type when omitted', async () => {
-    const orderId = await createTestOrder(await createTestClient());
-    const disputeId = await disputeRepository.create(orderId, '2026-10-23', 'Buyer', 'Legacy call site, no type arg', null, null);
-
-    const row = (await db.query('SELECT dispute_type FROM disputes WHERE id = :id', { id: disputeId }))[0];
-    expect(row.dispute_type).toBe('dispute');
-  });
-
-  it('create stores an explicit complaint_damage type', async () => {
-    const orderId = await createTestOrder(await createTestClient());
-    const disputeId = await disputeRepository.create(orderId, '2026-10-23', 'Buyer', 'Carton arrived crushed', null, null, 'complaint_damage');
-
-    const row = (await db.query('SELECT dispute_type FROM disputes WHERE id = :id', { id: disputeId }))[0];
-    expect(row.dispute_type).toBe('complaint_damage');
-  });
-
-  // ---------------------------------------------------------------
-  // disputeController.create() (staff) — reads dispute_type from POST
-  // ---------------------------------------------------------------
-
-  it('staff create stores the submitted complaint_damage type', async () => {
-    const userId = await createTestUser('Admin');
-    const orderId = await createTestOrder(await createTestClient());
-    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { notice_date: '2026-10-23', description: 'Goods damaged in transit', dispute_type: 'complaint_damage' } });
-
-    await disputeController.create(req, fakeRes());
-
-    const disputes = await disputeRepository.forOrder(orderId);
-    expect(disputes.length).toBe(1);
-    expect(disputes[0].dispute_type).toBe('complaint_damage');
-  });
-
-  it('staff create defaults to dispute for an unrecognised type', async () => {
-    const userId = await createTestUser('Admin');
-    const orderId = await createTestOrder(await createTestClient());
-    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { notice_date: '2026-10-23', description: 'Something went wrong', dispute_type: 'not_a_real_type' } });
-
-    await disputeController.create(req, fakeRes());
-
-    const disputes = await disputeRepository.forOrder(orderId);
-    expect(disputes[0].dispute_type).toBe('dispute');
-  });
-
-  // ---------------------------------------------------------------
-  // clientPortalController.raiseDispute() — dispute_type from the portal
-  // ---------------------------------------------------------------
-
-  it('client raiseDispute stores the submitted complaint_damage type', async () => {
-    const clientId = await createTestClient();
-    const orderId = await createTestOrder(clientId);
-    await db.execute('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id', { id: orderId });
-    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { description: 'Box arrived damaged', dispute_type: 'complaint_damage' } });
-
-    await clientPortalController.raiseDispute(req, fakeRes());
-
-    const disputes = await disputeRepository.forOrder(orderId);
-    expect(disputes.length).toBe(1);
-    expect(disputes[0].dispute_type).toBe('complaint_damage');
-  });
-
-  it('client raiseDispute defaults to dispute type when not submitted', async () => {
-    const clientId = await createTestClient();
-    const orderId = await createTestOrder(clientId);
-    await db.execute('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id', { id: orderId });
-    const req = fakeReq({ params: { id: String(orderId) }, session: { _client_portal_client_id: clientId }, body: { description: 'Payment terms disagreement' } });
-
-    await clientPortalController.raiseDispute(req, fakeRes());
-
-    const disputes = await disputeRepository.forOrder(orderId);
-    expect(disputes[0].dispute_type).toBe('dispute');
-  });
-
-  // ---------------------------------------------------------------
   // View rendering — real HTTP, through the live app (supertest)
   // ---------------------------------------------------------------
 
@@ -281,7 +204,6 @@ describe('Order Feedback + Disputes type field (Section BV)', () => {
       clientId = await createTestClient(clientEmail);
       await createTestClientLogin(clientId, clientPassword);
       orderId = await createTestOrder(clientId);
-      await db.execute('UPDATE orders SET dispute_button_visible_to_client = 1 WHERE id = :id', { id: orderId });
 
       agent = request.agent(app);
       const loginPage = await agent.get('/client/login');
@@ -296,12 +218,6 @@ describe('Order Feedback + Disputes type field (Section BV)', () => {
       expect(res.text).toContain(`action="/client/orders/${orderId}/feedback"`);
       expect(res.text).toContain('name="rating"');
       expect(res.text).toContain('Submit Feedback');
-    });
-
-    it('client order page offers both dispute types', async () => {
-      const res = await agent.get(`/client/orders/${orderId}`);
-      expect(res.text).toContain('name="dispute_type"');
-      expect(res.text).toContain('Complaint / Damage Report');
     });
 
     it('client order page prefills an existing submission and offers update', async () => {
@@ -325,36 +241,6 @@ describe('Order Feedback + Disputes type field (Section BV)', () => {
       expect(res.status).toBe(200);
       expect(res.text).toContain('Order Feedback');
       expect(res.text).toContain("hasn't submitted feedback");
-    });
-
-    it('global dispute log shows the type tag per card', async () => {
-      const staffAgent = request.agent(app);
-      const loginPage = await staffAgent.get('/login');
-      const csrf = extractCsrf(loginPage.text);
-      const loginRes = await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
-      expect(loginRes.status).toBe(302);
-
-      await disputeRepository.create(orderId, '2026-10-23', 'Buyer', 'Carton crushed', null, null, 'complaint_damage');
-
-      const res = await staffAgent.get('/disputes');
-      expect(res.status).toBe(200);
-      expect(res.text).toContain('Complaint / Damage');
-    });
-
-    it('staff order disputes page offers both types and shows a logged complaint\'s type', async () => {
-      const staffAgent = request.agent(app);
-      const loginPage = await staffAgent.get('/login');
-      const csrf = extractCsrf(loginPage.text);
-      const loginRes = await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
-      expect(loginRes.status).toBe(302);
-
-      const complaintOrderId = await createTestOrder(await createTestClient());
-      await disputeRepository.create(complaintOrderId, '2026-10-23', 'Buyer', 'Crate was wet on arrival', null, null, 'complaint_damage');
-
-      const res = await staffAgent.get(`/orders/${complaintOrderId}/disputes`);
-      expect(res.status).toBe(200);
-      expect(res.text).toContain('name="dispute_type"');
-      expect(res.text).toContain('Complaint / Damage');
     });
   });
 });
