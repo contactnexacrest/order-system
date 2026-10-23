@@ -63,9 +63,12 @@ correctly once the password is changed.
 
 ## What's in this folder
 
-- `docs/schema.sql` — full database schema (52 tables, 76 foreign keys),
-  validated against a live MariaDB instance after every change in this
-  delivery, including the Phase D additions below.
+- `docs/schema.sql` — full database schema (98 tables, 172 foreign keys as
+  of 2026-10-23 — see `docs/schema.sql`'s own trailing `-- SECTION X …
+  added YYYY-MM-DD` comments for the running changelog; 52 tables/76 FKs
+  at the time of this Phase D delivery specifically), validated against a
+  live MariaDB instance after every change in this delivery, including the
+  Phase D additions below.
 - `docs/seed.sql` — starter data: roles/permissions, one login user,
   company settings (a few are still PLACEHOLDER — see below), lookups,
   payment presets, stages, document types, the 21 real Terms & Conditions

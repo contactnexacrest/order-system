@@ -44,7 +44,10 @@ app/                    the application itself — this is what you deploy
   package.json / package-lock.json
   .env.example            template — copy to .env and fill in real values
 docs/
-  schema.sql              the MySQL schema — 52 tables, 76 foreign keys
+  schema.sql              the MySQL schema — 98 tables, 172 foreign keys
+                          as of 2026-10-23 (plus this stack's own
+                          `sessions` table = 99; see the file's own
+                          trailing changelog comments)
   seed.sql                seed data: roles/permissions, company settings,
                           lookup tables, one Admin user
   ARCHITECTURE.md         the original architecture document this build
@@ -107,7 +110,8 @@ storage/
    mysql -u nexacrest_app -p nexacrest < docs/schema.sql
    mysql -u nexacrest_app -p nexacrest < docs/seed.sql
    ```
-   This creates all 52 tables and seeds: the roles/permissions matrix, one
+   This creates all 98 tables (99 once this stack's own `sessions` store
+   is added at first run) and seeds: the roles/permissions matrix, one
    Admin login, company settings (with `PLACEHOLDER` values you must
    replace — see below), lookup tables (incoterms, currencies, ports, T&C
    clauses, payment presets), and 4 placeholder brand assets (logo,

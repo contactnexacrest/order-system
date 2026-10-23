@@ -346,7 +346,7 @@ sequenceDiagram
 
 <section id="e">
   <div class="sec-head"><span class="letter">E</span><h2>Database Schema</h2><span class="sub">Fig. E</span></div>
-  <p class="lede">One schema, 69 tables, shared byte-for-byte in spirit between both stacks (<code>NODE_MySQL_Version/docs/schema.sql</code> and <code>PHP_MySQL_Version/docs/schema.sql</code>). The file is organised as lettered sections in the order features were built — the comments at the bottom of the file (<code>-- Section X … added YYYY-MM-DD</code>) are the changelog.</p>
+  <p class="lede">One schema, 98 tables (Node adds one of its own — <code>sessions</code>, its DB-backed session store; PHP needs none), shared byte-for-byte in spirit between both stacks (<code>NODE_MySQL_Version/docs/schema.sql</code> and <code>PHP_MySQL_Version/docs/schema.sql</code>). 172 foreign keys. The file is organised as lettered sections in the order features were built — the comments at the bottom of the file (<code>-- Section X … added YYYY-MM-DD</code>) are the changelog.</p>
 
   <div class="sheet">
     <pre class="mermaid">
@@ -364,6 +364,7 @@ erDiagram
   ORDERS ||--o{ ORDER_ANNEXURE_PRODUCTS : "Annexure A specs"
   ORDERS ||--o{ DOCUMENTS : generates
   ORDERS ||--o{ AMENDMENTS : "payment-term changes"
+  ORDERS ||--o{ ORDER_CANCELLATIONS : "request/approve/reject"
   ORDERS ||--o{ DISPUTES : raises
   SUPPLIERS ||--o{ ORDER_SUPPLIER_PO : fulfils
   DOCUMENTS ||--o| FILE_STORE : "pdf_file_id"
@@ -379,7 +380,7 @@ erDiagram
   DOCUMENT_TYPES ||--o{ DOCUMENTS : "of type"
     </pre>
   </div>
-  <p class="sheet-cap">FIG. E1 — CORE ENTITY RELATIONSHIPS (SIMPLIFIED — 22 OF 69 TABLES SHOWN)</p>
+  <p class="sheet-cap">FIG. E1 — CORE ENTITY RELATIONSHIPS (SIMPLIFIED — 23 OF 98 TABLES SHOWN)</p>
 
   <div class="tablewrap"><table>
     <caption>Schema sections, in build order</caption>
@@ -390,7 +391,12 @@ erDiagram
     <tr><td>Q</td><td>Working-days calculator + holiday calendar</td><td>R</td><td>Internal reference library (SOPs, checklists, hard-rules docs)</td></tr>
     <tr><td>S</td><td>Buyer PO / Supplier PO signed-acknowledgement evidence files</td><td>T</td><td>Sample Data Playground flag (<code>is_sample_data</code>)</td></tr>
     <tr><td>U</td><td>Product Interface — internal product/supplier reference catalog (<code>catalog_*</code> tables, independent of the order pipeline)</td><td>V</td><td>Test Mode (<code>is_test_data</code> flag + <code>test_mode_settings</code>) — see §M</td></tr>
+    <tr><td>W–Z</td><td>Order archiving; role/permission management tooling; custom reference-library entries; protected founder accounts</td><td>AA–AG</td><td>Client self-service: intake self-correction link + PI-stage intake, HS code master list, client data lock, payment self-report, buyer OC acknowledgment, per-order dispute visibility toggle, reference-number sequence counter</td></tr>
+    <tr><td>AH–AN</td><td>Client-facing document revision numbers; order progress chat + email template CRUD + per-user notification prefs; client reorder requests; Supplier PO signing timestamp; HS code bulk import + product guide; expense-to-order linking; internal-only CA financial annexure</td><td>AO–AV</td><td>Dispute replies + granular dispute permissions; reorder-to-supplier linking + order profitability; logistics partners directory; pre-closure compliance task checklist; mail redirect/CC; Annexure A content mode; deferred-mail admin controls + OC-ack override; staff client-portal impersonation</td></tr>
+    <tr><td>AY–BD</td><td>RBAC scoping (reference-library categories, view-only tiers); additional documents at order/client level; Legal Terms &amp; Definitions (admin-configurable); consignee/notify-party self-service on client-facing forms; Bill of Lading endorsement; dropdown-options admin screen</td><td>BE–BJ</td><td>Client Agreement file upload + expiry; QT/PI intake structured billing address; Buyer Action Link (OC ack + Buyer PO upload, no login); ports admin screen; indicative freight as a single value, not a range</td></tr>
+    <tr><td>BK–BP</td><td>Action notifications; supplier factory addresses; supplier payment dates; user 3-way status (active/inactive/archived); document drift flag (External QA report M-08); formal order-cancellation workflow — request/approve/reject/refund (External QA report M-09)</td><td></td><td></td></tr>
   </table></div>
+  <p class="sheet-cap">66 lettered sections in all (A–BP; AW/AX skipped in the file's own lettering) — see <code>docs/schema.sql</code>'s own trailing comments for the exact column-level diff each one added.</p>
 
   <div class="callout note"><b>No <code>ON DELETE CASCADE</code> anywhere.</b> Every deletion routine in the app (Sample Data clear, Test Mode delete) walks the FK graph by hand, children before parents, and explicitly breaks the one real reference cycle — <code>documents.docx_file_id/pdf_file_id</code> ↔ <code>file_store.linked_document_id</code> — before deleting either side. If you add a table that hangs off <code>orders</code> or <code>clients</code>, you must add it to both deletion routines or it will silently orphan on cleanup.</div>
 </section>
@@ -695,8 +701,8 @@ flowchart TB
     <caption>Business objects at a glance</caption>
     <tr><th>Object</th><th>Count / shape</th></tr>
     <tr><td>Order pipeline stages</td><td>9, linear with one conditional skip (Stage 6, FOB Incoterm)</td></tr>
-    <tr><td>Generated document types</td><td>11 fixed + 1 dynamic (Amendment)</td></tr>
-    <tr><td>Database tables</td><td>69, in 22 lettered schema sections (A–V)</td></tr>
+    <tr><td>Generated document types</td><td>22 total — 9 customer-facing (QT/PI/OC/PL/CI/FDN/BUYERPO/ANNEXA/BLE), 2 procurement-only (SUPPO, COOPREP), 11 internal (AMD generated on demand + BLI + 4 cross-verification checklists + 2 SOP references + CAFIN + STAGEGATE + WALLREF)</td></tr>
+    <tr><td>Database tables</td><td>98 (Node: 99, plus its own <code>sessions</code> store), in 66 lettered schema sections (A–BP)</td></tr>
     <tr><td>Auth surfaces</td><td>3, structurally separate — staff session, client-portal session, and unauthenticated public intake</td></tr>
     <tr><td>File formats generated</td><td>PDF (always) + DOCX (optional, internal-only)</td></tr>
     <tr><td>Permission resolution layers</td><td>3 — Super Admin bypass → role_permissions → user_permissions</td></tr>
@@ -706,7 +712,7 @@ flowchart TB
 </main>
 </div>
 
-<footer>NEXACREST BLUEPRINT · REV. 2026-09-22 · BOTH STACKS, ONE SCHEMA · OPEN THIS FILE DIRECTLY IN ANY BROWSER</footer>
+<footer>NEXACREST BLUEPRINT · REV. 2026-10-23 · BOTH STACKS, ONE SCHEMA · OPEN THIS FILE DIRECTLY IN ANY BROWSER</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>
