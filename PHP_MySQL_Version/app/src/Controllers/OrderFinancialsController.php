@@ -8,9 +8,11 @@ use App\Helpers\Flash;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\OrderCostEntryRepository;
+use App\Repositories\OrderLcDetailRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AuthService;
 use App\Services\CaFyLockGuard;
+use App\Services\FileUploadService;
 
 /**
  * Order-page-embedded financial actions (docs/schema.sql Section AP) —
@@ -153,6 +155,108 @@ final class OrderFinancialsController
         $id = OrderCostEntryRepository::create($orderId, $category, $description, (float) $amount, $incurredAt, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'ORDER_COST_ENTRY_RECORDED', 'order_cost_entries', $id, null, null, $category);
         Flash::set('success', 'Cost entry recorded.');
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
+    /**
+     * Export process steps 5-1a/5-2a/5-3a: when a client opts for a
+     * Letter of Credit, record the final LC document + LC number against
+     * the order; if a bank loan was taken against that LC, record the
+     * loan amount/interest rate/interest paid, and keep that interest in
+     * sync with a single order_cost_entries row (category
+     * bank_loan_interest) — the same expense ledger every other order
+     * cost already uses, rather than a second, parallel place to look.
+     */
+    public function saveLcDetails(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+        $existing = OrderLcDetailRepository::find($orderId);
+
+        $lcNumber = trim((string) ($_POST['lc_number'] ?? '')) ?: null;
+
+        foreach (['bank_loan_amount' => 'bank loan amount', 'bank_loan_interest_rate' => 'interest rate', 'bank_loan_interest_paid' => 'interest paid'] as $field => $label) {
+            $raw = trim((string) ($_POST[$field] ?? ''));
+            if ($raw !== '' && (!is_numeric($raw) || (float) $raw < 0)) {
+                Flash::set('error', "Enter a valid {$label} (or leave it blank).");
+                header("Location: /orders/{$orderId}#order-financials");
+                return;
+            }
+        }
+        $bankLoanAmount = trim((string) ($_POST['bank_loan_amount'] ?? '')) !== '' ? (float) $_POST['bank_loan_amount'] : null;
+        $interestRate = trim((string) ($_POST['bank_loan_interest_rate'] ?? '')) !== '' ? (float) $_POST['bank_loan_interest_rate'] : null;
+        $interestPaid = trim((string) ($_POST['bank_loan_interest_paid'] ?? '')) !== '' ? (float) $_POST['bank_loan_interest_paid'] : null;
+
+        $lcFileId = $existing['lc_file_id'] ?? null;
+        if (!empty($_FILES['lc_file']['name'])) {
+            try {
+                $lcFileId = FileUploadService::handleUpload(
+                    'lc_file',
+                    'order_lc_copy',
+                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/lc',
+                    null,
+                    $orderId,
+                    (int) $user['id'],
+                    null,
+                    null,
+                    'Letter of Credit'
+                );
+            } catch (\Throwable $e) {
+                Flash::set('error', 'LC/loan details were not saved — the LC file upload failed: ' . Flash::describeException($e, 'upload failed — check the server error log.'));
+                header("Location: /orders/{$orderId}#order-financials");
+                return;
+            }
+        }
+
+        // Keep the single bank_loan_interest cost entry in sync: create it
+        // the first time an interest amount is entered, update it on every
+        // subsequent edit, and remove it if the amount is cleared back out
+        // — this order's expense ledger should never show a stale figure
+        // or a duplicate row for the same loan.
+        $interestCostEntryId = $existing['interest_cost_entry_id'] ?? null;
+        $staleCostEntryIdToDelete = null;
+        if ($interestPaid !== null && $interestPaid > 0) {
+            if ($interestCostEntryId) {
+                OrderCostEntryRepository::updateAmount($interestCostEntryId, $interestPaid, 'Bank loan interest (LC order)');
+            } else {
+                $interestCostEntryId = OrderCostEntryRepository::create(
+                    $orderId,
+                    'bank_loan_interest',
+                    'Bank loan interest (LC order)',
+                    $interestPaid,
+                    date('Y-m-d'),
+                    (int) $user['id']
+                );
+            }
+        } elseif ($interestCostEntryId) {
+            // order_lc_details.interest_cost_entry_id FK must stop pointing
+            // at this row BEFORE it's deleted, not after — the upsert below
+            // clears it to null first; only once that's committed is it
+            // safe to delete the now-unreferenced order_cost_entries row.
+            $staleCostEntryIdToDelete = $interestCostEntryId;
+            $interestCostEntryId = null;
+        }
+
+        OrderLcDetailRepository::upsert($orderId, [
+            'lc_number' => $lcNumber,
+            'lc_file_id' => $lcFileId,
+            'bank_loan_amount' => $bankLoanAmount,
+            'bank_loan_interest_rate' => $interestRate,
+            'bank_loan_interest_paid' => $interestPaid,
+            'interest_cost_entry_id' => $interestCostEntryId,
+            'recorded_by' => (int) $user['id'],
+        ]);
+        if ($staleCostEntryIdToDelete !== null) {
+            OrderCostEntryRepository::delete($staleCostEntryIdToDelete);
+        }
+        AuditLogRepository::log((int) $user['id'], 'ORDER_LC_DETAILS_SAVED', 'order_lc_details', $orderId, null, null, $lcNumber);
+        Flash::set('success', 'LC / bank loan details saved.');
         header("Location: /orders/{$orderId}#order-financials");
     }
 

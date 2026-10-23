@@ -18,6 +18,7 @@ const CATEGORIES = {
   bank_charges: 'Bank Charges',
   commission: 'Commission',
   packing_crates: 'Packing / Wooden Crates',
+  bank_loan_interest: 'Bank Loan Interest (LC order)',
   other: 'Other',
 };
 
@@ -65,4 +66,17 @@ async function remove(id) {
   await db.execute('DELETE FROM order_cost_entries WHERE id = :id', { id });
 }
 
-module.exports = { CATEGORIES, create, forOrder, totalForOrder, find, remove };
+/**
+ * docs/schema.sql Section BR — keeps the single bank_loan_interest cost
+ * entry for an order's LC tracking in sync with whatever amount is
+ * currently recorded there, rather than creating a new entry on every
+ * edit.
+ */
+async function updateAmount(id, amountInr, description) {
+  await db.execute(
+    'UPDATE order_cost_entries SET amount_inr = :amount_inr, description = :description WHERE id = :id',
+    { amount_inr: amountInr, description, id }
+  );
+}
+
+module.exports = { CATEGORIES, create, forOrder, totalForOrder, find, remove, updateAmount };

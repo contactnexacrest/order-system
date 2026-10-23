@@ -1838,6 +1838,29 @@
       </table>
     {% endif %}
 
+    {% set lcDetails = orderLcDetails or { lc_number: null, lc_file_id: null, bank_loan_amount: null, bank_loan_interest_rate: null, bank_loan_interest_paid: null } %}
+    <h3 style="font-size:0.95em; margin-top:14px;">Letter of Credit &amp; Bank Loan</h3>
+    <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
+    <div class="kv-grid">
+      <div><span class="k">LC Number</span><span class="v">{{ lcDetails.lc_number or '—' }}</span></div>
+      <div><span class="k">LC Document</span><span class="v">{% if lcDetails.lc_file_id %}<a href="/file-store/{{ lcDetails.lc_file_id }}/download" target="_blank">View LC</a>{% else %}—{% endif %}</span></div>
+      <div><span class="k">Bank Loan Amount</span><span class="v">{{ lcDetails.bank_loan_amount | money if lcDetails.bank_loan_amount != null else '—' }}</span></div>
+      <div><span class="k">Interest Rate</span><span class="v">{{ (lcDetails.bank_loan_interest_rate + '%') if lcDetails.bank_loan_interest_rate != null else '—' }}</span></div>
+      <div><span class="k">Interest Paid</span><span class="v">{{ lcDetails.bank_loan_interest_paid | money if lcDetails.bank_loan_interest_paid != null else '—' }}</span></div>
+    </div>
+    <details>
+      <summary>{{ 'Edit LC / bank loan details' if orderLcDetails else 'Record LC / bank loan details for this order' }}</summary>
+      <form method="post" action="/orders/{{ order.id }}/lc-details" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>LC Number<input type="text" name="lc_number" value="{{ lcDetails.lc_number or '' }}"></label>
+        <label>Final LC Document<input type="file" name="lc_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+        <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="{{ lcDetails.bank_loan_amount if lcDetails.bank_loan_amount != null else '' }}"></label>
+        <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="{{ lcDetails.bank_loan_interest_rate if lcDetails.bank_loan_interest_rate != null else '' }}"></label>
+        <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="{{ lcDetails.bank_loan_interest_paid if lcDetails.bank_loan_interest_paid != null else '' }}"></label>
+        <button type="submit" class="btn-sm">Save LC / Loan Details</button>
+      </form>
+    </details>
+
     <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
     <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
     {% if orderCostEntries.length == 0 %}

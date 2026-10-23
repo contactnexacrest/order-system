@@ -3602,3 +3602,37 @@ CREATE TABLE ui_templates (
 ALTER TABLE users
   ADD COLUMN ui_template_preference_id BIGINT UNSIGNED NULL AFTER email_action_notifications_enabled,
   ADD CONSTRAINT fk_users_ui_template FOREIGN KEY (ui_template_preference_id) REFERENCES ui_templates(id);
+
+-- ================================================================
+-- SECTION BR — LETTER OF CREDIT + BANK LOAN INTEREST TRACKING
+-- (added 2026-10-23)
+-- ================================================================
+-- Export process sequence, steps 5-1a/5-2a/5-3a: when a client opts for
+-- a Letter of Credit, record the final LC document + LC number against
+-- the order; if a bank loan was taken against that LC, record the loan
+-- amount/interest rate/interest paid, and let that interest be recorded
+-- as an order expense (order_cost_entries) the same way every other
+-- order cost already is. See
+-- docs/migrations/2026-10-23f-lc-bank-loan-tracking.sql.
+-- ================================================================
+CREATE TABLE order_lc_details (
+  id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id                BIGINT UNSIGNED NOT NULL UNIQUE,
+  lc_number               VARCHAR(100) NULL,
+  lc_file_id              BIGINT UNSIGNED NULL,
+  bank_loan_amount        DECIMAL(14,2) NULL,
+  bank_loan_interest_rate DECIMAL(6,3) NULL,
+  bank_loan_interest_paid DECIMAL(14,2) NULL,
+  interest_cost_entry_id  BIGINT UNSIGNED NULL,   -- the order_cost_entries row (category='bank_loan_interest') kept in sync with bank_loan_interest_paid
+  recorded_by             BIGINT UNSIGNED NULL,
+  updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (lc_file_id) REFERENCES file_store(id),
+  FOREIGN KEY (interest_cost_entry_id) REFERENCES order_cost_entries(id),
+  FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+ALTER TABLE order_cost_entries
+  MODIFY COLUMN category ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
+                               'documentation','port_charges','bank_charges','commission',
+                               'packing_crates','bank_loan_interest','other') NOT NULL;

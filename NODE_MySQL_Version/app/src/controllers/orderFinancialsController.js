@@ -4,10 +4,16 @@ const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
+const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
+const fileUploadService = require('../services/fileUploadService');
 const { todayIst } = require('../helpers/dbDateTime');
+
+function sanitizePathSegment(value) {
+  return String(value == null ? '' : value).replace(/[^A-Za-z0-9_-]+/g, '-');
+}
 
 /**
  * Port of App\Controllers\OrderFinancialsController (docs/schema.sql
@@ -144,6 +150,111 @@ async function addCostEntry(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
+/**
+ * Export process steps 5-1a/5-2a/5-3a: when a client opts for a Letter
+ * of Credit, record the final LC document + LC number against the
+ * order; if a bank loan was taken against that LC, record the loan
+ * amount/interest rate/interest paid, and keep that interest in sync
+ * with a single order_cost_entries row (category bank_loan_interest) —
+ * the same expense ledger every other order cost already uses, rather
+ * than a second, parallel place to look.
+ */
+async function saveLcDetails(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const user = req.user;
+  const existing = await orderLcDetailRepository.find(orderId);
+
+  const lcNumber = String(req.body.lc_number || '').trim() || null;
+
+  for (const [field, label] of [
+    ['bank_loan_amount', 'bank loan amount'],
+    ['bank_loan_interest_rate', 'interest rate'],
+    ['bank_loan_interest_paid', 'interest paid'],
+  ]) {
+    const raw = String(req.body[field] || '').trim();
+    if (raw !== '' && (Number.isNaN(Number(raw)) || Number(raw) < 0)) {
+      flash.set(req, 'error', `Enter a valid ${label} (or leave it blank).`);
+      res.redirect(`/orders/${orderId}#order-financials`);
+      return;
+    }
+  }
+  const bankLoanAmount = String(req.body.bank_loan_amount || '').trim() !== '' ? parseFloat(req.body.bank_loan_amount) : null;
+  const interestRate = String(req.body.bank_loan_interest_rate || '').trim() !== '' ? parseFloat(req.body.bank_loan_interest_rate) : null;
+  const interestPaid = String(req.body.bank_loan_interest_paid || '').trim() !== '' ? parseFloat(req.body.bank_loan_interest_paid) : null;
+
+  let lcFileId = existing ? existing.lc_file_id : null;
+  if (req.file && req.file.buffer) {
+    try {
+      lcFileId = await fileUploadService.handleUpload(
+        req,
+        'lc_file',
+        'order_lc_copy',
+        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/lc`,
+        null,
+        orderId,
+        user.id,
+        null,
+        null,
+        'Letter of Credit'
+      );
+    } catch (e) {
+      flash.set(req, 'error', `LC/loan details were not saved — the LC file upload failed: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
+      res.redirect(`/orders/${orderId}#order-financials`);
+      return;
+    }
+  }
+
+  // Keep the single bank_loan_interest cost entry in sync: create it the
+  // first time an interest amount is entered, update it on every
+  // subsequent edit, and remove it if the amount is cleared back out —
+  // this order's expense ledger should never show a stale figure or a
+  // duplicate row for the same loan.
+  let interestCostEntryId = existing ? existing.interest_cost_entry_id : null;
+  let staleCostEntryIdToDelete = null;
+  if (interestPaid !== null && interestPaid > 0) {
+    if (interestCostEntryId) {
+      await orderCostEntryRepository.updateAmount(interestCostEntryId, interestPaid, 'Bank loan interest (LC order)');
+    } else {
+      interestCostEntryId = await orderCostEntryRepository.create(
+        orderId,
+        'bank_loan_interest',
+        'Bank loan interest (LC order)',
+        interestPaid,
+        todayIst(),
+        user.id
+      );
+    }
+  } else if (interestCostEntryId) {
+    // order_lc_details.interest_cost_entry_id FK must stop pointing at
+    // this row BEFORE it's deleted, not after — the upsert below clears
+    // it to null first; only once that's committed is it safe to delete
+    // the now-unreferenced order_cost_entries row.
+    staleCostEntryIdToDelete = interestCostEntryId;
+    interestCostEntryId = null;
+  }
+
+  await orderLcDetailRepository.upsert(orderId, {
+    lc_number: lcNumber,
+    lc_file_id: lcFileId,
+    bank_loan_amount: bankLoanAmount,
+    bank_loan_interest_rate: interestRate,
+    bank_loan_interest_paid: interestPaid,
+    interest_cost_entry_id: interestCostEntryId,
+    recorded_by: user.id,
+  });
+  if (staleCostEntryIdToDelete !== null) {
+    await orderCostEntryRepository.remove(staleCostEntryIdToDelete);
+  }
+  await auditLogRepository.log(user.id, 'ORDER_LC_DETAILS_SAVED', 'order_lc_details', orderId, null, null, lcNumber);
+  flash.set(req, 'success', 'LC / bank loan details saved.');
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
 async function deleteCostEntry(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const entryId = parseInt(req.params.entryId, 10);
@@ -165,4 +276,4 @@ async function deleteCostEntry(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
-module.exports = { addExportBenefit, markExportBenefitReceived, addCostEntry, deleteCostEntry };
+module.exports = { addExportBenefit, markExportBenefitReceived, addCostEntry, deleteCostEntry, saveLcDetails };

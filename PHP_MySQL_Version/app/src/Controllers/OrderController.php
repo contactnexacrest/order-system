@@ -32,6 +32,7 @@ use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderComplianceTaskRepository;
 use App\Repositories\OrderCostEntryRepository;
+use App\Repositories\OrderLcDetailRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPackingRepository;
@@ -891,6 +892,7 @@ final class OrderController
             'canManageOrderFinancials' => $canManageOrderFinancials,
             'orderCostEntries' => $canManageOrderFinancials ? OrderCostEntryRepository::forOrder($orderId) : [],
             'costEntryCategories' => OrderCostEntryRepository::CATEGORIES,
+            'orderLcDetails' => $canManageOrderFinancials ? OrderLcDetailRepository::find($orderId) : null,
             'profitability' => $canManageOrderFinancials ? OrderProfitabilityService::computeForOrder($orderId) : null,
             'exportBenefitSchemes' => LookupRepository::dropdownOptions('export_benefit_scheme'),
             'duplicatedFromOrder' => $duplicatedFromOrder,

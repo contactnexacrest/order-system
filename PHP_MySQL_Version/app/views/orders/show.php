@@ -1994,6 +1994,29 @@ foreach ($stages as $s) {
       </table>
     <?php endif; ?>
 
+    <?php $lcDetails = $orderLcDetails ?: ['lc_number' => null, 'lc_file_id' => null, 'bank_loan_amount' => null, 'bank_loan_interest_rate' => null, 'bank_loan_interest_paid' => null]; ?>
+    <h3 style="font-size:0.95em; margin-top:14px;">Letter of Credit &amp; Bank Loan</h3>
+    <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
+    <div class="kv-grid">
+      <div><span class="k">LC Number</span><span class="v"><?= htmlspecialchars($lcDetails['lc_number'] ?? '—') ?></span></div>
+      <div><span class="k">LC Document</span><span class="v"><?php if (!empty($lcDetails['lc_file_id'])): ?><a href="/file-store/<?= (int) $lcDetails['lc_file_id'] ?>/download" target="_blank">View LC</a><?php else: ?>—<?php endif; ?></span></div>
+      <div><span class="k">Bank Loan Amount</span><span class="v"><?= $lcDetails['bank_loan_amount'] !== null ? number_format((float) $lcDetails['bank_loan_amount'], 2) : '—' ?></span></div>
+      <div><span class="k">Interest Rate</span><span class="v"><?= $lcDetails['bank_loan_interest_rate'] !== null ? number_format((float) $lcDetails['bank_loan_interest_rate'], 3) . '%' : '—' ?></span></div>
+      <div><span class="k">Interest Paid</span><span class="v"><?= $lcDetails['bank_loan_interest_paid'] !== null ? number_format((float) $lcDetails['bank_loan_interest_paid'], 2) : '—' ?></span></div>
+    </div>
+    <details>
+      <summary><?= $orderLcDetails ? 'Edit LC / bank loan details' : 'Record LC / bank loan details for this order' ?></summary>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-details" enctype="multipart/form-data">
+        <?= Csrf::field() ?>
+        <label>LC Number<input type="text" name="lc_number" value="<?= htmlspecialchars($lcDetails['lc_number'] ?? '') ?>"></label>
+        <label>Final LC Document<input type="file" name="lc_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+        <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="<?= htmlspecialchars($lcDetails['bank_loan_amount'] !== null ? (string) $lcDetails['bank_loan_amount'] : '') ?>"></label>
+        <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_rate'] !== null ? (string) $lcDetails['bank_loan_interest_rate'] : '') ?>"></label>
+        <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_paid'] !== null ? (string) $lcDetails['bank_loan_interest_paid'] : '') ?>"></label>
+        <button type="submit" class="btn-sm">Save LC / Loan Details</button>
+      </form>
+    </details>
+
     <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
     <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
     <?php if (empty($orderCostEntries)): ?>

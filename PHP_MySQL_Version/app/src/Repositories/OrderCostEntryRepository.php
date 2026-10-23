@@ -24,6 +24,7 @@ final class OrderCostEntryRepository
         'bank_charges'     => 'Bank Charges',
         'commission'       => 'Commission',
         'packing_crates'   => 'Packing / Wooden Crates',
+        'bank_loan_interest' => 'Bank Loan Interest (LC order)',
         'other'            => 'Other',
     ];
 
@@ -77,5 +78,18 @@ final class OrderCostEntryRepository
     public static function delete(int $id): void
     {
         Database::connection()->prepare('DELETE FROM order_cost_entries WHERE id = :id')->execute(['id' => $id]);
+    }
+
+    /**
+     * docs/schema.sql Section BR — keeps the single bank_loan_interest
+     * cost entry for an order's LC tracking in sync with whatever amount
+     * is currently recorded there, rather than creating a new entry on
+     * every edit.
+     */
+    public static function updateAmount(int $id, float $amountInr, ?string $description): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_cost_entries SET amount_inr = :amount_inr, description = :description WHERE id = :id'
+        )->execute(['amount_inr' => $amountInr, 'description' => $description, 'id' => $id]);
     }
 }
