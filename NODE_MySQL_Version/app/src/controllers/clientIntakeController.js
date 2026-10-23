@@ -7,6 +7,9 @@ const emailService = require('../services/emailService');
 const rateLimiter = require('../helpers/rateLimiter');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
+const permissionRepository = require('../repositories/permissionRepository');
+const notificationRepository = require('../repositories/notificationRepository');
+const auditLogRepository = require('../repositories/auditLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const countryList = require('../helpers/countryList');
 const { formatForDb } = require('../helpers/dbDateTime');
@@ -53,6 +56,15 @@ async function submit(req, res) {
 
   const id = await clientIntakeRepository.create(data, req.ip || null);
   const link = await issueCorrectionLink(id, data.email);
+
+  // "SYSTEM MUST SEND NOTIFICATION FOR ALL ACTIONS ... THIS IS NON
+  // NEGOTIABLE" — export process step 0: a prospect filling in the
+  // public Quotation-stage intake form must notify staff, not just sit
+  // silently in the review queue behind a nav badge.
+  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
+    await notificationRepository.create(staffUserId, null, 'client_intake_submitted', null, `New Quotation-stage intake submitted: ${data.company_legal_name}.`);
+  }
+  await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', id, null, null, null, `Submitted by ${data.company_legal_name} via the public quotation-details form.`);
 
   res.renderView('client_intake/thank_you', { correctionLink: link }, 'layout/bare');
 }

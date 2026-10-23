@@ -380,6 +380,11 @@ final class ClientPortalController
             );
         }
 
+        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
+            \App\Repositories\NotificationRepository::create($staffUserId, null, 'reorder_request_submitted', $orderId, "Client submitted a reorder request based on order {$order['order_reference']}.");
+        }
+        AuditLogRepository::log(null, 'REORDER_REQUEST_SUBMITTED', 'orders', $orderId, null, null, null, 'Reorder request submitted by the client via the client portal.');
+
         Flash::set('success', 'Reorder request submitted — our team will review it and confirm the new order with you shortly.');
         header("Location: /client/orders/{$orderId}");
     }
@@ -569,6 +574,15 @@ final class ClientPortalController
         $comments = trim((string) ($_POST['comments'] ?? '')) ?: null;
 
         \App\Repositories\OrderFeedbackRepository::upsert($orderId, $clientId, $rating, $comments);
+
+        // "SYSTEM MUST SEND NOTIFICATION FOR ALL ACTIONS ... THIS IS
+        // NON NEGOTIABLE" — same dual-channel pattern as
+        // OrderCommentService::postAsClient(): an in-app notification per
+        // manage_orders holder, plus the catch-all email via the audit log.
+        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
+            \App\Repositories\NotificationRepository::create($staffUserId, null, 'order_feedback_submitted', $orderId, "Client submitted feedback ({$rating}/5) on order {$order['order_reference']}.");
+        }
+        AuditLogRepository::log(null, 'ORDER_FEEDBACK_SUBMITTED', 'orders', $orderId, null, null, (string) $rating, 'Order feedback submitted by the client via the client portal.');
 
         Flash::set('success', 'Thank you — your feedback has been recorded.');
         header("Location: /client/orders/{$orderId}");

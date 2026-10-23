@@ -155,6 +155,17 @@ final class PiIntakeController
         }
 
         PiIntakeRepository::submit((int) $submission['id'], $data, $_SERVER['REMOTE_ADDR'] ?? null);
+
+        // "SYSTEM MUST SEND NOTIFICATION FOR ALL ACTIONS ... THIS IS
+        // NON NEGOTIABLE" — export process step 4d: the client filling in
+        // PI-stage details must notify staff, not just sit silently in
+        // the review queue behind a nav badge.
+        $orderId = (int) $submission['order_id'];
+        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
+            \App\Repositories\NotificationRepository::create($staffUserId, null, 'pi_intake_submitted', $orderId, "PI-stage details submitted for order {$submission['order_reference']}.");
+        }
+        \App\Repositories\AuditLogRepository::log(null, 'PI_INTAKE_SUBMITTED', 'orders', $orderId, null, null, null, 'PI-stage intake details submitted by the client.');
+
         View::render('pi_intake/thank_you', [], 'layout/bare');
     }
 

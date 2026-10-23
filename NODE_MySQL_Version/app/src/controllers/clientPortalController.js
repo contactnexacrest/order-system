@@ -27,6 +27,8 @@ const orderProductRepository = require('../repositories/orderProductRepository')
 const orderRepository = require('../repositories/orderRepository');
 const orderReorderRequestRepository = require('../repositories/orderReorderRequestRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const permissionRepository = require('../repositories/permissionRepository');
+const notificationRepository = require('../repositories/notificationRepository');
 const clientPortalService = require('../services/clientPortalService');
 const buyerActionService = require('../services/buyerActionService');
 const orderCommentService = require('../services/orderCommentService');
@@ -365,6 +367,11 @@ async function submitReorder(req, res) {
     );
   }
 
+  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
+    await notificationRepository.create(staffUserId, null, 'reorder_request_submitted', orderId, `Client submitted a reorder request based on order ${order.order_reference}.`);
+  }
+  await auditLogRepository.log(null, 'REORDER_REQUEST_SUBMITTED', 'orders', orderId, null, null, null, 'Reorder request submitted by the client via the client portal.');
+
   flash.set(req, 'success', 'Reorder request submitted — our team will review it and confirm the new order with you shortly.');
   res.redirect(`/client/orders/${orderId}`);
 }
@@ -600,6 +607,15 @@ async function submitFeedback(req, res) {
   const comments = String(req.body.comments || '').trim() || null;
 
   await orderFeedbackRepository.upsert(orderId, clientId, rating, comments);
+
+  // "SYSTEM MUST SEND NOTIFICATION FOR ALL ACTIONS ... THIS IS NON
+  // NEGOTIABLE" — same dual-channel pattern as
+  // orderCommentService.postAsClient(): an in-app notification per
+  // manage_orders holder, plus the catch-all email via the audit log.
+  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
+    await notificationRepository.create(staffUserId, null, 'order_feedback_submitted', orderId, `Client submitted feedback (${rating}/5) on order ${order.order_reference}.`);
+  }
+  await auditLogRepository.log(null, 'ORDER_FEEDBACK_SUBMITTED', 'orders', orderId, null, null, String(rating), 'Order feedback submitted by the client via the client portal.');
 
   flash.set(req, 'success', 'Thank you — your feedback has been recorded.');
   res.redirect(`/client/orders/${orderId}`);

@@ -60,6 +60,15 @@ final class ClientIntakeController
         $id = ClientIntakeRepository::create($data, $_SERVER['REMOTE_ADDR'] ?? null);
         $link = self::issueCorrectionLink($id, $data['email']);
 
+        // "SYSTEM MUST SEND NOTIFICATION FOR ALL ACTIONS ... THIS IS
+        // NON NEGOTIABLE" — export process step 0: a prospect filling in
+        // the public Quotation-stage intake form must notify staff, not
+        // just sit silently in the review queue behind a nav badge.
+        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
+            \App\Repositories\NotificationRepository::create($staffUserId, null, 'client_intake_submitted', null, "New Quotation-stage intake submitted: {$data['company_legal_name']}.");
+        }
+        \App\Repositories\AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', $id, null, null, null, "Submitted by {$data['company_legal_name']} via the public quotation-details form.");
+
         View::render('client_intake/thank_you', ['correctionLink' => $link], 'layout/bare');
     }
 
