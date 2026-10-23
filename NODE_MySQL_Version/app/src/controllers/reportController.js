@@ -436,8 +436,16 @@ async function payments(req, res) {
 async function todaysPayments(req, res) {
   const date = str(req.query.date) || todayIst();
 
+  // External QA report Q-RPT-1: supplier payment amounts are internal
+  // INR cost data, not something a broad view_reports audience
+  // (Viewer/Auditor included) should see by default — only
+  // computed/shown/exported for whoever holds manage_supplier_payments
+  // (Accounts/Admin/MD/ED), same tier that can now also act on these
+  // payments.
+  const canManageSupplierPayments = !!req.permissions.manage_supplier_payments;
+
   const incoming = await orderPaymentStatusRepository.clearedOnDate(date);
-  const supplier = await orderSupplierPoRepository.paidOnDate(date);
+  const supplier = canManageSupplierPayments ? await orderSupplierPoRepository.paidOnDate(date) : [];
 
   if (req.query.format === 'csv') {
     const rows = [];
@@ -487,7 +495,7 @@ async function todaysPayments(req, res) {
     }
   }
 
-  res.renderView('reports/todays_payments', { date, incomingRows, supplierRows }, 'layout/base');
+  res.renderView('reports/todays_payments', { date, incomingRows, supplierRows, canManageSupplierPayments }, 'layout/base');
 }
 
 function defaultDateFrom() {

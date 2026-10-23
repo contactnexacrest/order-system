@@ -141,4 +141,45 @@ final class SupplierPaymentDatesTest extends DbTestCase
         self::assertStringContainsString(number_format(1000.0, 2), $output);
         self::assertStringContainsString(number_format(20000.0, 2), $output);
     }
+
+    /**
+     * External QA report Q-RPT-1 (owner review, 2026-10-23): "Viewer and
+     * other view_reports roles can open Today's Payments, which also
+     * lists supplier (outgoing INR) payments — cost information." The
+     * Outgoing section (and its underlying data) is now only computed
+     * for whoever holds manage_supplier_payments.
+     */
+    public function testTodaysPaymentsHidesTheSupplierSectionWithoutManageSupplierPayments(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $adminId = $this->createTestUser('Admin');
+        $supplierId = SupplierRepository::create(['supplier_legal_name' => 'PHPUnit Restricted Supplier']);
+        $supplierPoId = OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-PAY-5', $this->fullSupplierPoData([
+            'advance_amount_inr' => '45000',
+        ]), 'issued');
+        OrderSupplierPoRepository::markAdvancePaid($supplierPoId, '2031-05-05', $adminId);
+
+        $_GET['date'] = '2031-05-05';
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Viewer / Auditor');
+        ob_start();
+        (new ReportController())->todaysPayments([]);
+        $asViewer = ob_get_clean();
+
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Export Executive');
+        ob_start();
+        (new ReportController())->todaysPayments([]);
+        $asExportExecutive = ob_get_clean();
+
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Accounts Executive');
+        ob_start();
+        (new ReportController())->todaysPayments([]);
+        $asAccounts = ob_get_clean();
+        unset($_GET['date']);
+
+        self::assertStringNotContainsString('PHPUnit Restricted Supplier', $asViewer);
+        self::assertStringContainsString('internal cost data', $asViewer);
+        self::assertStringNotContainsString('PHPUnit Restricted Supplier', $asExportExecutive);
+        self::assertStringContainsString('PHPUnit Restricted Supplier', $asAccounts, 'Accounts must still see supplier payment data');
+        self::assertStringContainsString(number_format(45000.0, 2), $asAccounts);
+    }
 }

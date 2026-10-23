@@ -40,6 +40,9 @@
 
   <div class="section">
     <h2>Outgoing (Supplier) Payments</h2>
+    <?php if (!$canManageSupplierPayments): ?>
+      <p class="muted">Only Accounts/Admin/MD/ED can see supplier payment amounts — this is internal cost data.</p>
+    <?php else: ?>
     <table class="list">
       <tr><th>Order Ref</th><th>Supplier</th><th>Leg</th><th>Amount (INR)</th><th>Paid</th></tr>
       <?php $anyOutgoing = false; ?>
@@ -67,5 +70,6 @@
       <?php endforeach; ?>
       <?php if (!$anyOutgoing): ?><tr><td colspan="5" class="muted">No supplier payments recorded on this date.</td></tr><?php endif; ?>
     </table>
+    <?php endif; ?>
   </div>
 </div>

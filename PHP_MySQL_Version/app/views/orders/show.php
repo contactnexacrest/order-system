@@ -16,6 +16,15 @@ $canEditLockedData = PermissionService::can((int) $currentUser['id'], $currentUs
 $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_orders');
 // QA-5 RBAC-03/04: duty-specific split of manage_orders — see docs/seed.sql.
 $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_payments');
+// External QA report Q-ROLE-1: clearing a buyer payment (confirming the
+// bank actually received it) is split out of manage_payments (recording
+// what the client says they sent) so the same person can't do both.
+$canClearPayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'clear_payments');
+// External QA report Q-ROLE-3: split out of manage_order_financials so
+// Accounts can confirm supplier payments without gaining the broader
+// financials permission's access to cost entries/export benefits/the
+// profitability report.
+$canManageSupplierPayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_supplier_payments');
 $canManageShipping = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_shipping');
 $canCloseOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'close_orders');
 // Payment Ledger / Payment Snapshot (new): "only able to see the needed things" —
@@ -1241,21 +1250,27 @@ foreach ($stages as $s) {
     <?php endif; ?>
 
     <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared): ?>
-      <?php if (!$canManagePayments): ?>
-        <p class="muted">Only Accounts can record or clear this payment.</p>
-      <?php elseif (!$payment || $payment['advance_remittance_received_at'] === null): ?>
+      <?php if (!$payment || $payment['advance_remittance_received_at'] === null): ?>
+        <?php if (!$canManagePayments): ?>
+          <p class="muted">Only Accounts/Export can record this payment.</p>
+        <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance">
           <?= Csrf::field() ?>
           <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required></label>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <?= $stepBadge('3c') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
+        <?php endif; ?>
       <?php else: ?>
+        <?php if (!$canClearPayments): ?>
+          <p class="muted">Advance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+        <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <?= Csrf::field() ?>
           <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
           <?= $stepBadge('3d') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
         </form>
+        <?php endif; ?>
       <?php endif; ?>
     <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
@@ -1617,7 +1632,7 @@ foreach ($stages as $s) {
         <p>Supplier has signed and returned the PO.</p>
       <?php endif; ?>
 
-      <?php if ($supplierPo && $canManageOrderFinancials): ?>
+      <?php if ($supplierPo && $canManageSupplierPayments): ?>
         <h3 style="font-size:0.95em; margin-top:14px;">Supplier Payments</h3>
         <div class="kv-grid">
           <div><span class="k">Advance (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['advance_amount_inr'] ?? '—') ?><?= !empty($supplierPo['advance_paid_at']) ? ' — paid ' . htmlspecialchars($supplierPo['advance_paid_at']) : '' ?></span></div>
@@ -1869,23 +1884,29 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if (!$balanceCleared): ?>
-        <?php if (!$canManagePayments): ?>
-          <p class="muted">Only Accounts can record or clear this payment.</p>
-        <?php elseif ((!$payment || $payment['balance_remittance_received_at'] === null) && !$ciDocGenerated): ?>
-          <p class="muted small">Generate the Commercial Invoice above before recording the balance remittance — the buyer can't be remitting against an invoice they were never sent.</p>
-        <?php elseif (!$payment || $payment['balance_remittance_received_at'] === null): ?>
+        <?php if (!$payment || $payment['balance_remittance_received_at'] === null): ?>
+          <?php if (!$ciDocGenerated): ?>
+            <p class="muted small">Generate the Commercial Invoice above before recording the balance remittance — the buyer can't be remitting against an invoice they were never sent.</p>
+          <?php elseif (!$canManagePayments): ?>
+            <p class="muted">Only Accounts/Export can record this payment.</p>
+          <?php else: ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance">
             <?= Csrf::field() ?>
             <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
             <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
             <?= $stepBadge('8c') ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
           </form>
+          <?php endif; ?>
         <?php else: ?>
+          <?php if (!$canClearPayments): ?>
+            <p class="muted">Balance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+          <?php else: ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
             <?= Csrf::field() ?>
             <label>Cleared On<input type="date" name="balance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
             <?= $stepBadge('8d') ?><button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
           </form>
+          <?php endif; ?>
         <?php endif; ?>
       <?php else: ?>
         <p>Balance payment cleared.</p>

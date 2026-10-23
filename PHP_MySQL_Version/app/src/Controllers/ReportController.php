@@ -268,8 +268,18 @@ final class ReportController
     {
         $date = trim((string) ($_GET['date'] ?? '')) ?: date('Y-m-d');
 
+        // External QA report Q-RPT-1: supplier payment amounts are
+        // internal INR cost data, not something a broad view_reports
+        // audience (Viewer/Auditor included) should see by default — only
+        // computed/shown/exported for whoever holds manage_supplier_payments
+        // (Accounts/Admin/MD/ED), same tier that can now also act on these
+        // payments (see docs/migrations/2026-10-23d-split-payment-and-
+        // supplier-payment-permissions.sql).
+        $user = AuthService::currentUser();
+        $canManageSupplierPayments = $user && PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_supplier_payments');
+
         $incoming = OrderPaymentStatusRepository::clearedOnDate($date);
-        $supplier = OrderSupplierPoRepository::paidOnDate($date);
+        $supplier = $canManageSupplierPayments ? OrderSupplierPoRepository::paidOnDate($date) : [];
 
         if (($_GET['format'] ?? '') === 'csv') {
             $rows = [];
@@ -299,6 +309,7 @@ final class ReportController
             'date' => $date,
             'incoming' => $incoming,
             'supplier' => $supplier,
+            'canManageSupplierPayments' => $canManageSupplierPayments,
         ], 'layout/base');
     }
 

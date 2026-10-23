@@ -1113,21 +1113,27 @@
     {% endif %}
 
     {% if stage3 and stage3.status != 'locked' and not advanceCleared %}
-      {% if not permissions.manage_payments %}
-        <p class="muted">Only Accounts can record or clear this payment.</p>
-      {% elif not payment or payment.advance_remittance_received_at == null %}
+      {% if not payment or payment.advance_remittance_received_at == null %}
+        {% if not permissions.manage_payments %}
+          <p class="muted">Only Accounts/Export can record this payment.</p>
+        {% else %}
         <form method="post" action="/orders/{{ order.id }}/payment/advance">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required></label>
           <label>Received On<input type="date" name="advance_received_at"></label>
           {{ stepBadge('3c') | safe }}<button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
+        {% endif %}
       {% else %}
+        {% if not permissions.clear_payments %}
+          <p class="muted">Advance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+        {% else %}
         <form method="post" action="/orders/{{ order.id }}/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Cleared On<input type="date" name="advance_cleared_at"></label>
           {{ stepBadge('3d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
         </form>
+        {% endif %}
       {% endif %}
     {% elif not stage3 or stage3.status == 'locked' %}
       <p class="muted">Record the Buyer PO first to unlock this gate.</p>
@@ -1476,7 +1482,7 @@
         <p>Supplier has signed and returned the PO.</p>
       {% endif %}
 
-      {% if supplierPo and canManageOrderFinancials %}
+      {% if supplierPo and permissions.manage_supplier_payments %}
         <h3 style="font-size:0.95em; margin-top:14px;">Supplier Payments</h3>
         <div class="kv-grid">
           <div><span class="k">Advance (INR)</span><span class="v">{{ supplierPo.advance_amount_inr or '—' }}{% if supplierPo.advance_paid_at %} — paid {{ supplierPo.advance_paid_at }}{% endif %}</span></div>
@@ -1722,23 +1728,29 @@
       {% endif %}
 
       {% if not balanceCleared %}
-        {% if not permissions.manage_payments %}
-          <p class="muted">Only Accounts can record or clear this payment.</p>
-        {% elif (not payment or payment.balance_remittance_received_at == null) and not ciDocGenerated %}
-          <p class="muted small">Generate the Commercial Invoice above before recording the balance remittance — the buyer can't be remitting against an invoice they were never sent.</p>
-        {% elif not payment or payment.balance_remittance_received_at == null %}
+        {% if not payment or payment.balance_remittance_received_at == null %}
+          {% if not ciDocGenerated %}
+            <p class="muted small">Generate the Commercial Invoice above before recording the balance remittance — the buyer can't be remitting against an invoice they were never sent.</p>
+          {% elif not permissions.manage_payments %}
+            <p class="muted">Only Accounts/Export can record this payment.</p>
+          {% else %}
           <form method="post" action="/orders/{{ order.id }}/payment/balance">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required value="{{ payment.balance_amount or '' }}"></label>
             <label>Received On<input type="date" name="balance_received_at"></label>
             {{ stepBadge('8c') | safe }}<button type="submit" class="btn-sm">Record Balance Remittance</button>
           </form>
+          {% endif %}
         {% else %}
+          {% if not permissions.clear_payments %}
+            <p class="muted">Balance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+          {% else %}
           <form method="post" action="/orders/{{ order.id }}/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Cleared On<input type="date" name="balance_cleared_at"></label>
             {{ stepBadge('8d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
           </form>
+          {% endif %}
         {% endif %}
       {% else %}
         <p>Balance payment cleared.</p>

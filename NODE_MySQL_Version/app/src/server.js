@@ -646,7 +646,10 @@ app.post('/orders/:id/payment/freight/inr-actual', requireAuth, requirePermissio
 app.post('/orders/:id/payment/freight/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteFreightInrActual));
 app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordAdvancePayment));
 app.post('/orders/:id/payment-reports/:reportId/reviewed', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markPaymentReportReviewed));
-app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
+// External QA report Q-ROLE-1: clearing a payment (confirming the bank
+// actually received it) is split out of manage_payments (recording it)
+// so the same person can't do both.
+app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
 app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 
@@ -673,8 +676,12 @@ app.post('/orders/:id/suppliers/:supplierId/factory-addresses', requireAuth, req
 app.post('/orders/:id/suppliers/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteSupplierFactoryAddress));
 app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
 app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
-app.post('/orders/:id/supplier-po/advance-paid', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierAdvancePaid));
-app.post('/orders/:id/supplier-po/balance-paid', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierBalancePaid));
+// External QA report Q-ROLE-3: split out of manage_order_financials so
+// Accounts can confirm supplier payments without gaining the broader
+// financials permission's access to cost entries/export benefits/the
+// profitability report.
+app.post('/orders/:id/supplier-po/advance-paid', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierAdvancePaid));
+app.post('/orders/:id/supplier-po/balance-paid', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierBalancePaid));
 app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
 
 app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveFreightTerms));
@@ -688,7 +695,7 @@ app.post('/orders/:id/bl-copy', requireAuth, requirePermission('manage_shipping'
 app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordScannedBlSent));
 
 app.post('/orders/:id/payment/balance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBalancePayment));
-app.post('/orders/:id/payment/balance/clear', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearBalancePayment));
+app.post('/orders/:id/payment/balance/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearBalancePayment));
 
 app.post('/orders/:id/bl-originals-received', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlOriginalsReceived));
 app.post('/orders/:id/bl-endorsed', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlEndorsed));

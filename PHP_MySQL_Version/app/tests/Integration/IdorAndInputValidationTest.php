@@ -98,6 +98,23 @@ final class IdorAndInputValidationTest extends DbTestCase
             ['Export Executive', 'manage_payments', true],
             ['Export Executive', 'manage_shipping', true],
             ['Export Executive', 'close_orders', true],
+            // External QA report Q-ROLE-1/Q-ROLE-3 (owner review,
+            // 2026-10-23): manage_payments no longer covers CLEARING a
+            // buyer payment — Export Executive must keep recording rights
+            // but never clearing rights, so the same person who logs what
+            // the client says they sent is never also the one who
+            // confirms the bank actually received it. Supplier payment
+            // confirmation is likewise split out of manage_order_financials
+            // so Accounts can do it without gaining access to cost
+            // entries/export benefits/the profitability report.
+            ['Export Executive', 'clear_payments', false],
+            ['Export Executive', 'manage_supplier_payments', false],
+            ['Accounts Executive', 'clear_payments', true],
+            ['Accounts Executive', 'manage_supplier_payments', true],
+            ['Accounts Executive', 'manage_order_financials', false],
+            ['Logistics Executive', 'clear_payments', false],
+            ['Logistics Executive', 'manage_supplier_payments', false],
+            ['Viewer / Auditor', 'manage_supplier_payments', false],
         ];
 
         foreach ($cases as [$roleName, $permissionKey, $expected]) {

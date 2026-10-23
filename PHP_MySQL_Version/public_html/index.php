@@ -432,7 +432,11 @@ $router->post('/orders/{id}/payment/freight/inr-actual/delete', [$orders, 'delet
 // payment as cleared (see docs/seed.sql's manage_payments permission).
 $router->post('/orders/{id}/payment/advance', [$orders, 'recordAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment-reports/{reportId}/reviewed', [$orders, 'markPaymentReportReviewed'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// External QA report Q-ROLE-1: clearing a payment (confirming the bank
+// actually received it) is split out of manage_payments (recording it)
+// so the same person can't do both — see docs/migrations/
+// 2026-10-23d-split-payment-and-supplier-payment-permissions.sql.
+$router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
@@ -460,8 +464,13 @@ $router->post('/orders/{id}/suppliers/{supplierId}/factory-addresses', [$orders,
 $router->post('/orders/{id}/suppliers/factory-addresses/{addressId}/delete', [$orders, 'deleteSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/advance-paid', [$orders, 'markSupplierAdvancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/balance-paid', [$orders, 'markSupplierBalancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// External QA report Q-ROLE-3: split out of manage_order_financials so
+// Accounts can confirm supplier payments without gaining the broader
+// financials permission's access to cost entries/export benefits/the
+// profitability report — see docs/migrations/
+// 2026-10-23d-split-payment-and-supplier-payment-permissions.sql.
+$router->post('/orders/{id}/supplier-po/advance-paid', [$orders, 'markSupplierAdvancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/balance-paid', [$orders, 'markSupplierBalancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // QA-5 RBAC-04: freight/packing/shipping/BL/closure are Logistics' duty,
@@ -479,7 +488,7 @@ $router->post('/orders/{id}/bl-copy', [$orders, 'attachBlCopy'], [SessionAuth::r
 $router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/payment/balance', [$orders, 'recordBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/balance/clear', [$orders, 'clearBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/balance/clear', [$orders, 'clearBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/bl-originals-received', [$orders, 'recordBlOriginalsReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);

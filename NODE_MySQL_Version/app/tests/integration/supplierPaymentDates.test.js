@@ -125,10 +125,50 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
     await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2026-10-21', clearUserId);
 
     const res = fakeRes();
-    await reportController.todaysPayments({ query: { date: '2026-10-21' } }, res);
+    await reportController.todaysPayments({ query: { date: '2026-10-21' }, permissions: new Proxy({}, { get: () => true }) }, res);
 
     expect(res.renderedData.supplierRows.some((r) => r.supplier_legal_name === 'Jest Test Supplier')).toBe(true);
     expect(res.renderedData.incomingRows.some((r) => Number(r.amount) === 1000)).toBe(true);
     expect(res.renderedData.supplierRows.some((r) => Number(r.amount) === 20000)).toBe(true);
+  });
+
+  /**
+   * External QA report Q-RPT-1 (owner review, 2026-10-23): "Viewer and
+   * other view_reports roles can open Today's Payments, which also
+   * lists supplier (outgoing INR) payments — cost information." The
+   * supplierRows data (and the Outgoing section it drives) is now only
+   * computed for whoever holds manage_supplier_payments. Port of PHP's
+   * testTodaysPaymentsHidesTheSupplierSectionWithoutManageSupplierPayments.
+   */
+  it('todaysPayments hides supplier data without manage_supplier_payments', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const adminId = await createTestUser('Admin');
+    const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Restricted Supplier' });
+    const supplierPoId = await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-5', {
+      advance_amount_inr: '45000',
+    }, 'issued');
+    await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2031-05-05', adminId);
+
+    async function loadRealPermissions(roleName) {
+      const userId = await createTestUser(roleName);
+      const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: roleName });
+      return require('../../src/services/permissionService').load(userId, role.id);
+    }
+
+    const resViewer = fakeRes();
+    await reportController.todaysPayments({ query: { date: '2031-05-05' }, permissions: await loadRealPermissions('Viewer / Auditor') }, resViewer);
+
+    const resExport = fakeRes();
+    await reportController.todaysPayments({ query: { date: '2031-05-05' }, permissions: await loadRealPermissions('Export Executive') }, resExport);
+
+    const resAccounts = fakeRes();
+    await reportController.todaysPayments({ query: { date: '2031-05-05' }, permissions: await loadRealPermissions('Accounts Executive') }, resAccounts);
+
+    expect(resViewer.renderedData.canManageSupplierPayments).toBe(false);
+    expect(resViewer.renderedData.supplierRows).toEqual([]);
+    expect(resExport.renderedData.canManageSupplierPayments).toBe(false);
+    expect(resExport.renderedData.supplierRows).toEqual([]);
+    expect(resAccounts.renderedData.canManageSupplierPayments).toBe(true);
+    expect(resAccounts.renderedData.supplierRows.some((r) => r.supplier_legal_name === 'Jest Restricted Supplier')).toBe(true);
   });
 });
