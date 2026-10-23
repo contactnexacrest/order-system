@@ -212,7 +212,10 @@ final class DisputeController
                 trim((string) ($_POST['received_from'] ?? '')) ?: null,
                 'Dispute-related document'
             );
-            DisputeDocumentRepository::attach($disputeId, $fileId);
+            $documentId = DisputeDocumentRepository::attach($disputeId, $fileId);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'DISPUTE_DOCUMENT_UPLOADED', 'dispute_documents', $documentId, null, null, null);
             Flash::set('success', 'Document attached to dispute.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);

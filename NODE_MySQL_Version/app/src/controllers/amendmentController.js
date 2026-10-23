@@ -115,6 +115,9 @@ async function generateDocument(req, res) {
 
   try {
     await amendmentService.generateDocument(amendmentId, req.user.id);
+    // External QA report N-08: this action never reached the audit
+    // log, so it never notified anyone either.
+    await auditLogRepository.log(req.user.id, 'AMENDMENT_DOCUMENT_GENERATED', 'amendments', amendmentId, null, null, null);
     flash.set(req, 'success', 'Payment Terms Amendment Agreement generated. Print, obtain wet signature + company stamp from the Importer, then upload the signed copy.');
   } catch (e) {
     flash.setErrorFromException(req, e);

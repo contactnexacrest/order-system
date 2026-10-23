@@ -128,6 +128,9 @@ final class AmendmentController
 
         try {
             AmendmentService::generateDocument($amendmentId, (int) AuthService::currentUser()['id']);
+            // External QA report N-08: this action never reached the
+            // audit log, so it never notified anyone either.
+            AuditLogRepository::log((int) AuthService::currentUser()['id'], 'AMENDMENT_DOCUMENT_GENERATED', 'amendments', $amendmentId, null, null, null);
             Flash::set('success', 'Payment Terms Amendment Agreement generated. Print, obtain wet signature + company stamp from the Importer, then upload the signed copy.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);

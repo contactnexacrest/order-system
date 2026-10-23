@@ -203,7 +203,10 @@ async function uploadDocument(req, res) {
       String(req.body.received_from || '').trim() || null,
       'Dispute-related document'
     );
-    await disputeDocumentRepository.attach(disputeId, fileId);
+    const documentId = await disputeDocumentRepository.attach(disputeId, fileId);
+    // External QA report N-08: this action never reached the audit
+    // log, so it never notified anyone either.
+    await auditLogRepository.log(req.user.id, 'DISPUTE_DOCUMENT_UPLOADED', 'dispute_documents', documentId, null, null, null);
     flash.set(req, 'success', 'Document attached to dispute.');
   } catch (e) {
     flash.setErrorFromException(req, e);
