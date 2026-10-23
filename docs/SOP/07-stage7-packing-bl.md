@@ -62,7 +62,31 @@ Three things happen in this section, each building toward the BL:
    to retain the BL as leverage, so that preset can have the checkbox
    unchecked and the sheet simply omits both rows for every order on it.
    Both seeded presets ship with it checked (unchanged behavior).
-3. **Confirm BL Issued** — once the shipping line actually issues the BL,
+3. **CHA Draft BL Review** — after the BL Instruction Sheet and packing
+   list go out to the CHA, the draft Bill of Lading they send back for
+   checking goes through its own review loop here, before the real BL is
+   ever confirmed:
+
+   - **Log Draft BL for Review** — upload the CHA's draft (PDF). This
+     starts a new, numbered round.
+   - For that round, staff decide **Approve** or **Request Revision**
+     (with notes explaining what needs to change). A revision request
+     doesn't end the loop — the CHA's corrected draft gets logged as the
+     *next* round, same as the first, and the cycle repeats until a
+     round is actually approved.
+   - **At most one round can be awaiting a decision at a time** — the
+     upload form for a new round only appears once the current round has
+     been approved or sent back for revision, so there's never ambiguity
+     about which draft is the one actually under review.
+
+   Every round stays on record (who uploaded it, when, its decision, and
+   any revision notes), so the back-and-forth with the CHA over a
+   tricky BL is never lost once it's resolved. This review loop is
+   purely a staff/CHA back-and-forth with no gate of its own — it never
+   blocks or is required for **Confirm BL Issued** below; it exists so
+   mistakes get caught on a draft rather than on the BL the shipping
+   line actually issues.
+4. **Confirm BL Issued** — once the shipping line actually issues the BL,
    staff type its number in here, with an optional scanned-copy upload on
    the same form. **This is the action that passes Stage 7's gate.** If
    the scanned copy isn't in hand yet, confirm with just the number and

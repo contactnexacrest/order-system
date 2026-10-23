@@ -428,7 +428,7 @@ flowchart TD
 
 <section id="g">
   <div class="sec-head"><span class="letter">G</span><h2>The 9-Stage Order Pipeline</h2><span class="sub">Fig. G</span></div>
-  <p class="lede">This is the core business object. <code>orders.current_stage_id</code> always points at the <b>frontier stage</b> — the one whose gate hasn't passed yet. Passing a gate (<code>stageGateService.passAndUnlockNext</code> / <code>StageGateService::passAndUnlockNext</code>) is the only thing that advances it. Two terminal side-exits — <code>lost</code> and the locked <code>complete</code>/<code>disputed</code> states — can happen from most points in the flow.</p>
+  <p class="lede">This is the core business object. <code>orders.current_stage_id</code> always points at the <b>frontier stage</b> — the one whose gate hasn't passed yet. Passing a gate (<code>stageGateService.passAndUnlockNext</code> / <code>StageGateService::passAndUnlockNext</code>) is the only thing that advances it. <code>lost</code> is a terminal side-exit that can happen from most early points in the flow (blocked once a real BL exists on file — see the two-phase closure below); <code>disputed</code> is a separate, non-terminal status a staff member can set alongside <code>active</code> and does <b>not</b> lock the order or pause stage progression (that's the Disputes <em>module</em> in §K's sibling features, a different thing from this status field).</p>
 
   <div class="sheet">
     <pre class="mermaid">
@@ -454,7 +454,9 @@ stateDiagram-v2
   S6 --> S7 : (auto-skip if Incoterm = FOB)
   S7 --> S8 : BL issued
   S8 --> S9 : Balance payment cleared
-  S9 --> [*] : Order marked complete (locked)
+  S9 --> Closed : Close Order (courier tracking no.)<br/>status=shipped_docs_sent, client sees Complete
+  Closed --> [*] : Mark Fully Settled<br/>blocked on pending export-benefit claims<br/>status=complete, now locked
+  Closed: DOCUMENTS SENT (open internally)
   S1 --> Lost
   S2 --> Lost
   S3 --> Lost
@@ -462,7 +464,7 @@ stateDiagram-v2
   Lost: LOST (locked, reason required)
     </pre>
   </div>
-  <p class="sheet-cap">FIG. G — ORDER STATE MACHINE (STAGE 6 IS THE ONLY CONDITIONAL SKIP)</p>
+  <p class="sheet-cap">FIG. G — ORDER STATE MACHINE (STAGE 6 IS THE ONLY CONDITIONAL SKIP; STAGE 9 CLOSES IN TWO SEPARATE PHASES)</p>
 
   <div class="stagegrid">
     <div class="stagecell"><div class="n">STAGE 1</div><div class="t">Enquiry &amp; Quotation</div></div>
@@ -476,6 +478,8 @@ stateDiagram-v2
     <div class="stagecell"><div class="n">STAGE 9</div><div class="t">Document Despatch &amp; Closure</div></div>
   </div>
   <div class="callout rule"><b>Hard rule</b>Stage 4's gate is also the trigger that provisions <code>client_logins</code> — a buyer only ever gets portal credentials automatically, at the advance-cleared moment, never by self-registering (see §K).</div>
+  <div class="callout note"><b>Stage 9 closes in two separate phases</b> <b>Close Order</b> (courier tracking number, gated on the Stage 7 BL Instruction Sheet + Stage 9's own COO Prep Sheet being approved/sent) sets <code>status=shipped_docs_sent</code> — the client portal already shows this order as "Complete" from that instant, but the order stays open and editable internally. <b>Mark Fully Settled</b> is the real, final lock (<code>status=complete</code>, <code>is_locked=1</code>); it's refused while a government export-benefit claim (RODTEP/similar) linked to the order is still awaiting receipt, with the same reason-required override escape hatch as every other hard gate in this system.</div>
+  <div class="callout note"><b>Pre-shipment inspection reminder</b> A daily cron checks every active order whose estimated shipment date is within 7 days and still has an unresolved Pre-Shipment Inspection compliance task; everyone holding <code>manage_orders</code> gets a reminder. Changing the estimated shipment date itself also auto-posts a message into that order's Client Portal conversation (§K) — one field, one notification channel, no separate mechanism.</div>
 </section>
 
 <section id="h">
@@ -566,6 +570,11 @@ flowchart TB
     <div class="card"><h4>Client portal login</h4><p><code>/client/login</code> — a structurally separate auth surface from staff sessions (its own session key, its own <code>ClientAuth</code> middleware). A <code>client_logins</code> row is provisioned by the server <em>only</em> at the Stage-4 advance-cleared gate — a buyer can never self-register.</p></div>
   </div>
   <p class="lede">Once logged in, a buyer can see their own order's stage, download sent (final, watermarked) documents, and manage their own password — nothing else. Both surfaces above are entirely unavailable while Test Mode is on (§M) — real buyers must never land on a test-populated system.</p>
+  <div class="grid2">
+    <div class="card"><h4>My Orders is grouped, not a board</h4><p>The dashboard splits orders into status groups (Active / Complete / Disputed / Lost / Cancelled) using the client-<em>facing</em> label — <code>shipped_docs_sent</code> and <code>complete</code> both render under "Complete," since the Stage-9 two-phase split (§G) is an internal distinction the buyer was never meant to see as two buckets. This is deliberately lighter than the staff-side Kanban template (§M) — no drag-and-drop, just a quick visual split once a client has several concurrent orders.</p></div>
+    <div class="card"><h4>Dispute vs. Complaint — two separate modules</h4><p>A <b>Dispute</b> is cancel-intent (buyer doesn't want to proceed with this order) — only visible to the client when staff flip a per-order toggle, with its own working-days response clock. A <b>Complaint</b> ("Report a Process Issue") is a process flaw with no cancel intent — always visible on every order regardless of status or the Dispute toggle, and a genuine two-way conversation (staff replies email the client; client replies notify every <code>manage_complaints</code>/<code>respond_to_complaints</code> holder in-app) rather than the Dispute thread's one-directional staff-only replies. They used to be one tagged record; they're now <code>disputes</code> and <code>order_complaints</code>, separate tables with separate permissions.</p></div>
+  </div>
+  <p class="lede">Also always available per order: <b>Order Feedback</b> — a 1-5 star rating plus optional comments, upserted (resubmitting replaces the earlier entry rather than stacking a second one) and visible to staff on that same order's page.</p>
 </section>
 
 <section id="l">
@@ -602,6 +611,10 @@ flowchart LR
     </pre>
   </div>
   <p class="sheet-cap">FIG. M — TEST MODE CANNOT BE TURNED OFF WITH DATA STILL LOADED, BY DESIGN</p>
+
+  <h3 style="margin-top:28px;font-size:15px;letter-spacing:.04em;color:var(--accent,#4fc3e8);">UI Template Preference — Standard vs. Kanban</h3>
+  <p class="lede">A per-user choice, not a global setting: every list-style screen in the app resolves which template to render through one chain — <b>personal preference</b> (<code>users.ui_template_preference_id</code>, set from My Account) → <b>company default</b> (<code>company_settings.default_ui_template</code>, set from Settings) → hard-coded <code>standard</code> fallback. <code>UiTemplateService::resolve()</code> / <code>uiTemplateService.resolve()</code> is the single function every affected controller calls; nothing re-implements this chain locally.</p>
+  <p class="lede">Six staff-side queues branch to a Kanban board when the resolved template is <code>kanban</code> — each controller's <code>index()</code> delegates to a private <code>indexKanban()</code>: the main <b>Orders</b> list, <b>Disputes</b>, <b>Reorder Requests</b>, <b>Client Intake Review</b>, <b>PI Intake Review</b>, and <b>Complaints</b>. Columns are seeded from the real status source for that queue (e.g. <code>dropdown_options</code> for Disputes) and always render, even empty — there's no "hide empty column" behavior to keep the board's shape predictable. The client portal deliberately does <b>not</b> get a Kanban board — see §K's lighter "grouped by status" dashboard instead.</p>
 </section>
 
 <section id="n">
@@ -702,7 +715,7 @@ flowchart TB
     <tr><th>Object</th><th>Count / shape</th></tr>
     <tr><td>Order pipeline stages</td><td>9, linear with one conditional skip (Stage 6, FOB Incoterm)</td></tr>
     <tr><td>Generated document types</td><td>22 total — 9 customer-facing (QT/PI/OC/PL/CI/FDN/BUYERPO/ANNEXA/BLE), 2 procurement-only (SUPPO, COOPREP), 11 internal (AMD generated on demand + BLI + 4 cross-verification checklists + 2 SOP references + CAFIN + STAGEGATE + WALLREF)</td></tr>
-    <tr><td>Database tables</td><td>98 (Node: 99, plus its own <code>sessions</code> store), in 66 lettered schema sections (A–BP)</td></tr>
+    <tr><td>Database tables</td><td>106 in both stacks, in 49 lettered schema sections (A–BX)</td></tr>
     <tr><td>Auth surfaces</td><td>3, structurally separate — staff session, client-portal session, and unauthenticated public intake</td></tr>
     <tr><td>File formats generated</td><td>PDF (always) + DOCX (optional, internal-only)</td></tr>
     <tr><td>Permission resolution layers</td><td>3 — Super Admin bypass → role_permissions → user_permissions</td></tr>

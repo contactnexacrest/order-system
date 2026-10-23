@@ -291,7 +291,7 @@
       <rect x="1620" y="110" width="150" height="74" rx="8" style="fill:var(--amber-soft);stroke:var(--amber)"/>
       <text x="1695" y="140" text-anchor="middle" font-size="11" font-weight="600" style="fill:var(--amber)">9 · Order</text>
       <text x="1695" y="155" text-anchor="middle" font-size="11" font-weight="600" style="fill:var(--amber)">Closure</text>
-      <text x="1695" y="172" text-anchor="middle" font-size="9.5" style="fill:var(--amber)">permanent lock</text>
+      <text x="1695" y="172" text-anchor="middle" font-size="9.5" style="fill:var(--amber)">two-phase: Close, then Settle</text>
 
       <!-- connecting gate arrows + labels -->
       <!-- 1->2 -->
@@ -343,7 +343,7 @@
       <text x="1495" y="228" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">Option B: N days from BL date</text>
     </svg>
     </div>
-    <figcaption>Every arrow label above is a <span class="mono">Business Rule</span> from your spec — not something the app decides on its own; the only per-order variable is which payment preset (A/B) governs Stage 8's timeline.</figcaption>
+    <figcaption>Every arrow label above is a <span class="mono">Business Rule</span> from your spec — not something the app decides on its own; the only per-order variable is which payment preset (A/B) governs Stage 8's timeline. Note this diagram groups the pipeline into 9 compressed boxes from the original spec's numbering, not the app's own 9 <code>order_stages</code> rows (which split Buyer PO and Supplier PO out as their own stages) — see <code>docs/SOP/</code> chapters 1–9 or <code>ARCHITECTURE.html</code> §G for the stage model the running code actually uses.</figcaption>
   </figure>
   <div class="legend">
     <span><span class="swatch" style="background:var(--navy-soft);border:1px solid var(--navy)"></span> standard stage</span>

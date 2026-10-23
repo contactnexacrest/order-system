@@ -156,3 +156,23 @@ straight to the order's own Audit Log page ("view update history") so this
 is never a dead end — click through any time to see the full trail of who
 said what, and when, without digging through the general Audit Log and
 filtering by order number.
+
+**Changing the estimated shipment date automatically tells the client** —
+it posts a message into that order's own [Order Updates
+conversation](./12-client-portal.md#inside-an-order) ("The estimated
+shipment date for your order has been updated to: ...") the same way a
+staff reply there does, so it shows up in their client-portal thread and,
+if an email address is on file, in their inbox too. There's no separate
+notification mechanism for this one field — it reuses the same channel
+every other order-update message already goes through.
+
+**A reminder fires automatically as shipment approaches**, too — every day
+the estimated shipment date is within the next 7 days (and not yet
+passed) for a still-active order that has a **Pre-Shipment Inspection**
+compliance task that isn't marked Skipped, everyone who manages orders
+gets a reminder to confirm production completion and prepare for the
+3rd-party inspection. See the [Compliance
+Checklist](./09-stage9-despatch-closure.md#compliance-checklist) in
+Stage 9 for that task, and
+[Order Financials](./ca-08-order-financials.md#4-travel-expenses--factory-visits)
+for recording the travel cost of these factory visits.

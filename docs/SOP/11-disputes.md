@@ -2,10 +2,23 @@
 
 ## What this module is for
 
-Formally recording and tracking a disagreement with a buyer — quality
-complaints, delivery issues, anything that needs a documented response
-within a committed timeframe — separate from the routine order-progress
-comments in [Client Portal](./12-client-portal.md).
+Formally recording and tracking a buyer who wants to **cancel this order
+and not proceed with NexaCrest on it** — a documented response within a
+committed timeframe, separate from the routine order-progress comments in
+[Client Portal](./12-client-portal.md).
+
+> **Not the same thing as a Complaint.** A buyer flagging a process issue
+> or a flaw they'd like fixed *next time*, with no intention of canceling
+> or asking for a refund on this order, is a
+> [**Complaint**](./19-complaints.md) instead — a separate feature, on a
+> separate screen, with none of this module's cancel-intent machinery
+> (response-due clock, the per-order client-facing toggle below) and
+> always available regardless of order status. If a buyer's message
+> sounds like "please cancel this / I don't want to continue," it belongs
+> here; if it sounds like "this went fine but here's what to improve," it
+> belongs there. The two used to be tagged variants of the same record —
+> they no longer are, precisely because they call for a different
+> response.
 
 Like Amendments, this isn't part of the 9-stage pipeline: a dispute can be
 raised at any point on any order and never blocks or unlocks a stage gate.

@@ -719,3 +719,15 @@ Also regenerated `NexaCrest_Node_Deployment_Guide.docx` from this
 README — see the PHP/MySQL README's matching section for how (a small
 PHPWord-based Markdown → OOXML converter, plus a real bug caught and
 fixed in that converter itself: PHPWord doesn't escape XML by default).
+
+## Follow-up (added 2026-10-23): UI Templates/Kanban, Complaints split, two-phase closure, LC & travel-expense tracking
+
+Same delivery as the PHP/MySQL README's matching section — see there for
+the full write-up; this stack mirrors every item exactly (same eight new
+tables, same 106-table total, same Jest-side coverage at 1407/1407). Worth
+calling out here specifically: the Kanban board views use Nunjucks macros
+rather than PHP's closures to avoid the same "can't redeclare a view
+helper" problem PHPUnit's shared process raises for the PHP stack, and the
+UI Template resolution chain is `uiTemplateService.resolve()` here against
+the identical `users.ui_template_preference_id` → `company_settings.default_ui_template`
+→ `standard` order.

@@ -112,9 +112,24 @@ override is logged (`CLIENT_ORDER_HISTORY_VISIBILITY_CHANGED`).
 The landing page after login — every order this client has, its current
 stage name, status, and a link into each (or, when their order history is
 not visible to them, their active/disputed orders only — see
-[Order history visibility](#order-history-visibility) above):
+[Order history visibility](#order-history-visibility) above).
 
-![Client dashboard — My Orders](./images/portal_dashboard.png)
+**Orders are grouped by status** rather than shown as one flat list — a
+lighter alternative to a full Kanban board, useful once a client has more
+than a couple of orders on file and wants a quick visual split without the
+drag-and-drop machinery staff get (see [Admin &
+Settings](./15-admin-settings.md#ui-template-preference--standard-vs-kanban)
+for that). The grouping uses the **label the client actually sees**, not
+the system's raw internal status — so an order in **"Documents Sent"**
+status (`shipped_docs_sent` — see [Stage 9's two-phase
+closure](./09-stage9-despatch-closure.md#closing-the-order--two-phases))
+and one already marked **complete** both land in the same **Complete**
+group, since the buyer was never meant to see that internal distinction as
+two separate buckets in the first place. Groups appear in a fixed,
+most-relevant-first order (Active, Complete, Disputed, Lost, Cancelled),
+and only a group with at least one order in it is shown:
+
+![Client dashboard — My Orders, grouped by status](./images/portal_dashboard.png)
 
 ### Inside an order
 
@@ -146,7 +161,23 @@ Opening an order (**View documents**) shows, top to bottom:
    purely informational, staff still verify against the bank statement
    before recording anything themselves.
 6. **Raise a Dispute** — only shown when staff have switched it on for this
-   specific order; see [Disputes](./11-disputes.md).
+   specific order; see [Disputes](./11-disputes.md). For cancel-intent
+   messages only — a process flaw with no intent to cancel belongs in
+   "Report a Process Issue" below instead, which is always available.
+7. **Report a Process Issue** — unlike Raise a Dispute, this is **always**
+   shown, regardless of order status or the dispute toggle above: a
+   description box plus, once something's been submitted, the full
+   two-way conversation with staff so far. See
+   [Complaints](./19-complaints.md) for the complete picture, including
+   who at NexaCrest sees and answers it.
+8. **Order Feedback** — always available too: a 1-5 star rating plus
+   optional comments on how this specific order went, distinct from the
+   running Order Updates/Complaint conversations above. Submitting it
+   again later replaces the earlier rating/comments rather than adding a
+   second entry — there's no reason to stop a client revising their own
+   feedback. Staff see the same rating and comments on that order's own
+   page, and everyone holding `manage_orders` gets an in-app notification
+   the moment feedback comes in.
 
 ### My Account
 

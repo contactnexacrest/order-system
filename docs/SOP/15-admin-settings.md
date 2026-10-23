@@ -425,6 +425,73 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   etc.) — every one of them requires a logged reason, never a silent edit.
 - **Sample Data** — populate or clear sample/demo data; see
   [Test Mode](./16-test-mode.md) for the safer, sandboxed version of this.
+- **UI Templates** (`/ui-templates`) — the master on/off switch for which
+  templates exist at all; see the dedicated section below for what each
+  one actually looks like and where the other two controls live.
+
+### UI Template Preference — Standard vs Kanban
+
+Two templates exist out of the box: **Standard** (the ordinary list/table
+screens used everywhere in this manual's screenshots) and **Kanban** (the
+same underlying data, shown as a board of cards in columns instead). This
+is purely a different way of looking at the same records — switching
+templates never changes what data exists, who can act on it, or any
+permission check; it only changes how a handful of list screens render.
+
+Three places control this, and they resolve in order — a person's own
+choice wins if they made one, otherwise the company default applies,
+and if neither resolves to something usable, Standard is always the
+final fallback:
+
+1. **A user's own preference** — each person sets this on their own
+   **My Account** page (**UI Template** section): pick a specific
+   template, or leave it on **"Use company default"** to automatically
+   follow whatever the company default is set to, even if that changes
+   later.
+2. **The company default** (**Settings → UI**, the `default_ui_template`
+   setting) — what anyone with no personal preference set sees.
+3. **Standard, hard-coded** — the fallback if the resolved template (a
+   personal pick or the company default) turns out to be deactivated.
+   **Standard can never itself be deactivated** from the UI Templates
+   screen above, specifically so this fallback always has somewhere
+   real to land — nobody can ever be locked out of every list screen at
+   once by a template being switched off.
+
+Deactivating a template on the UI Templates screen doesn't delete
+anything or affect anyone's underlying data — anyone currently resolved
+to it (by personal preference or because it was the company default)
+automatically falls back to the company default, or to Standard if
+that's also inactive, the next time they load an affected page.
+
+**Where Kanban actually changes the screen** — the same switch, applied
+independently on each of these six list pages, each rendering columns
+that match the real states that list already tracks elsewhere in this
+manual:
+
+- **Orders** (the main Orders list) — one column per pipeline stage
+  (Stage 1 through Stage 9, every column shown even when empty), plus a
+  **Docs Sent — Awaiting Benefits** column and a **Complete** column for
+  the two-phase closure (see [Stage 9](./09-stage9-despatch-closure.md)),
+  with **Lost** and **Cancelled** rolled up as compact count-chips
+  linking to the existing filtered list rather than given full columns —
+  they're dead ends, not pipeline stages worth a whole column of cards.
+- **Disputes** ([Chapter 11](./11-disputes.md)) — one column per
+  `dispute_status` dropdown option, in whatever order Admin has them
+  configured in (Open / Under Review / Resolved / Escalated by default).
+- **Reorder Requests** ([Chapter 17](./17-order-edit-duplication.md)) —
+  Pending / Approved / Rejected.
+- **Quotation Intake Review** ([Chapter 1](./01-stage1-enquiry-quotation.md)) —
+  Pending / Converted / Rejected.
+- **PI Intake Review** ([Chapter 3](./03-stage3-pi-advance.md)) — Pending
+  Review / Applied / Rejected.
+- **Complaints** ([Chapter 19](./19-complaints.md)) — Open / Acknowledged
+  / Resolved.
+
+Every other screen in this manual — including the client portal, which
+stays the simple grouped list described in
+[Client Portal](./12-client-portal.md) — is unaffected either way, since
+a board only makes sense for a cross-order queue, not a single order's
+own detail page or a one-client view.
 
 ## What the client does (or doesn't)
 

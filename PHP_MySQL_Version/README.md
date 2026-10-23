@@ -1613,3 +1613,71 @@ extension, UI/UX pass, and document fidelity pass above. Two parts:
    Verified the regenerated files open cleanly with `python-docx` (not
    just "the zip didn't error") and spot-checked heading styles, list
    formatting, and code-block line breaks in the actual document XML.
+
+## Follow-up (added 2026-10-23): UI Templates/Kanban, Complaints split, two-phase closure, LC & travel-expense tracking
+
+This delivery's own eight new tables are `ui_templates`, `order_lc_details`,
+`order_draft_bl_reviews`, `order_inspection_fees`, `order_feedback`,
+`order_travel_expenses`, `order_complaints`, and `order_complaint_replies`
+— both stacks now stand at **106 tables** in 49 lettered schema sections
+(A–BX); the table count quoted in the verification pass above is long
+superseded by this and the delivery work between it and this one. All
+items below are proven in both stacks, with matching PHPUnit/Jest coverage
+(full suite: 1362/1362 PHP, 1407/1407 Node).
+
+1. **UI Template Preference (Standard vs. Kanban).** A per-user choice
+   (My Account → company default in Settings → `standard` fallback,
+   resolved by one shared `UiTemplateService::resolve()` /
+   `uiTemplateService.resolve()` function) that switches six staff-side
+   queues — Orders, Disputes, Reorder Requests, Client Intake Review, PI
+   Intake Review, and the new Complaints queue — between the existing
+   list view and a real drag-free Kanban board (status columns seeded
+   from each queue's actual status source, always rendering even when
+   empty). The client portal deliberately does not get a Kanban option —
+   see item 4.
+2. **Letter of Credit / bank loan interest, and factory-visit travel
+   expenses**, as two new categories on the existing Order Cost Entry
+   screen (Order Financials, permission-gated same as the Profitability
+   Sheet) — `bank_loan_interest` and `travel_expenses`/`inspection_fee`
+   join the existing cost category list.
+3. **CHA Draft BL Review loop** (Stage 7) — the draft Bill of Lading the
+   CHA sends back for checking now goes through its own
+   upload → Approve/Request-Revision round, repeating until a round is
+   approved, before "Confirm BL Issued" is reached. Purely a staff/CHA
+   back-and-forth with no gate of its own.
+4. **Dispute vs. Complaint split.** The Dispute module (cancel-intent,
+   admin-gated per client, unchanged response-due clock) now has a
+   genuinely separate sibling: **Complaints**, for a process flaw with no
+   cancel intent, always available on the client portal regardless of
+   order status or the Dispute toggle, with its own
+   `manage_complaints`/`respond_to_complaints` permissions, Open →
+   Acknowledged → Resolved status, standalone staff nav page, and a real
+   two-way conversation thread (staff replies email the client; client
+   replies notify staff in-app) — not the Dispute thread's one-directional
+   staff-only replies. The client portal's own "My Orders" dashboard also
+   picked up a lighter grouped-by-status view (not a Kanban board) as part
+   of this same pass, grouping by the label the client actually sees so
+   `shipped_docs_sent` and `complete` share one "Complete" group.
+5. **Two-phase order closure.** Stage 9's "Close Order" button no longer
+   marks an order complete by itself — it sets `shipped_docs_sent` (the
+   client portal already shows "Complete" from that moment) while the
+   order stays open internally for a separate **Mark Fully Settled**
+   action, which is the real final lock and is blocked while a government
+   export-benefit claim on the order is still awaiting receipt.
+6. **Order Feedback** — a 1-5 star rating plus optional comments on the
+   client portal and that order's own staff-side page, upsertable (no
+   limit on resubmitting), notifying every `manage_orders` holder in-app
+   on submission.
+7. **Pre-shipment inspection reminder** — a daily check for any active
+   order whose estimated shipment date is within 7 days and still has an
+   open Pre-Shipment Inspection compliance task; changing the estimated
+   shipment date itself now also auto-posts into that order's Client
+   Portal conversation.
+8. **Full documentation audit** (this entry's own occasion): every SOP
+   chapter affected by the above was corrected or extended, a new SOP
+   chapter (`docs/SOP/19-complaints.md`) was added, a pre-existing,
+   unrelated one-file drift in `ca-06-fy-lock.md` was fixed, and all three
+   SOP mirrors (root, PHP, Node) were re-synced to byte-identical. Root
+   `ARCHITECTURE.html` was updated (state machine, RBAC, Client Portal,
+   Admin Tooling, and reference-table sections) for the same set of
+   features.

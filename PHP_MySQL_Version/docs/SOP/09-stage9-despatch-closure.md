@@ -4,16 +4,26 @@
 
 Wrapping up the paperwork side of a completed shipment — getting the
 original Bill of Lading copies back from the clearing agent, endorsing them,
-and courying the complete final document set to the buyer — then formally
-closing the order.
+and courying the complete final document set to the buyer — then closing
+the order, in **two separate phases**: **Close Order** (the document set
+has gone out — the buyer sees the order as done) and, once nothing
+financial is still outstanding, **Mark Fully Settled** (the real, final
+lock). See "Closing the order — two phases" below.
 
 ## The system does this automatically
 
 - Nothing progresses without a staff action; this stage is purely
   administrative wrap-up.
-- Closing the order also marks it **complete** in the system's own records
+- **Mark Fully Settled** (the second, final phase — not Close Order
+  itself) marks the order **complete** in the system's own records
   (distinct from *archived*, which only affects visibility — see
   [Admin & Settings](./15-admin-settings.md)).
+- **A pre-shipment inspection reminder fires automatically** for any
+  order whose estimated shipment date is within the next 7 days and
+  still has an unresolved **Pre-Shipment Inspection** compliance task
+  (see "Compliance Checklist" below) — covered in detail in
+  [Stage 5](./05-stage5-supplier-po.md#production--estimated-shipment--and-where-its-history-lives),
+  since that's where the estimated shipment date itself is maintained.
 
 ## What staff do
 
@@ -37,11 +47,18 @@ Two optional record-keeping steps, then the closing action:
 > follow the real-world process in the right order rather than enforcing it
 > as a hard rule here.
 
-**Close Order — Complete Document Set Couriered to Buyer** is the final
-action in the entire pipeline: staff enter the courier tracking number for
-the package containing the buyer's originals (final CI, endorsed BL,
-Certificate of Origin, etc.) and submit. **This is the action that passes
-Stage 9's gate and marks the order complete.**
+**Close Order — Complete Document Set Couriered to Buyer**: staff enter
+the courier tracking number for the package containing the buyer's
+originals (final CI, endorsed BL, Certificate of Origin, etc.) and
+submit. **This is the action that passes Stage 9's gate** — but, since
+the business closes an order in two separate phases (see "Closing the
+order — two phases" below), it does **not** by itself mark the order
+complete. It sets the order's status to **"Documents Sent"**
+(`shipped_docs_sent`): the client-portal dashboard already shows this
+order as **Complete** to the buyer from this moment, while internally
+the order stays open and unlocked for recording any government export
+benefit still due — see [Order
+Financials](./ca-08-order-financials.md).
 
 ![Stage 9 section — order closed](./images/s9_closed.png)
 
@@ -72,6 +89,38 @@ regardless of what happens with the buyer afterward. An order that is
 genuinely abandoned *before* shipping doesn't reach this gate at all: see
 "Marking an order lost" below for why an order can no longer be marked
 lost once a real Bill of Lading already exists on file.
+
+## Closing the order — two phases
+
+Despatching the documents and actually having nothing left outstanding
+are two different moments, so closing an order is two separate actions,
+not one:
+
+1. **Close Order** (above) — the document set has gone out. Status
+   becomes **"Documents Sent"** (`shipped_docs_sent`). The buyer's own
+   portal already shows this order as **Complete** from this instant —
+   whether a government export benefit is still outstanding internally
+   has no bearing on what the buyer needs to know, so that distinction
+   never reaches them (see [Client
+   Portal](./12-client-portal.md#my-orders-the-dashboard)). Internally,
+   though, the order is deliberately **not** locked yet.
+2. **Mark Fully Settled** — appears once an order is in "Documents Sent"
+   status, gated on `close_orders` (same permission as Close Order
+   itself). **This is the real, final lock**: it sets the order to
+   **complete**, after which nothing on it can be edited at all short of
+   a privileged override elsewhere in the system. Clicking it is
+   **blocked** while any government export benefit claim linked to this
+   order is still awaiting receipt — record it as received first (see
+   [Order Financials](./ca-08-order-financials.md)) — with the same
+   **"Override locked data"** reason-required escape hatch as the
+   document gate above, for the rare case a benefit genuinely never
+   arrives and the order needs closing anyway.
+
+The practical effect: a client never sees or cares about this internal
+distinction, but staff can despatch documents and move on the moment
+they're couriered, without the order sitting open indefinitely just
+because a RODTEP or similar claim is still working its way through
+government processing weeks later.
 
 ## BL Endorsement document
 
@@ -177,12 +226,15 @@ system's own record that despatch happened.
 
 ## What happens next
 
-Nothing — this is the end of the pipeline. The order's stage tracker shows
-all nine stages resolved (eight "Gate passed," one "Skipped" for this FOB
-example's Stage 6):
+Closing the order passes Stage 9's gate immediately — the stage tracker
+shows all nine stages resolved (eight "Gate passed," one "Skipped" for
+this FOB example's Stage 6) the moment Close Order is submitted:
 
 ![Final stage tracker — order complete](./images/s9_stage_tracker_final.png)
 
-From here, the order remains in the system as a completed record — visible
-in [Reports](./14-reports.md), still reachable from the client's own order
+That alone isn't the end, though — see "Closing the order — two phases"
+above: the one action still expected is **Mark Fully Settled**, once
+nothing financial is left outstanding. Once that's done too, the order
+remains in the system as a completed record — visible in
+[Reports](./14-reports.md), still reachable from the client's own order
 history, but with no further actions expected of anyone.

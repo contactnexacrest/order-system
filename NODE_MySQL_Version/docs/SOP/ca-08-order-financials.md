@@ -47,7 +47,7 @@ or a per-user override.
 
 Anyone holding `manage_order_financials` sees a section titled **Order
 Financials — Government Benefits, Costs & Profitability** on the order's
-own page, just below Payment Status. It has four parts, top to bottom:
+own page, just below Payment Status. It has six parts, top to bottom:
 
 ### 1. Government Export Benefits Claimed
 
@@ -65,7 +65,41 @@ Every expense linked to this order (see
 Read-only here — linking/unlinking an expense is still done from the
 Expenses register, since that's also where the TDS annotation lives.
 
-### 3. Other Order Costs (Order Cost Entries)
+### 3. Letter of Credit & Bank Loan
+
+Only relevant if the buyer's payment method for this order is a Letter
+of Credit. A small **LC Number** / **LC Document** (upload) / **Bank
+Loan Amount** / **Interest Rate** / **Total Interest Paid** form, shown
+as read values once saved with an **Edit** link to revise them. Interest
+Rate is a plain percentage, editable at any time as the bank's own
+figure is confirmed or changes.
+
+Saving a **Total Interest Paid** amount here automatically keeps a
+matching **Bank Loan Interest (LC order)** row in Other Order Costs
+(below) in sync — editing the cost-entries table directly for this one
+category isn't needed; change the figure here and the cost entry
+updates itself.
+
+### 4. Travel Expenses — Factory Visits
+
+Every order needs several trips to the factory during production (a
+minimum ~175 km round trip is the baseline the business works from).
+Rather than itemizing each specific trip, staff record the one-way
+**Factory Distance** (km, for reference only — it doesn't drive the
+calculation) and choose a **Travel Expense %** of the order's FOB value
+to charge: **5%, 7%, 10%, 15%**, or **Other** for a custom figure when
+none of the presets fit. The system computes and records the resulting
+amount automatically from that percentage and the order's own FOB
+value — staff never calculate it by hand.
+
+Like the LC/bank-loan interest above, saving this automatically keeps a
+matching **Travel Expenses (Factory Visits)** row in Other Order Costs
+(below) in sync; it is never entered twice. See also
+[Stage 5](./05-stage5-supplier-po.md#production--estimated-shipment--and-where-its-history-lives),
+where production progress is tracked for the same order during this
+same window.
+
+### 5. Other Order Costs (Order Cost Entries)
 
 A small table of costs this order incurred that aren't tracked anywhere
 else in the system:
@@ -81,18 +115,25 @@ else in the system:
 | Bank Charges | Charges the bank deducts on an inward/outward remittance. |
 | Commission | Any agent/broker commission on this order. |
 | Packing / Wooden Crates | Export packing beyond what's already captured elsewhere. |
+| Bank Loan Interest (LC order) | Auto-synced from Letter of Credit & Bank Loan above — see there. |
+| Pre-Shipment Inspection Fee | The 3rd-party inspection fee tied to this order's Pre-Shipment Inspection compliance task. |
+| Travel Expenses (Factory Visits) | Auto-synced from Travel Expenses above — see there. |
 | Other | Anything not covered above. |
 
 Each entry records a category, amount (INR), date, and an optional free-
 text description, and can be removed with a **Remove** button (a
 correction, not a routine action — same reasoning as INR-actual delete
-being its own permission elsewhere in this module).
+being its own permission elsewhere in this module). The three
+auto-synced categories (Bank Loan Interest, Travel Expenses) are driven
+from their own forms above rather than typed here directly, but still
+show up in this same table and count the same way toward the
+Profitability Summary below.
 
 **Supplier cost, ocean freight, and insurance are never entered here** —
 see "What feeds the Profitability Sheet" below for where those come
 from automatically.
 
-### 4. Profitability Summary
+### 6. Profitability Summary
 
 A live summary computed from everything above plus the order's own
 Supplier PO and freight/insurance figures — see the next section for the
