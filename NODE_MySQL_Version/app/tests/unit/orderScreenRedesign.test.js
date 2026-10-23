@@ -84,4 +84,45 @@ describe('Order screen redesign (Point 2/4)', () => {
     const html = showNjk();
     expect(html).toContain('id="order-updates"');
   });
+
+  /**
+   * QA Round 4, N-01: this template was missing a closing </div> after
+   * "Production & Estimated Shipment", silently nesting Stage 6 onward
+   * (and everything after it) one level deep — the sidebar builder only
+   * reads direct children of #order-panels, so Node showed 11 tabs where
+   * PHP showed 24. This pins the structural invariant directly (not just
+   * "the count matches", which the existing test above already checks but
+   * which a missing-</div> bug can still satisfy by accident) — walks the
+   * div-nesting depth and fails if fewer than 24 .section divs are a
+   * direct child of #order-panels.
+   */
+  it('every top-level section is a direct child of #order-panels', () => {
+    const html = showNjk();
+    const panelsOpenPos = html.indexOf('<div class="order-panels" id="order-panels">');
+    expect(panelsOpenPos).toBeGreaterThan(-1);
+
+    const tokens = html.slice(panelsOpenPos).match(/<div\b[^>]*>|<\/div>/g) || [];
+
+    // Depth 2 is "one level inside #order-panels itself" — a direct
+    // child. A legitimate sub-section used purely for visual grouping
+    // inside one of the 24 real panels sits deeper than this and is
+    // intentionally not counted — N-01's bug was a *top-level* panel
+    // swallowing every panel after it, which shows up as this count
+    // dropping below 24, not as a deeper nested div existing.
+    let depth = 0;
+    let directChildSectionCount = 0;
+    for (const token of tokens) {
+      if (token === '</div>') {
+        depth--;
+        if (depth === 0) break; // #order-panels itself has closed
+        continue;
+      }
+      depth++;
+      if (depth === 2 && token.startsWith('<div class="section"')) {
+        directChildSectionCount++;
+      }
+    }
+
+    expect(directChildSectionCount).toBe(24);
+  });
 });

@@ -109,6 +109,66 @@ final class OrderScreenRedesignTest extends TestCase
         $this->assertStringContainsString('id="order-updates"', $html);
     }
 
+    /**
+     * QA Round 4, N-01: the Node version of this template was missing a
+     * closing </div> after "Production & Estimated Shipment", silently
+     * nesting Stage 6 onward (and everything after it) one level deep —
+     * the sidebar builder only reads direct children of #order-panels, so
+     * Node showed 11 tabs where PHP showed 24. This test pins the
+     * structural invariant directly (not just "the count matches", which
+     * the existing test above already checks but which a missing-</div>
+     * bug can still satisfy by accident) — walks the div-nesting depth and
+     * fails if any `.section` div's immediate parent isn't #order-panels
+     * itself.
+     */
+    public function testEveryTopLevelSectionIsADirectChildOfOrderPanels(): void
+    {
+        $html = $this->showPhp();
+        $this->assertSectionsAreDirectChildrenOfOrderPanels($html);
+    }
+
+    private function assertSectionsAreDirectChildrenOfOrderPanels(string $html): void
+    {
+        $panelsOpenPos = strpos($html, '<div class="order-panels" id="order-panels">');
+        $this->assertNotFalse($panelsOpenPos, 'Could not find the #order-panels opening tag.');
+
+        // Walk every <div ...> / </div> from the panels wrapper's own
+        // opening tag onward, tracking nesting depth. #order-panels itself
+        // is depth 1; anything opened while depth === 1 is a direct child.
+        preg_match_all('/<div\b[^>]*>|<\/div>/', substr($html, $panelsOpenPos), $matches, PREG_OFFSET_CAPTURE);
+        $tokens = $matches[0];
+
+        // Depth 2 is "one level inside #order-panels itself" — a direct
+        // child. A legitimate sub-section used purely for visual grouping
+        // inside one of the 24 real panels (e.g. the pre-shipment
+        // inspection block) sits deeper than this and is intentionally not
+        // counted here; N-01's bug was a *top-level* panel swallowing every
+        // panel after it, which shows up as this count dropping below 24,
+        // not as a deeper nested div existing.
+        $depth = 0;
+        $directChildSectionCount = 0;
+        foreach ($tokens as [$token, ]) {
+            if ($token === '</div>') {
+                $depth--;
+                if ($depth === 0) {
+                    // #order-panels itself has closed.
+                    break;
+                }
+                continue;
+            }
+            $depth++;
+            if ($depth === 2 && str_starts_with($token, '<div class="section"')) {
+                $directChildSectionCount++;
+            }
+        }
+
+        $this->assertSame(
+            24,
+            $directChildSectionCount,
+            'Expected exactly 24 .section panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01).'
+        );
+    }
+
     private function readCss(): string
     {
         return (string) file_get_contents(__DIR__ . '/../../../public_html/assets/css/app.css');
