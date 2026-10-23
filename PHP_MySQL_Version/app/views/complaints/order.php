@@ -13,7 +13,7 @@ $statusLabel = static function (string $status): string {
   <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>">&larr; Back to Order</a></p>
   <h1>Complaints — <?= htmlspecialchars($order['order_reference']) ?></h1>
   <p class="muted"><?= htmlspecialchars($order['company_legal_name']) ?></p>
-  <p class="muted small">A process issue or flaw the client flagged for us to fix next time — not a Dispute (the client isn't canceling or asking for a refund on this order).</p>
+  <p class="muted small">A process issue or flaw the client flagged for us to fix next time — separate from Disputes, and always available regardless of order status.</p>
 
   <?php if ($canManage): ?>
   <div class="section">

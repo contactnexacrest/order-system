@@ -180,7 +180,7 @@
 
   <div class="section" id="order-complaints">
     <h2>Report a Process Issue</h2>
-    <p class="muted">Not happy with something about how we handled this order, but don't need a refund or cancellation? Tell us here so we can fix it next time — a NexaCrest team member will reply.</p>
+    <p class="muted">Something about this order we could do better next time? Tell us here and a NexaCrest team member will reply.</p>
     {% for c in orderComplaints %}
       <div class="card-nested" style="margin-bottom:0.75rem">
         <p class="muted small" style="margin:0 0 0.4rem;">Raised {{ c.created_at | humanDate }} — {{ c.status | capitalize }}</p>

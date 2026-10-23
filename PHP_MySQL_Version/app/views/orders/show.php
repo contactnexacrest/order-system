@@ -2366,13 +2366,13 @@ foreach ($stages as $s) {
 
   <div class="section" id="complaints">
     <h2>Complaints</h2>
-    <p class="muted">A process issue or flaw the client flagged for us to fix next time — not a refund/cancellation request, and always available to the client regardless of the Dispute toggle below.</p>
+    <p class="muted">A process issue or flaw the client flagged for us to fix next time — separate from Disputes below, and always available to the client regardless of the Dispute toggle.</p>
     <p><?= $canViewOrderComplaints ? '<a href="/orders/' . (int) $order['id'] . '/complaints">Complaints (' . (int) $openComplaintCount . ' open)</a>' : 'Complaints (' . (int) $openComplaintCount . ' open)' ?></p>
   </div>
 
   <div class="section" id="disputes">
     <h2>Disputes</h2>
-    <p class="muted">A buyer complaint or claim raised against this order or shipment — separate from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
+    <p class="muted">A buyer wanting to cancel this order and not proceed with us — separate from a Complaint above (no cancel intent) and from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
     <?php if ($canManageDisputes): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/dispute-visibility" style="margin-bottom:10px">
       <?= Csrf::field() ?>

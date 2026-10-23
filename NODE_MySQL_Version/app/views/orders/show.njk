@@ -2201,13 +2201,13 @@
 
   <div class="section" id="complaints">
     <h2>Complaints</h2>
-    <p class="muted">A process issue or flaw the client flagged for us to fix next time — not a refund/cancellation request, and always available to the client regardless of the Dispute toggle below.</p>
+    <p class="muted">A process issue or flaw the client flagged for us to fix next time — separate from Disputes below, and always available to the client regardless of the Dispute toggle.</p>
     <p>{% if permissions.manage_complaints or permissions.respond_to_complaints %}<a href="/orders/{{ order.id }}/complaints">Complaints ({{ openComplaintCount }} open)</a>{% else %}Complaints ({{ openComplaintCount }} open){% endif %}</p>
   </div>
 
   <div class="section" id="disputes">
     <h2>Disputes</h2>
-    <p class="muted">A buyer complaint or claim raised against this order or shipment — separate from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
+    <p class="muted">A buyer wanting to cancel this order and not proceed with us — separate from a Complaint above (no cancel intent) and from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
     {% if permissions.manage_disputes %}
     <form method="post" action="/orders/{{ order.id }}/dispute-visibility" style="margin-bottom:10px">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
