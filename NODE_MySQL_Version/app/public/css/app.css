@@ -283,7 +283,12 @@ table.list tr:hover td{background:var(--bg);}
 a.btn{display:inline-block;background:var(--navy);color:#fff;border:none;padding:0.65rem 1.4rem;border-radius:10px;font-size:1rem;font-weight:600;text-decoration:none;}
 a.btn:hover{background:var(--navy-strong);}
 a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
-.product-row{display:grid;grid-template-columns:2fr 1fr 1fr 0.8fr 0.8fr 0.9fr 0.8fr auto;gap:0.5rem;align-items:end;margin-bottom:0.6rem;}
+/* External QA report U-07: 7 inputs (plus the action buttons) crammed
+   into one single-row grid left every placeholder visually cut off even
+   on an ordinary desktop width. 4 equal columns put the row's 8 items
+   into two readable rows (Description/Dimensions/Finish/Qty, then
+   Unit/Unit Price/HS Code/Actions) instead of one cramped one. */
+.product-row{display:grid;grid-template-columns:repeat(4, minmax(150px, 1fr));gap:0.5rem;align-items:end;margin-bottom:0.6rem;}
 .product-row label{margin-bottom:0.2rem;font-size:0.72rem;}
 .product-row input{margin-top:0;}
 .product-row-actions{display:flex;gap:0.35rem;}
@@ -319,6 +324,14 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .process-step-label{margin-top:0.4rem;font-size:0.66rem;line-height:1.25;color:var(--ink-soft);font-weight:500;padding:0 3px;}
 .process-step.in_progress .process-step-label{color:var(--gold-strong);font-weight:700;}
 .process-step.gate_passed .process-step-label{color:var(--ink);}
+/* External QA report U-12: on a phone the stepper only shows the first
+   few stages with no hint it scrolls — this text-only hint is hidden by
+   default (plenty of room at desktop widths) and shown only at the same
+   <=900px width everything else on this page already treats as mobile. */
+.stepper-scroll-hint{display:none;margin:-0.5rem 0 0.75rem;text-align:center;}
+@media (max-width:900px){
+  .stepper-scroll-hint{display:block;}
+}
 
 /* --- Review/Approval/Send-to-Buyer: split into numbered steps --- */
 .review-steps{display:flex;flex-direction:column;gap:0;margin-top:0.5rem;}

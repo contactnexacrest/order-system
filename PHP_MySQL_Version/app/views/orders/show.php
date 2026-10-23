@@ -360,6 +360,11 @@ foreach ($stages as $s) {
       </div>
     <?php endforeach; ?>
   </div>
+  <!-- External QA report U-12: on a phone the 1-9 progress line only
+       shows stages 1-4 with no hint that it scrolls sideways for the
+       rest. CSS-only, shown just at the same <=900px width everything
+       else on this page already switches to a mobile layout at. -->
+  <p class="muted small stepper-scroll-hint">&larr;&rarr; Swipe to see all stages</p>
 
   <div class="stage-track">
     <?php foreach ($stages as $s): ?>
@@ -1215,7 +1220,7 @@ foreach ($stages as $s) {
   </div>
 
   <div class="section" data-stage="4">
-    <h2>Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
+    <h2 data-tab-label="Stage 4 — OC Ack">Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
     <?php if ($buyerAcknowledged): ?>
       <?php if ($ocAcknowledgment && $ocAcknowledgment['acknowledged_via'] === 'client_portal'): ?>
         <p>Buyer acknowledged the Order Confirmation themselves in the client portal on <?= htmlspecialchars(Dates::human($ocAcknowledgment['acknowledged_at'])) ?>.</p>
@@ -1289,7 +1294,7 @@ foreach ($stages as $s) {
   </div>
 
   <div class="section" data-stage="5">
-    <h2>Stage 5 — Supplier Purchase Order (Material Procurement)</h2>
+    <h2 data-tab-label="Stage 5 — Supplier PO">Stage 5 — Supplier Purchase Order (Material Procurement)</h2>
     <?php if (!$stage5 || $stage5['status'] === 'locked'): ?>
       <?php if ($supplierPo): ?>
         <div class="kv-grid">
@@ -1756,7 +1761,7 @@ foreach ($stages as $s) {
   </div>
 
   <div class="section" data-stage="8">
-    <h2>Stage 8 — Commercial Invoice &amp; Balance Payment</h2>
+    <h2 data-tab-label="Stage 8 — CI &amp; Balance">Stage 8 — Commercial Invoice &amp; Balance Payment</h2>
     <?php
       // Batch 3 #11 — the Commercial Invoice is conventionally dated to match the recorded BL date;
       // nothing enforces this, so flag it as an advisory (not a hard block — a same-day match is the
@@ -1807,7 +1812,7 @@ foreach ($stages as $s) {
 
   <?php if ($canManageOrderFinancials): ?>
   <div class="section" id="order-financials">
-    <h2>Order Financials — Government Benefits, Costs &amp; Profitability</h2>
+    <h2 data-tab-label="Financials">Order Financials — Government Benefits, Costs &amp; Profitability</h2>
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
 
     <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
@@ -2167,7 +2172,7 @@ foreach ($stages as $s) {
 
   <?php if ($canEditLockedData): ?>
   <div class="section" style="border-color:#D9822B;">
-    <h2>Force-Generate a Document (privileged override)</h2>
+    <h2 data-tab-label="Force-Generate Document">Force-Generate a Document (privileged override)</h2>
     <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" onsubmit="return confirmFieldOverride(this, 'generating this document out of sequence');">
       <?= Csrf::field() ?>
@@ -2231,7 +2236,11 @@ foreach ($stages as $s) {
 
     panels.forEach(function (panel) {
       var heading = panel.querySelector('h2');
-      var label = heading ? heading.textContent.trim() : panel.id;
+      // External QA report U-12: "section tabs wrap and the long tab
+      // names are cut" on a phone. data-tab-label is an optional short
+      // alias for the handful of headings long enough to cause that —
+      // the on-page <h2> itself stays the full, descriptive text.
+      var label = heading ? (heading.dataset.tabLabel || heading.textContent.trim()) : panel.id;
       var link = document.createElement('button');
       link.type = 'button';
       link.className = 'order-sidebar-link';
