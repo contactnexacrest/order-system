@@ -7,6 +7,7 @@ const orderFinancialsController = require('../../src/controllers/orderFinancials
 const orderCostEntryRepository = require('../../src/repositories/orderCostEntryRepository');
 const orderProductRepository = require('../../src/repositories/orderProductRepository');
 const orderTravelExpenseRepository = require('../../src/repositories/orderTravelExpenseRepository');
+const orderPaymentStatusRepository = require('../../src/repositories/orderPaymentStatusRepository');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 /**
@@ -49,6 +50,18 @@ describe('Travel expense recording (Section BW)', () => {
     await orderProductRepository.add(orderId, 1, 'Test Product', null, null, '1', false, 'pcs', String(fobValue));
   }
 
+  /**
+   * External QA report N-03: every order here is a real export order
+   * (currency USD, per createTestOrder's default) with no per-leg
+   * exchange rate known until this is called — exactly the real-world
+   * state right after order creation, before an advance payment has
+   * ever been recorded against it.
+   */
+  async function setAdvanceRate(orderId, userId, rate = 80.0) {
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', rate, userId);
+  }
+
   // ---------------------------------------------------------------
   // orderTravelExpenseRepository
   // ---------------------------------------------------------------
@@ -80,6 +93,7 @@ describe('Travel expense recording (Section BW)', () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
     await addProduct(orderId, 10000.0);
+    await setAdvanceRate(orderId, userId);
     const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { factory_distance_km: '175', expense_pct: '5' } });
 
     await orderFinancialsController.saveTravelExpenses(req, fakeRes());
@@ -87,7 +101,7 @@ describe('Travel expense recording (Section BW)', () => {
     const row = await orderTravelExpenseRepository.find(orderId);
     expect(Number(row.factory_distance_km)).toBe(175);
     expect(Number(row.expense_pct)).toBe(5);
-    expect(Number(row.expense_amount)).toBe(500);
+    expect(Number(row.expense_amount)).toBe(40000);
     expect(flash.pull(req)[0].type).toBe('success');
   });
 
@@ -95,19 +109,21 @@ describe('Travel expense recording (Section BW)', () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
     await addProduct(orderId, 10000.0);
+    await setAdvanceRate(orderId, userId);
     const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { expense_pct: 'other', expense_pct_other: '12.5' } });
 
     await orderFinancialsController.saveTravelExpenses(req, fakeRes());
 
     const row = await orderTravelExpenseRepository.find(orderId);
     expect(Number(row.expense_pct)).toBe(12.5);
-    expect(Number(row.expense_amount)).toBe(1250);
+    expect(Number(row.expense_amount)).toBe(100000);
   });
 
   it('creates a cost entry for the computed amount', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
     await addProduct(orderId, 20000.0);
+    await setAdvanceRate(orderId, userId);
     const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { expense_pct: '10' } });
 
     await orderFinancialsController.saveTravelExpenses(req, fakeRes());
@@ -115,20 +131,58 @@ describe('Travel expense recording (Section BW)', () => {
     const entries = await orderCostEntryRepository.forOrder(orderId);
     expect(entries.length).toBe(1);
     expect(entries[0].category).toBe('travel_expenses');
-    expect(Number(entries[0].amount_inr)).toBe(2000);
+    expect(Number(entries[0].amount_inr)).toBe(160000);
   });
 
   it('resaving updates the same cost entry rather than creating a second one', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
     await addProduct(orderId, 10000.0);
+    await setAdvanceRate(orderId, userId);
 
     await orderFinancialsController.saveTravelExpenses(fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { expense_pct: '5' } }), fakeRes());
     await orderFinancialsController.saveTravelExpenses(fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { expense_pct: '15' } }), fakeRes());
 
     const entries = await orderCostEntryRepository.forOrder(orderId);
     expect(entries.length).toBe(1);
-    expect(Number(entries[0].amount_inr)).toBe(1500);
+    expect(Number(entries[0].amount_inr)).toBe(120000);
+  });
+
+  /**
+   * External QA report N-03's own repro: a USD order with no exchange
+   * rate recorded yet (the real-world state before any advance payment
+   * has come in) must refuse to save rather than write pct% of the raw
+   * USD FOB value straight into an INR column.
+   */
+  it("refuses to save when the order's exchange rate is not known yet", async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    await addProduct(orderId, 10000.0);
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { expense_pct: '5' } });
+
+    await orderFinancialsController.saveTravelExpenses(req, fakeRes());
+
+    expect(await orderTravelExpenseRepository.find(orderId)).toBeNull();
+    expect(await orderCostEntryRepository.forOrder(orderId)).toEqual([]);
+    expect(flash.pull(req)[0].type).toBe('error');
+  });
+
+  /**
+   * Mirrors orderProfitabilityService's own fallback order: the balance
+   * leg's rate is used when the advance leg's rate isn't known yet.
+   */
+  it('falls back to the balance exchange rate when the advance rate is not set', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    await addProduct(orderId, 10000.0);
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'balance', 90.0, userId);
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { expense_pct: '5' } });
+
+    await orderFinancialsController.saveTravelExpenses(req, fakeRes());
+
+    const row = await orderTravelExpenseRepository.find(orderId);
+    expect(Number(row.expense_amount)).toBe(45000);
   });
 
   it('rejects a zero percentage', async () => {
@@ -182,6 +236,7 @@ describe('Travel expense recording (Section BW)', () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
     await addProduct(orderId, 10000.0);
+    await setAdvanceRate(orderId, userId);
     await orderFinancialsController.saveTravelExpenses(fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { expense_pct: '5' } }), fakeRes());
 
     const reqWith = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, permissions: { manage_order_financials: true } });
@@ -199,12 +254,13 @@ describe('Travel expense recording (Section BW)', () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
     await addProduct(orderId, 10000.0);
+    await setAdvanceRate(orderId, userId);
     await orderFinancialsController.saveTravelExpenses(fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { factory_distance_km: '175', expense_pct: '5' } }), fakeRes());
 
     const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, permissions: { manage_order_financials: true } });
     const res = fakeRes();
     await ordersController.show(req, res);
 
-    expect(Number(res.locals.orderTravelExpenses.expense_amount)).toBe(500);
+    expect(Number(res.locals.orderTravelExpenses.expense_amount)).toBe(40000);
   });
 });

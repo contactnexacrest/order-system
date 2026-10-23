@@ -9,6 +9,7 @@ use App\Controllers\OrderController;
 use App\Controllers\OrderFinancialsController;
 use App\Helpers\Flash;
 use App\Repositories\OrderCostEntryRepository;
+use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderTravelExpenseRepository;
 use App\Tests\Support\DbTestCase;
@@ -33,6 +34,19 @@ final class OrderTravelExpenseTest extends DbTestCase
     private function addProduct(int $orderId, float $fobValue): void
     {
         OrderProductRepository::add($orderId, 1, 'Test Product', null, null, '1', false, 'pcs', (string) $fobValue);
+    }
+
+    /**
+     * External QA report N-03: every order here is a real export order
+     * (currency USD, per DbTestCase::createTestOrder's default) with no
+     * per-leg exchange rate known until this is called — exactly the
+     * real-world state right after order creation, before an advance
+     * payment has ever been recorded against it.
+     */
+    private function setAdvanceRate(int $orderId, int $userId, float $rate = 80.0): void
+    {
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', $rate, $userId);
     }
 
     // ---------------------------------------------------------------
@@ -69,6 +83,7 @@ final class OrderTravelExpenseTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->addProduct($orderId, 10000.0);
+        $this->setAdvanceRate($orderId, $userId);
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = ['factory_distance_km' => '175', 'expense_pct' => '5'];
 
@@ -79,7 +94,7 @@ final class OrderTravelExpenseTest extends DbTestCase
         $row = OrderTravelExpenseRepository::find($orderId);
         self::assertSame('175.00', $row['factory_distance_km']);
         self::assertSame('5.00', $row['expense_pct']);
-        self::assertSame('500.00', $row['expense_amount'], '5% of 10000 FOB value');
+        self::assertSame('40000.00', $row['expense_amount'], '5% of 10000 FOB value, converted at the 80.0 order exchange rate');
         self::assertSame('success', Flash::pull()[0]['type']);
     }
 
@@ -88,6 +103,7 @@ final class OrderTravelExpenseTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->addProduct($orderId, 10000.0);
+        $this->setAdvanceRate($orderId, $userId);
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = ['expense_pct' => 'other', 'expense_pct_other' => '12.5'];
 
@@ -97,7 +113,7 @@ final class OrderTravelExpenseTest extends DbTestCase
 
         $row = OrderTravelExpenseRepository::find($orderId);
         self::assertSame('12.50', $row['expense_pct']);
-        self::assertSame('1250.00', $row['expense_amount']);
+        self::assertSame('100000.00', $row['expense_amount']);
     }
 
     public function testCreatesACostEntryForTheComputedAmount(): void
@@ -105,6 +121,7 @@ final class OrderTravelExpenseTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->addProduct($orderId, 20000.0);
+        $this->setAdvanceRate($orderId, $userId);
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = ['expense_pct' => '10'];
 
@@ -115,7 +132,7 @@ final class OrderTravelExpenseTest extends DbTestCase
         $entries = OrderCostEntryRepository::forOrder($orderId);
         self::assertCount(1, $entries);
         self::assertSame('travel_expenses', $entries[0]['category']);
-        self::assertSame('2000.00', $entries[0]['amount_inr']);
+        self::assertSame('160000.00', $entries[0]['amount_inr']);
     }
 
     public function testResavingUpdatesTheSameCostEntryRatherThanCreatingASecondOne(): void
@@ -123,6 +140,7 @@ final class OrderTravelExpenseTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->addProduct($orderId, 10000.0);
+        $this->setAdvanceRate($orderId, $userId);
         $_SESSION['_auth_user_id'] = $userId;
 
         $_POST = ['expense_pct' => '5'];
@@ -137,7 +155,53 @@ final class OrderTravelExpenseTest extends DbTestCase
 
         $entries = OrderCostEntryRepository::forOrder($orderId);
         self::assertCount(1, $entries);
-        self::assertSame('1500.00', $entries[0]['amount_inr']);
+        self::assertSame('120000.00', $entries[0]['amount_inr']);
+    }
+
+    /**
+     * External QA report N-03's own repro: a USD order with no exchange
+     * rate recorded yet (the real-world state before any advance
+     * payment has come in) must refuse to save rather than write pct%
+     * of the raw USD FOB value straight into an INR column.
+     */
+    public function testRefusesToSaveWhenTheOrdersExchangeRateIsNotKnownYet(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->addProduct($orderId, 10000.0);
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['expense_pct' => '5'];
+
+        ob_start();
+        (new OrderFinancialsController())->saveTravelExpenses(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        self::assertNull(OrderTravelExpenseRepository::find($orderId));
+        self::assertSame([], OrderCostEntryRepository::forOrder($orderId));
+        self::assertSame('error', Flash::pull()[0]['type']);
+    }
+
+    /**
+     * Mirrors OrderProfitabilityService::revenueInInr()'s own fallback
+     * order: the balance leg's rate is used when the advance leg's rate
+     * isn't known yet.
+     */
+    public function testFallsBackToTheBalanceExchangeRateWhenTheAdvanceRateIsNotSet(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->addProduct($orderId, 10000.0);
+        OrderPaymentStatusRepository::initializeForOrder($orderId);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', 90.0, $userId);
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['expense_pct' => '5'];
+
+        ob_start();
+        (new OrderFinancialsController())->saveTravelExpenses(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        $row = OrderTravelExpenseRepository::find($orderId);
+        self::assertSame('45000.00', $row['expense_amount'], '5% of 10000 FOB value, converted at the balance leg rate of 90.0');
     }
 
     public function testRejectsAZeroPercentage(): void
@@ -224,6 +288,7 @@ final class OrderTravelExpenseTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->addProduct($orderId, 10000.0);
+        $this->setAdvanceRate($orderId, $userId);
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = ['factory_distance_km' => '175', 'expense_pct' => '5'];
         ob_start();
@@ -235,7 +300,7 @@ final class OrderTravelExpenseTest extends DbTestCase
         $output = ob_get_clean();
 
         self::assertStringContainsString('175.00 km', $output);
-        self::assertStringContainsString('500.00', $output);
+        self::assertStringContainsString('40,000.00', $output);
     }
 
     public function testFieldIsNotExposedWithoutManageOrderFinancials(): void

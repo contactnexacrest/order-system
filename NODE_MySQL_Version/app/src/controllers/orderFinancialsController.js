@@ -325,7 +325,8 @@ async function saveInspectionFee(req, res) {
  */
 async function saveTravelExpenses(req, res) {
   const orderId = parseInt(req.params.id, 10);
-  if (!(await orderRepository.find(orderId))) {
+  const order = await orderRepository.find(orderId);
+  if (!order) {
     res.status(404).send('Order not found.');
     return;
   }
@@ -350,7 +351,36 @@ async function saveTravelExpenses(req, res) {
   const factoryDistanceKm = rawDistance !== '' ? parseFloat(rawDistance) : null;
 
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
-  const expenseAmount = Math.round((expensePct / 100) * fobTotal * 100) / 100;
+
+  /**
+   * External QA report N-03: this used to write pct% of the FOB value —
+   * which is in the order's OWN currency (e.g. USD) — straight into
+   * order_cost_entries.amount_inr with no conversion, understating the
+   * cost by the exchange rate on every foreign-currency order. Converts
+   * at the same rate orderProfitabilityService's revenueInInr() falls
+   * back to for an order with no per-leg actual yet
+   * (advance_exchange_rate ?? balance_exchange_rate) — the best "the
+   * order's exchange rate" available, since advance/balance each carry
+   * their own rate rather than one shared order-wide rate (Batch 3 #3).
+   * Refuses rather than silently store a wrong figure if neither is
+   * known yet.
+   */
+  const currencyCode = order.currency_code || 'INR';
+  let rate;
+  if (currencyCode === 'INR') {
+    rate = 1.0;
+  } else {
+    const payment = await orderPaymentStatusRepository.find(orderId);
+    const advanceRate = payment && payment.advance_exchange_rate != null ? Number(payment.advance_exchange_rate) : null;
+    const balanceRate = payment && payment.balance_exchange_rate != null ? Number(payment.balance_exchange_rate) : null;
+    rate = advanceRate ?? balanceRate;
+    if (rate == null) {
+      flash.set(req, 'error', "Travel expenses need this order's exchange rate — record the advance or balance payment's exchange rate first.");
+      res.redirect(`/orders/${orderId}#order-financials`);
+      return;
+    }
+  }
+  const expenseAmount = Math.round((expensePct / 100) * fobTotal * rate * 100) / 100;
 
   let costEntryId = existing ? existing.cost_entry_id : null;
   if (costEntryId) {

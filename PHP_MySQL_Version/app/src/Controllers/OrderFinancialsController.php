@@ -343,7 +343,8 @@ final class OrderFinancialsController
     public function saveTravelExpenses(array $params): void
     {
         $orderId = (int) $params['id'];
-        if (!OrderRepository::find($orderId)) {
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
             http_response_code(404);
             echo 'Order not found.';
             return;
@@ -369,7 +370,35 @@ final class OrderFinancialsController
         $factoryDistanceKm = $rawDistance !== '' ? (float) $rawDistance : null;
 
         $fobTotal = \App\Repositories\OrderProductRepository::totalFobValue($orderId);
-        $expenseAmount = round($expensePct / 100 * $fobTotal, 2);
+
+        /**
+         * External QA report N-03: this used to write pct% of the FOB
+         * value — which is in the order's OWN currency (e.g. USD) —
+         * straight into order_cost_entries.amount_inr with no
+         * conversion, understating the cost by the exchange rate on
+         * every foreign-currency order. Converts at the same rate
+         * OrderProfitabilityService::revenueInInr() falls back to for an
+         * order with no per-leg actual yet (advance_exchange_rate ??
+         * balance_exchange_rate) — the best "the order's exchange rate"
+         * available, since advance/balance each carry their own rate
+         * rather than one shared order-wide rate (Batch 3 #3). Refuses
+         * rather than silently store a wrong figure if neither is known
+         * yet.
+         */
+        $currencyCode = $order['currency_code'] ?? 'INR';
+        if ($currencyCode === 'INR') {
+            $rate = 1.0;
+        } else {
+            $payment = \App\Repositories\OrderPaymentStatusRepository::find($orderId);
+            $rate = $payment['advance_exchange_rate'] ?? $payment['balance_exchange_rate'] ?? null;
+            if ($rate === null) {
+                Flash::set('error', "Travel expenses need this order's exchange rate — record the advance or balance payment's exchange rate first.");
+                header("Location: /orders/{$orderId}#order-financials");
+                return;
+            }
+            $rate = (float) $rate;
+        }
+        $expenseAmount = round($expensePct / 100 * $fobTotal * $rate, 2);
 
         $costEntryId = $existing['cost_entry_id'] ?? null;
         if ($costEntryId) {
