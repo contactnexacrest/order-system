@@ -1685,6 +1685,56 @@
       {% endif %}
 
       {% if not blIssued %}
+      <h3 style="font-size:0.95em; margin-top:14px;">CHA Draft BL Review (steps 9h&ndash;9j)</h3>
+      <p class="muted small">After sending the BL Instruction Sheet and packing list above to your CHA, log each draft BL they send back here. Approve it, or request a revision with notes — the CHA's corrected draft is then logged as the next round. At most one round can be awaiting your decision at a time.</p>
+      {% set latestDraftRound = draftBlReviews[0] %}
+      {% if draftBlReviews.length == 0 %}
+        <p class="muted">No draft BL logged yet.</p>
+      {% else %}
+        <table class="list">
+          <tr><th>Round</th><th>Received</th><th>Draft</th><th>Status</th><th>Reviewed</th><th></th></tr>
+          {% for round in draftBlReviews %}
+          <tr>
+            <td>{{ round.round_number }}</td>
+            <td>{{ round.uploaded_at }}</td>
+            <td><a href="/file-store/{{ round.draft_file_id }}/download" target="_blank">View draft</a></td>
+            <td>
+              {% if round.status == 'pending' %}<span class="badge badge-inactive">Pending Review</span>
+              {% elif round.status == 'approved' %}<span class="badge badge-active">Approved</span>
+              {% else %}<span class="badge">Revision Requested</span>{% endif %}
+              {% if round.review_notes %}<br><small class="muted">{{ round.review_notes }}</small>{% endif %}
+            </td>
+            <td>{{ (round.reviewed_by_name + ' — ' + round.reviewed_at) if round.reviewed_by_name else '—' }}</td>
+            <td>
+              {% if round.status == 'pending' %}
+                <details>
+                  <summary class="small">Review</summary>
+                  <form method="post" action="/orders/{{ order.id }}/draft-bl/{{ round.id }}/review">
+                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                    <label>Decision
+                      <select name="decision" required>
+                        <option value="approved">Approve</option>
+                        <option value="revision_requested">Request Revision</option>
+                      </select>
+                    </label>
+                    <label>Notes <small class="muted">(required if requesting a revision)</small><input type="text" name="notes"></label>
+                    <button type="submit" class="btn-sm">Submit Review</button>
+                  </form>
+                </details>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+      {% if not latestDraftRound or latestDraftRound.status != 'pending' %}
+        <form method="post" action="/orders/{{ order.id }}/draft-bl" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Draft BL from CHA *<input type="file" name="draft_bl" accept=".pdf" required></label>
+          <button type="submit" class="btn-sm">Log Draft BL for Review</button>
+        </form>
+      {% endif %}
+
         <form method="post" action="/orders/{{ order.id }}/bl-issued" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>BL Number *<input type="text" name="bl_number" required></label>

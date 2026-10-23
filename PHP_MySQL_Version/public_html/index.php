@@ -490,6 +490,8 @@ $router->post('/orders/{id}/payment/freight/clear', [$orders, 'clearFreightPayme
 
 $router->post('/orders/{id}/packing', [$orders, 'savePacking'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/shipping', [$orders, 'saveShipping'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/draft-bl', [$orders, 'uploadDraftBl'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/draft-bl/{roundId}/review', [$orders, 'reviewDraftBl'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-issued', [$orders, 'recordBlIssued'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-copy', [$orders, 'attachBlCopy'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);

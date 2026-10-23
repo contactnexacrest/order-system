@@ -697,6 +697,8 @@ app.post('/orders/:id/payment/freight/clear', requireAuth, requirePermission('ma
 
 app.post('/orders/:id/packing', requireAuth, requirePermission('manage_shipping'), upload.single('buyer_approval'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.savePacking));
 app.post('/orders/:id/shipping', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveShipping));
+app.post('/orders/:id/draft-bl', requireAuth, requirePermission('manage_shipping'), upload.single('draft_bl'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadDraftBl));
+app.post('/orders/:id/draft-bl/:roundId/review', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.reviewDraftBl));
 app.post('/orders/:id/bl-issued', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlIssued));
 app.post('/orders/:id/bl-copy', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.attachBlCopy));
 app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordScannedBlSent));

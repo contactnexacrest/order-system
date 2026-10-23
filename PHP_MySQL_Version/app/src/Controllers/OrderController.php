@@ -43,6 +43,7 @@ use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderBlEndorsementRepository;
 use App\Repositories\OrderCancellationRepository;
+use App\Repositories\OrderDraftBlReviewRepository;
 use App\Repositories\OrderShippingRepository;
 use App\Repositories\OrderStageRepository;
 use App\Repositories\OrderSupplierPoDocumentRepository;
@@ -867,6 +868,7 @@ final class OrderController
             'packing'   => OrderPackingRepository::find($orderId),
             'crates'    => OrderCrateRepository::forOrder($orderId),
             'shipping'  => OrderShippingRepository::find($orderId),
+            'draftBlReviews' => OrderDraftBlReviewRepository::forOrder($orderId),
             'production' => OrderProductionRepository::find($orderId),
             'supplierTypes' => LookupRepository::dropdownOptions('supplier_type'),
             'units' => LookupRepository::dropdownOptions('unit'),
@@ -1875,6 +1877,103 @@ final class OrderController
             'seal_no'         => trim((string) ($_POST['seal_no'] ?? '')) ?: null,
         ]);
         Flash::set('success', 'Shipping details saved. Generate the BL Instruction Sheet below.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Export process steps 9h-9j: the BL Instruction Sheet + packing
+     * list have been sent to the CHA — this logs the draft BL the CHA
+     * sent back, as the next review round for this order. Refuses a new
+     * upload while the current round is still 'pending' — the existing
+     * draft must be approved or sent back for revision first, so at
+     * most one round is ever awaiting a decision at a time.
+     */
+    public function uploadDraftBl(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+
+        $latest = OrderDraftBlReviewRepository::latestForOrder($orderId);
+        if ($latest && $latest['status'] === 'pending') {
+            Flash::set('error', "Round {$latest['round_number']}'s draft is still awaiting your review — approve it or request a revision before logging another.");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        if (empty($_FILES['draft_bl']['name'])) {
+            Flash::set('error', 'Attach the draft BL the CHA sent before logging this round.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        try {
+            $fileId = FileUploadService::handleUpload(
+                'draft_bl',
+                'draft_bl',
+                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/shipping',
+                null,
+                $orderId,
+                (int) $user['id'],
+                null,
+                'CHA',
+                'Draft Bill of Lading'
+            );
+        } catch (\Throwable $e) {
+            Flash::set('error', 'Draft BL upload failed: ' . Flash::describeException($e, 'upload failed — check the server error log.'));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $roundId = OrderDraftBlReviewRepository::createRound($orderId, $fileId, (int) $user['id']);
+        OrderShippingRepository::attachDraftBl($orderId, $fileId);
+        AuditLogRepository::log((int) $user['id'], 'DRAFT_BL_UPLOADED', 'order_draft_bl_reviews', $roundId, null, null, (string) $orderId);
+        Flash::set('success', 'Draft BL logged for review.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /** Export process step 9j: staff's decision on a CHA draft BL round — approve it, or send it back with notes for a revision. */
+    public function reviewDraftBl(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $roundId = (int) $params['roundId'];
+        $round = OrderDraftBlReviewRepository::find($roundId);
+        if (!$round || (int) $round['order_id'] !== $orderId) {
+            http_response_code(404);
+            echo 'Draft BL round not found for this order.';
+            return;
+        }
+        if ($round['status'] !== 'pending') {
+            Flash::set('error', 'This round has already been reviewed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $decision = trim((string) ($_POST['decision'] ?? ''));
+        if (!in_array($decision, ['approved', 'revision_requested'], true)) {
+            Flash::set('error', 'Select a decision.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
+        if ($decision === 'revision_requested' && $notes === null) {
+            Flash::set('error', 'Explain what needs to change before sending this draft back for revision.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        OrderDraftBlReviewRepository::review($roundId, $decision, $notes, (int) $user['id']);
+        if ($decision === 'approved') {
+            OrderShippingRepository::approveDraftBl($orderId, (int) $user['id']);
+        }
+        AuditLogRepository::log((int) $user['id'], 'DRAFT_BL_REVIEWED', 'order_draft_bl_reviews', $roundId, 'status', 'pending', $decision);
+        Flash::set('success', $decision === 'approved' ? "Round {$round['round_number']} draft BL approved." : "Revision requested on round {$round['round_number']} — upload the CHA's corrected draft once received.");
         header("Location: /orders/{$orderId}");
     }
 

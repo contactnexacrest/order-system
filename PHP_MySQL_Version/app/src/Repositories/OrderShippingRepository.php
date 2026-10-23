@@ -83,4 +83,32 @@ final class OrderShippingRepository
             'UPDATE order_shipping SET scanned_bl_sent_to_buyer_at = NOW() WHERE order_id = :order_id'
         )->execute(['order_id' => $orderId]);
     }
+
+    /**
+     * docs/schema.sql Section BS — records the draft BL most recently
+     * received from the CHA as the order's CURRENT one (clearing any
+     * earlier approval — a new draft always needs its own review).
+     * Upserts because a draft can arrive before "Shipping / Vessel
+     * Details" has ever been saved, i.e. before any order_shipping row
+     * exists yet.
+     */
+    public static function attachDraftBl(int $orderId, int $fileId): void
+    {
+        Database::connection()->prepare(
+            'INSERT INTO order_shipping (order_id, draft_bl_file_id, draft_bl_uploaded_at, draft_bl_approved_at, draft_bl_approved_by)
+             VALUES (:order_id, :file_id, NOW(), NULL, NULL)
+             ON DUPLICATE KEY UPDATE
+                draft_bl_file_id = VALUES(draft_bl_file_id),
+                draft_bl_uploaded_at = VALUES(draft_bl_uploaded_at),
+                draft_bl_approved_at = NULL,
+                draft_bl_approved_by = NULL'
+        )->execute(['order_id' => $orderId, 'file_id' => $fileId]);
+    }
+
+    public static function approveDraftBl(int $orderId, int $userId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_shipping SET draft_bl_approved_at = NOW(), draft_bl_approved_by = :user_id WHERE order_id = :order_id'
+        )->execute(['user_id' => $userId, 'order_id' => $orderId]);
+    }
 }

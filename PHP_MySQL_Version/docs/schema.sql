@@ -3637,3 +3637,34 @@ ALTER TABLE order_cost_entries
   MODIFY COLUMN category ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
                                'documentation','port_charges','bank_charges','commission',
                                'packing_crates','bank_loan_interest','other') NOT NULL;
+
+-- ================================================================
+-- SECTION BS — CHA DRAFT BL REVIEW LOOP (added 2026-10-23)
+-- ================================================================
+-- Export process steps 9h-9j: after the BL Instruction Sheet + packing
+-- list are sent to the CHA, track each draft BL the CHA sends back as
+-- its own round — approved, or revision requested (with notes) and a
+-- corrected draft uploaded as the next round. order_shipping's existing
+-- draft_bl_file_id/draft_bl_uploaded_at/draft_bl_approved_at/
+-- draft_bl_approved_by columns (already in schema, previously unused by
+-- any application code) track the CURRENT draft's state; this table is
+-- the full round-by-round history. See
+-- docs/migrations/2026-10-23g-cha-draft-bl-review.sql.
+-- ================================================================
+CREATE TABLE order_draft_bl_reviews (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id       BIGINT UNSIGNED NOT NULL,
+  round_number   INT UNSIGNED NOT NULL,
+  draft_file_id  BIGINT UNSIGNED NOT NULL,
+  uploaded_by    BIGINT UNSIGNED NOT NULL,
+  uploaded_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status         ENUM('pending','approved','revision_requested') NOT NULL DEFAULT 'pending',
+  review_notes   TEXT NULL,
+  reviewed_by    BIGINT UNSIGNED NULL,
+  reviewed_at    TIMESTAMP NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (draft_file_id) REFERENCES file_store(id),
+  FOREIGN KEY (uploaded_by) REFERENCES users(id),
+  FOREIGN KEY (reviewed_by) REFERENCES users(id),
+  UNIQUE KEY uq_order_draft_bl_round (order_id, round_number)
+) ENGINE=InnoDB;

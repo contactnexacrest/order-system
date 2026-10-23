@@ -44,6 +44,7 @@ const orderProductRepository = require('../repositories/orderProductRepository')
 const orderRepository = require('../repositories/orderRepository');
 const orderBlEndorsementRepository = require('../repositories/orderBlEndorsementRepository');
 const orderShippingRepository = require('../repositories/orderShippingRepository');
+const orderDraftBlReviewRepository = require('../repositories/orderDraftBlReviewRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
@@ -872,6 +873,7 @@ async function show(req, res) {
       shortfallTolerance: (await companySettingsRepository.get('quantity_shortfall_tolerance_pct')) ?? '5',
       crates: await orderCrateRepository.forOrder(orderId),
       shipping: await orderShippingRepository.find(orderId),
+      draftBlReviews: await orderDraftBlReviewRepository.forOrder(orderId),
       production: await orderProductionRepository.find(orderId),
       supplierTypes: await lookupRepository.dropdownOptions('supplier_type'),
       units: await lookupRepository.dropdownOptions('unit'),
@@ -1876,6 +1878,101 @@ async function saveShipping(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * Export process steps 9h-9j: the BL Instruction Sheet + packing list
+ * have been sent to the CHA — this logs the draft BL the CHA sent
+ * back, as the next review round for this order. Refuses a new upload
+ * while the current round is still 'pending' — the existing draft must
+ * be approved or sent back for revision first, so at most one round is
+ * ever awaiting a decision at a time.
+ */
+async function uploadDraftBl(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const user = req.user;
+
+  const latest = await orderDraftBlReviewRepository.latestForOrder(orderId);
+  if (latest && latest.status === 'pending') {
+    flash.set(req, 'error', `Round ${latest.round_number}'s draft is still awaiting your review — approve it or request a revision before logging another.`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  if (!req.file || !req.file.buffer) {
+    flash.set(req, 'error', 'Attach the draft BL the CHA sent before logging this round.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  let fileId;
+  try {
+    fileId = await fileUploadService.handleUpload(
+      req,
+      'draft_bl',
+      'draft_bl',
+      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/shipping`,
+      null,
+      orderId,
+      user.id,
+      null,
+      'CHA',
+      'Draft Bill of Lading'
+    );
+  } catch (e) {
+    flash.set(req, 'error', `Draft BL upload failed: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const roundId = await orderDraftBlReviewRepository.createRound(orderId, fileId, user.id);
+  await orderShippingRepository.attachDraftBl(orderId, fileId);
+  await auditLogRepository.log(user.id, 'DRAFT_BL_UPLOADED', 'order_draft_bl_reviews', roundId, null, null, String(orderId));
+  flash.set(req, 'success', 'Draft BL logged for review.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+/** Export process step 9j: staff's decision on a CHA draft BL round — approve it, or send it back with notes for a revision. */
+async function reviewDraftBl(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const roundId = parseInt(req.params.roundId, 10);
+  const round = await orderDraftBlReviewRepository.find(roundId);
+  if (!round || Number(round.order_id) !== orderId) {
+    res.status(404).send('Draft BL round not found for this order.');
+    return;
+  }
+  if (round.status !== 'pending') {
+    flash.set(req, 'error', 'This round has already been reviewed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const decision = str(req.body.decision);
+  if (!['approved', 'revision_requested'].includes(decision)) {
+    flash.set(req, 'error', 'Select a decision.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const notes = str(req.body.notes) || null;
+  if (decision === 'revision_requested' && notes === null) {
+    flash.set(req, 'error', "Explain what needs to change before sending this draft back for revision.");
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const user = req.user;
+  await orderDraftBlReviewRepository.review(roundId, decision, notes, user.id);
+  if (decision === 'approved') {
+    await orderShippingRepository.approveDraftBl(orderId, user.id);
+  }
+  await auditLogRepository.log(user.id, 'DRAFT_BL_REVIEWED', 'order_draft_bl_reviews', roundId, 'status', 'pending', decision);
+  flash.set(req, 'success', decision === 'approved' ? `Round ${round.round_number} draft BL approved.` : `Revision requested on round ${round.round_number} — upload the CHA's corrected draft once received.`);
+  res.redirect(`/orders/${orderId}`);
+}
+
 /** Stage 7->8 gate: BL issued (vessel departs) — also the date CI must match. */
 async function recordBlIssued(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -2664,7 +2761,7 @@ module.exports = {
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment, updateProductionStatus,
   recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
-  savePacking, saveShipping, recordBlIssued, attachBlCopy, recordScannedBlSent,
+  savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   saveBlEndorsement, generateBlEndorsement,
   closeOrder, overrideStatusLock, markLost, updateComplianceTask,

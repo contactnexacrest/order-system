@@ -1838,6 +1838,56 @@ foreach ($stages as $s) {
       <?php endif; ?>
 
       <?php if (!$blIssued): ?>
+      <h3 style="font-size:0.95em; margin-top:14px;">CHA Draft BL Review (steps 9h&ndash;9j)</h3>
+      <p class="muted small">After sending the BL Instruction Sheet and packing list above to your CHA, log each draft BL they send back here. Approve it, or request a revision with notes — the CHA's corrected draft is then logged as the next round. At most one round can be awaiting your decision at a time.</p>
+      <?php $latestDraftRound = $draftBlReviews[0] ?? null; ?>
+      <?php if (empty($draftBlReviews)): ?>
+        <p class="muted">No draft BL logged yet.</p>
+      <?php else: ?>
+        <table class="list">
+          <tr><th>Round</th><th>Received</th><th>Draft</th><th>Status</th><th>Reviewed</th><th></th></tr>
+          <?php foreach ($draftBlReviews as $round): ?>
+          <tr>
+            <td><?= (int) $round['round_number'] ?></td>
+            <td><?= htmlspecialchars((string) $round['uploaded_at']) ?></td>
+            <td><a href="/file-store/<?= (int) $round['draft_file_id'] ?>/download" target="_blank">View draft</a></td>
+            <td>
+              <?php if ($round['status'] === 'pending'): ?><span class="badge badge-inactive">Pending Review</span>
+              <?php elseif ($round['status'] === 'approved'): ?><span class="badge badge-active">Approved</span>
+              <?php else: ?><span class="badge">Revision Requested</span><?php endif; ?>
+              <?php if (!empty($round['review_notes'])): ?><br><small class="muted"><?= htmlspecialchars($round['review_notes']) ?></small><?php endif; ?>
+            </td>
+            <td><?= $round['reviewed_by_name'] ? htmlspecialchars($round['reviewed_by_name']) . ' — ' . htmlspecialchars((string) $round['reviewed_at']) : '—' ?></td>
+            <td>
+              <?php if ($round['status'] === 'pending'): ?>
+                <details>
+                  <summary class="small">Review</summary>
+                  <form method="post" action="/orders/<?= (int) $order['id'] ?>/draft-bl/<?= (int) $round['id'] ?>/review">
+                    <?= Csrf::field() ?>
+                    <label>Decision
+                      <select name="decision" required>
+                        <option value="approved">Approve</option>
+                        <option value="revision_requested">Request Revision</option>
+                      </select>
+                    </label>
+                    <label>Notes <small class="muted">(required if requesting a revision)</small><input type="text" name="notes"></label>
+                    <button type="submit" class="btn-sm">Submit Review</button>
+                  </form>
+                </details>
+              <?php endif; ?>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </table>
+      <?php endif; ?>
+      <?php if (!$latestDraftRound || $latestDraftRound['status'] !== 'pending'): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/draft-bl" enctype="multipart/form-data">
+          <?= Csrf::field() ?>
+          <label>Draft BL from CHA *<input type="file" name="draft_bl" accept=".pdf" required></label>
+          <button type="submit" class="btn-sm">Log Draft BL for Review</button>
+        </form>
+      <?php endif; ?>
+
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-issued" enctype="multipart/form-data">
           <?= Csrf::field() ?>
           <label>BL Number *<input type="text" name="bl_number" required></label>
