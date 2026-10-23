@@ -196,6 +196,9 @@ final class CaController
         } else {
             Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
         }
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['synced']} synced/{$revenue['failed']} failed, expenses: {$expenses['imported']} imported/{$expenses['failed']} failed");
         header('Location: /ca/zoho-sync');
     }
 
@@ -581,6 +584,9 @@ final class CaController
             }
         }
 
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'CA_BANK_STATEMENT_UPLOADED', 'ca_bank_statement_lines', null, null, null, "imported: {$imported}, duplicates: {$duplicates}, skipped: {$parsed['skipped']}");
         Flash::set('success', "Imported {$imported} line(s). {$duplicates} already-imported duplicate(s) skipped, {$parsed['skipped']} unparseable row(s) skipped.");
         header('Location: /ca/bank-statement');
     }
@@ -740,6 +746,9 @@ final class CaController
             return;
         }
         CaFyLockRepository::lock($fy, (int) $user['id']);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'CA_FINANCIAL_YEAR_LOCKED', 'ca_fy_locks', null, 'financial_year', null, $fy);
         Flash::set('success', "FY {$fy} locked. No CA data entry against that year will be accepted until it's reopened.");
         header('Location: /ca/fy-locks');
     }
@@ -760,6 +769,9 @@ final class CaController
             return;
         }
         CaFyLockRepository::unlock($fy, (int) $user['id'], $reason);
+        // External QA report N-08: this action never reached the audit
+        // log, so it never notified anyone either.
+        AuditLogRepository::log((int) $user['id'], 'CA_FINANCIAL_YEAR_UNLOCKED', 'ca_fy_locks', null, 'financial_year', $fy, null, $reason);
         Flash::set('success', "FY {$fy} reopened for CA data entry.");
         header('Location: /ca/fy-locks');
     }
