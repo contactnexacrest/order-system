@@ -14,6 +14,23 @@ function extractCsrf(html) {
 }
 
 /**
+ * Isolates the sidebar's Notifications link markup specifically. The
+ * layout renders a `nav-badge` span for several unrelated counters too
+ * (Email Approvals, Quotation/PI Intake Review, Company Settings expiry
+ * warnings — see views/layout/base.njk) — a blanket `res.text.toContain`
+ * search can false-positive-fail whenever leftover data from an earlier
+ * test in the same full-suite run happens to leave any OTHER queue at a
+ * count of exactly 1, which has nothing to do with the staleness bug
+ * this test actually covers.
+ */
+function notificationsLinkMarkup(html) {
+  const start = html.indexOf('class="sidebar-user-notif');
+  if (start === -1) throw new Error('Notifications sidebar link not found in response HTML');
+  const end = html.indexOf('</a>', start);
+  return html.slice(start, end);
+}
+
+/**
  * 90-item backlog "nav badges": sessionAuth's requireAuth middleware sets
  * req.unreadCount ONCE, before the request reaches a controller. The
  * /notifications page's own controller then calls markAllRead() — but
@@ -57,8 +74,9 @@ describe('Notifications sidebar badge is not stale after visiting /notifications
     const res = await agent.get('/notifications');
     expect(res.status).toBe(200);
 
-    expect(res.text).not.toContain('nav-badge">1<');
-    expect(res.text).not.toContain('(1 unread)');
+    const notifLinkMarkup = notificationsLinkMarkup(res.text);
+    expect(notifLinkMarkup).not.toContain('nav-badge');
+    expect(notifLinkMarkup).not.toContain('unread)');
     expect(await notificationRepository.unreadCountForUser(userId)).toBe(0);
   });
 });

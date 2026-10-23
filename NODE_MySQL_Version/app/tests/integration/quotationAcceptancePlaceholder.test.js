@@ -5,6 +5,7 @@ const app = require('../../src/server');
 const db = require('../../src/config/db');
 const piIntakeRepository = require('../../src/repositories/piIntakeRepository');
 const { formatDate } = require('../../src/services/documentDataAssembler');
+const { todayIst } = require('../../src/helpers/dbDateTime');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 /**
@@ -54,7 +55,15 @@ describe('PI intake quotation-acceptance placeholder (user-reported batch, item 
     expect(body).not.toBeNull();
     expect(body.trim()).not.toBe('');
     expect(body).toContain(`We accept Quotation ${qtRef} dated`);
-    expect(body).toContain(formatDate(new Date().toISOString().slice(0, 10)));
+    // The fixture order's quotation_date is set via MySQL CURDATE() (same
+    // IST "today" the rest of the app uses — see todayIst()'s own
+    // docblock), not the test process's UTC wall clock. Using
+    // `new Date().toISOString()` here was a latent flake: IST runs ~5.5h
+    // ahead of UTC, so between 18:30-23:59 UTC daily this compared
+    // yesterday's (UTC) date against CURDATE()'s already-tomorrow (IST)
+    // one and failed for a reason that had nothing to do with the
+    // feature under test.
+    expect(body).toContain(formatDate(todayIst()));
   });
 
   it("shows the client's own previous answer verbatim, not the computed default", async () => {
