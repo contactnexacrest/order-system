@@ -32,6 +32,7 @@
   <?php if (!$downloadsHidden): ?>
   <div class="section">
     <h2>Documents</h2>
+    <p class="muted small">Every document we've finalized for your order so far — download any time.</p>
     <table class="list">
       <tr><th>Document</th><th>Reference</th><th>Date</th><th></th></tr>
       <?php foreach ($documents as $d): ?>

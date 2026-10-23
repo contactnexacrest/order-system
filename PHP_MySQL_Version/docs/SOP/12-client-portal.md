@@ -127,7 +127,10 @@ and one already marked **complete** both land in the same **Complete**
 group, since the buyer was never meant to see that internal distinction as
 two separate buckets in the first place. Groups appear in a fixed,
 most-relevant-first order (Active, Complete, Disputed, Lost, Cancelled),
-and only a group with at least one order in it is shown:
+and only a group with at least one order in it is shown — each rendered
+group carries its own short, factual one-line description (e.g.
+"Disputed — Being reviewed by our team"), so a client never has to guess
+what landed an order in a given bucket:
 
 ![Client dashboard — My Orders, grouped by status](./images/portal_dashboard.png)
 
@@ -138,8 +141,10 @@ Opening an order (**View documents**) shows, top to bottom:
 1. **Order Confirmation — Your Acknowledgement Needed** — only appears
    when there's a pending OC acknowledgment; see
    [Chapter 4](./04-stage4-order-confirmation.md) for the full mechanics.
-2. **Documents** — every customer-facing document generated so far, each
-   with a direct PDF download:
+2. **Documents** — every customer-facing document finalized so far, each
+   with a direct PDF download; a short on-page line says as much, so the
+   client knows these are final copies rather than wondering why nothing
+   shows up before the first one is ready:
 
    ![Documents table in the client portal](./images/portal_documents.png)
 

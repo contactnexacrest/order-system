@@ -1,4 +1,16 @@
 <?php use App\Helpers\Dates; ?>
+<?php
+// Short, factual one-liner per status group — a client who already has an
+// order in a given bucket benefits from knowing what it means; a group with
+// no orders is simply never rendered, so nothing hypothetical is ever shown.
+$__groupDescriptions = [
+    'Active'    => 'Currently moving through our pipeline.',
+    'Complete'  => 'Shipped and finished.',
+    'Disputed'  => 'Being reviewed by our team.',
+    'Lost'      => 'Did not go ahead.',
+    'Cancelled' => 'Called off.',
+];
+?>
 <div class="card page-wide">
   <h1>My Orders</h1>
   <?php if ($historyHidden): ?>
@@ -13,6 +25,9 @@
     <?php foreach ($orderGroups as $group): ?>
     <div class="section">
       <h2><?= htmlspecialchars($group['label']) ?> (<?= count($group['orders']) ?>)</h2>
+      <?php if (isset($__groupDescriptions[$group['label']])): ?>
+        <p class="muted small"><?= htmlspecialchars($__groupDescriptions[$group['label']]) ?></p>
+      <?php endif; ?>
       <table class="list">
         <tr><th>Order Ref</th><th>Stage</th><th>Created</th><th></th></tr>
         <?php foreach ($group['orders'] as $o): ?>
