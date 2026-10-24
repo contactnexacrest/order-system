@@ -185,9 +185,9 @@ final class OrderScreenRedesignTest extends TestCase
         }
 
         $this->assertSame(
-            26,
+            56,
             $directChildSectionCount,
-            'Expected exactly 26 step-card panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01).'
+            'Expected exactly 56 step-card panels as direct children of #order-panels (one per individual numbered/lettered step, nothing grouped) — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01).'
         );
     }
 

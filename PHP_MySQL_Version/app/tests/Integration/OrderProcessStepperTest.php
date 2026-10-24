@@ -44,16 +44,17 @@ final class OrderProcessStepperTest extends DbTestCase
 
     /**
      * Batch 3 #14 — the stepper is clickable: each step carries
-     * data-stage="N". The order-detail-page rebuild (step-card sequence)
-     * replaced every stage's own data-stage-carrying `<div class="section">`
-     * with one or more `<details class="step-card">` step-cards (one DB
-     * stage can now map to more than one card, e.g. Stage 2/3 split into
-     * two separate cards, and Stages 6-7 share a pair) — the stepper's
-     * click-to-jump script now resolves a clicked stage number to its
-     * card id via its own `stageToCardId` lookup object instead of a
-     * shared data-stage attribute on the target. This pins that every
-     * stage number the stepper exposes still resolves to a real step-card
-     * id present in the page.
+     * data-stage="N". The order-detail-page rebuild (step-card sequence,
+     * further split into one card per individual numbered/lettered step —
+     * nothing grouped) replaced every stage's own data-stage-carrying
+     * `<div class="section">` with several `<details class="step-card">`
+     * step-cards per DB stage — the stepper's click-to-jump script now
+     * resolves a clicked stage number to its full list of card ids via
+     * its own `stageToCardId` lookup object instead of a shared data-stage
+     * attribute on the target. This pins that every stage number the
+     * stepper exposes still resolves to real step-card ids present in the
+     * page (kept in lock-step with the same object in show.php's own
+     * script).
      */
     public function testStepperStepsAndTheirTargetPanelsCarryMatchingDataStageAttributes(): void
     {
@@ -66,15 +67,15 @@ final class OrderProcessStepperTest extends DbTestCase
         $output = ob_get_clean();
 
         $stageToCardId = [
-            1 => ['documents-approvals'],
-            2 => ['step-buyer-po'],
-            3 => ['step-pi-advance', 'step-pi-intake'],
-            4 => ['step-oc'],
-            5 => ['step-supplier-po'],
-            6 => ['step-freight'],
-            7 => ['step-packing-bl'],
-            8 => ['step-ci-balance'],
-            9 => ['step-despatch'],
+            1 => ['step-1-quotation-prepare', 'step-2-quotation-send', 'step-3-quotation-accept', 'document-review-approval'],
+            2 => ['step-4a-buyer-po-generate', 'step-4b-buyer-po-confirm', 'step-4c-buyer-po-attach'],
+            3 => ['step-5a-pi-generate', 'step-5b-advance-record', 'step-5c-advance-clear', 'step-4d-pi-intake-link', 'step-4e-pi-intake-apply', 'step-5-lc-bank-loan'],
+            4 => ['step-6a-oc-generate', 'step-6b-oc-acknowledge', 'step-6c-buyer-action-link'],
+            5 => ['step-7a-supplier-po-terms', 'step-7b-supplier-po-generate', 'step-7c-supplier-po-signed', 'step-7d-supplier-po-attach'],
+            6 => ['step-9a-freight-terms', 'step-9b-freight-debit-note', 'step-9c-freight-remittance', 'step-9d-freight-clear'],
+            7 => ['step-9e-packing', 'step-9f-packing-list', 'step-9g-shipping-details', 'step-9h-bl-instruction', 'step-9i-bl-issued'],
+            8 => ['step-ci-generate', 'step-ci-scanned-bl-sent', 'step-balance-record', 'step-balance-clear'],
+            9 => ['step-11a-coo-prep', 'step-11b-bl-originals-received', 'step-11c-bl-endorsed-mark', 'step-11d-bl-endorsement-save', 'step-11f-bl-endorsement-generate', 'step-11g-close-order', 'step-despatch'],
         ];
 
         foreach ([1, 2, 3, 4, 5, 6, 7, 8, 9] as $stage) {

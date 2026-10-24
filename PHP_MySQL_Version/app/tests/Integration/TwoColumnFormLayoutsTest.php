@@ -48,7 +48,7 @@ final class TwoColumnFormLayoutsTest extends DbTestCase
         $formIdPos = strpos($output, 'id="supplier-po-form"');
         $supplierSelectPos = strpos($output, 'name="supplier_id"');
         $calcPos = strpos($output, 'data-spo-calc="quantity"');
-        $submitPos = strpos($output, 'Save Supplier PO Terms');
+        $submitPos = strpos($output, 'Save Supplier PO Terms</button>');
 
         self::assertNotFalse($formIdPos);
         self::assertNotFalse($supplierSelectPos);

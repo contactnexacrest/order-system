@@ -13,12 +13,10 @@ use App\Tests\Support\DbTestCase;
  * User-reported batch item 19: the Documents panel's own numbered
  * sequence skipped straight past "Generate Packing List" — it had no
  * step badge at all, unlike every other document-generate button in
- * that panel. The order-detail-page rebuild relabelled this whole card
- * (DB Stage 7, "Packing, BL Instruction & CHA Draft Review") under the
- * user's own Step 9g-9k numbering; Packing List gets 9k, the one letter
- * in that range not already claimed by this card's other real actions
- * (Save Packing & Crates/Save Shipping Details/Generate BL Instruction
- * Sheet/Confirm BL Issued = 9g-9j).
+ * that panel. "Generate Packing List" is now its own single-purpose
+ * step-card (Step 9f, right after Step 9e "Save Packing & Crates", both
+ * split out of what used to be one shared DB Stage 7 card) — it carries
+ * the 9f badge matching that card's own heading.
  */
 final class PackingListStepBadgeTest extends DbTestCase
 {
@@ -48,7 +46,7 @@ final class PackingListStepBadgeTest extends DbTestCase
         $output = (string) ob_get_clean();
 
         self::assertMatchesRegularExpression(
-            '#<span class="step-badge"[^>]*>9k</span>\s*<button[^>]*>Generate Packing List</button>#',
+            '#<span class="step-badge"[^>]*>9f</span>\s*<button[^>]*>Generate Packing List</button>#',
             $output,
             'Generate Packing List must carry its own step badge, same as every other document-generate button in this panel'
         );

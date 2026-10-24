@@ -80,26 +80,26 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage2Pos = strpos($output, "Step 4a&ndash;4c &middot; Buyer's PO</h2>");
-        $buyerPoGeneratePos = strpos($output, 'Generate Buyer PO');
+        $stage2Pos = strpos($output, "Step 4a &middot; Generate Buyer's PO</h2>");
+        $buyerPoGeneratePos = strpos($output, 'Generate Buyer PO</button>');
 
         self::assertNotFalse($stage2Pos);
         self::assertNotFalse($buyerPoGeneratePos);
-        self::assertGreaterThan($stage2Pos, $buyerPoGeneratePos, "Generate Buyer PO must render inside the Buyer's PO step-card, after its heading");
+        self::assertGreaterThan($stage2Pos, $buyerPoGeneratePos, "Generate Buyer PO must render inside its own Step 4a step-card, after its heading");
 
         $topOfPage = substr($output, 0, $stage2Pos);
-        self::assertStringNotContainsString('Generate Buyer PO', $topOfPage, "Generate Buyer PO must no longer sit inside the top Documents & Approvals panel, before the Buyer's PO step-card");
+        self::assertStringNotContainsString('Generate Buyer PO</button>', $topOfPage, "Generate Buyer PO must no longer sit inside the top Documents & Approvals panel, before the Step 4a step-card");
     }
 
-    public function testPiGenerateButtonLivesInsidePiStageIntakeSection(): void
+    public function testPiGenerateButtonLivesInsideItsOwnStep5aSection(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->unlockThrough($orderId, 2);
 
         $output = $this->render($orderId);
 
-        $stage3Pos = strpos($output, 'PI-Stage Intake</h2>');
-        $piGeneratePos = strpos($output, 'Generate Proforma Invoice');
+        $stage3Pos = strpos($output, 'Step 5a &middot; Generate Proforma Invoice</h2>');
+        $piGeneratePos = strpos($output, 'Generate Proforma Invoice</button>');
 
         self::assertNotFalse($stage3Pos);
         self::assertNotFalse($piGeneratePos);
@@ -113,8 +113,8 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage4Pos = strpos($output, 'Step 6 &middot; Order Confirmation &amp; ECGC</h2>');
-        $ocGeneratePos = strpos($output, 'Generate Order Confirmation');
+        $stage4Pos = strpos($output, 'Step 6a &middot; Generate Order Confirmation</h2>');
+        $ocGeneratePos = strpos($output, 'Generate Order Confirmation</button>');
 
         self::assertNotFalse($stage4Pos);
         self::assertNotFalse($ocGeneratePos);
@@ -129,8 +129,8 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage5Pos = strpos($output, 'Step 7 &middot; Supplier Purchase Order</h2>');
-        $suppoGeneratePos = strpos($output, 'Generate Supplier PO');
+        $stage5Pos = strpos($output, 'Step 7b &middot; Generate Supplier PO</h2>');
+        $suppoGeneratePos = strpos($output, 'Generate Supplier PO</button>');
 
         self::assertNotFalse($stage5Pos);
         self::assertNotFalse($suppoGeneratePos);
@@ -145,8 +145,8 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage6Pos = strpos($output, 'Step 9a&ndash;9f &middot; Freight Payment');
-        $fdnGeneratePos = strpos($output, 'Generate Debit Note');
+        $stage6Pos = strpos($output, 'Step 9b &middot; Generate Debit Note</h2>');
+        $fdnGeneratePos = strpos($output, 'Generate Debit Note</button>');
 
         self::assertNotFalse($stage6Pos);
         self::assertNotFalse($fdnGeneratePos);
@@ -161,8 +161,8 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage7Pos = strpos($output, 'Step 9g&ndash;9j &middot; Packing, BL Instruction &amp; CHA Draft Review</h2>');
-        $plGeneratePos = strpos($output, 'Generate Packing List');
+        $stage7Pos = strpos($output, 'Step 9f &middot; Generate Packing List</h2>');
+        $plGeneratePos = strpos($output, 'Generate Packing List</button>');
 
         self::assertNotFalse($stage7Pos);
         self::assertNotFalse($plGeneratePos);
@@ -176,8 +176,8 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage8Pos = strpos($output, 'Step 9b&ndash;9f &middot; Commercial Invoice &amp; Balance Payment');
-        $ciGeneratePos = strpos($output, 'Generate Commercial Invoice');
+        $stage8Pos = strpos($output, 'Step 9j &middot; Generate Commercial Invoice');
+        $ciGeneratePos = strpos($output, 'Generate Commercial Invoice</button>');
 
         self::assertNotFalse($stage8Pos);
         self::assertNotFalse($ciGeneratePos);
@@ -191,15 +191,15 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $documentsPanelStart = strpos($output, 'Documents &amp; Approvals');
-        $stage2Pos = strpos($output, "Step 4a&ndash;4c &middot; Buyer's PO</h2>");
+        $documentsPanelStart = strpos($output, 'id="step-1-quotation-prepare"');
+        $stage2Pos = strpos($output, "Step 4a &middot; Generate Buyer's PO</h2>");
         self::assertNotFalse($documentsPanelStart);
         self::assertNotFalse($stage2Pos);
         $panel = substr($output, $documentsPanelStart, $stage2Pos - $documentsPanelStart);
 
         self::assertStringContainsString('document_type" value="QT"', $panel, 'the Quotation generate form must still be the one deliberately kept in the top panel');
-        foreach (['Generate Buyer PO', 'Generate Proforma Invoice', 'Generate Order Confirmation', 'Generate Supplier PO', 'Generate Debit Note', 'Generate Packing List', 'Generate Commercial Invoice'] as $label) {
-            self::assertStringNotContainsString($label, $panel, "{$label} must have moved out of the top Documents & Approvals panel");
+        foreach (['Generate Buyer PO</button>', 'Generate Proforma Invoice</button>', 'Generate Order Confirmation</button>', 'Generate Supplier PO</button>', 'Generate Debit Note</button>', 'Generate Packing List</button>', 'Generate Commercial Invoice</button>'] as $label) {
+            self::assertStringNotContainsString($label, $panel, "{$label} must have moved out of the top Step 1 Prepare Quotation card");
         }
     }
 
@@ -254,11 +254,11 @@ final class OrderPageSectionOrderTest extends DbTestCase
         $output = $this->render($orderId);
 
         $financialsPos = strpos($output, 'id="order-financials"');
-        $stage9Pos = strpos($output, 'Step 11 (continued) &middot; Document Despatch &amp; Closure</h2>');
+        $stage9Pos = strpos($output, 'id="step-11a-coo-prep"');
 
         self::assertNotFalse($financialsPos);
         self::assertNotFalse($stage9Pos);
-        self::assertLessThan($stage9Pos, $financialsPos, 'Order Financials must render before the Document Despatch & Closure step — that step\'s own gate refers staff to it as "above"');
+        self::assertLessThan($stage9Pos, $financialsPos, 'Order Financials must render before the Document Despatch & Closure steps — those steps\' own gates refer staff to it as "above"');
         self::assertStringNotContainsString('Order Financials below', $output, 'the stale "below" reference must be corrected now that Financials renders first');
     }
 }

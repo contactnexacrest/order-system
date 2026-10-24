@@ -26,7 +26,6 @@ final class MinimumFontSizeCssTest extends TestCase
         $css = (string) file_get_contents(dirname(__DIR__, 3) . '/public_html/assets/css/app.css');
 
         self::assertMatchesRegularExpression('/\.product-row label\{[^}]*font-size:0\.75rem/', $css);
-        self::assertMatchesRegularExpression('/\.stage-chip \.stage-chip-num\{[^}]*font-size:0\.75rem/', $css);
         self::assertMatchesRegularExpression('/\.process-step-label\{[^}]*font-size:0\.75rem/', $css);
     }
 }
