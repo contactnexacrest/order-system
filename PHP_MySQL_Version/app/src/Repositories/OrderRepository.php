@@ -531,6 +531,15 @@ final class OrderRepository
         // consulted by the stage-gate/permission system.
         OrderAssigneeRepository::add($orderId, $createdBy, $createdBy);
 
+        // Every active compliance task type gets a real 'not_started' row
+        // up front — a report run directly against order_compliance_tasks
+        // must never see "no row" as a stand-in for "not applicable."
+        OrderComplianceTaskRepository::initializeForOrder($orderId);
+
+        // Same materialization fix for export-benefit scheme eligibility —
+        // see OrderExportBenefitSchemeRepository's own docblock.
+        OrderExportBenefitSchemeRepository::initializeForOrder($orderId);
+
         return $orderId;
     }
 

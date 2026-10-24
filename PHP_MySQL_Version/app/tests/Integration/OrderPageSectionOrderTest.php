@@ -161,7 +161,7 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage7Pos = strpos($output, 'Step 9f &middot; Generate Packing List</h2>');
+        $stage7Pos = strpos($output, 'Step 10b &middot; Generate Packing List</h2>');
         $plGeneratePos = strpos($output, 'Generate Packing List</button>');
 
         self::assertNotFalse($stage7Pos);
@@ -176,7 +176,7 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage8Pos = strpos($output, 'Step 9j &middot; Generate Commercial Invoice');
+        $stage8Pos = strpos($output, 'Step 11a &middot; Generate Commercial Invoice');
         $ciGeneratePos = strpos($output, 'Generate Commercial Invoice</button>');
 
         self::assertNotFalse($stage8Pos);
@@ -214,15 +214,15 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $communicationPos = strpos($output, '<h2>Step 13 &middot; Order Communication</h2>');
-        $feedbackPos = strpos($output, '<h2>Step 14 &middot; Order Feedback</h2>');
-        $disputesPos = strpos($output, '<h2>Step 16 &middot; Disputes</h2>');
+        $communicationPos = strpos($output, '<h2>Order Communication</h2>');
+        $feedbackPos = strpos($output, '<h2>Order Feedback</h2>');
+        $disputesPos = strpos($output, '<h2>Disputes</h2>');
 
         self::assertNotFalse($communicationPos);
         self::assertNotFalse($feedbackPos);
         self::assertNotFalse($disputesPos);
-        self::assertLessThan($feedbackPos, $communicationPos, 'Order Communication (step 13) must render before Order Feedback (step 14)');
-        self::assertLessThan($disputesPos, $feedbackPos, 'Order Feedback (step 14) must render before Disputes (steps 15/16)');
+        self::assertLessThan($feedbackPos, $communicationPos, 'Order Communication (step 15) must render before Order Feedback (step 16)');
+        self::assertLessThan($disputesPos, $feedbackPos, 'Order Feedback (step 16) must render before Disputes (step 18)');
     }
 
     public function testTravelExpensesRendersInsideOrderFinancialsNextToLcAndBankLoan(): void

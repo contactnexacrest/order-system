@@ -216,7 +216,7 @@ FROM currencies c WHERE c.code = 'USD';
 -- Presets screen.
 INSERT INTO payment_presets
   (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
-SELECT 'Letter of Credit — 30/70', 0, 30.00, 'against Letter of Credit opened before production commences', 'LC',
+SELECT 'Irrevocable Letter of Credit at Sight', 0, 30.00, 'against Letter of Credit opened before production commences', 'LC',
        70.00, 'B_AGAINST_BL', 7,
        'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
        c.id, 1, 1

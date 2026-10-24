@@ -9,6 +9,8 @@ use App\Controllers\OrderController;
 use App\Controllers\OrderFinancialsController;
 use App\Helpers\Flash;
 use App\Repositories\CaExportBenefitRepository;
+use App\Repositories\OrderComplianceTaskRepository;
+use App\Repositories\OrderExportBenefitSchemeRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderShippingRepository;
@@ -36,6 +38,22 @@ final class OrderClosureTwoPhaseTest extends DbTestCase
     {
         for ($stage = 1; $stage <= $throughStage; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
+        }
+    }
+
+    /** Every order now gets real 'not_started' compliance-task rows at creation — resolve them so they don't block closure in tests unrelated to that gate. */
+    private function resolveAllComplianceTasks(int $orderId, int $userId): void
+    {
+        foreach (OrderComplianceTaskRepository::forOrder($orderId) as $ct) {
+            OrderComplianceTaskRepository::setStatus($orderId, (int) $ct['task_type_id'], 'skipped', 'not applicable to this test order', $userId);
+        }
+    }
+
+    /** Every order now gets real 'pending' export-benefit-scheme rows at creation — resolve them so they don't block closure in tests unrelated to that gate. */
+    private function resolveAllExportBenefitSchemes(int $orderId, int $userId): void
+    {
+        foreach (OrderExportBenefitSchemeRepository::forOrder($orderId) as $s) {
+            OrderExportBenefitSchemeRepository::setStatus($orderId, $s['scheme_name'], 'not_eligible', 'not applicable to this test order', $userId);
         }
     }
 
@@ -127,6 +145,8 @@ final class OrderClosureTwoPhaseTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->closeToShippedDocsSent($orderId, $userId);
+        $this->resolveAllComplianceTasks($orderId, $userId);
+        $this->resolveAllExportBenefitSchemes($orderId, $userId);
 
         ob_start();
         (new OrderController())->markFullySettled(['id' => (string) $orderId]);
@@ -136,6 +156,42 @@ final class OrderClosureTwoPhaseTest extends DbTestCase
         $order = OrderRepository::find($orderId);
         self::assertSame('complete', $order['status']);
         self::assertSame(1, (int) $order['is_locked']);
+    }
+
+    public function testMarkFullySettledBlocksWhileAComplianceTaskIsStillOutstanding(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->closeToShippedDocsSent($orderId, $userId);
+        // Deliberately does NOT call resolveAllComplianceTasks() — every
+        // order now gets real 'not_started' rows at creation, and this is
+        // the test that confirms closure is actually blocked on them, not
+        // just visually flagged.
+
+        ob_start();
+        (new OrderController())->markFullySettled(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        self::assertSame('error', Flash::pull()[0]['type']);
+        self::assertSame('shipped_docs_sent', OrderRepository::find($orderId)['status']);
+    }
+
+    public function testMarkFullySettledBlocksWhileAnExportBenefitSchemeIsStillPending(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->closeToShippedDocsSent($orderId, $userId);
+        $this->resolveAllComplianceTasks($orderId, $userId);
+        // Deliberately does NOT call resolveAllExportBenefitSchemes() —
+        // every order now gets real 'pending' rows at creation, and this
+        // is the test that confirms closure is actually blocked on them.
+
+        ob_start();
+        (new OrderController())->markFullySettled(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        self::assertSame('error', Flash::pull()[0]['type']);
+        self::assertSame('shipped_docs_sent', OrderRepository::find($orderId)['status']);
     }
 
     public function testMarkFullySettledBlocksWhileABenefitClaimIsStillAwaitingReceipt(): void
@@ -160,6 +216,8 @@ final class OrderClosureTwoPhaseTest extends DbTestCase
         $this->closeToShippedDocsSent($orderId, $userId);
         $benefitId = CaExportBenefitRepository::record($orderId, 'RODTEP', 'SB-002', 5000.0, '2026-06-01', 'INR', null, $userId);
         CaExportBenefitRepository::markReceived($benefitId, 5100.0, '2026-07-01');
+        $this->resolveAllComplianceTasks($orderId, $userId);
+        $this->resolveAllExportBenefitSchemes($orderId, $userId);
 
         ob_start();
         (new OrderController())->markFullySettled(['id' => (string) $orderId]);

@@ -31,6 +31,7 @@ use App\Repositories\LookupRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderComplianceTaskRepository;
+use App\Repositories\OrderExportBenefitSchemeRepository;
 use App\Repositories\OrderCostEntryRepository;
 use App\Repositories\OrderLcDetailRepository;
 use App\Repositories\OrderCrateRepository;
@@ -934,6 +935,7 @@ final class OrderController
                 break;
             }
         }
+        $exportBenefitSchemesForOrder = OrderExportBenefitSchemeRepository::forOrder($orderId);
 
         $duplicatedFromOrder = !empty($order['duplicated_from_order_id'])
             ? OrderRepository::find((int) $order['duplicated_from_order_id'])
@@ -976,6 +978,7 @@ final class OrderController
             'supplierFactoryAddressesBySupplier' => SupplierFactoryAddressRepository::allGroupedBySupplier(),
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
             'complianceTasks' => $complianceTasksForOrder,
+            'exportBenefitEligibility' => $exportBenefitSchemesForOrder,
             'pendingInspectionTask' => $pendingInspectionTask,
             'orderInspectionFee' => $canManageOrderFinancials ? OrderInspectionFeeRepository::find($orderId) : null,
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
@@ -2996,6 +2999,26 @@ final class OrderController
                 header("Location: /orders/{$orderId}#order-financials");
                 return;
             }
+
+            $outstandingComplianceTasks = array_filter(
+                OrderComplianceTaskRepository::forOrder($orderId),
+                static fn(array $ct): bool => $ct['status'] === 'not_started' || $ct['status'] === 'pending_approval'
+            );
+            if (!empty($outstandingComplianceTasks)) {
+                Flash::set('error', 'This order still has an unresolved Compliance Checklist task — approve or mark it Not Applicable (with a reason) first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
+                header("Location: /orders/{$orderId}#compliance-checklist");
+                return;
+            }
+
+            $pendingExportBenefitSchemes = array_filter(
+                OrderExportBenefitSchemeRepository::forOrder($orderId),
+                static fn(array $s): bool => $s['status'] === 'pending'
+            );
+            if (!empty($pendingExportBenefitSchemes)) {
+                Flash::set('error', 'This order still has a government export-benefit scheme with no eligibility decision — mark it Eligible or Not Eligible first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
+                header("Location: /orders/{$orderId}#order-financials");
+                return;
+            }
         }
 
         OrderRepository::markComplete($orderId);
@@ -3039,6 +3062,42 @@ final class OrderController
         OrderComplianceTaskRepository::setStatus($orderId, $taskTypeId, $status, $status === 'skipped' ? $skipReason : null, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', $orderId, 'compliance_task:' . $taskTypeId, null, $status, $status === 'skipped' ? $skipReason : null);
         Flash::set('success', 'Compliance checklist updated.');
+        header("Location: /orders/{$orderId}#compliance-checklist");
+    }
+
+    /**
+     * Repeat-order shortcut: skips every currently-outstanding (not yet
+     * approved/skipped) compliance task on this order in one submit, with
+     * one shared reason — the same deliberate "skipped requires a reason"
+     * rule as a single task, just applied to the whole remaining set at
+     * once instead of clicking through each one.
+     */
+    public function markAllComplianceTasksNotApplicable(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'close_orders')) {
+            Flash::set('error', 'You do not have permission to update the compliance checklist.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $skipReason = trim((string) ($_POST['skip_reason'] ?? ''));
+        if ($skipReason === '') {
+            Flash::set('error', 'A reason is required to mark the remaining compliance tasks Not Applicable.');
+            header("Location: /orders/{$orderId}#compliance-checklist");
+            return;
+        }
+
+        $outstanding = array_filter(
+            OrderComplianceTaskRepository::forOrder($orderId),
+            static fn(array $ct): bool => $ct['status'] === 'not_started' || $ct['status'] === 'pending_approval'
+        );
+        foreach ($outstanding as $ct) {
+            OrderComplianceTaskRepository::setStatus($orderId, (int) $ct['task_type_id'], 'skipped', $skipReason, (int) $user['id']);
+            AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', $orderId, 'compliance_task:' . $ct['task_type_id'], $ct['status'], 'skipped', $skipReason);
+        }
+        Flash::set('success', count($outstanding) . ' outstanding compliance task(s) marked Not Applicable.');
         header("Location: /orders/{$orderId}#compliance-checklist");
     }
 

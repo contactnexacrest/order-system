@@ -1368,6 +1368,27 @@ CREATE TABLE ca_export_benefits (
   INDEX idx_ca_export_benefits_claimed_at (claimed_at)
 ) ENGINE=InnoDB;
 
+-- Always-materialized eligibility decision per order per scheme —
+-- separate from ca_export_benefits above, which represents "a real
+-- claim" (NOT NULL amount/date) and is only written once staff actually
+-- submit one. A missing ca_export_benefits row is otherwise
+-- indistinguishable from "forgotten"; this table exists so "not
+-- eligible for this scheme" is always an explicit, real row (added
+-- 2026-10-24d — see docs/migrations/2026-10-24d-order-export-benefit-
+-- schemes.sql for the backfill of orders that predate this), same
+-- pattern as order_compliance_tasks below.
+CREATE TABLE order_export_benefit_schemes (
+  order_id    BIGINT UNSIGNED NOT NULL,
+  scheme_name VARCHAR(150) NOT NULL,   -- matches dropdown_options('export_benefit_scheme')
+  status      ENUM('pending','eligible','not_eligible') NOT NULL DEFAULT 'pending',
+  reason      VARCHAR(500) NULL,       -- required when status='not_eligible', same rule as order_compliance_tasks.skip_reason
+  resolved_at TIMESTAMP NULL,
+  resolved_by BIGINT UNSIGNED NULL,
+  PRIMARY KEY (order_id, scheme_name),
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (resolved_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
 -- ================================================================
 -- SECTION K — 2FA BACKUP CODES & SAVED REPORT DEFINITIONS
 -- (Resolved 2026-09-18 — see ARCHITECTURE.md "Open questions", now closed)

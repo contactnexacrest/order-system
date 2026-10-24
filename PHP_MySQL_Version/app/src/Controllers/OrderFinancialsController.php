@@ -116,6 +116,45 @@ final class OrderFinancialsController
         header("Location: /orders/{$orderId}#order-financials");
     }
 
+    /**
+     * Eligibility decision for a government export-benefit scheme —
+     * separate from (and a precondition of) actually recording a claim
+     * above. 'not_eligible' requires a reason, same deliberate
+     * "never silently skipped" rule as OrderComplianceTaskRepository's
+     * skip_reason.
+     */
+    public function setExportBenefitSchemeStatus(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+
+        $schemeName = trim((string) ($_POST['scheme_name'] ?? ''));
+        $status = trim((string) ($_POST['status'] ?? ''));
+        if ($schemeName === '' || !array_key_exists($status, \App\Repositories\OrderExportBenefitSchemeRepository::STATUSES) || $status === 'pending') {
+            Flash::set('error', 'Select a valid scheme and eligibility status.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if ($status === 'not_eligible' && $reason === '') {
+            Flash::set('error', 'A reason is required to mark a scheme Not Eligible.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+
+        \App\Repositories\OrderExportBenefitSchemeRepository::setStatus($orderId, $schemeName, $status, $status === 'not_eligible' ? $reason : null, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'EXPORT_BENEFIT_SCHEME_STATUS_UPDATED', 'orders', $orderId, 'export_benefit_scheme:' . $schemeName, null, $status, $status === 'not_eligible' ? $reason : null);
+        Flash::set('success', "{$schemeName} eligibility updated.");
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
     public function addCostEntry(array $params): void
     {
         $orderId = (int) $params['id'];

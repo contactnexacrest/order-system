@@ -31,6 +31,28 @@ final class OrderComplianceChecklistTest extends DbTestCase
         $this->taskTypeId = ComplianceTaskTypeRepository::create('PHPUnit ECGC Cover', $this->createTestUser('Admin'));
     }
 
+    public function testInitializeForOrderWritesARealRowForEveryActiveTaskTypeAtCreation(): void
+    {
+        // Unlike this file's own $this->taskTypeId (created AFTER
+        // $this->orderId in setUp, deliberately, to exercise the LEFT JOIN
+        // fallback below for a task type that postdates the order), this
+        // test creates the task type FIRST, then a fresh order, to confirm
+        // OrderRepository::insertRow() really did write a row up front —
+        // read the raw table directly, bypassing forOrder()'s COALESCE
+        // entirely, since a report against the raw table must never see
+        // "no row" standing in for "not applicable."
+        $preexistingTypeId = ComplianceTaskTypeRepository::create('PHPUnit Pre-Existing Task Type', $this->createTestUser('Admin'));
+        $freshOrderId = $this->createTestOrder($this->createTestClient());
+
+        $pdo = \App\Config\Database::connection();
+        $stmt = $pdo->prepare('SELECT status FROM order_compliance_tasks WHERE order_id = :order_id AND task_type_id = :task_type_id');
+        $stmt->execute(['order_id' => $freshOrderId, 'task_type_id' => $preexistingTypeId]);
+        $row = $stmt->fetch();
+
+        self::assertNotFalse($row, 'a real row must exist from order creation, not just the LEFT JOIN default');
+        self::assertSame('not_started', $row['status']);
+    }
+
     public function testForOrderDefaultsMissingRowsToNotStarted(): void
     {
         $rows = OrderComplianceTaskRepository::forOrder($this->orderId);
@@ -148,6 +170,70 @@ final class OrderComplianceChecklistTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $this->orderId]);
         $output2 = ob_get_clean();
         self::assertStringNotContainsString('Compliance Checklist', $output2);
+    }
+
+    public function testMarkAllNotApplicableRejectsAUserWithoutCloseOrdersPermission(): void
+    {
+        $userId = $this->createTestUser('Accounts Executive');
+        $_SESSION['_auth_user_id'] = $userId;
+        $this->postMarkAllNa(['skip_reason' => 'Repeat order']);
+
+        $row = $this->findRow(OrderComplianceTaskRepository::forOrder($this->orderId), $this->taskTypeId);
+        self::assertSame('not_started', $row['status'], 'Accounts Executive has no close_orders permission by default — the write must be refused');
+    }
+
+    public function testMarkAllNotApplicableWithoutAReasonIsRejected(): void
+    {
+        $userId = $this->createTestUser('Export Executive');
+        $_SESSION['_auth_user_id'] = $userId;
+        $this->postMarkAllNa([]);
+
+        $row = $this->findRow(OrderComplianceTaskRepository::forOrder($this->orderId), $this->taskTypeId);
+        self::assertSame('not_started', $row['status'], 'the bulk action requires a reason too — must not silently succeed without one');
+    }
+
+    public function testMarkAllNotApplicableResolvesEveryOutstandingTaskWithOneSharedReason(): void
+    {
+        $otherTypeId = ComplianceTaskTypeRepository::create('PHPUnit Fumigation Certificate', $this->createTestUser('Admin'));
+        $alreadyApprovedTypeId = ComplianceTaskTypeRepository::create('PHPUnit Due Diligence', $this->createTestUser('Admin'));
+        $userId = $this->createTestUser('Export Executive');
+        OrderComplianceTaskRepository::setStatus($this->orderId, $alreadyApprovedTypeId, 'approved', null, $userId);
+
+        // This is a shared, un-rolled-back dev DB (no per-test transaction),
+        // so by this point in a full suite run other tests may already have
+        // created their own active task types — the outstanding count below
+        // is read fresh rather than hardcoded, so this test holds regardless
+        // of what else is active at the time it runs.
+        $expectedOutstanding = OrderComplianceTaskRepository::summaryForOrder($this->orderId)['outstanding'];
+
+        $_SESSION['_auth_user_id'] = $userId;
+        $this->postMarkAllNa(['skip_reason' => 'Repeat order — buyer previously cleared']);
+
+        $rows = OrderComplianceTaskRepository::forOrder($this->orderId);
+        self::assertSame('skipped', $this->findRow($rows, $this->taskTypeId)['status']);
+        self::assertSame('Repeat order — buyer previously cleared', $this->findRow($rows, $this->taskTypeId)['skip_reason']);
+        self::assertSame('skipped', $this->findRow($rows, $otherTypeId)['status']);
+        self::assertSame(
+            'approved',
+            $this->findRow($rows, $alreadyApprovedTypeId)['status'],
+            'an already-resolved task must not be touched by the bulk skip'
+        );
+        self::assertSame(0, OrderComplianceTaskRepository::summaryForOrder($this->orderId)['outstanding'], 'every outstanding task must now be resolved');
+
+        $logRows = array_values(array_filter(
+            AuditLogRepository::forOrder($this->orderId),
+            static fn (array $r): bool => $r['action_type'] === 'COMPLIANCE_TASK_STATUS_UPDATED'
+        ));
+        self::assertCount($expectedOutstanding, $logRows, 'one audit log row per outstanding task actually touched, not per task type overall');
+    }
+
+    /** @param array<string, string> $fields */
+    private function postMarkAllNa(array $fields): void
+    {
+        $_POST = $fields;
+        ob_start();
+        (new OrderController())->markAllComplianceTasksNotApplicable(['id' => (string) $this->orderId]);
+        ob_end_clean();
     }
 
     /** @param array<string, string> $fields */

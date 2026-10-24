@@ -282,13 +282,14 @@ $paymentLegsApplicable = count(array_filter($paymentLegs, static fn(array $l): b
 
 // Order Details at-a-glance summary (redesign) — quick counts reused from
 // data already loaded for other sections, so no extra queries.
-$complianceSummary = ['total' => 0, 'approved' => 0];
+$complianceSummary = ['total' => 0, 'approved' => 0, 'outstanding' => 0];
 foreach ($complianceTasks as $ct) {
     $complianceSummary['total']++;
     if ($ct['status'] === 'approved' || $ct['status'] === 'skipped') {
         $complianceSummary['approved']++;
     }
 }
+$complianceSummary['outstanding'] = $complianceSummary['total'] - $complianceSummary['approved'];
 $currentStage = null;
 foreach ($stages as $s) {
     if ($s['status'] !== 'gate_passed' && $s['status'] !== 'skipped') {
@@ -323,31 +324,65 @@ $stepStatus = static function (?array $stage, bool $pastSignal = false) use ($or
     }
     return 'locked';
 };
-// One entry per user-facing top-level step (0-17) — 'num' is the display
-// label, 'status' drives the card's checkmark/current-highlight/locked
-// styling, 'open' is whether its <details> starts expanded.
+// Steps 1/2/3 used to share stage1's single DB status (which auto-passes
+// the instant a QT is generated — see StageGateService's own doc comment),
+// so all three opened/closed together and flipped "done" together even
+// though sending and client-acceptance hadn't actually happened yet. Each
+// now gets its own real signal, independent of the DB stage gate: step 1
+// from whether a QT document exists at all, step 2 from that QT's own
+// 'sent' status, step 3 from whether work on the next real action (the
+// Buyer PO) has actually started — the same thing its own card text already
+// tells staff to treat as "client accepted."
+$qtDoc = null;
+foreach ($documents as $__d) {
+    if ($__d['document_type_code'] === 'QT') {
+        $qtDoc = $__d;
+        break;
+    }
+}
+$hasQtDoc = $qtDoc !== null;
+$qtSent = $hasQtDoc && $qtDoc['status'] === 'sent';
+$hasBuyerPoDoc = in_array('BUYERPO', array_column($documents, 'document_type_code'), true);
+$step123Status = static function (bool $reached, bool $done) use ($orderClosed): string {
+    if ($orderClosed) {
+        return 'done';
+    }
+    if (!$reached) {
+        return 'locked';
+    }
+    return $done ? 'done' : 'current';
+};
+// One entry per user-facing top-level step (0-19, after the Compliance
+// Checklist got its own "8b" slot and the former double-"9"/double-"11"
+// collisions were split into distinct numbers) — 'status' drives the
+// card's checkmark/current-highlight/locked styling and open state.
 $stepStates = [
-    '1-3'  => $stepStatus($stage1),
+    '1'    => $step123Status(true, $hasQtDoc),
+    '2'    => $step123Status($hasQtDoc, $qtSent),
+    '3'    => $step123Status($qtSent, $hasBuyerPoDoc),
     '4'    => $stepStatus($stage2),
     '5'    => $stepStatus($stage3),
     '6'    => $stepStatus($stage4),
     '7'    => $stepStatus($stage5),
     '8'    => $stepStatus($stage5, $supplierSigned), // no own DB stage — unlocked once Stage 5 passes
-    '9'    => $stepStatus($isFob ? $stage7 : $stage6),
-    '9-10' => $stepStatus($stage8),
-    '11'   => $stepStatus($stage9),
-    '12'   => 'done', // reference/upload card — never gated
-    '13'   => 'done',
-    '14'   => 'done',
+    '8b'   => $orderClosed || $complianceSummary['outstanding'] === 0 ? 'done' : 'current', // Compliance Checklist — same resolved/outstanding signal as the sidebar summary
+    '9'    => $stepStatus($stage6), // Freight Payment — auto-skipped (status 'skipped' => 'done') for FOB orders
+    '10'   => $stepStatus($stage7),
+    '11'   => $stepStatus($stage8),
+    '12'   => $stepStatus($stage9),
+    '13'   => $stepStatus($stage9),
+    '14'   => 'done', // reference/upload card — never gated
     '15'   => 'done',
     '16'   => 'done',
-    '17'   => $orderClosed ? 'done' : 'locked',
+    '17'   => 'done',
+    '18'   => 'done',
+    '19'   => $orderClosed ? 'done' : 'locked',
 ];
 // The single step whose <details> should start open: the first one that
-// isn't yet 'done' (the order's real current step), or '17' once the
+// isn't yet 'done' (the order's real current step), or '19' once the
 // order is actually closed — same "first unresolved" logic $currentStage
 // above already uses, just applied to the user-facing step numbers.
-$currentUserStep = '17';
+$currentUserStep = '19';
 foreach ($stepStates as $__step => $__status) {
     if ($__status !== 'done') {
         // PHP casts a purely-numeric array key (e.g. '4') to an int, so
@@ -802,7 +837,7 @@ $stepStatusIcon = static function (string $status): string {
     </div>
   </details>
 
-  <details class="step-card step-card-reference" id="document-review-approval" open>
+  <details class="step-card step-card-reference" id="document-review-approval">
     <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small></h2></summary>
     <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">
@@ -842,7 +877,7 @@ $stepStatusIcon = static function (string $status): string {
       <tr><td colspan="7" class="muted">No documents generated yet.</td></tr>
       <?php endif; ?>
     </table>
-    <p class="muted small" style="margin-top:12px;">Free-form additional files (not one of the fixed document types above) are attached from <a href="#step-additional-documents">Step 12 &middot; Additional Documents</a>.</p>
+    <p class="muted small" style="margin-top:12px;">Free-form additional files (not one of the fixed document types above) are attached from <a href="#step-additional-documents">Step 14 &middot; Additional Documents</a>.</p>
     <script>
       function promptDeleteDraft(btn) {
         var form = btn.closest('form');
@@ -1088,8 +1123,8 @@ $stepStatusIcon = static function (string $status): string {
       </details>
     <?php endforeach; ?>
   </details>
-  <details class="step-card" id="step-1-quotation-prepare"<?= $stepCardOpen('1-3') ?>>
-    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 1 &middot; Prepare Quotation</h2></summary>
+  <details class="step-card" id="step-1-quotation-prepare"<?= $stepCardOpen('1') ?>>
+    <summary><?= $stepStatusIcon($stepStates['1']) ?><span class="step-group-num">STEP 1</span><h2>Prepare Quotation</h2></summary>
     <?php
       // Batch 3 #5 — differentiate 'not yet generated' vs 'already generated, this regenerates
       // it' document buttons visually, instead of every visible button looking identical.
@@ -1123,13 +1158,13 @@ $stepStatusIcon = static function (string $status): string {
     <p class="muted small">Review, approval, and sending to the buyer happen in <a href="#document-review-approval">Document Review &amp; Approval</a> below, once generated.</p>
   </details>
 
-  <details class="step-card step-card-reference" id="step-2-quotation-send"<?= $stepCardOpen('1-3') ?>>
-    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 2 &middot; Send Quotation to Client</h2></summary>
+  <details class="step-card step-card-reference" id="step-2-quotation-send"<?= $stepCardOpen('2') ?>>
+    <summary><?= $stepStatusIcon($stepStates['2']) ?><span class="step-group-num">STEP 2</span><h2>Send Quotation to Client</h2></summary>
     <p class="muted small">Sending happens through the shared <a href="#document-review-approval">Document Review &amp; Approval</a> workflow below &mdash; every generated document (not just the Quotation) is assigned a reviewer, approved, and dispatched from that one place, regardless of which step generated it. Once the Quotation is approved there, use its own "Send to Buyer" action.</p>
   </details>
 
-  <details class="step-card step-card-reference" id="step-3-quotation-accept"<?= $stepCardOpen('1-3') ?>>
-    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 3 &middot; Client Accepts Quotation</h2></summary>
+  <details class="step-card step-card-reference" id="step-3-quotation-accept"<?= $stepCardOpen('3') ?>>
+    <summary><?= $stepStatusIcon($stepStates['3']) ?><span class="step-group-num">STEP 3</span><h2>Client Accepts Quotation</h2></summary>
     <p class="muted small">There's no separate "accepted" button to click &mdash; the buyer's acceptance happens outside the system (a reply email, a call, a signed copy). Once your team is satisfied the client has accepted, move on to <a href="#step-4a-buyer-po-generate">Step 4a &middot; Buyer's PO</a>.</p>
   </details>
 
@@ -1366,15 +1401,17 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <?php if ($isLcPayment): ?>
   <details class="step-card step-card-reference" id="step-5-lc-bank-loan">
     <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; financing cost, not the LC leg above)</small></h2></summary>
     <p class="muted small">If the client financed their LC (Step 5d/5e above) with a bank loan, record that loan's amount/interest here — separate from the LC leg itself, since this is about the cost of financing it, not confirming it usable.</p>
     <?php if ($canManageOrderFinancials): ?>
-    <p class="muted small">Recorded in full under <a href="#order-financials">Order Financials</a> (Step 11) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
+    <p class="muted small">Recorded in full under <a href="#order-financials">Order Financials</a> (Step 12) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
     <?php else: ?>
     <p class="muted small">Recorded by Accounts/Export staff alongside this order's other costs.</p>
     <?php endif; ?>
   </details>
+  <?php endif; ?>
 
   <details class="step-group" id="step-group-stage-4"<?= $stepCardOpen('6') ?>>
     <summary><?= $stepStatusIcon($stepStates['6']) ?><span class="step-group-num">STEP 6</span><h3>Order Confirmation</h3></summary>
@@ -1382,9 +1419,9 @@ $stepStatusIcon = static function (string $status): string {
   <details class="step-card" id="step-6a-oc-generate"<?= $stepCardOpen('6') ?>>
     <summary><?= $stepStatusIcon($stepStates['6']) ?><h2>Step 6a &middot; Generate Order Confirmation</h2></summary>
     <?php if ($canCloseOrders): ?>
-    <p class="muted small">ECGC Cover is tracked on the <a href="#compliance-checklist">Compliance Checklist</a>.<?php if ($canManageOrderFinancials): ?> The premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 11) as an "ECGC insurance" cost entry — filed here, once the order is confirmed, so the fee is never paid before the order is certain to proceed.<?php endif; ?></p>
+    <p class="muted small">ECGC Cover is tracked on the <a href="#compliance-checklist">Compliance Checklist</a>.<?php if ($canManageOrderFinancials): ?> The premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) as an "ECGC insurance" cost entry — filed here, once the order is confirmed, so the fee is never paid before the order is certain to proceed.<?php endif; ?></p>
     <?php elseif ($canManageOrderFinancials): ?>
-    <p class="muted small">The ECGC insurance premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 11) once the order is confirmed.</p>
+    <p class="muted small">The ECGC insurance premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) once the order is confirmed.</p>
     <?php endif; ?>
     <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
@@ -1805,8 +1842,11 @@ $stepStatusIcon = static function (string $status): string {
 
   </details>
 
+  <details class="step-group" id="step-group-stage-production">
+    <summary><?= $stepStatusIcon($stepStates['8'] === 'done' && $stepStates['8b'] === 'done' ? 'done' : ($stepStates['8'] === 'locked' ? 'locked' : 'current')) ?><span class="step-group-num">STEP 8</span><h3>Production &amp; Pre-Shipment Compliance</h3></summary>
+
   <details class="step-card" id="step-production"<?= $stepCardOpen('8') ?>>
-    <summary><?= $stepStatusIcon($stepStates['8']) ?><h2>Step 8 &middot; Production &amp; Estimated Shipment</h2></summary>
+    <summary><?= $stepStatusIcon($stepStates['8']) ?><h2>Step 8a &middot; Production &amp; Estimated Shipment</h2></summary>
     <div class="kv-grid">
       <div><span class="k">Production Status</span><span class="v"><?= htmlspecialchars($order['production_status_text'] ?? 'Not yet commenced') ?></span></div>
       <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
@@ -1844,6 +1884,52 @@ $stepStatusIcon = static function (string $status): string {
         </form>
       </details>
     <?php endif; ?>
+  </details>
+
+  <?php if ($canCloseOrders): ?>
+  <details class="step-card" id="compliance-checklist"<?= $stepCardOpen('8b') ?>>
+    <summary><?= $stepStatusIcon($stepStates['8b']) ?><h2>Step 8b &middot; Compliance Checklist</h2></summary>
+    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.). A missing entry below means "Not Started". The task-name list itself is managed from <?= $canManageComplianceTaskTypes ? '<a href="/compliance-task-types">Compliance Task Types</a>' : 'Compliance Task Types' ?> (Admin-only).</p>
+    <?php if (empty($complianceTasks)): ?>
+    <p class="muted small">No compliance task types have been configured yet.</p>
+    <?php else: ?>
+    <table class="list">
+      <tr><th>Task</th><th>Status &amp; Details</th></tr>
+      <?php foreach ($complianceTasks as $ct): ?>
+      <tr>
+        <td><?= htmlspecialchars($ct['task_type_name']) ?></td>
+        <td>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/compliance-tasks" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="task_type_id" value="<?= (int) $ct['task_type_id'] ?>">
+            <select name="status">
+              <?php foreach (\App\Repositories\OrderComplianceTaskRepository::STATUSES as $key => $label): ?>
+              <option value="<?= htmlspecialchars($key) ?>" <?= $ct['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <input type="text" name="skip_reason" value="<?= htmlspecialchars($ct['skip_reason'] ?? '') ?>" placeholder="Reason — required if Skipped" style="flex:1;min-width:180px;">
+            <button type="submit" class="btn-sm">Save</button>
+            <?php if ($ct['resolved_at']): ?>
+            <span class="muted small"><?= htmlspecialchars($ct['resolved_at']) ?><?php if ($ct['resolved_by_name']): ?> by <?= htmlspecialchars($ct['resolved_by_name']) ?><?php endif; ?></span>
+            <?php endif; ?>
+          </form>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <?php if ($complianceSummary['outstanding'] > 0): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/compliance-tasks/mark-all-na" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;" onsubmit="return confirm('Mark every outstanding compliance task on this order Not Applicable? Use this for a repeat order where this checklist genuinely does not apply.');">
+      <?= Csrf::field() ?>
+      <label>Mark all remaining tasks Not Applicable <small class="muted">(e.g. repeat order — reason required, applied to every outstanding task above)</small>
+        <input type="text" name="skip_reason" placeholder="Reason (mandatory)" required style="min-width:260px;">
+      </label>
+      <button type="submit" class="btn-sm">Mark All N/A</button>
+    </form>
+    <?php endif; ?>
+    <?php endif; ?>
+  </details>
+  <?php endif; ?>
+
   </details>
 
   <?php $freightLocked = !$isFob && (!$stage6 || $stage6['status'] === 'locked'); ?>
@@ -1951,11 +2037,11 @@ $stepStatusIcon = static function (string $status): string {
 
   </details>
 
-  <details class="step-group" id="step-group-stage-7"<?= $stepCardOpen('9') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9']) ?><span class="step-group-num">STEP 9</span><h3>Packing &amp; BL Instruction</h3></summary>
+  <details class="step-group" id="step-group-stage-7"<?= $stepCardOpen('10') ?>>
+    <summary><?= $stepStatusIcon($stepStates['10']) ?><span class="step-group-num">STEP 10</span><h3>Packing &amp; BL Instruction</h3></summary>
 
-  <details class="step-card" id="step-9e-packing"<?= $stepCardOpen('9') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9e &middot; Save Packing &amp; Crates</h2></summary>
+  <details class="step-card" id="step-10a-packing"<?= $stepCardOpen('10') ?>>
+    <summary><?= $stepStatusIcon($stepStates['10']) ?><h2>Step 10a &middot; Save Packing &amp; Crates</h2></summary>
     <?php if ($packingLocked): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
     <?php else: ?>
@@ -2010,15 +2096,15 @@ $stepStatusIcon = static function (string $status): string {
           </tr>
           <?php endforeach; ?>
         </table>
-        <?= $stepBadge('9e') ?><button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
+        <?= $stepBadge('10a') ?><button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
       </form>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">generate the Packing List from those figures</div>
 
-  <details class="step-card" id="step-9f-packing-list"<?= $stepCardOpen('9') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9f &middot; Generate Packing List</h2></summary>
+  <details class="step-card" id="step-10b-packing-list"<?= $stepCardOpen('10') ?>>
+    <summary><?= $stepStatusIcon($stepStates['10']) ?><h2>Step 10b &middot; Generate Packing List</h2></summary>
     <?php if ($packingLocked): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
     <?php elseif ($packing): ?>
@@ -2027,17 +2113,17 @@ $stepStatusIcon = static function (string $status): string {
         <input type="hidden" name="document_type" value="PL">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <?= $stepBadge('9f') ?><button type="submit" class="<?= $__docBtnClass('PL') ?>" data-loading-text="Generating…">Generate Packing List</button>
+        <?= $stepBadge('10b') ?><button type="submit" class="<?= $__docBtnClass('PL') ?>" data-loading-text="Generating…">Generate Packing List</button>
       </form>
     <?php else: ?>
-      <p class="muted">Save Packing &amp; Crates first (Step 9e).</p>
+      <p class="muted">Save Packing &amp; Crates first (Step 10a).</p>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">once the vessel/sailing is confirmed</div>
 
-  <details class="step-card" id="step-9g-shipping-details"<?= $stepCardOpen('9') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9g &middot; Save Shipping Details</h2></summary>
+  <details class="step-card" id="step-10c-shipping-details"<?= $stepCardOpen('10') ?>>
+    <summary><?= $stepStatusIcon($stepStates['10']) ?><h2>Step 10c &middot; Save Shipping Details</h2></summary>
     <?php if ($packingLocked): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
     <?php else: ?>
@@ -2062,15 +2148,15 @@ $stepStatusIcon = static function (string $status): string {
           <label>Container No.<input type="text" name="container_no" value="<?= htmlspecialchars($shipping['container_no'] ?? '') ?>"></label>
           <label>Seal No.<input type="text" name="seal_no" value="<?= htmlspecialchars($shipping['seal_no'] ?? '') ?>"></label>
         </div>
-        <?= $stepBadge('9g') ?><button type="submit" class="btn-sm">Save Shipping Details</button>
+        <?= $stepBadge('10c') ?><button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">tell the CHA / shipping line how to issue the BL</div>
 
-  <details class="step-card" id="step-9h-bl-instruction"<?= $stepCardOpen('9') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9h &middot; Generate BL Instruction Sheet</h2></summary>
+  <details class="step-card" id="step-10d-bl-instruction"<?= $stepCardOpen('10') ?>>
+    <summary><?= $stepStatusIcon($stepStates['10']) ?><h2>Step 10d &middot; Generate BL Instruction Sheet</h2></summary>
     <?php if ($packingLocked): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
     <?php elseif ($shipping): ?>
@@ -2081,17 +2167,17 @@ $stepStatusIcon = static function (string $status): string {
         <input type="hidden" name="document_type" value="BLI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <?= $stepBadge('9h') ?><button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
+        <?= $stepBadge('10d') ?><button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
       </form>
     <?php else: ?>
-      <p class="muted">Save Shipping Details first (Step 9g).</p>
+      <p class="muted">Save Shipping Details first (Step 10c).</p>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">after the CHA draft-review loop below</div>
 
-  <details class="step-card" id="step-9i-bl-issued"<?= $stepCardOpen('9') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9i &middot; Confirm BL Issued <small class="muted">(after the CHA draft-review loop)</small></h2></summary>
+  <details class="step-card" id="step-10e-bl-issued"<?= $stepCardOpen('10') ?>>
+    <summary><?= $stepStatusIcon($stepStates['10']) ?><h2>Step 10e &middot; Confirm BL Issued <small class="muted">(after the CHA draft-review loop)</small></h2></summary>
     <?php if ($packingLocked): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
     <?php elseif (!$blIssued): ?>
@@ -2149,7 +2235,7 @@ $stepStatusIcon = static function (string $status): string {
         <label>BL Number *<input type="text" name="bl_number" required></label>
         <label>BL Date<input type="date" name="bl_date" value="<?= date('Y-m-d') ?>"></label>
         <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png"></label>
-        <?= $stepBadge('9i') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+        <?= $stepBadge('10e') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
       </form>
     <?php else: ?>
       <p>Bill of Lading recorded: <strong><?= htmlspecialchars((string) ($shipping['bl_number'] ?? '')) ?></strong> (<?= htmlspecialchars((string) ($shipping['bl_date'] ?? '')) ?>)</p>
@@ -2165,22 +2251,15 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
-  <?php
-    $ciBalanceLocked = !$stage8 || $stage8['status'] === 'locked';
-    // Step lettering continues from Freight/Packing's 9a-9i for an FOB
-    // order (balance settles before shipment, still within user step 9);
-    // a non-FOB (post-BL) order uses its own Step 10 lettering instead,
-    // matching the user's own 9/10 split for this leg.
-    $ciBadge = static fn (string $fobLetter, string $postBlLetter): string => $isFob ? $fobLetter : $postBlLetter;
-  ?>
+  <?php $ciBalanceLocked = !$stage8 || $stage8['status'] === 'locked'; ?>
 
   </details>
 
-  <details class="step-group" id="step-group-stage-8"<?= $stepCardOpen('9-10') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9-10']) ?><span class="step-group-num">STEP 9-10</span><h3>Commercial Invoice &amp; Balance</h3></summary>
+  <details class="step-group" id="step-group-stage-8"<?= $stepCardOpen('11') ?>>
+    <summary><?= $stepStatusIcon($stepStates['11']) ?><span class="step-group-num">STEP 11</span><h3>Commercial Invoice &amp; Balance</h3></summary>
 
-  <details class="step-card" id="step-ci-generate"<?= $stepCardOpen('9-10') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9j', '10a') ?> &middot; Generate Commercial Invoice<?= $isFob ? ' (before shipment)' : ' (against BL)' ?></h2></summary>
+  <details class="step-card" id="step-ci-generate"<?= $stepCardOpen('11') ?>>
+    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11a &middot; Generate Commercial Invoice<?= $isFob ? ' (before shipment)' : ' (against BL)' ?></h2></summary>
     <?php
       // Batch 3 #11 — the Commercial Invoice is conventionally dated to match the recorded BL date;
       // nothing enforces this, so flag it as an advisory (not a hard block — a same-day match is the
@@ -2198,21 +2277,21 @@ $stepStatusIcon = static function (string $status): string {
         <input type="hidden" name="document_type" value="CI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <?= $stepBadge($ciBadge('9j', '10a')) ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button>
+        <?= $stepBadge('11a') ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button>
       </form>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">timed with sending the scanned BL</div>
 
-  <details class="step-card" id="step-ci-scanned-bl-sent"<?= $stepCardOpen('9-10') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9k', '10b') ?> &middot; Mark Scanned BL Copy Sent to Buyer</h2></summary>
+  <details class="step-card" id="step-ci-scanned-bl-sent"<?= $stepCardOpen('11') ?>>
+    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11b &middot; Mark Scanned BL Copy Sent to Buyer</h2></summary>
     <?php if ($ciBalanceLocked): ?>
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     <?php elseif ($shipping && !$shipping['scanned_bl_sent_to_buyer_at']): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/scanned-bl-sent">
         <?= Csrf::field() ?>
-        <?= $stepBadge($ciBadge('9k', '10b')) ?><button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
+        <?= $stepBadge('11b') ?><button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
       </form>
     <?php elseif ($shipping): ?>
       <p class="muted small">Scanned BL copy sent to buyer.</p>
@@ -2221,8 +2300,8 @@ $stepStatusIcon = static function (string $status): string {
 
   <div class="step-group-connector">once the buyer's balance payment lands</div>
 
-  <details class="step-card" id="step-balance-record"<?= $stepCardOpen('9-10') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9l', '10c') ?> &middot; Record Balance Remittance</h2></summary>
+  <details class="step-card" id="step-balance-record"<?= $stepCardOpen('11') ?>>
+    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11c &middot; Record Balance Remittance</h2></summary>
     <?php if ($ciBalanceLocked): ?>
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     <?php elseif (!$balanceCleared && (!$payment || $payment['balance_remittance_received_at'] === null)): ?>
@@ -2235,7 +2314,7 @@ $stepStatusIcon = static function (string $status): string {
         <?= Csrf::field() ?>
         <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
         <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
-        <?= $stepBadge($ciBadge('9l', '10c')) ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
+        <?= $stepBadge('11c') ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
       </form>
       <?php endif; ?>
     <?php elseif ($balanceCleared): ?>
@@ -2251,8 +2330,8 @@ $stepStatusIcon = static function (string $status): string {
 
   <div class="step-group-connector">after funds are confirmed cleared</div>
 
-  <details class="step-card" id="step-balance-clear"<?= $stepCardOpen('9-10') ?>>
-    <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9m', '10d') ?> &middot; Mark Balance Cleared</h2></summary>
+  <details class="step-card" id="step-balance-clear"<?= $stepCardOpen('11') ?>>
+    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11d &middot; Mark Balance Cleared</h2></summary>
     <?php if ($ciBalanceLocked): ?>
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     <?php elseif ($balanceCleared): ?>
@@ -2264,7 +2343,7 @@ $stepStatusIcon = static function (string $status): string {
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
         <?= Csrf::field() ?>
         <label>Cleared On<input type="date" name="balance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-        <?= $stepBadge($ciBadge('9m', '10d')) ?><button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
+        <?= $stepBadge('11d') ?><button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
       </form>
       <?php endif; ?>
     <?php else: ?>
@@ -2275,11 +2354,38 @@ $stepStatusIcon = static function (string $status): string {
   </details>
 
   <?php if ($canManageOrderFinancials): ?>
-  <details class="step-card" id="order-financials"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11 &middot; Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
+  <details class="step-card" id="order-financials"<?= $stepCardOpen('12') ?>>
+    <summary><?= $stepStatusIcon($stepStates['12']) ?><span class="step-group-num">STEP 12</span><h2>Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
 
-    <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
+    <h3 style="font-size:0.95em;">Export Benefit Scheme Eligibility</h3>
+    <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Closing the order (Step 13e) is blocked while any scheme here is still Pending.</p>
+    <table class="list">
+      <tr><th>Scheme</th><th>Eligibility &amp; Reason</th></tr>
+      <?php foreach ($exportBenefitEligibility as $sch): ?>
+      <tr>
+        <td><?= htmlspecialchars($sch['scheme_name']) ?></td>
+        <td>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefit-schemes" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="scheme_name" value="<?= htmlspecialchars($sch['scheme_name']) ?>">
+            <select name="status">
+              <?php foreach (\App\Repositories\OrderExportBenefitSchemeRepository::STATUSES as $key => $label): ?>
+              <option value="<?= htmlspecialchars($key) ?>" <?= $sch['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <input type="text" name="reason" value="<?= htmlspecialchars($sch['reason'] ?? '') ?>" placeholder="Reason — required if Not Eligible" style="flex:1;min-width:180px;">
+            <button type="submit" class="btn-sm">Save</button>
+            <?php if ($sch['resolved_at']): ?>
+            <span class="muted small"><?= htmlspecialchars($sch['resolved_at']) ?><?php if ($sch['resolved_by_name']): ?> by <?= htmlspecialchars($sch['resolved_by_name']) ?><?php endif; ?></span>
+            <?php endif; ?>
+          </form>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Government Export Benefits Claimed</h3>
     <?php $govtBenefitsApplicable = in_array($order['status'], ['shipped_docs_sent', 'complete'], true) && !empty($payment['balance_remittance_received_at']); ?>
     <?php if (!$govtBenefitsApplicable): ?>
       <p class="muted">Not applicable until the order is complete and the CI (balance) remittance has been received — government benefit schemes only come into play once the full proceeds have actually landed.</p>
@@ -2503,11 +2609,11 @@ $stepStatusIcon = static function (string $status): string {
     // (after Close Order), so its letter doesn't sort before the rest.
   ?>
 
-  <details class="step-group" id="step-group-stage-9"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><span class="step-group-num">STEP 11</span><h3>Closure &mdash; Documents &amp; Settlement</h3></summary>
+  <details class="step-group" id="step-group-stage-9"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><span class="step-group-num">STEP 13</span><h3>Closure &mdash; Documents &amp; Settlement</h3></summary>
 
-  <details class="step-card" id="step-11a-coo-prep"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11a &middot; Generate COO Prep Sheet</h2></summary>
+  <details class="step-card" id="step-11a-coo-prep"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13a &middot; Generate COO Prep Sheet</h2></summary>
     <?php if ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php else: ?>
@@ -2518,15 +2624,15 @@ $stepStatusIcon = static function (string $status): string {
         <input type="hidden" name="document_type" value="COOPREP">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <?= $stepBadge('11a') ?><button type="submit" class="<?= $__docBtnClass('COOPREP') ?>" data-loading-text="Generating…">Generate COO Prep Sheet</button>
+        <?= $stepBadge('13a') ?><button type="submit" class="<?= $__docBtnClass('COOPREP') ?>" data-loading-text="Generating…">Generate COO Prep Sheet</button>
       </form>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">once the CHA delivers the original BLs</div>
 
-  <details class="step-card" id="step-11b-bl-originals-received"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11b &middot; Record Original BLs Received from CHA</h2></summary>
+  <details class="step-card" id="step-11b-bl-originals-received"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13b &middot; Record Original BLs Received from CHA</h2></summary>
     <?php if ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif (!$canManageShipping): ?>
@@ -2535,7 +2641,7 @@ $stepStatusIcon = static function (string $status): string {
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-originals-received">
         <?= Csrf::field() ?>
         <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
-        <?= $stepBadge('11b') ?><button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
+        <?= $stepBadge('13b') ?><button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
       </form>
     <?php else: ?>
       <p class="muted small">Original BLs received (<?= (int) $shipping['bl_originals_received_count'] ?>).</p>
@@ -2544,26 +2650,26 @@ $stepStatusIcon = static function (string $status): string {
 
   <div class="step-group-connector">endorse them over to the buyer's bank</div>
 
-  <details class="step-card" id="step-11c-bl-endorsed-mark"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11c &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
+  <details class="step-card" id="step-11c-bl-endorsed-mark"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13c &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
     <?php if ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif ($canManageShipping && $shipping && $shipping['bl_originals_received_at'] && !$shipping['bl_endorsed_at']): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsed">
         <?= Csrf::field() ?>
-        <?= $stepBadge('11c') ?><button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
+        <?= $stepBadge('13c') ?><button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
       </form>
     <?php elseif ($shipping && $shipping['bl_endorsed_at']): ?>
       <p class="muted small">Original BLs endorsed.</p>
     <?php else: ?>
-      <p class="muted">Record the original BLs received first (Step 11b).</p>
+      <p class="muted">Record the original BLs received first (Step 13b).</p>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">save who endorsed it and when</div>
 
-  <details class="step-card" id="step-11d-bl-endorsement-save"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11d &middot; Save BL Endorsement Details</h2></summary>
+  <details class="step-card" id="step-11d-bl-endorsement-save"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13d &middot; Save BL Endorsement Details</h2></summary>
     <?php if ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif ($canManageShipping && $shipping && $shipping['bl_originals_received_at']): ?>
@@ -2575,23 +2681,23 @@ $stepStatusIcon = static function (string $status): string {
         <label>Port of Loading<input type="text" name="port_of_loading" value="<?= htmlspecialchars($blEndorsement['port_of_loading'] ?? $order['port_of_loading_name'] ?? 'Chennai, India') ?>"></label>
         <label>Port of Discharge<input type="text" name="port_of_discharge" value="<?= htmlspecialchars($blEndorsement['port_of_discharge'] ?? $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '') ?>"></label>
         <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="<?= htmlspecialchars($blEndorsement['date_of_endorsement'] ?? date('Y-m-d')) ?>"></label>
-        <?= $stepBadge('11d') ?><button type="submit" class="btn-sm">Save BL Endorsement Details</button>
+        <?= $stepBadge('13d') ?><button type="submit" class="btn-sm">Save BL Endorsement Details</button>
       </form>
     <?php else: ?>
-      <p class="muted">Record the original BLs received first (Step 11b).</p>
+      <p class="muted">Record the original BLs received first (Step 13b).</p>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">print the endorsement for the courier pack</div>
 
-  <details class="step-card" id="step-11f-bl-endorsement-generate"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11f &middot; Generate / Print BL Endorsement</h2></summary>
+  <details class="step-card" id="step-11f-bl-endorsement-generate"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13f &middot; Generate / Print BL Endorsement</h2></summary>
     <?php if ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif ($blEndorsement): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsement/generate" style="margin-top:8px;">
         <?= Csrf::field() ?>
-        <?= $stepBadge('11f') ?><button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
+        <?= $stepBadge('13f') ?><button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
       </form>
       <?php if ($blEndorsementDoc): ?>
         <p class="small" style="margin-top:6px;">
@@ -2600,16 +2706,16 @@ $stepStatusIcon = static function (string $status): string {
         </p>
       <?php endif; ?>
     <?php else: ?>
-      <p class="muted">Save BL Endorsement Details first (Step 11d).</p>
+      <p class="muted">Save BL Endorsement Details first (Step 13d).</p>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">once documents are despatched to the buyer</div>
 
-  <details class="step-card" id="step-11g-close-order"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11g &middot; Close Order (Document Despatch)</h2></summary>
+  <details class="step-card" id="step-11g-close-order"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13g &middot; Close Order (Document Despatch)</h2></summary>
     <?php if ($orderClosed || $order['status'] === 'shipped_docs_sent'): ?>
-      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — see Step 11e to mark this order fully settled.</p>
+      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — see Step 13e to mark this order fully settled.</p>
     <?php elseif ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif (!$canCloseOrders): ?>
@@ -2624,22 +2730,22 @@ $stepStatusIcon = static function (string $status): string {
         <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
           <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
         </label>
-        <?= $stepBadge('11g') ?><button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
+        <?= $stepBadge('13g') ?><button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
       </form>
       <?php endif; ?>
     <?php else: ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
-        <?= $stepBadge('11g') ?><button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
+        <?= $stepBadge('13g') ?><button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">last — once the balance has actually cleared too</div>
 
-  <details class="step-card" id="step-despatch"<?= $stepCardOpen('11') ?>>
-    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11e &middot; Mark Fully Settled</h2></summary>
+  <details class="step-card" id="step-despatch"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13e &middot; Mark Fully Settled</h2></summary>
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
     <?php elseif ($order['status'] === 'shipped_docs_sent'): ?>
@@ -2647,7 +2753,7 @@ $stepStatusIcon = static function (string $status): string {
       <?php if ($canCloseOrders): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <?= Csrf::field() ?>
-        <?= $stepBadge('11e') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
+        <?= $stepBadge('13e') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
       <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials above).</p>
       <?php if ($canEditLockedData): ?>
@@ -2667,46 +2773,11 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted">Only Export/Logistics can mark this order fully settled.</p>
       <?php endif; ?>
     <?php else: ?>
-      <p class="muted">Close the order first (Step 11g).</p>
+      <p class="muted">Close the order first (Step 13g).</p>
     <?php endif; ?>
   </details>
 
   </details>
-
-  <?php if ($canCloseOrders): ?>
-  <details class="step-card step-card-reference" id="compliance-checklist">
-    <summary><h2>Compliance Checklist <small class="muted">(reference — ECGC Cover, Pre-Shipment Inspection, etc.)</small></h2></summary>
-    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <?= $canManageComplianceTaskTypes ? '<a href="/compliance-task-types">Compliance Task Types</a>' : 'Compliance Task Types' ?> (Admin-only).</p>
-    <?php if (empty($complianceTasks)): ?>
-    <p class="muted small">No compliance task types have been configured yet.</p>
-    <?php else: ?>
-    <table class="list">
-      <tr><th>Task</th><th>Status &amp; Details</th></tr>
-      <?php foreach ($complianceTasks as $ct): ?>
-      <tr>
-        <td><?= htmlspecialchars($ct['task_type_name']) ?></td>
-        <td>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/compliance-tasks" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <?= Csrf::field() ?>
-            <input type="hidden" name="task_type_id" value="<?= (int) $ct['task_type_id'] ?>">
-            <select name="status">
-              <?php foreach (\App\Repositories\OrderComplianceTaskRepository::STATUSES as $key => $label): ?>
-              <option value="<?= htmlspecialchars($key) ?>" <?= $ct['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <input type="text" name="skip_reason" value="<?= htmlspecialchars($ct['skip_reason'] ?? '') ?>" placeholder="Reason — required if Skipped" style="flex:1;min-width:180px;">
-            <button type="submit" class="btn-sm">Save</button>
-            <?php if ($ct['resolved_at']): ?>
-            <span class="muted small"><?= htmlspecialchars($ct['resolved_at']) ?><?php if ($ct['resolved_by_name']): ?> by <?= htmlspecialchars($ct['resolved_by_name']) ?><?php endif; ?></span>
-            <?php endif; ?>
-          </form>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </table>
-    <?php endif; ?>
-  </details>
-  <?php endif; ?>
 
   <?php if ($canManageOrders): ?>
   <details class="step-card step-card-reference" id="amendments">
@@ -2716,8 +2787,8 @@ $stepStatusIcon = static function (string $status): string {
   </details>
   <?php endif; ?>
 
-  <details class="step-card" id="step-additional-documents"<?= $stepCardOpen('12') ?>>
-    <summary><?= $stepStatusIcon($stepStates['12']) ?><h2>Step 12 &middot; Additional Documents</h2></summary>
+  <details class="step-card" id="step-additional-documents"<?= $stepCardOpen('14') ?>>
+    <summary><?= $stepStatusIcon($stepStates['14']) ?><span class="step-group-num">STEP 14</span><h2>Additional Documents</h2></summary>
     <p class="muted small">Free-form extras that don't fit any fixed document type — e.g. a buyer-supplied certificate template, a special packing instruction sheet. Every generated document for this order is listed in the sidebar; this is only for files that were never one of the fixed types above.</p>
     <table class="list">
       <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
@@ -2754,8 +2825,8 @@ $stepStatusIcon = static function (string $status): string {
     <p class="muted small" style="margin-top:8px;"><a href="/orders/<?= (int) $order['id'] ?>/additional-documents/removed">Show removed</a></p>
   </details>
 
-  <details class="step-card" id="order-updates"<?= $stepCardOpen('13') ?>>
-    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13 &middot; Order Communication</h2></summary>
+  <details class="step-card" id="order-updates"<?= $stepCardOpen('15') ?>>
+    <summary><?= $stepStatusIcon($stepStates['15']) ?><span class="step-group-num">STEP 15</span><h2>Order Communication</h2></summary>
     <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
     <div class="chat-thread">
       <?php if (empty($comments)): ?>
@@ -2801,8 +2872,8 @@ $stepStatusIcon = static function (string $status): string {
     </form>
   </details>
 
-  <details class="step-card" id="order-feedback"<?= $stepCardOpen('14') ?>>
-    <summary><?= $stepStatusIcon($stepStates['14']) ?><h2>Step 14 &middot; Order Feedback</h2></summary>
+  <details class="step-card" id="order-feedback"<?= $stepCardOpen('16') ?>>
+    <summary><?= $stepStatusIcon($stepStates['16']) ?><span class="step-group-num">STEP 16</span><h2>Order Feedback</h2></summary>
     <?php if (empty($orderFeedback)): ?>
       <p class="muted">The client hasn't submitted feedback for this order yet.</p>
     <?php else: ?>
@@ -2814,14 +2885,14 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
-  <details class="step-card" id="complaints"<?= $stepCardOpen('15') ?>>
-    <summary><?= $stepStatusIcon($stepStates['15']) ?><h2>Step 15 &middot; Complaints</h2></summary>
+  <details class="step-card" id="complaints"<?= $stepCardOpen('17') ?>>
+    <summary><?= $stepStatusIcon($stepStates['17']) ?><span class="step-group-num">STEP 17</span><h2>Complaints</h2></summary>
     <p class="muted">A process issue or flaw the client flagged for us to fix next time — separate from Disputes below, and always available to the client regardless of the Dispute toggle.</p>
     <p><?= $canViewOrderComplaints ? '<a href="/orders/' . (int) $order['id'] . '/complaints">Complaints (' . (int) $openComplaintCount . ' open)</a>' : 'Complaints (' . (int) $openComplaintCount . ' open)' ?></p>
   </details>
 
-  <details class="step-card" id="disputes"<?= $stepCardOpen('16') ?>>
-    <summary><?= $stepStatusIcon($stepStates['16']) ?><h2>Step 16 &middot; Disputes</h2></summary>
+  <details class="step-card" id="disputes"<?= $stepCardOpen('18') ?>>
+    <summary><?= $stepStatusIcon($stepStates['18']) ?><span class="step-group-num">STEP 18</span><h2>Disputes</h2></summary>
     <p class="muted">A buyer wanting to cancel this order and not proceed with us — separate from a Complaint above (no cancel intent) and from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
     <?php if ($canManageDisputes): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/dispute-visibility" style="margin-bottom:10px">
@@ -2842,12 +2913,12 @@ $stepStatusIcon = static function (string $status): string {
     </p>
   </details>
 
-  <details class="step-card" id="step-complete"<?= $stepCardOpen('17') ?>>
-    <summary><?= $stepStatusIcon($stepStates['17']) ?><h2>Step 17 &middot; Order Complete</h2></summary>
+  <details class="step-card" id="step-complete"<?= $stepCardOpen('19') ?>>
+    <summary><?= $stepStatusIcon($stepStates['19']) ?><span class="step-group-num">STEP 19</span><h2>Order Complete</h2></summary>
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
     <?php else: ?>
-      <p class="muted">Not yet complete — finish Step 11 above (Mark Fully Settled) to close this order.</p>
+      <p class="muted">Not yet complete — finish Step 13e above (Mark Fully Settled) to close this order.</p>
     <?php endif; ?>
   </details>
 
@@ -2991,8 +3062,8 @@ $stepStatusIcon = static function (string $status): string {
   // "see X" reference, the top stepper dots, or a direct #hash URL), and
   // mapping the stage-stepper's numeric stage to the right card id since
   // one DB stage can span two cards (Stage 2/3 -> Buyer PO + PI-Stage
-  // Intake) or share one card with another (Stage 6/7 both feed into the
-  // single Step 9 packing/freight pair).
+  // Intake) — Stage 6 (Freight, user Step 9) and Stage 7 (Packing & BL,
+  // user Step 10) are now separate numbered steps, each with its own card.
   (function () {
     var panelsContainer = document.getElementById('order-panels');
     if (!panelsContainer) { return; }

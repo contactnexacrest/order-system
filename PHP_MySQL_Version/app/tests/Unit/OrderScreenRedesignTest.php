@@ -205,12 +205,12 @@ final class OrderScreenRedesignTest extends TestCase
         }
 
         $this->assertSame(
-            19,
+            17,
             $directStepCardCount,
-            'Expected exactly 19 standalone step-card panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01).'
+            'Expected exactly 17 standalone step-card panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01). (Was 19 before the Compliance Checklist moved from its own standalone reference card into Step 8\'s group as "8b" — -1 for the standalone card removed, -1 for Step 8\'s former standalone card becoming that group\'s "8a".)'
         );
-        $this->assertSame(8, $groupCount, 'Expected exactly 8 step-group wrapper boxes (Step 4, 5, 6, 7, 9-freight, 9-packing/BL, CI&Balance, 11) as direct children of #order-panels.');
-        $this->assertSame(37, $groupedStepCardCount, 'Expected exactly 37 step-cards nested one level inside a step-group box — together with the 19 standalone ones, every one of the 56 individual step/sub-step cards.');
+        $this->assertSame(9, $groupCount, 'Expected exactly 9 step-group wrapper boxes (Step 4, 5, 6, 7, 8 (Production & Compliance), 9-freight, 10-packing/BL, 11 (CI&Balance), 13 (Documents & Settlement)) as direct children of #order-panels.');
+        $this->assertSame(39, $groupedStepCardCount, 'Expected exactly 39 step-cards nested one level inside a step-group box — together with the 17 standalone ones, every one of the 56 individual step/sub-step cards.');
     }
 
     private function readCss(): string

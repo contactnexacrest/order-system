@@ -256,6 +256,8 @@ abstract class DbTestCase extends TestCase
         $orderId = (int) $pdo->lastInsertId();
 
         \App\Repositories\OrderStageRepository::initializeForOrder($orderId);
+        \App\Repositories\OrderComplianceTaskRepository::initializeForOrder($orderId);
+        \App\Repositories\OrderExportBenefitSchemeRepository::initializeForOrder($orderId);
 
         foreach ($assigneeIds as $assigneeId) {
             \App\Repositories\OrderAssigneeRepository::add($orderId, $assigneeId, $assigneeId);

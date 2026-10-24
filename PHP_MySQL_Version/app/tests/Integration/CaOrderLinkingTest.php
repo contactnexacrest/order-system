@@ -197,6 +197,10 @@ final class CaOrderLinkingTest extends DbTestCase
         $output = ob_get_clean();
 
         self::assertStringContainsString('Not applicable until the order is complete', $output);
-        self::assertStringNotContainsString('RODTEP', $output);
+        // The scheme-eligibility table (separate from the claim table
+        // this gate covers) always lists every scheme name regardless of
+        // order status — eligibility can and should be resolved early.
+        // It's the CLAIM itself (its reference number) that stays hidden.
+        self::assertStringNotContainsString('SB-HIDDEN-1', $output);
     }
 }
