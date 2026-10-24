@@ -731,3 +731,20 @@ helper" problem PHPUnit's shared process raises for the PHP stack, and the
 UI Template resolution chain is `uiTemplateService.resolve()` here against
 the identical `users.ui_template_preference_id` → `company_settings.default_ui_template`
 → `standard` order.
+
+## Follow-up (added 2026-10-24): order assignee visibility, order-page step renumbering, always-materialized Compliance Checklist & Export Benefit Scheme Eligibility, LC preset rename
+
+Same delivery as the PHP/MySQL README's matching section — see there for
+the full write-up; this stack mirrors every item exactly (same two new
+tables, same 108-table total). Full suite: 1533/1533 Jest, plus a full
+Playwright e2e run green on both `BASE_URL`s (40/40 each).
+
+Worth calling out here specifically: fixing the hardcoded-`open` bug on
+the "Document Review & Approval" reference card surfaced a real,
+previously-latent bug in the order page's own `openAndScrollTo()` JS — a
+card nested inside a `.step-group` (Step 8's 8a/8b split, in particular
+`#compliance-checklist`) stayed invisible when a direct in-page link (the
+"At a Glance" sidebar's "see checklist", the ECGC cross-reference) opened
+only the matched card itself and not its closed ancestor group. Fixed by
+climbing every ancestor `<details>`, not just the nearest one, in both
+stacks' identical inline script.

@@ -136,10 +136,10 @@ footer{border-top:1px solid var(--line); padding:26px 20px 60px; text-align:cent
   <div class="tb-meta">
     <div><b>Stacks</b><span>Node.js + PHP</span></div>
     <div><b>Database</b><span>MySQL 8 / MariaDB 10.6</span></div>
-    <div><b>Tables</b><span>69 (Sections A–V)</span></div>
+    <div><b>Tables</b><span>108</span></div>
     <div><b>Doc types</b><span>11 + Amendment</span></div>
     <div><b>Order stages</b><span>9</span></div>
-    <div><b>Rev.</b><span>2026-09-22</span></div>
+    <div><b>Rev.</b><span>2026-10-24</span></div>
   </div>
 </div>
 
@@ -346,7 +346,7 @@ sequenceDiagram
 
 <section id="e">
   <div class="sec-head"><span class="letter">E</span><h2>Database Schema</h2><span class="sub">Fig. E</span></div>
-  <p class="lede">One schema, 98 tables (Node adds one of its own — <code>sessions</code>, its DB-backed session store; PHP needs none), shared byte-for-byte in spirit between both stacks (<code>NODE_MySQL_Version/docs/schema.sql</code> and <code>PHP_MySQL_Version/docs/schema.sql</code>). 172 foreign keys. The file is organised as lettered sections in the order features were built — the comments at the bottom of the file (<code>-- Section X … added YYYY-MM-DD</code>) are the changelog.</p>
+  <p class="lede">One schema, 108 tables (Node adds one of its own — <code>sessions</code>, its DB-backed session store; PHP needs none), shared byte-for-byte in spirit between both stacks (<code>NODE_MySQL_Version/docs/schema.sql</code> and <code>PHP_MySQL_Version/docs/schema.sql</code> — table/column definitions identical, only comment prose differs per stack's own naming convention). 200 foreign keys. The file is organised as lettered sections in the order most features were built — the comments at the bottom of the file (<code>-- Section X … added YYYY-MM-DD</code>) are the changelog; the newest few additions (below the lettered-sections table) are dated inline instead, not yet folded into a letter.</p>
 
   <div class="sheet">
     <pre class="mermaid">
@@ -396,7 +396,9 @@ erDiagram
     <tr><td>AY–BD</td><td>RBAC scoping (reference-library categories, view-only tiers); additional documents at order/client level; Legal Terms &amp; Definitions (admin-configurable); consignee/notify-party self-service on client-facing forms; Bill of Lading endorsement; dropdown-options admin screen</td><td>BE–BJ</td><td>Client Agreement file upload + expiry; QT/PI intake structured billing address; Buyer Action Link (OC ack + Buyer PO upload, no login); ports admin screen; indicative freight as a single value, not a range</td></tr>
     <tr><td>BK–BP</td><td>Action notifications; supplier factory addresses; supplier payment dates; user 3-way status (active/inactive/archived); document drift flag (External QA report M-08); formal order-cancellation workflow — request/approve/reject/refund (External QA report M-09)</td><td></td><td></td></tr>
   </table></div>
-  <p class="sheet-cap">66 lettered sections in all (A–BP; AW/AX skipped in the file's own lettering) — see <code>docs/schema.sql</code>'s own trailing comments for the exact column-level diff each one added.</p>
+  <p class="sheet-cap">Lettered sections run A–BP (not every letter used — AW/AX skipped) — see <code>docs/schema.sql</code>'s own trailing comments for the exact column-level diff each one added.</p>
+
+  <div class="callout note"><b>Latest additions (2026-10-24, dated comments, not yet lettered).</b> <code>order_assignees</code> — who can see an order at all (list, Kanban, detail page); replaces an earlier single <code>orders.assigned_to</code> column from the same day. An order has 0, 1, or more assignees (e.g. an Export Executive on office work and a Logistics Executive on CHA/factory work, concurrently, on the <em>same</em> order) rather than two fixed role-based slots — the creator becomes the first assignee automatically, changeable afterward only by <code>assign_order_owner</code> (Admin/MD/ED). <code>view_all_orders</code> (Accounts Executive, Viewer/Auditor, plus Admin/MD/ED via their existing blanket grant) bypasses assignee scoping entirely; everyone else only sees orders they're assigned to. Visibility-only — never consulted by the stage-gate/permission system in §F that decides who may <em>act</em>. Alongside it, <code>order_export_benefit_schemes</code> — see §G's closure callout below.</div>
 
   <div class="callout note"><b>No <code>ON DELETE CASCADE</code> anywhere.</b> Every deletion routine in the app (Sample Data clear, Test Mode delete) walks the FK graph by hand, children before parents, and explicitly breaks the one real reference cycle — <code>documents.docx_file_id/pdf_file_id</code> ↔ <code>file_store.linked_document_id</code> — before deleting either side. If you add a table that hangs off <code>orders</code> or <code>clients</code>, you must add it to both deletion routines or it will silently orphan on cleanup.</div>
 </section>
@@ -455,7 +457,7 @@ stateDiagram-v2
   S7 --> S8 : BL issued
   S8 --> S9 : Balance payment cleared
   S9 --> Closed : Close Order (courier tracking no.)<br/>status=shipped_docs_sent, client sees Complete
-  Closed --> [*] : Mark Fully Settled<br/>blocked on pending export-benefit claims<br/>status=complete, now locked
+  Closed --> [*] : Mark Fully Settled<br/>blocked on pending export-benefit claim,<br/>unresolved Compliance Checklist task, or<br/>unresolved Export Benefit Scheme Eligibility<br/>status=complete, now locked
   Closed: DOCUMENTS SENT (open internally)
   S1 --> Lost
   S2 --> Lost
@@ -478,8 +480,9 @@ stateDiagram-v2
     <div class="stagecell"><div class="n">STAGE 9</div><div class="t">Document Despatch &amp; Closure</div></div>
   </div>
   <div class="callout rule"><b>Hard rule</b>Stage 4's gate is also the trigger that provisions <code>client_logins</code> — a buyer only ever gets portal credentials automatically, at the advance-cleared moment, never by self-registering (see §K).</div>
-  <div class="callout note"><b>Stage 9 closes in two separate phases</b> <b>Close Order</b> (courier tracking number, gated on the Stage 7 BL Instruction Sheet + Stage 9's own COO Prep Sheet being approved/sent) sets <code>status=shipped_docs_sent</code> — the client portal already shows this order as "Complete" from that instant, but the order stays open and editable internally. <b>Mark Fully Settled</b> is the real, final lock (<code>status=complete</code>, <code>is_locked=1</code>); it's refused while a government export-benefit claim (RODTEP/similar) linked to the order is still awaiting receipt, with the same reason-required override escape hatch as every other hard gate in this system.</div>
+  <div class="callout note"><b>Stage 9 closes in two separate phases</b> <b>Close Order</b> (courier tracking number, gated on the Stage 7 BL Instruction Sheet + Stage 9's own COO Prep Sheet being approved/sent) sets <code>status=shipped_docs_sent</code> — the client portal already shows this order as "Complete" from that instant, but the order stays open and editable internally. <b>Mark Fully Settled</b> is the real, final lock (<code>status=complete</code>, <code>is_locked=1</code>); it's refused while any of three things is still outstanding — checked in order, resolve the first one it finds and retry: (1) a government export-benefit claim (RODTEP/similar) linked to the order still awaiting receipt, (2) a <code>order_compliance_tasks</code> row still Not Started/Pending Approval, or (3) an <code>order_export_benefit_schemes</code> row still Pending (not yet resolved Eligible/Not Eligible) — all three share the same reason-required override escape hatch as every other hard gate in this system. Both (2) and (3) are <b>always-materialized</b> rows, written at order creation (one per active compliance-task type / export-benefit scheme), never left as a missing row standing in for "not applicable" — a report run directly against either table always has an explicit value for every order.</div>
   <div class="callout note"><b>Pre-shipment inspection reminder</b> A daily cron checks every active order whose estimated shipment date is within 7 days and still has an unresolved Pre-Shipment Inspection compliance task; everyone holding <code>manage_orders</code> gets a reminder. Changing the estimated shipment date itself also auto-posts a message into that order's Client Portal conversation (§K) — one field, one notification channel, no separate mechanism.</div>
+  <div class="callout note"><b>Order assignee visibility (<code>order_assignees</code>)</b> Separate from the stage-gate/permission system above — this controls who can <em>see</em> an order at all, not who may act on it. An order has 0, 1, or more assignees; a scoped user (anyone without <code>view_all_orders</code>) only sees orders they're assigned to, in the list, the Kanban board, and direct access to the detail page. <code>view_all_orders</code> holders (Accounts Executive, Viewer/Auditor, plus Admin/MD/ED's existing blanket grant) see every order regardless. Only <code>assign_order_owner</code> holders (Admin/MD/ED) can add or remove an assignee; the creator is auto-assigned at order creation.</div>
 </section>
 
 <section id="h">
@@ -715,7 +718,7 @@ flowchart TB
     <tr><th>Object</th><th>Count / shape</th></tr>
     <tr><td>Order pipeline stages</td><td>9, linear with one conditional skip (Stage 6, FOB Incoterm)</td></tr>
     <tr><td>Generated document types</td><td>22 total — 9 customer-facing (QT/PI/OC/PL/CI/FDN/BUYERPO/ANNEXA/BLE), 2 procurement-only (SUPPO, COOPREP), 11 internal (AMD generated on demand + BLI + 4 cross-verification checklists + 2 SOP references + CAFIN + STAGEGATE + WALLREF)</td></tr>
-    <tr><td>Database tables</td><td>106 in both stacks, in 49 lettered schema sections (A–BX)</td></tr>
+    <tr><td>Database tables</td><td>108 in both stacks, in lettered schema sections A–BP plus a handful of newer dated-but-unlettered additions (see §E)</td></tr>
     <tr><td>Auth surfaces</td><td>3, structurally separate — staff session, client-portal session, and unauthenticated public intake</td></tr>
     <tr><td>File formats generated</td><td>PDF (always) + DOCX (optional, internal-only)</td></tr>
     <tr><td>Permission resolution layers</td><td>3 — Super Admin bypass → role_permissions → user_permissions</td></tr>
@@ -725,7 +728,7 @@ flowchart TB
 </main>
 </div>
 
-<footer>NEXACREST BLUEPRINT · REV. 2026-10-23 · BOTH STACKS, ONE SCHEMA · OPEN THIS FILE DIRECTLY IN ANY BROWSER</footer>
+<footer>NEXACREST BLUEPRINT · REV. 2026-10-24 · BOTH STACKS, ONE SCHEMA · OPEN THIS FILE DIRECTLY IN ANY BROWSER</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>

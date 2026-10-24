@@ -1681,3 +1681,71 @@ items below are proven in both stacks, with matching PHPUnit/Jest coverage
    `ARCHITECTURE.html` was updated (state machine, RBAC, Client Portal,
    Admin Tooling, and reference-table sections) for the same set of
    features.
+
+## Follow-up (added 2026-10-24): order assignee visibility, order-page step renumbering, always-materialized Compliance Checklist & Export Benefit Scheme Eligibility, LC preset rename
+
+Two new tables this delivery — `order_assignees` and
+`order_export_benefit_schemes` — both stacks now stand at **108 tables**.
+All items below are proven in both stacks, with matching PHPUnit/Jest
+coverage (full suite: 1485/1485 PHP, 1533/1533 Node) and a full
+Playwright e2e run green on both `BASE_URL`s (40/40 each).
+
+1. **Order assignee visibility — replaces the single-owner model.** An
+   order now has 0, 1, or more assignees (`order_assignees`), not one
+   `orders.assigned_to` column (that column existed for under a day,
+   superseded the same day it was added once the real org structure
+   turned out to need concurrent assignees — e.g. an Export Executive on
+   office work and a Logistics Executive on CHA/factory work, on the
+   *same* order at the same time). The creator is auto-assigned at
+   creation; only `assign_order_owner` holders (Admin/MD/ED) can add or
+   remove an assignee afterward. `view_all_orders` holders (Accounts
+   Executive, Viewer/Auditor, plus Admin/MD/ED's existing blanket grant)
+   bypass assignee scoping entirely; everyone else only sees orders
+   they're assigned to, in the list, the Kanban board, and direct access
+   to the order's own page. Purely a visibility control — never consulted
+   by the stage-gate/permission system that decides who may act.
+2. **Order detail page: two real bugs fixed.** The "Document Review &
+   Approval" card was hardcoded `open` regardless of state (now renders
+   collapsed like every other reference card unless it's genuinely the
+   current step); the "Letter of Credit & Bank Loan" reference card
+   rendered on every order regardless of payment method (now correctly
+   guarded on `payment_method = 'LC'`, the same check the real Step 5 LC
+   fork already used).
+3. **Order detail page: step-card renumbering, 1–19.** Steps 1/2/3 (QT
+   prepare/send/accept) now gate independently instead of sharing one
+   open/closed state. Two genuine numbering collisions are fixed — Freight
+   Payment and Packing & BL Instruction both used to show "STEP 9"; two
+   closure sections both showed "STEP 11" — by renumbering the sequence
+   cleanly (Packing & BL → 10, Commercial Invoice & Balance → 11 with the
+   old FOB-dependent dual lettering removed, Financials → 12,
+   Documents & Settlement → 13, the six trailing steps → 14–19) and
+   unifying every top-level step on the same pill-badge style. The
+   Compliance Checklist moved from an unnumbered bottom-of-page card into
+   Step 8 as "8b" (alongside "8a · Production & Estimated Shipment") —
+   reusing Step 8's own number rather than inserting a new one and
+   cascading every step after it.
+4. **Compliance Checklist and Export Benefit Scheme Eligibility are now
+   always-materialized** — a real row for every active compliance-task
+   type / export-benefit scheme is written the moment the order is
+   created (mirroring the `order_assignees` auto-insert pattern), never
+   left as a missing row silently standing in for "not applicable." A new
+   bulk **"Mark all remaining tasks Not Applicable"** action resolves
+   every outstanding compliance task in one submit with one shared
+   reason, for the repeat-order case. **Mark Fully Settled** (Stage 9's
+   second closure phase) now blocks on three checks in order — an
+   outstanding export-benefit claim (existing), an unresolved Compliance
+   Checklist task, or a pending Export Benefit Scheme Eligibility
+   decision (both new) — sharing the same reason-required override escape
+   hatch as every other hard gate in this system.
+5. **LC payment preset renamed** to "Irrevocable Letter of Credit at
+   Sight" (display name only — `payment_method = 'LC'`, the actual
+   conditional-rendering gate, is untouched) via a data-only migration;
+   fresh-DB seed data updated to match.
+6. **Full documentation audit** (this entry's own occasion): the order
+   detail page's own step list, the Compliance Checklist chapter, and the
+   Order Financials chapter were corrected across all three SOP mirrors;
+   `ca-07-export-benefits.md` gained a new section distinguishing scheme
+   eligibility (resolved early, blocks closure) from a recorded claim
+   (filed later, once the order is complete and paid); root
+   `ARCHITECTURE.html` was updated (schema section, state machine, and a
+   new order-visibility callout) for this same set of features.
