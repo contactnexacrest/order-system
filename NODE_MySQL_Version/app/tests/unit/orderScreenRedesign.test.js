@@ -116,6 +116,17 @@ describe('Order screen redesign (Point 2/4)', () => {
    * missing-closing-tag bug can still satisfy by accident) — walks the
    * div/details nesting depth and fails if a lower-than-expected count
    * of step-cards are a direct child of #order-panels.
+   *
+   * Since the parent-group redesign, a direct child of #order-panels is
+   * now either (a) a standalone step-card, same as before, or (b) a
+   * <div class="step-group"> wrapper — purely a visual container for a
+   * multi-letter step's own cards (4a/4b/4c, etc.), each of which sits
+   * one level deeper (depth 3) as that group's own direct child. Both
+   * patterns are asserted explicitly, so N-01's original bug class (a
+   * panel's own markup never closing, silently nesting every later panel
+   * inside it) still fails this test — on either axis, a card swallowed
+   * by an unclosed sibling either vanishes from its expected depth or
+   * appears one level deeper than it should.
    */
   it('every top-level section is a direct child of #order-panels', () => {
     const html = showNjk();
@@ -124,30 +135,35 @@ describe('Order screen redesign (Point 2/4)', () => {
 
     const tokens = html.slice(panelsOpenPos).match(/<div\b[^>]*>|<\/div>|<details\b[^>]*>|<\/details>/g) || [];
 
-    // Depth 2 is "one level inside #order-panels itself" — a direct
-    // child step-card. A legitimate nested <details> used purely for
-    // visual grouping inside one of the real step-cards sits deeper than
-    // this and is intentionally not counted — N-01's bug was a
-    // *top-level* panel swallowing every panel after it, which shows up
-    // as this count dropping below the expected total, not as a deeper
-    // nested element existing.
     let depth = 0;
-    let directChildSectionCount = 0;
+    let directStepCardCount = 0;
+    let groupCount = 0;
+    let groupedStepCardCount = 0;
+    let inGroupAtDepth = null;
     for (const token of tokens) {
       if (token === '</div>' || token === '</details>') {
         depth--;
         if (depth === 0) break; // #order-panels itself has closed
+        if (inGroupAtDepth !== null && depth < inGroupAtDepth) {
+          inGroupAtDepth = null;
+        }
         continue;
       }
       depth++;
-      if (depth === 2 && token.startsWith('<details class="step-card')) {
-        directChildSectionCount++;
+      if (depth === 2) {
+        if (token.startsWith('<details class="step-card')) {
+          directStepCardCount++;
+        } else if (token.startsWith('<div class="step-group"')) {
+          groupCount++;
+          inGroupAtDepth = depth;
+        }
+      } else if (depth === 3 && inGroupAtDepth === 2 && token.startsWith('<details class="step-card')) {
+        groupedStepCardCount++;
       }
     }
 
-    // "option 3 — one card per individual step, nothing grouped": every
-    // grouped multi-badge card was split into one card per lettered/
-    // numbered sub-step, taking the direct-child count from 26 to 56.
-    expect(directChildSectionCount).toBe(56);
+    expect(directStepCardCount).toBe(19);
+    expect(groupCount).toBe(8);
+    expect(groupedStepCardCount).toBe(37);
   });
 });

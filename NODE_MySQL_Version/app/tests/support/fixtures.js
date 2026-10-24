@@ -30,7 +30,7 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
   const incoterm = await db.queryOne('SELECT id, code FROM incoterms WHERE code = :code', { code: incotermCode });
   const currency = await db.queryOne('SELECT id, code FROM currencies WHERE code = :code', { code: currencyCode });
   const preset = await db.queryOne(
-    `SELECT id, preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+    `SELECT id, preset_name, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option,
             balance_days, balance_trigger_wording, show_bl_instructions
      FROM payment_presets WHERE preset_name = :preset_name`,
     { preset_name: presetName }
@@ -74,7 +74,7 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
         (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
          currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
          port_of_loading_id, port_of_discharge_id,
-         incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text,
+         incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text, payment_method,
          balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions,
          port_of_loading_name, port_of_loading_city, port_of_discharge_name, port_of_discharge_city,
          company_legal_name, billing_address, billing_address_line1, billing_address_line2,
@@ -90,7 +90,7 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
         (:ref, :client_id, 1, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, 'TBC', 'NIL',
          CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active',
          :port_of_loading_id, :port_of_discharge_id,
-         :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text,
+         :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text, :payment_method,
          :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions,
          :port_of_loading_name, :port_of_loading_city, :port_of_discharge_name, :port_of_discharge_city,
          :company_legal_name, :billing_address, :billing_address_line1, :billing_address_line2,
@@ -111,6 +111,7 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
       preset_name: preset.preset_name,
       advance_pct: preset.advance_pct,
       advance_trigger_text: preset.advance_trigger_text,
+      payment_method: preset.payment_method,
       balance_pct: preset.balance_pct,
       balance_trigger_option: preset.balance_trigger_option,
       balance_days: preset.balance_days,

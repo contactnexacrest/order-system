@@ -16,6 +16,11 @@ const TRIGGER_OPTIONS = {
   B_AGAINST_BL: 'Against Scanned BL Copy',
 };
 
+const PAYMENT_METHOD_OPTIONS = {
+  CASH_ADVANCE: 'Cash Advance — buyer wires the advance directly',
+  LC: 'Letter of Credit — replaces the cash advance entirely',
+};
+
 async function index(req, res) {
   const presets = await paymentPresetRepository.all(true);
   for (const p of presets) {
@@ -28,6 +33,7 @@ async function createForm(req, res) {
   res.renderView('payment_presets/create', {
     currencies: await lookupRepository.currencies(),
     triggerOptions: TRIGGER_OPTIONS,
+    paymentMethodOptions: PAYMENT_METHOD_OPTIONS,
   }, 'layout/base');
 }
 
@@ -41,12 +47,16 @@ function collectFormData(req) {
   const balancePct = parseFloat(req.body.balance_pct || 0);
   const balanceDays = parseInt(req.body.balance_days || 0, 10);
   const currencyId = parseInt(req.body.currency_id || 0, 10);
+  const paymentMethod = String(req.body.payment_method || '').trim();
 
   if (presetName === '') {
     return { error: 'Preset name is required.' };
   }
   if (advanceTriggerText === '') {
     return { error: 'Advance trigger text is required.' };
+  }
+  if (!Object.prototype.hasOwnProperty.call(PAYMENT_METHOD_OPTIONS, paymentMethod)) {
+    return { error: 'Select a valid payment method.' };
   }
   if (!Object.prototype.hasOwnProperty.call(TRIGGER_OPTIONS, balanceTriggerOption)) {
     return { error: 'Select a valid balance trigger option.' };
@@ -73,6 +83,7 @@ function collectFormData(req) {
       is_default: !!req.body.is_default,
       advance_pct: advancePct,
       advance_trigger_text: advanceTriggerText,
+      payment_method: paymentMethod,
       balance_pct: balancePct,
       balance_trigger_option: balanceTriggerOption,
       balance_days: balanceDays,
@@ -109,6 +120,7 @@ async function editForm(req, res) {
     preset,
     currencies: await lookupRepository.currencies(),
     triggerOptions: TRIGGER_OPTIONS,
+    paymentMethodOptions: PAYMENT_METHOD_OPTIONS,
     inUse: await paymentPresetRepository.isInUse(id),
   }, 'layout/base');
 }

@@ -21,8 +21,16 @@
         <label>Advance % *
           <input type="number" name="advance_pct" step="0.01" min="0.01" max="99.99" required value="40.00" placeholder="e.g., 40.00">
         </label>
+        <label>Payment Method *
+          <select name="payment_method" required>
+            {% for key, label in paymentMethodOptions %}
+              <option value="{{ key }}" {{ 'selected' if key == 'CASH_ADVANCE' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
       </div>
       <p class="muted small">Printed as "{advance_pct}% advance T/T on FOB Value {advance_trigger_text}" — this is the second half of that sentence.</p>
+      <p class="muted small">Payment Method controls which actions the order-detail page shows for this leg: <strong>Cash Advance</strong> shows "Record Advance Remittance" / "Mark Advance Cleared"; <strong>Letter of Credit</strong> shows "Record LC Details" / "Confirm LC Usable" instead — the LC leg replaces the cash advance entirely, the Balance leg afterward is unaffected either way.</p>
     </fieldset>
 
     <fieldset>

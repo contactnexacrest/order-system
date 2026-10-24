@@ -125,6 +125,15 @@ CREATE TABLE payment_presets (
   is_default              TINYINT(1) NOT NULL DEFAULT 0,
   advance_pct             DECIMAL(5,2) NOT NULL DEFAULT 40.00,
   advance_trigger_text    VARCHAR(255) NOT NULL DEFAULT 'against Proforma Invoice before production commences',
+  payment_method          ENUM('CASH_ADVANCE','LC') NOT NULL DEFAULT 'CASH_ADVANCE',  -- how the advance leg of
+                                                           -- this preset is actually settled. CASH_ADVANCE: the
+                                                           -- buyer wires the advance_pct directly (Record Advance
+                                                           -- Remittance / Mark Advance Cleared). LC: the buyer
+                                                           -- opens a Letter of Credit instead — replaces the cash
+                                                           -- advance entirely (Record LC Details / Confirm LC
+                                                           -- Usable, order_lc_details). The order-detail page's
+                                                           -- Step 5 renders exactly one of these two leg UIs,
+                                                           -- never both, based on the order's own preset.
   balance_pct             DECIMAL(5,2) NOT NULL DEFAULT 60.00,
   balance_trigger_option  ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NOT NULL DEFAULT 'A_BEFORE_SHIPMENT',
   balance_days            INT NOT NULL DEFAULT 3,    -- 3 for option A, 7 for option B (both configurable)
@@ -539,6 +548,10 @@ CREATE TABLE orders (
                                                            -- is always this order's own current effective value
   advance_trigger_text    VARCHAR(255) NULL,              -- payment_presets.advance_trigger_text at creation time —
                                                            -- never changed by an Amendment (see payment_presets)
+  payment_method          ENUM('CASH_ADVANCE','LC') NOT NULL DEFAULT 'CASH_ADVANCE',  -- payment_presets.payment_method
+                                                           -- at creation time — never changed by an Amendment, same
+                                                           -- as advance_trigger_text above. Drives which Step 5
+                                                           -- leg the order-detail page renders.
   balance_pct             DECIMAL(5,2) NULL,               -- payment_presets.balance_pct — Amendment-updatable, as above
   balance_trigger_option  ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NULL,  -- payment_presets.balance_trigger_option —
                                                            -- Amendment-updatable, as above
@@ -3615,11 +3628,26 @@ ALTER TABLE users
 -- order cost already is. See
 -- docs/migrations/2026-10-23f-lc-bank-loan-tracking.sql.
 -- ================================================================
+-- Extended (LC payment leg): when the order's payment_presets row has
+-- payment_method = 'LC', the order-detail page's Step 5 replaces the
+-- cash-advance leg (Record Advance Remittance / Mark Advance Cleared)
+-- with an LC leg (Record LC Details / Confirm LC Usable) — this is a
+-- genuinely different staff action, not just extra paperwork on top of
+-- a cash advance, so it needs its own amount/charges/confirmation
+-- fields here rather than reusing order_payment_status's advance_*
+-- columns. lc_confirmed_at is this leg's equivalent of
+-- advance_cleared_at — stageGateService unlocks the next stage from it
+-- instead.
 CREATE TABLE order_lc_details (
   id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id                BIGINT UNSIGNED NOT NULL UNIQUE,
   lc_number               VARCHAR(100) NULL,
   lc_file_id              BIGINT UNSIGNED NULL,
+  lc_bank_name            VARCHAR(150) NULL,      -- issuing bank, LC payment leg (Step 5d)
+  lc_amount               DECIMAL(14,2) NULL,     -- LC payment leg's equivalent of advance_amount
+  lc_charges_amount       DECIMAL(14,2) NULL,     -- LC issuance/negotiation charges — billed to the client, not a NexaCrest cost (unlike bank_loan_interest_paid below)
+  lc_confirmed_at         TIMESTAMP NULL,         -- LC payment leg's equivalent of advance_cleared_at (Step 5e)
+  lc_confirmed_by         BIGINT UNSIGNED NULL,
   bank_loan_amount        DECIMAL(14,2) NULL,
   bank_loan_interest_rate DECIMAL(6,3) NULL,
   bank_loan_interest_paid DECIMAL(14,2) NULL,
@@ -3629,7 +3657,8 @@ CREATE TABLE order_lc_details (
   FOREIGN KEY (order_id) REFERENCES orders(id),
   FOREIGN KEY (lc_file_id) REFERENCES file_store(id),
   FOREIGN KEY (interest_cost_entry_id) REFERENCES order_cost_entries(id),
-  FOREIGN KEY (recorded_by) REFERENCES users(id)
+  FOREIGN KEY (recorded_by) REFERENCES users(id),
+  FOREIGN KEY (lc_confirmed_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
 ALTER TABLE order_cost_entries

@@ -675,6 +675,11 @@ app.post('/orders/:id/payment-reports/:reportId/reviewed', requireAuth, requireP
 // actually received it) is split out of manage_payments (recording it)
 // so the same person can't do both.
 app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearAdvancePayment));
+// Step 5 LC leg (order.payment_method = 'LC') — same manage_payments/
+// clear_payments split as the cash-advance leg above, since recording
+// vs. confirming-usable is the same record/clear duty split either way.
+app.post('/orders/:id/payment/lc', requireAuth, requirePermission('manage_payments'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordLcDetails));
+app.post('/orders/:id/payment/lc/confirm-usable', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmLcUsable));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
 app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 

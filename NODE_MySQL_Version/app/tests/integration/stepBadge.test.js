@@ -40,7 +40,7 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
     }
   }
 
-  // 4d (PI Form Link) and 6c (Buyer Action Link) are deliberate exceptions
+  // 5a (PI Form Link) and 6c (Buyer Action Link) are deliberate exceptions
   // — both are optional, never-blocking alternate channels available from
   // the very first render regardless of stage ("entirely optional and
   // never blocks anything" per docs/SOP), not part of the gated sequence.
@@ -52,10 +52,10 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
     expect(res.status).toBe(200);
 
     expect(res.text).toContain('<span class="step-badge" title="Step 1a">1a</span>');
-    expect(res.text).toContain('title="Step 4d"');
+    expect(res.text).toContain('title="Step 5a"');
     expect(res.text).toContain('title="Step 6c"');
 
-    const stripped = res.text.replace(/class="step-badge" title="Step (1a|4d|6c)">[^<]*<\/span>/g, '');
+    const stripped = res.text.replace(/class="step-badge" title="Step (1a|5a|6c)">[^<]*<\/span>/g, '');
     expect(stripped).not.toContain('class="step-badge"');
   });
 
@@ -82,7 +82,7 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
     const badgeStage = {
       '1a': 1,
       '4a': 2, '4b': 2, '4c': 2,
-      '5a': 3, '5b': 3, '5c': 3,
+      '5c': 3, '5d': 3, '5e': 3,
       '6a': 4, '6b': 4,
       '7a': 5, '7b': 5, '7c': 5, '7d': 5,
       '9a': 6, '9b': 6, '9c': 6, '9d': 6,
@@ -100,7 +100,7 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
       const matches = [...res.text.matchAll(/class="step-badge" title="Step ([0-9a-z]+)"/g)];
       for (const match of matches) {
         const badge = match[1];
-        if (badge === '4d' || badge === '6c') { continue; }
+        if (badge === '5a' || badge === '6c') { continue; }
         expect(badgeStage).toHaveProperty(badge);
         expect(badgeStage[badge]).toBeLessThanOrEqual(reachedStage);
       }
@@ -114,7 +114,9 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
    * & Advance Payment -> Order Confirmation -> Supplier PO), not DB
    * stage_number order, and every badge now carries that same user-step
    * numbering too, so the badges appear in ascending step order: 1a ->
-   * 4a -> 5a -> 6a -> 7a.
+   * 4a -> 5a -> 6a -> 7a. (5a is itself an always-rendered exception — see
+   * above — but its card still sits positionally inside the Step 5 group,
+   * between Step 4's and Step 6's, so the ordering check still holds.)
    */
   it('badges appear in ascending order as they first become actionable', async () => {
     const orderId = await createTestOrder(await createTestClient());

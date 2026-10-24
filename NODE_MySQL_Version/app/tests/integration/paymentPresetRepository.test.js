@@ -35,6 +35,7 @@ describe('paymentPresetRepository', () => {
       is_default: false,
       advance_pct: 40,
       advance_trigger_text: 'against Proforma Invoice before production commences',
+      payment_method: 'CASH_ADVANCE',
       balance_pct: 60,
       balance_trigger_option: 'A_BEFORE_SHIPMENT',
       balance_days: 3,

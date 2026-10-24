@@ -6,9 +6,9 @@
     <p><a href="/payment-presets/create" class="btn-sm btn-accent">Add Preset</a></p>
 
     <table class="list">
-      <tr><th>Preset</th><th>Advance / Balance</th><th>Balance Trigger</th><th>Days</th><th>Currency</th><th>In Use</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Preset</th><th>Advance / Balance</th><th>Payment Method</th><th>Balance Trigger</th><th>Days</th><th>Currency</th><th>In Use</th><th>Status</th><th>Actions</th></tr>
       {% if presets.length == 0 %}
-      <tr><td colspan="8" class="muted">No payment presets yet — add the first one above.</td></tr>
+      <tr><td colspan="9" class="muted">No payment presets yet — add the first one above.</td></tr>
       {% endif %}
       {% for p in presets %}
       <tr>
@@ -18,6 +18,7 @@
           {% if p.is_protected %}<span class="badge" title="Protected — unlock via Field Protection before editing">&#128274; protected</span>{% endif %}
         </td>
         <td>{{ p.advance_pct }}% / {{ p.balance_pct }}%</td>
+        <td>{{ 'Letter of Credit' if p.payment_method == 'LC' else 'Cash Advance' }}</td>
         <td>{{ 'Before Shipment' if p.balance_trigger_option == 'A_BEFORE_SHIPMENT' else 'Against Scanned BL Copy' }}</td>
         <td>{{ p.balance_days }}</td>
         <td>{{ p.currency_code }}</td>

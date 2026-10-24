@@ -27,6 +27,7 @@ function bindData(data) {
     is_default: data.is_default ? 1 : 0,
     advance_pct: data.advance_pct,
     advance_trigger_text: data.advance_trigger_text,
+    payment_method: data.payment_method,
     balance_pct: data.balance_pct,
     balance_trigger_option: data.balance_trigger_option,
     balance_days: data.balance_days,
@@ -63,11 +64,11 @@ async function isInUse(id) {
 async function create(data, createdBy) {
   const result = await db.execute(
     `INSERT INTO payment_presets
-        (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct,
+        (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct,
          balance_trigger_option, balance_days, balance_trigger_wording, currency_id,
          requires_md_approval, show_bl_instructions, is_active, created_by)
      VALUES
-        (:preset_name, :is_default, :advance_pct, :advance_trigger_text, :balance_pct,
+        (:preset_name, :is_default, :advance_pct, :advance_trigger_text, :payment_method, :balance_pct,
          :balance_trigger_option, :balance_days, :balance_trigger_wording, :currency_id,
          :requires_md_approval, :show_bl_instructions, 1, :created_by)`,
     { ...bindData(data), created_by: createdBy }
@@ -84,7 +85,7 @@ async function update(id, data) {
   await db.execute(
     `UPDATE payment_presets SET
         preset_name = :preset_name, is_default = :is_default, advance_pct = :advance_pct,
-        advance_trigger_text = :advance_trigger_text, balance_pct = :balance_pct,
+        advance_trigger_text = :advance_trigger_text, payment_method = :payment_method, balance_pct = :balance_pct,
         balance_trigger_option = :balance_trigger_option, balance_days = :balance_days,
         balance_trigger_wording = :balance_trigger_wording, currency_id = :currency_id,
         requires_md_approval = :requires_md_approval, show_bl_instructions = :show_bl_instructions

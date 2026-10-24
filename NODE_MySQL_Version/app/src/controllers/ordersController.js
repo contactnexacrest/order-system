@@ -1002,7 +1002,10 @@ async function show(req, res) {
       canManageOrderFinancials: !!req.permissions.manage_order_financials,
       orderCostEntries: req.permissions.manage_order_financials ? await orderCostEntryRepository.forOrder(orderId) : [],
       costEntryCategories: orderCostEntryRepository.CATEGORIES,
-      orderLcDetails: req.permissions.manage_order_financials ? await orderLcDetailRepository.find(orderId) : null,
+      // Not gated on manage_order_financials like the cost-entry fields
+      // above — Step 5d/5e (LC payment leg) needs this for anyone viewing
+      // the order page, not just Order Financials staff.
+      orderLcDetails: await orderLcDetailRepository.find(orderId),
       orderTravelExpenses: req.permissions.manage_order_financials ? await orderTravelExpenseRepository.find(orderId) : null,
       profitability: req.permissions.manage_order_financials ? await orderProfitabilityService.computeForOrder(orderId) : null,
       exportBenefitSchemes: await lookupRepository.dropdownOptions('export_benefit_scheme'),
@@ -1424,6 +1427,121 @@ async function clearAdvancePayment(req, res) {
   const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId);
 
   const baseMessage = 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.';
+  if (provisionStatus === 'provisioned') {
+    flash.set(req, 'success', `${baseMessage} The client has been emailed their portal login.`);
+  } else if (provisionStatus === 'no_email_on_file') {
+    flash.set(req, 'warning', `${baseMessage} WARNING: this client has no email on file, so portal login could NOT be provisioned — add an email to their record and provision access manually, otherwise they will never be able to log in.`);
+  } else {
+    flash.set(req, 'success', `${baseMessage} The client already has portal access from an earlier order.`);
+  }
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Step 5 LC leg (order.payment_method = 'LC'): records the LC that
+ * replaces the cash advance entirely — issuing bank, LC number, LC
+ * amount, charges billed to the client, and (optionally) the final LC
+ * document. This leg's equivalent of recordAdvancePayment() — purely
+ * an informational entry, no stage gate of its own; confirmLcUsable()
+ * below is the real gate.
+ */
+async function recordLcDetails(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const user = req.user;
+
+  const lcAmount = parseFloat(req.body.lc_amount || 0);
+  if (!(lcAmount > 0)) {
+    flash.set(req, 'error', 'Enter the LC amount.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const lcChargesRaw = str(req.body.lc_charges_amount);
+  if (lcChargesRaw !== '' && (Number.isNaN(parseFloat(lcChargesRaw)) || parseFloat(lcChargesRaw) < 0)) {
+    flash.set(req, 'error', 'Enter a valid LC charges amount (or leave it blank).');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const lcNumber = str(req.body.lc_number) || null;
+  const lcBankName = str(req.body.lc_bank_name) || null;
+  const lcCharges = lcChargesRaw !== '' ? parseFloat(lcChargesRaw) : null;
+
+  const existing = await orderLcDetailRepository.find(orderId);
+  let lcFileId = existing ? existing.lc_file_id : null;
+  if (req.file && req.file.buffer) {
+    try {
+      lcFileId = await fileUploadService.handleUpload(
+        req,
+        'lc_file',
+        'order_lc_copy',
+        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/lc`,
+        null,
+        orderId,
+        user.id,
+        null,
+        null,
+        'Letter of Credit'
+      );
+    } catch (e) {
+      flash.set(req, 'error', `LC details were not saved — the LC file upload failed: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+  }
+
+  await orderLcDetailRepository.recordLegDetails(orderId, lcNumber, lcBankName, lcAmount, lcCharges, lcFileId, user.id);
+  await auditLogRepository.log(user.id, 'LC_DETAILS_RECORDED', 'order_lc_details', orderId, 'lc_amount', null, String(lcAmount));
+
+  // Same real-money-moving trigger as recordAdvancePayment() — see
+  // docs/schema.sql Section AC.
+  await clientRepository.lockData(order.client_id, 'Auto-locked: LC details recorded before client PI-details consent');
+
+  flash.set(req, 'success', 'LC details recorded. Confirm it usable once the advising bank confirms.');
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Step 5 LC leg's equivalent of clearAdvancePayment() — the real Stage
+ * 2->3 gate when this order's payment_method is LC. Mirrors
+ * clearAdvancePayment() exactly (same stage check, same balance
+ * computation, same client-portal provisioning), just reading the LC
+ * leg's own confirmation instead of the cash advance's.
+ */
+async function confirmLcUsable(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 3))) {
+    flash.set(req, 'error', 'Stage 3 has not been unlocked for this order yet — complete Stage 2 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const existingLc = await orderLcDetailRepository.find(orderId);
+  if (!existingLc || existingLc.lc_amount === null) {
+    flash.set(req, 'error', 'Record the LC details before confirming it usable.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const fobTotal = await orderProductRepository.totalFobValue(orderId);
+  const order = await orderRepository.find(orderId);
+  const balanceAmount = Math.round(fobTotal * (parseFloat(order.balance_pct) / 100) * 100) / 100;
+  const balanceDueDate =
+    order.balance_trigger_option === 'A_BEFORE_SHIPMENT'
+      ? null
+      : addDaysYmd(todayYmd(), parseInt(order.balance_days, 10));
+
+  await orderLcDetailRepository.confirmUsable(orderId, user.id);
+  await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
+  await auditLogRepository.log(user.id, 'LC_CONFIRMED_USABLE', 'order_lc_details', orderId, 'lc_confirmed_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '));
+  await stageGateService.passAndUnlockNext(orderId, 3, user.id);
+
+  const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId);
+
+  const baseMessage = 'LC confirmed usable. Stage 4 unlocked — you can now generate the Order Confirmation.';
   if (provisionStatus === 'provisioned') {
     flash.set(req, 'success', `${baseMessage} The client has been emailed their portal login.`);
   } else if (provisionStatus === 'no_email_on_file') {
@@ -3059,7 +3177,8 @@ async function completeCancellationRefund(req, res) {
 module.exports = {
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, downloadDossier, generatePiFormLink, generateBuyerActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
-  recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment, updateProductionStatus,
+  recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
+  recordLcDetails, confirmLcUsable, updateProductionStatus,
   recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,

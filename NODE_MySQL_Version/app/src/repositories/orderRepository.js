@@ -168,7 +168,7 @@ async function createWithNextSequence(clientId, buildFields, createdBy, executor
  */
 async function resolveSnapshot(executor, data) {
   const preset = await executor.queryOne(
-    `SELECT preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+    `SELECT preset_name, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option,
             balance_days, balance_trigger_wording, show_bl_instructions
      FROM payment_presets WHERE id = :id`,
     { id: data.payment_preset_id }
@@ -179,6 +179,7 @@ async function resolveSnapshot(executor, data) {
     preset_name: (preset && preset.preset_name) ?? null,
     advance_pct: (preset && preset.advance_pct) ?? null,
     advance_trigger_text: (preset && preset.advance_trigger_text) ?? null,
+    payment_method: (preset && preset.payment_method) ?? 'CASH_ADVANCE',
     balance_pct: (preset && preset.balance_pct) ?? null,
     balance_trigger_option: (preset && preset.balance_trigger_option) ?? null,
     balance_days: (preset && preset.balance_days) ?? null,
@@ -338,7 +339,7 @@ async function insertOrderRow(executor, data, createdBy) {
          status, created_by, duplicated_from_order_id,
          incoterm_code, currency_code, port_of_loading_name, port_of_loading_city,
          port_of_discharge_name, port_of_discharge_city, preset_name, advance_pct,
-         advance_trigger_text, balance_pct, balance_trigger_option, balance_days,
+         advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days,
          balance_trigger_wording, show_bl_instructions,
          company_legal_name, billing_address, billing_address_line1, billing_address_line2,
          billing_city, billing_postcode, billing_country, vat_eori_tax_no, contact_person,
@@ -361,7 +362,7 @@ async function insertOrderRow(executor, data, createdBy) {
          'active', :created_by, :duplicated_from_order_id,
          :incoterm_code, :currency_code, :port_of_loading_name, :port_of_loading_city,
          :port_of_discharge_name, :port_of_discharge_city, :preset_name, :advance_pct,
-         :advance_trigger_text, :balance_pct, :balance_trigger_option, :balance_days,
+         :advance_trigger_text, :payment_method, :balance_pct, :balance_trigger_option, :balance_days,
          :balance_trigger_wording, :show_bl_instructions,
          :company_legal_name, :billing_address, :billing_address_line1, :billing_address_line2,
          :billing_city, :billing_postcode, :billing_country, :vat_eori_tax_no, :contact_person,
@@ -413,6 +414,7 @@ async function insertOrderRow(executor, data, createdBy) {
       preset_name: snapshot.preset_name,
       advance_pct: snapshot.advance_pct,
       advance_trigger_text: snapshot.advance_trigger_text,
+      payment_method: snapshot.payment_method,
       balance_pct: snapshot.balance_pct,
       balance_trigger_option: snapshot.balance_trigger_option,
       balance_days: snapshot.balance_days,

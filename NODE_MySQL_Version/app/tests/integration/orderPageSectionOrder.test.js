@@ -91,13 +91,13 @@ describe('Order page section order (Task #36)', () => {
     expect(topOfPage).not.toContain('Generate Buyer PO</button>');
   });
 
-  it('PI generate button lives inside its own Step 5a section', async () => {
+  it('PI generate button lives inside its own Step 5c section', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThrough(orderId, 2);
 
     const output = await render(orderId);
 
-    const stage3Pos = output.indexOf('Step 5a &middot; Generate Proforma Invoice</h2>');
+    const stage3Pos = output.indexOf('Step 5c &middot; Generate Proforma Invoice</h2>');
     const piGeneratePos = output.indexOf('Generate Proforma Invoice</button>');
 
     expect(stage3Pos).toBeGreaterThan(-1);
