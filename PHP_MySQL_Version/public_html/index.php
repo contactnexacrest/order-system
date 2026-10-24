@@ -385,6 +385,7 @@ $router->get('/orders/archived', [$orders, 'archivedIndex'], [SessionAuth::requi
 $router->get('/orders/create', [$orders, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders', [$orders, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/orders/{id}', [$orders, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders'])]);
+$router->post('/orders/{id}/assign', [$orders, 'assignOwner'], [SessionAuth::required(), PermissionCheck::requires('assign_order_owner'), CsrfCheck::verify()]);
 $router->get('/orders/{id}/edit', [$orders, 'editDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/edit', [$orders, 'updateDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/archive', [$orders, 'archive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);

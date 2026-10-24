@@ -103,6 +103,15 @@ final class OrderLockGuardMiddlewareTest extends DbTestCase
             // deliberately gated on (one step below edit_locked_data).
             '/orders/{id}/cancellation/request', '/orders/{id}/cancellation/{cancellationId}/approve',
             '/orders/{id}/cancellation/{cancellationId}/reject', '/orders/{id}/cancellation/{cancellationId}/complete-refund',
+            // Order ownership / assignment visibility (see
+            // docs/migrations/2026-10-24b-order-owner-assignment.sql) —
+            // visibility-only, never touches the order's own substantive
+            // data, same tier as disputes/complaints above: reassigning
+            // who owns a completed order (e.g. a staff member leaves)
+            // must stay reachable regardless of lock state. Already
+            // narrowly gated to assign_order_owner (Admin/MD/ED), who
+            // hold edit_locked_data too in practice.
+            '/orders/{id}/assign',
         ];
         $lines = array_filter(
             explode("\n", $source),

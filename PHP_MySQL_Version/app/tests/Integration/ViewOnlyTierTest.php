@@ -87,8 +87,8 @@ final class ViewOnlyTierTest extends DbTestCase
 
     public function testOrderShowPageShowsMutatingButtonsForAManageOrdersUser(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
         $userId = $this->createTestUser('Export Executive');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, $userId);
         $_SESSION['_auth_user_id'] = $userId;
 
         ob_start();

@@ -51,7 +51,7 @@ final class OrderDetailsAtAGlanceTest extends DbTestCase
     public function testComplianceChecklistLineShownWithCloseOrders(): void
     {
         $userId = $this->createTestUser('Export Executive');
-        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, $userId);
 
         $_SESSION['_auth_user_id'] = $userId;
         ob_start();

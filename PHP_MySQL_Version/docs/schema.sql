@@ -689,6 +689,15 @@ CREATE TABLE orders (
 
   is_sample_data          TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real order
   created_by              BIGINT UNSIGNED NULL,
+  -- Added 2026-10-24 (see docs/migrations/2026-10-24b-order-owner-assignment.sql):
+  -- the single staff "owner" of this order — visibility-only (which staff
+  -- see the order in the list/Kanban/detail page at all), never consulted
+  -- by the stage-gate/permission system that decides who may act on a
+  -- step. Auto-set to created_by's value at creation; changeable
+  -- afterward only by a holder of assign_order_owner (Admin/MD/ED).
+  -- FK-constrained unlike created_by — disputes.assigned_to below is the
+  -- precedent for a constrained column of this exact name.
+  assigned_to              BIGINT UNSIGNED NULL,
   created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (client_id) REFERENCES clients(id),
   FOREIGN KEY (payment_preset_id) REFERENCES payment_presets(id),
@@ -697,8 +706,11 @@ CREATE TABLE orders (
   FOREIGN KEY (port_of_discharge_id) REFERENCES ports(id),
   FOREIGN KEY (currency_id) REFERENCES currencies(id),
   FOREIGN KEY (current_stage_id) REFERENCES stages_master(id),
+  FOREIGN KEY (assigned_to) REFERENCES users(id),
   UNIQUE KEY uq_client_sequence (client_id, sequence_no)
 ) ENGINE=InnoDB;
+
+CREATE INDEX idx_orders_assigned_to ON orders (assigned_to);
 
 CREATE TABLE order_stages (
   id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -60,6 +60,7 @@ use App\Services\DocumentGenerationService;
 use App\Services\EmailService;
 use App\Services\FileUploadService;
 use App\Services\MakerCheckerGuard;
+use App\Services\OrderAssignmentService;
 use App\Services\OrderCommentService;
 use App\Services\OrderDuplicationService;
 use App\Services\OrderEditGuard;
@@ -85,12 +86,13 @@ final class OrderController
     public function index(array $params): void
     {
         $actor = AuthService::currentUser();
+        $seesAllOrders = PermissionService::can((int) $actor['id'], $actor['role_id'] !== null ? (int) $actor['role_id'] : null, 'view_all_orders');
         if (\App\Services\UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
-            $this->indexKanban();
+            $this->indexKanban((int) $actor['id'], $seesAllOrders);
             return;
         }
 
-        $all = OrderRepository::all();
+        $all = OrderRepository::allVisibleTo((int) $actor['id'], $seesAllOrders);
         // Default to the Active tab, not All — most orders in the system
         // at any time are still in play, and staff opening this screen
         // want to see what's actually moving, not a completed/lost order
@@ -145,6 +147,7 @@ final class OrderController
             'page' => $page,
             'totalPages' => $totalPages,
             'totalFiltered' => $totalFiltered,
+            'seesAllOrders' => $seesAllOrders,
         ], 'layout/base');
     }
 
@@ -161,9 +164,9 @@ final class OrderController
      * glance, which the existing card-grid list already offers filtered/
      * paginated for anyone who wants that instead.
      */
-    private function indexKanban(): void
+    private function indexKanban(int $actorId, bool $seesAllOrders): void
     {
-        $all = OrderRepository::all();
+        $all = OrderRepository::allVisibleTo($actorId, $seesAllOrders);
         $stages = LookupRepository::stagesMaster();
 
         $columns = [];
@@ -199,6 +202,7 @@ final class OrderController
             'lostCount' => $lostCount,
             'cancelledCount' => $cancelledCount,
             'totalActive' => count(array_filter($all, static fn($o) => $o['status'] === 'active')),
+            'seesAllOrders' => $seesAllOrders,
         ], 'layout/base');
     }
 
@@ -835,6 +839,19 @@ final class OrderController
             }
         }
 
+        // Order ownership / assignment visibility — a guessed/bookmarked
+        // URL must not bypass the same scoping the Orders list and Kanban
+        // board already apply. Visibility only: this never touches who may
+        // act on a step (manage_payments/clear_payments/manage_shipping/
+        // etc. are unaffected and checked exactly as before, below).
+        $seesAllOrders = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_all_orders');
+        if (!$seesAllOrders && (int) ($order['assigned_to'] ?? 0) !== (int) $actor['id']) {
+            http_response_code(403);
+            echo 'This order is assigned to a different user. You can only open orders assigned to you.';
+            return;
+        }
+        $canAssignOwner = PermissionService::can((int) $actor['id'], $actorRoleId, 'assign_order_owner');
+
         // CA / Accounting module (Phase 1) — INR-actual settlement widgets
         // on this page are shown/hidden per-permission rather than gated at
         // the route level, since they're a small part of a page most staff
@@ -924,6 +941,8 @@ final class OrderController
 
         View::render('orders/show', [
             'order'    => $order,
+            'canAssignOwner' => $canAssignOwner,
+            'seesAllOrders' => $seesAllOrders,
             'leadTimeDisplayUnit' => CompanySettingsRepository::get('lead_time_display_unit') ?: 'days',
             'products' => OrderProductRepository::forOrder($orderId),
             'hsCodes'  => HsCodeRepository::active(),
@@ -993,6 +1012,39 @@ final class OrderController
             // data, so this isn't gated behind manage_order_financials.
             'orderFeedback' => \App\Repositories\OrderFeedbackRepository::find($orderId),
         ], 'layout/base');
+    }
+
+    /**
+     * Order ownership / assignment visibility — reassigns an order's
+     * single owner. Route-gated to assign_order_owner (Admin/MD/ED only);
+     * this method doesn't re-check it. Visibility-only: never touches
+     * stage-gate or action-permission checks elsewhere on this order.
+     */
+    public function assignOwner(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header('Location: /orders');
+            return;
+        }
+
+        $newOwnerId = (int) ($_POST['assigned_to'] ?? 0);
+        $newOwner = $newOwnerId > 0 ? UserRepository::findById($newOwnerId) : null;
+        if (!$newOwner || !$newOwner['is_active']) {
+            Flash::set('error', 'Select a valid, active user to assign this order to.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        try {
+            OrderAssignmentService::reassign($orderId, $newOwnerId, (int) AuthService::currentUser()['id']);
+            Flash::set('success', "Order reassigned to {$newOwner['name']}.");
+        } catch (\Throwable $e) {
+            Flash::setErrorFromException($e);
+        }
+        header("Location: /orders/{$orderId}");
     }
 
     /**

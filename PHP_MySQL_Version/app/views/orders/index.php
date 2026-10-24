@@ -43,6 +43,7 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
       <div class="entity-card-header">
         <span class="entity-card-title"><?= htmlspecialchars($o['order_reference']) ?></span>
         <?php if (!empty($o['incoterm_code'])): ?><span class="tag tag-gold"><?= htmlspecialchars($o['incoterm_code']) ?></span><?php endif; ?>
+        <?php if (!empty($seesAllOrders) && !empty($o['assigned_to_name'])): ?><span class="tag tag-navy"><?= htmlspecialchars($o['assigned_to_name']) ?></span><?php endif; ?>
       </div>
       <div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div>
       <div>

@@ -11,7 +11,7 @@ $canViewArchivedOrders = $currentUser && PermissionService::can((int) $currentUs
  * process (every test in the suite shares one process), and a second
  * `include` would fatal on "Cannot redeclare function" otherwise.
  */
-$renderKanbanCard = static function (array $o): string {
+$renderKanbanCard = static function (array $o) use ($seesAllOrders): string {
     $currency = $o['currency_code'] ?? '';
     $amount = trim($currency . ' ' . number_format((float) $o['total_fob_value'], 2));
     ob_start();
@@ -20,6 +20,7 @@ $renderKanbanCard = static function (array $o): string {
       <div class="entity-card-header">
         <span class="entity-card-title"><?= htmlspecialchars($o['order_reference']) ?></span>
         <?php if (!empty($o['incoterm_code'])): ?><span class="tag tag-gold"><?= htmlspecialchars($o['incoterm_code']) ?></span><?php endif; ?>
+        <?php if (!empty($seesAllOrders) && !empty($o['assigned_to_name'])): ?><span class="tag tag-navy"><?= htmlspecialchars($o['assigned_to_name']) ?></span><?php endif; ?>
       </div>
       <div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div>
       <div class="entity-card-footer">

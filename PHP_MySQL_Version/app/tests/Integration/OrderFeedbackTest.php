@@ -290,7 +290,7 @@ final class OrderFeedbackTest extends DbTestCase
         // manage_order_financials grant must still see it.
         $userId = $this->createTestUser('Export Executive');
         $clientId = $this->createTestClient();
-        $orderId = $this->createTestOrder($clientId);
+        $orderId = $this->createTestOrder($clientId, 'FOB', 'Standard — New Buyer', 'USD', null, null, $userId);
         OrderFeedbackRepository::upsert($orderId, $clientId, 3, 'Average — packaging could improve.');
         $_SESSION['_auth_user_id'] = $userId;
 

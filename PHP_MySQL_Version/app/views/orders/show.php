@@ -382,7 +382,21 @@ $stepStatusIcon = static function (string $status): string {
     <?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_city'] ?? $order['port_of_loading_name'] ?? '') ?>
     <?php if ($canViewReports): ?>&nbsp;·&nbsp; <a href="/reports/order/<?= (int) $order['id'] ?>">Full Report</a><?php endif; ?>
     <?php if ($canManageOrders): ?>&nbsp;·&nbsp; <a href="/orders/<?= (int) $order['id'] ?>/edit">Edit Order Details</a><?php endif; ?>
+    <?php if (!empty($seesAllOrders)): ?>&nbsp;·&nbsp; Assigned to: <strong><?= htmlspecialchars($order['assigned_to_name'] ?? 'Unassigned') ?></strong><?php endif; ?>
   </p>
+  <?php if (!empty($canAssignOwner)): ?>
+  <form method="post" action="/orders/<?= (int) $order['id'] ?>/assign" class="btn-row" style="margin-top:-6px;align-items:center;">
+    <?= Csrf::field() ?>
+    <label class="muted small" style="margin:0;">Reassign to
+      <select name="assigned_to" style="margin-left:4px;">
+        <?php foreach ($activeUsers as $u): ?>
+          <option value="<?= (int) $u['id'] ?>"<?= (int) ($order['assigned_to'] ?? 0) === (int) $u['id'] ? ' selected' : '' ?>><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role_name'] ?? '—') ?>)</option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <button type="submit" class="btn-sm">Reassign</button>
+  </form>
+  <?php endif; ?>
   <?php if ($duplicatedFromOrder): ?>
     <p class="notice notice-info">This order was created as a repeat order from <a href="/orders/<?= (int) $duplicatedFromOrder['id'] ?>"><?= htmlspecialchars($duplicatedFromOrder['order_reference']) ?></a>.<?php if ($supplierPo && $supplierPo['status'] === 'draft'): ?> Its Supplier PO terms were carried over below as a draft — review and confirm once Stage 5 is reached.<?php endif; ?></p>
   <?php endif; ?>

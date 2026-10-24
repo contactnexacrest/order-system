@@ -63,7 +63,7 @@ final class PaymentLedgerTest extends DbTestCase
     public function testCloseOrdersHolderSeesAmountsEvenWithoutManagePayments(): void
     {
         $userId = $this->createTestUser('Logistics Executive');
-        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, $userId);
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 7500.0, '2026-06-01');
 

@@ -77,8 +77,9 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
 
     public function testExportExecutiveDoesSeeTheOrderDisputesLinkViaRespondToDisputes(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $_SESSION['_auth_user_id'] = $this->createTestUser('Export Executive');
+        $userId = $this->createTestUser('Export Executive');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, $userId);
+        $_SESSION['_auth_user_id'] = $userId;
 
         ob_start();
         (new OrderController())->show(['id' => $orderId]);
