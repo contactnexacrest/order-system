@@ -184,21 +184,22 @@ SELECT 'Established Buyer — Post-BL', 0, 40.00, 'against Proforma Invoice befo
        c.id, 1, 1
 FROM currencies c WHERE c.code = 'USD';
 
--- Both presets ship protected by default — they drive where money is
--- actually sent/received; see field_protection_requests to unprotect.
-UPDATE payment_presets SET is_protected = 1;
-
--- 90-item backlog "30/70 payment preset": a third preset for an
--- established buyer wanting an even lighter upfront commitment than
--- the existing 40/60 presets. Deliberately left UNPROTECTED (added
--- after the blanket UPDATE above, not before it) — unlike the two
--- foundational presets, this one didn't exist when the app shipped, so
--- there's nothing historical to guard; an admin can freely adjust it
--- via the full Payment Presets CRUD screen (/payment-presets) without
--- the unlock gesture, same as any other preset they create themselves.
+-- 90-item backlog "30/70 payment preset": two more presets for an
+-- established buyer wanting a lighter upfront commitment than the
+-- 40/60 presets above — the same Before-Shipment/After-BL pair the
+-- 40/60 bucket has (Standard — New Buyer / Established Buyer —
+-- Post-BL), just at a 30/70 split instead.
 INSERT INTO payment_presets
   (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
-SELECT 'Extended Terms — 30/70', 0, 30.00, 'against Proforma Invoice before production commences', 'CASH_ADVANCE',
+SELECT 'Extended Terms — Before Shipment', 0, 30.00, 'against Proforma Invoice before production commences', 'CASH_ADVANCE',
+       70.00, 'A_BEFORE_SHIPMENT', 3,
+       'Payable before shipment — within {days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest.',
+       c.id, 1, 1
+FROM currencies c WHERE c.code = 'USD';
+
+INSERT INTO payment_presets
+  (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
+SELECT 'Extended Terms — Post-BL', 0, 30.00, 'against Proforma Invoice before production commences', 'CASH_ADVANCE',
        70.00, 'B_AGAINST_BL', 7,
        'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
        c.id, 1, 1
@@ -211,16 +212,24 @@ FROM currencies c WHERE c.code = 'USD';
 -- Step 5 render "Record LC Details" / "Confirm LC Usable" in place of
 -- "Record Advance Remittance" / "Mark Advance Cleared" — the LC leg
 -- replaces the cash advance entirely; the Balance leg afterward is
--- unaffected. Deliberately left UNPROTECTED, same reasoning as Extended
--- Terms above — an admin can freely retune the % split via the Payment
--- Presets screen.
+-- unaffected. advance_pct is 0 here (not a typo) — a sight LC has no
+-- separate cash advance leg; the full amount is paid once shipping
+-- documents are presented to the bank, so the whole order value sits
+-- in balance_pct instead. "LC Amount" on the order page's Record LC
+-- Details step is a free-typed field, never derived from advance_pct,
+-- so this doesn't change anything about that step itself — only what
+-- prints as the advance/balance split on generated documents.
 INSERT INTO payment_presets
   (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
-SELECT 'Irrevocable Letter of Credit at Sight', 0, 30.00, 'against Letter of Credit opened before production commences', 'LC',
-       70.00, 'B_AGAINST_BL', 7,
+SELECT 'Irrevocable Letter of Credit at Sight', 0, 0.00, 'against Letter of Credit opened before production commences', 'LC',
+       100.00, 'B_AGAINST_BL', 7,
        'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
        c.id, 1, 1
 FROM currencies c WHERE c.code = 'USD';
+
+-- All five presets ship protected — they drive where money is actually
+-- sent/received; see field_protection_requests to unprotect.
+UPDATE payment_presets SET is_protected = 1;
 
 -- ================================================================
 -- STAGES MASTER — the 9 gates from StageGate.docx / WallReference.docx

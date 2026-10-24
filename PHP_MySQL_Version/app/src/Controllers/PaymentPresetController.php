@@ -158,7 +158,7 @@ final class PaymentPresetController
             Flash::set('error', 'Select a valid balance trigger option.');
             return null;
         }
-        if ($advancePct <= 0 || $advancePct >= 100) {
+        if ($advancePct < 0 || $advancePct >= 100) {
             Flash::set('error', 'Advance % must be between 0 and 100.');
             return null;
         }

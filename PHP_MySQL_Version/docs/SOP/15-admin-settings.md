@@ -294,8 +294,8 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   Instruction Sheet (90-item backlog #32) — unchecking this on a preset
   omits both rows from every Stage 7 BL Instruction Sheet generated for
   orders on it, for payment terms (e.g. balance paid before shipment)
-  that don't need NexaCrest to retain the BL as leverage; both seeded
-  presets ship with it checked, reproducing the sheet's content exactly
+  that don't need NexaCrest to retain the BL as leverage; every seeded
+  preset ships with it checked, reproducing the sheet's content exactly
   as before this field existed. Creating a new
   preset — say a 20% advance / 80% balance trial-order preset — needs no
   further code change anywhere: every order on that preset calculates

@@ -61,7 +61,7 @@ function collectFormData(req) {
   if (!Object.prototype.hasOwnProperty.call(TRIGGER_OPTIONS, balanceTriggerOption)) {
     return { error: 'Select a valid balance trigger option.' };
   }
-  if (advancePct <= 0 || advancePct >= 100) {
+  if (advancePct < 0 || advancePct >= 100) {
     return { error: 'Advance % must be between 0 and 100.' };
   }
   if (Math.abs((advancePct + balancePct) - 100.0) > 0.01) {
