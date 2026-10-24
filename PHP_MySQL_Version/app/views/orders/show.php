@@ -1138,7 +1138,7 @@ $stepStatusIcon = static function (string $status): string {
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
         <?= Csrf::field() ?>
         <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-        <?= $stepBadge('5c') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 6)</button>
+        <?= $stepBadge('5c') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
       </form>
       <?php endif; ?>
     <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>

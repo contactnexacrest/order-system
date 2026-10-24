@@ -962,7 +962,7 @@
       <form method="post" action="/orders/{{ order.id }}/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Cleared On<input type="date" name="advance_cleared_at"></label>
-        {{ stepBadge('5c') | safe }}<button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 6)</button>
+        {{ stepBadge('5c') | safe }}<button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
       </form>
       {% endif %}
     {% elif not stage3 or stage3.status == 'locked' %}
