@@ -48,7 +48,11 @@ describe('Government Export Benefits section is gated on order-complete + CI rem
     const res = await agent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
     expect(res.text).toContain('Not applicable until the order is complete');
-    expect(res.text).not.toContain('RODTEP');
+    // The scheme-eligibility table (separate from the claim table this
+    // gate covers) always lists every scheme name regardless of order
+    // status — eligibility can and should be resolved early. It's the
+    // CLAIM itself (its reference number) that stays hidden.
+    expect(res.text).not.toContain('SB-GATE-1');
   });
 
   it('shows the claimed benefit once the order is complete and remittance is received', async () => {

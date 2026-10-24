@@ -156,7 +156,7 @@ describe('Order page section order (Task #36)', () => {
 
     const output = await render(orderId);
 
-    const stage7Pos = output.indexOf('Step 9f &middot; Generate Packing List</h2>');
+    const stage7Pos = output.indexOf('Step 10b &middot; Generate Packing List</h2>');
     const plGeneratePos = output.indexOf('Generate Packing List</button>');
 
     expect(stage7Pos).toBeGreaterThan(-1);
@@ -170,7 +170,7 @@ describe('Order page section order (Task #36)', () => {
 
     const output = await render(orderId);
 
-    const stage8Pos = output.indexOf('Step 9j &middot; Generate Commercial Invoice');
+    const stage8Pos = output.indexOf('Step 11a &middot; Generate Commercial Invoice');
     const ciGeneratePos = output.indexOf('Generate Commercial Invoice</button>');
 
     expect(stage8Pos).toBeGreaterThan(-1);
@@ -206,9 +206,9 @@ describe('Order page section order (Task #36)', () => {
 
     const output = await render(orderId);
 
-    const communicationPos = output.indexOf('<h2>Step 13 &middot; Order Communication</h2>');
-    const feedbackPos = output.indexOf('<h2>Step 14 &middot; Order Feedback</h2>');
-    const disputesPos = output.indexOf('<h2>Step 16 &middot; Disputes</h2>');
+    const communicationPos = output.indexOf('<h2>Order Communication</h2>');
+    const feedbackPos = output.indexOf('<h2>Order Feedback</h2>');
+    const disputesPos = output.indexOf('<h2>Disputes</h2>');
 
     expect(communicationPos).toBeGreaterThan(-1);
     expect(feedbackPos).toBeGreaterThan(-1);

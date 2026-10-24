@@ -165,8 +165,8 @@ describe('Order screen redesign (Point 2/4)', () => {
       }
     }
 
-    expect(directStepCardCount).toBe(19);
-    expect(groupCount).toBe(8);
-    expect(groupedStepCardCount).toBe(37);
+    expect(directStepCardCount).toBe(17);
+    expect(groupCount).toBe(9);
+    expect(groupedStepCardCount).toBe(39);
   });
 });

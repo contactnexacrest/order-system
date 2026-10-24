@@ -60,7 +60,7 @@ describe('Step 5 LC payment leg', () => {
   }
 
   it('an LC-preset order shows Record LC Details / Confirm LC Usable, never the cash-advance leg', async () => {
-    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Letter of Credit — 30/70');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight');
     await unlockThrough(orderId, 2);
 
     const res = await agent.get(`/orders/${orderId}`);
@@ -88,7 +88,7 @@ describe('Step 5 LC payment leg', () => {
   });
 
   it('recordLcDetails then confirmLcUsable unlocks Stage 4 and stamps lc_confirmed_at', async () => {
-    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Letter of Credit — 30/70');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight');
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     const userId = await createTestUser('Accounts Executive');
     await unlockThrough(orderId, 2);
@@ -116,7 +116,7 @@ describe('Step 5 LC payment leg', () => {
   });
 
   it('confirmLcUsable refuses when LC details have not been recorded yet', async () => {
-    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Letter of Credit — 30/70');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight');
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     const userId = await createTestUser('Accounts Executive');
     await unlockThrough(orderId, 2);
@@ -132,7 +132,7 @@ describe('Step 5 LC payment leg', () => {
   });
 
   it('recordLcDetails refuses a zero/blank LC amount', async () => {
-    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Letter of Credit — 30/70');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight');
     const userId = await createTestUser('Accounts Executive');
     await unlockThrough(orderId, 2);
 

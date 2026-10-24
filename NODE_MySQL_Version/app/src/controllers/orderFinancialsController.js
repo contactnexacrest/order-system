@@ -4,6 +4,7 @@ const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
+const orderExportBenefitSchemeRepository = require('../repositories/orderExportBenefitSchemeRepository');
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderInspectionFeeRepository = require('../repositories/orderInspectionFeeRepository');
 const orderTravelExpenseRepository = require('../repositories/orderTravelExpenseRepository');
@@ -110,6 +111,42 @@ async function markExportBenefitReceived(req, res) {
   await caExportBenefitRepository.markReceived(benefitId, parseFloat(receivedAmount), receivedAt);
   await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', benefitId, null, null, receivedAmount);
   flash.set(req, 'success', 'Marked as received.');
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
+/**
+ * Eligibility decision for a government export-benefit scheme —
+ * separate from (and a precondition of) actually recording a claim
+ * above. 'not_eligible' requires a reason, same deliberate "never
+ * silently skipped" rule as orderComplianceTaskRepository's skip_reason.
+ */
+async function setExportBenefitSchemeStatus(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const user = req.user;
+
+  const schemeName = String(req.body.scheme_name || '').trim();
+  const status = String(req.body.status || '').trim();
+  if (schemeName === '' || !Object.prototype.hasOwnProperty.call(orderExportBenefitSchemeRepository.STATUSES, status) || status === 'pending') {
+    flash.set(req, 'error', 'Select a valid scheme and eligibility status.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+
+  const reason = String(req.body.reason || '').trim();
+  if (status === 'not_eligible' && reason === '') {
+    flash.set(req, 'error', 'A reason is required to mark a scheme Not Eligible.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+
+  await orderExportBenefitSchemeRepository.setStatus(orderId, schemeName, status, status === 'not_eligible' ? reason : null, user.id);
+  await auditLogRepository.log(user.id, 'EXPORT_BENEFIT_SCHEME_STATUS_UPDATED', 'orders', orderId, `export_benefit_scheme:${schemeName}`, null, status, status === 'not_eligible' ? reason : null);
+  flash.set(req, 'success', `${schemeName} eligibility updated.`);
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
@@ -440,4 +477,4 @@ async function deleteCostEntry(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
-module.exports = { addExportBenefit, markExportBenefitReceived, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };
+module.exports = { addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };

@@ -24,6 +24,7 @@ const orderCancellationRepository = require('../repositories/orderCancellationRe
 const makerCheckerGuard = require('../services/makerCheckerGuard');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderComplianceTaskRepository = require('../repositories/orderComplianceTaskRepository');
+const orderExportBenefitSchemeRepository = require('../repositories/orderExportBenefitSchemeRepository');
 const orderInspectionFeeRepository = require('../repositories/orderInspectionFeeRepository');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
 const clientRepository = require('../repositories/clientRepository');
@@ -870,6 +871,7 @@ async function show(req, res) {
   const complianceTasksForOrder = await orderComplianceTaskRepository.forOrder(orderId);
   const pendingInspectionTask = complianceTasksForOrder.some((t) => t.task_type_name === 'Pre-Shipment Inspection' && t.status !== 'skipped');
   const canManageOrderFinancialsForInspection = !!req.permissions.manage_order_financials;
+  const exportBenefitSchemesForOrder = await orderExportBenefitSchemeRepository.forOrder(orderId);
 
   const duplicatedFromOrder = order.duplicated_from_order_id
     ? await orderRepository.find(order.duplicated_from_order_id)
@@ -985,6 +987,8 @@ async function show(req, res) {
       complianceTasks: complianceTasksForOrder,
       complianceStatuses: orderComplianceTaskRepository.STATUSES,
       pendingInspectionTask,
+      exportBenefitEligibility: exportBenefitSchemesForOrder,
+      exportBenefitEligibilityStatuses: orderExportBenefitSchemeRepository.STATUSES,
       orderInspectionFee: canManageOrderFinancialsForInspection ? await orderInspectionFeeRepository.find(orderId) : null,
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
       openComplaintCount: complaints.filter((c) => c.status !== 'resolved').length,
@@ -2959,6 +2963,22 @@ async function markFullySettled(req, res) {
       res.redirect(`/orders/${orderId}#order-financials`);
       return;
     }
+
+    const complianceTasks = await orderComplianceTaskRepository.forOrder(orderId);
+    const outstandingComplianceTasks = complianceTasks.filter((ct) => ct.status === 'not_started' || ct.status === 'pending_approval');
+    if (outstandingComplianceTasks.length > 0) {
+      flash.set(req, 'error', 'This order still has an unresolved Compliance Checklist task — approve or mark it Not Applicable (with a reason) first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
+      res.redirect(`/orders/${orderId}#compliance-checklist`);
+      return;
+    }
+
+    const exportBenefitSchemes = await orderExportBenefitSchemeRepository.forOrder(orderId);
+    const pendingExportBenefitSchemes = exportBenefitSchemes.filter((s) => s.status === 'pending');
+    if (pendingExportBenefitSchemes.length > 0) {
+      flash.set(req, 'error', 'This order still has a government export-benefit scheme with no eligibility decision — mark it Eligible or Not Eligible first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
+      res.redirect(`/orders/${orderId}#order-financials`);
+      return;
+    }
   }
 
   await orderRepository.markComplete(orderId);
@@ -3001,6 +3021,39 @@ async function updateComplianceTask(req, res) {
   await orderComplianceTaskRepository.setStatus(orderId, taskTypeId, status, status === 'skipped' ? skipReason : null, user.id);
   await auditLogRepository.log(user.id, 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', orderId, `compliance_task:${taskTypeId}`, null, status, status === 'skipped' ? skipReason : null);
   flash.set(req, 'success', 'Compliance checklist updated.');
+  res.redirect(`/orders/${orderId}#compliance-checklist`);
+}
+
+/**
+ * Repeat-order shortcut: skips every currently-outstanding (not yet
+ * approved/skipped) compliance task on this order in one submit, with
+ * one shared reason — the same deliberate "skipped requires a reason"
+ * rule as a single task, just applied to the whole remaining set at
+ * once instead of clicking through each one.
+ */
+async function markAllComplianceTasksNotApplicable(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  if (!req.permissions || !req.permissions.close_orders) {
+    flash.set(req, 'error', 'You do not have permission to update the compliance checklist.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const skipReason = str(req.body.skip_reason).trim();
+  if (skipReason === '') {
+    flash.set(req, 'error', 'A reason is required to mark the remaining compliance tasks Not Applicable.');
+    res.redirect(`/orders/${orderId}#compliance-checklist`);
+    return;
+  }
+
+  const tasks = await orderComplianceTaskRepository.forOrder(orderId);
+  const outstanding = tasks.filter((ct) => ct.status === 'not_started' || ct.status === 'pending_approval');
+  for (const ct of outstanding) {
+    await orderComplianceTaskRepository.setStatus(orderId, ct.task_type_id, 'skipped', skipReason, user.id);
+    await auditLogRepository.log(user.id, 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', orderId, `compliance_task:${ct.task_type_id}`, ct.status, 'skipped', skipReason);
+  }
+  flash.set(req, 'success', `${outstanding.length} outstanding compliance task(s) marked Not Applicable.`);
   res.redirect(`/orders/${orderId}#compliance-checklist`);
 }
 
@@ -3264,7 +3317,7 @@ module.exports = {
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   saveBlEndorsement, generateBlEndorsement,
-  closeOrder, markFullySettled, overrideStatusLock, markLost, updateComplianceTask,
+  closeOrder, markFullySettled, overrideStatusLock, markLost, updateComplianceTask, markAllComplianceTasksNotApplicable,
   requestCancellation, approveCancellation, rejectCancellation, completeCancellationRefund,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,

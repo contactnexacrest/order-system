@@ -3,6 +3,8 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 const orderAssigneeRepository = require('./orderAssigneeRepository');
+const orderComplianceTaskRepository = require('./orderComplianceTaskRepository');
+const orderExportBenefitSchemeRepository = require('./orderExportBenefitSchemeRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const encryptionService = require('../services/encryptionService');
 const { formatForDb } = require('../helpers/dbDateTime');
@@ -500,6 +502,15 @@ async function insertOrderRow(executor, data, createdBy) {
   // executor as the order INSERT above, QA-5 ORD-05) so this row rolls
   // back together with the order on any failure.
   await orderAssigneeRepository.add(orderId, createdBy, createdBy, executor);
+
+  // Every active compliance task type gets a real 'not_started' row up
+  // front — a report run directly against order_compliance_tasks must
+  // never see "no row" as a stand-in for "not applicable."
+  await orderComplianceTaskRepository.initializeForOrder(orderId, executor);
+
+  // Same materialization fix for export-benefit scheme eligibility —
+  // see orderExportBenefitSchemeRepository.js's own docblock.
+  await orderExportBenefitSchemeRepository.initializeForOrder(orderId, executor);
 
   return orderId;
 }

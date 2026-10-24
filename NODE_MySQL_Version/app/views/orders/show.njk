@@ -183,6 +183,7 @@
   {% if ct.status == 'approved' or ct.status == 'skipped' %}{% set complianceApproved = complianceApproved + 1 %}{% endif %}
 {% endfor %}
 {% set complianceTotal = (complianceTasks or []) | length %}
+{% set complianceOutstanding = complianceTotal - complianceApproved %}
 {% set currentStage = null %}
 {% for s in stages %}
   {% if not currentStage and s.status != 'gate_passed' and s.status != 'skipped' %}{% set currentStage = s %}{% endif %}
@@ -199,31 +200,43 @@
    card — it never gates an action (every existing permission/stage-gate
    check below is completely unchanged). #}
 {% macro stepStatusFn(stage, pastSignal) %}{% if orderClosed %}done{% elif not stage %}{% if pastSignal %}done{% else %}locked{% endif %}{% elif stage.status == 'gate_passed' or stage.status == 'skipped' %}done{% elif stage.status == 'in_progress' %}current{% else %}locked{% endif %}{% endmacro %}
+{# Steps 1/2/3 used to share stage1's single DB status (which auto-passes
+   the instant a QT is generated), so all three opened/closed together
+   even though sending and client-acceptance hadn't actually happened
+   yet. Each now gets its own real signal: step 1 from whether a QT
+   document exists at all, step 2 from that QT's own 'sent' status,
+   step 3 from whether work on the next real action (the Buyer PO) has
+   actually started — the same thing its own card text already tells
+   staff to treat as "client accepted." #}
+{% set hasQtDoc = docGenerated(documents, 'QT') %}
+{% set qtSent = docStatus(documents, 'QT') == 'sent' %}
+{% set hasBuyerPoDoc = docGenerated(documents, 'BUYERPO') %}
+{% macro step123Status(reached, done) %}{% if orderClosed %}done{% elif not reached %}locked{% elif done %}done{% else %}current{% endif %}{% endmacro %}
 {% set stepStates = {
-  's1-3': stepStatusFn(stage1, false),
+  's1': step123Status(true, hasQtDoc),
+  's2': step123Status(hasQtDoc, qtSent),
+  's3': step123Status(qtSent, hasBuyerPoDoc),
   's4': stepStatusFn(stage2, false),
   's5': stepStatusFn(stage3, false),
   's6': stepStatusFn(stage4, false),
   's7': stepStatusFn(stage5, false),
   's8': stepStatusFn(stage5, supplierSigned),
-  's9': stepStatusFn((stage7 if isFob else stage6), false),
-  's9-10': stepStatusFn(stage8, false),
-  's11': stepStatusFn(stage9, false),
-  's12': 'done',
-  's13': 'done',
+  's8b': ('done' if (orderClosed or complianceOutstanding == 0) else 'current'),
+  's9': stepStatusFn(stage6, false),
+  's10': stepStatusFn(stage7, false),
+  's11': stepStatusFn(stage8, false),
+  's12': stepStatusFn(stage9, false),
+  's13': stepStatusFn(stage9, false),
   's14': 'done',
   's15': 'done',
   's16': 'done',
-  's17': ('done' if orderClosed else 'locked')
+  's17': 'done',
+  's18': 'done',
+  's19': ('done' if orderClosed else 'locked')
 } %}
 {% set currentUserStep = firstNonDoneStep(stepStates) %}
 {% macro stepCardOpen(step) %}{% if step == currentUserStep %} open{% endif %}{% endmacro %}
 {% macro stepStatusIcon(status) %}{% if status == 'done' %}<span class="step-card-icon done" aria-hidden="true">&#10003;</span>{% elif status == 'current' %}<span class="step-card-icon current" aria-hidden="true">&#9679;</span>{% else %}<span class="step-card-icon locked" aria-hidden="true">&#9675;</span>{% endif %}{% endmacro %}
-{# Step lettering for the CI & Balance cards continues from Freight/
-   Packing's 9a-9i for an FOB order (balance settles before shipment,
-   still within user step 9); a non-FOB (post-BL) order uses its own
-   Step 10 lettering instead, matching the user's own 9/10 split. #}
-{% macro ciBadge(fobLetter, postBlLetter) %}{{ fobLetter if isFob else postBlLetter }}{% endmacro %}
 
 <div class="card page-wide">
   {% if query.from == 'kanban' %}
@@ -651,7 +664,7 @@
     </div>
   </details>
 
-  <details class="step-card step-card-reference" id="document-review-approval" open>
+  <details class="step-card step-card-reference" id="document-review-approval">
     <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small></h2></summary>
     <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">
@@ -706,7 +719,7 @@
       }
     </script>
 
-    <p class="muted small" style="margin-top:18px;">Free-form additional documents (not one of the fixed document types above) are attached from <a href="#step-additional-documents">Step 12 — Additional Documents</a> below.</p>
+    <p class="muted small" style="margin-top:18px;">Free-form additional documents (not one of the fixed document types above) are attached from <a href="#step-additional-documents">Step 14 — Additional Documents</a> below.</p>
     <h3 style="font-size:0.95em; margin-top:18px;">Review &amp; Approval</h3>
     <p class="muted">A document generated above starts life <strong>draft</strong> with the DRAFT watermark. Assign at least one reviewer to move it to review; once every assigned reviewer approves (minimum required per document type), it's re-watermarked as final and can be sent to the buyer. The buyer only ever receives that final watermarked PDF — never the internal DOCX, never an unwatermarked copy.</p>
     {% for d in documents %}
@@ -911,8 +924,8 @@
     {% endfor %}
   </details>
 
-  <details class="step-card" id="step-1-quotation-prepare"{{ stepCardOpen('s1-3') }}>
-    <summary>{{ stepStatusIcon(stepStates['s1-3']) }}<h2>Step 1 &middot; Prepare Quotation</h2></summary>
+  <details class="step-card" id="step-1-quotation-prepare"{{ stepCardOpen('s1') }}>
+    <summary>{{ stepStatusIcon(stepStates['s1']) }}<span class="step-group-num">STEP 1</span><h2>Prepare Quotation</h2></summary>
     <div class="btn-row">
       {% if stage1 and stage1.status != 'locked' %}
         <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
@@ -947,13 +960,13 @@
     <p class="muted small">Review, approval, and sending to the buyer happen in <a href="#document-review-approval">Document Review &amp; Approval</a> below, once generated.</p>
   </details>
 
-  <details class="step-card step-card-reference" id="step-2-quotation-send"{{ stepCardOpen('s1-3') }}>
-    <summary>{{ stepStatusIcon(stepStates['s1-3']) }}<h2>Step 2 &middot; Send Quotation to Client</h2></summary>
+  <details class="step-card step-card-reference" id="step-2-quotation-send"{{ stepCardOpen('s2') }}>
+    <summary>{{ stepStatusIcon(stepStates['s2']) }}<span class="step-group-num">STEP 2</span><h2>Send Quotation to Client</h2></summary>
     <p class="muted small">Sending happens through the shared <a href="#document-review-approval">Document Review &amp; Approval</a> workflow below &mdash; every generated document (not just the Quotation) is assigned a reviewer, approved, and dispatched from that one place, regardless of which step generated it. Once the Quotation is approved there, use its own "Send to Buyer" action.</p>
   </details>
 
-  <details class="step-card step-card-reference" id="step-3-quotation-accept"{{ stepCardOpen('s1-3') }}>
-    <summary>{{ stepStatusIcon(stepStates['s1-3']) }}<h2>Step 3 &middot; Client Accepts Quotation</h2></summary>
+  <details class="step-card step-card-reference" id="step-3-quotation-accept"{{ stepCardOpen('s3') }}>
+    <summary>{{ stepStatusIcon(stepStates['s3']) }}<span class="step-group-num">STEP 3</span><h2>Client Accepts Quotation</h2></summary>
     <p class="muted small">There's no separate "accepted" button to click &mdash; the buyer's acceptance happens outside the system (a reply email, a call, a signed copy). Once your team is satisfied the client has accepted, move on to <a href="#step-4a-buyer-po-generate">Step 4a &middot; Buyer's PO</a>.</p>
   </details>
 
@@ -1185,15 +1198,17 @@
     {% endif %}
   </details>
 
+  {% if isLcPayment %}
   <details class="step-card step-card-reference" id="step-5-lc-bank-loan">
     <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; financing cost, not the LC leg above)</small></h2></summary>
     <p class="muted small">If the client financed their LC (Step 5d/5e above) with a bank loan, record that loan's amount/interest here — separate from the LC leg itself, since this is about the cost of financing it, not confirming it usable.</p>
     {% if canManageOrderFinancials %}
-    <p class="muted small">Recorded in full under <a href="#order-financials">Order Financials</a> (Step 11) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
+    <p class="muted small">Recorded in full under <a href="#order-financials">Order Financials</a> (Step 12) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
     {% else %}
     <p class="muted small">Recorded by Accounts/Export staff alongside this order's other costs.</p>
     {% endif %}
   </details>
+  {% endif %}
 
   <details class="step-group" id="step-group-stage-4"{{ stepCardOpen('s6') }}>
     <summary>{{ stepStatusIcon(stepStates['s6']) }}<span class="step-group-num">STEP 6</span><h3>Order Confirmation</h3></summary>
@@ -1201,9 +1216,9 @@
   <details class="step-card" id="step-6a-oc-generate"{{ stepCardOpen('s6') }}>
     <summary>{{ stepStatusIcon(stepStates['s6']) }}<h2>Step 6a &middot; Generate Order Confirmation</h2></summary>
     {% if permissions.close_orders %}
-    <p class="muted small">ECGC Cover is tracked on the <a href="#compliance-checklist">Compliance Checklist</a>.{% if canManageOrderFinancials %} The premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 11) as an "ECGC insurance" cost entry — filed here, once the order is confirmed, so the fee is never paid before the order is certain to proceed.{% endif %}</p>
+    <p class="muted small">ECGC Cover is tracked on the <a href="#compliance-checklist">Compliance Checklist</a>.{% if canManageOrderFinancials %} The premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) as an "ECGC insurance" cost entry — filed here, once the order is confirmed, so the fee is never paid before the order is certain to proceed.{% endif %}</p>
     {% elif canManageOrderFinancials %}
-    <p class="muted small">The ECGC insurance premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 11) once the order is confirmed.</p>
+    <p class="muted small">The ECGC insurance premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) once the order is confirmed.</p>
     {% endif %}
     {% if stage4 and stage4.status != 'locked' %}
       <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
@@ -1609,8 +1624,11 @@
 
   </details>
 
+  <details class="step-group" id="step-group-stage-production">
+    <summary>{{ stepStatusIcon('done' if (stepStates['s8'] == 'done' and stepStates['s8b'] == 'done') else ('locked' if stepStates['s8'] == 'locked' else 'current')) }}<span class="step-group-num">STEP 8</span><h3>Production &amp; Pre-Shipment Compliance</h3></summary>
+
   <details class="step-card" id="step-production"{{ stepCardOpen('s8') }}>
-    <summary>{{ stepStatusIcon(stepStates['s8']) }}<h2>Step 8 &middot; Production &amp; Estimated Shipment</h2></summary>
+    <summary>{{ stepStatusIcon(stepStates['s8']) }}<h2>Step 8a &middot; Production &amp; Estimated Shipment</h2></summary>
     <div class="kv-grid">
       <div><span class="k">Production Status</span><span class="v">{{ order.production_status_text or 'Not yet commenced' }}</span></div>
       <div><span class="k">Est. Shipment</span><span class="v">{{ order.est_shipment_date_text or 'To Be Confirmed' }}</span></div>
@@ -1648,6 +1666,52 @@
         </form>
       </details>
     {% endif %}
+  </details>
+
+  {% if permissions.close_orders %}
+  <details class="step-card" id="compliance-checklist"{{ stepCardOpen('s8b') }}>
+    <summary>{{ stepStatusIcon(stepStates['s8b']) }}<h2>Step 8b &middot; Compliance Checklist</h2></summary>
+    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.). A missing entry below means "Not Started". The task-name list itself is managed from {% if permissions.manage_compliance_task_types %}<a href="/compliance-task-types">Compliance Task Types</a>{% else %}Compliance Task Types{% endif %} (Admin-only).</p>
+    {% if not complianceTasks or complianceTasks.length == 0 %}
+    <p class="muted small">No compliance task types have been configured yet.</p>
+    {% else %}
+    <table class="list">
+      <tr><th>Task</th><th>Status &amp; Details</th></tr>
+      {% for ct in complianceTasks %}
+      <tr>
+        <td>{{ ct.task_type_name }}</td>
+        <td>
+          <form method="post" action="/orders/{{ order.id }}/compliance-tasks" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="task_type_id" value="{{ ct.task_type_id }}">
+            <select name="status">
+              {% for key, label in complianceStatuses %}
+              <option value="{{ key }}" {% if ct.status == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <input type="text" name="skip_reason" value="{{ ct.skip_reason or '' }}" placeholder="Reason — required if Skipped" style="flex:1;min-width:180px;">
+            <button type="submit" class="btn-sm">Save</button>
+            {% if ct.resolved_at %}
+            <span class="muted small">{{ ct.resolved_at }}{% if ct.resolved_by_name %} by {{ ct.resolved_by_name }}{% endif %}</span>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% if complianceOutstanding > 0 %}
+    <form method="post" action="/orders/{{ order.id }}/compliance-tasks/mark-all-na" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;" onsubmit="return confirm('Mark every outstanding compliance task on this order Not Applicable? Use this for a repeat order where this checklist genuinely does not apply.');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Mark all remaining tasks Not Applicable <small class="muted">(e.g. repeat order — reason required, applied to every outstanding task above)</small>
+        <input type="text" name="skip_reason" placeholder="Reason (mandatory)" required style="min-width:260px;">
+      </label>
+      <button type="submit" class="btn-sm">Mark All N/A</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </details>
+  {% endif %}
+
   </details>
 
   {% set freightLocked = (not isFob) and ((not stage6) or stage6.status == 'locked') %}
@@ -1755,11 +1819,11 @@
 
   {% set packingLocked = (not stage7) or stage7.status == 'locked' %}
 
-  <details class="step-group" id="step-group-stage-7"{{ stepCardOpen('s9') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9']) }}<span class="step-group-num">STEP 9</span><h3>Packing &amp; BL Instruction</h3></summary>
+  <details class="step-group" id="step-group-stage-7"{{ stepCardOpen('s10') }}>
+    <summary>{{ stepStatusIcon(stepStates['s10']) }}<span class="step-group-num">STEP 10</span><h3>Packing &amp; BL Instruction</h3></summary>
 
-  <details class="step-card" id="step-9e-packing"{{ stepCardOpen('s9') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9']) }}<h2>Step 9e &middot; Save Packing &amp; Crates</h2></summary>
+  <details class="step-card" id="step-10a-packing"{{ stepCardOpen('s10') }}>
+    <summary>{{ stepStatusIcon(stepStates['s10']) }}<h2>Step 10a &middot; Save Packing &amp; Crates</h2></summary>
     {% if packingLocked %}
       <p class="muted">{{ 'Confirm the Supplier PO is signed first' if isFob else 'Clear the freight payment first' }} to unlock this gate.</p>
     {% else %}
@@ -1811,15 +1875,15 @@
           </tr>
           {% endfor %}
         </table>
-        {{ stepBadge('9e') | safe }}<button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
+        {{ stepBadge('10a') | safe }}<button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
       </form>
     {% endif %}
   </details>
 
   <div class="step-group-connector">generate the Packing List from those figures</div>
 
-  <details class="step-card" id="step-9f-packing-list"{{ stepCardOpen('s9') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9']) }}<h2>Step 9f &middot; Generate Packing List</h2></summary>
+  <details class="step-card" id="step-10b-packing-list"{{ stepCardOpen('s10') }}>
+    <summary>{{ stepStatusIcon(stepStates['s10']) }}<h2>Step 10b &middot; Generate Packing List</h2></summary>
     {% if packingLocked %}
       <p class="muted">{{ 'Confirm the Supplier PO is signed first' if isFob else 'Clear the freight payment first' }} to unlock this gate.</p>
     {% elif packing %}
@@ -1828,17 +1892,17 @@
           <input type="hidden" name="document_type" value="PL">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          {{ stepBadge('9f') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'PL') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Packing List</button>
+          {{ stepBadge('10b') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'PL') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Packing List</button>
         </form>
     {% else %}
-      <p class="muted">Save Packing &amp; Crates first (Step 9e).</p>
+      <p class="muted">Save Packing &amp; Crates first (Step 10a).</p>
     {% endif %}
   </details>
 
   <div class="step-group-connector">once the vessel/sailing is confirmed</div>
 
-  <details class="step-card" id="step-9g-shipping-details"{{ stepCardOpen('s9') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9']) }}<h2>Step 9g &middot; Save Shipping Details</h2></summary>
+  <details class="step-card" id="step-10c-shipping-details"{{ stepCardOpen('s10') }}>
+    <summary>{{ stepStatusIcon(stepStates['s10']) }}<h2>Step 10c &middot; Save Shipping Details</h2></summary>
     {% if packingLocked %}
       <p class="muted">{{ 'Confirm the Supplier PO is signed first' if isFob else 'Clear the freight payment first' }} to unlock this gate.</p>
     {% else %}
@@ -1863,15 +1927,15 @@
           <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}"></label>
           <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}"></label>
         </div>
-        {{ stepBadge('9g') | safe }}<button type="submit" class="btn-sm">Save Shipping Details</button>
+        {{ stepBadge('10c') | safe }}<button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
     {% endif %}
   </details>
 
   <div class="step-group-connector">tell the CHA / shipping line how to issue the BL</div>
 
-  <details class="step-card" id="step-9h-bl-instruction"{{ stepCardOpen('s9') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9']) }}<h2>Step 9h &middot; Generate BL Instruction Sheet</h2></summary>
+  <details class="step-card" id="step-10d-bl-instruction"{{ stepCardOpen('s10') }}>
+    <summary>{{ stepStatusIcon(stepStates['s10']) }}<h2>Step 10d &middot; Generate BL Instruction Sheet</h2></summary>
     {% if packingLocked %}
       <p class="muted">{{ 'Confirm the Supplier PO is signed first' if isFob else 'Clear the freight payment first' }} to unlock this gate.</p>
     {% elif shipping %}
@@ -1882,17 +1946,17 @@
         <input type="hidden" name="document_type" value="BLI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        {{ stepBadge('9h') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'BLI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
+        {{ stepBadge('10d') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'BLI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
       </form>
     {% else %}
-      <p class="muted">Save Shipping Details first (Step 9g).</p>
+      <p class="muted">Save Shipping Details first (Step 10c).</p>
     {% endif %}
   </details>
 
   <div class="step-group-connector">after the CHA draft-review loop below</div>
 
-  <details class="step-card" id="step-9i-bl-issued"{{ stepCardOpen('s9') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9']) }}<h2>Step 9i &middot; Confirm BL Issued <small class="muted">(after the CHA draft-review loop)</small></h2></summary>
+  <details class="step-card" id="step-10e-bl-issued"{{ stepCardOpen('s10') }}>
+    <summary>{{ stepStatusIcon(stepStates['s10']) }}<h2>Step 10e &middot; Confirm BL Issued <small class="muted">(after the CHA draft-review loop)</small></h2></summary>
     {% if packingLocked %}
       <p class="muted">{{ 'Confirm the Supplier PO is signed first' if isFob else 'Clear the freight payment first' }} to unlock this gate.</p>
     {% else %}
@@ -1951,7 +2015,7 @@
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date"></label>
           <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png"></label>
-          {{ stepBadge('9i') | safe }}<button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+          {{ stepBadge('10e') | safe }}<button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
       {% else %}
         <p>Bill of Lading recorded: <strong>{{ shipping.bl_number }}</strong> ({{ shipping.bl_date }})</p>
@@ -1972,11 +2036,11 @@
 
   {% set ciBalanceLocked = (not stage8) or stage8.status == 'locked' %}
 
-  <details class="step-group" id="step-group-stage-8"{{ stepCardOpen('s9-10') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9-10']) }}<span class="step-group-num">STEP 9-10</span><h3>Commercial Invoice &amp; Balance</h3></summary>
+  <details class="step-group" id="step-group-stage-8"{{ stepCardOpen('s11') }}>
+    <summary>{{ stepStatusIcon(stepStates['s11']) }}<span class="step-group-num">STEP 11</span><h3>Commercial Invoice &amp; Balance</h3></summary>
 
-  <details class="step-card" id="step-ci-generate"{{ stepCardOpen('s9-10') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9-10']) }}<h2>Step {{ ciBadge('9j', '10a') }} &middot; Generate Commercial Invoice{{ ' (before shipment)' if isFob else ' (against BL)' }}</h2></summary>
+  <details class="step-card" id="step-ci-generate"{{ stepCardOpen('s11') }}>
+    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11a &middot; Generate Commercial Invoice{{ ' (before shipment)' if isFob else ' (against BL)' }}</h2></summary>
     {# Batch 3 #11 — the Commercial Invoice is conventionally dated to match the recorded BL date;
        nothing enforces this, so flag it as an advisory (not a hard block) right where staff generate the CI. #}
     {% set ciBlDateMismatch = shipping and shipping.bl_date and shipping.bl_date != today() %}
@@ -1991,21 +2055,21 @@
         <input type="hidden" name="document_type" value="CI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        {{ stepBadge(ciBadge('9j', '10a')) | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>
+        {{ stepBadge('11a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>
       </form>
     {% endif %}
   </details>
 
   <div class="step-group-connector">timed with sending the scanned BL</div>
 
-  <details class="step-card" id="step-ci-scanned-bl-sent"{{ stepCardOpen('s9-10') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9-10']) }}<h2>Step {{ ciBadge('9k', '10b') }} &middot; Mark Scanned BL Copy Sent to Buyer</h2></summary>
+  <details class="step-card" id="step-ci-scanned-bl-sent"{{ stepCardOpen('s11') }}>
+    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11b &middot; Mark Scanned BL Copy Sent to Buyer</h2></summary>
     {% if ciBalanceLocked %}
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     {% elif shipping and not shipping.scanned_bl_sent_to_buyer_at %}
       <form method="post" action="/orders/{{ order.id }}/scanned-bl-sent">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge(ciBadge('9k', '10b')) | safe }}<button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
+        {{ stepBadge('11b') | safe }}<button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
       </form>
     {% elif shipping %}
       <p class="muted small">Scanned BL copy sent to buyer.</p>
@@ -2014,8 +2078,8 @@
 
   <div class="step-group-connector">once the buyer's balance payment lands</div>
 
-  <details class="step-card" id="step-balance-record"{{ stepCardOpen('s9-10') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9-10']) }}<h2>Step {{ ciBadge('9l', '10c') }} &middot; Record Balance Remittance</h2></summary>
+  <details class="step-card" id="step-balance-record"{{ stepCardOpen('s11') }}>
+    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11c &middot; Record Balance Remittance</h2></summary>
     {% if ciBalanceLocked %}
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     {% elif not balanceCleared and (not payment or payment.balance_remittance_received_at == null) %}
@@ -2028,7 +2092,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required value="{{ payment.balance_amount or '' }}"></label>
         <label>Received On<input type="date" name="balance_received_at"></label>
-        {{ stepBadge(ciBadge('9l', '10c')) | safe }}<button type="submit" class="btn-sm">Record Balance Remittance</button>
+        {{ stepBadge('11c') | safe }}<button type="submit" class="btn-sm">Record Balance Remittance</button>
       </form>
       {% endif %}
     {% elif balanceCleared %}
@@ -2044,8 +2108,8 @@
 
   <div class="step-group-connector">after funds are confirmed cleared</div>
 
-  <details class="step-card" id="step-balance-clear"{{ stepCardOpen('s9-10') }}>
-    <summary>{{ stepStatusIcon(stepStates['s9-10']) }}<h2>Step {{ ciBadge('9m', '10d') }} &middot; Mark Balance Cleared</h2></summary>
+  <details class="step-card" id="step-balance-clear"{{ stepCardOpen('s11') }}>
+    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11d &middot; Mark Balance Cleared</h2></summary>
     {% if ciBalanceLocked %}
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     {% elif balanceCleared %}
@@ -2057,7 +2121,7 @@
       <form method="post" action="/orders/{{ order.id }}/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Cleared On<input type="date" name="balance_cleared_at"></label>
-        {{ stepBadge(ciBadge('9m', '10d')) | safe }}<button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
+        {{ stepBadge('11d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
       </form>
       {% endif %}
     {% else %}
@@ -2068,11 +2132,38 @@
   </details>
 
   {% if canManageOrderFinancials %}
-  <details class="step-card" id="order-financials"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11 &middot; Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
+  <details class="step-card" id="order-financials"{{ stepCardOpen('s12') }}>
+    <summary>{{ stepStatusIcon(stepStates['s12']) }}<span class="step-group-num">STEP 12</span><h2>Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
 
-    <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
+    <h3 style="font-size:0.95em;">Export Benefit Scheme Eligibility</h3>
+    <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Closing the order (Step 13e) is blocked while any scheme here is still Pending.</p>
+    <table class="list">
+      <tr><th>Scheme</th><th>Eligibility &amp; Reason</th></tr>
+      {% for sch in exportBenefitEligibility %}
+      <tr>
+        <td>{{ sch.scheme_name }}</td>
+        <td>
+          <form method="post" action="/orders/{{ order.id }}/export-benefit-schemes" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="scheme_name" value="{{ sch.scheme_name }}">
+            <select name="status">
+              {% for key, label in exportBenefitEligibilityStatuses %}
+              <option value="{{ key }}" {% if sch.status == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <input type="text" name="reason" value="{{ sch.reason or '' }}" placeholder="Reason — required if Not Eligible" style="flex:1;min-width:180px;">
+            <button type="submit" class="btn-sm">Save</button>
+            {% if sch.resolved_at %}
+            <span class="muted small">{{ sch.resolved_at }}{% if sch.resolved_by_name %} by {{ sch.resolved_by_name }}{% endif %}</span>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Government Export Benefits Claimed</h3>
     {% set govtBenefitsApplicable = (order.status == 'shipped_docs_sent' or order.status == 'complete') and payment and payment.balance_remittance_received_at %}
     {% if not govtBenefitsApplicable %}
       <p class="muted">Not applicable until the order is complete and the CI (balance) remittance has been received — government benefit schemes only come into play once the full proceeds have actually landed.</p>
@@ -2284,11 +2375,11 @@
 
   {% set despatchLocked = (not stage9) or stage9.status == 'locked' %}
 
-  <details class="step-group" id="step-group-stage-9"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<span class="step-group-num">STEP 11</span><h3>Closure &mdash; Documents &amp; Settlement</h3></summary>
+  <details class="step-group" id="step-group-stage-9"{{ stepCardOpen('s13') }}>
+    <summary>{{ stepStatusIcon(stepStates['s13']) }}<span class="step-group-num">STEP 13</span><h3>Closure &mdash; Documents &amp; Settlement</h3></summary>
 
-  <details class="step-card" id="step-11a-coo-prep"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11a &middot; Generate COO Prep Sheet</h2></summary>
+  <details class="step-card" id="step-11a-coo-prep"{{ stepCardOpen('s13') }}>
+    <summary>{{ stepStatusIcon(stepStates['s13']) }}<h2>Step 13a &middot; Generate COO Prep Sheet</h2></summary>
     {% if despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% else %}
@@ -2299,15 +2390,15 @@
         <input type="hidden" name="document_type" value="COOPREP">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        {{ stepBadge('11a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'COOPREP') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate COO Prep Sheet</button>
+        {{ stepBadge('13a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'COOPREP') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate COO Prep Sheet</button>
       </form>
     {% endif %}
   </details>
 
   <div class="step-group-connector">once the CHA delivers the original BLs</div>
 
-  <details class="step-card" id="step-11b-bl-originals-received"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11b &middot; Record Original BLs Received from CHA</h2></summary>
+  <details class="step-card" id="step-11b-bl-originals-received"{{ stepCardOpen('s13') }}>
+    <summary>{{ stepStatusIcon(stepStates['s13']) }}<h2>Step 13b &middot; Record Original BLs Received from CHA</h2></summary>
     {% if despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif not permissions.manage_shipping %}
@@ -2316,7 +2407,7 @@
       <form method="post" action="/orders/{{ order.id }}/bl-originals-received">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
-        {{ stepBadge('11b') | safe }}<button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
+        {{ stepBadge('13b') | safe }}<button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
       </form>
     {% else %}
       <p class="muted small">Original BLs received ({{ shipping.bl_originals_received_count }}).</p>
@@ -2325,26 +2416,26 @@
 
   <div class="step-group-connector">endorse them over to the buyer's bank</div>
 
-  <details class="step-card" id="step-11c-bl-endorsed-mark"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11c &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
+  <details class="step-card" id="step-11c-bl-endorsed-mark"{{ stepCardOpen('s13') }}>
+    <summary>{{ stepStatusIcon(stepStates['s13']) }}<h2>Step 13c &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
     {% if despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif permissions.manage_shipping and shipping and shipping.bl_originals_received_at and not shipping.bl_endorsed_at %}
       <form method="post" action="/orders/{{ order.id }}/bl-endorsed">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge('11c') | safe }}<button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
+        {{ stepBadge('13c') | safe }}<button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
       </form>
     {% elif shipping and shipping.bl_endorsed_at %}
       <p class="muted small">Original BLs endorsed.</p>
     {% else %}
-      <p class="muted">Record the original BLs received first (Step 11b).</p>
+      <p class="muted">Record the original BLs received first (Step 13b).</p>
     {% endif %}
   </details>
 
   <div class="step-group-connector">save who endorsed it and when</div>
 
-  <details class="step-card" id="step-11d-bl-endorsement-save"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11d &middot; Save BL Endorsement Details</h2></summary>
+  <details class="step-card" id="step-11d-bl-endorsement-save"{{ stepCardOpen('s13') }}>
+    <summary>{{ stepStatusIcon(stepStates['s13']) }}<h2>Step 13d &middot; Save BL Endorsement Details</h2></summary>
     {% if despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif permissions.manage_shipping and shipping and shipping.bl_originals_received_at %}
@@ -2356,23 +2447,23 @@
         <label>Port of Loading<input type="text" name="port_of_loading" value="{{ blEndorsement.port_of_loading or order.port_of_loading_name or 'Chennai, India' }}"></label>
         <label>Port of Discharge<input type="text" name="port_of_discharge" value="{{ blEndorsement.port_of_discharge or order.port_of_discharge_name or order.port_of_discharge_text or '' }}"></label>
         <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="{{ blEndorsement.date_of_endorsement or today() }}"></label>
-        {{ stepBadge('11d') | safe }}<button type="submit" class="btn-sm">Save BL Endorsement Details</button>
+        {{ stepBadge('13d') | safe }}<button type="submit" class="btn-sm">Save BL Endorsement Details</button>
       </form>
     {% else %}
-      <p class="muted">Record the original BLs received first (Step 11b).</p>
+      <p class="muted">Record the original BLs received first (Step 13b).</p>
     {% endif %}
   </details>
 
   <div class="step-group-connector">print the endorsement for the courier pack</div>
 
-  <details class="step-card" id="step-11f-bl-endorsement-generate"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11f &middot; Generate / Print BL Endorsement</h2></summary>
+  <details class="step-card" id="step-11f-bl-endorsement-generate"{{ stepCardOpen('s13') }}>
+    <summary>{{ stepStatusIcon(stepStates['s13']) }}<h2>Step 13f &middot; Generate / Print BL Endorsement</h2></summary>
     {% if despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif blEndorsement %}
       <form method="post" action="/orders/{{ order.id }}/bl-endorsement/generate" style="margin-top:8px;">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge('11f') | safe }}<button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
+        {{ stepBadge('13f') | safe }}<button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
       </form>
       {% if blEndorsementDoc %}
         <p class="small" style="margin-top:6px;">
@@ -2381,16 +2472,16 @@
         </p>
       {% endif %}
     {% else %}
-      <p class="muted">Save BL Endorsement Details first (Step 11d).</p>
+      <p class="muted">Save BL Endorsement Details first (Step 13d).</p>
     {% endif %}
   </details>
 
   <div class="step-group-connector">once documents are despatched to the buyer</div>
 
-  <details class="step-card" id="step-11g-close-order"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11g &middot; Close Order (Document Despatch)</h2></summary>
+  <details class="step-card" id="step-11g-close-order"{{ stepCardOpen('s13') }}>
+    <summary>{{ stepStatusIcon(stepStates['s13']) }}<h2>Step 13g &middot; Close Order (Document Despatch)</h2></summary>
     {% if orderClosed or order.status == 'shipped_docs_sent' %}
-      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }} — see Step 11e to mark this order fully settled.</p>
+      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }} — see Step 13e to mark this order fully settled.</p>
     {% elif despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif not permissions.close_orders %}
@@ -2405,22 +2496,22 @@
         <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
           <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
         </label>
-        {{ stepBadge('11g') | safe }}<button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
+        {{ stepBadge('13g') | safe }}<button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
       </form>
       {% endif %}
     {% else %}
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
-        {{ stepBadge('11g') | safe }}<button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
+        {{ stepBadge('13g') | safe }}<button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
     {% endif %}
   </details>
 
   <div class="step-group-connector">last — once the balance has actually cleared too</div>
 
-  <details class="step-card" id="step-despatch"{{ stepCardOpen('s11') }}>
-    <summary>{{ stepStatusIcon(stepStates['s11']) }}<h2>Step 11e &middot; Mark Fully Settled</h2></summary>
+  <details class="step-card" id="step-despatch"{{ stepCardOpen('s13') }}>
+    <summary>{{ stepStatusIcon(stepStates['s13']) }}<h2>Step 13e &middot; Mark Fully Settled</h2></summary>
     {% if orderClosed %}
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }}</p>
     {% elif order.status == 'shipped_docs_sent' %}
@@ -2428,7 +2519,7 @@
       {% if permissions.close_orders %}
       <form method="post" action="/orders/{{ order.id }}/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge('11e') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
+        {{ stepBadge('13e') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
       <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials above).</p>
       {% if permissions.edit_locked_data %}
@@ -2448,46 +2539,11 @@
       <p class="muted">Only Export/Logistics can mark this order fully settled.</p>
       {% endif %}
     {% else %}
-      <p class="muted">Close the order first (Step 11g).</p>
+      <p class="muted">Close the order first (Step 13g).</p>
     {% endif %}
   </details>
 
   </details>
-
-  {% if permissions.close_orders %}
-  <details class="step-card step-card-reference" id="compliance-checklist">
-    <summary><h2>Compliance Checklist <small class="muted">(reference — ECGC Cover, Pre-Shipment Inspection, etc.)</small></h2></summary>
-    <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from {% if permissions.manage_compliance_task_types %}<a href="/compliance-task-types">Compliance Task Types</a>{% else %}Compliance Task Types{% endif %} (Admin-only).</p>
-    {% if not complianceTasks or complianceTasks.length == 0 %}
-    <p class="muted small">No compliance task types have been configured yet.</p>
-    {% else %}
-    <table class="list">
-      <tr><th>Task</th><th>Status &amp; Details</th></tr>
-      {% for ct in complianceTasks %}
-      <tr>
-        <td>{{ ct.task_type_name }}</td>
-        <td>
-          <form method="post" action="/orders/{{ order.id }}/compliance-tasks" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <input type="hidden" name="task_type_id" value="{{ ct.task_type_id }}">
-            <select name="status">
-              {% for key, label in complianceStatuses %}
-              <option value="{{ key }}" {% if ct.status == key %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <input type="text" name="skip_reason" value="{{ ct.skip_reason or '' }}" placeholder="Reason — required if Skipped" style="flex:1;min-width:180px;">
-            <button type="submit" class="btn-sm">Save</button>
-            {% if ct.resolved_at %}
-            <span class="muted small">{{ ct.resolved_at }}{% if ct.resolved_by_name %} by {{ ct.resolved_by_name }}{% endif %}</span>
-            {% endif %}
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-    {% endif %}
-  </details>
-  {% endif %}
 
   {% if permissions.manage_orders %}
   <details class="step-card step-card-reference" id="amendments">
@@ -2497,8 +2553,8 @@
   </details>
   {% endif %}
 
-  <details class="step-card" id="step-additional-documents"{{ stepCardOpen('s12') }}>
-    <summary>{{ stepStatusIcon(stepStates['s12']) }}<h2>Step 12 &middot; Additional Documents</h2></summary>
+  <details class="step-card" id="step-additional-documents"{{ stepCardOpen('s14') }}>
+    <summary>{{ stepStatusIcon(stepStates['s14']) }}<span class="step-group-num">STEP 14</span><h2>Additional Documents</h2></summary>
     <p class="muted small">Free-form extras that don't fit any fixed document type above — e.g. a buyer-supplied certificate template, a special packing instruction sheet. <a href="/orders/{{ order.id }}/additional-documents/removed" class="muted small" style="font-weight:normal;">(show removed)</a></p>
     <table class="list">
       <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
@@ -2550,8 +2606,8 @@
     {% endif %}
   </details>
 
-  <details class="step-card" id="order-updates"{{ stepCardOpen('s13') }}>
-    <summary>{{ stepStatusIcon(stepStates['s13']) }}<h2>Step 13 &middot; Order Communication</h2></summary>
+  <details class="step-card" id="order-updates"{{ stepCardOpen('s15') }}>
+    <summary>{{ stepStatusIcon(stepStates['s15']) }}<span class="step-group-num">STEP 15</span><h2>Order Communication</h2></summary>
     <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.{% if permissions.generate_documents %} Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.{% endif %}</p>
     <div class="chat-thread">
       {% if comments.length == 0 %}
@@ -2594,8 +2650,8 @@
     </form>
   </details>
 
-  <details class="step-card" id="order-feedback"{{ stepCardOpen('s14') }}>
-    <summary>{{ stepStatusIcon(stepStates['s14']) }}<h2>Step 14 &middot; Order Feedback</h2></summary>
+  <details class="step-card" id="order-feedback"{{ stepCardOpen('s16') }}>
+    <summary>{{ stepStatusIcon(stepStates['s16']) }}<span class="step-group-num">STEP 16</span><h2>Order Feedback</h2></summary>
     {% if not orderFeedback %}
       <p class="muted">The client hasn't submitted feedback for this order yet.</p>
     {% else %}
@@ -2607,14 +2663,14 @@
     {% endif %}
   </details>
 
-  <details class="step-card" id="complaints"{{ stepCardOpen('s15') }}>
-    <summary>{{ stepStatusIcon(stepStates['s15']) }}<h2>Step 15 &middot; Complaints</h2></summary>
+  <details class="step-card" id="complaints"{{ stepCardOpen('s17') }}>
+    <summary>{{ stepStatusIcon(stepStates['s17']) }}<span class="step-group-num">STEP 17</span><h2>Complaints</h2></summary>
     <p class="muted">A process issue or flaw the client flagged for us to fix next time — separate from Disputes below, and always available to the client regardless of the Dispute toggle.</p>
     <p>{% if permissions.manage_complaints or permissions.respond_to_complaints %}<a href="/orders/{{ order.id }}/complaints">Complaints ({{ openComplaintCount }} open)</a>{% else %}Complaints ({{ openComplaintCount }} open){% endif %}</p>
   </details>
 
-  <details class="step-card" id="disputes"{{ stepCardOpen('s16') }}>
-    <summary>{{ stepStatusIcon(stepStates['s16']) }}<h2>Step 16 &middot; Disputes</h2></summary>
+  <details class="step-card" id="disputes"{{ stepCardOpen('s18') }}>
+    <summary>{{ stepStatusIcon(stepStates['s18']) }}<span class="step-group-num">STEP 18</span><h2>Disputes</h2></summary>
     <p class="muted">A buyer wanting to cancel this order and not proceed with us — separate from a Complaint above (no cancel intent) and from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
     {% if permissions.manage_disputes %}
     <form method="post" action="/orders/{{ order.id }}/dispute-visibility" style="margin-bottom:10px">
@@ -2635,12 +2691,12 @@
     </p>
   </details>
 
-  <details class="step-card" id="step-complete"{{ stepCardOpen('s17') }}>
-    <summary>{{ stepStatusIcon(stepStates['s17']) }}<h2>Step 17 &middot; Order Complete</h2></summary>
+  <details class="step-card" id="step-complete"{{ stepCardOpen('s19') }}>
+    <summary>{{ stepStatusIcon(stepStates['s19']) }}<span class="step-group-num">STEP 19</span><h2>Order Complete</h2></summary>
     {% if orderClosed %}
     <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
     {% else %}
-    <p class="muted">Not yet complete — finish Step 11 above (Mark Fully Settled) to close this order.</p>
+    <p class="muted">Not yet complete — finish Step 13e above (Mark Fully Settled) to close this order.</p>
     {% endif %}
   </details>
 
@@ -2783,8 +2839,8 @@
   // "see X" reference, the top stepper dots, or a direct #hash URL), and
   // mapping the stage-stepper's numeric stage to the right card id since
   // one DB stage can span two cards (Stage 2/3 -> Buyer PO + PI-Stage
-  // Intake) or share one card with another (Stage 6/7 both feed into the
-  // single Step 9 packing/freight pair).
+  // Intake) — Stage 6 (Freight, user Step 9) and Stage 7 (Packing & BL,
+  // user Step 10) are now separate numbered steps, each with its own card.
   (function () {
     var panelsContainer = document.getElementById('order-panels');
     if (!panelsContainer) { return; }

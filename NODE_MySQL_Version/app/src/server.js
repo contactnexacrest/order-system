@@ -167,11 +167,19 @@ njkEnv.addGlobal('today', () => {
 // Batch 3 #5 — document generate buttons: whether a document of this type code already
 // exists for the order, so the view can pick btn-doc-new vs btn-doc-regenerate.
 njkEnv.addGlobal('docGenerated', (documents, code) => (documents || []).some((d) => d.document_type_code === code));
+// Steps 1/2/3 independent gating: the newest revision's own status for a
+// given document type code ('sent', 'approved', ...), or null if that
+// type was never generated — documents is already newest-first (see
+// documentRepository.forOrder()'s own ORDER BY generated_at DESC).
+njkEnv.addGlobal('docStatus', (documents, code) => {
+  const doc = (documents || []).find((d) => d.document_type_code === code);
+  return doc ? doc.status : null;
+});
 njkEnv.addGlobal('annexureConfirmAttr', require('./helpers/annexureConfirmAttr').annexureConfirmAttr);
 njkEnv.addGlobal('stepBadge', require('./helpers/stepBadge').stepBadge);
 njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').formatRange);
-// Order detail page rebuild — the first user-facing step (0-17) that isn't
-// yet 'done' (the order's real current step), or '17' once every step is
+// Order detail page rebuild — the first user-facing step (0-19) that isn't
+// yet 'done' (the order's real current step), or 's19' once every step is
 // done. A plain JS helper rather than a Nunjucks {% for %} loop: `{% set %}`
 // inside a `{% for %}` is scoped to that iteration and never leaks back out
 // to the template's outer scope, so a "first match wins" search can't be
@@ -180,7 +188,7 @@ njkEnv.addGlobal('firstNonDoneStep', (stepStates) => {
   for (const key of Object.keys(stepStates)) {
     if (stepStates[key] !== 'done') { return key; }
   }
-  return '17';
+  return 's19';
 });
 
 // --- Session store (MySQL-backed via knex, not PHP's file-session
@@ -642,6 +650,7 @@ app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('c
 app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.generateInternalDoc));
 app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
 app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
+app.post('/orders/:id/export-benefit-schemes', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.setExportBenefitSchemeStatus));
 app.post('/orders/:id/lc-details', requireAuth, requirePermission('manage_order_financials'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveLcDetails));
 app.post('/orders/:id/inspection-fee', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveInspectionFee));
 app.post('/orders/:id/travel-expenses', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveTravelExpenses));
@@ -744,6 +753,7 @@ app.post('/orders/:id/cancellation/:cancellationId/approve', requireAuth, requir
 app.post('/orders/:id/cancellation/:cancellationId/reject', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(ordersController.rejectCancellation));
 app.post('/orders/:id/cancellation/:cancellationId/complete-refund', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.completeCancellationRefund));
 app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('close_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateComplianceTask));
+app.post('/orders/:id/compliance-tasks/mark-all-na', requireAuth, requirePermission('close_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markAllComplianceTasksNotApplicable));
 
 app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));
 app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.deleteDraft));

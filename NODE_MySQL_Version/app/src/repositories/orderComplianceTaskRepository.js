@@ -4,12 +4,16 @@ const db = require('../config/db');
 
 /**
  * Per-order status against the compliance_task_types list (docs/schema.sql
- * Section AR). A missing row for a given order+task_type pair means
- * not_started — rows are only written the first time staff actually touch
- * that task on that order. Visibility and every write action here is gated
- * on the existing close_orders permission (checked in the controller),
- * not a new one — "the person who has permission to close the order must
- * able to see this otherwise no meaning for this."
+ * Section AR). Every active task type gets a real 'not_started' row for
+ * every order, written at order creation (initializeForOrder(), called
+ * from orderRepository.js's insertOrderRow() the same way
+ * orderAssigneeRepository.js auto-assigns the creator) — a report run
+ * directly against this table must never see "no row" standing in for
+ * "not applicable," since that's indistinguishable from "forgotten."
+ * Visibility and every write action here is gated on the existing
+ * close_orders permission (checked in the controller), not a new one —
+ * "the person who has permission to close the order must able to see
+ * this otherwise no meaning for this."
  */
 const STATUSES = {
   not_started: 'Not Started',
@@ -17,6 +21,24 @@ const STATUSES = {
   approved: 'Approved',
   skipped: 'Skipped (Not Applicable)',
 };
+
+/**
+ * Writes a real 'not_started' row for every active task type — called
+ * once, at order creation. Optional executor lets this join the
+ * caller's transaction (see orderRepository.insertOrderRow()), same
+ * pattern as orderAssigneeRepository.add().
+ */
+async function initializeForOrder(orderId, executor = db) {
+  const taskTypes = await executor.query('SELECT id FROM compliance_task_types WHERE is_active = 1');
+  for (const t of taskTypes) {
+    await executor.execute(
+      `INSERT INTO order_compliance_tasks (order_id, task_type_id, status)
+       VALUES (:order_id, :task_type_id, 'not_started')
+       ON DUPLICATE KEY UPDATE status = status`,
+      { order_id: orderId, task_type_id: t.id }
+    );
+  }
+}
 
 /** @return one row per active task type, LEFT JOINed against this order's own status */
 async function forOrder(orderId) {
@@ -64,4 +86,4 @@ async function summaryForOrder(orderId) {
   return { total, approved, outstanding: total - approved };
 }
 
-module.exports = { STATUSES, forOrder, setStatus, summaryForOrder };
+module.exports = { STATUSES, initializeForOrder, forOrder, setStatus, summaryForOrder };

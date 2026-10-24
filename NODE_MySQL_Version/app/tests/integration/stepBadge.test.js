@@ -64,10 +64,14 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
    * own step numbering rather than the DB's stage_number, so a badge's
    * own digit prefix no longer equals its governing DB stage — this map
    * is the authoritative link between the two, kept in lock-step with
-   * the stepBadge() calls in views/orders/show.njk. The CI & Balance
-   * card's own badges are dynamic (isFob ? '9j'/'9k'/'9l'/'9m' :
-   * '10a'/'10b'/'10c'/'10d') — this order is FOB (createTestOrder()'s
-   * default), so only the 9j-9m set can ever appear here.
+   * the stepBadge() calls in views/orders/show.njk. Freight Payment (DB
+   * stage 6) kept its original Step 9 numbering; Packing & BL
+   * Instruction (DB stage 7, previously also mislabelled "Step 9") is
+   * now Step 10 (10a-10e); Commercial Invoice & Balance (DB stage 8,
+   * previously "Step 9-10" with an isFob-dependent dual badge) is now
+   * unconditionally Step 11 (11a-11d, no FOB branching); Closure —
+   * Documents & Settlement (DB stage 9, previously colliding with Order
+   * Financials as "Step 11") is now Step 13 (13a-13g).
    */
   it('never shows a badge for a stage further along than what has actually unlocked', async () => {
     const orderId = await createTestOrder(await createTestClient());
@@ -86,9 +90,9 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
       '6a': 4, '6b': 4,
       '7a': 5, '7b': 5, '7c': 5, '7d': 5,
       '9a': 6, '9b': 6, '9c': 6, '9d': 6,
-      '9e': 7, '9f': 7, '9g': 7, '9h': 7, '9i': 7,
-      '9j': 8, '9k': 8, '9l': 8, '9m': 8,
-      '11a': 9, '11b': 9, '11c': 9, '11d': 9, '11e': 9, '11f': 9, '11g': 9,
+      '10a': 7, '10b': 7, '10c': 7, '10d': 7, '10e': 7,
+      '11a': 8, '11b': 8, '11c': 8, '11d': 8,
+      '13a': 9, '13b': 9, '13c': 9, '13d': 9, '13e': 9, '13f': 9, '13g': 9,
     };
 
     for (let reachedStage = 1; reachedStage <= 9; reachedStage++) {

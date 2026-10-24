@@ -3,6 +3,8 @@
 const bcrypt = require('bcrypt');
 const db = require('../../src/config/db');
 const orderAssigneeRepository = require('../../src/repositories/orderAssigneeRepository');
+const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
+const orderExportBenefitSchemeRepository = require('../../src/repositories/orderExportBenefitSchemeRepository');
 const orderStageRepository = require('../../src/repositories/orderStageRepository');
 
 /** Minimal valid client row, returns its id. */
@@ -161,6 +163,8 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
   );
   const orderId = result.insertId;
   await orderStageRepository.initializeForOrder(orderId);
+  await orderComplianceTaskRepository.initializeForOrder(orderId);
+  await orderExportBenefitSchemeRepository.initializeForOrder(orderId);
   for (const assigneeId of assigneeIds) {
     await orderAssigneeRepository.add(orderId, assigneeId, assigneeId);
   }

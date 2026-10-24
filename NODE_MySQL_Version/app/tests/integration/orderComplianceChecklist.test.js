@@ -46,6 +46,26 @@ describe('Compliance checklist (per order)', () => {
     return row;
   }
 
+  it('initializeForOrder writes a real row for every active task type at creation', async () => {
+    // Unlike this file's own task types (created AFTER the order,
+    // deliberately, to exercise the LEFT JOIN fallback in forOrder()),
+    // this test creates the task type FIRST, then a fresh order, to
+    // confirm insertOrderRow() really did write a row up front — read
+    // the raw table directly, bypassing forOrder()'s COALESCE entirely,
+    // since a report against the raw table must never see "no row"
+    // standing in for "not applicable."
+    const preexistingTypeId = await complianceTaskTypeRepository.create('Jest Pre-Existing Task Type', await createTestUser('Admin'));
+    const freshOrderId = await createTestOrder(await createTestClient());
+
+    const row = await db.queryOne(
+      'SELECT status FROM order_compliance_tasks WHERE order_id = :order_id AND task_type_id = :task_type_id',
+      { order_id: freshOrderId, task_type_id: preexistingTypeId }
+    );
+
+    expect(row).not.toBeNull();
+    expect(row.status).toBe('not_started');
+  });
+
   it('forOrder defaults missing rows to not_started', async () => {
     const orderId = await createTestOrder(await createTestClient());
     const taskTypeId = await complianceTaskTypeRepository.create('Jest ECGC Cover', await createTestUser('Admin'));
@@ -154,6 +174,58 @@ describe('Compliance checklist (per order)', () => {
     const logRows = (await auditLogRepository.forOrder(orderId)).filter((r) => r.action_type === 'COMPLIANCE_TASK_STATUS_UPDATED');
     expect(logRows).toHaveLength(1);
     expect(logRows[0].user_id).toBe(userId);
+  });
+
+  it('markAllComplianceTasksNotApplicable rejects a user without close_orders permission', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const taskTypeId = await complianceTaskTypeRepository.create('Jest ECGC Cover', await createTestUser('Admin'));
+    const userId = await createTestUser('Accounts Executive');
+
+    const req = { params: { id: String(orderId) }, body: { skip_reason: 'Repeat order' }, user: { id: userId }, permissions: {}, session: {} };
+    await ordersController.markAllComplianceTasksNotApplicable(req, fakeRes());
+
+    const row = findRow(await orderComplianceTaskRepository.forOrder(orderId), taskTypeId);
+    expect(row.status).toBe('not_started');
+  });
+
+  it('markAllComplianceTasksNotApplicable without a reason is rejected', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const taskTypeId = await complianceTaskTypeRepository.create('Jest ECGC Cover', await createTestUser('Admin'));
+    const userId = await createTestUser('Export Executive');
+
+    const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, permissions: { close_orders: true }, session: {} };
+    await ordersController.markAllComplianceTasksNotApplicable(req, fakeRes());
+
+    const row = findRow(await orderComplianceTaskRepository.forOrder(orderId), taskTypeId);
+    expect(row.status).toBe('not_started');
+  });
+
+  it('markAllComplianceTasksNotApplicable resolves every outstanding task with one shared reason', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const adminId = await createTestUser('Admin');
+    const taskTypeId = await complianceTaskTypeRepository.create('Jest ECGC Cover', adminId);
+    const otherTypeId = await complianceTaskTypeRepository.create('Jest Fumigation Certificate', adminId);
+    const alreadyApprovedTypeId = await complianceTaskTypeRepository.create('Jest Due Diligence', adminId);
+    const userId = await createTestUser('Export Executive');
+    await orderComplianceTaskRepository.setStatus(orderId, alreadyApprovedTypeId, 'approved', null, userId);
+
+    // Shared dev DB with no per-test transaction — other tests may already
+    // have created their own active task types by the time this runs, so
+    // read the real outstanding count fresh rather than hardcoding it.
+    const expectedOutstanding = (await orderComplianceTaskRepository.summaryForOrder(orderId)).outstanding;
+
+    const req = { params: { id: String(orderId) }, body: { skip_reason: 'Repeat order — buyer previously cleared' }, user: { id: userId }, permissions: { close_orders: true }, session: {} };
+    await ordersController.markAllComplianceTasksNotApplicable(req, fakeRes());
+
+    const rows = await orderComplianceTaskRepository.forOrder(orderId);
+    expect(findRow(rows, taskTypeId).status).toBe('skipped');
+    expect(findRow(rows, taskTypeId).skip_reason).toBe('Repeat order — buyer previously cleared');
+    expect(findRow(rows, otherTypeId).status).toBe('skipped');
+    expect(findRow(rows, alreadyApprovedTypeId).status).toBe('approved');
+    expect((await orderComplianceTaskRepository.summaryForOrder(orderId)).outstanding).toBe(0);
+
+    const logRows = (await auditLogRepository.forOrder(orderId)).filter((r) => r.action_type === 'COMPLIANCE_TASK_STATUS_UPDATED');
+    expect(logRows).toHaveLength(expectedOutstanding);
   });
 
   function extractCsrf(html) {
