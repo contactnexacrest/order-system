@@ -2,6 +2,7 @@
 
 const bcrypt = require('bcrypt');
 const db = require('../../src/config/db');
+const orderAssigneeRepository = require('../../src/repositories/orderAssigneeRepository');
 const orderStageRepository = require('../../src/repositories/orderStageRepository');
 
 /** Minimal valid client row, returns its id. */
@@ -27,6 +28,7 @@ async function createTestClient(email = null) {
  * one — snapshotted once here, never re-joined.
  */
 async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Standard — New Buyer', currencyCode = 'USD', portOfLoadingId = null, portOfDischargeId = null, assignedTo = null) {
+  const assigneeIds = assignedTo === null ? [] : Array.isArray(assignedTo) ? assignedTo : [assignedTo];
   const incoterm = await db.queryOne('SELECT id, code FROM incoterms WHERE code = :code', { code: incotermCode });
   const currency = await db.queryOne('SELECT id, code FROM currencies WHERE code = :code', { code: currencyCode });
   const preset = await db.queryOne(
@@ -72,7 +74,7 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
   const result = await db.execute(
     `INSERT INTO orders
         (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
-         currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status, assigned_to,
+         currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
          port_of_loading_id, port_of_discharge_id,
          incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text, payment_method,
          balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions,
@@ -88,7 +90,7 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
          notify_party_contact_person, notify_party_phone, notify_party_email)
      VALUES
         (:ref, :client_id, 1, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, 'TBC', 'NIL',
-         CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active', :assigned_to,
+         CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active',
          :port_of_loading_id, :port_of_discharge_id,
          :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text, :payment_method,
          :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions,
@@ -105,7 +107,6 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
     {
       ref, client_id: clientId, inquiry_ref: inquiryRef,
       preset_id: preset.id, incoterm_id: incoterm.id, currency_id: currency.id,
-      assigned_to: assignedTo,
       port_of_loading_id: portOfLoadingId, port_of_discharge_id: portOfDischargeId,
       incoterm_code: incoterm.code,
       currency_code: currency.code,
@@ -160,6 +161,9 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
   );
   const orderId = result.insertId;
   await orderStageRepository.initializeForOrder(orderId);
+  for (const assigneeId of assigneeIds) {
+    await orderAssigneeRepository.add(orderId, assigneeId, assigneeId);
+  }
   return orderId;
 }
 

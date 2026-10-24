@@ -240,19 +240,29 @@
     {{ order.incoterm_code }} {{ order.port_of_loading_city or order.port_of_loading_name or '' }}
     {% if permissions.view_reports %}&nbsp;&middot;&nbsp; <a href="/reports/order/{{ order.id }}">Full Report</a>{% endif %}
     {% if permissions.manage_orders %}&nbsp;&middot;&nbsp; <a href="/orders/{{ order.id }}/edit">Edit Order Details</a>{% endif %}
-    {% if seesAllOrders %}&nbsp;&middot;&nbsp; Assigned to: <strong>{{ order.assigned_to_name or 'Unassigned' }}</strong>{% endif %}
+    {% if seesAllOrders %}&nbsp;&middot;&nbsp; Assigned to: <strong>{{ order.assignee_names or 'Unassigned' }}</strong>{% endif %}
   </p>
   {% if canAssignOwner %}
-  <form method="post" action="/orders/{{ order.id }}/assign" class="btn-row" style="margin-top:-6px;align-items:center;">
+  <div class="btn-row" style="margin-top:-6px;align-items:center;flex-wrap:wrap;">
+    {% for a in assignees %}
+      <form method="post" action="/orders/{{ order.id }}/assignees/{{ a.user_id }}/remove" style="display:inline" onsubmit="return confirm('Remove {{ a.name }} as an assignee on this order?');">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <span class="tag tag-navy">{{ a.name }} <button type="submit" class="btn-sm btn-danger" style="padding:0 4px;margin-left:4px;" title="Remove">&times;</button></span>
+      </form>
+    {% endfor %}
+  </div>
+  <form method="post" action="/orders/{{ order.id }}/assignees" class="btn-row" style="margin-top:4px;align-items:center;">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <label class="muted small" style="margin:0;">Reassign to
-      <select name="assigned_to" style="margin-left:4px;">
+    <label class="muted small" style="margin:0;">Add assignee
+      <select name="user_id" style="margin-left:4px;">
         {% for u in activeUsers %}
-          <option value="{{ u.id }}" {{ 'selected' if order.assigned_to == u.id }}>{{ u.name }} ({{ u.role_name or '—' }})</option>
+          {% if u.id not in assignedUserIds %}
+            <option value="{{ u.id }}">{{ u.name }} ({{ u.role_name or '—' }})</option>
+          {% endif %}
         {% endfor %}
       </select>
     </label>
-    <button type="submit" class="btn-sm">Reassign</button>
+    <button type="submit" class="btn-sm">Add</button>
   </form>
   {% endif %}
   {% if duplicatedFromOrder %}

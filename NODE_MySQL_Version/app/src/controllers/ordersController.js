@@ -14,6 +14,7 @@ const caFyLockRepository = require('../repositories/caFyLockRepository');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
+const orderAssigneeRepository = require('../repositories/orderAssigneeRepository');
 const orderAssignmentService = require('../services/orderAssignmentService');
 const orderDuplicationService = require('../services/orderDuplicationService');
 const orderEditGuard = require('../services/orderEditGuard');
@@ -802,7 +803,7 @@ async function show(req, res) {
   // step (manage_payments/clear_payments/manage_shipping/etc. are
   // unaffected and checked exactly as before, below).
   const seesAllOrders = !!req.permissions.view_all_orders;
-  if (!seesAllOrders && Number(order.assigned_to || 0) !== Number(req.user.id)) {
+  if (!seesAllOrders && !(await orderAssigneeRepository.isAssignedTo(orderId, req.user.id))) {
     res.status(403).send('This order is assigned to a different user. You can only open orders assigned to you.');
     return;
   }
@@ -926,12 +927,16 @@ async function show(req, res) {
     supplierFactoryAddressTextsBySupplier[supplierId] = addresses.map((a) => a.address);
   }
 
+  const assigneesForView = await orderAssigneeRepository.forOrder(orderId);
+
   res.renderView(
     'orders/show',
     {
       order,
       canAssignOwner,
       seesAllOrders,
+      assignees: assigneesForView,
+      assignedUserIds: assigneesForView.map((a) => a.user_id),
       leadTimeDisplayUnit: (await companySettingsRepository.get('lead_time_display_unit')) || 'days',
       products: await orderProductRepository.forOrder(orderId),
       hsCodes: await hsCodeRepository.active(),
@@ -1042,12 +1047,13 @@ async function show(req, res) {
 }
 
 /**
- * Order ownership / assignment visibility — reassigns an order's single
- * owner. Route-gated to assign_order_owner (Admin/MD/ED only); this
- * function doesn't re-check it. Visibility-only: never touches stage-gate
- * or action-permission checks elsewhere on this order.
+ * Order ownership / assignment visibility — adds a staff member to an
+ * order's assignee list. Route-gated to assign_order_owner (Admin/MD/ED
+ * only); this function doesn't re-check it. Visibility-only: never
+ * touches stage-gate or action-permission checks elsewhere on this
+ * order.
  */
-async function assignOwner(req, res) {
+async function addAssignee(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
   if (!order) {
@@ -1056,17 +1062,41 @@ async function assignOwner(req, res) {
     return;
   }
 
-  const newOwnerId = parseInt(req.body.assigned_to, 10) || 0;
-  const newOwner = newOwnerId > 0 ? await userRepository.findById(newOwnerId) : null;
-  if (!newOwner || !newOwner.is_active) {
+  const userId = parseInt(req.body.user_id, 10) || 0;
+  const user = userId > 0 ? await userRepository.findById(userId) : null;
+  if (!user || !user.is_active) {
     flash.set(req, 'error', 'Select a valid, active user to assign this order to.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
 
   try {
-    await orderAssignmentService.reassign(orderId, newOwnerId, req.user.id);
-    flash.set(req, 'success', `Order reassigned to ${newOwner.name}.`);
+    await orderAssignmentService.addAssignee(orderId, userId, req.user.id);
+    flash.set(req, 'success', `${user.name} added as an assignee on this order.`);
+  } catch (e) {
+    flash.setErrorFromException(req, e);
+  }
+  res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Order ownership / assignment visibility — removes a staff member from
+ * an order's assignee list. Route-gated to assign_order_owner (Admin/MD/
+ * ED only); this function doesn't re-check it.
+ */
+async function removeAssignee(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const userId = parseInt(req.params.userId, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect('/orders');
+    return;
+  }
+
+  try {
+    await orderAssignmentService.removeAssignee(orderId, userId, req.user.id);
+    flash.set(req, 'success', 'Assignee removed from this order.');
   } catch (e) {
     flash.setErrorFromException(req, e);
   }
@@ -3225,7 +3255,7 @@ async function completeCancellationRefund(req, res) {
 }
 
 module.exports = {
-  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, assignOwner, downloadDossier, generatePiFormLink, generateBuyerActionLink,
+  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,

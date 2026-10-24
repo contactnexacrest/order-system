@@ -85,14 +85,14 @@ describe('orderLockGuard middleware (External QA report L-28)', () => {
       '/orders/:id/cancellation/request', '/orders/:id/cancellation/:cancellationId/approve',
       '/orders/:id/cancellation/:cancellationId/reject', '/orders/:id/cancellation/:cancellationId/complete-refund',
       // Order ownership / assignment visibility (see
-      // docs/migrations/2026-10-24b-order-owner-assignment.sql) —
+      // docs/migrations/2026-10-24c-order-multi-assignee.sql) —
       // visibility-only, never touches the order's own substantive data,
-      // same tier as disputes/complaints above: reassigning who owns a
-      // completed order (e.g. a staff member leaves) must stay reachable
-      // regardless of lock state. Already narrowly gated to
-      // assign_order_owner (Admin/MD/ED), who hold edit_locked_data too
-      // in practice.
-      '/orders/:id/assign',
+      // same tier as disputes/complaints above: adding or removing an
+      // assignee on a completed order (e.g. a staff member leaves) must
+      // stay reachable regardless of lock state. Already narrowly gated
+      // to assign_order_owner (Admin/MD/ED), who hold edit_locked_data
+      // too in practice.
+      '/orders/:id/assignees', '/orders/:id/assignees/:userId/remove',
     ]);
     const lines = source.split('\n').filter((line) => /^app\.post\('\/orders\/:id/.test(line.trim()));
     expect(lines.length).toBeGreaterThan(0);

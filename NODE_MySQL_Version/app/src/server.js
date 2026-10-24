@@ -613,7 +613,8 @@ app.get('/orders/archived', requireAuth, requirePermission('view_archived_orders
 app.get('/orders/create', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.create));
 app.post('/orders', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.store));
 app.get('/orders/:id', requireAuth, requirePermissionAny(['manage_orders', 'view_orders']), asyncHandler(ordersController.show));
-app.post('/orders/:id/assign', requireAuth, requirePermission('assign_order_owner'), verifyCsrf, asyncHandler(ordersController.assignOwner));
+app.post('/orders/:id/assignees', requireAuth, requirePermission('assign_order_owner'), verifyCsrf, asyncHandler(ordersController.addAssignee));
+app.post('/orders/:id/assignees/:userId/remove', requireAuth, requirePermission('assign_order_owner'), verifyCsrf, asyncHandler(ordersController.removeAssignee));
 app.get('/orders/:id/edit', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.editDetails));
 app.post('/orders/:id/edit', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateDetails));
 app.post('/orders/:id/archive', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.archive));

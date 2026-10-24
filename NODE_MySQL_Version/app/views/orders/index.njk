@@ -33,7 +33,7 @@
       <div class="entity-card-header">
         <span class="entity-card-title">{{ o.order_reference }}</span>
         {% if o.incoterm_code %}<span class="tag tag-gold">{{ o.incoterm_code }}</span>{% endif %}
-        {% if seesAllOrders and o.assigned_to_name %}<span class="tag tag-navy">{{ o.assigned_to_name }}</span>{% endif %}
+        {% if seesAllOrders and o.assignee_names %}<span class="tag tag-navy">{{ o.assignee_names }}</span>{% endif %}
       </div>
       <div class="entity-card-sub">{{ o.company_legal_name }}</div>
       <div>
