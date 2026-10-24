@@ -184,10 +184,13 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await expect(page.locator('.alert')).toContainText('generated');
       await assertNoHorizontalOverflow(page);
 
-      // The outer "Documents & Approvals" step-card also "has" a matching
-      // nested summary descendant (the QT-specific review widget this is
-      // actually looking for) — excluding .step-card keeps this matching
-      // only the innermost, document-specific <details>.
+      // The QT-specific review widget lives inside #document-review-approval
+      // — a reference card, not tied to any stage stepper dot, so it
+      // renders collapsed by default and needs opening explicitly before
+      // reaching the nested summary descendant this is actually looking for.
+      const openDocumentReviewCard = () =>
+        page.locator('#document-review-approval').evaluate((el) => { el.open = true; });
+      await openDocumentReviewCard();
       let panel = page
         .locator('details:not(.step-card)')
         .filter({ has: page.locator('summary', { hasText: /^\s*QT\s/ }) })
@@ -198,7 +201,7 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
-      await openStage(1);
+      await openDocumentReviewCard();
       panel = page
         .locator('details:not(.step-card)')
         .filter({ has: page.locator('summary', { hasText: /^\s*QT\s/ }) })

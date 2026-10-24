@@ -16,12 +16,13 @@ const ADMIN_NAME = ROLES.admin.name;
  * step-cards (views/orders/show.php) — each one collapsed/expanded
  * independently, no single-active-panel JS. The top stage stepper
  * (`.process-step[data-stage=N]`) still exists and opens (and scrolls
- * to) whichever card covers that DB stage. The Documents & Approvals
- * card (every document type's Generate/Review/Approve controls) is its
- * own card pinned to data-stage="1" regardless of which real stage the
- * document belongs to, so generating/approving a document always needs
- * openStage(page, 1) first, separately from whichever stage's own
- * action card is needed next.
+ * to) whichever card covers that DB stage — used for each document
+ * type's own Generate action. Review/approve is different: every
+ * document type's reviewer-assignment/approve widget lives inside the
+ * single `#document-review-approval` reference card (reachable from
+ * anywhere, not tied to any one stage), which — like every other
+ * reference card — renders collapsed unless it happens to be the
+ * order's current step, so reaching it needs its own explicit open.
  *
  * This only drives the actions that actually pass each stage's gate
  * (confirmed against each controller method, not assumed from the
@@ -78,9 +79,17 @@ function documentPanel(page, typeCode) {
     .first();
 }
 
+// #document-review-approval is a reference card (same bucket as Payment
+// Overview/Compliance Checklist/Amendments) — it renders collapsed by
+// default, not tied to any stage stepper dot, so every document's
+// review/approve widget needs this opened explicitly first.
+async function openDocumentReviewCard(page) {
+  await page.locator('#document-review-approval').evaluate((el) => { el.open = true; });
+}
+
 /** Opens a document's review panel, assigns the logged-in admin as sole reviewer, then approves as them. */
 async function assignSelfAndApprove(page, typeCode) {
-  await openStage(page, 1);
+  await openDocumentReviewCard(page);
   let panel = documentPanel(page, typeCode);
   await panel.locator('summary').click();
   const reviewerSelect = panel.locator('select[name="reviewer_ids[]"]');
@@ -92,11 +101,51 @@ async function assignSelfAndApprove(page, typeCode) {
   await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
   await expect(page.locator('.alert')).toBeVisible();
 
-  await openStage(page, 1);
+  await openDocumentReviewCard(page);
   panel = documentPanel(page, typeCode);
   await panel.locator('summary').click();
   await panel.getByRole('button', { name: 'Approve', exact: true }).click();
   await expect(page.locator('.alert')).toBeVisible();
+}
+
+// Opens a card by id and every ancestor <details> above it (e.g.
+// #compliance-checklist nests inside Step 8's .step-group) — a closed
+// ancestor hides a nested card regardless of its own `open` state.
+async function openCardAndAncestors(page, selector) {
+  await page.locator(selector).evaluate((el) => {
+    for (let node = el; node; node = node.parentElement ? node.parentElement.closest('details') : null) {
+      node.open = true;
+    }
+  });
+}
+
+// Order closure now blocks (OrderController::markFullySettled) while any
+// compliance-task or export-benefit-scheme row is unresolved — both are
+// always materialized at order creation, never left as a missing row.
+async function resolveComplianceChecklistIfNeeded(page, orderId) {
+  await openCardAndAncestors(page, '#compliance-checklist');
+  const markAllNaForm = page.locator(`form[action="/orders/${orderId}/compliance-tasks/mark-all-na"]`);
+  if (await markAllNaForm.count() === 0) { return; }
+  await markAllNaForm.locator('input[name="skip_reason"]').fill('Not applicable to this smoke-test order');
+  await markAllNaForm.getByRole('button', { name: 'Mark All N/A' }).click();
+  await expect(page.locator('.alert')).toBeVisible();
+}
+
+async function resolveExportBenefitSchemes(page, orderId) {
+  await page.goto(`/orders/${orderId}#order-financials`);
+  await openCardAndAncestors(page, '#order-financials');
+  for (;;) {
+    const pendingForm = page
+      .locator(`form[action="/orders/${orderId}/export-benefit-schemes"]`)
+      .filter({ has: page.locator('select[name="status"] option[value="pending"][selected]') });
+    if (await pendingForm.count() === 0) { break; }
+    const form = pendingForm.first();
+    await form.locator('select[name="status"]').selectOption('not_eligible');
+    await form.locator('input[name="reason"]').fill('Not applicable to this smoke-test order');
+    await form.getByRole('button', { name: 'Save' }).click();
+    await expect(page.locator('.alert')).toContainText('eligibility updated');
+    await openCardAndAncestors(page, '#order-financials');
+  }
 }
 
 test('staff can create a CIF order and walk it through all 9 stage gates to completion', async ({ page }) => {
@@ -308,6 +357,9 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   });
 
   await test.step('Mark Fully Settled — phase 2 of closure, the real completion', async () => {
+    await resolveComplianceChecklistIfNeeded(page, orderId);
+    await resolveExportBenefitSchemes(page, orderId);
+
     await openStage(page, 9);
     const settleForm = page.locator(`form[action="/orders/${orderId}/mark-fully-settled"]`);
     await settleForm.getByRole('button', { name: 'Mark Fully Settled' }).click();

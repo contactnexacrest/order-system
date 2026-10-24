@@ -84,8 +84,16 @@ function documentPanel(page, typeCode) {
     .first();
 }
 
+// #document-review-approval is a reference card (same bucket as Payment
+// Overview/Compliance Checklist/Amendments) — it renders collapsed by
+// default, not tied to any stage stepper dot, so every document's
+// review/approve widget needs this opened explicitly first.
+async function openDocumentReviewCard(page) {
+  await page.locator('#document-review-approval').evaluate((el) => { el.open = true; });
+}
+
 async function adminAssignSelfAndApprove(page, typeCode, reviewerName) {
-  await openStage(page, 1);
+  await openDocumentReviewCard(page);
   let panel = documentPanel(page, typeCode);
   await panel.locator('summary').click();
   const reviewerSelect = panel.locator('select[name="reviewer_ids[]"]');
@@ -94,7 +102,7 @@ async function adminAssignSelfAndApprove(page, typeCode, reviewerName) {
   await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
   await expect(page.locator('.alert')).toBeVisible();
 
-  await openStage(page, 1);
+  await openDocumentReviewCard(page);
   panel = documentPanel(page, typeCode);
   await panel.locator('summary').click();
   await panel.getByRole('button', { name: 'Approve', exact: true }).click();

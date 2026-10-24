@@ -2850,7 +2850,17 @@
       if (!el) { return false; }
       var details = el.tagName === 'DETAILS' ? el : el.closest('details');
       if (details) {
-        details.open = true;
+        // A card nested inside a .step-group (Step 8's 8a/8b, etc.) is
+        // invisible while that group itself is still closed — a closed
+        // ancestor <details> hides every descendant regardless of its
+        // own `open` state. Climb every ancestor <details>, not just
+        // the nearest one, so a direct link into a nested card (the
+        // "At a Glance" sidebar's "see checklist", the ECGC cross-
+        // reference, etc.) actually reveals it rather than only
+        // scrolling to a still-hidden element.
+        for (var node = details; node; node = node.parentElement ? node.parentElement.closest('details') : null) {
+          node.open = true;
+        }
         // Opening a .step-group only reveals the group shell — every
         // one of its own step-cards needs opening too, not just
         // whichever one the server happened to mark current. Several

@@ -86,6 +86,14 @@ function documentPanel(page, typeCode) {
     .first();
 }
 
+// #document-review-approval is a reference card (same bucket as Payment
+// Overview/Compliance Checklist/Amendments) — it renders collapsed by
+// default, not tied to any stage stepper dot, so every document's
+// review/approve widget needs this opened explicitly first.
+async function openDocumentReviewCard(page) {
+  await page.locator('#document-review-approval').evaluate((el) => { el.open = true; });
+}
+
 /**
  * Order ownership / assignment visibility: a scoped role (Export
  * Executive, Logistics Executive — neither holds view_all_orders) can
@@ -116,7 +124,7 @@ async function addAssigneeTo(page, orderId, roleName) {
  */
 async function adminAssignSelfAndApprove(page, typeCode) {
   const adminName = ROLES.admin.name;
-  await openStage(page, 1);
+  await openDocumentReviewCard(page);
   let panel = documentPanel(page, typeCode);
   await panel.locator('summary').click();
   const reviewerSelect = panel.locator('select[name="reviewer_ids[]"]');
@@ -125,11 +133,56 @@ async function adminAssignSelfAndApprove(page, typeCode) {
   await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
   await expect(page.locator('.alert')).toBeVisible();
 
-  await openStage(page, 1);
+  await openDocumentReviewCard(page);
   panel = documentPanel(page, typeCode);
   await panel.locator('summary').click();
   await panel.getByRole('button', { name: 'Approve', exact: true }).click();
   await expect(page.locator('.alert')).toBeVisible();
+}
+
+// Order closure now blocks (OrderController::markFullySettled) while any
+// compliance-task or export-benefit-scheme row is unresolved — both are
+// always materialized at order creation, never left as a missing row.
+// close_orders holders (here, Logistics Executive) can bulk-resolve the
+// Compliance Checklist themselves; Export Benefit Scheme Eligibility
+// lives in the Order Financials card, gated on manage_order_financials
+// (Admin/MD/ED only), so that one is resolved by whichever Admin step
+// already runs just before the close.
+// Opens a card by id and every ancestor <details> above it (e.g.
+// #compliance-checklist nests inside Step 8's .step-group) — a closed
+// ancestor hides a nested card regardless of its own `open` state.
+async function openCardAndAncestors(page, selector) {
+  await page.locator(selector).evaluate((el) => {
+    for (let node = el; node; node = node.parentElement ? node.parentElement.closest('details') : null) {
+      node.open = true;
+    }
+  });
+}
+
+async function resolveComplianceChecklistIfNeeded(page, orderId) {
+  await openCardAndAncestors(page, '#compliance-checklist');
+  const markAllNaForm = page.locator(`form[action="/orders/${orderId}/compliance-tasks/mark-all-na"]`);
+  if (await markAllNaForm.count() === 0) { return; }
+  await markAllNaForm.locator('input[name="skip_reason"]').fill('Not applicable to this smoke-test order');
+  await markAllNaForm.getByRole('button', { name: 'Mark All N/A' }).click();
+  await expect(page.locator('.alert')).toBeVisible();
+}
+
+async function resolveExportBenefitSchemes(page, orderId) {
+  await page.goto(`/orders/${orderId}#order-financials`);
+  await openCardAndAncestors(page, '#order-financials');
+  for (;;) {
+    const pendingForm = page
+      .locator(`form[action="/orders/${orderId}/export-benefit-schemes"]`)
+      .filter({ has: page.locator('select[name="status"] option[value="pending"][selected]') });
+    if (await pendingForm.count() === 0) { break; }
+    const form = pendingForm.first();
+    await form.locator('select[name="status"]').selectOption('not_eligible');
+    await form.locator('input[name="reason"]').fill('Not applicable to this smoke-test order');
+    await form.getByRole('button', { name: 'Save' }).click();
+    await expect(page.locator('.alert')).toContainText('eligibility updated');
+    await openCardAndAncestors(page, '#order-financials');
+  }
 }
 
 test.describe.serial('Deep per-role pipeline workflows', () => {
@@ -364,6 +417,12 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await page.goto(`/orders/${orderId}`);
       await adminAssignSelfAndApprove(page, 'COOPREP');
       await adminAssignSelfAndApprove(page, 'BLI');
+
+      // Export Benefit Scheme Eligibility lives in the Order Financials
+      // card (manage_order_financials — Admin/MD/ED only), so it's
+      // resolved here rather than by Logistics Executive, who can't see
+      // that card at all.
+      await resolveExportBenefitSchemes(page, orderId);
     });
 
     await logout(page);
@@ -371,6 +430,12 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     await test.step('Logistics Executive — Stage 9 close the order (close_orders)', async () => {
       await login(page, 'logisticsExecutive');
       await page.goto(`/orders/${orderId}`);
+
+      // Closure now blocks while any Compliance Checklist task is still
+      // unresolved — bulk-resolve it here (close_orders also governs
+      // this card, so Logistics Executive can do it themselves).
+      await resolveComplianceChecklistIfNeeded(page, orderId);
+
       await openStage(page, 9);
       const closeForm = page.locator(`form[action="/orders/${orderId}/close"]`);
       await closeForm.locator('input[name="courier_tracking_number"]').fill(`ROLE-COURIER-${UNIQUE}`);

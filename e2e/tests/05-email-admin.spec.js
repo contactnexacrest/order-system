@@ -66,6 +66,14 @@ function documentPanel(page, typeCode) {
     .first();
 }
 
+// #document-review-approval is a reference card (same bucket as Payment
+// Overview/Compliance Checklist/Amendments) — it renders collapsed by
+// default, not tied to any stage stepper dot, so every document's
+// review/approve widget needs this opened explicitly first.
+async function openDocumentReviewCard(page) {
+  await page.locator('#document-review-approval').evaluate((el) => { el.open = true; });
+}
+
 /**
  * Order ownership / assignment visibility: Admin created this order (so
  * it's auto-assigned to Admin as its first assignee), but Export
@@ -85,7 +93,7 @@ async function addAssigneeTo(page, orderId, roleName) {
 
 async function adminAssignSelfAndApprove(page, typeCode) {
   const adminName = ROLES.admin.name;
-  await openStage(page, 1);
+  await openDocumentReviewCard(page);
   let panel = documentPanel(page, typeCode);
   await panel.locator('summary').click();
   const reviewerSelect = panel.locator('select[name="reviewer_ids[]"]');
@@ -94,7 +102,7 @@ async function adminAssignSelfAndApprove(page, typeCode) {
   await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
   await expect(page.locator('.alert')).toBeVisible();
 
-  await openStage(page, 1);
+  await openDocumentReviewCard(page);
   panel = documentPanel(page, typeCode);
   await panel.locator('summary').click();
   await panel.getByRole('button', { name: 'Approve', exact: true }).click();
@@ -156,11 +164,10 @@ test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queu
     await test.step("Export Executive opens the approved QT's Send-to-Buyer flow (generate_documents)", async () => {
       await login(page, 'exportExecutive');
       await page.goto(`/orders/${orderId}`);
-      // Stage 1's gate already passed (QT approval passes it), so its
-      // "Documents & Approvals" step-card is no longer the order's
-      // current step and renders collapsed on this fresh page load —
-      // open it before reaching the nested QT panel inside it.
-      await openStage(page, 1);
+      // #document-review-approval is a reference card, not tied to any
+      // stage stepper dot — it renders collapsed by default, so it
+      // needs opening explicitly before reaching the nested QT panel.
+      await openDocumentReviewCard(page);
       const panel = documentPanel(page, 'QT');
       await panel.locator('summary').click();
       await panel.getByRole('link', { name: 'Send to Buyer (deferred, 2-level approval)' }).click();
@@ -206,7 +213,7 @@ test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queu
     // just that the button click didn't error.
     const orderPage = await page.goto(`/orders/${orderId}`);
     expect(orderPage.status()).toBe(200);
-    await openStage(page, 1);
+    await openDocumentReviewCard(page);
     const panel = documentPanel(page, 'QT');
     await panel.locator('summary').click();
     await expect(panel).toContainText('Approved — will send once its scheduled time arrives.');

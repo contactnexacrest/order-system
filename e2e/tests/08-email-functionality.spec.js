@@ -82,6 +82,14 @@ function documentPanel(page, typeCode) {
     .first();
 }
 
+// #document-review-approval is a reference card (same bucket as Payment
+// Overview/Compliance Checklist/Amendments) — it renders collapsed by
+// default, not tied to any stage stepper dot, so every document's
+// review/approve widget needs this opened explicitly first.
+async function openDocumentReviewCard(page) {
+  await page.locator('#document-review-approval').evaluate((el) => { el.open = true; });
+}
+
 test.describe('Email functionality — real attempts, right recipient, right attachment', () => {
   test('plain-text notifications: Login Success and Permission Denied actually attempt to send', async ({
     page,
@@ -142,13 +150,14 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await openStage(page, 1);
     await docForm(page, orderId, 'QT').locator('button[type="submit"]').click();
     await expect(page.locator('.alert')).toContainText('generated');
+    await openDocumentReviewCard(page);
     let panel = documentPanel(page, 'QT');
     await panel.locator('summary').click();
     const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
     await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
     await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
     await expect(page.locator('.alert')).toBeVisible();
-    await openStage(page, 1);
+    await openDocumentReviewCard(page);
     panel = documentPanel(page, 'QT');
     await panel.locator('summary').click();
     await panel.getByRole('button', { name: 'Approve', exact: true }).click();
@@ -225,13 +234,14 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await openStage(page, 1);
     await docForm(page, orderId, 'QT').locator('button[type="submit"]').click();
     await expect(page.locator('.alert')).toContainText('generated');
+    await openDocumentReviewCard(page);
     let panel = documentPanel(page, 'QT');
     await panel.locator('summary').click();
     const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
     await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
     await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
     await expect(page.locator('.alert')).toBeVisible();
-    await openStage(page, 1);
+    await openDocumentReviewCard(page);
     panel = documentPanel(page, 'QT');
     await panel.locator('summary').click();
     await panel.getByRole('button', { name: 'Approve', exact: true }).click();
@@ -242,11 +252,10 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await logout(page);
     await login(page, 'exportExecutive');
     await page.goto(`/orders/${orderId}`);
-    // Stage 1's gate already passed (QT approval passes it), so its
-    // "Documents & Approvals" step-card is no longer the order's current
-    // step and renders collapsed on this fresh page load — open it
-    // before reaching the nested QT panel inside it.
-    await openStage(page, 1);
+    // #document-review-approval is a reference card, not tied to any
+    // stage stepper dot — it renders collapsed by default, so it needs
+    // opening explicitly before reaching the nested QT panel.
+    await openDocumentReviewCard(page);
     panel = documentPanel(page, 'QT');
     await panel.locator('summary').click();
     await panel.getByRole('link', { name: 'Send to Buyer (deferred, 2-level approval)' }).click();
