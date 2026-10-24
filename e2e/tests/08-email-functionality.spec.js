@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');
-const { login, logout } = require('./support/auth');
+const { login, logout, ROLES } = require('./support/auth');
 const { resetClientPassword } = require('./support/db');
 const { mark, sinceMark } = require('./support/mail');
 
@@ -50,6 +50,22 @@ function docForm(page, orderId, typeCode) {
   return page.locator(
     `form[action="/orders/${orderId}/documents/generate"]:has(input[name="document_type"][value="${typeCode}"])`
   );
+}
+
+/**
+ * Order ownership / assignment visibility: Admin created this order (so
+ * it's auto-assigned to Admin), but Export Executive — who doesn't hold
+ * view_all_orders — needs to open it directly next. Must be run while
+ * still logged in as Admin (or any assign_order_owner holder).
+ */
+async function assignOrderTo(page, orderId, roleName) {
+  await page.goto(`/orders/${orderId}`);
+  const form = page.locator(`form[action="/orders/${orderId}/assign"]`);
+  const targetName = ROLES[roleName].name;
+  const targetValue = await form.locator('option', { hasText: targetName }).first().getAttribute('value');
+  await form.locator('select[name="assigned_to"]').selectOption(targetValue);
+  await form.getByRole('button', { name: 'Reassign' }).click();
+  await expect(page.locator('.alert')).toContainText('reassigned');
 }
 
 function documentPanel(page, typeCode) {
@@ -219,6 +235,8 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await panel.locator('summary').click();
     await panel.getByRole('button', { name: 'Approve', exact: true }).click();
     await expect(page.locator('.alert')).toBeVisible();
+
+    await assignOrderTo(page, orderId, 'exportExecutive');
 
     await logout(page);
     await login(page, 'exportExecutive');

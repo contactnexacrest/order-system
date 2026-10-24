@@ -49,6 +49,25 @@ touching any mutating route or button, which all stay gated on
 carries both, so it can finally see real order and client data instead
 of only reports and the audit log.
 
+Every order now also has a single staff **owner** (auto-assigned to
+whoever created it), and most roles only see orders assigned to them —
+in the Orders list, the Kanban board, and the order detail page itself
+(a bookmarked or guessed URL to someone else's order is refused, not
+just hidden). **Admin, Managing Director, Executive Director, Accounts
+Executive,** and **Viewer / Auditor** hold a separate permission,
+**View All Orders** (`view_all_orders`), which bypasses this and shows
+every order regardless of who owns it — Accounts Executive needs this
+because they touch payment steps across orders they didn't create.
+Reassigning an order's owner (a small control on the order detail page
+itself) needs its own permission, **Assign Order Owner**
+(`assign_order_owner`), held only by Admin/Managing Director/Executive
+Director — not by the order's own current owner, and not by anyone who
+merely holds `manage_orders`. This is purely about who can *see* an
+order; it never changes who can *act* on it — `manage_payments`,
+`manage_shipping`, `close_orders`, and the rest of the permission system
+work exactly as before, completely independent of who the order is
+assigned to.
+
 ### Users
 
 Create logins, edit an existing one, deactivate one, archive one, delete

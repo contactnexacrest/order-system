@@ -66,6 +66,22 @@ function documentPanel(page, typeCode) {
     .first();
 }
 
+/**
+ * Order ownership / assignment visibility: Admin created this order (so
+ * it's auto-assigned to Admin), but Export Executive — who doesn't hold
+ * view_all_orders — needs to open it directly next. Must be run while
+ * still logged in as Admin (or any assign_order_owner holder).
+ */
+async function assignOrderTo(page, orderId, roleName) {
+  await page.goto(`/orders/${orderId}`);
+  const form = page.locator(`form[action="/orders/${orderId}/assign"]`);
+  const targetName = ROLES[roleName].name;
+  const targetValue = await form.locator('option', { hasText: targetName }).first().getAttribute('value');
+  await form.locator('select[name="assigned_to"]').selectOption(targetValue);
+  await form.getByRole('button', { name: 'Reassign' }).click();
+  await expect(page.locator('.alert')).toContainText('reassigned');
+}
+
 async function adminAssignSelfAndApprove(page, typeCode) {
   const adminName = ROLES.admin.name;
   await openStage(page, 1);
@@ -128,6 +144,10 @@ test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queu
 
       await generateDocument(page, orderId, 'QT', 'generated');
       await adminAssignSelfAndApprove(page, 'QT');
+    });
+
+    await test.step('Admin reassigns the order to Export Executive, who opens it next', async () => {
+      await assignOrderTo(page, orderId, 'exportExecutive');
     });
 
     await logout(page);
