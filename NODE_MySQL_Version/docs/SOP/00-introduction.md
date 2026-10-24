@@ -59,8 +59,22 @@ progress / unlocked), green (gate passed) — each naming its own status in
 words, for when you need more than the quick glance. Both use the same
 three colors for the same three states, so they always agree with each
 other. Each dot in the stepper is also clickable (and keyboard-focusable)
-— clicking one jumps straight to that stage's own section further down
-the page, the same as clicking any of the sidebar links on the left.
+— clicking one jumps straight to that stage's own card further down the
+page.
+
+Below the stepper, the rest of the page is a single vertical sequence of
+collapsible **step-cards** — one per step in the buyer's own export
+process (QT → Buyer PO → PI & Advance Payment → Order Confirmation →
+Supplier PO → Production → Freight → Packing & BL → Commercial Invoice &
+Balance → Closure → Communication → Feedback → Complaints → Disputes),
+each labelled with that step's own number so the on-screen order always
+matches the real order of work — not the 9 internal stage numbers above,
+which are a separate, coarser-grained tracker. The order's current step
+opens automatically; every other step-card stays collapsed until you
+click its heading, so the page never buries one step's actions behind
+another's. A persistent panel to the side (stacked below on a phone) always
+shows an "At a Glance" summary and the full list of documents generated
+so far, regardless of which step-card is open.
 
 ## Modules that sit alongside the 9 stages
 
@@ -179,52 +193,67 @@ the Quotation's "VALID UNTIL" banner. The field itself (renamed from just
 and Supplier PO forms) is optional and free text, but when something is
 written there, it's meant to be noticed, not buried.
 
-**An order's detail page is one page, navigated through a sidebar, not one
-long scroll.** Every order's own page (`/orders/{id}`) always shows the
-order's title, action buttons, and 9-stage tracker at the top — those never
-move. Below that, a sidebar on the left lists every section of the order
-(Order Details, Products, Documents, each numbered stage, and so on); click
-one to bring up just that section in the pane on the right, instead of
-scrolling past everything else to find it. This is purely a navigation
-aid — nothing about what a section does, what permission it needs, or what
-button does what has changed; a section still works exactly as this SOP
-describes it, it's just reached by clicking its name in the sidebar rather
-than scrolling to it. On a narrow screen (phone width) the sidebar becomes
-a row of tabs above the content instead of a column beside it. If the
-sidebar's script fails to load for any reason, every section simply
-appears one after another on the page, exactly as it did before this
-navigation was added — nothing is ever hidden behind JavaScript that isn't
-there as a backup.
+**An order's detail page is one vertical sequence of collapsible
+step-cards, numbered to match the buyer's own export process — not the
+9 internal stages, and not one long undifferentiated scroll.** Every
+order's own page (`/orders/{id}`) always shows the order's title, action
+buttons, and 9-stage tracker at the top — those never move. Below that,
+the page lays out every section as its own numbered step-card, in the
+exact order staff actually work through an order (Quotation → Buyer PO
+→ PI-Stage Intake → PI & Advance Payment → Order Confirmation & ECGC →
+Supplier PO → Production → Freight → Packing/BL/CHA Review → Commercial
+Invoice & Balance → Closure → Additional Documents → Communication →
+Feedback → Complaints → Disputes → Order Complete), each labelled with
+that step's own number (e.g. "Step 7 · Supplier Purchase Order") so the
+screen's own order always matches the real order of work. The order's
+current step opens automatically; every other step-card starts
+collapsed — click its heading to open it. This is purely a layout and
+navigation change — nothing about what a section does, what permission
+it needs, or what button does what is any different; a section still
+works exactly as this SOP describes it, it's just reached by clicking
+its own heading rather than scrolling to it or picking it from a
+separate nav. Step-cards are native, no-JavaScript-required HTML
+(`<details>`/`<summary>`): if a browser's JavaScript never runs, every
+step-card still opens and closes with a plain click, and nothing is
+hidden behind a script that isn't there as a backup. A persistent panel
+beside the step-cards (stacked below them on a phone) always shows an
+"At a Glance" summary and the full list of documents generated so far,
+whichever step-card happens to be open.
 
-**Each stage's own action buttons now carry a small sub-step badge** (e.g.
-"5a", "5b", "5c") immediately before the button itself, wherever a stage
-involves more than one action a staff member presses in sequence — for
-example Stage 5's "Save Supplier PO Terms" (5a) → "Generate Supplier PO"
-(5b) → "Confirm Supplier Signed & Returned PO" (5c). This shows the literal
-order of operations *within* a stage, not just which of the 9 stages the
-order is on overall (that's still the process stepper above). Two badges —
-**"3b"** (the PI Form Link) and **"4c"** (the Buyer Action Link) — are
-deliberately not tied to their own stage's lock status and appear from the
-very first page load regardless of where the order actually stands: both
-are optional, never-blocking alternate channels, exactly as their own
+**Each stage's own action buttons still carry a small sub-step badge**
+(e.g. "7a", "7b", "7c") immediately before the button itself, wherever a
+stage involves more than one action a staff member presses in
+sequence — for example Supplier PO's "Save Supplier PO Terms" (7a) →
+"Generate Supplier PO" (7b) → "Confirm Supplier Signed & Returned PO"
+(7c). This shows the literal order of operations *within* a step, not
+just which of the 9 internal stages the order is on overall (that's
+still the process stepper above) — badge numbers follow the step-card's
+own on-screen number, not the stage number. Two badges — **"4d"** (the
+PI Form Link) and **"4c"** (the Buyer Action Link) — are deliberately
+not tied to their own stage's lock status and appear from the very
+first page load regardless of where the order actually stands: both are
+optional, never-blocking alternate channels, exactly as their own
 chapters already describe them. The badge is purely a labelling aid — it
 changes no permission, no gate, and no button's underlying behaviour.
 
-**"Order Details" is the order's own at-a-glance summary, not just its
-commercial terms.** The first section in the sidebar now opens with a quick
-row of counts before the FOB value/Port of Discharge/Container Type/etc.
-fields it always had: **Current Stage**, **Products** (line count),
-**Payment Legs** (how many of advance/freight/balance are cleared, with a
-jump link to [Payment Snapshot](#payment-snapshot-and-payment-ledger)),
-**Compliance Checklist** (resolved count, shown only to whoever holds
-`close_orders` — same gate as the checklist itself, see
-[Stage 9](./09-stage9-despatch-closure.md)), **Documents Generated**, plus
-Client, Buyer Inquiry Ref, Incoterm/Port of Loading and Quotation Date,
-which previously only appeared in the small subtitle line under the order
-reference. The idea is that opening an order answers "where does this
-stand?" without scrolling or clicking into every other section first;
-every number here is a read-only reflection of data recorded elsewhere on
-the same page, never something edited from this panel.
+**"At a Glance" is the order's own persistent summary panel, not just
+its commercial terms.** Open at all times beside the step-cards (never
+collapsed, since it's how staff get back their bearings while stepping
+through the page) is a quick row of counts — **Current Stage**,
+**Products** (line count), **Payment Legs** (how many of
+advance/freight/balance are cleared, with a jump link to
+[Payment Snapshot](#payment-snapshot-and-payment-ledger)), **Compliance
+Checklist** (resolved count, shown only to whoever holds `close_orders`
+— same gate as the checklist itself, see
+[Stage 9](./09-stage9-despatch-closure.md)), **Documents Generated** —
+followed by Client, Buyer Inquiry Ref, Incoterm/Port of Loading and
+Quotation Date, and the rest of the order's own commercial terms. The
+idea is that opening an order answers "where does this stand?" without
+scrolling or opening every step-card first; every number here is a
+read-only reflection of data recorded elsewhere on the same page, never
+something edited from this panel. The same panel's "All Documents" list
+(every document generated so far, newest first) is covered in
+[Document Review & Approval](./13-document-review-approval.md).
 
 **A creation or edit form groups related fields two to a row, not one.**
 The New Order form (and other detail-entry screens like it) pairs related

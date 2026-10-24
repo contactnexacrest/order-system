@@ -188,8 +188,10 @@ nothing changes from the behaviour above until an admin turns one on):
 Separate from everything above — these are staff-uploaded extras that don't
 fit any fixed document type and aren't part of the order progress chat
 either. Both the order detail page and the client detail page carry their
-own **Additional Documents** section (inside Documents & Approvals on the
-order page): a title (required), optional notes, and a file. Typical use:
+own **Additional Documents** section (its own step-card on the order
+page, Step 12 — between Amendments and Order Communication, next to the
+persistent "All Documents" sidebar panel that lists every document
+generated so far): a title (required), optional notes, and a file. Typical use:
 a buyer-supplied certificate template, a special packing instruction sheet,
 a standing NDA on a client's own page. There's no approval workflow here —
 whoever can edit the order/client (`manage_orders`) can add or remove one;

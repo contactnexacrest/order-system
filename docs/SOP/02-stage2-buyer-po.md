@@ -35,8 +35,9 @@ upload kept, nothing overwritten. This is purely for record-keeping and
 
 > **Common confusion this causes:** if staff attach the buyer's PO copy but
 > never separately type the reference number into "Confirm Buyer PO
-> Received," the order's **Buyer's PO Ref** in Order Details will still
-> read a plain "NIL" — even though a file is clearly on record. The system
+> Received," the order's **Buyer's PO Ref** in the "At a Glance" sidebar
+> panel will still read a plain "NIL" — even though a file is clearly on
+> record. The system
 > now shows *"Not yet recorded — N file(s) attached"* instead of a bare NIL
 > in that situation, precisely so this half-done state is visible rather
 > than looking like nothing happened at all.
@@ -54,7 +55,7 @@ Once confirmed, the order updates immediately:
 
 ![Stage 2 after confirming](./images/s2_after_confirm.png)
 
-![Order Details showing the recorded ref](./images/s2_order_details_po_ref.png)
+![At a Glance panel showing the recorded ref](./images/s2_order_details_po_ref.png)
 
 ![Stage tracker after Stage 2 passes](./images/s2_stage_tracker_after.png)
 
