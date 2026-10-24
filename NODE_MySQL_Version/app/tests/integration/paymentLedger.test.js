@@ -19,6 +19,13 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * these HTTP-level tests confirm the "can see amounts" path; the
  * PHPUnit suite additionally pins the "general staff see status only, no
  * amounts" path via direct controller calls with a Viewer/Auditor role.
+ *
+ * UI-polish round: Snapshot/Ledger/Full Status became real tabs
+ * (parallel views of the same data) instead of nested <details>, so
+ * both panels are always present in the static markup (zero-JS-safe
+ * degrade — JS applies the single-pane switching at runtime) and are
+ * asserted by their tab-panel id rather than a now-gone per-panel
+ * <summary>.
  */
 describe('Payment Overview (order page)', () => {
   let agent;
@@ -43,8 +50,8 @@ describe('Payment Overview (order page)', () => {
     const res = await agent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
     expect(res.text).toContain('Payment Overview');
-    expect(res.text).toContain('<summary>Snapshot</summary>');
-    expect(res.text).toContain('<summary>Ledger</summary>');
+    expect(res.text).toContain('id="payment-overview-snapshot"');
+    expect(res.text).toContain('id="payment-overview-ledger"');
     expect(res.text).toMatch(/5,000\.00\s*USD/);
     expect(res.text).toContain('Advance Remittance Received');
   });

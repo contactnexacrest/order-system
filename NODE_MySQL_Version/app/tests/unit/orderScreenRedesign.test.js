@@ -119,14 +119,17 @@ describe('Order screen redesign (Point 2/4)', () => {
    *
    * Since the parent-group redesign, a direct child of #order-panels is
    * now either (a) a standalone step-card, same as before, or (b) a
-   * <div class="step-group"> wrapper — purely a visual container for a
-   * multi-letter step's own cards (4a/4b/4c, etc.), each of which sits
-   * one level deeper (depth 3) as that group's own direct child. Both
-   * patterns are asserted explicitly, so N-01's original bug class (a
-   * panel's own markup never closing, silently nesting every later panel
-   * inside it) still fails this test — on either axis, a card swallowed
-   * by an unclosed sibling either vanishes from its expected depth or
-   * appears one level deeper than it should.
+   * <details class="step-group"> wrapper — now itself collapsible
+   * (default-collapsed unless it's the order's current stage, same
+   * stepCardOpen()/stepStatusIcon() discipline as every step-card)
+   * rather than an always-visible <div> — for a multi-letter step's own
+   * cards (4a/4b/4c, etc.), each of which sits one level deeper (depth
+   * 3) as that group's own direct child. Both patterns are asserted
+   * explicitly, so N-01's original bug class (a panel's own markup
+   * never closing, silently nesting every later panel inside it) still
+   * fails this test — on either axis, a card swallowed by an unclosed
+   * sibling either vanishes from its expected depth or appears one
+   * level deeper than it should.
    */
   it('every top-level section is a direct child of #order-panels', () => {
     const html = showNjk();
@@ -153,7 +156,7 @@ describe('Order screen redesign (Point 2/4)', () => {
       if (depth === 2) {
         if (token.startsWith('<details class="step-card')) {
           directStepCardCount++;
-        } else if (token.startsWith('<div class="step-group"')) {
+        } else if (token.startsWith('<details class="step-group"')) {
           groupCount++;
           inGroupAtDepth = depth;
         }

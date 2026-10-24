@@ -48,16 +48,17 @@ describe('Order-page process stepper (Point 2)', () => {
   });
 
   /**
-   * Batch 3 #14 — the stepper is clickable: each step carries
-   * data-stage="N". The order-detail-page rebuild (step-card sequence)
-   * replaced every stage's own data-stage-carrying `<div class="section">`
-   * with one or more `<details class="step-card">` step-cards (one DB
-   * stage can now map to more than one card, e.g. Stage 3 splits into
-   * two cards) — the stepper's click-to-jump script now resolves a
-   * clicked stage number to its card id via its own `stageToCardId`
-   * lookup object instead of a shared data-stage attribute. This pins
-   * that every stage number the stepper exposes still resolves to a
-   * real step-card id present in the page.
+   * Batch 3 #14, updated for the UI-polish round that made every
+   * .step-group its own collapsible `<details>` with a unique id
+   * (step-group-stage-N, N = DB stage_number 2-9): the stepper's
+   * click-to-jump script now resolves a clicked stage number to that
+   * one parent group box — opening and scrolling to the group itself,
+   * never diving into one of its sub-item cards — via its own
+   * `stageToGroupId` lookup object instead of a per-card list. Stage 1
+   * has no group (standalone Quotation cards), so it still targets the
+   * first of those. This pins that every stage number the stepper
+   * exposes still resolves to a real id present in the page (kept in
+   * lock-step with the same object in show.njk's own script).
    */
   it('stepper steps and their target panels carry matching data-stage attributes', async () => {
     const orderId = await createTestOrder(await createTestClient());
@@ -65,23 +66,21 @@ describe('Order-page process stepper (Point 2)', () => {
     const res = await agent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
 
-    const stageToCardId = {
-      1: ['step-1-quotation-prepare', 'step-2-quotation-send', 'step-3-quotation-accept', 'document-review-approval'],
-      2: ['step-4a-buyer-po-generate', 'step-4b-buyer-po-confirm', 'step-4c-buyer-po-attach'],
-      3: ['step-5a-pi-form-link', 'step-5b-pi-intake-apply', 'step-5c-pi-generate', 'step-5d-payment-record', 'step-5e-payment-confirm', 'step-5-lc-bank-loan'],
-      4: ['step-6a-oc-generate', 'step-6b-oc-acknowledge', 'step-6c-buyer-action-link'],
-      5: ['step-7a-supplier-po-terms', 'step-7b-supplier-po-generate', 'step-7c-supplier-po-signed', 'step-7d-supplier-po-attach'],
-      6: ['step-9a-freight-terms', 'step-9b-freight-debit-note', 'step-9c-freight-remittance', 'step-9d-freight-clear'],
-      7: ['step-9e-packing', 'step-9f-packing-list', 'step-9g-shipping-details', 'step-9h-bl-instruction', 'step-9i-bl-issued'],
-      8: ['step-ci-generate', 'step-ci-scanned-bl-sent', 'step-balance-record', 'step-balance-clear'],
-      9: ['step-11a-coo-prep', 'step-11b-bl-originals-received', 'step-11c-bl-endorsed-mark', 'step-11d-bl-endorsement-save', 'step-11f-bl-endorsement-generate', 'step-11g-close-order', 'step-despatch'],
+    const stageToGroupId = {
+      1: 'step-1-quotation-prepare',
+      2: 'step-group-stage-2',
+      3: 'step-group-stage-3',
+      4: 'step-group-stage-4',
+      5: 'step-group-stage-5',
+      6: 'step-group-stage-6',
+      7: 'step-group-stage-7',
+      8: 'step-group-stage-8',
+      9: 'step-group-stage-9',
     };
 
     for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
       expect(res.text).toContain(`role="button" tabindex="0" data-stage="${stage}"`);
-      for (const cardId of stageToCardId[stage]) {
-        expect(res.text).toContain(`id="${cardId}"`);
-      }
+      expect(res.text).toContain(`id="${stageToGroupId[stage]}"`);
     }
   });
 
