@@ -698,7 +698,7 @@ $stepStatusIcon = static function (string $status): string {
     <p class="muted small">There's no separate "accepted" button to click &mdash; the buyer's acceptance happens outside the system (a reply email, a call, a signed copy). Once your team is satisfied the client has accepted, move on to <a href="#step-4a-buyer-po-generate">Step 4a &middot; Buyer's PO</a>.</p>
   </details>
 
-  <details class="step-card step-card-reference" id="document-review-approval">
+  <details class="step-card step-card-reference" id="document-review-approval" open>
     <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small></h2></summary>
     <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">

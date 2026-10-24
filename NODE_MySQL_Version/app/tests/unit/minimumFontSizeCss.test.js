@@ -22,7 +22,6 @@ describe('Minimum font size CSS (External QA report U-20)', () => {
 
   it('helper text labels meet the 12px floor', () => {
     expect(css).toMatch(/\.product-row label\{[^}]*font-size:0\.75rem/);
-    expect(css).toMatch(/\.stage-chip \.stage-chip-num\{[^}]*font-size:0\.75rem/);
     expect(css).toMatch(/\.process-step-label\{[^}]*font-size:0\.75rem/);
   });
 });

@@ -50,7 +50,7 @@ describe('Two-column form layouts (90-item backlog "2-column layouts for Report-
     const formIdPos = output.indexOf('id="supplier-po-form"');
     const supplierSelectPos = output.indexOf('name="supplier_id"');
     const calcPos = output.indexOf('data-spo-calc="quantity"');
-    const submitPos = output.indexOf('Save Supplier PO Terms');
+    const submitPos = output.indexOf('Save Supplier PO Terms</button>');
 
     expect(formIdPos).toBeGreaterThan(-1);
     expect(supplierSelectPos).toBeGreaterThan(-1);

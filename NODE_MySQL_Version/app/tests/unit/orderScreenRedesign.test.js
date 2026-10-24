@@ -145,6 +145,9 @@ describe('Order screen redesign (Point 2/4)', () => {
       }
     }
 
-    expect(directChildSectionCount).toBe(26);
+    // "option 3 — one card per individual step, nothing grouped": every
+    // grouped multi-badge card was split into one card per lettered/
+    // numbered sub-step, taking the direct-child count from 26 to 56.
+    expect(directChildSectionCount).toBe(56);
   });
 });

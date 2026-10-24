@@ -40,14 +40,10 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
     }
   }
 
-  // 4d (PI Form Link) and 4c (Buyer Action Link) are deliberate exceptions
+  // 4d (PI Form Link) and 6c (Buyer Action Link) are deliberate exceptions
   // — both are optional, never-blocking alternate channels available from
   // the very first render regardless of stage ("entirely optional and
-  // never blocks anything" per docs/SOP), not part of the gated sequence —
-  // so they're stripped out before the leak-invariant checks below.
-  function stripUngatedExceptions(html) {
-    return html.split('title="Step 4d"').join('').split('title="Step 4c"').join('');
-  }
+  // never blocks anything" per docs/SOP), not part of the gated sequence.
 
   it("shows only Stage 1's badge (plus the two documented exceptions) on a fresh order", async () => {
     const orderId = await createTestOrder(await createTestClient());
@@ -57,9 +53,9 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
 
     expect(res.text).toContain('<span class="step-badge" title="Step 1a">1a</span>');
     expect(res.text).toContain('title="Step 4d"');
-    expect(res.text).toContain('title="Step 4c"');
+    expect(res.text).toContain('title="Step 6c"');
 
-    const stripped = res.text.replace(/class="step-badge" title="Step (1a|4d|4c)">[^<]*<\/span>/g, '');
+    const stripped = res.text.replace(/class="step-badge" title="Step (1a|4d|6c)">[^<]*<\/span>/g, '');
     expect(stripped).not.toContain('class="step-badge"');
   });
 
@@ -68,7 +64,10 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
    * own step numbering rather than the DB's stage_number, so a badge's
    * own digit prefix no longer equals its governing DB stage — this map
    * is the authoritative link between the two, kept in lock-step with
-   * the stepBadge() calls in views/orders/show.njk.
+   * the stepBadge() calls in views/orders/show.njk. The CI & Balance
+   * card's own badges are dynamic (isFob ? '9j'/'9k'/'9l'/'9m' :
+   * '10a'/'10b'/'10c'/'10d') — this order is FOB (createTestOrder()'s
+   * default), so only the 9j-9m set can ever appear here.
    */
   it('never shows a badge for a stage further along than what has actually unlocked', async () => {
     const orderId = await createTestOrder(await createTestClient());
@@ -82,15 +81,14 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
 
     const badgeStage = {
       '1a': 1,
-      '2a': 2, '2b': 2, '2c': 2,
+      '4a': 2, '4b': 2, '4c': 2,
       '5a': 3, '5b': 3, '5c': 3,
-      '4a': 4, '4b': 4,
+      '6a': 4, '6b': 4,
       '7a': 5, '7b': 5, '7c': 5, '7d': 5,
-      '6a': 6, '6b': 6, '6c': 6, '6d': 6,
-      '9g': 7, '9h': 7, '9i': 7, '9j': 7, '9k': 7,
-      '8a': 8, '8b': 8, '8c': 8, '8d': 8,
-      '9a': 9, '9b': 9, '9c': 9, '9d': 9, '9e': 9, '9f': 9,
-      '11e': 9,
+      '9a': 6, '9b': 6, '9c': 6, '9d': 6,
+      '9e': 7, '9f': 7, '9g': 7, '9h': 7, '9i': 7,
+      '9j': 8, '9k': 8, '9l': 8, '9m': 8,
+      '11a': 9, '11b': 9, '11c': 9, '11d': 9, '11e': 9, '11f': 9, '11g': 9,
     };
 
     for (let reachedStage = 1; reachedStage <= 9; reachedStage++) {
@@ -102,7 +100,7 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
       const matches = [...res.text.matchAll(/class="step-badge" title="Step ([0-9a-z]+)"/g)];
       for (const match of matches) {
         const badge = match[1];
-        if (badge === '4c' || badge === '4d') { continue; }
+        if (badge === '4d' || badge === '6c') { continue; }
         expect(badgeStage).toHaveProperty(badge);
         expect(badgeStage[badge]).toBeLessThanOrEqual(reachedStage);
       }
@@ -110,12 +108,13 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
   });
 
   /**
-   * DOM order follows the user's own step sequence (QT -> Buyer PO -> PI
+   * Stages 1-5's own primary badge each render with no further setup
+   * beyond the stage itself being unlocked. The order-detail-page rebuild
+   * lays out cards in the user's own step sequence (QT -> Buyer PO -> PI
    * & Advance Payment -> Order Confirmation -> Supplier PO), not DB
-   * stage_number order, so the badges appear in that same sequence even
-   * though their own letters (driven by each card's governing DB stage)
-   * aren't numerically ascending — "5a" (PI & Advance, DB stage 3) sits
-   * before "4a" (Order Confirmation, DB stage 4) here.
+   * stage_number order, and every badge now carries that same user-step
+   * numbering too, so the badges appear in ascending step order: 1a ->
+   * 4a -> 5a -> 6a -> 7a.
    */
   it('badges appear in ascending order as they first become actionable', async () => {
     const orderId = await createTestOrder(await createTestClient());
@@ -125,19 +124,19 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
     expect(res.status).toBe(200);
 
     const pos1a = res.text.indexOf('title="Step 1a"');
-    const pos2a = res.text.indexOf('title="Step 2a"');
-    const pos5a = res.text.indexOf('title="Step 5a"');
     const pos4a = res.text.indexOf('title="Step 4a"');
+    const pos5a = res.text.indexOf('title="Step 5a"');
+    const pos6a = res.text.indexOf('title="Step 6a"');
     const pos7a = res.text.indexOf('title="Step 7a"');
 
     expect(pos1a).toBeGreaterThan(-1);
-    expect(pos2a).toBeGreaterThan(-1);
-    expect(pos5a).toBeGreaterThan(-1);
     expect(pos4a).toBeGreaterThan(-1);
+    expect(pos5a).toBeGreaterThan(-1);
+    expect(pos6a).toBeGreaterThan(-1);
     expect(pos7a).toBeGreaterThan(-1);
-    expect(pos1a).toBeLessThan(pos2a);
-    expect(pos2a).toBeLessThan(pos5a);
-    expect(pos5a).toBeLessThan(pos4a);
-    expect(pos4a).toBeLessThan(pos7a);
+    expect(pos1a).toBeLessThan(pos4a);
+    expect(pos4a).toBeLessThan(pos5a);
+    expect(pos5a).toBeLessThan(pos6a);
+    expect(pos6a).toBeLessThan(pos7a);
   });
 });

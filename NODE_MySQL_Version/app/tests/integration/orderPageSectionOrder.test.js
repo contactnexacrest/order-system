@@ -74,124 +74,124 @@ describe('Order page section order (Task #36)', () => {
   // Document-generate buttons now live inside their own stage section
   // ---------------------------------------------------------------
 
-  it('Buyer PO generate button lives inside Stage 2, not the top Documents panel', async () => {
+  it('Buyer PO generate button lives inside its own Step 4a card, not the top Documents panel', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThrough(orderId, 1);
 
     const output = await render(orderId);
 
-    const stage2Pos = output.indexOf("Step 4a&ndash;4c &middot; Buyer's PO</h2>");
-    const buyerPoGeneratePos = output.indexOf('Generate Buyer PO');
+    const stage2Pos = output.indexOf("Step 4a &middot; Generate Buyer's PO</h2>");
+    const buyerPoGeneratePos = output.indexOf('Generate Buyer PO</button>');
 
     expect(stage2Pos).toBeGreaterThan(-1);
     expect(buyerPoGeneratePos).toBeGreaterThan(-1);
     expect(buyerPoGeneratePos).toBeGreaterThan(stage2Pos);
 
     const topOfPage = output.slice(0, stage2Pos);
-    expect(topOfPage).not.toContain('Generate Buyer PO');
+    expect(topOfPage).not.toContain('Generate Buyer PO</button>');
   });
 
-  it('PI generate button lives inside the PI-Stage Intake section', async () => {
+  it('PI generate button lives inside its own Step 5a section', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThrough(orderId, 2);
 
     const output = await render(orderId);
 
-    const stage3Pos = output.indexOf('PI-Stage Intake</h2>');
-    const piGeneratePos = output.indexOf('Generate Proforma Invoice');
+    const stage3Pos = output.indexOf('Step 5a &middot; Generate Proforma Invoice</h2>');
+    const piGeneratePos = output.indexOf('Generate Proforma Invoice</button>');
 
     expect(stage3Pos).toBeGreaterThan(-1);
     expect(piGeneratePos).toBeGreaterThan(-1);
     expect(piGeneratePos).toBeGreaterThan(stage3Pos);
   });
 
-  it('OC generate button lives inside Stage 4', async () => {
+  it('OC generate button lives inside Stage 4 section', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThrough(orderId, 3);
 
     const output = await render(orderId);
 
-    const stage4Pos = output.indexOf('Step 6 &middot; Order Confirmation &amp; ECGC</h2>');
-    const ocGeneratePos = output.indexOf('Generate Order Confirmation');
+    const stage4Pos = output.indexOf('Step 6a &middot; Generate Order Confirmation</h2>');
+    const ocGeneratePos = output.indexOf('Generate Order Confirmation</button>');
 
     expect(stage4Pos).toBeGreaterThan(-1);
     expect(ocGeneratePos).toBeGreaterThan(-1);
     expect(ocGeneratePos).toBeGreaterThan(stage4Pos);
   });
 
-  it('Supplier PO generate button lives inside Stage 5 once a Supplier PO exists', async () => {
+  it('Supplier PO generate button lives inside Stage 5 section once a Supplier PO exists', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThrough(orderId, 4);
     await createTestSupplierPo(orderId);
 
     const output = await render(orderId);
 
-    const stage5Pos = output.indexOf('Step 7 &middot; Supplier Purchase Order</h2>');
-    const suppoGeneratePos = output.indexOf('Generate Supplier PO');
+    const stage5Pos = output.indexOf('Step 7b &middot; Generate Supplier PO</h2>');
+    const suppoGeneratePos = output.indexOf('Generate Supplier PO</button>');
 
     expect(stage5Pos).toBeGreaterThan(-1);
     expect(suppoGeneratePos).toBeGreaterThan(-1);
     expect(suppoGeneratePos).toBeGreaterThan(stage5Pos);
   });
 
-  it('Debit Note generate button lives inside Stage 6 once freight terms are saved', async () => {
+  it('Debit Note generate button lives inside Stage 6 section once freight terms are saved', async () => {
     const orderId = await createTestOrder(await createTestClient(), 'CIF');
     await unlockThrough(orderId, 5);
     await orderFreightRepository.upsert(orderId, { confirmed_freight_rate: '1200.00', insurance_amount: '150.00' });
 
     const output = await render(orderId);
 
-    const stage6Pos = output.indexOf('Step 9a&ndash;9f &middot; Freight Payment');
-    const fdnGeneratePos = output.indexOf('Generate Debit Note');
+    const stage6Pos = output.indexOf('Step 9b &middot; Generate Debit Note</h2>');
+    const fdnGeneratePos = output.indexOf('Generate Debit Note</button>');
 
     expect(stage6Pos).toBeGreaterThan(-1);
     expect(fdnGeneratePos).toBeGreaterThan(-1);
     expect(fdnGeneratePos).toBeGreaterThan(stage6Pos);
   });
 
-  it('Packing List generate button lives inside Stage 7 once packing is saved', async () => {
+  it('Packing List generate button lives inside Stage 7 section once packing is saved', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThrough(orderId, 6);
     await orderPackingRepository.upsert(orderId, { actual_quantity_packed: '50', crate_count: '10' });
 
     const output = await render(orderId);
 
-    const stage7Pos = output.indexOf('Step 9g&ndash;9j &middot; Packing, BL Instruction &amp; CHA Draft Review</h2>');
-    const plGeneratePos = output.indexOf('Generate Packing List');
+    const stage7Pos = output.indexOf('Step 9f &middot; Generate Packing List</h2>');
+    const plGeneratePos = output.indexOf('Generate Packing List</button>');
 
     expect(stage7Pos).toBeGreaterThan(-1);
     expect(plGeneratePos).toBeGreaterThan(-1);
     expect(plGeneratePos).toBeGreaterThan(stage7Pos);
   });
 
-  it('Commercial Invoice generate button lives inside Stage 8', async () => {
+  it('Commercial Invoice generate button lives inside Stage 8 section', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThrough(orderId, 7);
 
     const output = await render(orderId);
 
-    const stage8Pos = output.indexOf('Step 9b&ndash;9f &middot; Commercial Invoice &amp; Balance Payment');
-    const ciGeneratePos = output.indexOf('Generate Commercial Invoice');
+    const stage8Pos = output.indexOf('Step 9j &middot; Generate Commercial Invoice');
+    const ciGeneratePos = output.indexOf('Generate Commercial Invoice</button>');
 
     expect(stage8Pos).toBeGreaterThan(-1);
     expect(ciGeneratePos).toBeGreaterThan(-1);
     expect(ciGeneratePos).toBeGreaterThan(stage8Pos);
   });
 
-  it('no document-generate button except Quotation and Annexure remains in the top Documents panel', async () => {
+  it('no document-generate button except Quotation and Annexure remains in the top Step 1 card', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThrough(orderId, 1);
 
     const output = await render(orderId);
 
-    const documentsPanelStart = output.indexOf('Documents &amp; Approvals');
-    const stage2Pos = output.indexOf("Step 4a&ndash;4c &middot; Buyer's PO</h2>");
+    const documentsPanelStart = output.indexOf('id="step-1-quotation-prepare"');
+    const stage2Pos = output.indexOf("Step 4a &middot; Generate Buyer's PO</h2>");
     expect(documentsPanelStart).toBeGreaterThan(-1);
     expect(stage2Pos).toBeGreaterThan(-1);
     const panel = output.slice(documentsPanelStart, stage2Pos);
 
     expect(panel).toContain('document_type" value="QT"');
-    for (const label of ['Generate Buyer PO', 'Generate Proforma Invoice', 'Generate Order Confirmation', 'Generate Supplier PO', 'Generate Debit Note', 'Generate Packing List', 'Generate Commercial Invoice']) {
+    for (const label of ['Generate Buyer PO</button>', 'Generate Proforma Invoice</button>', 'Generate Order Confirmation</button>', 'Generate Supplier PO</button>', 'Generate Debit Note</button>', 'Generate Packing List</button>', 'Generate Commercial Invoice</button>']) {
       expect(panel).not.toContain(label);
     }
   });
@@ -244,7 +244,7 @@ describe('Order page section order (Task #36)', () => {
     const output = await render(orderId);
 
     const financialsPos = output.indexOf('id="order-financials"');
-    const stage9Pos = output.indexOf('Step 11 (continued) &middot; Document Despatch &amp; Closure</h2>');
+    const stage9Pos = output.indexOf('id="step-11a-coo-prep"');
 
     expect(financialsPos).toBeGreaterThan(-1);
     expect(stage9Pos).toBeGreaterThan(-1);

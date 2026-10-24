@@ -10,11 +10,12 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
 /**
  * Port of OrderProcessStepperTest.php. Point 2 (2026-10-01): "on order
  * screen -> on the top -> must show the process/sequence like a line with
- * dots and a step below, indicative of process." The existing stage-chip
- * grid gives full per-stage detail but reads as a grid of boxes, not a
- * sequence — this adds a horizontal line-with-dots stepper above it
- * (process-stepper/process-step markup), purely an at-a-glance summary;
- * the detailed grid is untouched below it.
+ * dots and a step below, indicative of process." This stepper used to sit
+ * above a second, more detailed "Stage N" chip grid that repeated the
+ * same 9-stage status in box form — removed (QA feedback: showing the
+ * same status three times, once here and again via every step-card's own
+ * status icon, reads as duplication rather than detail) so the dots are
+ * now the only stage-level indicator.
  */
 describe('Order-page process stepper (Point 2)', () => {
   let agent;
@@ -65,15 +66,15 @@ describe('Order-page process stepper (Point 2)', () => {
     expect(res.status).toBe(200);
 
     const stageToCardId = {
-      1: ['documents-approvals'],
-      2: ['step-buyer-po'],
-      3: ['step-pi-advance', 'step-pi-intake'],
-      4: ['step-oc'],
-      5: ['step-supplier-po'],
-      6: ['step-freight'],
-      7: ['step-packing-bl'],
-      8: ['step-ci-balance'],
-      9: ['step-despatch'],
+      1: ['step-1-quotation-prepare', 'step-2-quotation-send', 'step-3-quotation-accept', 'document-review-approval'],
+      2: ['step-4a-buyer-po-generate', 'step-4b-buyer-po-confirm', 'step-4c-buyer-po-attach'],
+      3: ['step-5a-pi-generate', 'step-5b-advance-record', 'step-5c-advance-clear', 'step-4d-pi-intake-link', 'step-4e-pi-intake-apply', 'step-5-lc-bank-loan'],
+      4: ['step-6a-oc-generate', 'step-6b-oc-acknowledge', 'step-6c-buyer-action-link'],
+      5: ['step-7a-supplier-po-terms', 'step-7b-supplier-po-generate', 'step-7c-supplier-po-signed', 'step-7d-supplier-po-attach'],
+      6: ['step-9a-freight-terms', 'step-9b-freight-debit-note', 'step-9c-freight-remittance', 'step-9d-freight-clear'],
+      7: ['step-9e-packing', 'step-9f-packing-list', 'step-9g-shipping-details', 'step-9h-bl-instruction', 'step-9i-bl-issued'],
+      8: ['step-ci-generate', 'step-ci-scanned-bl-sent', 'step-balance-record', 'step-balance-clear'],
+      9: ['step-11a-coo-prep', 'step-11b-bl-originals-received', 'step-11c-bl-endorsed-mark', 'step-11d-bl-endorsement-save', 'step-11f-bl-endorsement-generate', 'step-11g-close-order', 'step-despatch'],
     };
 
     for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {

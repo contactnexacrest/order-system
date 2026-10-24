@@ -310,21 +310,10 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .product-row-actions{display:flex;gap:0.35rem;}
 .remove-row{background:var(--danger);padding:0.5rem 0.7rem;}
 .remove-row:hover{background:#7e3221;}
-.stage-track{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.65rem;margin-bottom:1.25rem;}
-.stage-chip{border:1px solid var(--line);border-top:3px solid var(--line);border-radius:12px;padding:0.7rem 0.85rem;background:#fff;}
-.stage-chip .stage-chip-num{font-size:0.75rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
-.stage-chip .stage-chip-name{font-size:0.84rem;font-weight:700;color:var(--ink);margin:0.2rem 0 0.5rem;line-height:1.3;min-height:2.2em;}
-.stage-chip .stage-chip-status{display:inline-flex;align-items:center;font-size:0.7rem;font-weight:600;padding:2px 9px;border-radius:999px;}
-.stage-chip.locked{border-top-color:var(--line);}
-.stage-chip.locked .stage-chip-status{background:var(--bg);color:var(--ink-soft);}
-.stage-chip.in_progress{border-top-color:var(--gold);}
-.stage-chip.in_progress .stage-chip-status{background:var(--gold-soft);color:var(--gold-strong);}
-.stage-chip.gate_passed{border-top-color:var(--success);}
-.stage-chip.gate_passed .stage-chip-status{background:var(--success-soft);color:var(--success);}
-
-/* Point 2 (2026-10-01): a horizontal line-with-dots process indicator above
-   the detailed stage-chip grid — a quick "how far along are we" read before
-   scanning the grid below for per-stage detail. */
+/* Point 2 (2026-10-01): a horizontal line-with-dots process indicator —
+   this used to sit above a second, more detailed "Stage N" chip grid
+   (.stage-track/.stage-chip*, removed) that repeated the same 9-stage
+   status in box form; the dots are now the only stage-level indicator. */
 .process-stepper{display:flex;align-items:flex-start;margin:1.25rem 0 1rem;overflow-x:auto;padding:2px 2px 6px;}
 .process-step{flex:1 1 0;min-width:84px;position:relative;text-align:center;cursor:pointer;border-radius:6px;}
 .process-step:hover .process-step-label{color:var(--gold-strong);}

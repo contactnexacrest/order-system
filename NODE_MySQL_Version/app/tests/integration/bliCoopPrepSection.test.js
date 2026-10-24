@@ -38,9 +38,9 @@ describe('BLI/COOPREP get their own explained section (90-item backlog #38/#55)'
     expect(countOccurrences(source, 'document_type" value="BLI"')).toBe(1);
   });
 
-  it('BL Instruction Sheet section sits after Shipping/Vessel Details, inside the Packing & BL step-card', () => {
-    const stage7Start = source.indexOf('id="step-packing-bl"');
-    const stage8Start = source.indexOf('id="step-ci-balance"');
+  it('BL Instruction Sheet section sits after Shipping/Vessel Details, inside its own Step 9h step-card', () => {
+    const stage7Start = source.indexOf('id="step-9e-packing"');
+    const stage8Start = source.indexOf('id="step-ci-generate"');
     const shippingPos = source.indexOf('Save Shipping Details');
     const bliPos = source.indexOf('BL Instruction Sheet (for your CHA');
 
@@ -55,8 +55,8 @@ describe('BLI/COOPREP get their own explained section (90-item backlog #38/#55)'
     expect(countOccurrences(source, 'document_type" value="COOPREP"')).toBe(1);
   });
 
-  it('COO Prep Sheet section sits inside the Document Despatch & Closure step-card', () => {
-    const stage9Start = source.indexOf('id="step-despatch"');
+  it('COO Prep Sheet section sits inside its own Step 11a step-card', () => {
+    const stage9Start = source.indexOf('id="step-11a-coo-prep"');
     const coopPos = source.indexOf('COO Prep Sheet (internal — for the Chamber of Commerce application)');
 
     expect(stage9Start).toBeGreaterThan(-1);
