@@ -172,7 +172,7 @@ final class OrderRepository
     private static function resolveSnapshot(array $data): array
     {
         $preset = Database::connection()->prepare(
-            'SELECT preset_name, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option,
+            'SELECT preset_name, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option,
                     balance_days, balance_trigger_wording, show_bl_instructions
              FROM payment_presets WHERE id = :id'
         );
@@ -188,6 +188,7 @@ final class OrderRepository
             'preset_name'             => $presetRow['preset_name'] ?? null,
             'advance_pct'             => $presetRow['advance_pct'] ?? null,
             'advance_trigger_text'    => $presetRow['advance_trigger_text'] ?? null,
+            'payment_method'          => $presetRow['payment_method'] ?? 'CASH_ADVANCE',
             'balance_pct'             => $presetRow['balance_pct'] ?? null,
             'balance_trigger_option'  => $presetRow['balance_trigger_option'] ?? null,
             'balance_days'            => $presetRow['balance_days'] ?? null,
@@ -369,7 +370,7 @@ final class OrderRepository
                  status, created_by, duplicated_from_order_id,
                  incoterm_code, currency_code, port_of_loading_name, port_of_loading_city,
                  port_of_discharge_name, port_of_discharge_city, preset_name, advance_pct,
-                 advance_trigger_text, balance_pct, balance_trigger_option, balance_days,
+                 advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days,
                  balance_trigger_wording, show_bl_instructions,
                  company_legal_name, billing_address, billing_address_line1, billing_address_line2,
                  billing_city, billing_postcode, billing_country, vat_eori_tax_no, contact_person,
@@ -392,7 +393,7 @@ final class OrderRepository
                  \'active\', :created_by, :duplicated_from_order_id,
                  :incoterm_code, :currency_code, :port_of_loading_name, :port_of_loading_city,
                  :port_of_discharge_name, :port_of_discharge_city, :preset_name, :advance_pct,
-                 :advance_trigger_text, :balance_pct, :balance_trigger_option, :balance_days,
+                 :advance_trigger_text, :payment_method, :balance_pct, :balance_trigger_option, :balance_days,
                  :balance_trigger_wording, :show_bl_instructions,
                  :company_legal_name, :billing_address, :billing_address_line1, :billing_address_line2,
                  :billing_city, :billing_postcode, :billing_country, :vat_eori_tax_no, :contact_person,
@@ -445,6 +446,7 @@ final class OrderRepository
             'preset_name'                 => $snapshot['preset_name'],
             'advance_pct'                 => $snapshot['advance_pct'],
             'advance_trigger_text'        => $snapshot['advance_trigger_text'],
+            'payment_method'              => $snapshot['payment_method'],
             'balance_pct'                 => $snapshot['balance_pct'],
             'balance_trigger_option'      => $snapshot['balance_trigger_option'],
             'balance_days'                => $snapshot['balance_days'],

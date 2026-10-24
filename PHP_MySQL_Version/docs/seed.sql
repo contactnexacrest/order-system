@@ -166,16 +166,16 @@ INSERT INTO incoterms (code, label_template, requires_port_role, is_default, is_
 -- found in the source documents (see ARCHITECTURE.md section 4.3).
 -- ================================================================
 INSERT INTO payment_presets
-  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
-SELECT 'Standard — New Buyer', 1, 40.00, 'against Proforma Invoice before production commences',
+  (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
+SELECT 'Standard — New Buyer', 1, 40.00, 'against Proforma Invoice before production commences', 'CASH_ADVANCE',
        60.00, 'A_BEFORE_SHIPMENT', 3,
        'Payable before shipment — within {days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest.',
        c.id, 0, 1
 FROM currencies c WHERE c.code = 'USD';
 
 INSERT INTO payment_presets
-  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
-SELECT 'Established Buyer — Post-BL', 0, 40.00, 'against Proforma Invoice before production commences',
+  (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
+SELECT 'Established Buyer — Post-BL', 0, 40.00, 'against Proforma Invoice before production commences', 'CASH_ADVANCE',
        60.00, 'B_AGAINST_BL', 7,
        'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
        c.id, 1, 1
@@ -194,8 +194,26 @@ UPDATE payment_presets SET is_protected = 1;
 -- via the full Payment Presets CRUD screen (/payment-presets) without
 -- the unlock gesture, same as any other preset they create themselves.
 INSERT INTO payment_presets
-  (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
-SELECT 'Extended Terms — 30/70', 0, 30.00, 'against Proforma Invoice before production commences',
+  (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
+SELECT 'Extended Terms — 30/70', 0, 30.00, 'against Proforma Invoice before production commences', 'CASH_ADVANCE',
+       70.00, 'B_AGAINST_BL', 7,
+       'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
+       c.id, 1, 1
+FROM currencies c WHERE c.code = 'USD';
+
+-- The third real-world payment option NexaCrest offers (per the
+-- business, apart from the two 30/70 cash presets above, nothing else
+-- is offered): the buyer opens a Letter of Credit instead of wiring a
+-- cash advance. payment_method = 'LC' makes the order-detail page's
+-- Step 5 render "Record LC Details" / "Confirm LC Usable" in place of
+-- "Record Advance Remittance" / "Mark Advance Cleared" — the LC leg
+-- replaces the cash advance entirely; the Balance leg afterward is
+-- unaffected. Deliberately left UNPROTECTED, same reasoning as Extended
+-- Terms above — an admin can freely retune the % split via the Payment
+-- Presets screen.
+INSERT INTO payment_presets
+  (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, currency_id, requires_md_approval, is_active)
+SELECT 'Letter of Credit — 30/70', 0, 30.00, 'against Letter of Credit opened before production commences', 'LC',
        70.00, 'B_AGAINST_BL', 7,
        'Payable against scanned copy of Bill of Lading, within {days} Calendar Days of the date NexaCrest emails the scanned BL copy.',
        c.id, 1, 1

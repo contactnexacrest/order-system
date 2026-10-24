@@ -59,11 +59,11 @@ final class PaymentPresetRepository
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'INSERT INTO payment_presets
-                (preset_name, is_default, advance_pct, advance_trigger_text, balance_pct,
+                (preset_name, is_default, advance_pct, advance_trigger_text, payment_method, balance_pct,
                  balance_trigger_option, balance_days, balance_trigger_wording, currency_id,
                  requires_md_approval, show_bl_instructions, is_active, created_by)
              VALUES
-                (:preset_name, :is_default, :advance_pct, :advance_trigger_text, :balance_pct,
+                (:preset_name, :is_default, :advance_pct, :advance_trigger_text, :payment_method, :balance_pct,
                  :balance_trigger_option, :balance_days, :balance_trigger_wording, :currency_id,
                  :requires_md_approval, :show_bl_instructions, 1, :created_by)'
         );
@@ -81,7 +81,7 @@ final class PaymentPresetRepository
         Database::connection()->prepare(
             'UPDATE payment_presets SET
                 preset_name = :preset_name, is_default = :is_default, advance_pct = :advance_pct,
-                advance_trigger_text = :advance_trigger_text, balance_pct = :balance_pct,
+                advance_trigger_text = :advance_trigger_text, payment_method = :payment_method, balance_pct = :balance_pct,
                 balance_trigger_option = :balance_trigger_option, balance_days = :balance_days,
                 balance_trigger_wording = :balance_trigger_wording, currency_id = :currency_id,
                 requires_md_approval = :requires_md_approval, show_bl_instructions = :show_bl_instructions
@@ -122,6 +122,7 @@ final class PaymentPresetRepository
             'is_default'              => !empty($data['is_default']) ? 1 : 0,
             'advance_pct'             => $data['advance_pct'],
             'advance_trigger_text'    => $data['advance_trigger_text'],
+            'payment_method'          => $data['payment_method'],
             'balance_pct'             => $data['balance_pct'],
             'balance_trigger_option'  => $data['balance_trigger_option'],
             'balance_days'            => $data['balance_days'],

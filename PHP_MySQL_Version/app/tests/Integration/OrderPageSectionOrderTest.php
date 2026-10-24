@@ -91,14 +91,14 @@ final class OrderPageSectionOrderTest extends DbTestCase
         self::assertStringNotContainsString('Generate Buyer PO</button>', $topOfPage, "Generate Buyer PO must no longer sit inside the top Documents & Approvals panel, before the Step 4a step-card");
     }
 
-    public function testPiGenerateButtonLivesInsideItsOwnStep5aSection(): void
+    public function testPiGenerateButtonLivesInsideItsOwnStep5cSection(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->unlockThrough($orderId, 2);
 
         $output = $this->render($orderId);
 
-        $stage3Pos = strpos($output, 'Step 5a &middot; Generate Proforma Invoice</h2>');
+        $stage3Pos = strpos($output, 'Step 5c &middot; Generate Proforma Invoice</h2>');
         $piGeneratePos = strpos($output, 'Generate Proforma Invoice</button>');
 
         self::assertNotFalse($stage3Pos);

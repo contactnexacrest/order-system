@@ -23,6 +23,11 @@ final class PaymentPresetController
         'B_AGAINST_BL'      => 'Against Scanned BL Copy',
     ];
 
+    private const PAYMENT_METHOD_OPTIONS = [
+        'CASH_ADVANCE' => 'Cash Advance — buyer wires the advance directly',
+        'LC'           => 'Letter of Credit — replaces the cash advance entirely',
+    ];
+
     public function index(array $params): void
     {
         View::render('payment_presets/index', [
@@ -35,6 +40,7 @@ final class PaymentPresetController
         View::render('payment_presets/create', [
             'currencies' => LookupRepository::currencies(),
             'triggerOptions' => self::TRIGGER_OPTIONS,
+            'paymentMethodOptions' => self::PAYMENT_METHOD_OPTIONS,
         ], 'layout/base');
     }
 
@@ -66,6 +72,7 @@ final class PaymentPresetController
             'preset' => $preset,
             'currencies' => LookupRepository::currencies(),
             'triggerOptions' => self::TRIGGER_OPTIONS,
+            'paymentMethodOptions' => self::PAYMENT_METHOD_OPTIONS,
             'inUse' => PaymentPresetRepository::isInUse($id),
         ], 'layout/base');
     }
@@ -133,6 +140,7 @@ final class PaymentPresetController
         $balancePct = (float) ($_POST['balance_pct'] ?? 0);
         $balanceDays = (int) ($_POST['balance_days'] ?? 0);
         $currencyId = (int) ($_POST['currency_id'] ?? 0);
+        $paymentMethod = trim((string) ($_POST['payment_method'] ?? ''));
 
         if ($presetName === '') {
             Flash::set('error', 'Preset name is required.');
@@ -140,6 +148,10 @@ final class PaymentPresetController
         }
         if ($advanceTriggerText === '') {
             Flash::set('error', 'Advance trigger text is required.');
+            return null;
+        }
+        if (!array_key_exists($paymentMethod, self::PAYMENT_METHOD_OPTIONS)) {
+            Flash::set('error', 'Select a valid payment method.');
             return null;
         }
         if (!array_key_exists($balanceTriggerOption, self::TRIGGER_OPTIONS)) {
@@ -172,6 +184,7 @@ final class PaymentPresetController
             'is_default'              => !empty($_POST['is_default']),
             'advance_pct'             => $advancePct,
             'advance_trigger_text'    => $advanceTriggerText,
+            'payment_method'          => $paymentMethod,
             'balance_pct'             => $balancePct,
             'balance_trigger_option'  => $balanceTriggerOption,
             'balance_days'            => $balanceDays,

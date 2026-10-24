@@ -974,7 +974,12 @@ final class OrderController
             'canManageOrderFinancials' => $canManageOrderFinancials,
             'orderCostEntries' => $canManageOrderFinancials ? OrderCostEntryRepository::forOrder($orderId) : [],
             'costEntryCategories' => OrderCostEntryRepository::CATEGORIES,
-            'orderLcDetails' => $canManageOrderFinancials ? OrderLcDetailRepository::find($orderId) : null,
+            // Always fetched (not gated on canManageOrderFinancials): Step
+            // 5's LC leg (payment_method = 'LC') needs this for whoever can
+            // manage/clear payments, a different permission tier than Order
+            // Financials — display of the financials-specific fields below
+            // stays gated by $canManageOrderFinancials in the view itself.
+            'orderLcDetails' => OrderLcDetailRepository::find($orderId),
             'orderTravelExpenses' => $canManageOrderFinancials ? \App\Repositories\OrderTravelExpenseRepository::find($orderId) : null,
             'profitability' => $canManageOrderFinancials ? OrderProfitabilityService::computeForOrder($orderId) : null,
             'exportBenefitSchemes' => LookupRepository::dropdownOptions('export_benefit_scheme'),
@@ -1419,6 +1424,122 @@ final class OrderController
         $provisionStatus = \App\Services\ClientPortalService::provisionIfNeeded((int) $order['client_id'], $orderId);
 
         $baseMessage = 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.';
+        if ($provisionStatus === 'provisioned') {
+            Flash::set('success', $baseMessage . ' The client has been emailed their portal login.');
+        } elseif ($provisionStatus === 'no_email_on_file') {
+            Flash::set('warning', $baseMessage . ' WARNING: this client has no email on file, so portal login could NOT be provisioned — add an email to their record and provision access manually, otherwise they will never be able to log in.');
+        } else {
+            Flash::set('success', $baseMessage . ' The client already has portal access from an earlier order.');
+        }
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Step 5 LC leg (order.payment_method = 'LC'): records the LC that
+     * replaces the cash advance entirely — issuing bank, LC number, LC
+     * amount, charges billed to the client, and (optionally) the final
+     * LC document. This leg's equivalent of recordAdvancePayment() —
+     * purely an informational entry, no stage gate of its own;
+     * confirmLcUsable() below is the real gate.
+     */
+    public function recordLcDetails(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+
+        $lcAmount = (float) ($_POST['lc_amount'] ?? 0);
+        if ($lcAmount <= 0) {
+            Flash::set('error', 'Enter the LC amount.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $lcChargesRaw = trim((string) ($_POST['lc_charges_amount'] ?? ''));
+        if ($lcChargesRaw !== '' && (!is_numeric($lcChargesRaw) || (float) $lcChargesRaw < 0)) {
+            Flash::set('error', 'Enter a valid LC charges amount (or leave it blank).');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $lcNumber = trim((string) ($_POST['lc_number'] ?? '')) ?: null;
+        $lcBankName = trim((string) ($_POST['lc_bank_name'] ?? '')) ?: null;
+        $lcCharges = $lcChargesRaw !== '' ? (float) $lcChargesRaw : null;
+
+        $existing = OrderLcDetailRepository::find($orderId);
+        $lcFileId = $existing['lc_file_id'] ?? null;
+        if (!empty($_FILES['lc_file']['name'])) {
+            try {
+                $lcFileId = FileUploadService::handleUpload(
+                    'lc_file',
+                    'order_lc_copy',
+                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/lc',
+                    null,
+                    $orderId,
+                    (int) $user['id'],
+                    null,
+                    null,
+                    'Letter of Credit'
+                );
+            } catch (\Throwable $e) {
+                Flash::set('error', 'LC details were not saved — the LC file upload failed: ' . Flash::describeException($e, 'upload failed — check the server error log.'));
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+        }
+
+        OrderLcDetailRepository::recordLegDetails($orderId, $lcNumber, $lcBankName, $lcAmount, $lcCharges, $lcFileId, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'LC_DETAILS_RECORDED', 'order_lc_details', $orderId, 'lc_amount', null, (string) $lcAmount);
+
+        // Same real-money-moving trigger as recordAdvancePayment() — see
+        // docs/schema.sql Section AC.
+        ClientRepository::lockData((int) $order['client_id'], 'Auto-locked: LC details recorded before client PI-details consent');
+
+        Flash::set('success', 'LC details recorded. Confirm it usable once the advising bank confirms.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Step 5 LC leg's equivalent of clearAdvancePayment() — the real
+     * Stage 2->3 gate when this order's payment_method is LC. Mirrors
+     * clearAdvancePayment() exactly (same stage check, same balance
+     * computation, same client-portal provisioning), just reading the
+     * LC leg's own confirmation instead of the cash advance's.
+     */
+    public function confirmLcUsable(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 3)) {
+            Flash::set('error', 'Stage 3 has not been unlocked for this order yet — complete Stage 2 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $existingLc = OrderLcDetailRepository::find($orderId);
+        if (!$existingLc || $existingLc['lc_amount'] === null) {
+            Flash::set('error', 'Record the LC details before confirming it usable.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $fobTotal = OrderProductRepository::totalFobValue($orderId);
+        $order = OrderRepository::find($orderId);
+        $balanceAmount = round($fobTotal * ((float) $order['balance_pct']) / 100, 2);
+        $balanceDueDate = $order['balance_trigger_option'] === 'A_BEFORE_SHIPMENT'
+            ? null
+            : date('Y-m-d', strtotime('+' . (int) $order['balance_days'] . ' days'));
+
+        OrderLcDetailRepository::confirmUsable($orderId, (int) $user['id']);
+        OrderPaymentStatusRepository::setBalanceAmount($orderId, $balanceAmount, $balanceDueDate);
+        AuditLogRepository::log((int) $user['id'], 'LC_CONFIRMED_USABLE', 'order_lc_details', $orderId, 'lc_confirmed_at', null, date('Y-m-d H:i:s'));
+        StageGateService::passAndUnlockNext($orderId, 3, (int) $user['id']);
+
+        $provisionStatus = \App\Services\ClientPortalService::provisionIfNeeded((int) $order['client_id'], $orderId);
+
+        $baseMessage = 'LC confirmed usable. Stage 4 unlocked — you can now generate the Order Confirmation.';
         if ($provisionStatus === 'provisioned') {
             Flash::set('success', $baseMessage . ' The client has been emailed their portal login.');
         } elseif ($provisionStatus === 'no_email_on_file') {

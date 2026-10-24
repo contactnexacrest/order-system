@@ -7,9 +7,9 @@
     <p><a href="/payment-presets/create" class="btn-sm btn-accent">Add Preset</a></p>
 
     <table class="list">
-      <tr><th>Preset</th><th>Advance / Balance</th><th>Balance Trigger</th><th>Days</th><th>Currency</th><th>In Use</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Preset</th><th>Advance / Balance</th><th>Payment Method</th><th>Balance Trigger</th><th>Days</th><th>Currency</th><th>In Use</th><th>Status</th><th>Actions</th></tr>
       <?php if (empty($presets)): ?>
-      <tr><td colspan="8" class="muted">No payment presets yet — add the first one above.</td></tr>
+      <tr><td colspan="9" class="muted">No payment presets yet — add the first one above.</td></tr>
       <?php endif; ?>
       <?php foreach ($presets as $p): ?>
       <tr>
@@ -19,6 +19,7 @@
           <?php if ((int) $p['is_protected'] === 1): ?><span class="badge" title="Protected — unlock via Field Protection before editing">&#128274; protected</span><?php endif; ?>
         </td>
         <td><?= rtrim(rtrim(number_format((float) $p['advance_pct'], 2), '0'), '.') ?>% / <?= rtrim(rtrim(number_format((float) $p['balance_pct'], 2), '0'), '.') ?>%</td>
+        <td><?= $p['payment_method'] === 'LC' ? 'Letter of Credit' : 'Cash Advance' ?></td>
         <td><?= $p['balance_trigger_option'] === 'A_BEFORE_SHIPMENT' ? 'Before Shipment' : 'Against Scanned BL Copy' ?></td>
         <td><?= (int) $p['balance_days'] ?></td>
         <td><?= htmlspecialchars($p['currency_code']) ?></td>

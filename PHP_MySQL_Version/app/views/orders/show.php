@@ -226,6 +226,13 @@ $stage9 = $stageByNumber[9] ?? null;
 $hasQt = $stage1 && $stage1['status'] === 'gate_passed';
 $hasBuyerPo = $stage2 && $stage2['status'] === 'gate_passed';
 $advanceCleared = $stage3 && $stage3['status'] === 'gate_passed';
+// Step 5 payment-method fork: when this order's preset set payment_method
+// = 'LC' (snapshotted onto the order at creation, never Amendment-updatable
+// — see docs/schema.sql), the LC leg (Record LC Details / Confirm LC
+// Usable) replaces the cash-advance leg (Record Advance Remittance / Mark
+// Advance Cleared) entirely — only one of the two ever renders.
+$isLcPayment = ($order['payment_method'] ?? 'CASH_ADVANCE') === 'LC';
+$lcConfirmed = $orderLcDetails && $orderLcDetails['lc_confirmed_at'] !== null;
 $buyerAcknowledged = $stage4 && $stage4['status'] === 'gate_passed';
 $ocDocGenerated = (bool) array_filter($documents, static fn(array $d): bool => $d['document_type_code'] === 'OC');
 // 90-item backlog #52/#53: confirmSupplierSigned()/recordBalancePayment() now
@@ -653,6 +660,110 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <details class="step-card step-card-reference" id="payment-overview">
+    <summary><h2>Payment Overview <small class="muted">(reference — every leg, always current)</small></h2></summary>
+    <p class="muted small">Pinned here at the top rather than wherever it happened to sit in the sequence, since it's referenced from every payment step below and staff need it at a glance regardless of which step they're on.</p>
+
+    <details open>
+      <summary>Snapshot</summary>
+      <div class="kv-grid">
+        <?php foreach ($paymentLegs as $leg): ?>
+        <div>
+          <span class="k"><?= htmlspecialchars($leg['label']) ?></span>
+          <span class="v">
+            <?php if ($leg['amount'] === null && $leg['received_at'] === null): ?>
+              Not applicable / not yet recorded
+            <?php elseif ($canViewPaymentAmounts): ?>
+              <?= $leg['amount'] !== null ? number_format((float) $leg['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?>
+              — <?= $leg['cleared_at'] !== null ? 'Cleared' : ($leg['received_at'] !== null ? 'Received, pending clearance' : 'Not yet received') ?>
+            <?php else: ?>
+              <?= $leg['cleared_at'] !== null ? 'Cleared' : ($leg['received_at'] !== null ? 'Received, pending clearance' : 'Not yet received') ?>
+            <?php endif; ?>
+          </span>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php if (!$canViewPaymentAmounts): ?>
+      <p class="muted small">Amounts are only shown to Accounts/Logistics/Export staff who can manage or close this order.</p>
+      <?php endif; ?>
+    </details>
+
+    <details>
+      <summary>Ledger</summary>
+      <p class="muted">A single, read-only history of every payment-related event recorded against this order — consolidating what's otherwise scattered across Payment Status and Client-Reported Payments. Nothing here can be edited; use the forms in each payment step to record new events.</p>
+      <?php if (empty($ledgerEvents)): ?>
+      <p class="muted small">No payment events recorded yet.</p>
+      <?php else: ?>
+      <table class="list">
+        <tr><th>Date</th><th>Event</th><?php if ($canViewPaymentAmounts): ?><th>Amount</th><?php endif; ?><th>Source</th></tr>
+        <?php foreach ($ledgerEvents as $ev): ?>
+        <tr>
+          <td><?= htmlspecialchars((string) $ev['date']) ?></td>
+          <td><?= htmlspecialchars($ev['event']) ?></td>
+          <?php if ($canViewPaymentAmounts): ?>
+          <td><?= $ev['amount'] !== null ? number_format((float) $ev['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></td>
+          <?php endif; ?>
+          <td><?= htmlspecialchars($ev['source']) ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+      <?php endif; ?>
+    </details>
+
+    <details>
+      <summary>Full Status</summary>
+      <?php if ($payment): ?>
+      <div class="kv-grid">
+        <div><span class="k">Advance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['advance_amount'] !== null ? number_format((float) $payment['advance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
+        <div><span class="k">Advance T/T Received</span><span class="v"><?= htmlspecialchars($payment['advance_remittance_received_at'] ?? '—') ?></span></div>
+        <div><span class="k">Advance Cleared</span><span class="v"><?= htmlspecialchars($payment['advance_cleared_at'] ?? '—') ?></span></div>
+        <div><span class="k">Balance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['balance_amount'] !== null ? number_format((float) $payment['balance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
+        <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($payment['balance_due_date'] ?? 'event-triggered') ?></span></div>
+      </div>
+      <?php endif; ?>
+      <p class="muted small">Advance (or LC) is recorded from Step 5 above; Freight and Balance are recorded from their own steps below.</p>
+
+      <?php if (!empty($clientPaymentReports)): ?>
+        <h3 style="margin-top:16px">Client-Reported Payments</h3>
+        <p class="muted small">Purely informational — the client submitted these themselves. Always verify against the actual bank statement before recording a payment above.</p>
+        <table class="list">
+          <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Bank / Payer Details</th><th>Attachment</th><th>Reported</th><th>Status</th><th></th></tr>
+          <?php foreach ($clientPaymentReports as $r): ?>
+          <tr>
+            <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
+            <td><?= htmlspecialchars($r['transaction_ref']) ?></td>
+            <td><?= $canViewPaymentAmounts ? ($r['amount'] !== null ? number_format((float) $r['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—') : '—' ?></td>
+            <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
+            <td><?= htmlspecialchars($r['payer_bank_details'] ?? '—') ?></td>
+            <td>
+              <?php if (!empty($r['screenshot_file_id'])): ?>
+                <?php $screenshotUrl = '/file-store/' . (int) $r['screenshot_file_id'] . '/download'; ?>
+                <?php if (str_starts_with((string) $r['screenshot_mime_type'], 'image/')): ?>
+                  <a href="<?= $screenshotUrl ?>" target="_blank"><img src="<?= $screenshotUrl ?>" alt="Payment screenshot" class="asset-preview" style="max-height:60px;"></a>
+                <?php else: ?>
+                  <a href="<?= $screenshotUrl ?>" target="_blank">View attachment</a>
+                <?php endif; ?>
+              <?php else: ?>
+                <span class="muted small">—</span>
+              <?php endif; ?>
+            </td>
+            <td><?= htmlspecialchars(Dates::human($r['reported_at'])) ?></td>
+            <td><?= $r['status'] === 'reviewed' ? 'Reviewed by ' . htmlspecialchars($r['reviewed_by_name'] ?? '—') : 'New' ?></td>
+            <td>
+              <?php if ($r['status'] !== 'reviewed'): ?>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment-reports/<?= (int) $r['id'] ?>/reviewed">
+                <?= Csrf::field() ?>
+                <button type="submit" class="btn-sm">Mark Reviewed</button>
+              </form>
+              <?php endif; ?>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </table>
+      <?php endif; ?>
+    </details>
+  </details>
+
   <details class="step-card" id="step-1-quotation-prepare"<?= $stepCardOpen('1-3') ?>>
     <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 1 &middot; Prepare Quotation</h2></summary>
     <?php
@@ -985,278 +1096,250 @@ $stepStatusIcon = static function (string $status): string {
     <?php endforeach; ?>
   </details>
 
-  <details class="step-card" id="step-4a-buyer-po-generate"<?= $stepCardOpen('4') ?>>
-    <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4a &middot; Generate Buyer's PO</h2></summary>
-    <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-        <?= Csrf::field() ?>
-        <input type="hidden" name="document_type" value="BUYERPO">
-        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <?= $stepBadge('4a') ?><button type="submit" class="<?= $__docBtnClass('BUYERPO') ?>" data-loading-text="Generating…">Generate Buyer PO</button>
-      </form>
-    <?php else: ?>
-      <p class="muted">Generate the Quotation first to unlock this gate.</p>
-    <?php endif; ?>
-  </details>
+  <div class="step-group">
+    <div class="step-group-header"><span class="step-group-num">STEP 4</span><h3>Buyer's PO</h3></div>
 
-  <details class="step-card" id="step-4b-buyer-po-confirm"<?= $stepCardOpen('4') ?>>
-    <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4b &middot; Confirm Buyer's PO Received</h2></summary>
-    <?php if ($hasBuyerPo): ?>
-      <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
-    <?php elseif ($stage2 && $stage2['status'] !== 'locked'): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
-        <?= Csrf::field() ?>
-        <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-        <?= $stepBadge('4b') ?><button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
-      </form>
-    <?php else: ?>
-      <p class="muted">Generate the Quotation first to unlock this gate.</p>
-    <?php endif; ?>
-  </details>
-
-  <details class="step-card" id="step-4c-buyer-po-attach"<?= $stepCardOpen('4') ?>>
-    <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4c &middot; Attach Buyer's PO Copy</h2></summary>
-    <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
-      <?php if (!empty($buyerPoDocuments)): ?>
-        <table class="list" style="margin-top:8px">
-          <tr><th>File</th><th>Uploaded</th><th></th></tr>
-          <?php foreach ($buyerPoDocuments as $bd): ?>
-            <tr>
-              <td><?= htmlspecialchars($bd['original_filename']) ?></td>
-              <td><?= htmlspecialchars($bd['uploaded_at']) ?></td>
-              <td><a href="/file-store/<?= (int) $bd['file_id'] ?>/download">Download</a></td>
-            </tr>
-          <?php endforeach; ?>
-        </table>
+    <details class="step-card" id="step-4a-buyer-po-generate"<?= $stepCardOpen('4') ?>>
+      <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4a &middot; Generate Buyer's PO</h2></summary>
+      <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="BUYERPO">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <?= $stepBadge('4a') ?><button type="submit" class="<?= $__docBtnClass('BUYERPO') ?>" data-loading-text="Generating…">Generate Buyer PO</button>
+        </form>
+      <?php else: ?>
+        <p class="muted">Generate the Quotation first to unlock this gate.</p>
       <?php endif; ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
-        <?= Csrf::field() ?>
-        <input type="file" name="document" required>
-        <?= $stepBadge('4c') ?><button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
-      </form>
-    <?php else: ?>
-      <p class="muted">Generate the Quotation first to unlock this gate.</p>
-    <?php endif; ?>
-  </details>
+    </details>
 
-  <details class="step-card" id="step-4d-pi-intake-link"<?= $stepCardOpen('4') ?>>
-    <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4d &middot; Generate PI Form Link</h2></summary>
-    <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
-    <?php if ($piIntake): ?>
-      <p>
-        Status: <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $piIntake['status']))) ?></strong>
-        <?php if ($piIntake['status'] === 'pending_review'): ?>
-          &nbsp;·&nbsp; <a href="/pi-intake-review">Review in PI Intake Review</a>
-        <?php elseif ($piIntake['status'] === 'applied'): ?>
-          &nbsp;·&nbsp; Applied by <?= htmlspecialchars($piIntake['reviewed_by_name'] ?? '—') ?> on <?= htmlspecialchars((string) $piIntake['reviewed_at']) ?>
+    <div class="step-group-connector">once the buyer sends their actual PO back</div>
+
+    <details class="step-card" id="step-4b-buyer-po-confirm"<?= $stepCardOpen('4') ?>>
+      <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4b &middot; Confirm Buyer's PO Received</h2></summary>
+      <?php if ($hasBuyerPo): ?>
+        <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
+      <?php elseif ($stage2 && $stage2['status'] !== 'locked'): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
+          <?= Csrf::field() ?>
+          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+          <?= $stepBadge('4b') ?><button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+        </form>
+      <?php else: ?>
+        <p class="muted">Generate the Quotation first to unlock this gate.</p>
+      <?php endif; ?>
+    </details>
+
+    <div class="step-group-connector">attach their signed copy for the file</div>
+
+    <details class="step-card" id="step-4c-buyer-po-attach"<?= $stepCardOpen('4') ?>>
+      <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4c &middot; Attach Buyer's PO Copy</h2></summary>
+      <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+        <?php if (!empty($buyerPoDocuments)): ?>
+          <table class="list" style="margin-top:8px">
+            <tr><th>File</th><th>Uploaded</th><th></th></tr>
+            <?php foreach ($buyerPoDocuments as $bd): ?>
+              <tr>
+                <td><?= htmlspecialchars($bd['original_filename']) ?></td>
+                <td><?= htmlspecialchars($bd['uploaded_at']) ?></td>
+                <td><a href="/file-store/<?= (int) $bd['file_id'] ?>/download">Download</a></td>
+              </tr>
+            <?php endforeach; ?>
+          </table>
         <?php endif; ?>
-      </p>
-      <?php if (in_array($piIntake['status'], ['awaiting_client', 'rejected'], true) && strtotime((string) $piIntake['access_token_expires_at']) > time()): ?>
-        <?php $piFormFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/pi-details/' . $piIntake['access_token_plain']; ?>
-        <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
-          <span>Current link (valid until <?= htmlspecialchars(Dates::human($piIntake['access_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input type="text" readonly value="<?= htmlspecialchars($piFormFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
-            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($piFormFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
+          <?= Csrf::field() ?>
+          <input type="file" name="document" required>
+          <?= $stepBadge('4c') ?><button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+        </form>
+      <?php else: ?>
+        <p class="muted">Generate the Quotation first to unlock this gate.</p>
+      <?php endif; ?>
+    </details>
+  </div>
+
+  <div class="step-group">
+    <div class="step-group-header"><span class="step-group-num">STEP 5</span><h3>Proforma Invoice &amp; Payment</h3></div>
+
+    <details class="step-card" id="step-5a-pi-form-link"<?= $stepCardOpen('5') ?>>
+      <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5a &middot; Generate PI Form Link</h2></summary>
+      <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
+      <?php if ($piIntake): ?>
+        <p>
+          Status: <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $piIntake['status']))) ?></strong>
+          <?php if ($piIntake['status'] === 'pending_review'): ?>
+            &nbsp;·&nbsp; <a href="/pi-intake-review">Review in PI Intake Review</a>
+          <?php elseif ($piIntake['status'] === 'applied'): ?>
+            &nbsp;·&nbsp; Applied by <?= htmlspecialchars($piIntake['reviewed_by_name'] ?? '—') ?> on <?= htmlspecialchars((string) $piIntake['reviewed_at']) ?>
+          <?php endif; ?>
+        </p>
+        <?php if (in_array($piIntake['status'], ['awaiting_client', 'rejected'], true) && strtotime((string) $piIntake['access_token_expires_at']) > time()): ?>
+          <?php $piFormFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/pi-details/' . $piIntake['access_token_plain']; ?>
+          <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
+            <span>Current link (valid until <?= htmlspecialchars(Dates::human($piIntake['access_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" readonly value="<?= htmlspecialchars($piFormFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+              <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($piFormFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+            </div>
           </div>
-        </div>
-      <?php elseif ($piIntake['status'] === 'awaiting_client'): ?>
-        <p class="muted small">This link has expired — use Regenerate below to issue a fresh one.</p>
-      <?php endif; ?>
-      <?php if ($piIntake['status'] === 'applied'): ?>
-        <div class="kv-grid">
-          <div><span class="k">Confirmed Incoterm</span><span class="v"><?= htmlspecialchars($piIntake['incoterm_confirmed'] ?? '—') ?></span></div>
-          <div><span class="k">Confirmed Port of Discharge</span><span class="v"><?= htmlspecialchars($piIntake['port_of_discharge_text'] ?? '—') ?></span></div>
-          <div><span class="k">Confirmed COO Type</span><span class="v"><?= htmlspecialchars($piIntake['coo_type'] ?? '—') ?></span></div>
-          <div><span class="k">Payment Terms Confirmation</span><span class="v"><?= htmlspecialchars($piIntake['payment_terms_confirmation'] ?? '—') ?></span></div>
-          <div><span class="k">Quotation Acceptance Reference</span><span class="v"><?= htmlspecialchars($piIntake['quotation_acceptance_reference'] ?? '—') ?></span></div>
-          <?php if ($piIntake['changes_from_quotation']): ?><div><span class="k">Changes from Quotation</span><span class="v"><?= htmlspecialchars($piIntake['changes_from_quotation']) ?></span></div><?php endif; ?>
-          <?php if ($piIntake['special_document_requirements']): ?><div><span class="k">Special Document Requirements</span><span class="v"><?= htmlspecialchars($piIntake['special_document_requirements']) ?></span></div><?php endif; ?>
-        </div>
-      <?php endif; ?>
-    <?php else: ?>
-      <p class="muted">No PI-stage form has been sent to this client yet.</p>
-    <?php endif; ?>
-    <?php if ($canManageOrders): ?>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/pi-form-link" style="display:inline">
-      <?= Csrf::field() ?>
-      <?= $stepBadge('4d') ?><button type="submit" class="btn-sm"><?= $piIntake ? 'Regenerate PI Form Link' : 'Generate PI Form Link' ?></button>
-    </form>
-    <?php endif; ?>
-  </details>
-
-  <details class="step-card step-card-reference" id="step-4e-pi-intake-apply"<?= $stepCardOpen('4') ?>>
-    <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4e &middot; Apply the Client's PI-Stage Confirmation</h2></summary>
-    <p class="muted small">Once the client submits the PI-stage form, review and apply it at <a href="/pi-intake-review">PI Intake Review</a> — applying it overwrites the live client record with exactly what the buyer confirmed.</p>
-  </details>
-
-  <details class="step-card" id="step-5a-pi-generate"<?= $stepCardOpen('5') ?>>
-    <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5a &middot; Generate Proforma Invoice</h2></summary>
-    <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-        <?= Csrf::field() ?>
-        <input type="hidden" name="document_type" value="PI">
-        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <?= $stepBadge('5a') ?><button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
-      </form>
-    <?php else: ?>
-      <p class="muted">Record the Buyer PO first to unlock this gate.</p>
-    <?php endif; ?>
-  </details>
-
-  <details class="step-card" id="step-5b-advance-record"<?= $stepCardOpen('5') ?>>
-    <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5b &middot; Record Advance Remittance</h2></summary>
-    <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared && (!$payment || $payment['advance_remittance_received_at'] === null)): ?>
-      <?php if (!$canManagePayments): ?>
-        <p class="muted">Only Accounts/Export can record this payment.</p>
+        <?php elseif ($piIntake['status'] === 'awaiting_client'): ?>
+          <p class="muted small">This link has expired — use Regenerate below to issue a fresh one.</p>
+        <?php endif; ?>
+        <?php if ($piIntake['status'] === 'applied'): ?>
+          <div class="kv-grid">
+            <div><span class="k">Confirmed Incoterm</span><span class="v"><?= htmlspecialchars($piIntake['incoterm_confirmed'] ?? '—') ?></span></div>
+            <div><span class="k">Confirmed Port of Discharge</span><span class="v"><?= htmlspecialchars($piIntake['port_of_discharge_text'] ?? '—') ?></span></div>
+            <div><span class="k">Confirmed COO Type</span><span class="v"><?= htmlspecialchars($piIntake['coo_type'] ?? '—') ?></span></div>
+            <div><span class="k">Payment Terms Confirmation</span><span class="v"><?= htmlspecialchars($piIntake['payment_terms_confirmation'] ?? '—') ?></span></div>
+            <div><span class="k">Quotation Acceptance Reference</span><span class="v"><?= htmlspecialchars($piIntake['quotation_acceptance_reference'] ?? '—') ?></span></div>
+            <?php if ($piIntake['changes_from_quotation']): ?><div><span class="k">Changes from Quotation</span><span class="v"><?= htmlspecialchars($piIntake['changes_from_quotation']) ?></span></div><?php endif; ?>
+            <?php if ($piIntake['special_document_requirements']): ?><div><span class="k">Special Document Requirements</span><span class="v"><?= htmlspecialchars($piIntake['special_document_requirements']) ?></span></div><?php endif; ?>
+          </div>
+        <?php endif; ?>
       <?php else: ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance">
+        <p class="muted">No PI-stage form has been sent to this client yet.</p>
+      <?php endif; ?>
+      <?php if ($canManageOrders): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/pi-form-link" style="display:inline">
         <?= Csrf::field() ?>
-        <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required></label>
-        <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
-        <?= $stepBadge('5b') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
+        <?= $stepBadge('5a') ?><button type="submit" class="btn-sm"><?= $piIntake ? 'Regenerate PI Form Link' : 'Generate PI Form Link' ?></button>
       </form>
       <?php endif; ?>
-    <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
-      <p class="muted">Record the Buyer PO first to unlock this gate.</p>
-    <?php elseif ($payment && $payment['advance_remittance_received_at'] !== null): ?>
-      <p class="muted">Already recorded — see Step 5c to mark it cleared.</p>
-    <?php endif; ?>
+    </details>
 
-    <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
-    <?php $renderExchangeRateWidget('advance', 'Advance Payment'); ?>
-  </details>
+    <div class="step-group-connector">client replies</div>
 
-  <details class="step-card" id="step-5c-advance-clear"<?= $stepCardOpen('5') ?>>
-    <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5c &middot; Mark Advance Cleared</h2></summary>
-    <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared && $payment && $payment['advance_remittance_received_at'] !== null): ?>
-      <?php if (!$canClearPayments): ?>
-        <p class="muted">Advance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+    <details class="step-card step-card-reference" id="step-5b-pi-intake-apply"<?= $stepCardOpen('5') ?>>
+      <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5b &middot; Apply the Client's PI-Stage Confirmation</h2></summary>
+      <p class="muted small">Once the client submits the PI-stage form, review and apply it at <a href="/pi-intake-review">PI Intake Review</a> — applying it overwrites the live client record with exactly what the buyer confirmed.</p>
+    </details>
+
+    <div class="step-group-connector">now the real PI can be issued</div>
+
+    <details class="step-card" id="step-5c-pi-generate"<?= $stepCardOpen('5') ?>>
+      <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5c &middot; Generate Proforma Invoice</h2></summary>
+      <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="PI">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <?= $stepBadge('5c') ?><button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
+        </form>
       <?php else: ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
-        <?= Csrf::field() ?>
-        <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-        <?= $stepBadge('5c') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
-      </form>
+        <p class="muted">Record the Buyer PO first to unlock this gate.</p>
       <?php endif; ?>
-    <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
-      <p class="muted">Record the Buyer PO first to unlock this gate.</p>
-    <?php elseif ($advanceCleared): ?>
-      <p class="muted">Advance already cleared.</p>
+    </details>
+
+    <div class="step-group-connector">payment method for this order: <strong><?= $isLcPayment ? 'Letter of Credit' : 'Cash Advance' ?></strong></div>
+
+    <?php if ($isLcPayment): ?>
+    <details class="step-card" id="step-5d-payment-record"<?= $stepCardOpen('5') ?>>
+      <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5d &middot; Record LC Details</h2></summary>
+      <?php if ($stage3 && $stage3['status'] !== 'locked' && !$lcConfirmed && ($orderLcDetails === null || $orderLcDetails['lc_amount'] === null)): ?>
+        <?php if (!$canManagePayments): ?>
+          <p class="muted">Only Accounts/Export can record this payment.</p>
+        <?php else: ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/lc" enctype="multipart/form-data">
+          <?= Csrf::field() ?>
+          <label>Issuing Bank<input type="text" name="lc_bank_name"></label>
+          <label>LC Number<input type="text" name="lc_number"></label>
+          <label>LC Amount * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="lc_amount" required></label>
+          <label>LC Charges <small class="muted">(billed to the client, in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="lc_charges_amount"></label>
+          <label>LC Document (optional)<input type="file" name="lc_file"></label>
+          <?= $stepBadge('5d') ?><button type="submit" class="btn-sm">Record LC Details</button>
+        </form>
+        <?php endif; ?>
+      <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
+        <p class="muted">Record the Buyer PO first to unlock this gate.</p>
+      <?php elseif ($orderLcDetails && $orderLcDetails['lc_amount'] !== null): ?>
+        <p class="muted">Already recorded — see Step 5e to confirm it usable.</p>
+      <?php endif; ?>
+    </details>
+
+    <div class="step-group-connector">once the advising bank confirms</div>
+
+    <details class="step-card" id="step-5e-payment-confirm"<?= $stepCardOpen('5') ?>>
+      <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5e &middot; Confirm LC Usable</h2></summary>
+      <?php if ($stage3 && $stage3['status'] !== 'locked' && !$lcConfirmed && $orderLcDetails && $orderLcDetails['lc_amount'] !== null): ?>
+        <?php if (!$canClearPayments): ?>
+          <p class="muted">LC details recorded — awaiting Accounts to confirm it usable.</p>
+        <?php else: ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/lc/confirm-usable" onsubmit="return confirm('Confirm this LC usable? This unlocks Stage 4 and auto-provisions the client portal login — confirm the advising bank has actually confirmed first.');">
+          <?= Csrf::field() ?>
+          <?= $stepBadge('5e') ?><button type="submit" class="btn-sm btn-success">Confirm LC Usable (unlocks Stage 4)</button>
+        </form>
+        <?php endif; ?>
+      <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
+        <p class="muted">Record the Buyer PO first to unlock this gate.</p>
+      <?php elseif ($lcConfirmed): ?>
+        <p class="muted">LC already confirmed usable.</p>
+      <?php else: ?>
+        <p class="muted">Record the LC details first (Step 5d).</p>
+      <?php endif; ?>
+    </details>
     <?php else: ?>
-      <p class="muted">Record the advance remittance first (Step 5b).</p>
+    <details class="step-card" id="step-5d-payment-record"<?= $stepCardOpen('5') ?>>
+      <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5d &middot; Record Advance Remittance</h2></summary>
+      <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared && (!$payment || $payment['advance_remittance_received_at'] === null)): ?>
+        <?php if (!$canManagePayments): ?>
+          <p class="muted">Only Accounts/Export can record this payment.</p>
+        <?php else: ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance">
+          <?= Csrf::field() ?>
+          <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required></label>
+          <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
+          <?= $stepBadge('5d') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
+        </form>
+        <?php endif; ?>
+      <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
+        <p class="muted">Record the Buyer PO first to unlock this gate.</p>
+      <?php elseif ($payment && $payment['advance_remittance_received_at'] !== null): ?>
+        <p class="muted">Already recorded — see Step 5e to mark it cleared.</p>
+      <?php endif; ?>
+
+      <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
+      <?php $renderExchangeRateWidget('advance', 'Advance Payment'); ?>
+    </details>
+
+    <div class="step-group-connector">once the bank confirms the funds landed</div>
+
+    <details class="step-card" id="step-5e-payment-confirm"<?= $stepCardOpen('5') ?>>
+      <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5e &middot; Mark Advance Cleared</h2></summary>
+      <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared && $payment && $payment['advance_remittance_received_at'] !== null): ?>
+        <?php if (!$canClearPayments): ?>
+          <p class="muted">Advance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+        <?php else: ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
+          <?= Csrf::field() ?>
+          <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
+          <?= $stepBadge('5e') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
+        </form>
+        <?php endif; ?>
+      <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
+        <p class="muted">Record the Buyer PO first to unlock this gate.</p>
+      <?php elseif ($advanceCleared): ?>
+        <p class="muted">Advance already cleared.</p>
+      <?php else: ?>
+        <p class="muted">Record the advance remittance first (Step 5d).</p>
+      <?php endif; ?>
+    </details>
     <?php endif; ?>
-  </details>
+  </div>
 
   <details class="step-card step-card-reference" id="step-5-lc-bank-loan">
-    <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; only if opting for LC)</small></h2></summary>
+    <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; financing cost, not the LC leg above)</small></h2></summary>
+    <p class="muted small">If the client financed their LC (Step 5d/5e above) with a bank loan, record that loan's amount/interest here — separate from the LC leg itself, since this is about the cost of financing it, not confirming it usable.</p>
     <?php if ($canManageOrderFinancials): ?>
-    <p class="muted small">Only relevant if the client opted for payment by LC. Recorded in full under <a href="#order-financials">Order Financials</a> (Step 11) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
+    <p class="muted small">Recorded in full under <a href="#order-financials">Order Financials</a> (Step 11) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
     <?php else: ?>
-    <p class="muted small">Only relevant if the client opted for payment by LC. Recorded by Accounts/Export staff alongside this order's other costs.</p>
+    <p class="muted small">Recorded by Accounts/Export staff alongside this order's other costs.</p>
     <?php endif; ?>
   </details>
 
-  <details class="step-card step-card-reference" id="payment-snapshot">
-    <summary><h2>Payment Snapshot <small class="muted">(reference — every leg, at a glance)</small></h2></summary>
-    <div class="kv-grid">
-      <?php foreach ($paymentLegs as $leg): ?>
-      <div>
-        <span class="k"><?= htmlspecialchars($leg['label']) ?></span>
-        <span class="v">
-          <?php if ($leg['amount'] === null && $leg['received_at'] === null): ?>
-            Not applicable / not yet recorded
-          <?php elseif ($canViewPaymentAmounts): ?>
-            <?= $leg['amount'] !== null ? number_format((float) $leg['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?>
-            — <?= $leg['cleared_at'] !== null ? 'Cleared' : ($leg['received_at'] !== null ? 'Received, pending clearance' : 'Not yet received') ?>
-          <?php else: ?>
-            <?= $leg['cleared_at'] !== null ? 'Cleared' : ($leg['received_at'] !== null ? 'Received, pending clearance' : 'Not yet received') ?>
-          <?php endif; ?>
-        </span>
-      </div>
-      <?php endforeach; ?>
-    </div>
-    <?php if (!$canViewPaymentAmounts): ?>
-    <p class="muted small">Amounts are only shown to Accounts/Logistics/Export staff who can manage or close this order.</p>
-    <?php endif; ?>
-  </details>
-
-  <details class="step-card step-card-reference">
-    <summary><h2>Payment Ledger <small class="muted">(reference — read-only history)</small></h2></summary>
-    <p class="muted">A single, read-only history of every payment-related event recorded against this order — consolidating what's otherwise scattered across Payment Status and Client-Reported Payments. Nothing here can be edited; use the forms in Payment Status below to record new events.</p>
-    <?php if (empty($ledgerEvents)): ?>
-    <p class="muted small">No payment events recorded yet.</p>
-    <?php else: ?>
-    <table class="list">
-      <tr><th>Date</th><th>Event</th><?php if ($canViewPaymentAmounts): ?><th>Amount</th><?php endif; ?><th>Source</th></tr>
-      <?php foreach ($ledgerEvents as $ev): ?>
-      <tr>
-        <td><?= htmlspecialchars((string) $ev['date']) ?></td>
-        <td><?= htmlspecialchars($ev['event']) ?></td>
-        <?php if ($canViewPaymentAmounts): ?>
-        <td><?= $ev['amount'] !== null ? number_format((float) $ev['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></td>
-        <?php endif; ?>
-        <td><?= htmlspecialchars($ev['source']) ?></td>
-      </tr>
-      <?php endforeach; ?>
-    </table>
-    <?php endif; ?>
-  </details>
-
-  <details class="step-card step-card-reference">
-    <summary><h2>Payment Status <small class="muted">(reference — every leg, full detail)</small></h2></summary>
-    <?php if ($payment): ?>
-    <div class="kv-grid">
-      <div><span class="k">Advance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['advance_amount'] !== null ? number_format((float) $payment['advance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
-      <div><span class="k">Advance T/T Received</span><span class="v"><?= htmlspecialchars($payment['advance_remittance_received_at'] ?? '—') ?></span></div>
-      <div><span class="k">Advance Cleared</span><span class="v"><?= htmlspecialchars($payment['advance_cleared_at'] ?? '—') ?></span></div>
-      <div><span class="k">Balance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['balance_amount'] !== null ? number_format((float) $payment['balance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
-      <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($payment['balance_due_date'] ?? 'event-triggered') ?></span></div>
-    </div>
-    <?php endif; ?>
-    <p class="muted small">Advance is recorded from Step 5 above; Freight and Balance are recorded from their own steps below.</p>
-
-    <?php if (!empty($clientPaymentReports)): ?>
-      <h3 style="margin-top:16px">Client-Reported Payments</h3>
-      <p class="muted small">Purely informational — the client submitted these themselves. Always verify against the actual bank statement before recording a payment above.</p>
-      <table class="list">
-        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Bank / Payer Details</th><th>Attachment</th><th>Reported</th><th>Status</th><th></th></tr>
-        <?php foreach ($clientPaymentReports as $r): ?>
-        <tr>
-          <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
-          <td><?= htmlspecialchars($r['transaction_ref']) ?></td>
-          <td><?= $canViewPaymentAmounts ? ($r['amount'] !== null ? number_format((float) $r['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—') : '—' ?></td>
-          <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
-          <td><?= htmlspecialchars($r['payer_bank_details'] ?? '—') ?></td>
-          <td>
-            <?php if (!empty($r['screenshot_file_id'])): ?>
-              <?php $screenshotUrl = '/file-store/' . (int) $r['screenshot_file_id'] . '/download'; ?>
-              <?php if (str_starts_with((string) $r['screenshot_mime_type'], 'image/')): ?>
-                <a href="<?= $screenshotUrl ?>" target="_blank"><img src="<?= $screenshotUrl ?>" alt="Payment screenshot" class="asset-preview" style="max-height:60px;"></a>
-              <?php else: ?>
-                <a href="<?= $screenshotUrl ?>" target="_blank">View attachment</a>
-              <?php endif; ?>
-            <?php else: ?>
-              <span class="muted small">—</span>
-            <?php endif; ?>
-          </td>
-          <td><?= htmlspecialchars(Dates::human($r['reported_at'])) ?></td>
-          <td><?= $r['status'] === 'reviewed' ? 'Reviewed by ' . htmlspecialchars($r['reviewed_by_name'] ?? '—') : 'New' ?></td>
-          <td>
-            <?php if ($r['status'] !== 'reviewed'): ?>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment-reports/<?= (int) $r['id'] ?>/reviewed">
-              <?= Csrf::field() ?>
-              <button type="submit" class="btn-sm">Mark Reviewed</button>
-            </form>
-            <?php endif; ?>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-    <?php endif; ?>
-  </details>
+  <div class="step-group">
+    <div class="step-group-header"><span class="step-group-num">STEP 6</span><h3>Order Confirmation</h3></div>
 
   <details class="step-card" id="step-6a-oc-generate"<?= $stepCardOpen('6') ?>>
     <summary><?= $stepStatusIcon($stepStates['6']) ?><h2>Step 6a &middot; Generate Order Confirmation</h2></summary>
@@ -1277,6 +1360,8 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted">Clear the advance payment first to unlock this gate.</p>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">once the buyer acknowledges it</div>
 
   <details class="step-card" id="step-6b-oc-acknowledge"<?= $stepCardOpen('6') ?>>
     <summary><?= $stepStatusIcon($stepStates['6']) ?><h2>Step 6b &middot; Record Buyer's Acknowledgement</h2></summary>
@@ -1318,6 +1403,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">optional, any time — never blocks the above</div>
+
   <details class="step-card" id="step-6c-buyer-action-link"<?= $stepCardOpen('6') ?>>
     <summary><?= $stepStatusIcon($stepStates['6']) ?><h2>Step 6c &middot; Generate Buyer Action Link</h2></summary>
     <?php
@@ -1353,6 +1440,11 @@ $stepStatusIcon = static function (string $status): string {
   </details>
 
   <?php $supplierPoLocked = !$stage5 || $stage5['status'] === 'locked'; ?>
+
+  </div>
+
+  <div class="step-group">
+    <div class="step-group-header"><span class="step-group-num">STEP 7</span><h3>Supplier PO</h3></div>
 
   <details class="step-card" id="step-7a-supplier-po-terms"<?= $stepCardOpen('7') ?>>
     <summary><?= $stepStatusIcon($stepStates['7']) ?><h2>Step 7a &middot; Save Supplier PO Terms</h2></summary>
@@ -1574,6 +1666,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">generate the actual Supplier PO document</div>
+
   <details class="step-card" id="step-7b-supplier-po-generate"<?= $stepCardOpen('7') ?>>
     <summary><?= $stepStatusIcon($stepStates['7']) ?><h2>Step 7b &middot; Generate Supplier PO</h2></summary>
     <?php if ($supplierPoLocked): ?>
@@ -1597,6 +1691,8 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted">Save Supplier PO Terms first (Step 7a).</p>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">once the supplier signs and returns it</div>
 
   <details class="step-card" id="step-7c-supplier-po-signed"<?= $stepCardOpen('7') ?>>
     <summary><?= $stepStatusIcon($stepStates['7']) ?><h2>Step 7c &middot; Confirm Supplier Signed &amp; Returned PO</h2></summary>
@@ -1640,6 +1736,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">attach their signed copy for the file</div>
+
   <details class="step-card" id="step-7d-supplier-po-attach"<?= $stepCardOpen('7') ?>>
     <summary><?= $stepStatusIcon($stepStates['7']) ?><h2>Step 7d &middot; Attach Supplier PO Acknowledgment</h2></summary>
     <?php if ($supplierPoLocked): ?>
@@ -1666,6 +1764,8 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted">Save Supplier PO Terms first (Step 7a).</p>
     <?php endif; ?>
   </details>
+
+  </div>
 
   <details class="step-card" id="step-production"<?= $stepCardOpen('8') ?>>
     <summary><?= $stepStatusIcon($stepStates['8']) ?><h2>Step 8 &middot; Production &amp; Estimated Shipment</h2></summary>
@@ -1710,6 +1810,9 @@ $stepStatusIcon = static function (string $status): string {
 
   <?php $freightLocked = !$isFob && (!$stage6 || $stage6['status'] === 'locked'); ?>
 
+  <div class="step-group">
+    <div class="step-group-header"><span class="step-group-num">STEP 9</span><h3>Freight Payment</h3></div>
+
   <details class="step-card" id="step-9a-freight-terms"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9a &middot; Save Freight Terms<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
     <?php if ($isFob): ?>
@@ -1736,6 +1839,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">generates the debit note for the buyer</div>
+
   <details class="step-card" id="step-9b-freight-debit-note"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9b &middot; Generate Debit Note<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
     <?php if ($isFob): ?>
@@ -1754,6 +1859,8 @@ $stepStatusIcon = static function (string $status): string {
       </form>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">once their payment lands</div>
 
   <details class="step-card" id="step-9c-freight-remittance"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9c &middot; Record Freight Remittance<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
@@ -1779,6 +1886,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">after funds are confirmed cleared</div>
+
   <details class="step-card" id="step-9d-freight-clear"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9d &middot; Mark Freight Cleared<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
     <?php if ($isFob): ?>
@@ -1801,6 +1910,11 @@ $stepStatusIcon = static function (string $status): string {
   </details>
 
   <?php $packingLocked = !$stage7 || $stage7['status'] === 'locked'; ?>
+
+  </div>
+
+  <div class="step-group">
+    <div class="step-group-header"><span class="step-group-num">STEP 9</span><h3>Packing &amp; BL Instruction</h3></div>
 
   <details class="step-card" id="step-9e-packing"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9e &middot; Save Packing &amp; Crates</h2></summary>
@@ -1863,6 +1977,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">generate the Packing List from those figures</div>
+
   <details class="step-card" id="step-9f-packing-list"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9f &middot; Generate Packing List</h2></summary>
     <?php if ($packingLocked): ?>
@@ -1879,6 +1995,8 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted">Save Packing &amp; Crates first (Step 9e).</p>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">once the vessel/sailing is confirmed</div>
 
   <details class="step-card" id="step-9g-shipping-details"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9g &middot; Save Shipping Details</h2></summary>
@@ -1911,6 +2029,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">tell the CHA / shipping line how to issue the BL</div>
+
   <details class="step-card" id="step-9h-bl-instruction"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9h &middot; Generate BL Instruction Sheet</h2></summary>
     <?php if ($packingLocked): ?>
@@ -1929,6 +2049,8 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted">Save Shipping Details first (Step 9g).</p>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">after the CHA draft-review loop below</div>
 
   <details class="step-card" id="step-9i-bl-issued"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9i &middot; Confirm BL Issued <small class="muted">(after the CHA draft-review loop)</small></h2></summary>
@@ -2014,6 +2136,11 @@ $stepStatusIcon = static function (string $status): string {
     $ciBadge = static fn (string $fobLetter, string $postBlLetter): string => $isFob ? $fobLetter : $postBlLetter;
   ?>
 
+  </div>
+
+  <div class="step-group">
+    <div class="step-group-header"><span class="step-group-num">STEP 9-10</span><h3>Commercial Invoice &amp; Balance</h3></div>
+
   <details class="step-card" id="step-ci-generate"<?= $stepCardOpen('9-10') ?>>
     <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9j', '10a') ?> &middot; Generate Commercial Invoice<?= $isFob ? ' (before shipment)' : ' (against BL)' ?></h2></summary>
     <?php
@@ -2038,6 +2165,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">timed with sending the scanned BL</div>
+
   <details class="step-card" id="step-ci-scanned-bl-sent"<?= $stepCardOpen('9-10') ?>>
     <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9k', '10b') ?> &middot; Mark Scanned BL Copy Sent to Buyer</h2></summary>
     <?php if ($ciBalanceLocked): ?>
@@ -2051,6 +2180,8 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted small">Scanned BL copy sent to buyer.</p>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">once the buyer's balance payment lands</div>
 
   <details class="step-card" id="step-balance-record"<?= $stepCardOpen('9-10') ?>>
     <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9l', '10c') ?> &middot; Record Balance Remittance</h2></summary>
@@ -2080,6 +2211,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">after funds are confirmed cleared</div>
+
   <details class="step-card" id="step-balance-clear"<?= $stepCardOpen('9-10') ?>>
     <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9m', '10d') ?> &middot; Mark Balance Cleared</h2></summary>
     <?php if ($ciBalanceLocked): ?>
@@ -2102,6 +2235,8 @@ $stepStatusIcon = static function (string $status): string {
   </details>
 
   <?php if ($canManageOrderFinancials): ?>
+  </div>
+
   <details class="step-card" id="order-financials"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11 &middot; Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
@@ -2330,6 +2465,9 @@ $stepStatusIcon = static function (string $status): string {
     // (after Close Order), so its letter doesn't sort before the rest.
   ?>
 
+  <div class="step-group">
+    <div class="step-group-header"><span class="step-group-num">STEP 11</span><h3>Closure &mdash; Documents &amp; Settlement</h3></div>
+
   <details class="step-card" id="step-11a-coo-prep"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11a &middot; Generate COO Prep Sheet</h2></summary>
     <?php if ($despatchLocked): ?>
@@ -2346,6 +2484,8 @@ $stepStatusIcon = static function (string $status): string {
       </form>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">once the CHA delivers the original BLs</div>
 
   <details class="step-card" id="step-11b-bl-originals-received"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11b &middot; Record Original BLs Received from CHA</h2></summary>
@@ -2364,6 +2504,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">endorse them over to the buyer's bank</div>
+
   <details class="step-card" id="step-11c-bl-endorsed-mark"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11c &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
     <?php if ($despatchLocked): ?>
@@ -2379,6 +2521,8 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted">Record the original BLs received first (Step 11b).</p>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">save who endorsed it and when</div>
 
   <details class="step-card" id="step-11d-bl-endorsement-save"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11d &middot; Save BL Endorsement Details</h2></summary>
@@ -2400,6 +2544,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
+  <div class="step-group-connector">print the endorsement for the courier pack</div>
+
   <details class="step-card" id="step-11f-bl-endorsement-generate"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11f &middot; Generate / Print BL Endorsement</h2></summary>
     <?php if ($despatchLocked): ?>
@@ -2419,6 +2565,8 @@ $stepStatusIcon = static function (string $status): string {
       <p class="muted">Save BL Endorsement Details first (Step 11d).</p>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">once documents are despatched to the buyer</div>
 
   <details class="step-card" id="step-11g-close-order"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11g &middot; Close Order (Document Despatch)</h2></summary>
@@ -2449,6 +2597,8 @@ $stepStatusIcon = static function (string $status): string {
       </form>
     <?php endif; ?>
   </details>
+
+  <div class="step-group-connector">last — once the balance has actually cleared too</div>
 
   <details class="step-card" id="step-despatch"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11e &middot; Mark Fully Settled</h2></summary>
@@ -2484,6 +2634,8 @@ $stepStatusIcon = static function (string $status): string {
   </details>
 
   <?php if ($canCloseOrders): ?>
+  </div>
+
   <details class="step-card step-card-reference" id="compliance-checklist">
     <summary><h2>Compliance Checklist <small class="muted">(reference — ECGC Cover, Pre-Shipment Inspection, etc.)</small></h2></summary>
     <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <?= $canManageComplianceTaskTypes ? '<a href="/compliance-task-types">Compliance Task Types</a>' : 'Compliance Task Types' ?> (Admin-only).</p>
@@ -2724,7 +2876,7 @@ $stepStatusIcon = static function (string $status): string {
         <div class="kv-grid">
           <div><span class="k">Current Stage</span><span class="v"><?= $currentStage ? 'Stage ' . (int) $currentStage['stage_number'] . ' — ' . htmlspecialchars($currentStage['stage_name']) : ($orderClosed ? 'Complete — all 9 stages resolved' : '—') ?></span></div>
           <div><span class="k">Products</span><span class="v"><?= count($products) ?> line<?= count($products) === 1 ? '' : 's' ?></span></div>
-          <div><span class="k">Payment Legs</span><span class="v"><?= $paymentLegsResolved ?> of <?= $paymentLegsApplicable ?> cleared<?= $paymentLegsApplicable === 0 ? ' (nothing recorded yet)' : '' ?> — <a href="#payment-snapshot">see Payment Snapshot</a></span></div>
+          <div><span class="k">Payment Legs</span><span class="v"><?= $paymentLegsResolved ?> of <?= $paymentLegsApplicable ?> cleared<?= $paymentLegsApplicable === 0 ? ' (nothing recorded yet)' : '' ?> — <a href="#payment-overview">see Payment Overview</a></span></div>
           <?php if ($canCloseOrders): ?>
           <div><span class="k">Compliance Checklist</span><span class="v"><?= $complianceSummary['total'] === 0 ? 'No task types configured' : $complianceSummary['approved'] . ' of ' . $complianceSummary['total'] . ' resolved' ?> — <a href="#compliance-checklist">see checklist</a></span></div>
           <?php endif; ?>
@@ -2817,7 +2969,7 @@ $stepStatusIcon = static function (string $status): string {
     }
 
     // Any in-page link to a card's #id (the sidebar's "At a Glance" cross
-    // references, "see Payment Snapshot", "see checklist", etc.) opens
+    // references, "see Payment Overview", "see checklist", etc.) opens
     // the target card before the browser's default jump, since a closed
     // <details> has nothing visible to scroll to otherwise.
     document.addEventListener('click', function (e) {
@@ -2840,7 +2992,7 @@ $stepStatusIcon = static function (string $status): string {
     var stageToCardId = {
       1: ['step-1-quotation-prepare', 'step-2-quotation-send', 'step-3-quotation-accept', 'document-review-approval'],
       2: ['step-4a-buyer-po-generate', 'step-4b-buyer-po-confirm', 'step-4c-buyer-po-attach'],
-      3: ['step-5a-pi-generate', 'step-5b-advance-record', 'step-5c-advance-clear', 'step-4d-pi-intake-link', 'step-4e-pi-intake-apply', 'step-5-lc-bank-loan'],
+      3: ['step-5a-pi-form-link', 'step-5b-pi-intake-apply', 'step-5c-pi-generate', 'step-5d-payment-record', 'step-5e-payment-confirm', 'step-5-lc-bank-loan'],
       4: ['step-6a-oc-generate', 'step-6b-oc-acknowledge', 'step-6c-buyer-action-link'],
       5: ['step-7a-supplier-po-terms', 'step-7b-supplier-po-generate', 'step-7c-supplier-po-signed', 'step-7d-supplier-po-attach'],
       6: ['step-9a-freight-terms', 'step-9b-freight-debit-note', 'step-9c-freight-remittance', 'step-9d-freight-clear'],

@@ -10,8 +10,8 @@ use App\Repositories\OrderPaymentStatusRepository;
 use App\Tests\Support\DbTestCase;
 
 /**
- * Payment Snapshot + Payment Ledger — a quick-glance summary and a single
- * consolidated, read-only history of every payment-related event on an
+ * Payment Overview's Snapshot + Ledger tabs — a quick-glance summary and
+ * a single consolidated, read-only history of every payment-related event on an
  * order (advance/freight/balance remittance+clearance, plus every
  * client-self-reported payment). Amounts are gated: everyone who can view
  * the order sees each leg's STATUS, but only manage_payments/close_orders
@@ -32,8 +32,9 @@ final class PaymentLedgerTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringContainsString('Payment Snapshot', $output);
-        self::assertStringContainsString('Payment Ledger', $output);
+        self::assertStringContainsString('Payment Overview', $output);
+        self::assertStringContainsString('<summary>Snapshot</summary>', $output);
+        self::assertStringContainsString('<summary>Ledger</summary>', $output);
         self::assertStringContainsString('Received, pending clearance', $output);
         self::assertStringNotContainsString('5,000.00', $output);
     }

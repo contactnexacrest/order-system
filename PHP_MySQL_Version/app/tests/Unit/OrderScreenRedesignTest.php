@@ -156,19 +156,26 @@ final class OrderScreenRedesignTest extends TestCase
         // panels wrapper's own opening tag onward, tracking nesting depth.
         // #order-panels itself is depth 1; anything opened while depth
         // === 1 is a direct child (depth becomes 2).
+        //
+        // Since the parent-group redesign, a direct child of #order-panels
+        // is now either (a) a standalone step-card, same as before, or
+        // (b) a <div class="step-group"> wrapper — purely a visual
+        // container for a multi-letter step's own cards (4a/4b/4c, etc.),
+        // each of which sits one level deeper (depth 3) as that group's
+        // own direct child. Both patterns are asserted explicitly, so
+        // N-01's original bug class (a panel's own markup never closing,
+        // silently nesting every later panel inside it) still fails this
+        // test — on either axis, a card swallowed by an unclosed sibling
+        // either vanishes from its expected depth or appears one level
+        // deeper than it should.
         preg_match_all('/<div\b[^>]*>|<\/div>|<details\b[^>]*>|<\/details>/', substr($html, $panelsOpenPos), $matches, PREG_OFFSET_CAPTURE);
         $tokens = $matches[0];
 
-        // Depth 2 is "one level inside #order-panels itself" — a direct
-        // child step-card. A legitimate nested <details> used purely for
-        // visual grouping inside one of the real step-cards (e.g. the
-        // pre-shipment inspection block, or "Add a new supplier") sits
-        // deeper than this and is intentionally not counted here — N-01's
-        // bug was a *top-level* panel swallowing every panel after it,
-        // which shows up as this count dropping below the expected total,
-        // not as a deeper nested element existing.
         $depth = 0;
-        $directChildSectionCount = 0;
+        $directStepCardCount = 0;
+        $groupCount = 0;
+        $groupedStepCardCount = 0;
+        $inGroupAtDepth = null;
         foreach ($tokens as [$token, ]) {
             if ($token === '</div>' || $token === '</details>') {
                 $depth--;
@@ -176,19 +183,31 @@ final class OrderScreenRedesignTest extends TestCase
                     // #order-panels itself has closed.
                     break;
                 }
+                if ($inGroupAtDepth !== null && $depth < $inGroupAtDepth) {
+                    $inGroupAtDepth = null;
+                }
                 continue;
             }
             $depth++;
-            if ($depth === 2 && str_starts_with($token, '<details class="step-card')) {
-                $directChildSectionCount++;
+            if ($depth === 2) {
+                if (str_starts_with($token, '<details class="step-card')) {
+                    $directStepCardCount++;
+                } elseif (str_starts_with($token, '<div class="step-group"')) {
+                    $groupCount++;
+                    $inGroupAtDepth = $depth;
+                }
+            } elseif ($depth === 3 && $inGroupAtDepth === 2 && str_starts_with($token, '<details class="step-card')) {
+                $groupedStepCardCount++;
             }
         }
 
         $this->assertSame(
-            56,
-            $directChildSectionCount,
-            'Expected exactly 56 step-card panels as direct children of #order-panels (one per individual numbered/lettered step, nothing grouped) — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01).'
+            19,
+            $directStepCardCount,
+            'Expected exactly 19 standalone step-card panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01).'
         );
+        $this->assertSame(8, $groupCount, 'Expected exactly 8 step-group wrapper boxes (Step 4, 5, 6, 7, 9-freight, 9-packing/BL, CI&Balance, 11) as direct children of #order-panels.');
+        $this->assertSame(37, $groupedStepCardCount, 'Expected exactly 37 step-cards nested one level inside a step-group box — together with the 19 standalone ones, every one of the 56 individual step/sub-step cards.');
     }
 
     private function readCss(): string

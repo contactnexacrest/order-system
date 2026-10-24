@@ -451,6 +451,11 @@ $router->post('/orders/{id}/payment-reports/{reportId}/reviewed', [$orders, 'mar
 // so the same person can't do both — see docs/migrations/
 // 2026-10-23d-split-payment-and-supplier-payment-permissions.sql.
 $router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayment'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Step 5 LC leg (order.payment_method = 'LC') — same manage_payments/
+// clear_payments split as the cash-advance leg above, since recording
+// vs. confirming-usable is the same record/clear duty split either way.
+$router->post('/orders/{id}/payment/lc', [$orders, 'recordLcDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/lc/confirm-usable', [$orders, 'confirmLcUsable'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), OrderLockGuard::check(), CsrfCheck::verify()]);
 

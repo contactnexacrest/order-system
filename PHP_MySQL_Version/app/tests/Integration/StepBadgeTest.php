@@ -52,15 +52,15 @@ final class StepBadgeTest extends DbTestCase
         $output = $this->render($orderId);
 
         self::assertStringContainsString('<span class="step-badge" title="Step 1a">1a</span>', $output);
-        // A freshly-created order has only Stage 1 unlocked. 4d (PI Form
+        // A freshly-created order has only Stage 1 unlocked. 5a (PI Form
         // Link) and 6c (Buyer Action Link) are deliberate exceptions —
         // both are optional, never-blocking alternate channels available
         // from the very first render regardless of stage ("entirely
         // optional and never blocks anything" per docs/SOP), not part of
         // the gated sequence — so every OTHER badge must be absent.
-        self::assertStringContainsString('title="Step 4d"', $output);
+        self::assertStringContainsString('title="Step 5a"', $output);
         self::assertStringContainsString('title="Step 6c"', $output);
-        $stripped = preg_replace('/class="step-badge" title="Step (1a|4d|6c)">[^<]*<\/span>/', '', $output);
+        $stripped = preg_replace('/class="step-badge" title="Step (1a|5a|6c)">[^<]*<\/span>/', '', $output);
         self::assertStringNotContainsString('class="step-badge"', $stripped, 'no other step badge may leak onto a brand-new order');
     }
 
@@ -70,7 +70,7 @@ final class StepBadgeTest extends DbTestCase
         // checkpoint, that no rendered badge names a stage further along
         // than what has actually unlocked so far — the literal promise of
         // this feature ("staff can't skip or forget a step" also means
-        // staff are never shown a later step before an earlier one). 4d
+        // staff are never shown a later step before an earlier one). 5a
         // and 6c are excluded as documented above — they are intentionally
         // not stage-gated. The order-detail-page rebuild relabelled every
         // badge to the user's own step numbering rather than the DB's
@@ -94,7 +94,7 @@ final class StepBadgeTest extends DbTestCase
         $badgeStage = [
             '1a' => 1,
             '4a' => 2, '4b' => 2, '4c' => 2,
-            '5a' => 3, '5b' => 3, '5c' => 3,
+            '5c' => 3, '5d' => 3, '5e' => 3,
             '6a' => 4, '6b' => 4,
             '7a' => 5, '7b' => 5, '7c' => 5, '7d' => 5,
             '9a' => 6, '9b' => 6, '9c' => 6, '9d' => 6,
@@ -110,7 +110,7 @@ final class StepBadgeTest extends DbTestCase
             $output = $this->render($orderId);
             preg_match_all('/class="step-badge" title="Step ([0-9a-z]+)"/', $output, $matches);
             foreach ($matches[1] as $badge) {
-                if ($badge === '4d' || $badge === '6c') {
+                if ($badge === '5a' || $badge === '6c') {
                     continue;
                 }
                 self::assertArrayHasKey($badge, $badgeStage, "unrecognised step badge '{$badge}' — update this test's badge-to-stage map");
@@ -134,7 +134,9 @@ final class StepBadgeTest extends DbTestCase
         // Confirmation -> Supplier PO), not DB stage_number order, and
         // every badge now carries that same user-step numbering too, so
         // the badges appear in ascending step order: 1a -> 4a -> 5a -> 6a
-        // -> 7a.
+        // -> 7a. (5a is itself an always-rendered exception — see above —
+        // but its card still sits positionally inside the Step 5 group,
+        // between Step 4's and Step 6's, so the ordering check still holds.)
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->unlockThrough($orderId, 4);
         self::assertTrue(StageGateService::isUnlocked($orderId, 5));
