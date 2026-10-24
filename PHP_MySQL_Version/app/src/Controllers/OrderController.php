@@ -40,6 +40,7 @@ use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductionRepository;
 use App\Repositories\OrderProductRepository;
+use App\Repositories\OrderAssigneeRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderBlEndorsementRepository;
 use App\Repositories\OrderCancellationRepository;
@@ -845,7 +846,7 @@ final class OrderController
         // act on a step (manage_payments/clear_payments/manage_shipping/
         // etc. are unaffected and checked exactly as before, below).
         $seesAllOrders = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_all_orders');
-        if (!$seesAllOrders && (int) ($order['assigned_to'] ?? 0) !== (int) $actor['id']) {
+        if (!$seesAllOrders && !OrderAssigneeRepository::isAssignedTo($orderId, (int) $actor['id'])) {
             http_response_code(403);
             echo 'This order is assigned to a different user. You can only open orders assigned to you.';
             return;
@@ -943,6 +944,7 @@ final class OrderController
             'order'    => $order,
             'canAssignOwner' => $canAssignOwner,
             'seesAllOrders' => $seesAllOrders,
+            'assignees' => OrderAssigneeRepository::forOrder($orderId),
             'leadTimeDisplayUnit' => CompanySettingsRepository::get('lead_time_display_unit') ?: 'days',
             'products' => OrderProductRepository::forOrder($orderId),
             'hsCodes'  => HsCodeRepository::active(),
@@ -1015,12 +1017,13 @@ final class OrderController
     }
 
     /**
-     * Order ownership / assignment visibility — reassigns an order's
-     * single owner. Route-gated to assign_order_owner (Admin/MD/ED only);
-     * this method doesn't re-check it. Visibility-only: never touches
-     * stage-gate or action-permission checks elsewhere on this order.
+     * Order ownership / assignment visibility — adds a staff member to an
+     * order's assignee list. Route-gated to assign_order_owner (Admin/MD/ED
+     * only); this method doesn't re-check it. Visibility-only: never
+     * touches stage-gate or action-permission checks elsewhere on this
+     * order.
      */
-    public function assignOwner(array $params): void
+    public function addAssignee(array $params): void
     {
         $orderId = (int) $params['id'];
         $order = OrderRepository::find($orderId);
@@ -1030,17 +1033,42 @@ final class OrderController
             return;
         }
 
-        $newOwnerId = (int) ($_POST['assigned_to'] ?? 0);
-        $newOwner = $newOwnerId > 0 ? UserRepository::findById($newOwnerId) : null;
-        if (!$newOwner || !$newOwner['is_active']) {
+        $userId = (int) ($_POST['user_id'] ?? 0);
+        $user = $userId > 0 ? UserRepository::findById($userId) : null;
+        if (!$user || !$user['is_active']) {
             Flash::set('error', 'Select a valid, active user to assign this order to.');
             header("Location: /orders/{$orderId}");
             return;
         }
 
         try {
-            OrderAssignmentService::reassign($orderId, $newOwnerId, (int) AuthService::currentUser()['id']);
-            Flash::set('success', "Order reassigned to {$newOwner['name']}.");
+            OrderAssignmentService::addAssignee($orderId, $userId, (int) AuthService::currentUser()['id']);
+            Flash::set('success', "{$user['name']} added as an assignee on this order.");
+        } catch (\Throwable $e) {
+            Flash::setErrorFromException($e);
+        }
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Order ownership / assignment visibility — removes a staff member
+     * from an order's assignee list. Route-gated to assign_order_owner
+     * (Admin/MD/ED only); this method doesn't re-check it.
+     */
+    public function removeAssignee(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $userId = (int) $params['userId'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header('Location: /orders');
+            return;
+        }
+
+        try {
+            OrderAssignmentService::removeAssignee($orderId, $userId, (int) AuthService::currentUser()['id']);
+            Flash::set('success', 'Assignee removed from this order.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
         }

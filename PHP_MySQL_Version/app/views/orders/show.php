@@ -382,19 +382,31 @@ $stepStatusIcon = static function (string $status): string {
     <?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_city'] ?? $order['port_of_loading_name'] ?? '') ?>
     <?php if ($canViewReports): ?>&nbsp;·&nbsp; <a href="/reports/order/<?= (int) $order['id'] ?>">Full Report</a><?php endif; ?>
     <?php if ($canManageOrders): ?>&nbsp;·&nbsp; <a href="/orders/<?= (int) $order['id'] ?>/edit">Edit Order Details</a><?php endif; ?>
-    <?php if (!empty($seesAllOrders)): ?>&nbsp;·&nbsp; Assigned to: <strong><?= htmlspecialchars($order['assigned_to_name'] ?? 'Unassigned') ?></strong><?php endif; ?>
+    <?php if (!empty($seesAllOrders)): ?>&nbsp;·&nbsp; Assigned to:
+      <strong><?= $assignees ? htmlspecialchars(implode(', ', array_column($assignees, 'name'))) : 'Unassigned' ?></strong>
+    <?php endif; ?>
   </p>
   <?php if (!empty($canAssignOwner)): ?>
-  <form method="post" action="/orders/<?= (int) $order['id'] ?>/assign" class="btn-row" style="margin-top:-6px;align-items:center;">
+  <?php $__assignedUserIds = array_column($assignees, 'user_id'); ?>
+  <div class="btn-row" style="margin-top:-6px;align-items:center;flex-wrap:wrap;">
+    <?php foreach ($assignees as $__assignee): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/assignees/<?= (int) $__assignee['user_id'] ?>/remove" style="display:inline" onsubmit="return confirm('Remove <?= htmlspecialchars(addslashes($__assignee['name'])) ?> as an assignee on this order?');">
+        <?= Csrf::field() ?>
+        <span class="tag tag-navy"><?= htmlspecialchars($__assignee['name']) ?> <button type="submit" class="btn-sm btn-danger" style="padding:0 4px;margin-left:4px;" title="Remove">&times;</button></span>
+      </form>
+    <?php endforeach; ?>
+  </div>
+  <form method="post" action="/orders/<?= (int) $order['id'] ?>/assignees" class="btn-row" style="margin-top:4px;align-items:center;">
     <?= Csrf::field() ?>
-    <label class="muted small" style="margin:0;">Reassign to
-      <select name="assigned_to" style="margin-left:4px;">
+    <label class="muted small" style="margin:0;">Add assignee
+      <select name="user_id" style="margin-left:4px;">
         <?php foreach ($activeUsers as $u): ?>
-          <option value="<?= (int) $u['id'] ?>"<?= (int) ($order['assigned_to'] ?? 0) === (int) $u['id'] ? ' selected' : '' ?>><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role_name'] ?? '—') ?>)</option>
+          <?php if (in_array((int) $u['id'], $__assignedUserIds, true)): continue; endif; ?>
+          <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role_name'] ?? '—') ?>)</option>
         <?php endforeach; ?>
       </select>
     </label>
-    <button type="submit" class="btn-sm">Reassign</button>
+    <button type="submit" class="btn-sm">Add</button>
   </form>
   <?php endif; ?>
   <?php if ($duplicatedFromOrder): ?>

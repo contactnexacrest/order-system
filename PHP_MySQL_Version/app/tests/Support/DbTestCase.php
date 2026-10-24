@@ -100,8 +100,13 @@ abstract class DbTestCase extends TestCase
         string $currencyCode = 'USD',
         ?int $portOfLoadingId = null,
         ?int $portOfDischargeId = null,
-        ?int $assignedTo = null
+        int|array|null $assignedTo = null
     ): int {
+        $assigneeIds = match (true) {
+            $assignedTo === null => [],
+            is_array($assignedTo) => $assignedTo,
+            default => [$assignedTo],
+        };
         $pdo = \App\Config\Database::connection();
 
         $incotermStmt = $pdo->prepare('SELECT id, code FROM incoterms WHERE code = :code');
@@ -159,7 +164,6 @@ abstract class DbTestCase extends TestCase
             'INSERT INTO orders
                 (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
                  currency_id, coo_type, buyers_po_ref, quotation_date, quotation_valid_until, status,
-                 assigned_to,
                  port_of_loading_id, port_of_discharge_id,
                  incoterm_code, currency_code, preset_name, advance_pct, advance_trigger_text, payment_method,
                  balance_pct, balance_trigger_option, balance_days, balance_trigger_wording, show_bl_instructions,
@@ -176,7 +180,6 @@ abstract class DbTestCase extends TestCase
              VALUES
                 (:ref, :client_id, 1, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, \'TBC\', \'NIL\',
                  CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), \'active\',
-                 :assigned_to,
                  :port_of_loading_id, :port_of_discharge_id,
                  :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text, :payment_method,
                  :balance_pct, :balance_trigger_option, :balance_days, :balance_trigger_wording, :show_bl_instructions,
@@ -198,7 +201,6 @@ abstract class DbTestCase extends TestCase
             'preset_id'   => $presetId,
             'incoterm_id' => $incotermId,
             'currency_id' => $currencyId,
-            'assigned_to' => $assignedTo,
             'port_of_loading_id'      => $portOfLoadingId,
             'port_of_discharge_id'    => $portOfDischargeId,
             'incoterm_code'           => $incoterm['code'],
@@ -254,6 +256,10 @@ abstract class DbTestCase extends TestCase
         $orderId = (int) $pdo->lastInsertId();
 
         \App\Repositories\OrderStageRepository::initializeForOrder($orderId);
+
+        foreach ($assigneeIds as $assigneeId) {
+            \App\Repositories\OrderAssigneeRepository::add($orderId, $assigneeId, $assigneeId);
+        }
 
         return $orderId;
     }

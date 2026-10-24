@@ -91,7 +91,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('view_clients', 'View clients (read-only)', 'See the Clients list and a client''s detail page without being able to create, edit, or act on it. Anyone holding manage_orders already has this implicitly — this permission exists only for a view-only tier that holds no manage_orders.', 'clients'),
   -- Order ownership / assignment visibility (see docs/migrations/2026-10-24b-order-owner-assignment.sql)
   ('view_all_orders',   'View all orders regardless of assignment', 'See every order in the Orders list, Kanban board, and order detail page, not just ones assigned to you. Oversight roles only.', 'orders'),
-  ('assign_order_owner', 'Assign/reassign order owner', 'Set or change which single user owns an order (orders.assigned_to). Visibility-only control — never affects stage-gate or payment/shipping permissions.', 'orders');
+  ('assign_order_owner', 'Manage order assignees', 'Add or remove which staff are assigned to an order (order_assignees). Visibility-only control — never affects stage-gate or payment/shipping permissions.', 'orders');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)

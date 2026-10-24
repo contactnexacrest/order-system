@@ -134,7 +134,7 @@ final class OrderComplianceChecklistTest extends DbTestCase
     public function testOrderPageShowsChecklistOnlyToUsersWithCloseOrdersPermission(): void
     {
         $withPermission = $this->createTestUser('Export Executive');
-        \App\Repositories\OrderRepository::setAssignedTo($this->orderId, $withPermission);
+        \App\Repositories\OrderAssigneeRepository::add($this->orderId, $withPermission, $withPermission);
         $_SESSION['_auth_user_id'] = $withPermission;
         ob_start();
         (new OrderController())->show(['id' => (string) $this->orderId]);

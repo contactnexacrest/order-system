@@ -49,11 +49,13 @@ final class OrderRepository
      */
     public static function allVisibleTo(int $userId, bool $seesAll): array
     {
-        $scopeClause = $seesAll ? '' : 'AND o.assigned_to = :user_id';
+        $scopeClause = $seesAll ? '' : 'AND EXISTS (SELECT 1 FROM order_assignees oa WHERE oa.order_id = o.id AND oa.user_id = :user_id)';
         $stmt = Database::connection()->prepare(
             "SELECT o.*, sm.stage_name AS current_stage_name,
                     sm.stage_number AS current_stage_number,
-                    au.name AS assigned_to_name,
+                    (SELECT GROUP_CONCAT(u2.name ORDER BY u2.name SEPARATOR ', ')
+                     FROM order_assignees oa2 JOIN users u2 ON u2.id = oa2.user_id
+                     WHERE oa2.order_id = o.id) AS assignee_names,
                     (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
                     EXISTS (
                         SELECT 1 FROM order_payment_status ops
@@ -62,7 +64,6 @@ final class OrderRepository
                     ) AS is_overdue
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             LEFT JOIN users au ON au.id = o.assigned_to
              WHERE o.is_archived = 0 {$scopeClause}
              ORDER BY o.created_at DESC, o.id DESC"
         );
@@ -89,14 +90,6 @@ final class OrderRepository
         Database::connection()->prepare(
             'UPDATE orders SET is_archived = 1, archived_at = NOW(), archived_by = :archived_by WHERE id = :id'
         )->execute(['archived_by' => $archivedBy, 'id' => $orderId]);
-    }
-
-    /** Visibility-only — see OrderAssignmentService::reassign() for the full write path (audit log + notification). */
-    public static function setAssignedTo(int $orderId, int $assignedTo): void
-    {
-        Database::connection()->prepare(
-            'UPDATE orders SET assigned_to = :assigned_to WHERE id = :id'
-        )->execute(['assigned_to' => $assignedTo, 'id' => $orderId]);
     }
 
     public static function unarchive(int $orderId): void
@@ -135,12 +128,13 @@ final class OrderRepository
                     c.agreement_expiry_date, c.agreement_force_expired,
                     sm.stage_name AS current_stage_name, sm.stage_slug AS current_stage_slug,
                     sm.stage_number AS current_stage_number,
-                    au.name AS assigned_to_name,
+                    (SELECT GROUP_CONCAT(u2.name ORDER BY u2.name SEPARATOR \', \')
+                     FROM order_assignees oa2 JOIN users u2 ON u2.id = oa2.user_id
+                     WHERE oa2.order_id = o.id) AS assignee_names,
                     (o.active_amendment_id IS NOT NULL) AS has_active_amendment
              FROM orders o
              JOIN clients c ON c.id = o.client_id
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             LEFT JOIN users au ON au.id = o.assigned_to
              WHERE o.id = :id'
         );
         $stmt->execute(['id' => $id]);
@@ -409,7 +403,7 @@ final class OrderRepository
                  sailing_lead_time_min_days, sailing_lead_time_max_days,
                  indicative_freight_amount,
                  indicative_insurance_amount, buyers_po_ref, quotation_date, quotation_valid_until,
-                 status, created_by, assigned_to, duplicated_from_order_id,
+                 status, created_by, duplicated_from_order_id,
                  incoterm_code, currency_code, port_of_loading_name, port_of_loading_city,
                  port_of_discharge_name, port_of_discharge_city, preset_name, advance_pct,
                  advance_trigger_text, payment_method, balance_pct, balance_trigger_option, balance_days,
@@ -432,7 +426,7 @@ final class OrderRepository
                  :sailing_lead_time_min_days, :sailing_lead_time_max_days,
                  :indicative_freight_amount,
                  :indicative_insurance_amount, :buyers_po_ref, :quotation_date, :quotation_valid_until,
-                 \'active\', :created_by, :assigned_to, :duplicated_from_order_id,
+                 \'active\', :created_by, :duplicated_from_order_id,
                  :incoterm_code, :currency_code, :port_of_loading_name, :port_of_loading_city,
                  :port_of_discharge_name, :port_of_discharge_city, :preset_name, :advance_pct,
                  :advance_trigger_text, :payment_method, :balance_pct, :balance_trigger_option, :balance_days,
@@ -478,11 +472,6 @@ final class OrderRepository
             'quotation_date'              => $data['quotation_date'],
             'quotation_valid_until'       => $data['quotation_valid_until'],
             'created_by'                  => $createdBy,
-            // Auto-assigned to whoever creates the order — only a holder of
-            // assign_order_owner (Admin/MD/ED) can change it afterward, via
-            // OrderAssignmentService::reassign(). Visibility-only; never
-            // consulted by the stage-gate/permission system.
-            'assigned_to'                 => $createdBy,
             'duplicated_from_order_id'    => $data['duplicated_from_order_id'] ?? null,
             'incoterm_code'               => $snapshot['incoterm_code'],
             'currency_code'               => $snapshot['currency_code'],
@@ -534,7 +523,15 @@ final class OrderRepository
             'notify_party_phone'          => $snapshot['notify_party_phone'],
             'notify_party_email'          => $snapshot['notify_party_email'],
         ]);
-        return (int) $pdo->lastInsertId();
+        $orderId = (int) $pdo->lastInsertId();
+
+        // Auto-assigned to whoever creates the order — only a holder of
+        // assign_order_owner (Admin/MD/ED) can add/remove assignees
+        // afterward, via OrderAssignmentService. Visibility-only; never
+        // consulted by the stage-gate/permission system.
+        OrderAssigneeRepository::add($orderId, $createdBy, $createdBy);
+
+        return $orderId;
     }
 
     /** Repeat orders created from this one (staff "Duplicate Order" or an approved client reorder), newest first. */
