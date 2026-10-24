@@ -394,14 +394,36 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
    each action" (every card still fully separate, own heading/badge) —
    neither collapses the other out. Each card inside keeps working
    exactly as a standalone .step-card; this is a presentation wrapper
-   only, no gating logic of its own. */
-.step-group{border:1.5px solid var(--navy-soft);border-radius:14px;padding:0.9rem 0.9rem 0.3rem;display:flex;flex-direction:column;gap:0.9rem;}
-.step-group-header{display:flex;align-items:baseline;gap:0.5rem;padding:0 0.2rem;}
+   only, no gating logic of its own.
+   Collapsible (native <details>), same discipline as .step-card: only
+   the group matching the order's current stage starts open — every
+   other group (done or not yet reached) starts collapsed with its own
+   status icon in the header, so page length stays controlled on long
+   orders instead of showing every stage's cards at once. */
+.step-group{border:1.5px solid var(--navy-soft);border-radius:14px;padding:0 0.9rem;}
+.step-group[open]{padding:0.9rem 0.9rem 0.3rem;display:flex;flex-direction:column;gap:0.9rem;}
+.step-group > summary{list-style:none;cursor:pointer;padding:0.9rem 0;display:flex;align-items:baseline;gap:0.5rem;}
+.step-group > summary::-webkit-details-marker{display:none;}
 .step-group-num{background:var(--navy);color:#fff;font-size:0.68rem;font-weight:800;border-radius:999px;padding:3px 9px;letter-spacing:0.02em;flex:none;}
-.step-group-header h3{margin:0;font-size:0.98rem;font-weight:700;color:var(--navy-strong);}
+.step-group > summary h3{margin:0;font-size:0.98rem;font-weight:700;color:var(--navy-strong);}
+.step-group[open] > summary{border-bottom:1px solid var(--navy-soft);margin-bottom:0.3rem;padding-bottom:0.6rem;}
+.step-group:not([open]) > summary:hover{background:var(--navy-soft);margin:0 -0.9rem;padding-left:0.9rem;padding-right:0.9rem;border-radius:14px;}
 .step-group-connector{display:flex;align-items:center;gap:0.4rem;padding:0 0.3rem;color:var(--ink-soft);font-size:0.72rem;margin:-0.45rem 0;}
 .step-group-connector::before{content:"\2193";color:var(--gold-strong);font-size:0.85rem;}
 .step-group > .step-card{margin:0;}
+
+/* Payment Overview: real tabs (Snapshot/Ledger/Full Status are parallel
+   views of the same data, not a sequence — unlike the step sub-steps
+   above, which deliberately keep the connector-arrow stacked-card
+   layout instead of becoming tabs). Zero-JS-safe: no panel is hidden in
+   the static markup, so with JS disabled all three show stacked and
+   fully usable; app.js applies single-pane switching at runtime and
+   hides every panel but the active one. */
+.tabs-nav{display:flex;gap:0.3rem;border-bottom:1px solid var(--line);margin-bottom:1rem;flex-wrap:wrap;}
+.tab-btn{appearance:none;border:none;background:none;cursor:pointer;padding:0.5rem 0.9rem;font-size:0.85rem;font-weight:600;color:var(--ink-soft);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tab-btn:hover{color:var(--navy);}
+.tab-btn[aria-selected="true"]{color:var(--navy);border-bottom-color:var(--navy);}
+.tab-panel + .tab-panel{margin-top:1.2rem;}
 .order-detail-sidebar{flex:0 0 280px;position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow-y:auto;display:flex;flex-direction:column;gap:1rem;}
 .sidebar-panel{border:1px solid var(--line);border-radius:12px;background:#fff;padding:1rem 1.1rem;}
 .sidebar-panel h3{margin:0 0 0.7rem;font-size:0.85rem;font-weight:700;color:var(--ink);}

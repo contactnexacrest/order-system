@@ -350,7 +350,11 @@ $stepStates = [
 $currentUserStep = '17';
 foreach ($stepStates as $__step => $__status) {
     if ($__status !== 'done') {
-        $currentUserStep = $__step;
+        // PHP casts a purely-numeric array key (e.g. '4') to an int, so
+        // $__step here is int(4), not string('4') — cast back to string
+        // or every $stepCardOpen('4') call below (string param) fails
+        // its strict === against this int and never opens that card.
+        $currentUserStep = (string) $__step;
         break;
     }
 }
@@ -543,7 +547,7 @@ $stepStatusIcon = static function (string $status): string {
   <div class="order-layout" id="order-layout">
     <div class="step-sequence" id="order-panels">
 
-  <details class="step-card" id="step-products" open>
+  <details class="step-card" id="step-products">
     <summary><h2>Products</h2></summary>
     <?php if (!$canEditProducts): ?>
       <table class="list">
@@ -664,8 +668,15 @@ $stepStatusIcon = static function (string $status): string {
     <summary><h2>Payment Overview <small class="muted">(reference — every leg, always current)</small></h2></summary>
     <p class="muted small">Pinned here at the top rather than wherever it happened to sit in the sequence, since it's referenced from every payment step below and staff need it at a glance regardless of which step they're on.</p>
 
-    <details open>
-      <summary>Snapshot</summary>
+    <div class="tabs" data-tabs>
+      <div class="tabs-nav" role="tablist">
+        <button type="button" class="tab-btn" data-tab-target="payment-overview-snapshot" aria-selected="true">Snapshot</button>
+        <button type="button" class="tab-btn" data-tab-target="payment-overview-ledger" aria-selected="false">Ledger</button>
+        <button type="button" class="tab-btn" data-tab-target="payment-overview-full-status" aria-selected="false">Full Status</button>
+      </div>
+
+      <div class="tab-panel" id="payment-overview-snapshot" data-tab-panel>
+        <h3>Snapshot</h3>
       <div class="kv-grid">
         <?php foreach ($paymentLegs as $leg): ?>
         <div>
@@ -686,10 +697,10 @@ $stepStatusIcon = static function (string $status): string {
       <?php if (!$canViewPaymentAmounts): ?>
       <p class="muted small">Amounts are only shown to Accounts/Logistics/Export staff who can manage or close this order.</p>
       <?php endif; ?>
-    </details>
+      </div>
 
-    <details>
-      <summary>Ledger</summary>
+      <div class="tab-panel" id="payment-overview-ledger" data-tab-panel>
+        <h3>Ledger</h3>
       <p class="muted">A single, read-only history of every payment-related event recorded against this order — consolidating what's otherwise scattered across Payment Status and Client-Reported Payments. Nothing here can be edited; use the forms in each payment step to record new events.</p>
       <?php if (empty($ledgerEvents)): ?>
       <p class="muted small">No payment events recorded yet.</p>
@@ -708,10 +719,10 @@ $stepStatusIcon = static function (string $status): string {
         <?php endforeach; ?>
       </table>
       <?php endif; ?>
-    </details>
+      </div>
 
-    <details>
-      <summary>Full Status</summary>
+      <div class="tab-panel" id="payment-overview-full-status" data-tab-panel>
+        <h3>Full Status</h3>
       <?php if ($payment): ?>
       <div class="kv-grid">
         <div><span class="k">Advance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['advance_amount'] !== null ? number_format((float) $payment['advance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
@@ -761,52 +772,8 @@ $stepStatusIcon = static function (string $status): string {
           <?php endforeach; ?>
         </table>
       <?php endif; ?>
-    </details>
-  </details>
-
-  <details class="step-card" id="step-1-quotation-prepare"<?= $stepCardOpen('1-3') ?>>
-    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 1 &middot; Prepare Quotation</h2></summary>
-    <?php
-      // Batch 3 #5 — differentiate 'not yet generated' vs 'already generated, this regenerates
-      // it' document buttons visually, instead of every visible button looking identical.
-      $__genTypes = array_column($documents, 'document_type_code');
-      $__docBtnClass = static fn (string $code): string => 'btn-sm ' . (in_array($code, $__genTypes, true) ? 'btn-doc-regenerate' : 'btn-doc-new');
-    ?>
-    <div class="btn-row">
-      <?php if ($stage1 && $stage1['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="QT">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('1a') ?><button type="submit" class="<?= $__docBtnClass('QT') ?>" data-loading-text="Generating…"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button>
-        </form>
-      <?php endif; ?>
-
-      <?php if ($order['include_annexure_a']): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-          <?= Csrf::field() ?>
-          <input type="hidden" name="document_type" value="ANNEXA">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('ANNEXA') ?>" data-loading-text="Generating…">Generate Annexure A</button>
-        </form>
-      <?php endif; ?>
+      </div>
     </div>
-    <?php if ($canManageOrders): ?>
-    <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>/annexure"><?= $order['include_annexure_a'] ? 'Manage Annexure A product entries &amp; images' : 'Enable / manage Annexure A' ?></a></p>
-    <?php endif; ?>
-    <p class="muted small">Review, approval, and sending to the buyer happen in <a href="#document-review-approval">Document Review &amp; Approval</a> below, once generated.</p>
-  </details>
-
-  <details class="step-card step-card-reference" id="step-2-quotation-send"<?= $stepCardOpen('1-3') ?>>
-    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 2 &middot; Send Quotation to Client</h2></summary>
-    <p class="muted small">Sending happens through the shared <a href="#document-review-approval">Document Review &amp; Approval</a> workflow below &mdash; every generated document (not just the Quotation) is assigned a reviewer, approved, and dispatched from that one place, regardless of which step generated it. Once the Quotation is approved there, use its own "Send to Buyer" action.</p>
-  </details>
-
-  <details class="step-card step-card-reference" id="step-3-quotation-accept"<?= $stepCardOpen('1-3') ?>>
-    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 3 &middot; Client Accepts Quotation</h2></summary>
-    <p class="muted small">There's no separate "accepted" button to click &mdash; the buyer's acceptance happens outside the system (a reply email, a call, a signed copy). Once your team is satisfied the client has accepted, move on to <a href="#step-4a-buyer-po-generate">Step 4a &middot; Buyer's PO</a>.</p>
   </details>
 
   <details class="step-card step-card-reference" id="document-review-approval" open>
@@ -1095,9 +1062,54 @@ $stepStatusIcon = static function (string $status): string {
       </details>
     <?php endforeach; ?>
   </details>
+  <details class="step-card" id="step-1-quotation-prepare"<?= $stepCardOpen('1-3') ?>>
+    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 1 &middot; Prepare Quotation</h2></summary>
+    <?php
+      // Batch 3 #5 — differentiate 'not yet generated' vs 'already generated, this regenerates
+      // it' document buttons visually, instead of every visible button looking identical.
+      $__genTypes = array_column($documents, 'document_type_code');
+      $__docBtnClass = static fn (string $code): string => 'btn-sm ' . (in_array($code, $__genTypes, true) ? 'btn-doc-regenerate' : 'btn-doc-new');
+    ?>
+    <div class="btn-row">
+      <?php if ($stage1 && $stage1['status'] !== 'locked'): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="QT">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <?= $stepBadge('1a') ?><button type="submit" class="<?= $__docBtnClass('QT') ?>" data-loading-text="Generating…"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button>
+        </form>
+      <?php endif; ?>
 
-  <div class="step-group">
-    <div class="step-group-header"><span class="step-group-num">STEP 4</span><h3>Buyer's PO</h3></div>
+      <?php if ($order['include_annexure_a']): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="ANNEXA">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <button type="submit" class="<?= $__docBtnClass('ANNEXA') ?>" data-loading-text="Generating…">Generate Annexure A</button>
+        </form>
+      <?php endif; ?>
+    </div>
+    <?php if ($canManageOrders): ?>
+    <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>/annexure"><?= $order['include_annexure_a'] ? 'Manage Annexure A product entries &amp; images' : 'Enable / manage Annexure A' ?></a></p>
+    <?php endif; ?>
+    <p class="muted small">Review, approval, and sending to the buyer happen in <a href="#document-review-approval">Document Review &amp; Approval</a> below, once generated.</p>
+  </details>
+
+  <details class="step-card step-card-reference" id="step-2-quotation-send"<?= $stepCardOpen('1-3') ?>>
+    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 2 &middot; Send Quotation to Client</h2></summary>
+    <p class="muted small">Sending happens through the shared <a href="#document-review-approval">Document Review &amp; Approval</a> workflow below &mdash; every generated document (not just the Quotation) is assigned a reviewer, approved, and dispatched from that one place, regardless of which step generated it. Once the Quotation is approved there, use its own "Send to Buyer" action.</p>
+  </details>
+
+  <details class="step-card step-card-reference" id="step-3-quotation-accept"<?= $stepCardOpen('1-3') ?>>
+    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 3 &middot; Client Accepts Quotation</h2></summary>
+    <p class="muted small">There's no separate "accepted" button to click &mdash; the buyer's acceptance happens outside the system (a reply email, a call, a signed copy). Once your team is satisfied the client has accepted, move on to <a href="#step-4a-buyer-po-generate">Step 4a &middot; Buyer's PO</a>.</p>
+  </details>
+
+
+  <details class="step-group" id="step-group-stage-2"<?= $stepCardOpen('4') ?>>
+    <summary><?= $stepStatusIcon($stepStates['4']) ?><span class="step-group-num">STEP 4</span><h3>Buyer's PO</h3></summary>
 
     <details class="step-card" id="step-4a-buyer-po-generate"<?= $stepCardOpen('4') ?>>
       <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4a &middot; Generate Buyer's PO</h2></summary>
@@ -1157,10 +1169,10 @@ $stepStatusIcon = static function (string $status): string {
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
       <?php endif; ?>
     </details>
-  </div>
+  </details>
 
-  <div class="step-group">
-    <div class="step-group-header"><span class="step-group-num">STEP 5</span><h3>Proforma Invoice &amp; Payment</h3></div>
+  <details class="step-group" id="step-group-stage-3"<?= $stepCardOpen('5') ?>>
+    <summary><?= $stepStatusIcon($stepStates['5']) ?><span class="step-group-num">STEP 5</span><h3>Proforma Invoice &amp; Payment</h3></summary>
 
     <details class="step-card" id="step-5a-pi-form-link"<?= $stepCardOpen('5') ?>>
       <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5a &middot; Generate PI Form Link</h2></summary>
@@ -1326,7 +1338,7 @@ $stepStatusIcon = static function (string $status): string {
       <?php endif; ?>
     </details>
     <?php endif; ?>
-  </div>
+  </details>
 
   <details class="step-card step-card-reference" id="step-5-lc-bank-loan">
     <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; financing cost, not the LC leg above)</small></h2></summary>
@@ -1338,8 +1350,8 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
-  <div class="step-group">
-    <div class="step-group-header"><span class="step-group-num">STEP 6</span><h3>Order Confirmation</h3></div>
+  <details class="step-group" id="step-group-stage-4"<?= $stepCardOpen('6') ?>>
+    <summary><?= $stepStatusIcon($stepStates['6']) ?><span class="step-group-num">STEP 6</span><h3>Order Confirmation</h3></summary>
 
   <details class="step-card" id="step-6a-oc-generate"<?= $stepCardOpen('6') ?>>
     <summary><?= $stepStatusIcon($stepStates['6']) ?><h2>Step 6a &middot; Generate Order Confirmation</h2></summary>
@@ -1441,10 +1453,10 @@ $stepStatusIcon = static function (string $status): string {
 
   <?php $supplierPoLocked = !$stage5 || $stage5['status'] === 'locked'; ?>
 
-  </div>
+  </details>
 
-  <div class="step-group">
-    <div class="step-group-header"><span class="step-group-num">STEP 7</span><h3>Supplier PO</h3></div>
+  <details class="step-group" id="step-group-stage-5"<?= $stepCardOpen('7') ?>>
+    <summary><?= $stepStatusIcon($stepStates['7']) ?><span class="step-group-num">STEP 7</span><h3>Supplier PO</h3></summary>
 
   <details class="step-card" id="step-7a-supplier-po-terms"<?= $stepCardOpen('7') ?>>
     <summary><?= $stepStatusIcon($stepStates['7']) ?><h2>Step 7a &middot; Save Supplier PO Terms</h2></summary>
@@ -1765,7 +1777,7 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
-  </div>
+  </details>
 
   <details class="step-card" id="step-production"<?= $stepCardOpen('8') ?>>
     <summary><?= $stepStatusIcon($stepStates['8']) ?><h2>Step 8 &middot; Production &amp; Estimated Shipment</h2></summary>
@@ -1810,8 +1822,8 @@ $stepStatusIcon = static function (string $status): string {
 
   <?php $freightLocked = !$isFob && (!$stage6 || $stage6['status'] === 'locked'); ?>
 
-  <div class="step-group">
-    <div class="step-group-header"><span class="step-group-num">STEP 9</span><h3>Freight Payment</h3></div>
+  <details class="step-group" id="step-group-stage-6"<?= $stepCardOpen('9') ?>>
+    <summary><?= $stepStatusIcon($stepStates['9']) ?><span class="step-group-num">STEP 9</span><h3>Freight Payment</h3></summary>
 
   <details class="step-card" id="step-9a-freight-terms"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9a &middot; Save Freight Terms<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
@@ -1911,10 +1923,10 @@ $stepStatusIcon = static function (string $status): string {
 
   <?php $packingLocked = !$stage7 || $stage7['status'] === 'locked'; ?>
 
-  </div>
+  </details>
 
-  <div class="step-group">
-    <div class="step-group-header"><span class="step-group-num">STEP 9</span><h3>Packing &amp; BL Instruction</h3></div>
+  <details class="step-group" id="step-group-stage-7"<?= $stepCardOpen('9') ?>>
+    <summary><?= $stepStatusIcon($stepStates['9']) ?><span class="step-group-num">STEP 9</span><h3>Packing &amp; BL Instruction</h3></summary>
 
   <details class="step-card" id="step-9e-packing"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9e &middot; Save Packing &amp; Crates</h2></summary>
@@ -2136,10 +2148,10 @@ $stepStatusIcon = static function (string $status): string {
     $ciBadge = static fn (string $fobLetter, string $postBlLetter): string => $isFob ? $fobLetter : $postBlLetter;
   ?>
 
-  </div>
+  </details>
 
-  <div class="step-group">
-    <div class="step-group-header"><span class="step-group-num">STEP 9-10</span><h3>Commercial Invoice &amp; Balance</h3></div>
+  <details class="step-group" id="step-group-stage-8"<?= $stepCardOpen('9-10') ?>>
+    <summary><?= $stepStatusIcon($stepStates['9-10']) ?><span class="step-group-num">STEP 9-10</span><h3>Commercial Invoice &amp; Balance</h3></summary>
 
   <details class="step-card" id="step-ci-generate"<?= $stepCardOpen('9-10') ?>>
     <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $ciBadge('9j', '10a') ?> &middot; Generate Commercial Invoice<?= $isFob ? ' (before shipment)' : ' (against BL)' ?></h2></summary>
@@ -2234,9 +2246,9 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
-  <?php if ($canManageOrderFinancials): ?>
-  </div>
+  </details>
 
+  <?php if ($canManageOrderFinancials): ?>
   <details class="step-card" id="order-financials"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11 &middot; Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
@@ -2465,8 +2477,8 @@ $stepStatusIcon = static function (string $status): string {
     // (after Close Order), so its letter doesn't sort before the rest.
   ?>
 
-  <div class="step-group">
-    <div class="step-group-header"><span class="step-group-num">STEP 11</span><h3>Closure &mdash; Documents &amp; Settlement</h3></div>
+  <details class="step-group" id="step-group-stage-9"<?= $stepCardOpen('11') ?>>
+    <summary><?= $stepStatusIcon($stepStates['11']) ?><span class="step-group-num">STEP 11</span><h3>Closure &mdash; Documents &amp; Settlement</h3></summary>
 
   <details class="step-card" id="step-11a-coo-prep"<?= $stepCardOpen('11') ?>>
     <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11a &middot; Generate COO Prep Sheet</h2></summary>
@@ -2633,9 +2645,9 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
-  <?php if ($canCloseOrders): ?>
-  </div>
+  </details>
 
+  <?php if ($canCloseOrders): ?>
   <details class="step-card step-card-reference" id="compliance-checklist">
     <summary><h2>Compliance Checklist <small class="muted">(reference — ECGC Cover, Pre-Shipment Inspection, etc.)</small></h2></summary>
     <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <?= $canManageComplianceTaskTypes ? '<a href="/compliance-task-types">Compliance Task Types</a>' : 'Compliance Task Types' ?> (Admin-only).</p>
@@ -2963,7 +2975,18 @@ $stepStatusIcon = static function (string $status): string {
       var el = document.getElementById(id);
       if (!el) { return false; }
       var details = el.tagName === 'DETAILS' ? el : el.closest('details');
-      if (details) { details.open = true; }
+      if (details) {
+        details.open = true;
+        // Opening a .step-group only reveals the group shell — every
+        // one of its own step-cards needs opening too, not just
+        // whichever one the server happened to mark current. Several
+        // (Step 5a, 6c) are deliberately reachable before their stage
+        // is actually current at all (optional, never-blocking
+        // channels available from the very first render), so a direct
+        // click always has to reach them regardless of server state.
+        var children = details.querySelectorAll(':scope > details');
+        Array.prototype.forEach.call(children, function (child) { child.open = true; });
+      }
       el.scrollIntoView({ block: 'start' });
       return true;
     }
@@ -2983,35 +3006,28 @@ $stepStatusIcon = static function (string $status): string {
       }
     });
 
-    // The top-of-page stage stepper dots jump to whichever card(s) cover
-    // that DB stage — each stage now maps to several single-action
-    // step-cards (nothing is grouped under one heading any more), so
-    // every entry is a list; the stepper scrolls to the first (primary)
-    // one but opens every card in the list, so none of that stage's
-    // cards are left unexpectedly collapsed.
-    var stageToCardId = {
-      1: ['step-1-quotation-prepare', 'step-2-quotation-send', 'step-3-quotation-accept', 'document-review-approval'],
-      2: ['step-4a-buyer-po-generate', 'step-4b-buyer-po-confirm', 'step-4c-buyer-po-attach'],
-      3: ['step-5a-pi-form-link', 'step-5b-pi-intake-apply', 'step-5c-pi-generate', 'step-5d-payment-record', 'step-5e-payment-confirm', 'step-5-lc-bank-loan'],
-      4: ['step-6a-oc-generate', 'step-6b-oc-acknowledge', 'step-6c-buyer-action-link'],
-      5: ['step-7a-supplier-po-terms', 'step-7b-supplier-po-generate', 'step-7c-supplier-po-signed', 'step-7d-supplier-po-attach'],
-      6: ['step-9a-freight-terms', 'step-9b-freight-debit-note', 'step-9c-freight-remittance', 'step-9d-freight-clear'],
-      7: ['step-9e-packing', 'step-9f-packing-list', 'step-9g-shipping-details', 'step-9h-bl-instruction', 'step-9i-bl-issued'],
-      8: ['step-ci-generate', 'step-ci-scanned-bl-sent', 'step-balance-record', 'step-balance-clear'],
-      9: ['step-11a-coo-prep', 'step-11b-bl-originals-received', 'step-11c-bl-endorsed-mark', 'step-11d-bl-endorsement-save', 'step-11f-bl-endorsement-generate', 'step-11g-close-order', 'step-despatch'],
+    // The top-of-page stage stepper dots jump to the stage's own parent
+    // group box (stages 2-9 each have exactly one — see the
+    // .step-group <details> above) rather than diving into one of its
+    // sub-items, so a click always lands on the same collapsible unit
+    // staff would reach by scrolling and opening it themselves. Stage 1
+    // has no group (standalone Quotation cards), so it targets the
+    // first of those instead.
+    var stageToGroupId = {
+      1: 'step-1-quotation-prepare',
+      2: 'step-group-stage-2',
+      3: 'step-group-stage-3',
+      4: 'step-group-stage-4',
+      5: 'step-group-stage-5',
+      6: 'step-group-stage-6',
+      7: 'step-group-stage-7',
+      8: 'step-group-stage-8',
+      9: 'step-group-stage-9',
     };
     var stepperSteps = document.querySelectorAll('.process-stepper .process-step');
     function jumpToStage(stageNumber) {
-      var ids = stageToCardId[String(stageNumber)] || [];
-      ids.forEach(function (id, idx) {
-        if (idx === 0) {
-          openAndScrollTo(id);
-          return;
-        }
-        var el = document.getElementById(id);
-        var details = el && (el.tagName === 'DETAILS' ? el : el.closest('details'));
-        if (details) { details.open = true; }
-      });
+      var id = stageToGroupId[String(stageNumber)];
+      if (id) { openAndScrollTo(id); }
     }
     Array.prototype.forEach.call(stepperSteps, function (step) {
       var stageNumber = step.dataset.stage;
@@ -3032,6 +3048,31 @@ $stepStatusIcon = static function (string $status): string {
       var current = panelsContainer.querySelector('details[open]');
       if (current) { current.scrollIntoView({ block: 'start' }); }
     }
+  })();
+
+  // Payment Overview's Snapshot/Ledger/Full Status: real single-pane
+  // tabs, zero-JS-safe. No panel is ever marked `hidden` in the static
+  // markup, so with JS disabled every panel shows stacked (degraded but
+  // fully usable); here JS switches to true tab behavior, hiding every
+  // panel but the one clicked, with the first active by default.
+  (function () {
+    var tabGroups = document.querySelectorAll('[data-tabs]');
+    Array.prototype.forEach.call(tabGroups, function (group) {
+      var buttons = group.querySelectorAll('.tab-btn');
+      var panels = group.querySelectorAll('[data-tab-panel]');
+      function activate(targetId) {
+        Array.prototype.forEach.call(panels, function (panel) {
+          panel.hidden = panel.id !== targetId;
+        });
+        Array.prototype.forEach.call(buttons, function (btn) {
+          btn.setAttribute('aria-selected', String(btn.dataset.tabTarget === targetId));
+        });
+      }
+      Array.prototype.forEach.call(buttons, function (btn) {
+        btn.addEventListener('click', function () { activate(btn.dataset.tabTarget); });
+      });
+      if (buttons.length) { activate(buttons[0].dataset.tabTarget); }
+    });
   })();
   </script>
 </div>

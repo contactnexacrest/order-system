@@ -17,6 +17,12 @@ use App\Tests\Support\DbTestCase;
  * the order sees each leg's STATUS, but only manage_payments/close_orders
  * (Super Admin already covered transitively through PermissionService::can())
  * see the actual figures — "only able to see the needed things."
+ *
+ * UI-polish round: Snapshot/Ledger/Full Status became real tabs (parallel
+ * views of the same data) instead of nested <details>, so both panels are
+ * always present in the static markup (zero-JS-safe degrade — JS applies
+ * the single-pane switching at runtime) and are asserted by their
+ * tab-panel id rather than a now-gone per-panel <summary>.
  */
 final class PaymentLedgerTest extends DbTestCase
 {
@@ -33,8 +39,8 @@ final class PaymentLedgerTest extends DbTestCase
         $output = ob_get_clean();
 
         self::assertStringContainsString('Payment Overview', $output);
-        self::assertStringContainsString('<summary>Snapshot</summary>', $output);
-        self::assertStringContainsString('<summary>Ledger</summary>', $output);
+        self::assertStringContainsString('id="payment-overview-snapshot"', $output);
+        self::assertStringContainsString('id="payment-overview-ledger"', $output);
         self::assertStringContainsString('Received, pending clearance', $output);
         self::assertStringNotContainsString('5,000.00', $output);
     }
