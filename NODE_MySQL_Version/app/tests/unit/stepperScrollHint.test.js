@@ -27,22 +27,21 @@ describe('Stepper scroll hint and short tab labels (External QA report U-12)', (
     expect(css).toMatch(/@media \(max-width:900px\)\{\s*\.stepper-scroll-hint\{display:block;\}/);
   });
 
-  it('the longest section headings have a short tab label alias', () => {
+  /**
+   * The order-detail-page rebuild (step-card sequence) removed the
+   * JS-built mobile section-tab bar this alias existed to shorten labels
+   * for — every section is now a native <details>/<summary> step-card
+   * stacked vertically, with no per-section tab strip to build on mobile
+   * at all, so there is nothing left to alias. The `data-tab-label`
+   * attribute and its consuming
+   * `heading.dataset.tabLabel || heading.textContent.trim()` JS line
+   * (covered by the two tests this replaced) were deleted along with
+   * that tab-building script.
+   */
+  it('the obsolete section tab-label alias machinery is gone', () => {
     const html = view();
 
-    const expected = {
-      'Stage 4 — Order Confirmation: Buyer Acknowledgement': 'Stage 4 — OC Ack',
-      'Stage 5 — Supplier Purchase Order (Material Procurement)': 'Stage 5 — Supplier PO',
-      'Order Financials — Government Benefits, Costs &amp; Profitability': 'Financials',
-    };
-    for (const [fullHeading, shortLabel] of Object.entries(expected)) {
-      expect(html).toContain(`data-tab-label="${shortLabel}">${fullHeading}</h2>`);
-    }
-  });
-
-  it('the tab builder JS prefers the short alias over the full heading text', () => {
-    const html = view();
-
-    expect(html).toContain('heading.dataset.tabLabel || heading.textContent.trim()');
+    expect(html).not.toContain('data-tab-label');
+    expect(html).not.toContain('heading.dataset.tabLabel');
   });
 });

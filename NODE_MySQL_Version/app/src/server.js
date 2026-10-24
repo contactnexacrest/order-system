@@ -170,6 +170,18 @@ njkEnv.addGlobal('docGenerated', (documents, code) => (documents || []).some((d)
 njkEnv.addGlobal('annexureConfirmAttr', require('./helpers/annexureConfirmAttr').annexureConfirmAttr);
 njkEnv.addGlobal('stepBadge', require('./helpers/stepBadge').stepBadge);
 njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').formatRange);
+// Order detail page rebuild — the first user-facing step (0-17) that isn't
+// yet 'done' (the order's real current step), or '17' once every step is
+// done. A plain JS helper rather than a Nunjucks {% for %} loop: `{% set %}`
+// inside a `{% for %}` is scoped to that iteration and never leaks back out
+// to the template's outer scope, so a "first match wins" search can't be
+// written as a template-side loop here.
+njkEnv.addGlobal('firstNonDoneStep', (stepStates) => {
+  for (const key of Object.keys(stepStates)) {
+    if (stepStates[key] !== 'done') { return key; }
+  }
+  return '17';
+});
 
 // --- Session store (MySQL-backed via knex, not PHP's file-session
 // equivalent — Node is a long-running multi-connection process, so a
@@ -295,6 +307,7 @@ app.use((req, res, next) => {
       devServerEnabled: env.isDevServer(),
       isImpersonating: clientPortalService.isImpersonating(req),
       currentPath: req.path,
+      query: req.query || {},
     };
     const context = Object.assign({}, common, data);
     const content = njkEnv.render(`${viewPath}.njk`, context);

@@ -57,27 +57,50 @@ describe('Order screen redesign (Point 2/4)', () => {
     expect(html).toContain('id="freight-currency-unit"');
   });
 
-  it('order show page wraps all sections in the Concept C sidebar layout', () => {
+  /**
+   * External QA report: the approved "NexaCrest: Standard vs Kanban UI"
+   * design (KanbanDetail.dc.html/Main.dc.html) replaced the Concept C
+   * sidebar + single-panel layout with a vertical sequence of
+   * <details>/<summary> step-cards plus a persistent reference sidebar
+   * (documents + at-a-glance) — reached identically whether the order
+   * was opened from the Standard list or the Kanban board.
+   */
+  it('order show page wraps all sections in a step-card sequence plus sidebar', () => {
     const html = showNjk();
     expect(html).toContain('id="order-layout"');
-    expect(html).toContain('id="order-sidebar"');
     expect(html).toContain('id="order-panels"');
+    expect(html).toContain('id="order-detail-sidebar"');
+    expect(html).toContain('class="step-sequence"');
 
+    const layoutStart = html.indexOf('id="order-layout"');
     const panelsStart = html.indexOf('id="order-panels"');
-    expect(panelsStart).toBeGreaterThan(-1);
+    const sidebarStart = html.indexOf('id="order-detail-sidebar"');
+    expect(layoutStart).toBeGreaterThan(-1);
+    expect(panelsStart).toBeGreaterThan(layoutStart);
+    expect(sidebarStart).toBeGreaterThan(panelsStart);
 
-    const sectionCountTotal = (html.match(/<div class="section"/g) || []).length;
+    // Every existing top-level section must now live inside the
+    // step-sequence wrapper as its own step-card — nothing was dropped,
+    // only re-parented and re-labelled with the user's own 0-17 step
+    // numbering.
+    const sectionCountTotal = (html.match(/<details class="step-card/g) || []).length;
     const afterPanels = html.slice(panelsStart);
-    const sectionCountInsidePanels = (afterPanels.match(/<div class="section"/g) || []).length;
+    const sectionCountInsidePanels = (afterPanels.match(/<details class="step-card/g) || []).length;
     expect(sectionCountInsidePanels).toBe(sectionCountTotal);
     expect(sectionCountTotal).toBeGreaterThanOrEqual(18);
   });
 
   it('order show page degrades gracefully without JavaScript', () => {
     const html = showNjk();
-    const css = fs.readFileSync(cssPath, 'utf8');
-    expect(css).toContain('.js-enabled .order-panels > .section{display:none;}');
-    expect(html).toContain("layout.classList.add('js-enabled')");
+    // Step-cards are native <details>/<summary> — collapse/expand,
+    // keyboard toggling, and reaching every card's content all come from
+    // the browser itself, with zero script required (unlike the old
+    // design, whose CSS hid every inactive panel behind a JS-built
+    // ".js-enabled" gate). There is nothing left to gate.
+    expect(html).not.toContain('order-sidebar');
+    expect(html).not.toContain('active-panel');
+    expect(html).not.toContain('js-enabled');
+    expect((html.match(/<details class="step-card/g) || []).length).toBeGreaterThanOrEqual(18);
   });
 
   it('order show page preserves the #order-updates anchor id', () => {
@@ -86,43 +109,42 @@ describe('Order screen redesign (Point 2/4)', () => {
   });
 
   /**
-   * QA Round 4, N-01: this template was missing a closing </div> after
-   * "Production & Estimated Shipment", silently nesting Stage 6 onward
-   * (and everything after it) one level deep — the sidebar builder only
-   * reads direct children of #order-panels, so Node showed 11 tabs where
-   * PHP showed 24. This pins the structural invariant directly (not just
-   * "the count matches", which the existing test above already checks but
-   * which a missing-</div> bug can still satisfy by accident) — walks the
-   * div-nesting depth and fails if fewer than 24 .section divs are a
-   * direct child of #order-panels.
+   * QA Round 4, N-01: this template was previously missing a closing
+   * </div>, silently nesting every panel after it one level deep. This
+   * pins the structural invariant directly (not just "the count
+   * matches", which the test above already checks but which a
+   * missing-closing-tag bug can still satisfy by accident) — walks the
+   * div/details nesting depth and fails if a lower-than-expected count
+   * of step-cards are a direct child of #order-panels.
    */
   it('every top-level section is a direct child of #order-panels', () => {
     const html = showNjk();
-    const panelsOpenPos = html.indexOf('<div class="order-panels" id="order-panels">');
+    const panelsOpenPos = html.indexOf('<div class="step-sequence" id="order-panels">');
     expect(panelsOpenPos).toBeGreaterThan(-1);
 
-    const tokens = html.slice(panelsOpenPos).match(/<div\b[^>]*>|<\/div>/g) || [];
+    const tokens = html.slice(panelsOpenPos).match(/<div\b[^>]*>|<\/div>|<details\b[^>]*>|<\/details>/g) || [];
 
     // Depth 2 is "one level inside #order-panels itself" — a direct
-    // child. A legitimate sub-section used purely for visual grouping
-    // inside one of the 24 real panels sits deeper than this and is
-    // intentionally not counted — N-01's bug was a *top-level* panel
-    // swallowing every panel after it, which shows up as this count
-    // dropping below 24, not as a deeper nested div existing.
+    // child step-card. A legitimate nested <details> used purely for
+    // visual grouping inside one of the real step-cards sits deeper than
+    // this and is intentionally not counted — N-01's bug was a
+    // *top-level* panel swallowing every panel after it, which shows up
+    // as this count dropping below the expected total, not as a deeper
+    // nested element existing.
     let depth = 0;
     let directChildSectionCount = 0;
     for (const token of tokens) {
-      if (token === '</div>') {
+      if (token === '</div>' || token === '</details>') {
         depth--;
         if (depth === 0) break; // #order-panels itself has closed
         continue;
       }
       depth++;
-      if (depth === 2 && token.startsWith('<div class="section"')) {
+      if (depth === 2 && token.startsWith('<details class="step-card')) {
         directChildSectionCount++;
       }
     }
 
-    expect(directChildSectionCount).toBe(24);
+    expect(directChildSectionCount).toBe(26);
   });
 });

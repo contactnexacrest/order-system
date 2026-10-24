@@ -17,11 +17,15 @@ function extractCsrf(html) {
 
 /**
  * Port of PackingListStepBadgeTest.php. User-reported batch item 19:
- * the Documents panel's own numbered sequence (1a, 2a, 3a, 4a, 5b, 6b,
- * ?, 8b) skipped straight from 6b to 8b — "Generate Packing List" had
- * no step badge at all, unlike every other document-generate button in
- * that panel. Stage 7's own a-d letters are already fully claimed by
- * real Stage 7 actions, so Packing List gets a new, non-colliding 7e.
+ * the Documents panel's own numbered sequence skipped straight past
+ * "Generate Packing List" — it had no step badge at all, unlike every
+ * other document-generate button in that panel. The order-detail-page
+ * rebuild relabelled this whole card (DB Stage 7, "Packing, BL
+ * Instruction & CHA Draft Review") under the user's own Step 9g-9k
+ * numbering; Packing List gets 9k, the one letter in that range not
+ * already claimed by this card's other real actions (Save Packing &
+ * Crates/Save Shipping Details/Generate BL Instruction Sheet/Confirm BL
+ * Issued = 9g-9j).
  */
 describe('Packing List step badge (90-item backlog item 19)', () => {
   let agent;
@@ -60,6 +64,6 @@ describe('Packing List step badge (90-item backlog item 19)', () => {
     const res = await agent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
 
-    expect(res.text).toMatch(/<span class="step-badge"[^>]*>7e<\/span>\s*<button[^>]*>Generate Packing List<\/button>/);
+    expect(res.text).toMatch(/<span class="step-badge"[^>]*>9k<\/span>\s*<button[^>]*>Generate Packing List<\/button>/);
   });
 });

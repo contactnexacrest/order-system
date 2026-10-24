@@ -1,5 +1,5 @@
 {% macro kanbanCard(o) %}
-<a class="entity-card kanban-card{{ ' entity-card-overdue' if o.is_overdue }}" href="/orders/{{ o.id }}">
+<a class="entity-card kanban-card{{ ' entity-card-overdue' if o.is_overdue }}" href="/orders/{{ o.id }}?from=kanban">
   <div class="entity-card-header">
     <span class="entity-card-title">{{ o.order_reference }}</span>
     {% if o.incoterm_code %}<span class="tag tag-gold">{{ o.incoterm_code }}</span>{% endif %}

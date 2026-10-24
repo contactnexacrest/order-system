@@ -376,26 +376,37 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .kv-grid div span.v{font-weight:700;}
 .doc-pill{display:inline-block;padding:0.15rem 0.6rem;border-radius:999px;font-size:0.7rem;font-weight:600;background:var(--navy-soft);color:var(--navy);margin-left:0.4rem;}
 
-/* --- Order detail page: Concept C sidebar + single-panel layout.
-   Sidebar and panel-switching are JS-built progressive enhancement: the
-   ".js-enabled" class is only added once the script below successfully
-   builds the nav, so with JS disabled/failed every section still renders,
-   one after another, exactly as before this redesign. --- */
+/* --- Order detail page rebuild: approved "NexaCrest: Standard vs Kanban
+   UI" design (KanbanDetail.dc.html/Main.dc.html) — a vertical sequence of
+   step-cards (native <details>/<summary>, so collapse/expand, keyboard
+   toggling, and the no-JS fallback — every card simply open and stacked —
+   all come from the browser for free) plus a sticky reference sidebar.
+   Reached identically whether opened from the Standard list or the
+   Kanban board (see show.njk's stepCardOpen()/stepStatusIcon()). --- */
 .order-layout{display:flex;gap:1.75rem;align-items:flex-start;}
-.order-sidebar{flex:0 0 220px;position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow-y:auto;border-right:1px solid var(--line);padding-right:0.9rem;display:none;}
-.order-layout.js-enabled .order-sidebar{display:block;}
-.order-sidebar-link{display:block;width:100%;text-align:left;background:none;border:none;border-left:3px solid transparent;padding:0.5rem 0.7rem;margin-bottom:2px;border-radius:0 8px 8px 0;font-size:0.82rem;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
-.order-sidebar-link:hover{background:var(--navy-soft);color:var(--navy);}
-.order-sidebar-link.active{background:var(--navy-soft);color:var(--navy);border-left-color:var(--gold);}
-.order-panels{flex:1;min-width:0;}
-.order-layout.js-enabled .order-panels > .section{display:none;}
-.order-layout.js-enabled .order-panels > .section.active-panel{display:block;}
+.step-sequence{flex:1;min-width:0;display:flex;flex-direction:column;gap:1.1rem;}
+.step-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 1.1rem;}
+.step-card > summary{list-style:none;cursor:pointer;padding:1rem 0;display:flex;align-items:center;gap:0.6rem;}
+.step-card > summary::-webkit-details-marker{display:none;}
+.step-card > summary h2{margin:0;font-size:1rem;font-weight:700;color:var(--ink);border-left:none;padding-left:0;}
+.step-card[open] > summary{border-bottom:1px solid var(--line);margin-bottom:1rem;}
+.step-card[open] > summary h2{color:var(--navy);}
+.step-card:not([open]) > summary:hover{background:var(--navy-soft);margin:0 -1.1rem;padding-left:1.1rem;padding-right:1.1rem;border-radius:12px;}
+.step-card{padding-bottom:1.1rem;}
+.step-card-reference{background:var(--bg-soft,#FAFAF8);}
+.step-card-icon{flex:none;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;}
+.step-card-icon.done{background:var(--success-soft);color:var(--success);}
+.step-card-icon.current{background:var(--gold-soft);color:var(--gold-strong);}
+.step-card-icon.locked{background:var(--line);color:var(--ink-soft);}
+.order-detail-sidebar{flex:0 0 280px;position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow-y:auto;display:flex;flex-direction:column;gap:1rem;}
+.sidebar-panel{border:1px solid var(--line);border-radius:12px;background:#fff;padding:1rem 1.1rem;}
+.sidebar-panel h3{margin:0 0 0.7rem;font-size:0.85rem;font-weight:700;color:var(--ink);}
+.sidebar-doc-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.35rem;font-size:0.8rem;}
+.sidebar-doc-list li{display:flex;flex-direction:column;border-bottom:1px solid var(--line);padding-bottom:0.35rem;}
+.sidebar-doc-list li:last-child{border-bottom:none;padding-bottom:0;}
 @media (max-width:900px){
-  .order-sidebar{position:static;max-height:none;border-right:none;border-bottom:1px solid var(--line);padding-right:0;padding-bottom:0.6rem;flex-wrap:wrap;gap:4px;}
-  .order-layout.js-enabled .order-sidebar{display:flex;}
   .order-layout{flex-direction:column;}
-  .order-sidebar-link{width:auto;border-left:none;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;}
-  .order-sidebar-link.active{border-left-color:transparent;border-bottom-color:var(--gold);}
+  .order-detail-sidebar{position:static;max-height:none;flex:1 1 auto;width:100%;}
 }
 
 /* --- Phase E: dashboard / reports --- */
