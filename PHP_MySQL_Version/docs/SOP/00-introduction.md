@@ -200,12 +200,15 @@ order's own page (`/orders/{id}`) always shows the order's title, action
 buttons, and 9-stage tracker at the top — those never move. Below that,
 the page lays out every section as its own numbered step-card, in the
 exact order staff actually work through an order (Quotation → Buyer PO
-→ PI-Stage Intake → PI & Advance Payment → Order Confirmation & ECGC →
-Supplier PO → Production → Freight → Packing/BL/CHA Review → Commercial
-Invoice & Balance → Closure → Additional Documents → Communication →
-Feedback → Complaints → Disputes → Order Complete), each labelled with
-that step's own number (e.g. "Step 7 · Supplier Purchase Order") so the
-screen's own order always matches the real order of work. The order's
+→ PI-Stage Intake → PI & Advance Payment → Order Confirmation →
+Supplier PO → Production & Pre-Shipment Compliance (production status
+plus the Compliance Checklist) → Freight Payment → Packing & BL
+Instruction → Commercial Invoice & Balance → Closure — Financials,
+Benefits & Costs → Closure — Documents & Settlement → Additional
+Documents → Communication → Feedback → Complaints → Disputes → Order
+Complete), each labelled with that step's own number (e.g. "Step 7 ·
+Supplier PO") so the screen's own order always matches the real order
+of work. The order's
 current step opens automatically; every other step-card starts
 collapsed — click its heading to open it. This is purely a layout and
 navigation change — nothing about what a section does, what permission

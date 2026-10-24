@@ -109,12 +109,22 @@ not one:
    itself). **This is the real, final lock**: it sets the order to
    **complete**, after which nothing on it can be edited at all short of
    a privileged override elsewhere in the system. Clicking it is
-   **blocked** while any government export benefit claim linked to this
-   order is still awaiting receipt — record it as received first (see
-   [Order Financials](./ca-08-order-financials.md)) — with the same
+   **blocked** while any of the following is still outstanding, checked
+   in order — record/resolve the first one it finds, then try again:
+   1. A government export benefit claim linked to this order still
+      awaiting receipt — record it as received first (see [Order
+      Financials](./ca-08-order-financials.md)).
+   2. A Compliance Checklist task still **Not Started** or **Pending
+      Approval** — approve it or mark it Not Applicable with a reason
+      first (see "Compliance Checklist" below).
+   3. An Export Benefit Scheme Eligibility row still **Pending** — mark
+      it Eligible or Not Eligible first (see [Order
+      Financials](./ca-08-order-financials.md#export-benefit-scheme-eligibility)).
+
+   Every one of these three checks shares the same
    **"Override locked data"** reason-required escape hatch as the
-   document gate above, for the rare case a benefit genuinely never
-   arrives and the order needs closing anyway.
+   document gate above, for the rare case something genuinely can't be
+   resolved and the order needs closing anyway.
 
 The practical effect: a client never sees or cares about this internal
 distinction, but staff can despatch documents and move on the moment
@@ -172,30 +182,47 @@ as many times as needed if the underlying order data changes.
 
 ## Compliance Checklist
 
-A separate "Compliance Checklist" panel sits on every order's own page
-(visible regardless of which stage the order is currently in) tracking
-pre-closure compliance tasks — ECGC Cover, Pre-Shipment Inspection,
-Fumigation Certificate, Phytosanitary Certificate, Due Diligence by
-default; Admin can add more from
-[Compliance Task Types](./15-admin-settings.md). Each task's status is one
-of **Not Started** (the default — no row exists yet until staff first
-touch it), **Pending Approval**, **Approved**, or **Skipped (Not
-Applicable)** — skipping requires a reason, since "not applicable to this
-order" still needs to be recorded, not just silently left blank.
+A "Compliance Checklist" panel sits on every order's own page as **Step
+8b** (alongside "Production & Estimated Shipment" as 8a, under the
+shared "Production & Pre-Shipment Compliance" group — see [Stage
+5](./05-stage5-supplier-po.md#production--estimated-shipment--and-where-its-history-lives))
+tracking pre-closure compliance tasks — ECGC Cover, Pre-Shipment
+Inspection, Fumigation Certificate, Phytosanitary Certificate, Due
+Diligence by default; Admin can add more from
+[Compliance Task Types](./15-admin-settings.md). **A real row for every
+active task type is written the moment the order is created** — never
+left as a missing row standing in for "not applicable," so a report run
+directly against the underlying table always has an explicit value for
+every order. Each task's status is one of **Not Started** (the row's
+own starting value), **Pending Approval**, **Approved**, or **Skipped
+(Not Applicable)** — skipping requires a reason, since "not applicable
+to this order" still needs to be recorded, not just silently left
+blank.
 
-Visibility of the whole panel, and every status change on it, is gated on
-the same `close_orders` permission that gates the **Close Order** button
-above — "the person who has permission to close the order must able to see
-this otherwise no meaning for this." There is no separate permission for
-the checklist itself. Every status change is recorded in the order's own
+For a repeat order where the whole checklist genuinely doesn't apply, a
+**"Mark all remaining tasks Not Applicable"** action (appears only while
+something is still outstanding) resolves every currently-unresolved task
+in one submit with one shared reason, instead of skipping each task
+individually.
+
+Visibility of the whole panel, and every status change on it (including
+the bulk action), is gated on the same `close_orders` permission that
+gates the **Close Order** button above — "the person who has permission
+to close the order must able to see this otherwise no meaning for
+this." There is no separate permission for the checklist itself. Every
+status change is recorded in the order's own
 [Audit Log](./13-document-review-approval.md) under
 `COMPLIANCE_TASK_STATUS_UPDATED`.
 
-The checklist does not itself gate **Close Order** — closing requires
-Stage 9's own gate, the courier tracking number, and (see above) the BLI
-and COO Prep Sheet being approved/sent, but never the checklist itself.
-The checklist is a tracking aid for the same person who has the
-authority to close the order, not an additional hard-coded lock.
+The checklist does not gate **Close Order** (phase 1) — closing
+requires Stage 9's own gate, the courier tracking number, and (see
+above) the BLI and COO Prep Sheet being approved/sent, but never the
+checklist itself. It does, however, now gate **Mark Fully Settled**
+(phase 2, see "Closing the order — two phases" above): any task still
+**Not Started** or **Pending Approval** blocks it, the same way an
+outstanding export benefit claim does — the checklist is still reached
+and worked the same way regardless, but closing can no longer happen
+while it has something genuinely unresolved on it.
 
 ## Marking an order lost
 

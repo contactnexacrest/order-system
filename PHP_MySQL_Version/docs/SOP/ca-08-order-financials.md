@@ -45,11 +45,35 @@ or a per-user override.
 
 ## The Order Financials box (order's own page)
 
-Anyone holding `manage_order_financials` sees a section titled **Order
-Financials — Government Benefits, Costs & Profitability** on the order's
-own page, just below Payment Status. It has six parts, top to bottom:
+Anyone holding `manage_order_financials` sees a section titled **Closure
+— Financials, Benefits & Costs** (Step 12 on the order's own page) on the
+order's own page, just below Payment Status. It has seven parts, top to
+bottom:
 
-### 1. Government Export Benefits Claimed
+### 1. Export Benefit Scheme Eligibility
+
+Not every order qualifies for every government export-benefit scheme, so
+**a real row for every active scheme is written the moment the order is
+created** (RODTEP, Duty Drawback, RoSCTL, Other by default — Admin can
+add more schemes the same way as any other dropdown option) — never left
+as a missing row standing in for "not applicable," the same
+always-materialized pattern the Compliance Checklist uses (see [Stage
+9](./09-stage9-despatch-closure.md#compliance-checklist)). Each row
+starts **Pending** and is resolved to either **Eligible** (then a claim
+can be recorded against it in "Government Export Benefits Claimed"
+below) or **Not Eligible** (a reason is required, same "not applicable
+still needs recording" rule as everywhere else in this system) — there
+is no path back to Pending once resolved.
+
+Resolving a scheme is logged to the order's own
+[Audit Log](./13-document-review-approval.md) under
+`EXPORT_BENEFIT_SCHEME_STATUS_UPDATED`. **Closing the order (Mark Fully
+Settled, Stage 9's second phase) is blocked while any scheme here is
+still Pending** — see [Stage
+9](./09-stage9-despatch-closure.md#closing-the-order--two-phases) for
+the full list of what Mark Fully Settled checks, in order.
+
+### 2. Government Export Benefits Claimed
 
 Every RODTEP/export-benefit claim linked to this order (see
 [Government Export Benefits](./ca-07-export-benefits.md)), plus a
@@ -58,14 +82,14 @@ leaving the page or typing the order reference by hand — the order is
 implicit. A claim not yet marked received shows a **Mark received**
 mini-form inline.
 
-### 2. Expenses Imported from Zoho Books
+### 3. Expenses Imported from Zoho Books
 
 Every expense linked to this order (see
 [Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to)).
 Read-only here — linking/unlinking an expense is still done from the
 Expenses register, since that's also where the TDS annotation lives.
 
-### 3. Letter of Credit & Bank Loan
+### 4. Letter of Credit & Bank Loan
 
 Only relevant if the buyer's payment method for this order is a Letter
 of Credit. A small **LC Number** / **LC Document** (upload) / **Bank
@@ -80,7 +104,7 @@ matching **Bank Loan Interest (LC order)** row in Other Order Costs
 category isn't needed; change the figure here and the cost entry
 updates itself.
 
-### 4. Travel Expenses — Factory Visits
+### 5. Travel Expenses — Factory Visits
 
 Every order needs several trips to the factory during production (a
 minimum ~175 km round trip is the baseline the business works from).
@@ -99,7 +123,7 @@ matching **Travel Expenses (Factory Visits)** row in Other Order Costs
 where production progress is tracked for the same order during this
 same window.
 
-### 5. Other Order Costs (Order Cost Entries)
+### 6. Other Order Costs (Order Cost Entries)
 
 A small table of costs this order incurred that aren't tracked anywhere
 else in the system:
@@ -133,7 +157,7 @@ Profitability Summary below.
 see "What feeds the Profitability Sheet" below for where those come
 from automatically.
 
-### 6. Profitability Summary
+### 7. Profitability Summary
 
 A live summary computed from everything above plus the order's own
 Supplier PO and freight/insurance figures — see the next section for the

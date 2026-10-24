@@ -17,6 +17,22 @@ which the government pays out (often at a different amount than claimed,
 after their own scrutiny). Zoho Books has no equivalent record for this,
 so it's entered directly here instead of through a sync.
 
+## Eligibility vs. a recorded claim — two different questions
+
+This chapter is about an actual claim — a real amount filed and (later)
+paid. A separate, earlier question — **does this order even qualify for
+each scheme at all?** — is answered on the order's own page under
+**Export Benefit Scheme Eligibility** (see [Order
+Financials](./ca-08-order-financials.md#1-export-benefit-scheme-eligibility)),
+resolved to **Eligible** or **Not Eligible** for every scheme before the
+order can be closed. An **Eligible** scheme is where this chapter's
+claim-recording actually applies; a **Not Eligible** one never gets a
+claim at all. Don't confuse the two: eligibility is resolved early
+(it blocks Mark Fully Settled) and answers "does this apply," while a
+claim is recorded later (only once the order is complete and paid, see
+"Gated on the order being complete" below) and answers "how much, and
+has it arrived."
+
 ## Recording a claim
 
 A claim can be recorded from either of two places, both writing to the
