@@ -54,8 +54,14 @@ async function generateDocument(page, orderId, typeCode, expectedBannerSubstring
 }
 
 function documentPanel(page, typeCode) {
+  // The order-detail-page rebuild wraps the whole "Documents & Approvals"
+  // section in its own outer <details class="step-card">, which itself
+  // "has" a matching nested summary descendant (the document-specific
+  // review widget this is actually looking for) — excluding .step-card
+  // keeps this matching only the innermost, document-specific <details>,
+  // not the step-card wrapper around all of them.
   return page
-    .locator('details')
+    .locator('details:not(.step-card)')
     .filter({ has: page.locator('summary', { hasText: new RegExp('^\\s*' + typeCode + '\\s') }) })
     .first();
 }
@@ -129,6 +135,11 @@ test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queu
     await test.step("Export Executive opens the approved QT's Send-to-Buyer flow (generate_documents)", async () => {
       await login(page, 'exportExecutive');
       await page.goto(`/orders/${orderId}`);
+      // Stage 1's gate already passed (QT approval passes it), so its
+      // "Documents & Approvals" step-card is no longer the order's
+      // current step and renders collapsed on this fresh page load —
+      // open it before reaching the nested QT panel inside it.
+      await openStage(page, 1);
       const panel = documentPanel(page, 'QT');
       await panel.locator('summary').click();
       await panel.getByRole('link', { name: 'Send to Buyer (deferred, 2-level approval)' }).click();

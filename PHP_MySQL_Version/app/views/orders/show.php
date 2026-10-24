@@ -289,9 +289,79 @@ foreach ($stages as $s) {
         break;
     }
 }
+
+// Order detail page rebuild (approved design: "NexaCrest: Standard vs Kanban
+// UI" canvas, KanbanDetail.dc.html/Main.dc.html) — the user's own numbered
+// 0-17 export process sequence, shown as collapsible step-cards instead of
+// a sidebar-nav-switched single-panel-at-a-time page. The lettered
+// sub-steps ($stepBadge above) carry no DB-backed state of their own
+// (confirmed in the rebuild's own research pass); $stepStatus below
+// computes done/current/locked purely from the SAME signals the page
+// already reads for each stage, centralized here once instead of
+// scattered per-section, and used only to badge/auto-open a card — it
+// never gates an action (every existing permission/stage-gate check below
+// is completely unchanged).
+$stepStatus = static function (?array $stage, bool $pastSignal = false) use ($orderClosed): string {
+    if ($orderClosed) {
+        return 'done';
+    }
+    if ($stage === null) {
+        return $pastSignal ? 'done' : 'locked';
+    }
+    if ($stage['status'] === 'gate_passed' || $stage['status'] === 'skipped') {
+        return 'done';
+    }
+    if ($stage['status'] === 'in_progress') {
+        return 'current';
+    }
+    return 'locked';
+};
+// One entry per user-facing top-level step (0-17) — 'num' is the display
+// label, 'status' drives the card's checkmark/current-highlight/locked
+// styling, 'open' is whether its <details> starts expanded.
+$stepStates = [
+    '1-3'  => $stepStatus($stage1),
+    '4'    => $stepStatus($stage2),
+    '5'    => $stepStatus($stage3),
+    '6'    => $stepStatus($stage4),
+    '7'    => $stepStatus($stage5),
+    '8'    => $stepStatus($stage5, $supplierSigned), // no own DB stage — unlocked once Stage 5 passes
+    '9'    => $stepStatus($isFob ? $stage7 : $stage6),
+    '9-10' => $stepStatus($stage8),
+    '11'   => $stepStatus($stage9),
+    '12'   => 'done', // reference/upload card — never gated
+    '13'   => 'done',
+    '14'   => 'done',
+    '15'   => 'done',
+    '16'   => 'done',
+    '17'   => $orderClosed ? 'done' : 'locked',
+];
+// The single step whose <details> should start open: the first one that
+// isn't yet 'done' (the order's real current step), or '17' once the
+// order is actually closed — same "first unresolved" logic $currentStage
+// above already uses, just applied to the user-facing step numbers.
+$currentUserStep = '17';
+foreach ($stepStates as $__step => $__status) {
+    if ($__status !== 'done') {
+        $currentUserStep = $__step;
+        break;
+    }
+}
+$stepCardOpen = static fn(string $step): string => ($step === $currentUserStep) ? ' open' : '';
+$stepStatusIcon = static function (string $status): string {
+    return match ($status) {
+        'done' => '<span class="step-card-icon done" aria-hidden="true">&#10003;</span>',
+        'current' => '<span class="step-card-icon current" aria-hidden="true">&#9679;</span>',
+        default => '<span class="step-card-icon locked" aria-hidden="true">&#9675;</span>',
+    };
+};
 ?>
 <div class="card page-wide">
+  <?php if (($_GET['from'] ?? '') === 'kanban'): ?>
+  <p class="muted small"><a href="/orders">&larr; Back to Board</a></p>
+  <?php else: ?>
   <p class="muted small"><a href="/orders">&larr; Back to Orders</a></p>
+  <?php endif; ?>
   <h1><?= htmlspecialchars($order['order_reference']) ?>
     <?php if ($order['status'] !== 'active'): ?><span class="badge badge-<?= htmlspecialchars($order['status']) ?>"><?= htmlspecialchars($order['status']) ?></span><?php endif; ?>
   </h1>
@@ -472,46 +542,10 @@ foreach ($stages as $s) {
   </div>
 
   <div class="order-layout" id="order-layout">
-    <nav class="order-sidebar" id="order-sidebar" aria-label="Order sections"></nav>
-    <div class="order-panels" id="order-panels">
+    <div class="step-sequence" id="order-panels">
 
-
-  <div class="section">
-    <h2>Order Details</h2>
-    <p class="muted small">At a glance — everything else on this page in one place, so you don't have to scroll through every section just to see where this order stands.</p>
-    <div class="kv-grid">
-      <div><span class="k">Current Stage</span><span class="v"><?= $currentStage ? 'Stage ' . (int) $currentStage['stage_number'] . ' — ' . htmlspecialchars($currentStage['stage_name']) : ($orderClosed ? 'Complete — all 9 stages resolved' : '—') ?></span></div>
-      <div><span class="k">Products</span><span class="v"><?= count($products) ?> line<?= count($products) === 1 ? '' : 's' ?></span></div>
-      <div><span class="k">Payment Legs</span><span class="v"><?= $paymentLegsResolved ?> of <?= $paymentLegsApplicable ?> cleared<?= $paymentLegsApplicable === 0 ? ' (nothing recorded yet)' : '' ?> — <a href="#payment-snapshot">see Payment Snapshot</a></span></div>
-      <?php if ($canCloseOrders): ?>
-      <div><span class="k">Compliance Checklist</span><span class="v"><?= $complianceSummary['total'] === 0 ? 'No task types configured' : $complianceSummary['approved'] . ' of ' . $complianceSummary['total'] . ' resolved' ?> — <a href="#compliance-checklist">see checklist</a></span></div>
-      <?php endif; ?>
-      <div><span class="k">Documents Generated</span><span class="v"><?= count($documents) ?></span></div>
-      <div><span class="k">Client</span><span class="v"><?= htmlspecialchars($order['company_legal_name']) ?></span></div>
-      <div><span class="k">Buyer Inquiry Ref</span><span class="v"><?= htmlspecialchars($order['buyer_inquiry_ref']) ?></span></div>
-      <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v"><?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '—') ?></span></div>
-      <div><span class="k">Quotation Date</span><span class="v"><?= htmlspecialchars($order['quotation_date'] ?? '—') ?></span></div>
-      <div><span class="k">FOB Value</span><span class="v"><?= htmlspecialchars($order['currency_code']) ?> <?= number_format((float) $fobTotal, 2) ?></span></div>
-      <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed') ?></span></div>
-      <div><span class="k">Container Type</span><span class="v"><?= htmlspecialchars($order['container_type'] ?? '—') ?></span></div>
-      <div><span class="k">Production Lead Time (<?= htmlspecialchars($leadTimeDisplayUnit) ?>)</span><span class="v"><?= htmlspecialchars(LeadTimeDisplay::formatRange($order['lead_time_min_days'] !== null ? (int) $order['lead_time_min_days'] : null, $order['lead_time_max_days'] !== null ? (int) $order['lead_time_max_days'] : null, $leadTimeDisplayUnit)) ?></span></div>
-      <div><span class="k">Sailing Lead Time (<?= htmlspecialchars($leadTimeDisplayUnit) ?>)</span><span class="v"><?= htmlspecialchars(LeadTimeDisplay::formatRange($order['sailing_lead_time_min_days'] !== null ? (int) $order['sailing_lead_time_min_days'] : null, $order['sailing_lead_time_max_days'] !== null ? (int) $order['sailing_lead_time_max_days'] : null, $leadTimeDisplayUnit)) ?></span></div>
-      <div><span class="k">Payment Preset</span><span class="v"><?= htmlspecialchars($order['preset_name']) ?></span></div>
-      <div><span class="k">Buyer's PO Ref</span><span class="v">
-        <?php if (!empty($order['buyers_po_ref']) && $order['buyers_po_ref'] !== 'NIL'): ?>
-          <?= htmlspecialchars($order['buyers_po_ref']) ?>
-        <?php elseif (!empty($buyerPoDocuments)): ?>
-          <span class="muted">Not yet recorded &mdash; <?= count($buyerPoDocuments) ?> file<?= count($buyerPoDocuments) === 1 ? '' : 's' ?> attached (see Stage 2 below)</span>
-        <?php else: ?>
-          NIL
-        <?php endif; ?>
-      </span></div>
-      <div><span class="k">Special Requirements/Instructions</span><span class="v"><?= htmlspecialchars($order['special_requirements'] ?? '—') ?></span></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Products</h2>
+  <details class="step-card" id="step-products" open>
+    <summary><h2>Products</h2></summary>
     <?php if (!$canEditProducts): ?>
       <table class="list">
         <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
@@ -625,10 +659,10 @@ foreach ($stages as $s) {
         <?php endforeach; ?>
       </datalist>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section" id="documents-approvals" data-stage="1">
-    <h2>Documents &amp; Approvals</h2>
+  <details class="step-card" id="documents-approvals"<?= $stepCardOpen('1-3') ?>>
+    <summary><?= $stepStatusIcon($stepStates['1-3']) ?><h2>Step 1&ndash;3 &middot; Quotation (Documents &amp; Approvals)</h2></summary>
     <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">
       <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th><th></th></tr>
@@ -697,40 +731,7 @@ foreach ($stages as $s) {
       }
     </script>
 
-    <h3 style="font-size:0.95em; margin-top:18px;">Additional Documents <a href="/orders/<?= (int) $order['id'] ?>/additional-documents/removed" class="muted small" style="font-weight:normal;">(show removed)</a></h3>
-    <p class="muted small">Free-form extras that don't fit any fixed document type above — e.g. a buyer-supplied certificate template, a special packing instruction sheet.</p>
-    <table class="list">
-      <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
-      <?php foreach ($additionalDocuments as $ad): ?>
-      <tr>
-        <td><?= htmlspecialchars($ad['document_type_label'] ?? '') ?></td>
-        <td class="muted small"><?= htmlspecialchars($ad['notes'] ?? '') ?></td>
-        <td><a href="/file-store/<?= (int) $ad['id'] ?>/download"><?= htmlspecialchars($ad['original_filename']) ?></a></td>
-        <td><?= htmlspecialchars((string) $ad['uploaded_at']) ?><?php if (!empty($ad['uploaded_by_name'])): ?> <span class="muted small">by <?= htmlspecialchars($ad['uploaded_by_name']) ?></span><?php endif; ?></td>
-        <td>
-          <?php if ($canManageOrders): ?>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents/<?= (int) $ad['id'] ?>/delete" style="display:inline" onsubmit="return confirmRemoveAdditionalDocument(this);">
-            <?= Csrf::field() ?>
-            <input type="hidden" name="reason" class="remove-additional-document-reason">
-            <button type="button" class="btn-sm btn-danger" onclick="promptRemoveAdditionalDocument(this)">Remove</button>
-          </form>
-          <?php endif; ?>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-      <?php if (empty($additionalDocuments)): ?>
-      <tr><td colspan="5" class="muted">No additional documents attached yet.</td></tr>
-      <?php endif; ?>
-    </table>
-    <?php if ($canManageOrders): ?>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
-      <?= Csrf::field() ?>
-      <input type="text" name="title" placeholder="Title *" required style="width:220px">
-      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
-      <input type="file" name="document" required>
-      <button type="submit" class="btn-sm">Attach Document</button>
-    </form>
-    <?php endif; ?>
+    <p class="muted small" style="margin-top:18px;">Free-form additional files (not one of the fixed document types above) are attached from <a href="#step-additional-documents">Step 12 — Additional Files</a>.</p>
 
     <?php
       // Batch 3 #5 — differentiate 'not yet generated' vs 'already generated, this regenerates
@@ -984,10 +985,10 @@ foreach ($stages as $s) {
         </div>
       </details>
     <?php endforeach; ?>
-  </div>
+  </details>
 
-  <div class="section" data-stage="2">
-    <h2>Stage 2 — Buyer PO</h2>
+  <details class="step-card" id="step-buyer-po"<?= $stepCardOpen('4') ?>>
+    <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4a&ndash;4c &middot; Buyer's PO</h2></summary>
     <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
@@ -1028,19 +1029,10 @@ foreach ($stages as $s) {
         <?= $stepBadge('2c') ?><button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
       </form>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section" data-stage="3">
-    <h2>PI-Stage Intake</h2>
-    <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
-        <?= Csrf::field() ?>
-        <input type="hidden" name="document_type" value="PI">
-        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
-        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <?= $stepBadge('3a') ?><button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
-      </form>
-    <?php endif; ?>
+  <details class="step-card" id="step-pi-intake"<?= $stepCardOpen('4') ?>>
+    <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4d&ndash;4e &middot; PI-Stage Intake</h2></summary>
     <p class="muted small">A separate form from the Quotation-stage request — sent to the client to confirm consignee/notify-party/payment-terms details before the PI is issued.</p>
     <?php if ($piIntake): ?>
       <p>
@@ -1080,13 +1072,65 @@ foreach ($stages as $s) {
     <?php if ($canManageOrders): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/pi-form-link" style="display:inline">
       <?= Csrf::field() ?>
-      <?= $stepBadge('3b') ?><button type="submit" class="btn-sm"><?= $piIntake ? 'Regenerate PI Form Link' : 'Generate PI Form Link' ?></button>
+      <?= $stepBadge('4d') ?><button type="submit" class="btn-sm"><?= $piIntake ? 'Regenerate PI Form Link' : 'Generate PI Form Link' ?></button>
     </form>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section" id="payment-snapshot">
-    <h2>Payment Snapshot</h2>
+  <details class="step-card" id="step-pi-advance"<?= $stepCardOpen('5') ?>>
+    <summary><?= $stepStatusIcon($stepStates['5']) ?><h2>Step 5 &middot; Proforma Invoice &amp; Advance Payment</h2></summary>
+    <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="document_type" value="PI">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+        <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+        <?= $stepBadge('5a') ?><button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button>
+      </form>
+    <?php endif; ?>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Advance Payment</h3>
+    <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared): ?>
+      <?php if (!$payment || $payment['advance_remittance_received_at'] === null): ?>
+        <?php if (!$canManagePayments): ?>
+          <p class="muted">Only Accounts/Export can record this payment.</p>
+        <?php else: ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance">
+          <?= Csrf::field() ?>
+          <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required></label>
+          <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
+          <?= $stepBadge('5b') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
+        </form>
+        <?php endif; ?>
+      <?php else: ?>
+        <?php if (!$canClearPayments): ?>
+          <p class="muted">Advance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+        <?php else: ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
+          <?= Csrf::field() ?>
+          <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
+          <?= $stepBadge('5c') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 6)</button>
+        </form>
+        <?php endif; ?>
+      <?php endif; ?>
+    <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
+      <p class="muted">Record the Buyer PO first to unlock this gate.</p>
+    <?php endif; ?>
+
+    <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
+    <?php $renderExchangeRateWidget('advance', 'Advance Payment'); ?>
+
+    <h3 style="font-size:0.95em; margin-top:14px;">Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; only if opting for LC)</small></h3>
+    <?php if ($canManageOrderFinancials): ?>
+    <p class="muted small">Only relevant if the client opted for payment by LC. Recorded in full under <a href="#order-financials">Order Financials</a> (Step 11) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
+    <?php else: ?>
+    <p class="muted small">Only relevant if the client opted for payment by LC. Recorded by Accounts/Export staff alongside this order's other costs.</p>
+    <?php endif; ?>
+
+  </details>
+
+  <details class="step-card step-card-reference" id="payment-snapshot">
+    <summary><h2>Payment Snapshot <small class="muted">(reference — every leg, at a glance)</small></h2></summary>
     <div class="kv-grid">
       <?php foreach ($paymentLegs as $leg): ?>
       <div>
@@ -1107,10 +1151,10 @@ foreach ($stages as $s) {
     <?php if (!$canViewPaymentAmounts): ?>
     <p class="muted small">Amounts are only shown to Accounts/Logistics/Export staff who can manage or close this order.</p>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section">
-    <h2>Payment Ledger</h2>
+  <details class="step-card step-card-reference">
+    <summary><h2>Payment Ledger <small class="muted">(reference — read-only history)</small></h2></summary>
     <p class="muted">A single, read-only history of every payment-related event recorded against this order — consolidating what's otherwise scattered across Payment Status and Client-Reported Payments. Nothing here can be edited; use the forms in Payment Status below to record new events.</p>
     <?php if (empty($ledgerEvents)): ?>
     <p class="muted small">No payment events recorded yet.</p>
@@ -1129,10 +1173,10 @@ foreach ($stages as $s) {
       <?php endforeach; ?>
     </table>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section">
-    <h2>Payment Status</h2>
+  <details class="step-card step-card-reference">
+    <summary><h2>Payment Status <small class="muted">(reference — every leg, full detail)</small></h2></summary>
     <?php if ($payment): ?>
     <div class="kv-grid">
       <div><span class="k">Advance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['advance_amount'] !== null ? number_format((float) $payment['advance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
@@ -1142,36 +1186,7 @@ foreach ($stages as $s) {
       <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($payment['balance_due_date'] ?? 'event-triggered') ?></span></div>
     </div>
     <?php endif; ?>
-
-    <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared): ?>
-      <?php if (!$payment || $payment['advance_remittance_received_at'] === null): ?>
-        <?php if (!$canManagePayments): ?>
-          <p class="muted">Only Accounts/Export can record this payment.</p>
-        <?php else: ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance">
-          <?= Csrf::field() ?>
-          <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required></label>
-          <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
-          <?= $stepBadge('3c') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
-        </form>
-        <?php endif; ?>
-      <?php else: ?>
-        <?php if (!$canClearPayments): ?>
-          <p class="muted">Advance remittance recorded — awaiting Accounts to confirm it cleared.</p>
-        <?php else: ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
-          <?= Csrf::field() ?>
-          <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-          <?= $stepBadge('3d') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
-        </form>
-        <?php endif; ?>
-      <?php endif; ?>
-    <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
-      <p class="muted">Record the Buyer PO first to unlock this gate.</p>
-    <?php endif; ?>
-
-    <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
-    <?php $renderExchangeRateWidget('advance', 'Advance Payment'); ?>
+    <p class="muted small">Advance is recorded from Step 5 above; Freight and Balance are recorded from their own steps below.</p>
 
     <?php if (!empty($clientPaymentReports)): ?>
       <h3 style="margin-top:16px">Client-Reported Payments</h3>
@@ -1211,10 +1226,15 @@ foreach ($stages as $s) {
         <?php endforeach; ?>
       </table>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section" data-stage="4">
-    <h2 data-tab-label="Stage 4 — OC Ack">Stage 4 — Order Confirmation: Buyer Acknowledgement</h2>
+  <details class="step-card" id="step-oc"<?= $stepCardOpen('6') ?>>
+    <summary><?= $stepStatusIcon($stepStates['6']) ?><h2>Step 6 &middot; Order Confirmation &amp; ECGC</h2></summary>
+    <?php if ($canCloseOrders): ?>
+    <p class="muted small">ECGC Cover is tracked on the <a href="#compliance-checklist">Compliance Checklist</a>.<?php if ($canManageOrderFinancials): ?> The premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 11) as an "ECGC insurance" cost entry — filed here, once the order is confirmed, so the fee is never paid before the order is certain to proceed.<?php endif; ?></p>
+    <?php elseif ($canManageOrderFinancials): ?>
+    <p class="muted small">The ECGC insurance premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 11) once the order is confirmed.</p>
+    <?php endif; ?>
     <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
@@ -1294,10 +1314,10 @@ foreach ($stages as $s) {
       </form>
       <?php endif; ?>
     </div>
-  </div>
+  </details>
 
-  <div class="section" data-stage="5">
-    <h2 data-tab-label="Stage 5 — Supplier PO">Stage 5 — Supplier Purchase Order (Material Procurement)</h2>
+  <details class="step-card" id="step-supplier-po"<?= $stepCardOpen('7') ?>>
+    <summary><?= $stepStatusIcon($stepStates['7']) ?><h2>Step 7 &middot; Supplier Purchase Order</h2></summary>
     <?php if (!$stage5 || $stage5['status'] === 'locked'): ?>
       <?php if ($supplierPo): ?>
         <div class="kv-grid">
@@ -1323,7 +1343,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="SUPPO">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('5b') ?><button type="submit" class="<?= $__docBtnClass('SUPPO') ?>" data-loading-text="Generating…">Generate Supplier PO</button>
+          <?= $stepBadge('7b') ?><button type="submit" class="<?= $__docBtnClass('SUPPO') ?>" data-loading-text="Generating…">Generate Supplier PO</button>
         </form>
       <?php else: ?>
         <details open>
@@ -1453,7 +1473,7 @@ foreach ($stages as $s) {
           <label>Required Delivery Date<input type="date" name="required_delivery_date"></label>
           <label>Packing Requirement<input type="text" name="packing_requirement" placeholder="e.g., Wooden crates, export packing"></label>
           </div>
-          <?= $stepBadge('5a') ?><button type="submit" class="btn-sm">Save Supplier PO Terms</button>
+          <?= $stepBadge('7a') ?><button type="submit" class="btn-sm">Save Supplier PO Terms</button>
         </form>
         <script>
         (function () {
@@ -1534,7 +1554,7 @@ foreach ($stages as $s) {
       <?php if ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/signed">
           <?= Csrf::field() ?>
-          <?= $stepBadge('5c') ?><button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
+          <?= $stepBadge('7c') ?><button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
         </form>
       <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed'): ?>
         <p class="muted small">Generate the Supplier PO document above before confirming the supplier's signature — they can't have signed and returned a document that was never sent.</p>
@@ -1582,14 +1602,14 @@ foreach ($stages as $s) {
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <?= Csrf::field() ?>
           <input type="file" name="document" required>
-          <?= $stepBadge('5d') ?><button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
+          <?= $stepBadge('7d') ?><button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
         </form>
       <?php endif; ?>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section">
-    <h2>Production &amp; Estimated Shipment</h2>
+  <details class="step-card" id="step-production"<?= $stepCardOpen('8') ?>>
+    <summary><?= $stepStatusIcon($stepStates['8']) ?><h2>Step 8 &middot; Production &amp; Estimated Shipment</h2></summary>
     <div class="kv-grid">
       <div><span class="k">Production Status</span><span class="v"><?= htmlspecialchars($order['production_status_text'] ?? 'Not yet commenced') ?></span></div>
       <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
@@ -1627,10 +1647,10 @@ foreach ($stages as $s) {
         </form>
       </details>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section" data-stage="6">
-    <h2>Stage 6 — Freight Payment<?= $isFob ? ' (skipped — FOB)' : '' ?></h2>
+  <details class="step-card" id="step-freight"<?= $stepCardOpen('9') ?>>
+    <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9a&ndash;9f &middot; Freight Payment<?= $isFob ? ' (skipped — FOB)' : ' (balance due before shipment)' ?></h2></summary>
     <?php if ($isFob): ?>
       <p class="muted">FOB order — buyer arranges and pays freight directly. This stage is auto-skipped once Stage 5 passes.</p>
       <?php if ($freightSkipped): ?><p>Confirmed skipped: <?= htmlspecialchars($stage6['skip_reason']) ?></p><?php endif; ?>
@@ -1681,10 +1701,10 @@ foreach ($stages as $s) {
         <?php $renderExchangeRateWidget('freight', 'Freight Payment'); ?>
       <?php endif; ?>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section" data-stage="7">
-    <h2>Stage 7 — Packing &amp; BL Instruction</h2>
+  <details class="step-card" id="step-packing-bl"<?= $stepCardOpen('9') ?>>
+    <summary><?= $stepStatusIcon($stepStates['9']) ?><h2>Step 9g&ndash;9j &middot; Packing, BL Instruction &amp; CHA Draft Review</h2></summary>
     <?php if (!$stage7 || $stage7['status'] === 'locked'): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
     <?php else: ?>
@@ -1740,7 +1760,7 @@ foreach ($stages as $s) {
           </tr>
           <?php endforeach; ?>
         </table>
-        <?= $stepBadge('7a') ?><button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
+        <?= $stepBadge('9g') ?><button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
       </form>
       <?php if ($packing): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
@@ -1748,7 +1768,7 @@ foreach ($stages as $s) {
           <input type="hidden" name="document_type" value="PL">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <?= $stepBadge('7e') ?><button type="submit" class="<?= $__docBtnClass('PL') ?>" data-loading-text="Generating…">Generate Packing List</button>
+          <?= $stepBadge('9k') ?><button type="submit" class="<?= $__docBtnClass('PL') ?>" data-loading-text="Generating…">Generate Packing List</button>
         </form>
       <?php endif; ?>
 
@@ -1774,7 +1794,7 @@ foreach ($stages as $s) {
           <label>Container No.<input type="text" name="container_no" value="<?= htmlspecialchars($shipping['container_no'] ?? '') ?>"></label>
           <label>Seal No.<input type="text" name="seal_no" value="<?= htmlspecialchars($shipping['seal_no'] ?? '') ?>"></label>
         </div>
-        <?= $stepBadge('7b') ?><button type="submit" class="btn-sm">Save Shipping Details</button>
+        <?= $stepBadge('9h') ?><button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
 
       <?php if ($shipping): ?>
@@ -1785,7 +1805,7 @@ foreach ($stages as $s) {
         <input type="hidden" name="document_type" value="BLI">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-        <?= $stepBadge('7c') ?><button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
+        <?= $stepBadge('9i') ?><button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button>
       </form>
       <?php endif; ?>
 
@@ -1845,7 +1865,7 @@ foreach ($stages as $s) {
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date" value="<?= date('Y-m-d') ?>"></label>
           <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png"></label>
-          <?= $stepBadge('7d') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+          <?= $stepBadge('9j') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
       <?php else: ?>
         <p>Bill of Lading recorded: <strong><?= htmlspecialchars((string) ($shipping['bl_number'] ?? '')) ?></strong> (<?= htmlspecialchars((string) ($shipping['bl_date'] ?? '')) ?>)</p>
@@ -1860,10 +1880,10 @@ foreach ($stages as $s) {
         <?php endif; ?>
       <?php endif; ?>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section" data-stage="8">
-    <h2 data-tab-label="Stage 8 — CI &amp; Balance">Stage 8 — Commercial Invoice &amp; Balance Payment</h2>
+  <details class="step-card" id="step-ci-balance"<?= $stepCardOpen('9-10') ?>>
+    <summary><?= $stepStatusIcon($stepStates['9-10']) ?><h2>Step <?= $isFob ? '9b&ndash;9f' : '10a&ndash;10e' ?> &middot; Commercial Invoice &amp; Balance Payment<?= $isFob ? ' (before shipment)' : ' (against BL)' ?></h2></summary>
     <?php
       // Batch 3 #11 — the Commercial Invoice is conventionally dated to match the recorded BL date;
       // nothing enforces this, so flag it as an advisory (not a hard block — a same-day match is the
@@ -1923,11 +1943,11 @@ foreach ($stages as $s) {
       <?php endif; ?>
       <?php $renderExchangeRateWidget('balance', 'Balance Payment'); ?>
     <?php endif; ?>
-  </div>
+  </details>
 
   <?php if ($canManageOrderFinancials): ?>
-  <div class="section" id="order-financials">
-    <h2 data-tab-label="Financials">Order Financials — Government Benefits, Costs &amp; Profitability</h2>
+  <details class="step-card" id="order-financials"<?= $stepCardOpen('11') ?>>
+    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11 &middot; Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
 
     <h3 style="font-size:0.95em;">Government Export Benefits Claimed</h3>
@@ -2137,11 +2157,11 @@ foreach ($stages as $s) {
         (generated <?= htmlspecialchars((string) $caInternalDoc['generated_at']) ?>) — <span class="badge">INTERNAL ONLY — never shown to client</span>
       </p>
     <?php endif; ?>
-  </div>
+  </details>
   <?php endif; ?>
 
-  <div class="section" data-stage="9">
-    <h2>Stage 9 — Document Despatch &amp; Closure</h2>
+  <details class="step-card" id="step-despatch"<?= $stepCardOpen('11') ?>>
+    <summary><?= $stepStatusIcon($stepStates['11']) ?><h2>Step 11 (continued) &middot; Document Despatch &amp; Closure</h2></summary>
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
     <?php elseif ($order['status'] === 'shipped_docs_sent'): ?>
@@ -2261,11 +2281,11 @@ foreach ($stages as $s) {
       <p class="muted">Only Export/Logistics can close this order.</p>
       <?php endif; ?>
     <?php endif; ?>
-  </div>
+  </details>
 
   <?php if ($canCloseOrders): ?>
-  <div class="section" id="compliance-checklist">
-    <h2>Compliance Checklist</h2>
+  <details class="step-card step-card-reference" id="compliance-checklist">
+    <summary><h2>Compliance Checklist <small class="muted">(reference — ECGC Cover, Pre-Shipment Inspection, etc.)</small></h2></summary>
     <p class="muted">Pre-closure compliance tasks (ECGC Cover, Pre-Shipment Inspection, etc.) — visible here because you have the close_orders permission. A missing entry below means "Not Started". The task-name list itself is managed from <?= $canManageComplianceTaskTypes ? '<a href="/compliance-task-types">Compliance Task Types</a>' : 'Compliance Task Types' ?> (Admin-only).</p>
     <?php if (empty($complianceTasks)): ?>
     <p class="muted small">No compliance task types have been configured yet.</p>
@@ -2295,19 +2315,57 @@ foreach ($stages as $s) {
       <?php endforeach; ?>
     </table>
     <?php endif; ?>
-  </div>
+  </details>
   <?php endif; ?>
 
   <?php if ($canManageOrders): ?>
-  <div class="section" id="amendments">
-    <h2>Amendments</h2>
+  <details class="step-card step-card-reference" id="amendments">
+    <summary><h2>Amendments <small class="muted">(reference — mutually-agreed term changes)</small></h2></summary>
     <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>
     <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Payment Terms Amendments (<?= (int) $amendmentCount ?>)</a></p>
-  </div>
+  </details>
   <?php endif; ?>
 
-  <div class="section" id="order-updates">
-    <h2>Order Communication</h2>
+  <details class="step-card" id="step-additional-documents"<?= $stepCardOpen('12') ?>>
+    <summary><?= $stepStatusIcon($stepStates['12']) ?><h2>Step 12 &middot; Additional Documents</h2></summary>
+    <p class="muted small">Free-form extras that don't fit any fixed document type — e.g. a buyer-supplied certificate template, a special packing instruction sheet. Every generated document for this order is listed in the sidebar; this is only for files that were never one of the fixed types above.</p>
+    <table class="list">
+      <tr><th>Title</th><th>Notes</th><th>File</th><th>Uploaded</th><th></th></tr>
+      <?php foreach ($additionalDocuments as $ad): ?>
+      <tr>
+        <td><?= htmlspecialchars($ad['document_type_label'] ?? '') ?></td>
+        <td class="muted small"><?= htmlspecialchars($ad['notes'] ?? '') ?></td>
+        <td><a href="/file-store/<?= (int) $ad['id'] ?>/download"><?= htmlspecialchars($ad['original_filename']) ?></a></td>
+        <td><?= htmlspecialchars((string) $ad['uploaded_at']) ?><?php if (!empty($ad['uploaded_by_name'])): ?> <span class="muted small">by <?= htmlspecialchars($ad['uploaded_by_name']) ?></span><?php endif; ?></td>
+        <td>
+          <?php if ($canManageOrders): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents/<?= (int) $ad['id'] ?>/delete" style="display:inline" onsubmit="return confirmRemoveAdditionalDocument(this);">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="reason" class="remove-additional-document-reason">
+            <button type="button" class="btn-sm btn-danger" onclick="promptRemoveAdditionalDocument(this)">Remove</button>
+          </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+      <?php if (empty($additionalDocuments)): ?>
+      <tr><td colspan="5" class="muted">No additional documents attached yet.</td></tr>
+      <?php endif; ?>
+    </table>
+    <?php if ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+      <?= Csrf::field() ?>
+      <input type="text" name="title" placeholder="Title *" required style="width:220px">
+      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
+      <input type="file" name="document" required>
+      <button type="submit" class="btn-sm">Attach Document</button>
+    </form>
+    <?php endif; ?>
+    <p class="muted small" style="margin-top:8px;"><a href="/orders/<?= (int) $order['id'] ?>/additional-documents/removed">Show removed</a></p>
+  </details>
+
+  <details class="step-card" id="order-updates"<?= $stepCardOpen('13') ?>>
+    <summary><?= $stepStatusIcon($stepStates['13']) ?><h2>Step 13 &middot; Order Communication</h2></summary>
     <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
     <div class="chat-thread">
       <?php if (empty($comments)): ?>
@@ -2351,10 +2409,10 @@ foreach ($stages as $s) {
         <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
       </div>
     </form>
-  </div>
+  </details>
 
-  <div class="section" id="order-feedback">
-    <h2>Order Feedback</h2>
+  <details class="step-card" id="order-feedback"<?= $stepCardOpen('14') ?>>
+    <summary><?= $stepStatusIcon($stepStates['14']) ?><h2>Step 14 &middot; Order Feedback</h2></summary>
     <?php if (empty($orderFeedback)): ?>
       <p class="muted">The client hasn't submitted feedback for this order yet.</p>
     <?php else: ?>
@@ -2364,16 +2422,16 @@ foreach ($stages as $s) {
         <div class="full"><span class="k">Comments</span><span class="v"><?= $orderFeedback['comments'] ? nl2br(htmlspecialchars($orderFeedback['comments'])) : '—' ?></span></div>
       </div>
     <?php endif; ?>
-  </div>
+  </details>
 
-  <div class="section" id="complaints">
-    <h2>Complaints</h2>
+  <details class="step-card" id="complaints"<?= $stepCardOpen('15') ?>>
+    <summary><?= $stepStatusIcon($stepStates['15']) ?><h2>Step 15 &middot; Complaints</h2></summary>
     <p class="muted">A process issue or flaw the client flagged for us to fix next time — separate from Disputes below, and always available to the client regardless of the Dispute toggle.</p>
     <p><?= $canViewOrderComplaints ? '<a href="/orders/' . (int) $order['id'] . '/complaints">Complaints (' . (int) $openComplaintCount . ' open)</a>' : 'Complaints (' . (int) $openComplaintCount . ' open)' ?></p>
-  </div>
+  </details>
 
-  <div class="section" id="disputes">
-    <h2>Disputes</h2>
+  <details class="step-card" id="disputes"<?= $stepCardOpen('16') ?>>
+    <summary><?= $stepStatusIcon($stepStates['16']) ?><h2>Step 16 &middot; Disputes</h2></summary>
     <p class="muted">A buyer wanting to cancel this order and not proceed with us — separate from a Complaint above (no cancel intent) and from an Amendment, which is a planned, mutually-agreed change to order terms.</p>
     <?php if ($canManageDisputes): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/dispute-visibility" style="margin-bottom:10px">
@@ -2392,11 +2450,20 @@ foreach ($stages as $s) {
        &nbsp;·&nbsp;
        <a href="/orders/<?= (int) $order['id'] ?>/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
     </p>
-  </div>
+  </details>
+
+  <details class="step-card" id="step-complete"<?= $stepCardOpen('17') ?>>
+    <summary><?= $stepStatusIcon($stepStates['17']) ?><h2>Step 17 &middot; Order Complete</h2></summary>
+    <?php if ($orderClosed): ?>
+      <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
+    <?php else: ?>
+      <p class="muted">Not yet complete — finish Step 11 above (Mark Fully Settled) to close this order.</p>
+    <?php endif; ?>
+  </details>
 
   <?php if ($canEditLockedData): ?>
-  <div class="section">
-    <h2>Admin Override</h2>
+  <details class="step-card step-card-reference">
+    <summary><h2>Admin Override</h2></summary>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/override-status-lock" onsubmit="return confirmFieldOverride(this, 'this order\'s status/lock');">
       <?= Csrf::field() ?>
       <label>Status
@@ -2413,7 +2480,7 @@ foreach ($stages as $s) {
       <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
       <button type="submit" class="btn-sm btn-danger">Override Status/Lock</button>
     </form>
-  </div>
+  </details>
   <script>
   function confirmFieldOverride(form, label) {
     var reasonEl = form.querySelector('.override-reason');
@@ -2427,8 +2494,8 @@ foreach ($stages as $s) {
   <?php endif; ?>
 
   <?php if ($canEditLockedData): ?>
-  <div class="section" style="border-color:#D9822B;">
-    <h2 data-tab-label="Force-Generate Document">Force-Generate a Document (privileged override)</h2>
+  <details class="step-card step-card-reference" style="border-color:#D9822B;">
+    <summary><h2>Force-Generate a Document (privileged override)</h2></summary>
     <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" onsubmit="return confirmDocumentRegeneration(this) && confirmFieldOverride(this, 'generating this document out of sequence');">
       <?= Csrf::field() ?>
@@ -2446,10 +2513,62 @@ foreach ($stages as $s) {
       </label>
       <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
     </form>
-  </div>
+  </details>
   <?php endif; ?>
 
     </div>
+
+    <aside class="order-detail-sidebar" id="order-detail-sidebar">
+      <div class="sidebar-panel">
+        <h3>At a Glance</h3>
+        <div class="kv-grid">
+          <div><span class="k">Current Stage</span><span class="v"><?= $currentStage ? 'Stage ' . (int) $currentStage['stage_number'] . ' — ' . htmlspecialchars($currentStage['stage_name']) : ($orderClosed ? 'Complete — all 9 stages resolved' : '—') ?></span></div>
+          <div><span class="k">Products</span><span class="v"><?= count($products) ?> line<?= count($products) === 1 ? '' : 's' ?></span></div>
+          <div><span class="k">Payment Legs</span><span class="v"><?= $paymentLegsResolved ?> of <?= $paymentLegsApplicable ?> cleared<?= $paymentLegsApplicable === 0 ? ' (nothing recorded yet)' : '' ?> — <a href="#payment-snapshot">see Payment Snapshot</a></span></div>
+          <?php if ($canCloseOrders): ?>
+          <div><span class="k">Compliance Checklist</span><span class="v"><?= $complianceSummary['total'] === 0 ? 'No task types configured' : $complianceSummary['approved'] . ' of ' . $complianceSummary['total'] . ' resolved' ?> — <a href="#compliance-checklist">see checklist</a></span></div>
+          <?php endif; ?>
+          <div><span class="k">Documents Generated</span><span class="v"><?= count($documents) ?></span></div>
+          <div><span class="k">Client</span><span class="v"><?= htmlspecialchars($order['company_legal_name']) ?></span></div>
+          <div><span class="k">Buyer Inquiry Ref</span><span class="v"><?= htmlspecialchars($order['buyer_inquiry_ref']) ?></span></div>
+          <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v"><?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '—') ?></span></div>
+          <div><span class="k">Quotation Date</span><span class="v"><?= htmlspecialchars($order['quotation_date'] ?? '—') ?></span></div>
+          <div><span class="k">FOB Value</span><span class="v"><?= htmlspecialchars($order['currency_code']) ?> <?= number_format((float) $fobTotal, 2) ?></span></div>
+          <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed') ?></span></div>
+          <div><span class="k">Container Type</span><span class="v"><?= htmlspecialchars($order['container_type'] ?? '—') ?></span></div>
+          <div><span class="k">Production Lead Time (<?= htmlspecialchars($leadTimeDisplayUnit) ?>)</span><span class="v"><?= htmlspecialchars(LeadTimeDisplay::formatRange($order['lead_time_min_days'] !== null ? (int) $order['lead_time_min_days'] : null, $order['lead_time_max_days'] !== null ? (int) $order['lead_time_max_days'] : null, $leadTimeDisplayUnit)) ?></span></div>
+          <div><span class="k">Sailing Lead Time (<?= htmlspecialchars($leadTimeDisplayUnit) ?>)</span><span class="v"><?= htmlspecialchars(LeadTimeDisplay::formatRange($order['sailing_lead_time_min_days'] !== null ? (int) $order['sailing_lead_time_min_days'] : null, $order['sailing_lead_time_max_days'] !== null ? (int) $order['sailing_lead_time_max_days'] : null, $leadTimeDisplayUnit)) ?></span></div>
+          <div><span class="k">Payment Preset</span><span class="v"><?= htmlspecialchars($order['preset_name']) ?></span></div>
+          <div><span class="k">Buyer's PO Ref</span><span class="v">
+            <?php if (!empty($order['buyers_po_ref']) && $order['buyers_po_ref'] !== 'NIL'): ?>
+              <?= htmlspecialchars($order['buyers_po_ref']) ?>
+            <?php elseif (!empty($buyerPoDocuments)): ?>
+              <span class="muted">Not yet recorded &mdash; <?= count($buyerPoDocuments) ?> file<?= count($buyerPoDocuments) === 1 ? '' : 's' ?> attached (see Step 4 below)</span>
+            <?php else: ?>
+              NIL
+            <?php endif; ?>
+          </span></div>
+          <div><span class="k">Special Requirements/Instructions</span><span class="v"><?= htmlspecialchars($order['special_requirements'] ?? '—') ?></span></div>
+        </div>
+      </div>
+
+      <div class="sidebar-panel">
+        <h3>All Documents <small class="muted">(step 12)</small></h3>
+        <?php if (empty($documents)): ?>
+          <p class="muted small">No documents generated yet.</p>
+        <?php else: ?>
+          <ul class="sidebar-doc-list">
+            <?php foreach ($documents as $d): ?>
+              <li>
+                <?php if ($d['pdf_file_id']): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf"><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?></a><?php else: ?><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?><?php endif; ?>
+                <span class="muted small">Rev.<?= (int) $d['revision_number'] ?> &middot; <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?></span>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
+        <p class="muted small"><a href="#documents-approvals">Full list with review/approval status &rarr;</a></p>
+      </div>
+    </aside>
   </div>
   <script>
   // External QA report M-08: "Regenerating an earlier-stage document after
@@ -2474,104 +2593,73 @@ foreach ($stages as $s) {
   }
   </script>
   <script>
+  // Order detail page rebuild: step-cards are native <details>/<summary> —
+  // open/closed state, keyboard toggling, and the no-JS fallback (every
+  // card simply stacked, all collapsed) all come from the browser for
+  // free. This script only handles the parts <details> doesn't: opening
+  // AND scrolling to a card when something links to it (an in-page
+  // "see X" reference, the top stepper dots, or a direct #hash URL), and
+  // mapping the stage-stepper's numeric stage to the right card id since
+  // one DB stage can span two cards (Stage 2/3 -> Buyer PO + PI-Stage
+  // Intake) or share one card with another (Stage 6/7 both feed into the
+  // single Step 9 packing/freight pair).
   (function () {
-    var layout = document.getElementById('order-layout');
     var panelsContainer = document.getElementById('order-panels');
-    var sidebar = document.getElementById('order-sidebar');
-    if (!layout || !panelsContainer || !sidebar) { return; }
-    var panels = Array.prototype.filter.call(panelsContainer.children, function (el) {
-      return el.classList.contains('section');
-    });
-    if (!panels.length) { return; }
+    if (!panelsContainer) { return; }
 
-    // Remembers the active panel per-order in sessionStorage so that a
-    // plain form submit inside a panel (e.g. "Regenerate PI Form Link"),
-    // which redirects back to this same page with no #hash, still lands
-    // the user back on the panel they were just working in, instead of
-    // silently resetting to the first one. A #hash in the URL (e.g. from
-    // a direct link or the "Order Updates" comment form) always wins over
-    // the remembered panel, so existing deep links keep working.
-    var storageKey = 'orderActivePanel:<?= (int) $order['id'] ?>';
-
-    function slugify(text) {
-      var s = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      return s || 'section';
-    }
-    var usedIds = {};
-    panels.forEach(function (panel, idx) {
-      if (panel.id) {
-        usedIds[panel.id] = true;
-        return;
-      }
-      var heading = panel.querySelector('h2');
-      var label = heading ? heading.textContent.trim() : ('Section ' + (idx + 1));
-      var base = 'panel-' + slugify(label);
-      var id = base, n = 2;
-      while (usedIds[id]) { id = base + '-' + n; n++; }
-      usedIds[id] = true;
-      panel.id = id;
-    });
-
-    panels.forEach(function (panel) {
-      var heading = panel.querySelector('h2');
-      // External QA report U-12: "section tabs wrap and the long tab
-      // names are cut" on a phone. data-tab-label is an optional short
-      // alias for the handful of headings long enough to cause that —
-      // the on-page <h2> itself stays the full, descriptive text.
-      var label = heading ? (heading.dataset.tabLabel || heading.textContent.trim()) : panel.id;
-      var link = document.createElement('button');
-      link.type = 'button';
-      link.className = 'order-sidebar-link';
-      link.textContent = label;
-      link.dataset.target = panel.id;
-      link.addEventListener('click', function () { activate(panel.id, true); });
-      sidebar.appendChild(link);
-    });
-
-    function activate(id, updateHash) {
-      panels.forEach(function (p) { p.classList.toggle('active-panel', p.id === id); });
-      Array.prototype.forEach.call(sidebar.children, function (link) {
-        link.classList.toggle('active', link.dataset.target === id);
-      });
-      if (updateHash && window.history && window.history.pushState) {
-        window.history.pushState(null, '', '#' + id);
-      }
-      try { sessionStorage.setItem(storageKey, id); } catch (e) { /* private browsing etc — fine to skip */ }
+    function openAndScrollTo(id) {
+      var el = document.getElementById(id);
+      if (!el) { return false; }
+      var details = el.tagName === 'DETAILS' ? el : el.closest('details');
+      if (details) { details.open = true; }
+      el.scrollIntoView({ block: 'start' });
+      return true;
     }
 
-    // Order Details' "see Payment Snapshot" / "see checklist" links (and any
-    // other in-page #anchor pointing at a panel) only ever changed the URL
-    // hash — since every non-active panel is display:none, the browser had
-    // nothing visible to scroll to, so the click appeared to do nothing.
-    // Intercepting the click lets us activate the right panel first, then
-    // scroll to it.
-    panelsContainer.addEventListener('click', function (e) {
+    // Any in-page link to a card's #id (the sidebar's "At a Glance" cross
+    // references, "see Payment Snapshot", "see checklist", etc.) opens
+    // the target card before the browser's default jump, since a closed
+    // <details> has nothing visible to scroll to otherwise.
+    document.addEventListener('click', function (e) {
       var link = e.target.closest ? e.target.closest('a[href^="#"]') : null;
       if (!link) { return; }
       var targetId = link.getAttribute('href').slice(1);
-      var targetPanel = null;
-      panels.forEach(function (p) { if (p.id === targetId) { targetPanel = p; } });
-      if (!targetPanel) { return; }
+      if (!targetId || !openAndScrollTo(targetId)) { return; }
       e.preventDefault();
-      activate(targetPanel.id, true);
-      targetPanel.scrollIntoView({ block: 'start' });
+      if (window.history && window.history.pushState) {
+        window.history.pushState(null, '', '#' + targetId);
+      }
     });
 
-    // Batch 3 #14 — the at-a-glance stepper at the top of the page was
-    // purely visual; clicking a step now jumps straight to whichever
-    // panel covers that stage, exactly like the Order Details "see →"
-    // links above intercept and activate(). Matched via each panel's own
-    // data-stage attribute (set on the Documents & Approvals panel for
-    // Stage 1/Stage 3's PI-Stage Intake panel and on each "Stage N — ..."
-    // panel) rather than by guessing the auto-slugified id, since several
-    // panels share one stage and the slug depends on the heading text.
+    // The top-of-page stage stepper dots jump to whichever card(s) cover
+    // that DB stage. Stage 3 alone spans two cards (PI-Stage Intake and
+    // PI & Advance Payment — see the step -> existing-content mapping in
+    // the rebuild plan), so every entry is a list; the stepper scrolls to
+    // the first (primary) one but opens every card in the list, so the
+    // PI-Stage Intake card is never left unexpectedly collapsed.
+    var stageToCardId = {
+      1: ['documents-approvals'],
+      2: ['step-buyer-po'],
+      3: ['step-pi-advance', 'step-pi-intake'],
+      4: ['step-oc'],
+      5: ['step-supplier-po'],
+      6: ['step-freight'],
+      7: ['step-packing-bl'],
+      8: ['step-ci-balance'],
+      9: ['step-despatch'],
+    };
     var stepperSteps = document.querySelectorAll('.process-stepper .process-step');
     function jumpToStage(stageNumber) {
-      var targetPanel = null;
-      panels.forEach(function (p) { if (p.dataset.stage === String(stageNumber)) { targetPanel = p; } });
-      if (!targetPanel) { return; }
-      activate(targetPanel.id, true);
-      targetPanel.scrollIntoView({ block: 'start' });
+      var ids = stageToCardId[String(stageNumber)] || [];
+      ids.forEach(function (id, idx) {
+        if (idx === 0) {
+          openAndScrollTo(id);
+          return;
+        }
+        var el = document.getElementById(id);
+        var details = el && (el.tagName === 'DETAILS' ? el : el.closest('details'));
+        if (details) { details.open = true; }
+      });
     }
     Array.prototype.forEach.call(stepperSteps, function (step) {
       var stageNumber = step.dataset.stage;
@@ -2582,19 +2670,16 @@ foreach ($stages as $s) {
       });
     });
 
+    // On load: a direct #hash URL wins (open + scroll to it); otherwise
+    // scroll to whichever card the server already marked `open` (the
+    // order's real current step) so staff land on it without hunting.
     var initialId = (window.location.hash || '').replace('#', '');
-    var initialPanel = null;
-    panels.forEach(function (p) { if (p.id === initialId) { initialPanel = p; } });
-    if (!initialPanel) {
-      var rememberedId = null;
-      try { rememberedId = sessionStorage.getItem(storageKey); } catch (e) { /* ignore */ }
-      if (rememberedId) {
-        panels.forEach(function (p) { if (p.id === rememberedId) { initialPanel = p; } });
-      }
+    if (initialId && document.getElementById(initialId)) {
+      openAndScrollTo(initialId);
+    } else {
+      var current = panelsContainer.querySelector('details[open]');
+      if (current) { current.scrollIntoView({ block: 'start' }); }
     }
-    activate(initialPanel ? initialPanel.id : panels[0].id, false);
-
-    layout.classList.add('js-enabled');
   })();
   </script>
 </div>

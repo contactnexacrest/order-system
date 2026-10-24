@@ -69,24 +69,38 @@ final class OrderScreenRedesignTest extends TestCase
         $this->assertStringContainsString('id="freight-currency-unit"', $html);
     }
 
-    public function testOrderShowPageWrapsAllSectionsInConceptCSidebarLayout(): void
+    /**
+     * External QA report: the approved "NexaCrest: Standard vs Kanban UI"
+     * design (KanbanDetail.dc.html/Main.dc.html) replaced the Concept C
+     * sidebar + single-panel layout with a vertical sequence of
+     * <details>/<summary> step-cards plus a persistent reference sidebar
+     * (documents + at-a-glance) — reached identically whether the order
+     * was opened from the Standard list or the Kanban board.
+     */
+    public function testOrderShowPageWrapsAllSectionsInStepCardSequencePlusSidebar(): void
     {
         $html = $this->showPhp();
         $this->assertStringContainsString('id="order-layout"', $html);
-        $this->assertStringContainsString('id="order-sidebar"', $html);
         $this->assertStringContainsString('id="order-panels"', $html);
+        $this->assertStringContainsString('id="order-detail-sidebar"', $html);
+        $this->assertStringContainsString('class="step-sequence"', $html);
 
         $layoutStart = strpos($html, 'id="order-layout"');
         $panelsStart = strpos($html, 'id="order-panels"');
+        $sidebarStart = strpos($html, 'id="order-detail-sidebar"');
         $this->assertNotFalse($layoutStart);
         $this->assertNotFalse($panelsStart);
+        $this->assertNotFalse($sidebarStart);
         $this->assertGreaterThan($layoutStart, $panelsStart);
+        $this->assertGreaterThan($panelsStart, $sidebarStart);
 
-        // Every existing top-level section must now live inside the panels
-        // wrapper — nothing was dropped, only re-parented.
-        $sectionCountTotal = substr_count($html, '<div class="section"');
+        // Every existing top-level section must now live inside the
+        // step-sequence wrapper as its own step-card — nothing was
+        // dropped, only re-parented and re-labelled with the user's own
+        // 0-17 step numbering.
+        $sectionCountTotal = substr_count($html, '<details class="step-card');
         $afterPanels = substr($html, $panelsStart);
-        $sectionCountInsidePanels = substr_count($afterPanels, '<div class="section"');
+        $sectionCountInsidePanels = substr_count($afterPanels, '<details class="step-card');
         $this->assertSame($sectionCountTotal, $sectionCountInsidePanels);
         $this->assertGreaterThanOrEqual(18, $sectionCountTotal);
     }
@@ -94,11 +108,17 @@ final class OrderScreenRedesignTest extends TestCase
     public function testOrderShowPageDegradesGracefullyWithoutJavascript(): void
     {
         $html = $this->showPhp();
-        // The CSS rule that hides inactive panels is scoped to
-        // ".order-layout.js-enabled" only — never a bare ".section", so if
-        // the script never runs, every section still renders in sequence.
-        $this->assertStringContainsString('.js-enabled .order-panels > .section{display:none;}', $this->readCss());
-        $this->assertStringContainsString("layout.classList.add('js-enabled')", $html);
+        // Step-cards are native <details>/<summary> — collapse/expand,
+        // keyboard toggling, and reaching every card's content all come
+        // from the browser itself, with zero script required (unlike the
+        // old design, whose CSS hid every inactive panel behind a
+        // JS-built ".js-enabled" gate). The panel-switching script this
+        // test used to pin the absence of a CSS/JS coupling for is gone
+        // entirely — there is nothing left to gate.
+        $this->assertStringNotContainsString('order-sidebar', $html);
+        $this->assertStringNotContainsString('active-panel', $html);
+        $this->assertStringNotContainsString("js-enabled", $html);
+        $this->assertGreaterThanOrEqual(18, substr_count($html, '<details class="step-card'));
     }
 
     public function testOrderShowPagePreservesTheOrderUpdatesAnchorId(): void
@@ -129,26 +149,28 @@ final class OrderScreenRedesignTest extends TestCase
 
     private function assertSectionsAreDirectChildrenOfOrderPanels(string $html): void
     {
-        $panelsOpenPos = strpos($html, '<div class="order-panels" id="order-panels">');
+        $panelsOpenPos = strpos($html, '<div class="step-sequence" id="order-panels">');
         $this->assertNotFalse($panelsOpenPos, 'Could not find the #order-panels opening tag.');
 
-        // Walk every <div ...> / </div> from the panels wrapper's own
-        // opening tag onward, tracking nesting depth. #order-panels itself
-        // is depth 1; anything opened while depth === 1 is a direct child.
-        preg_match_all('/<div\b[^>]*>|<\/div>/', substr($html, $panelsOpenPos), $matches, PREG_OFFSET_CAPTURE);
+        // Walk every <div.../<details ...> / </div>/</details> from the
+        // panels wrapper's own opening tag onward, tracking nesting depth.
+        // #order-panels itself is depth 1; anything opened while depth
+        // === 1 is a direct child (depth becomes 2).
+        preg_match_all('/<div\b[^>]*>|<\/div>|<details\b[^>]*>|<\/details>/', substr($html, $panelsOpenPos), $matches, PREG_OFFSET_CAPTURE);
         $tokens = $matches[0];
 
         // Depth 2 is "one level inside #order-panels itself" — a direct
-        // child. A legitimate sub-section used purely for visual grouping
-        // inside one of the 24 real panels (e.g. the pre-shipment
-        // inspection block) sits deeper than this and is intentionally not
-        // counted here; N-01's bug was a *top-level* panel swallowing every
-        // panel after it, which shows up as this count dropping below 24,
-        // not as a deeper nested div existing.
+        // child step-card. A legitimate nested <details> used purely for
+        // visual grouping inside one of the real step-cards (e.g. the
+        // pre-shipment inspection block, or "Add a new supplier") sits
+        // deeper than this and is intentionally not counted here — N-01's
+        // bug was a *top-level* panel swallowing every panel after it,
+        // which shows up as this count dropping below the expected total,
+        // not as a deeper nested element existing.
         $depth = 0;
         $directChildSectionCount = 0;
         foreach ($tokens as [$token, ]) {
-            if ($token === '</div>') {
+            if ($token === '</div>' || $token === '</details>') {
                 $depth--;
                 if ($depth === 0) {
                     // #order-panels itself has closed.
@@ -157,15 +179,15 @@ final class OrderScreenRedesignTest extends TestCase
                 continue;
             }
             $depth++;
-            if ($depth === 2 && str_starts_with($token, '<div class="section"')) {
+            if ($depth === 2 && str_starts_with($token, '<details class="step-card')) {
                 $directChildSectionCount++;
             }
         }
 
         $this->assertSame(
-            24,
+            26,
             $directChildSectionCount,
-            'Expected exactly 24 .section panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01).'
+            'Expected exactly 26 step-card panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01).'
         );
     }
 

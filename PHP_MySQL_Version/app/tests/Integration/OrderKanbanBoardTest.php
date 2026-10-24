@@ -117,7 +117,7 @@ final class OrderKanbanBoardTest extends DbTestCase
         self::assertNotFalse($stage1ColPos);
         self::assertNotFalse($stage2ColPos);
         $stage1Column = substr($output, $stage1ColPos, $stage2ColPos - $stage1ColPos);
-        self::assertStringContainsString("href=\"/orders/{$orderId}\"", $stage1Column, 'a fresh order must have a card inside the Stage 1 column');
+        self::assertStringContainsString("href=\"/orders/{$orderId}?from=kanban\"", $stage1Column, 'a fresh order must have a card inside the Stage 1 column, linking back to the board');
     }
 
     public function testAnOrderUnlockedThroughStage3AppearsInTheStage4Column(): void
@@ -208,5 +208,40 @@ final class OrderKanbanBoardTest extends DbTestCase
         for ($stage = 1; $stage <= 9; $stage++) {
             self::assertStringContainsString("Stage {$stage} &middot;", $output, "Stage {$stage} column must always render, even with zero orders currently in it");
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Order detail page is reached identically from either list type —
+    // only the "back" breadcrumb differs, driven by the ?from=kanban
+    // query param the board's own card link now carries.
+    // ---------------------------------------------------------------
+
+    public function testOrderDetailBreadcrumbPointsBackToTheBoardWhenOpenedFromKanban(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+
+        $_SESSION['_auth_user_id'] = $userId;
+        $_GET['from'] = 'kanban';
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $output = (string) ob_get_clean();
+
+        self::assertStringContainsString('&larr; Back to Board</a>', $output);
+        self::assertStringNotContainsString('&larr; Back to Orders</a>', $output);
+    }
+
+    public function testOrderDetailBreadcrumbPointsBackToTheStandardListWhenOpenedWithoutFromKanban(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+
+        $_SESSION['_auth_user_id'] = $userId;
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $output = (string) ob_get_clean();
+
+        self::assertStringContainsString('&larr; Back to Orders</a>', $output);
+        self::assertStringNotContainsString('&larr; Back to Board</a>', $output);
     }
 }

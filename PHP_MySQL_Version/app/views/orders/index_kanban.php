@@ -16,7 +16,7 @@ $renderKanbanCard = static function (array $o): string {
     $amount = trim($currency . ' ' . number_format((float) $o['total_fob_value'], 2));
     ob_start();
     ?>
-    <a class="entity-card kanban-card<?= !empty($o['is_overdue']) ? ' entity-card-overdue' : '' ?>" href="/orders/<?= (int) $o['id'] ?>">
+    <a class="entity-card kanban-card<?= !empty($o['is_overdue']) ? ' entity-card-overdue' : '' ?>" href="/orders/<?= (int) $o['id'] ?>?from=kanban">
       <div class="entity-card-header">
         <span class="entity-card-title"><?= htmlspecialchars($o['order_reference']) ?></span>
         <?php if (!empty($o['incoterm_code'])): ?><span class="tag tag-gold"><?= htmlspecialchars($o['incoterm_code']) ?></span><?php endif; ?>

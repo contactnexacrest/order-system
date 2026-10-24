@@ -23,8 +23,9 @@ const DUMMY_FILE = path.join(__dirname, 'fixtures', 'dummy-signed-copy.pdf');
  *     the checkbox is checked.
  *   - .card-grid (orders/clients list) and .page-header-row drop to a
  *     single column.
- *   - the order detail page's .order-sidebar (the stage-panel tab list)
- *     switches from a vertical sidebar to a horizontal wrapping strip.
+ *   - the order detail page's .order-detail-sidebar (At a Glance + All
+ *     Documents) drops from a sticky side column to a static block
+ *     stacked below the step-card sequence.
  *   - chat bubbles widen to 90% at <=640px.
  * Every test also asserts no horizontal page overflow — the CSS
  * comment's own stated goal ("nothing forces horizontal scroll on a
@@ -134,28 +135,33 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await assertNoHorizontalOverflow(page);
     });
 
-    test('order detail page: stage tabs are a horizontal strip, not clipped, and still switch panels', async ({
+    test('order detail page: step-cards stack with the sidebar, and a collapsed card still opens', async ({
       page,
     }) => {
       await login(page, 'admin');
       await page.goto(`/orders/${orderId}`);
       await assertNoHorizontalOverflow(page);
 
-      // Below 900px .order-sidebar switches from a vertical sidebar to a
-      // horizontal wrapping strip (position:static, flex-wrap) — confirm
-      // that's really the layout in effect, not just that the class exists.
+      // Below 900px .order-detail-sidebar (At a Glance + All Documents)
+      // drops from a sticky side column to a static block stacked below
+      // the step-card sequence — confirm that's really the layout in
+      // effect, not just that the class exists.
       const sidebarPosition = await page.evaluate(() => {
-        const el = document.querySelector('.order-sidebar');
+        const el = document.querySelector('.order-detail-sidebar');
         return el ? getComputedStyle(el).position : null;
       });
       expect(sidebarPosition).toBe('static');
 
-      // The tab strip must still be genuinely usable — click one and
-      // confirm the corresponding panel actually becomes the active one.
-      const paymentTab = page.locator('.order-sidebar-link', { hasText: 'Payment Status' });
-      await expect(paymentTab).toBeVisible();
-      await paymentTab.click();
-      await expect(paymentTab).toHaveClass(/active/);
+      // Step-cards are native <details>/<summary> — collapse/expand must
+      // still work with a tap at phone width. "Disputes" is reliably
+      // collapsed on a fresh order (it isn't the current step).
+      const disputesCard = page
+        .locator('details.step-card')
+        .filter({ has: page.locator('summary', { hasText: 'Disputes' }) })
+        .first();
+      expect(await disputesCard.evaluate((el) => el.open)).toBe(false);
+      await disputesCard.locator('summary').click();
+      expect(await disputesCard.evaluate((el) => el.open)).toBe(true);
       await assertNoHorizontalOverflow(page);
     });
 
@@ -178,8 +184,12 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await expect(page.locator('.alert')).toContainText('generated');
       await assertNoHorizontalOverflow(page);
 
+      // The outer "Documents & Approvals" step-card also "has" a matching
+      // nested summary descendant (the QT-specific review widget this is
+      // actually looking for) — excluding .step-card keeps this matching
+      // only the innermost, document-specific <details>.
       let panel = page
-        .locator('details')
+        .locator('details:not(.step-card)')
         .filter({ has: page.locator('summary', { hasText: /^\s*QT\s/ }) })
         .first();
       await panel.locator('summary').click();
@@ -190,7 +200,7 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
 
       await openStage(1);
       panel = page
-        .locator('details')
+        .locator('details:not(.step-card)')
         .filter({ has: page.locator('summary', { hasText: /^\s*QT\s/ }) })
         .first();
       await panel.locator('summary').click();
@@ -210,13 +220,13 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await expect(page.locator('.alert')).toContainText('unlocked');
       await assertNoHorizontalOverflow(page);
 
-      await page.locator('.order-sidebar-link', { hasText: 'Payment Status' }).click();
+      await openStage(3);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
       await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
       await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
-      await page.locator('.order-sidebar-link', { hasText: 'Payment Status' }).click();
+      await openStage(3);
       const clearForm = page.locator(`form[action="/orders/${orderId}/payment/advance/clear"]`);
       await clearForm.getByRole('button', { name: 'Mark Advance Cleared' }).click();
       await expect(page.locator('.alert')).toContainText('unlocked');

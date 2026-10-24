@@ -43,11 +43,17 @@ final class OrderProcessStepperTest extends DbTestCase
     }
 
     /**
-     * Batch 3 #14 — the stepper is now clickable: each step carries
-     * data-stage="N" and the JS jumps to whichever panel carries the
-     * matching data-stage attribute. This doesn't exercise the JS itself
-     * (no headless browser here), but pins the markup contract the JS
-     * depends on — both sides of the match must be present in the HTML.
+     * Batch 3 #14 — the stepper is clickable: each step carries
+     * data-stage="N". The order-detail-page rebuild (step-card sequence)
+     * replaced every stage's own data-stage-carrying `<div class="section">`
+     * with one or more `<details class="step-card">` step-cards (one DB
+     * stage can now map to more than one card, e.g. Stage 2/3 split into
+     * two separate cards, and Stages 6-7 share a pair) — the stepper's
+     * click-to-jump script now resolves a clicked stage number to its
+     * card id via its own `stageToCardId` lookup object instead of a
+     * shared data-stage attribute on the target. This pins that every
+     * stage number the stepper exposes still resolves to a real step-card
+     * id present in the page.
      */
     public function testStepperStepsAndTheirTargetPanelsCarryMatchingDataStageAttributes(): void
     {
@@ -59,13 +65,23 @@ final class OrderProcessStepperTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
+        $stageToCardId = [
+            1 => ['documents-approvals'],
+            2 => ['step-buyer-po'],
+            3 => ['step-pi-advance', 'step-pi-intake'],
+            4 => ['step-oc'],
+            5 => ['step-supplier-po'],
+            6 => ['step-freight'],
+            7 => ['step-packing-bl'],
+            8 => ['step-ci-balance'],
+            9 => ['step-despatch'],
+        ];
+
         foreach ([1, 2, 3, 4, 5, 6, 7, 8, 9] as $stage) {
             self::assertStringContainsString("role=\"button\" tabindex=\"0\" data-stage=\"{$stage}\"", $output, "stepper step {$stage} must be focusable and carry data-stage");
-            self::assertMatchesRegularExpression(
-                '/<div class="section"[^>]*data-stage="' . $stage . '"/',
-                $output,
-                "a panel carrying data-stage=\"{$stage}\" must exist for the stepper to jump to"
-            );
+            foreach ($stageToCardId[$stage] as $cardId) {
+                self::assertStringContainsString("id=\"{$cardId}\"", $output, "a step-card carrying id=\"{$cardId}\" must exist for the stepper to jump to for stage {$stage}");
+            }
         }
     }
 

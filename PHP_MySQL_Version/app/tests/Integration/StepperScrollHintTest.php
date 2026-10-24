@@ -36,28 +36,22 @@ final class StepperScrollHintTest extends \PHPUnit\Framework\TestCase
         self::assertMatchesRegularExpression('/@media \(max-width:900px\)\{\s*\.stepper-scroll-hint\{display:block;\}/', $css);
     }
 
-    public function testTheLongestSectionHeadingsHaveAShortTabLabelAlias(): void
+    /**
+     * The order-detail-page rebuild (step-card sequence) removed the
+     * JS-built mobile section-tab bar this alias existed to shorten
+     * labels for — every section is now a native <details>/<summary>
+     * step-card stacked vertically, with no per-section tab strip to
+     * build on mobile at all, so there is nothing left to alias. The
+     * `data-tab-label` attribute and its consuming
+     * `heading.dataset.tabLabel || heading.textContent.trim()` JS line
+     * (covered by the two tests this replaced) were deleted along with
+     * that tab-building script.
+     */
+    public function testTheObsoleteSectionTabLabelAliasMachineryIsGone(): void
     {
         $html = $this->view();
 
-        $expected = [
-            'Stage 4 — Order Confirmation: Buyer Acknowledgement' => 'Stage 4 — OC Ack',
-            'Stage 5 — Supplier Purchase Order (Material Procurement)' => 'Stage 5 — Supplier PO',
-            'Order Financials — Government Benefits, Costs &amp; Profitability' => 'Financials',
-        ];
-        foreach ($expected as $fullHeading => $shortLabel) {
-            self::assertStringContainsString(
-                "data-tab-label=\"{$shortLabel}\">{$fullHeading}</h2>",
-                $html,
-                "the on-page heading for \"{$fullHeading}\" must be left unchanged, with only a short data-tab-label alias added"
-            );
-        }
-    }
-
-    public function testTheTabBuilderJsPrefersTheShortAliasOverTheFullHeadingText(): void
-    {
-        $html = $this->view();
-
-        self::assertStringContainsString("heading.dataset.tabLabel || heading.textContent.trim()", $html);
+        self::assertStringNotContainsString('data-tab-label', $html);
+        self::assertStringNotContainsString('heading.dataset.tabLabel', $html);
     }
 }

@@ -12,15 +12,16 @@ const ADMIN_NAME = ROLES.admin.name;
  * chosen so Stage 6 (Freight Payment) is exercised rather than
  * auto-skipped — genuine 9-of-9 stage coverage.
  *
- * The order page is a JS-driven single-page-per-order layout
- * (views/orders/show.php + app.css's .order-layout.js-enabled rule):
- * only one `.section` panel is visible at a time, switched by clicking
- * the stage stepper (`.process-step[data-stage=N]`). The Documents &
- * Approvals panel (every document type's Generate/Review/Approve
- * controls) is its own panel pinned to data-stage="1" regardless of
- * which real stage the document belongs to, so generating/approving a
- * document always needs openStage(page, 1) first, separately from
- * whichever stage's own action panel is needed next.
+ * The order page is a vertical sequence of native <details>/<summary>
+ * step-cards (views/orders/show.php) — each one collapsed/expanded
+ * independently, no single-active-panel JS. The top stage stepper
+ * (`.process-step[data-stage=N]`) still exists and opens (and scrolls
+ * to) whichever card covers that DB stage. The Documents & Approvals
+ * card (every document type's Generate/Review/Approve controls) is its
+ * own card pinned to data-stage="1" regardless of which real stage the
+ * document belongs to, so generating/approving a document always needs
+ * openStage(page, 1) first, separately from whichever stage's own
+ * action card is needed next.
  *
  * This only drives the actions that actually pass each stage's gate
  * (confirmed against each controller method, not assumed from the
@@ -34,20 +35,12 @@ const ADMIN_NAME = ROLES.admin.name;
 const DUMMY_FILE = path.join(__dirname, 'fixtures', 'dummy-signed-copy.pdf');
 const UNIQUE = Date.now();
 
+// Clicks a stage stepper dot, which opens (and scrolls to) whichever
+// step-card(s) cover that DB stage — the Advance Payment form lives in
+// the Stage 3 "PI & Advance Payment" step-card, reached the same way as
+// every other stage's own primary action.
 async function openStage(page, stageNumber) {
   await page.locator(`.process-step[data-stage="${stageNumber}"]`).click();
-}
-
-/**
- * A few panels aren't reachable via the stage stepper at all — the
- * Advance/Balance payment forms live in the "Payment Status" panel
- * (shared by both legs), not under any data-stage attribute (that
- * attribute on the order page's 3rd section is actually "PI-Stage
- * Intake", unrelated). Opened via the auto-generated order-sidebar link
- * instead, which exists for every panel regardless of data-stage.
- */
-async function openPanelByHeading(page, headingText) {
-  await page.locator('.order-sidebar-link', { hasText: headingText }).click();
 }
 
 function docForm(page, orderId, typeCode) {
@@ -73,8 +66,14 @@ async function generateDocument(page, orderId, typeCode, expectedBannerSubstring
 }
 
 function documentPanel(page, typeCode) {
+  // The order-detail-page rebuild wraps the whole "Documents & Approvals"
+  // section in its own outer <details class="step-card">, which itself
+  // "has" a matching nested summary descendant (the document-specific
+  // review widget this is actually looking for) — excluding .step-card
+  // keeps this matching only the innermost, document-specific <details>,
+  // not the step-card wrapper around all of them.
   return page
-    .locator('details')
+    .locator('details:not(.step-card)')
     .filter({ has: page.locator('summary', { hasText: new RegExp('^\\s*' + typeCode + '\\s') }) })
     .first();
 }
@@ -170,13 +169,13 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   });
 
   await test.step('Stage 3 — Advance Payment: record then clear', async () => {
-    await openPanelByHeading(page, 'Payment Status');
+    await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
     await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
-    await openPanelByHeading(page, 'Payment Status');
+    await openStage(page, 3);
     const clearForm = page.locator(`form[action="/orders/${orderId}/payment/advance/clear"]`);
     await clearForm.getByRole('button', { name: 'Mark Advance Cleared' }).click();
     await expect(page.locator('.alert')).toContainText('unlocked');

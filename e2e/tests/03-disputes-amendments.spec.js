@@ -59,10 +59,6 @@ async function openStage(page, stageNumber) {
   await page.locator(`.process-step[data-stage="${stageNumber}"]`).click();
 }
 
-async function openPanelByHeading(page, headingText) {
-  await page.locator('.order-sidebar-link', { hasText: headingText }).click();
-}
-
 function docForm(page, orderId, typeCode) {
   return page.locator(
     `form[action="/orders/${orderId}/documents/generate"]:has(input[name="document_type"][value="${typeCode}"])`
@@ -76,8 +72,14 @@ async function generateDocument(page, orderId, typeCode, expectedBannerSubstring
 }
 
 function documentPanel(page, typeCode) {
+  // The order-detail-page rebuild wraps the whole "Documents & Approvals"
+  // section in its own outer <details class="step-card">, which itself
+  // "has" a matching nested summary descendant (the document-specific
+  // review widget this is actually looking for) — excluding .step-card
+  // keeps this matching only the innermost, document-specific <details>,
+  // not the step-card wrapper around all of them.
   return page
-    .locator('details')
+    .locator('details:not(.step-card)')
     .filter({ has: page.locator('summary', { hasText: new RegExp('^\\s*' + typeCode + '\\s') }) })
     .first();
 }
@@ -155,13 +157,13 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
     await poForm.getByRole('button', { name: 'Confirm Buyer PO Received' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
-    await openPanelByHeading(page, 'Payment Status');
+    await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
     await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
-    await openPanelByHeading(page, 'Payment Status');
+    await openStage(page, 3);
     const clearForm = page.locator(`form[action="/orders/${orderId}/payment/advance/clear"]`);
     await clearForm.getByRole('button', { name: 'Mark Advance Cleared' }).click();
     await expect(page.locator('.alert')).toContainText('unlocked');
@@ -177,12 +179,17 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
     await test.step('Admin turns on the client-facing dispute button for this order (manage_disputes)', async () => {
       await login(page, 'admin');
       await page.goto(`/orders/${orderId}`);
-      // The toggle lives in the main order page's own "Disputes" panel
-      // (<div class="section" id="disputes">) — a single-page-per-order
-      // layout only shows one .section at a time, so it must be opened
-      // via its sidebar tab first or the checkbox is in the DOM but not
-      // visible/clickable.
-      await page.locator('.order-sidebar-link', { hasText: 'Disputes' }).click();
+      // The toggle lives in the order page's own "Disputes" step-card
+      // (<details class="step-card" id="disputes">) — collapsed by
+      // default unless it's the order's current step, so open it first
+      // or the checkbox is in the DOM but not visible/clickable.
+      const disputesCard = page
+        .locator('details.step-card')
+        .filter({ has: page.locator('summary', { hasText: 'Disputes' }) })
+        .first();
+      if (!(await disputesCard.evaluate((el) => el.open))) {
+        await disputesCard.locator('summary').click();
+      }
       const toggle = page.locator('input[name="dispute_button_visible_to_client"]');
       await toggle.check();
       await expect(page.locator('.alert')).toBeVisible();

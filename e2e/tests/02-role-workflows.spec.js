@@ -53,10 +53,6 @@ async function openStage(page, stageNumber) {
   await page.locator(`.process-step[data-stage="${stageNumber}"]`).click();
 }
 
-async function openPanelByHeading(page, headingText) {
-  await page.locator('.order-sidebar-link', { hasText: headingText }).click();
-}
-
 function docForm(page, orderId, typeCode) {
   return page.locator(
     `form[action="/orders/${orderId}/documents/generate"]:has(input[name="document_type"][value="${typeCode}"])`
@@ -78,8 +74,14 @@ async function generateDocument(page, orderId, typeCode, expectedBannerSubstring
 }
 
 function documentPanel(page, typeCode) {
+  // The order-detail-page rebuild wraps the whole "Documents & Approvals"
+  // section in its own outer <details class="step-card">, which itself
+  // "has" a matching nested summary descendant (the document-specific
+  // review widget this is actually looking for) — excluding .step-card
+  // keeps this matching only the innermost, document-specific <details>,
+  // not the step-card wrapper around all of them.
   return page
-    .locator('details')
+    .locator('details:not(.step-card)')
     .filter({ has: page.locator('summary', { hasText: new RegExp('^\\s*' + typeCode + '\\s') }) })
     .first();
 }
@@ -178,13 +180,13 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     await test.step('Accounts Executive — Stage 3 advance payment record + clear (manage_payments)', async () => {
       await login(page, 'accountsExecutive');
       await page.goto(`/orders/${orderId}`);
-      await openPanelByHeading(page, 'Payment Status');
+      await openStage(page, 3);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
       await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
       await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
-      await openPanelByHeading(page, 'Payment Status');
+      await openStage(page, 3);
       const clearForm = page.locator(`form[action="/orders/${orderId}/payment/advance/clear"]`);
       await clearForm.getByRole('button', { name: 'Mark Advance Cleared' }).click();
       await expect(page.locator('.alert')).toContainText('unlocked');

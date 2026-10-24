@@ -53,8 +53,14 @@ function docForm(page, orderId, typeCode) {
 }
 
 function documentPanel(page, typeCode) {
+  // The order-detail-page rebuild wraps the whole "Documents & Approvals"
+  // section in its own outer <details class="step-card">, which itself
+  // "has" a matching nested summary descendant (the document-specific
+  // review widget this is actually looking for) — excluding .step-card
+  // keeps this matching only the innermost, document-specific <details>,
+  // not the step-card wrapper around all of them.
   return page
-    .locator('details')
+    .locator('details:not(.step-card)')
     .filter({ has: page.locator('summary', { hasText: new RegExp('^\\s*' + typeCode + '\\s') }) })
     .first();
 }
@@ -143,14 +149,14 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await poForm.getByRole('button', { name: 'Confirm Buyer PO Received' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
-    await page.locator('.order-sidebar-link', { hasText: 'Payment Status' }).click();
+    await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
     await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
     const mailMark = mark();
-    await page.locator('.order-sidebar-link', { hasText: 'Payment Status' }).click();
+    await openStage(page, 3);
     const clearForm = page.locator(`form[action="/orders/${orderId}/payment/advance/clear"]`);
     await clearForm.getByRole('button', { name: 'Mark Advance Cleared' }).click();
     await expect(page.locator('.alert')).toContainText('unlocked');
@@ -217,6 +223,11 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await logout(page);
     await login(page, 'exportExecutive');
     await page.goto(`/orders/${orderId}`);
+    // Stage 1's gate already passed (QT approval passes it), so its
+    // "Documents & Approvals" step-card is no longer the order's current
+    // step and renders collapsed on this fresh page load — open it
+    // before reaching the nested QT panel inside it.
+    await openStage(page, 1);
     panel = documentPanel(page, 'QT');
     await panel.locator('summary').click();
     await panel.getByRole('link', { name: 'Send to Buyer (deferred, 2-level approval)' }).click();
