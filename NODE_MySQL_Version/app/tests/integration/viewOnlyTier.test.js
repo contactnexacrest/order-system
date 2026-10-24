@@ -115,8 +115,14 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
     });
 
     test('order show page shows mutating buttons for a manage_orders user', async () => {
-      const orderId = await createTestOrder(await createTestClient());
-      const agent = await loginAs('Export Executive');
+      const { userId, email, password } = await createLoginableUser('Export Executive');
+      const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, userId);
+      const agent = request.agent(app);
+      const loginPage = await agent.get('/login');
+      const csrf = extractCsrf(loginPage.text);
+      const loginRes = await agent.post('/login').type('form').send({ _csrf: csrf, email, password });
+      expect(loginRes.status).toBe(302);
+      expect(loginRes.headers.location).not.toBe('/login');
 
       const res = await agent.get(`/orders/${orderId}`);
 

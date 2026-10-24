@@ -290,7 +290,7 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
   it('order show page hides the toggle from a non-privileged CA viewer', async () => {
     const orderId = await createTestOrder(await createTestClient());
 
-    const req = { params: { id: String(orderId) }, permissions: { ca_module_view: true }, session: {} };
+    const req = { params: { id: String(orderId) }, permissions: { ca_module_view: true, view_all_orders: true }, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 

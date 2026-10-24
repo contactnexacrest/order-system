@@ -116,8 +116,8 @@ describe('CA FY-lock enforcement (QA-4 P0.3)', () => {
       expect(loginRes.status).toBe(302);
       expect(loginRes.headers.location).not.toBe('/login');
 
-      orderLocked = await createTestOrder(await createTestClient());
-      orderOpen = await createTestOrder(await createTestClient());
+      orderLocked = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, limitedUserId);
+      orderOpen = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, limitedUserId);
       await db.execute(
         'INSERT INTO order_payment_status (order_id, advance_amount, advance_cleared_at) VALUES (:order_id, 500.00, :cleared_at)',
         { order_id: orderLocked, cleared_at: LOCKED_DATE }

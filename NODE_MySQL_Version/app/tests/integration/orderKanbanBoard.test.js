@@ -48,7 +48,11 @@ describe('Order Kanban board (Task #37)', () => {
 
   async function render(userId) {
     const user = await userRepository.findById(userId);
-    const req = { query: {}, user, permissions: {} };
+    // Order ownership / assignment visibility: this suite is about which
+    // Kanban column an order lands in, not about who can see it, so the
+    // viewer is given view_all_orders — the orthogonal oversight tier —
+    // rather than threading assigned_to through every fixture order here.
+    const req = { query: {}, user, permissions: { view_all_orders: true } };
     const res = fakeRes();
     await ordersController.index(req, res);
     return res;

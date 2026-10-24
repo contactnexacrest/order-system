@@ -234,7 +234,7 @@ describe('Travel expense recording (Section BW)', () => {
 
   it('show() exposes orderTravelExpenses only with manage_order_financials', async () => {
     const userId = await createTestUser();
-    const orderId = await createTestOrder(await createTestClient());
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, userId);
     await addProduct(orderId, 10000.0);
     await setAdvanceRate(orderId, userId);
     await orderFinancialsController.saveTravelExpenses(fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { expense_pct: '5' } }), fakeRes());
@@ -252,7 +252,7 @@ describe('Travel expense recording (Section BW)', () => {
 
   it('show() returns the saved amount once recorded', async () => {
     const userId = await createTestUser();
-    const orderId = await createTestOrder(await createTestClient());
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, userId);
     await addProduct(orderId, 10000.0);
     await setAdvanceRate(orderId, userId);
     await orderFinancialsController.saveTravelExpenses(fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { factory_distance_km: '175', expense_pct: '5' } }), fakeRes());

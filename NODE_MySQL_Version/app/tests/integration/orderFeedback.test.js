@@ -207,7 +207,7 @@ describe('Order Feedback (Section BV)', () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     await orderFeedbackRepository.upsert(orderId, clientId, 3, 'Average — packaging could improve.');
-    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, permissions: { manage_order_financials: false } });
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, permissions: { manage_order_financials: false, view_all_orders: true } });
     const res = fakeRes();
 
     await ordersController.show(req, res);

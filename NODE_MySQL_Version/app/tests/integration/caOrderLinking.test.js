@@ -165,7 +165,7 @@ describe('CA order linking (Point 2 follow-up)', () => {
   it('order show page returns no linked data when the permission is absent', async () => {
     const orderId = await createTestOrder(await createTestClient());
 
-    const req = { params: { id: String(orderId) }, permissions: {}, session: {} };
+    const req = { params: { id: String(orderId) }, permissions: { view_all_orders: true }, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 

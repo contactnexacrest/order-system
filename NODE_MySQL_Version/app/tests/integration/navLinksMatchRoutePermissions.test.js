@@ -84,8 +84,8 @@ describe('Nav links match their own route permissions (External QA report U-01)'
   });
 
   test('Export Executive does see the order-disputes link via respond_to_disputes', async () => {
-    const orderId = await createTestOrder(await createTestClient());
-    const { agent } = await loginAs('Export Executive');
+    const { agent, userId } = await loginAs('Export Executive');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, userId);
 
     const res = await agent.get(`/orders/${orderId}`);
 
@@ -120,8 +120,8 @@ describe('Nav links match their own route permissions (External QA report U-01)'
   });
 
   test('Logistics Executive sees Compliance Task Types as plain text on an order page', async () => {
-    const orderId = await createTestOrder(await createTestClient());
-    const { agent } = await loginAs('Logistics Executive');
+    const { agent, userId } = await loginAs('Logistics Executive');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, userId);
 
     const res = await agent.get(`/orders/${orderId}`);
 

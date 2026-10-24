@@ -1,8 +1,9 @@
-{% macro kanbanCard(o) %}
+{% macro kanbanCard(o, seesAllOrders) %}
 <a class="entity-card kanban-card{{ ' entity-card-overdue' if o.is_overdue }}" href="/orders/{{ o.id }}?from=kanban">
   <div class="entity-card-header">
     <span class="entity-card-title">{{ o.order_reference }}</span>
     {% if o.incoterm_code %}<span class="tag tag-gold">{{ o.incoterm_code }}</span>{% endif %}
+    {% if seesAllOrders and o.assigned_to_name %}<span class="tag tag-navy">{{ o.assigned_to_name }}</span>{% endif %}
   </div>
   <div class="entity-card-sub">{{ o.company_legal_name }}</div>
   <div class="entity-card-footer">
@@ -41,7 +42,7 @@
         {% if col.orders.length == 0 %}
           <p class="kanban-column-empty">No orders here</p>
         {% else %}
-          {% for o in col.orders %}{{ kanbanCard(o) }}{% endfor %}
+          {% for o in col.orders %}{{ kanbanCard(o, seesAllOrders) }}{% endfor %}
         {% endif %}
       </div>
     {% endfor %}
@@ -54,7 +55,7 @@
       {% if shippedDocsSent.length == 0 %}
         <p class="kanban-column-empty">No orders here</p>
       {% else %}
-        {% for o in shippedDocsSent %}{{ kanbanCard(o) }}{% endfor %}
+        {% for o in shippedDocsSent %}{{ kanbanCard(o, seesAllOrders) }}{% endfor %}
       {% endif %}
     </div>
 
@@ -66,7 +67,7 @@
       {% if complete.length == 0 %}
         <p class="kanban-column-empty">No orders here</p>
       {% else %}
-        {% for o in complete %}{{ kanbanCard(o) }}{% endfor %}
+        {% for o in complete %}{{ kanbanCard(o, seesAllOrders) }}{% endfor %}
       {% endif %}
     </div>
   </div>

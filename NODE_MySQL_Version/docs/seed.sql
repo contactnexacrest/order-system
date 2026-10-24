@@ -88,7 +88,10 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('impersonate_client', 'Log in as a client', 'Start a staff-initiated client-portal session for a client who can''t use the portal themselves. Requires client_impersonation_enabled (global) and the client''s own allow_staff_impersonation flag both on. Every use is logged.', 'clients'),
   -- docs/schema.sql Section AY
   ('view_orders',  'View orders (read-only)',  'See the Orders list and an order''s detail page without being able to create, edit, or act on it. Anyone holding manage_orders already has this implicitly — this permission exists only for a view-only tier that holds no manage_orders.', 'orders'),
-  ('view_clients', 'View clients (read-only)', 'See the Clients list and a client''s detail page without being able to create, edit, or act on it. Anyone holding manage_orders already has this implicitly — this permission exists only for a view-only tier that holds no manage_orders.', 'clients');
+  ('view_clients', 'View clients (read-only)', 'See the Clients list and a client''s detail page without being able to create, edit, or act on it. Anyone holding manage_orders already has this implicitly — this permission exists only for a view-only tier that holds no manage_orders.', 'clients'),
+  -- Order ownership / assignment visibility (see docs/migrations/2026-10-24b-order-owner-assignment.sql)
+  ('view_all_orders',   'View all orders regardless of assignment', 'See every order in the Orders list, Kanban board, and order detail page, not just ones assigned to you. Oversight roles only.', 'orders'),
+  ('assign_order_owner', 'Assign/reassign order owner', 'Set or change which single user owns an order (orders.assigned_to). Visibility-only control — never affects stage-gate or payment/shipping permissions.', 'orders');
 
 -- ================================================================
 -- ROLE_PERMISSIONS — first-cut matrix (see note above)
@@ -108,7 +111,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Accounts Executive'
-  AND p.permission_key IN ('manage_orders','manage_payments','clear_payments','manage_supplier_payments','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override','override_buyer_acknowledgment');
+  AND p.permission_key IN ('manage_orders','manage_payments','clear_payments','manage_supplier_payments','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override','override_buyer_acknowledgment','view_all_orders');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
@@ -120,7 +123,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Viewer / Auditor'
-  AND p.permission_key IN ('view_reports','view_audit_log','view_product_catalog','view_orders','view_clients');
+  AND p.permission_key IN ('view_reports','view_audit_log','view_product_catalog','view_orders','view_clients','view_all_orders');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1

@@ -14,6 +14,7 @@ const caFyLockRepository = require('../repositories/caFyLockRepository');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
+const orderAssignmentService = require('../services/orderAssignmentService');
 const orderDuplicationService = require('../services/orderDuplicationService');
 const orderEditGuard = require('../services/orderEditGuard');
 const encryptionService = require('../services/encryptionService');
@@ -102,12 +103,13 @@ function str(v, fallback = '') {
  * clicked to know its count.
  */
 async function index(req, res) {
+  const seesAllOrders = !!req.permissions.view_all_orders;
   if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
-    await indexKanban(req, res);
+    await indexKanban(req, res, seesAllOrders);
     return;
   }
 
-  const all = await orderRepository.all();
+  const all = await orderRepository.allVisibleTo(req.user.id, seesAllOrders);
   // Default to the Active tab, not All — most orders in the system at
   // any time are still in play, and staff opening this screen want to
   // see what's actually moving, not a completed/lost order buried in the
@@ -159,6 +161,7 @@ async function index(req, res) {
     page,
     totalPages,
     totalFiltered,
+    seesAllOrders,
   }, 'layout/base');
 }
 
@@ -175,8 +178,8 @@ async function index(req, res) {
  * glance, which the existing card-grid list already offers filtered/
  * paginated for anyone who wants that instead.
  */
-async function indexKanban(req, res) {
-  const all = await orderRepository.all();
+async function indexKanban(req, res, seesAllOrders) {
+  const all = await orderRepository.allVisibleTo(req.user.id, seesAllOrders);
   const stages = await lookupRepository.stagesMaster();
 
   const columns = {};
@@ -212,6 +215,7 @@ async function indexKanban(req, res) {
     lostCount,
     cancelledCount,
     totalActive: all.filter((o) => o.status === 'active').length,
+    seesAllOrders,
   }, 'layout/base');
 }
 
@@ -792,6 +796,18 @@ async function show(req, res) {
     return;
   }
 
+  // Order ownership / assignment visibility — a guessed/bookmarked URL
+  // must not bypass the same scoping the Orders list and Kanban board
+  // already apply. Visibility only: this never touches who may act on a
+  // step (manage_payments/clear_payments/manage_shipping/etc. are
+  // unaffected and checked exactly as before, below).
+  const seesAllOrders = !!req.permissions.view_all_orders;
+  if (!seesAllOrders && Number(order.assigned_to || 0) !== Number(req.user.id)) {
+    res.status(403).send('This order is assigned to a different user. You can only open orders assigned to you.');
+    return;
+  }
+  const canAssignOwner = !!req.permissions.assign_order_owner;
+
   const stages = await orderStageRepository.forOrder(orderId);
   const stageByNumber = {};
   for (const s of stages) stageByNumber[s.stage_number] = s;
@@ -914,6 +930,8 @@ async function show(req, res) {
     'orders/show',
     {
       order,
+      canAssignOwner,
+      seesAllOrders,
       leadTimeDisplayUnit: (await companySettingsRepository.get('lead_time_display_unit')) || 'days',
       products: await orderProductRepository.forOrder(orderId),
       hsCodes: await hsCodeRepository.active(),
@@ -1021,6 +1039,38 @@ async function show(req, res) {
     },
     'layout/base'
   );
+}
+
+/**
+ * Order ownership / assignment visibility — reassigns an order's single
+ * owner. Route-gated to assign_order_owner (Admin/MD/ED only); this
+ * function doesn't re-check it. Visibility-only: never touches stage-gate
+ * or action-permission checks elsewhere on this order.
+ */
+async function assignOwner(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect('/orders');
+    return;
+  }
+
+  const newOwnerId = parseInt(req.body.assigned_to, 10) || 0;
+  const newOwner = newOwnerId > 0 ? await userRepository.findById(newOwnerId) : null;
+  if (!newOwner || !newOwner.is_active) {
+    flash.set(req, 'error', 'Select a valid, active user to assign this order to.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  try {
+    await orderAssignmentService.reassign(orderId, newOwnerId, req.user.id);
+    flash.set(req, 'success', `Order reassigned to ${newOwner.name}.`);
+  } catch (e) {
+    flash.setErrorFromException(req, e);
+  }
+  res.redirect(`/orders/${orderId}`);
 }
 
 /**
@@ -3175,7 +3225,7 @@ async function completeCancellationRefund(req, res) {
 }
 
 module.exports = {
-  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, downloadDossier, generatePiFormLink, generateBuyerActionLink,
+  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, assignOwner, downloadDossier, generatePiFormLink, generateBuyerActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,

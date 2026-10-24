@@ -240,7 +240,21 @@
     {{ order.incoterm_code }} {{ order.port_of_loading_city or order.port_of_loading_name or '' }}
     {% if permissions.view_reports %}&nbsp;&middot;&nbsp; <a href="/reports/order/{{ order.id }}">Full Report</a>{% endif %}
     {% if permissions.manage_orders %}&nbsp;&middot;&nbsp; <a href="/orders/{{ order.id }}/edit">Edit Order Details</a>{% endif %}
+    {% if seesAllOrders %}&nbsp;&middot;&nbsp; Assigned to: <strong>{{ order.assigned_to_name or 'Unassigned' }}</strong>{% endif %}
   </p>
+  {% if canAssignOwner %}
+  <form method="post" action="/orders/{{ order.id }}/assign" class="btn-row" style="margin-top:-6px;align-items:center;">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label class="muted small" style="margin:0;">Reassign to
+      <select name="assigned_to" style="margin-left:4px;">
+        {% for u in activeUsers %}
+          <option value="{{ u.id }}" {{ 'selected' if order.assigned_to == u.id }}>{{ u.name }} ({{ u.role_name or '—' }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn-sm">Reassign</button>
+  </form>
+  {% endif %}
   {% if duplicatedFromOrder %}
     <p class="notice notice-info">This order was created as a repeat order from <a href="/orders/{{ duplicatedFromOrder.id }}">{{ duplicatedFromOrder.order_reference }}</a>.{% if supplierPo and supplierPo.status == 'draft' %} Its Supplier PO terms were carried over below as a draft — review and confirm once Stage 5 is reached.{% endif %}</p>
   {% endif %}
