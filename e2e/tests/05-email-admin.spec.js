@@ -68,18 +68,19 @@ function documentPanel(page, typeCode) {
 
 /**
  * Order ownership / assignment visibility: Admin created this order (so
- * it's auto-assigned to Admin), but Export Executive — who doesn't hold
- * view_all_orders — needs to open it directly next. Must be run while
- * still logged in as Admin (or any assign_order_owner holder).
+ * it's auto-assigned to Admin as its first assignee), but Export
+ * Executive — who doesn't hold view_all_orders — needs to open it
+ * directly next. Must be run while still logged in as Admin (or any
+ * assign_order_owner holder).
  */
-async function assignOrderTo(page, orderId, roleName) {
+async function addAssigneeTo(page, orderId, roleName) {
   await page.goto(`/orders/${orderId}`);
-  const form = page.locator(`form[action="/orders/${orderId}/assign"]`);
+  const form = page.locator(`form[action="/orders/${orderId}/assignees"]`);
   const targetName = ROLES[roleName].name;
   const targetValue = await form.locator('option', { hasText: targetName }).first().getAttribute('value');
-  await form.locator('select[name="assigned_to"]').selectOption(targetValue);
-  await form.getByRole('button', { name: 'Reassign' }).click();
-  await expect(page.locator('.alert')).toContainText('reassigned');
+  await form.locator('select[name="user_id"]').selectOption(targetValue);
+  await form.getByRole('button', { name: 'Add' }).click();
+  await expect(page.locator('.alert')).toContainText('added as an assignee');
 }
 
 async function adminAssignSelfAndApprove(page, typeCode) {
@@ -146,8 +147,8 @@ test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queu
       await adminAssignSelfAndApprove(page, 'QT');
     });
 
-    await test.step('Admin reassigns the order to Export Executive, who opens it next', async () => {
-      await assignOrderTo(page, orderId, 'exportExecutive');
+    await test.step('Admin assigns Export Executive so they can open it next', async () => {
+      await addAssigneeTo(page, orderId, 'exportExecutive');
     });
 
     await logout(page);

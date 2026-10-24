@@ -54,18 +54,19 @@ function docForm(page, orderId, typeCode) {
 
 /**
  * Order ownership / assignment visibility: Admin created this order (so
- * it's auto-assigned to Admin), but Export Executive — who doesn't hold
- * view_all_orders — needs to open it directly next. Must be run while
- * still logged in as Admin (or any assign_order_owner holder).
+ * it's auto-assigned to Admin as its first assignee), but Export
+ * Executive — who doesn't hold view_all_orders — needs to open it
+ * directly next. Must be run while still logged in as Admin (or any
+ * assign_order_owner holder).
  */
-async function assignOrderTo(page, orderId, roleName) {
+async function addAssigneeTo(page, orderId, roleName) {
   await page.goto(`/orders/${orderId}`);
-  const form = page.locator(`form[action="/orders/${orderId}/assign"]`);
+  const form = page.locator(`form[action="/orders/${orderId}/assignees"]`);
   const targetName = ROLES[roleName].name;
   const targetValue = await form.locator('option', { hasText: targetName }).first().getAttribute('value');
-  await form.locator('select[name="assigned_to"]').selectOption(targetValue);
-  await form.getByRole('button', { name: 'Reassign' }).click();
-  await expect(page.locator('.alert')).toContainText('reassigned');
+  await form.locator('select[name="user_id"]').selectOption(targetValue);
+  await form.getByRole('button', { name: 'Add' }).click();
+  await expect(page.locator('.alert')).toContainText('added as an assignee');
 }
 
 function documentPanel(page, typeCode) {
@@ -236,7 +237,7 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await panel.getByRole('button', { name: 'Approve', exact: true }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
-    await assignOrderTo(page, orderId, 'exportExecutive');
+    await addAssigneeTo(page, orderId, 'exportExecutive');
 
     await logout(page);
     await login(page, 'exportExecutive');

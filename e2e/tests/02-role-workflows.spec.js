@@ -90,19 +90,21 @@ function documentPanel(page, typeCode) {
  * Order ownership / assignment visibility: a scoped role (Export
  * Executive, Logistics Executive — neither holds view_all_orders) can
  * only open an order it's assigned to. This single shared order is
- * worked by BOTH of them at different points, so whoever's turn it is
- * next must be made the owner first — must be run as Admin (or any
- * Admin/MD/ED holder), the only tier holding assign_order_owner. Caller
- * is responsible for being logged in as such before calling this.
+ * worked by BOTH of them at different points (the multi-assignee model
+ * exists precisely so both can be assigned to it concurrently, rather
+ * than reassigning it back and forth on every handoff) — must be run as
+ * Admin (or any Admin/MD/ED holder), the only tier holding
+ * assign_order_owner. Caller is responsible for being logged in as such
+ * before calling this.
  */
-async function assignOrderTo(page, orderId, roleName) {
+async function addAssigneeTo(page, orderId, roleName) {
   await page.goto(`/orders/${orderId}`);
-  const form = page.locator(`form[action="/orders/${orderId}/assign"]`);
+  const form = page.locator(`form[action="/orders/${orderId}/assignees"]`);
   const targetName = ROLES[roleName].name;
   const targetValue = await form.locator('option', { hasText: targetName }).first().getAttribute('value');
-  await form.locator('select[name="assigned_to"]').selectOption(targetValue);
-  await form.getByRole('button', { name: 'Reassign' }).click();
-  await expect(page.locator('.alert')).toContainText('reassigned');
+  await form.locator('select[name="user_id"]').selectOption(targetValue);
+  await form.getByRole('button', { name: 'Add' }).click();
+  await expect(page.locator('.alert')).toContainText('added as an assignee');
 }
 
 /**
@@ -175,6 +177,11 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       orderId = Number(page.url().match(/\/orders\/(\d+)$/)[1]);
     });
 
+    await test.step('Admin assigns Export Executive and Logistics Executive to the order up front — both need it concurrently later', async () => {
+      await addAssigneeTo(page, orderId, 'exportExecutive');
+      await addAssigneeTo(page, orderId, 'logisticsExecutive');
+    });
+
     await test.step('Admin — Stage 1 (QT generate + self-review-approve, needs approve_documents)', async () => {
       await generateDocument(page, orderId, 'QT', 'generated');
       await adminAssignSelfAndApprove(page, 'QT');
@@ -216,12 +223,6 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     });
 
     await logout(page);
-
-    await test.step('Admin reassigns the order to Export Executive, whose turn is next', async () => {
-      await login(page, 'admin');
-      await assignOrderTo(page, orderId, 'exportExecutive');
-      await logout(page);
-    });
 
     await test.step('Export Executive — Stage 4 OC generate + acknowledgement (manage_orders)', async () => {
       await login(page, 'exportExecutive');
@@ -271,12 +272,6 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     });
 
     await logout(page);
-
-    await test.step('Admin reassigns the order to Logistics Executive, whose turn is next', async () => {
-      await login(page, 'admin');
-      await assignOrderTo(page, orderId, 'logisticsExecutive');
-      await logout(page);
-    });
 
     await test.step('Logistics Executive — Stage 6 freight terms/payment/clear (manage_shipping, not manage_payments)', async () => {
       await login(page, 'logisticsExecutive');
@@ -331,12 +326,6 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
     await logout(page);
 
-    await test.step('Admin reassigns the order back to Export Executive, whose turn is next', async () => {
-      await login(page, 'admin');
-      await assignOrderTo(page, orderId, 'exportExecutive');
-      await logout(page);
-    });
-
     await test.step('Export Executive — Stage 8 generate the Commercial Invoice (generate_documents; Accounts Executive does not hold it)', async () => {
       await login(page, 'exportExecutive');
       await page.goto(`/orders/${orderId}`);
@@ -360,12 +349,6 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     });
 
     await logout(page);
-
-    await test.step('Admin reassigns the order back to Logistics Executive, whose turn is next', async () => {
-      await login(page, 'admin');
-      await assignOrderTo(page, orderId, 'logisticsExecutive');
-      await logout(page);
-    });
 
     await test.step('Logistics Executive — Stage 9 generate COOPREP + BLI (generate_documents)', async () => {
       await login(page, 'logisticsExecutive');
