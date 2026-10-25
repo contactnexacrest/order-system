@@ -13,7 +13,8 @@ use App\Tests\Support\DbTestCase;
  * - "Assignee name is cutting" on the Orders cards — the assignee tag may
  *   now wrap inside the card header instead of being clipped.
  * - The order page's client name links to that client's details.
- * - Indicative Freight / Insurance is disabled while the Incoterm is FOB:
+ * - Indicative Freight / Insurance is hidden (and disabled) while the
+ *   Incoterm is FOB:
  *   each Incoterm option carries its code (data-code) for the page script,
  *   placed after `selected` so `value="N" selected` still renders intact.
  */
@@ -58,6 +59,7 @@ final class OrderFormAndCardTweaksTest extends DbTestCase
         self::assertStringContainsString('id="incoterm-select"', $html);
         self::assertMatchesRegularExpression('/<option value="\d+" selected data-code="FOB">FOB<\/option>/', $html);
         self::assertStringContainsString('function updateFreightFieldsAvailability(clearOnDisable)', $html);
+        self::assertStringContainsString('fieldset.hidden = isFob;', $html, 'owner request: the section is not shown at all for FOB');
     }
 
     public function testCreateFormMarksTheFreightFieldsetAndIncotermCodes(): void

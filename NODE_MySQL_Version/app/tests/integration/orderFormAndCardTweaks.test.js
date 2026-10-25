@@ -14,7 +14,8 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * - "Assignee name is cutting" on the Orders cards — the assignee tag may
  *   now wrap inside the card header instead of being clipped.
  * - The order page's client name links to that client's details.
- * - Indicative Freight / Insurance is disabled while the Incoterm is FOB:
+ * - Indicative Freight / Insurance is hidden (and disabled) while the
+ *   Incoterm is FOB:
  *   each Incoterm option carries its code (data-code) for the page script,
  *   placed after `selected` so `value="N" selected` still renders intact.
  */
@@ -52,6 +53,8 @@ describe('Order form and card tweaks', () => {
     expect(res.text).toContain('id="incoterm-select"');
     expect(res.text).toMatch(/<option value="\d+" selected data-code="FOB">FOB<\/option>/);
     expect(res.text).toContain('function updateFreightFieldsAvailability(clearOnDisable)');
+    // Owner request: the section is not shown at all for FOB.
+    expect(res.text).toContain('fieldset.hidden = isFob;');
   });
 
   it('marks the freight fieldset and incoterm codes on the create form', async () => {

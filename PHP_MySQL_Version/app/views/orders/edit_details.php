@@ -181,9 +181,9 @@ function updateFreightCurrencyLabels(selectEl) {
 // User report: Freight/Insurance is only ever relevant when the seller
 // is on the hook for it (CFR/CIF etc.) — under FOB the buyer arranges
 // and pays freight directly, so these fields have nothing to record.
-// Disabling the whole <fieldset> (rather than each input) reuses the
-// existing fieldset[disabled] greyed-out styling for free, and disabled
-// inputs are simply left out of the form submission. Matches the app's
+// Hiding and disabling the whole <fieldset> (rather than each input)
+// takes the section off the page and its inputs out of the form
+// submission in one place. Matches the app's
 // own is_fob rule everywhere else: strtoupper(incoterm_code) === 'FOB'.
 function updateFreightFieldsAvailability(clearOnDisable) {
   var incotermSelect = document.getElementById('incoterm-select');
@@ -192,6 +192,9 @@ function updateFreightFieldsAvailability(clearOnDisable) {
   var opt = incotermSelect.options[incotermSelect.selectedIndex];
   var code = ((opt && opt.getAttribute('data-code')) || '').toUpperCase();
   var isFob = code === 'FOB';
+  // Owner request: not shown at all for FOB (hidden), and disabled so its
+  // inputs are left out of the submission.
+  fieldset.hidden = isFob;
   fieldset.disabled = isFob;
   if (isFob && clearOnDisable) {
     var freightInput = fieldset.querySelector('input[name="indicative_freight_amount"]');

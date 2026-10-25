@@ -184,6 +184,9 @@ function updateFreightFieldsAvailability(clearOnDisable) {
   var opt = incotermSelect.options[incotermSelect.selectedIndex];
   var code = ((opt && opt.getAttribute('data-code')) || '').toUpperCase();
   var isFob = code === 'FOB';
+  // Owner request: not shown at all for FOB (hidden), and disabled so its
+  // inputs are left out of the submission.
+  fieldset.hidden = isFob;
   fieldset.disabled = isFob;
   if (isFob && clearOnDisable) {
     var freightInput = fieldset.querySelector('input[name="indicative_freight_amount"]');
