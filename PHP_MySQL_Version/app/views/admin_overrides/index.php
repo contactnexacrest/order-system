@@ -205,8 +205,8 @@ document.querySelectorAll('.md-btn').forEach(function (btn) {
 
 function unlockFieldset(btn) {
   var fieldset = btn.closest('fieldset');
-  var reason = prompt('Why are you unlocking this protected item? (required)');
-  if (!reason || !reason.trim()) { return; }
+  var reason = promptForReason('Why are you unlocking this protected item? (required)');
+  if (!reason) { return; }
   fieldset.querySelectorAll('input[data-protected="1"], textarea[data-protected="1"]').forEach(function (el) {
     el.removeAttribute('readonly');
   });

@@ -623,8 +623,8 @@ $stepStatusIcon = static function (string $status): string {
   <script>
     function promptMarkLost(btn) {
       var form = btn.closest('form');
-      var reason = prompt('Why is this order lost? (required — recorded in the audit log)');
-      if (!reason || !reason.trim()) { return; }
+      var reason = promptForReason('Why is this order lost? (required — recorded in the audit log)');
+      if (!reason) { return; }
       form.querySelector('.mark-lost-reason').value = reason.trim();
       form.requestSubmit ? form.requestSubmit() : form.submit();
     }
@@ -682,8 +682,8 @@ $stepStatusIcon = static function (string $status): string {
         <script>
           function promptRejectCancellation(btn) {
             var form = btn.closest('form');
-            var notes = prompt('Why is this cancellation request being rejected? (required — recorded in the audit log)');
-            if (!notes || !notes.trim()) { return; }
+            var notes = promptForReason('Why is this cancellation request being rejected? (required — recorded in the audit log)');
+            if (!notes) { return; }
             form.querySelector('.reject-cancellation-notes').value = notes.trim();
             form.requestSubmit ? form.requestSubmit() : form.submit();
           }
@@ -704,8 +704,8 @@ $stepStatusIcon = static function (string $status): string {
     <script>
       function promptRequestCancellation(btn) {
         var form = btn.closest('form');
-        var reason = prompt('Why is cancellation being requested? (required — recorded in the audit log; a privileged second person still has to approve this)');
-        if (!reason || !reason.trim()) { return; }
+        var reason = promptForReason('Why is cancellation being requested? (required — recorded in the audit log; a privileged second person still has to approve this)');
+        if (!reason) { return; }
         form.querySelector('.request-cancellation-reason').value = reason.trim();
         form.requestSubmit ? form.requestSubmit() : form.submit();
       }
@@ -1020,8 +1020,8 @@ $stepStatusIcon = static function (string $status): string {
     <script>
       function promptDeleteDraft(btn) {
         var form = btn.closest('form');
-        var reason = prompt('Why is this draft document being deleted? (required, at least 10 characters — recorded in the audit log)');
-        if (!reason || reason.trim().length < 10) { return; }
+        var reason = promptForReason('Why is this draft document being deleted? (required, at least 10 characters — recorded in the audit log)');
+        if (!reason) { return; }
         form.querySelector('.delete-draft-reason').value = reason.trim();
         form.requestSubmit ? form.requestSubmit() : form.submit();
       }
@@ -1035,8 +1035,8 @@ $stepStatusIcon = static function (string $status): string {
       // promptDeleteDraft() above.
       function promptRemoveAdditionalDocument(btn) {
         var form = btn.closest('form');
-        var reason = prompt('Why is this document being removed? (required, at least 10 characters — recorded in the audit log)');
-        if (!reason || reason.trim().length < 10) { return; }
+        var reason = promptForReason('Why is this document being removed? (required, at least 10 characters — recorded in the audit log)');
+        if (!reason) { return; }
         form.querySelector('.remove-additional-document-reason').value = reason.trim();
         form.requestSubmit ? form.requestSubmit() : form.submit();
       }

@@ -139,8 +139,8 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
       // views/orders/show.php's promptRemoveAdditionalDocument().
       function promptRemoveAdditionalDocument(btn) {
         var form = btn.closest('form');
-        var reason = prompt('Why is this document being removed? (required, at least 10 characters — recorded in the audit log)');
-        if (!reason || reason.trim().length < 10) { return; }
+        var reason = promptForReason('Why is this document being removed? (required, at least 10 characters — recorded in the audit log)');
+        if (!reason) { return; }
         form.querySelector('.remove-additional-document-reason').value = reason.trim();
         form.requestSubmit ? form.requestSubmit() : form.submit();
       }

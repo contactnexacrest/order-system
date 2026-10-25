@@ -250,6 +250,23 @@
   // handling). Messages appear next to the field and the submit is
   // stopped before any confirm dialog or "Working…" state.
   var REASON_MIN_LENGTH = 10;
+  // Asks for a reason in a prompt() dialog — the delete-draft / remove-
+  // document / mark-lost / cancellation / unlock actions. A reason shorter
+  // than the server's minimum used to be silently thrown away (the button
+  // just did nothing — "delete is not working" with "duplicate", 9
+  // characters); now it asks again, saying why. Cancel still cancels.
+  // Returns the trimmed reason, or null if cancelled.
+  window.promptForReason = function (question) {
+    var message = question;
+    for (;;) {
+      var reason = window.prompt(message);
+      if (reason === null) return null;
+      reason = reason.trim();
+      if (reason.length >= REASON_MIN_LENGTH) return reason;
+      message = 'Please give a reason of at least ' + REASON_MIN_LENGTH + ' characters (you entered ' + reason.length + ').\n\n' + question;
+    }
+  };
+
   // Matched against numeric DB columns only — estimated_package_count is
   // deliberately free text ("TBD at packing"), so counts are listed by name.
   var NUMERIC_FIELD_NAME = /(_amount|amount_|_inr$|_kg$|_cbm$|^cbm$|_pct$|_rate$|unit_price|quantity|^crate_count$|_days$)/;

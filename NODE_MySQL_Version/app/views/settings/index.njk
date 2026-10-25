@@ -185,8 +185,8 @@ function unlockRow(btn) {
   var label = btn.closest('.setting-row');
   var field = label.querySelector('input[type=text][data-key], input[type=checkbox][data-key], textarea[data-key], select[data-key]');
   var flag = label.querySelector('.unlock-flag');
-  var reason = prompt('Why are you unlocking this protected field? (required)');
-  if (!reason || !reason.trim()) { return; }
+  var reason = promptForReason('Why are you unlocking this protected field? (required)');
+  if (!reason) { return; }
   if (field.type === 'checkbox' || field.tagName === 'SELECT') { field.disabled = false; } else { field.removeAttribute('readonly'); }
   field.focus();
   flag.value = '1';
