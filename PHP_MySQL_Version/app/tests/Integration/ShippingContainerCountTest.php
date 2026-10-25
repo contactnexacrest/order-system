@@ -25,8 +25,13 @@ final class ShippingContainerCountTest extends DbTestCase
     {
         $file = FileStoreRepository::find($pdfFileId);
         self::assertNotNull($file, 'generated PDF file_store row must exist');
+        // -layout: the default "reading order" mode can interleave the
+        // diagonal draft watermark's text with nearby table rows in an
+        // order sensitive to exact row height, which this test's
+        // label-then-value regexes aren't meant to depend on; -layout
+        // preserves the physical column layout instead.
         $process = proc_open(
-            ['pdftotext', $file['server_path'], '-'],
+            ['pdftotext', '-layout', $file['server_path'], '-'],
             [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes
         );

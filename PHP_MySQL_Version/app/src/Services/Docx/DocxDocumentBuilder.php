@@ -102,11 +102,6 @@ final class DocxDocumentBuilder
      * "[ ]" is the more reliable real-Word-formatting equivalent of the
      * CSS .cbx checkbox square.
      */
-    private static function checkbox(bool $checked, string $label): string
-    {
-        return ($checked ? '[X] ' : '[ ] ') . $label;
-    }
-
     private static function starRun(): array
     {
         return ['*', ['bold' => true, 'color' => 'C0392B']];
@@ -1259,12 +1254,8 @@ final class DocxDocumentBuilder
         DocxComponents::addSectionTitle($section, '5. CONTAINER & CARGO DETAILS');
         DocxComponents::addKvTable($section, [
             ['label' => 'Number of Containers', 'value' => self::g($shipping, 'container_count', 'To Be Confirmed')],
-            ['label' => 'Container Load Type *', 'value' => self::checkbox(true, 'FCL (Full Container Load)') . '    ' . self::checkbox(false, 'LCL (Less than Container Load)')],
-            ['label' => 'Container Size *', 'value' =>
-                self::checkbox(str_contains($containerType, '20ft'), '20ft Standard') . '   ' .
-                self::checkbox(str_contains($containerType, '40ft') && !str_contains($containerType, 'High Cube'), '40ft Standard') . '   ' .
-                self::checkbox(str_contains($containerType, 'High Cube'), '40ft High Cube'),
-            ],
+            ['label' => 'Container Load Type *', 'value' => str_contains($containerType, 'LCL') ? 'LCL (Less than Container Load)' : 'FCL (Full Container Load)'],
+            ['label' => 'Container Size *', 'value' => str_contains($containerType, 'LCL') ? 'N/A — LCL shipment' : ($containerType !== '' ? $containerType : 'To Be Confirmed')],
             ['label' => 'Container No. *', 'value' => self::g($shipping, 'container_no', 'TBC — to be confirmed by shipping line after stuffing')],
             ['label' => 'Seal No. *', 'value' => self::g($shipping, 'seal_no', 'TBC — to be confirmed after stuffing')],
             ['label' => 'No. of Packages *', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' Wooden Crates' : 'To Be Confirmed') . ' — must match Packing List exactly'],
@@ -1287,10 +1278,7 @@ final class DocxDocumentBuilder
         $isFob = !empty($order['is_fob']);
         DocxComponents::addSectionTitle($section, "7. FREIGHT & CHARGES ON BL  |  " . self::g($order, 'incoterm_label'));
         DocxComponents::addKvTable($section, [
-            ['label' => 'Freight Terms *', 'value' =>
-                self::checkbox(!$isFob, 'Freight Prepaid (seller pays freight — CFR/CIF)') . '    ' .
-                self::checkbox($isFob, 'Freight Collect (buyer pays freight — FOB)'),
-            ],
+            ['label' => 'Freight Terms *', 'value' => $isFob ? 'Freight Collect (buyer pays freight — FOB)' : 'Freight Prepaid (seller pays freight — CFR/CIF)'],
             ['label' => 'Freight Amount', 'value' => $isFob ? 'N/A — Freight Collect' : (self::g($freight, 'confirmed_freight_rate', 'To Be Confirmed') . ' ' . $currency)],
         ], true);
 
