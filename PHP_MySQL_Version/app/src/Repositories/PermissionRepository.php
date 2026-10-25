@@ -169,6 +169,14 @@ final class PermissionRepository
         return (int) $stmt->fetchColumn();
     }
 
+    /** The row being removed, read before the delete — the only way to still know which user it was for once it's gone. */
+    public static function findOverride(int $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM user_permissions WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch() ?: null;
+    }
+
     /** Only ever removes a grant-only override row (is_enabled = 1) — never touches a force-disable row. */
     public static function removeGrantOverride(int $id): void
     {

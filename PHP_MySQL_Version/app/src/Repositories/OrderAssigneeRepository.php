@@ -21,7 +21,7 @@ final class OrderAssigneeRepository
     public static function forOrder(int $orderId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT oa.order_id, oa.user_id, oa.assigned_at, u.name, r.name AS role_name
+            'SELECT oa.order_id, oa.user_id, oa.assigned_at, u.name, u.email, r.name AS role_name
              FROM order_assignees oa
              JOIN users u ON u.id = oa.user_id
              LEFT JOIN roles r ON r.id = u.role_id

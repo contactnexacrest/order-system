@@ -18,7 +18,8 @@ final class AuditLogRepository
         ?string $fieldName = null,
         ?string $oldValue = null,
         ?string $newValue = null,
-        ?string $reason = null
+        ?string $reason = null,
+        ?int $notifyTargetUserId = null
     ): void {
         // Test Mode (docs/schema.sql Section V) — no audit trail for
         // actions on test-flagged records. Only the entity types that can
@@ -45,16 +46,23 @@ final class AuditLogRepository
             'ip'          => $_SERVER['REMOTE_ADDR'] ?? null,
         ]);
 
-        // User-reported batch item 20 ("non-negotiable"): every action
-        // logged here also fires a notification email — see
+        // Notification Routing Plan (superseding the old flat "every
+        // action, same two recipients" design): every action logged here
+        // also fires a notification email, routed by category — see
         // ActionNotificationService's own docblock for the full
-        // rationale. Wrapped so a notification failure (bad SMTP config,
-        // a transient DB hiccup reading company_settings/users) can
-        // never break the action this audit-log call is reporting on;
-        // ActionNotificationService::notify() itself also guards its own
-        // per-recipient sends.
+        // rationale. $notifyTargetUserId is an optional hint for the
+        // handful of "about one specific person" action types where the
+        // affected user can't be derived from entityType/entityId alone
+        // (e.g. a permission grant/revoke row, which may already be
+        // deleted by the time this runs) — every other call site leaves
+        // it null and the category router resolves recipients from
+        // entityType/entityId as usual. Wrapped so a notification
+        // failure (bad SMTP config, a transient DB hiccup reading
+        // company_settings/users) can never break the action this
+        // audit-log call is reporting on; ActionNotificationService::notify()
+        // itself also guards its own per-recipient sends.
         try {
-            ActionNotificationService::notify($userId, $actionType, $entityType, $entityId, $fieldName, $oldValue, $newValue, $reason);
+            ActionNotificationService::notify($userId, $actionType, $entityType, $entityId, $fieldName, $oldValue, $newValue, $reason, $notifyTargetUserId);
         } catch (\Throwable $e) {
             // Intentionally swallowed — see comment above.
         }

@@ -28,13 +28,21 @@ final class AuditLogNotificationHookTest extends DbTestCase
         self::assertStringContainsString('ActionNotificationService::notify(', $source, 'log() must call ActionNotificationService::notify() so every audit-logged action also fires a notification email');
     }
 
+    /**
+     * Notification Routing Plan: PASSWORD_CHANGED is a "self" category
+     * action type — the only category where the catch-all + acting
+     * user's own opt-in toggle still governs recipients, exactly as the
+     * original flat design did for every action type. FIELD_EDIT (used
+     * here previously) is now a "none" category type, so it no longer
+     * exercises this pathway at all — see testNoneCategoryActionTypesSendNoEmail().
+     */
     public function testNotifyResolvesTheConfiguredCatchAllAddressAgainstRealDbState(): void
     {
         CompanySettingsRepository::set('notification_email', 'ops-notify@nexacrestinternational.test');
         $userId = $this->createTestUser('Export Executive');
         UserRepository::updateNotificationPreference($userId, false);
 
-        $recipients = ActionNotificationService::notify($userId, 'FIELD_EDIT', 'orders', 1, 'incoterm_id', '1', '2', null);
+        $recipients = ActionNotificationService::notify($userId, 'PASSWORD_CHANGED', 'users', $userId, null, null, null, null);
 
         self::assertSame(['ops-notify@nexacrestinternational.test'], $recipients, 'opted-out user must not be in the list, but the catch-all address must still fire');
 
@@ -48,7 +56,7 @@ final class AuditLogNotificationHookTest extends DbTestCase
         UserRepository::updateNotificationPreference($userId, true);
         $user = UserRepository::findById($userId);
 
-        $recipients = ActionNotificationService::notify($userId, 'ORDER_CREATED', 'orders', 1, null, null, null, null);
+        $recipients = ActionNotificationService::notify($userId, 'PASSWORD_CHANGED', 'users', $userId, null, null, null, null);
 
         self::assertContains('ops-notify@nexacrestinternational.test', $recipients);
         self::assertContains($user['email'], $recipients);

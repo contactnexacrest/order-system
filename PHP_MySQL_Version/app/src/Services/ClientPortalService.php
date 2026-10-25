@@ -59,7 +59,10 @@ final class ClientPortalService
         // the staff admin-created-account pattern.
         $randomPassword = bin2hex(random_bytes(16));
         ClientLoginRepository::create($clientId, password_hash($randomPassword, PASSWORD_DEFAULT), $orderId);
-        AuditLogRepository::log(null, 'CLIENT_PORTAL_PROVISIONED', 'clients', $clientId, null, null, null, "Triggered by order #{$orderId} advance cleared");
+        // Logged against the triggering order (not the client) so the
+        // Notification Routing Plan's order-scoped recipient resolution
+        // (that order's own assignees) can actually find it.
+        AuditLogRepository::log(null, 'CLIENT_PORTAL_PROVISIONED', 'orders', $orderId, null, null, null, "Client portal provisioned — advance cleared");
 
         self::sendSetPasswordEmail($clientId, $client['email'], $client['company_legal_name']);
 
