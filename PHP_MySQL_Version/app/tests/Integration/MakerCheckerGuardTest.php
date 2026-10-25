@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Repositories\AmendmentRepository;
+use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentReviewRepository;
 use App\Repositories\EmailLogRepository;
 use App\Services\AmendmentService;
@@ -26,6 +27,25 @@ use App\Tests\Support\DbTestCase;
  */
 final class MakerCheckerGuardTest extends DbTestCase
 {
+    private ?string $originalMailSendingEnabled = null;
+
+    // These approvals are asserted to stay 'approved' — the email-on
+    // behaviour. With mail_sending_enabled off (the seed default since
+    // 2026-10-25) an approved buyer-sendable document is marked 'sent'
+    // instead; that path is covered by EmailOffAutoSentTest.
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->originalMailSendingEnabled = CompanySettingsRepository::get('mail_sending_enabled');
+        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+    }
+
+    protected function tearDown(): void
+    {
+        CompanySettingsRepository::set('mail_sending_enabled', $this->originalMailSendingEnabled, null);
+        parent::tearDown();
+    }
+
     private function makeSuperAdmin(int $userId): void
     {
         \App\Config\Database::connection()

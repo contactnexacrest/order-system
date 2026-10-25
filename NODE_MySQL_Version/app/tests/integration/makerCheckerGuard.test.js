@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../../src/config/db');
+const companySettingsRepository = require('../../src/repositories/companySettingsRepository');
 const amendmentRepository = require('../../src/repositories/amendmentRepository');
 const documentRepository = require('../../src/repositories/documentRepository');
 const documentReviewRepository = require('../../src/repositories/documentReviewRepository');
@@ -25,7 +26,18 @@ const { createTestClient, createTestOrder, createTestFile } = require('../suppor
  * document).
  */
 describe('Maker-checker guard (QA-5)', () => {
+  // These approvals are asserted to stay 'approved' — the email-on
+  // behaviour. With mail_sending_enabled off (the seed default since
+  // 2026-10-25) an approved buyer-sendable document is marked 'sent'
+  // instead; that path is covered by emailOffAutoSent.test.js.
+  let originalMailSendingEnabled;
+  beforeAll(async () => {
+    originalMailSendingEnabled = await companySettingsRepository.get('mail_sending_enabled');
+    await companySettingsRepository.set('mail_sending_enabled', '1');
+  });
+
   afterAll(async () => {
+    await companySettingsRepository.set('mail_sending_enabled', originalMailSendingEnabled);
     await db.pool.end();
   });
 

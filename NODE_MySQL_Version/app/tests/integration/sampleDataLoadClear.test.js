@@ -21,6 +21,9 @@ const sampleDataService = require('../../src/services/sampleDataService');
  * pending).
  */
 describe('Sample data load / clear', () => {
+  // Loading all 10 sample orders generates ~40 documents — well past Jest's
+  // 20s default once the full suite has the machine busy.
+  jest.setTimeout(120000);
   let userId;
 
   beforeAll(async () => {

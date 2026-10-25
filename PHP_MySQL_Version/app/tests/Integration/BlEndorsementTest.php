@@ -6,6 +6,7 @@ namespace App\Tests\Integration;
 
 use App\Config\Database;
 use App\Controllers\OrderController;
+use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\OrderBlEndorsementRepository;
@@ -23,6 +24,25 @@ use App\Tests\Support\DbTestCase;
  */
 final class BlEndorsementTest extends DbTestCase
 {
+    private ?string $originalMailSendingEnabled = null;
+
+    // These approvals are asserted to stay 'approved' — the email-on
+    // behaviour. With mail_sending_enabled off (the seed default since
+    // 2026-10-25) an approved buyer-sendable document is marked 'sent'
+    // instead; that path is covered by EmailOffAutoSentTest.
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->originalMailSendingEnabled = CompanySettingsRepository::get('mail_sending_enabled');
+        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+    }
+
+    protected function tearDown(): void
+    {
+        CompanySettingsRepository::set('mail_sending_enabled', $this->originalMailSendingEnabled, null);
+        parent::tearDown();
+    }
+
     /** Order-page polish round: saveBlEndorsement()/generateBlEndorsement() now require Stage 9 unlocked — see OrderPageStageGateFixesTest. */
     private function unlockThroughStage9(int $orderId): void
     {

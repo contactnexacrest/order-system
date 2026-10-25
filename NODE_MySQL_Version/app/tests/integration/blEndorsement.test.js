@@ -12,6 +12,7 @@ jest.mock('../../src/services/pdfRenderService', () => ({
 
 const fs = require('fs');
 const db = require('../../src/config/db');
+const companySettingsRepository = require('../../src/repositories/companySettingsRepository');
 const documentRepository = require('../../src/repositories/documentRepository');
 const fileStoreRepository = require('../../src/repositories/fileStoreRepository');
 const orderBlEndorsementRepository = require('../../src/repositories/orderBlEndorsementRepository');
@@ -28,7 +29,18 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * self-approves instead of going through the normal draft->review cycle.
  */
 describe('BL Endorsement (Section BC)', () => {
+  // These approvals are asserted to stay 'approved' — the email-on
+  // behaviour. With mail_sending_enabled off (the seed default since
+  // 2026-10-25) an approved buyer-sendable document is marked 'sent'
+  // instead; that path is covered by emailOffAutoSent.test.js.
+  let originalMailSendingEnabled;
+  beforeAll(async () => {
+    originalMailSendingEnabled = await companySettingsRepository.get('mail_sending_enabled');
+    await companySettingsRepository.set('mail_sending_enabled', '1');
+  });
+
   afterAll(async () => {
+    await companySettingsRepository.set('mail_sending_enabled', originalMailSendingEnabled);
     await db.pool.end();
   });
 
