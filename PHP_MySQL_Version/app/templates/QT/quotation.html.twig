@@ -56,10 +56,10 @@
 <table class="totals">
   <tr><td class="k">FOB Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.fob_value }}</td></tr>
   <tr><td class="k">Freight ({{ order.currency_code }})</td><td class="v">
-    {% if order.is_fob %}NIL — freight arranged by buyer.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_amount ?: 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.{% endif %}
+    {% if order.is_fob %}NIL{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_amount ?: 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.{% endif %}
   </td></tr>
   <tr><td class="k">Insurance ({{ order.currency_code }})</td><td class="v">
-    {% if order.is_fob %}NIL — buyer's responsibility.{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount ?: 'XX' }}. Confirmed by Debit Note when cargo is ready.{% endif %}
+    {% if order.is_fob %}NIL{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount ?: 'XX' }}. Confirmed by Debit Note when cargo is ready.{% endif %}
   </td></tr>
   <tr class="highlight"><td class="k">TOTAL QUOTED VALUE ({{ order.currency_code }})</td><td class="v">{{ financial.total_value }}</td></tr>
 </table>

@@ -221,9 +221,9 @@ function renderQt(context) {
   children.push(...C.productsTable(productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(context.products)));
 
   const freightText = order.is_fob
-    ? 'NIL — freight arranged by buyer.'
+    ? 'NIL'
     : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.`;
-  const insuranceText = order.is_fob ? "NIL — buyer's responsibility." : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
+  const insuranceText = order.is_fob ? "NIL" : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
   children.push(
     ...C.totalsTable([
       { label: `FOB Value (${currency}) *`, value: g(financial, 'fob_value') },
@@ -356,9 +356,9 @@ function renderPi(context) {
   );
 
   const freightText = order.is_fob
-    ? 'NIL — freight arranged by buyer.'
+    ? 'NIL'
     : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.`;
-  const insuranceText = order.is_fob ? "NIL — buyer's responsibility." : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
+  const insuranceText = order.is_fob ? "NIL" : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
   children.push(
     ...C.totalsTable([
       { label: `FOB Value (${currency}) *`, value: g(financial, 'fob_value') },
