@@ -26,11 +26,12 @@ async function customerFacingForOrder(orderId) {
 
 async function forOrder(orderId) {
   return db.query(
-    `SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default, dt.category AS document_type_category
+    `SELECT d.*, dt.code AS document_type_code, dt.name AS document_type_name, dt.min_reviewers_default, dt.category AS document_type_category,
+            dt.never_shown_to_buyer AS document_type_never_shown_to_buyer
      FROM documents d
      JOIN document_types dt ON dt.id = d.document_type_id
      WHERE d.order_id = :order_id
-     ORDER BY d.generated_at DESC`,
+     ORDER BY d.generated_at DESC, d.id DESC`,
     { order_id: orderId }
   );
 }

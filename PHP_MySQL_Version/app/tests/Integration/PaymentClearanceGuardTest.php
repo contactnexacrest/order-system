@@ -57,6 +57,7 @@ final class PaymentClearanceGuardTest extends DbTestCase
         StageGateService::passAndUnlockNext($orderId, 1, null);
         StageGateService::passAndUnlockNext($orderId, 2, null);
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 1000.00, '2026-01-10');
+        $this->createTestDocument($orderId, 'PI', 'approved');
         $_SESSION['_auth_user_id'] = $userId;
 
         ob_start();
@@ -107,6 +108,7 @@ final class PaymentClearanceGuardTest extends DbTestCase
         // AND balance_remittance_received_at, as the real
         // recordBalancePayment() action does.
         OrderPaymentStatusRepository::recordBalanceReceived($orderId, 1500.00, '2026-03-01');
+        $this->createTestDocument($orderId, 'CI', 'approved');
         $_SESSION['_auth_user_id'] = $userId;
 
         ob_start();

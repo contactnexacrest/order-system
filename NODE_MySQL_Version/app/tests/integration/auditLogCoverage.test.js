@@ -148,6 +148,7 @@ describe('Audit log coverage (External QA report L-23)', () => {
     expect(Number(recordedLog.entity_id)).toBe(orderId);
     expect(recordedLog.new_value).toBe('1000');
 
+    await createTestDocument(orderId, 'PI', 'sent');
     await ordersController.clearAdvancePayment(
       fakeReq({ id: userId }, { advance_cleared_at: '2026-01-15' }, { id: String(orderId) }),
       fakeRes()
@@ -164,7 +165,7 @@ describe('Audit log coverage (External QA report L-23)', () => {
     for (let stage = 1; stage <= 7; stage++) {
       await stageGateService.passAndUnlockNext(orderId, stage, null);
     }
-    await createTestDocument(orderId, 'CI', 'approved');
+    await createTestDocument(orderId, 'CI', 'sent');
 
     await ordersController.recordBalancePayment(
       fakeReq({ id: userId }, { balance_amount: '1500.00', balance_received_at: '2026-03-01' }, { id: String(orderId) }),
@@ -218,6 +219,8 @@ describe('Audit log coverage (External QA report L-23)', () => {
     for (let stage = 1; stage <= 6; stage++) {
       await stageGateService.passAndUnlockNext(orderId, stage, null);
     }
+    await createTestDocument(orderId, 'PL', 'sent');
+    await createTestDocument(orderId, 'BLI', 'sent');
 
     await ordersController.recordBlIssued(
       fakeReq({ id: userId }, { bl_number: 'L23MSCU0001', bl_date: '2026-06-15' }, { id: String(orderId) }),

@@ -1274,6 +1274,14 @@ async function recordBuyerPo(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision (2026-10-25): this stage completes only once its
+  // document is approved (email off) / sent (email on).
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 2);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const ref = str(req.body.buyers_po_ref);
   if (ref === '') {
     flash.set(req, 'error', "Buyer's PO / reference number is required to confirm this gate.");
@@ -1491,6 +1499,14 @@ async function clearAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision (2026-10-25): this stage completes only once its
+  // document is approved (email off) / sent (email on).
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 3);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   // QA-5 (GATE-05/GATE-10): the stage-unlock check above only proves Stage
   // 2 was passed — it says nothing about whether an advance amount was
   // ever actually recorded via recordAdvancePayment(), and doesn't catch
@@ -1618,6 +1634,14 @@ async function confirmLcUsable(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision (2026-10-25): this stage completes only once its
+  // document is approved (email off) / sent (email on).
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 3);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const existingLc = await orderLcDetailRepository.find(orderId);
   if (!existingLc || existingLc.lc_amount === null) {
     flash.set(req, 'error', 'Record the LC details before confirming it usable.');
@@ -1707,6 +1731,14 @@ async function recordOcAcknowledgment(req, res) {
   const orderId = parseInt(req.params.id, 10);
   if (!(await stageGateService.isUnlocked(orderId, 4))) {
     flash.set(req, 'error', 'Stage 4 has not been unlocked for this order yet — complete Stage 3 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // Owner decision (2026-10-25): this stage completes only once its
+  // document is approved (email off) / sent (email on).
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 4);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1968,6 +2000,14 @@ async function confirmSupplierSigned(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision (2026-10-25): ...and approved (email off) / sent (email
+  // on) — after the more specific "generate it first" checks.
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 5);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (await wetSignatureGuardService.supplierPoBlocked(supplierPo.id)) {
     flash.set(req, 'error', 'Wet-signature required: upload the supplier\'s signed acknowledgment copy before confirming this gate.');
     res.redirect(`/orders/${orderId}`);
@@ -2191,6 +2231,14 @@ async function clearFreightPayment(req, res) {
   const user = req.user;
   if (!(await stageGateService.isUnlocked(orderId, 6))) {
     flash.set(req, 'error', 'Stage 6 has not been unlocked for this order yet — complete Stage 5 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // Owner decision (2026-10-25): this stage completes only once its
+  // document is approved (email off) / sent (email on).
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 6);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -2462,6 +2510,14 @@ async function recordBlIssued(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision (2026-10-25): this stage completes only once its
+  // document is approved (email off) / sent (email on).
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 7);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const blNumber = str(req.body.bl_number);
   const blDate = str(req.body.bl_date) || todayYmd();
   if (blNumber === '') {
@@ -2581,6 +2637,14 @@ async function clearBalancePayment(req, res) {
   const user = req.user;
   if (!(await stageGateService.isUnlocked(orderId, 8))) {
     flash.set(req, 'error', 'Stage 8 has not been unlocked for this order yet — complete Stage 7 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // Owner decision (2026-10-25): this stage completes only once its
+  // document is approved (email off) / sent (email on).
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 8);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
     res.redirect(`/orders/${orderId}`);
     return;
   }

@@ -65,8 +65,12 @@ function docForm(page, orderId, typeCode) {
   );
 }
 
+// Each stage gate waits for its own document to be approved, so the Buyer
+// PO (Stage 2) and PI (Stage 3) are generated from their own stage cards.
+const DOC_GENERATE_STAGE = { BUYERPO: 2, PI: 3 };
+
 async function generateDocument(page, orderId, typeCode, expectedBannerSubstring) {
-  await openStage(page, 1);
+  await openStage(page, DOC_GENERATE_STAGE[typeCode] ?? 1);
   await docForm(page, orderId, typeCode).locator('button[type="submit"]').click();
   await expect(page.locator('.alert')).toContainText(expectedBannerSubstring);
 }
@@ -152,6 +156,8 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
 
     await generateDocument(page, orderId, 'QT', 'generated');
     await adminAssignSelfAndApprove(page, 'QT', 'Gulmohar Sontakke');
+    await generateDocument(page, orderId, 'BUYERPO', 'generated');
+    await adminAssignSelfAndApprove(page, 'BUYERPO', 'Gulmohar Sontakke');
 
     await openStage(page, 2);
     const uploadForm = page.locator(`form[action="/orders/${orderId}/buyer-po/documents"]`);
@@ -164,6 +170,9 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
     await poForm.locator('input[name="buyers_po_ref"]').fill(`PO-DA-${UNIQUE}`);
     await poForm.getByRole('button', { name: 'Confirm Buyer PO Received' }).click();
     await expect(page.locator('.alert')).toBeVisible();
+
+    await generateDocument(page, orderId, 'PI', 'generated');
+    await adminAssignSelfAndApprove(page, 'PI', 'Gulmohar Sontakke');
 
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);

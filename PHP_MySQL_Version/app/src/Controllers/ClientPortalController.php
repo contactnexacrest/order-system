@@ -25,6 +25,7 @@ use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderReorderRequestRepository;
+use App\Services\DocumentGenerationService;
 use App\Services\ClientPortalService;
 use App\Services\EmailService;
 use App\Services\FileUploadService;
@@ -285,7 +286,9 @@ final class ClientPortalController
         $ocAcknowledgment = OrderOcAcknowledgmentRepository::find($orderId);
         if (!$ocAcknowledgment) {
             $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
-            if ($ocDoc && in_array($ocDoc['status'], ['approved', 'sent'], true)) {
+            // Only once the OC counts as issued (approved while email is
+            // off, sent while it is on) — the same rule the Stage 4 gate applies.
+            if ($ocDoc && DocumentGenerationService::stageDocumentBlockedBy($orderId, 4) === []) {
                 OrderOcAcknowledgmentRepository::ensureRowExists($orderId, (int) $ocDoc['id']);
                 $ocAcknowledgment = OrderOcAcknowledgmentRepository::find($orderId);
             }

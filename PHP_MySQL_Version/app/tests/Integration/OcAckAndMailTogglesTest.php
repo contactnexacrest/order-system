@@ -75,7 +75,7 @@ final class OcAckAndMailTogglesTest extends DbTestCase
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->unlockStage4($orderId);
-        $documentId = $this->createTestDocument($orderId, 'OC', 'draft');
+        $documentId = $this->createTestDocument($orderId, 'OC', 'approved');
         self::assertNull(OrderOcAcknowledgmentRepository::find($orderId), 'no ack row should exist yet — the OC was never actually sent');
         $userId = $this->createTestUser('Export Executive');
         $_SESSION['_auth_user_id'] = $userId;
@@ -154,7 +154,7 @@ final class OcAckAndMailTogglesTest extends DbTestCase
         CompanySettingsRepository::set('oc_ack_override_restricted', '1');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->unlockStage4($orderId);
-        $this->createTestDocument($orderId, 'OC', 'draft');
+        $this->createTestDocument($orderId, 'OC', 'approved');
         $userId = $this->createTestUser('Export Executive'); // keeps override_buyer_acknowledgment from seed
         $_SESSION['_auth_user_id'] = $userId;
         $_POST['acknowledged_note'] = 'Buyer confirmed by phone.';
@@ -186,7 +186,7 @@ final class OcAckAndMailTogglesTest extends DbTestCase
         CompanySettingsRepository::set('oc_ack_override_restricted', '1');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->unlockStage4($orderId);
-        $this->createTestDocument($orderId, 'OC', 'draft');
+        $this->createTestDocument($orderId, 'OC', 'approved');
         $userId = $this->createTestUser('Export Executive');
         Database::connection()
             ->prepare('UPDATE users SET is_super_admin = 1, role_id = NULL WHERE id = :id')

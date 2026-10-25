@@ -13,6 +13,7 @@ use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Services\BuyerActionService;
+use App\Services\DocumentGenerationService;
 
 /**
  * 90-item backlog #75: public, no-login counterpart to the two
@@ -74,7 +75,9 @@ final class BuyerActionController
         $ocAcknowledgment = OrderOcAcknowledgmentRepository::find($orderId);
         if (!$ocAcknowledgment) {
             $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
-            if ($ocDoc && in_array($ocDoc['status'], ['approved', 'sent'], true)) {
+            // Only once the OC counts as issued (approved while email is
+            // off, sent while it is on) — the same rule the Stage 4 gate applies.
+            if ($ocDoc && DocumentGenerationService::stageDocumentBlockedBy($orderId, 4) === []) {
                 OrderOcAcknowledgmentRepository::ensureRowExists($orderId, (int) $ocDoc['id']);
                 $ocAcknowledgment = OrderOcAcknowledgmentRepository::find($orderId);
             }

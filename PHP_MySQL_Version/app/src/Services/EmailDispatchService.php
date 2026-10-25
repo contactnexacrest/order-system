@@ -349,6 +349,11 @@ final class EmailDispatchService
             // acknowledgeOc() / the auto_confirm_oc_acknowledgments.php cron
             // are the three ways it later resolves).
             self::startOcAcknowledgmentClock($document);
+            // With email sending on, the Quotation completes Stage 1 when it's
+            // sent, not when it's approved (ReviewWorkflowService).
+            if ($document['document_type_code'] === 'QT' && $document['order_id'] !== null) {
+                StageGateService::passAndUnlockNext((int) $document['order_id'], 1, null);
+            }
         } else {
             EmailLogRepository::markFailed((int) $emailLogRow['id']);
         }

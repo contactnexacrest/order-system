@@ -436,59 +436,68 @@ $stepCardOpen = static fn(string $step): string => ($step === $currentUserStep) 
 // no signal of its own (optional/reference) — it just follows its step.
 // Within a step a later sub-step done means the earlier ones count as done
 // too (the same owner rule as above).
-$docCodes = array_column($documents, 'document_type_code');
-$hasDocType = static fn(string $code): bool => in_array($code, $docCodes, true);
+// A "Generate …" sub-step is only done once its document is complete —
+// approved, or sent while email sending is on (owner decision 2026-10-25,
+// DocumentGenerationService::isDocumentComplete()) — not merely generated.
+$docComplete = static function (string $code) use ($documents): bool {
+    foreach ($documents as $__doc) {
+        if ($__doc['document_type_code'] === $code && $__doc['status'] !== 'superseded') {
+            return DocumentGenerationService::isDocumentComplete($__doc);
+        }
+    }
+    return false;
+};
 $subStepDone = [
     '4' => [
-        '4a' => $hasBuyerPoDoc,
+        '4a' => $docComplete('BUYERPO'),
         '4b' => !empty($buyerPoDocuments),
         '4c' => $hasBuyerPo,
     ],
     '5' => [
         '5a' => $piIntake !== null,
         '5b' => $piIntake !== null && $piIntake['status'] === 'applied',
-        '5c' => $hasDocType('PI'),
+        '5c' => $docComplete('PI'),
         '5d' => $isLcPayment
             ? ($orderLcDetails !== null && $orderLcDetails['lc_amount'] !== null)
             : ($payment !== null && $payment['advance_remittance_received_at'] !== null),
         '5e' => $isLcPayment ? $lcConfirmed : $advanceCleared,
     ],
     '6' => [
-        '6a' => $ocDocGenerated,
+        '6a' => $docComplete('OC'),
         '6b' => $buyerAcknowledged,
         '6c' => null, // optional Buyer Action Link — never blocks
     ],
     '7' => [
         '7a' => $supplierPo !== null,
-        '7b' => $suppoDocGenerated,
+        '7b' => $docComplete('SUPPO'),
         '7c' => !empty($supplierPoDocuments),
         '7d' => $supplierSigned,
     ],
     '9' => [
         '9a' => $freight !== null,
-        '9b' => $hasDocType('FDN'),
+        '9b' => $docComplete('FDN'),
         '9c' => $payment !== null && $payment['freight_remittance_received_at'] !== null,
         '9d' => $freightCleared,
     ],
     '10' => [
         '10a' => $packing !== null,
-        '10b' => $hasDocType('PL'),
+        '10b' => $docComplete('PL'),
         '10c' => $shipping !== null,
-        '10d' => $hasDocType('BLI'),
+        '10d' => $docComplete('BLI'),
         '10e' => $blIssued,
     ],
     '11' => [
-        '11a' => $ciDocGenerated,
+        '11a' => $docComplete('CI'),
         '11b' => $shipping !== null && !empty($shipping['scanned_bl_sent_to_buyer_at']),
         '11c' => $payment !== null && $payment['balance_remittance_received_at'] !== null,
         '11d' => $balanceCleared,
     ],
     '13' => [
-        '13a' => $hasDocType('COOPREP'),
+        '13a' => $docComplete('COOPREP'),
         '13b' => $shipping !== null && !empty($shipping['bl_originals_received_at']),
         '13c' => $shipping !== null && !empty($shipping['bl_endorsed_at']),
         '13d' => $blEndorsement !== null,
-        '13f' => $hasDocType('BLE'),
+        '13f' => $docComplete('BLE'),
         '13g' => $orderClosed || $order['status'] === 'shipped_docs_sent',
         '13e' => $orderClosed,
     ],

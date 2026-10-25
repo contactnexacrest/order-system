@@ -5,7 +5,7 @@ const orderPaymentStatusRepository = require('../../src/repositories/orderPaymen
 const ordersController = require('../../src/controllers/ordersController');
 const stageGateService = require('../../src/services/stageGateService');
 const flash = require('../../src/helpers/flash');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestDocument } = require('../support/fixtures');
 
 /**
  * QA-5 (GATE-04/GATE-05/GATE-10 — external QA report cross-verification):
@@ -62,6 +62,7 @@ describe('Payment clearance guard (QA-5)', () => {
     await stageGateService.passAndUnlockNext(orderId, 1, null);
     await stageGateService.passAndUnlockNext(orderId, 2, null);
     await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 1000.0, '2026-01-10');
+    await createTestDocument(orderId, 'PI');
 
     const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, session: {} };
     await ordersController.clearAdvancePayment(req, fakeRes());
@@ -105,6 +106,7 @@ describe('Payment clearance guard (QA-5)', () => {
     // balance_remittance_received_at, as the real clearBalancePayment()
     // action does.
     await orderPaymentStatusRepository.recordBalanceReceived(orderId, 1500.0, '2026-03-01');
+    await createTestDocument(orderId, 'CI');
 
     const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, session: {} };
     await ordersController.clearBalancePayment(req, fakeRes());

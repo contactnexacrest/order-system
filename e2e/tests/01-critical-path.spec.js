@@ -24,6 +24,10 @@ const ADMIN_NAME = ROLES.admin.name;
  * reference card — renders collapsed unless it happens to be the
  * order's current step, so reaching it needs its own explicit open.
  *
+ * A stage's gate only passes once that stage's own document is approved
+ * (mail sending is off on the dev servers, so approval is enough) — each
+ * stage step below generates and approves its document before the gate.
+ *
  * This only drives the actions that actually pass each stage's gate
  * (confirmed against each controller method, not assumed from the
  * TEST_PLAN's one-line summaries) — it deliberately skips every
@@ -58,7 +62,7 @@ function docForm(page, orderId, typeCode) {
 // after the order page's stage re-sequencing) — re-derived directly
 // from views/orders/show.php's own data-stage sections rather than
 // assumed from the TEST_PLAN's simplified summary.
-const DOC_GENERATE_STAGE = { OC: 4, SUPPO: 5, BLI: 7, CI: 8, COOPREP: 9 };
+const DOC_GENERATE_STAGE = { BUYERPO: 2, PI: 3, OC: 4, SUPPO: 5, FDN: 6, PL: 7, BLI: 7, CI: 8, COOPREP: 9 };
 
 async function generateDocument(page, orderId, typeCode, expectedBannerSubstring) {
   await openStage(page, DOC_GENERATE_STAGE[typeCode] ?? 1);
@@ -160,6 +164,10 @@ async function resolveExportBenefitSchemes(page, orderId) {
 }
 
 test('staff can create a CIF order and walk it through all 9 stage gates to completion', async ({ page }) => {
+  // Every stage now generates and approves its own document before its
+  // gate — well past the suite's 60s default.
+  test.setTimeout(240_000);
+
   // Several gate-confirming actions (advance/freight/balance clear, etc.)
   // use a native onsubmit confirm() as a last-are-you-sure check — accept
   // it automatically so the suite proceeds as a confident operator would.
@@ -214,7 +222,10 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await assignSelfAndApprove(page, 'QT');
   });
 
-  await test.step('Stage 2 — Buyer PO: wet-signature upload, then confirm receipt', async () => {
+  await test.step('Stage 2 — Buyer PO: generate + approve, wet-signature upload, then confirm receipt', async () => {
+    await generateDocument(page, orderId, 'BUYERPO', 'generated');
+    await assignSelfAndApprove(page, 'BUYERPO');
+
     await openStage(page, 2);
     const uploadForm = page.locator(`form[action="/orders/${orderId}/buyer-po/documents"]`);
     await uploadForm.locator('input[type="file"]').setInputFiles(DUMMY_FILE);
@@ -228,7 +239,10 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await expect(page.locator('.alert')).toBeVisible();
   });
 
-  await test.step('Stage 3 — Advance Payment: record then clear', async () => {
+  await test.step('Stage 3 — PI & Advance Payment: PI approved, record then clear', async () => {
+    await generateDocument(page, orderId, 'PI', 'generated');
+    await assignSelfAndApprove(page, 'PI');
+
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
@@ -243,13 +257,14 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
 
   await test.step('Stage 4 — Order Confirmation: generate OC, record acknowledgement', async () => {
     await generateDocument(page, orderId, 'OC', 'generated');
+    await assignSelfAndApprove(page, 'OC');
 
     await openStage(page, 4);
     const ackForm = page.locator(`form[action="/orders/${orderId}/oc-acknowledgment"]`);
     await ackForm
       .locator('textarea[name="acknowledged_note"]')
       .fill('Buyer confirmed by email reply, quoted verbatim in our records.');
-    await ackForm.getByRole('button', { name: /Record Buyer's Acknowledgement/ }).click();
+    await ackForm.getByRole('button', { name: /Record Buyer's (Email )?Acknowledgement/ }).click();
     await expect(page.locator('.alert')).toContainText('unlocked');
   });
 
@@ -273,6 +288,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await expect(page.locator('.alert')).toBeVisible();
 
     await generateDocument(page, orderId, 'SUPPO', 'generated');
+    await assignSelfAndApprove(page, 'SUPPO');
 
     await openStage(page, 5);
     const ackUploadForm = page.locator(`form[action="/orders/${orderId}/supplier-po/documents"]`);
@@ -294,6 +310,9 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await termsForm.locator('input[name="freight_forwarder_name"]').fill('Smoke Test Forwarder Ltd');
     await termsForm.getByRole('button', { name: 'Save Freight Terms' }).click();
     await expect(page.locator('.alert')).toBeVisible();
+
+    await generateDocument(page, orderId, 'FDN', 'generated');
+    await assignSelfAndApprove(page, 'FDN');
 
     await openStage(page, 6);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/freight"]`);
@@ -328,6 +347,11 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await shippingForm.getByRole('button', { name: 'Save Shipping Details' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
+    await generateDocument(page, orderId, 'PL', 'generated');
+    await assignSelfAndApprove(page, 'PL');
+    await generateDocument(page, orderId, 'BLI', 'generated');
+    await assignSelfAndApprove(page, 'BLI');
+
     await openStage(page, 7);
     const blForm = page.locator(`form[action="/orders/${orderId}/bl-issued"]`);
     await blForm.locator('input[name="bl_number"]').fill(`SMOKE-BL-${UNIQUE}`);
@@ -337,6 +361,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
 
   await test.step('Stage 8 — Commercial Invoice & Balance Payment: generate CI, record, clear', async () => {
     await generateDocument(page, orderId, 'CI', 'generated');
+    await assignSelfAndApprove(page, 'CI');
 
     await openStage(page, 8);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
@@ -349,12 +374,9 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await expect(page.locator('.alert')).toContainText('unlocked');
   });
 
-  await test.step('Stage 9 — Document Despatch & Closure: COO Prep + BLI approved, then close', async () => {
+  await test.step('Stage 9 — Document Despatch & Closure: COO Prep approved, then close', async () => {
     await generateDocument(page, orderId, 'COOPREP', 'generated');
     await assignSelfAndApprove(page, 'COOPREP');
-
-    await generateDocument(page, orderId, 'BLI', 'generated');
-    await assignSelfAndApprove(page, 'BLI');
 
     await openStage(page, 9);
     const closeForm = page.locator(`form[action="/orders/${orderId}/close"]`);

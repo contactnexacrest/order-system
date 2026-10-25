@@ -195,4 +195,18 @@ async function createTestFile(orderId, clientId) {
   return result.insertId;
 }
 
-module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile };
+// A stage gate only passes once its document is complete (approved, or sent
+// to the buyer while mail sending is on) — tests driving a gate create one.
+// 'sent' is complete whichever way mail_sending_enabled is set, which
+// matters because suites share one test DB and some flip that setting.
+async function createTestDocument(orderId, typeCode, status = 'sent') {
+  const type = await db.queryOne('SELECT id FROM document_types WHERE code = :code', { code: typeCode });
+  const result = await db.execute(
+    `INSERT INTO documents (order_id, document_type_id, document_reference, status)
+     VALUES (:order_id, :type_id, :ref, :status)`,
+    { order_id: orderId, type_id: type.id, ref: `JEST-DOC-${Math.random().toString(16).slice(2, 10)}`, status }
+  );
+  return result.insertId;
+}
+
+module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument };

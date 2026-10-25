@@ -393,6 +393,73 @@ final class DocumentGenerationService
         return $blockedBy;
     }
 
+    /**
+     * The document(s) each stage produces, whose completion that stage's
+     * gate now waits on (owner decision 2026-10-25: "a stage with a
+     * generated document is not complete until that document is approved
+     * — or, with email sending on, sent"). Stage 9's own BLI + COOPREP rule
+     * is closureBlockedBy() above, unchanged.
+     */
+    public const STAGE_DOCUMENTS = [
+        1 => ['QT'],
+        2 => ['BUYERPO'],
+        3 => ['PI'],
+        4 => ['OC'],
+        5 => ['SUPPO'],
+        6 => ['FDN'],
+        7 => ['PL', 'BLI'],
+        8 => ['CI'],
+    ];
+
+    /**
+     * Whether a document counts as finished for its stage: an internal
+     * never-shown-to-buyer type (SUPPO, BLI) once approved; a buyer-facing
+     * one once approved while email sending is off (approval marks it sent
+     * anyway — EmailDispatchService::markSentIfMailDisabled()), but only
+     * once actually sent while email sending is on.
+     *
+     * @param array<string,mixed> $document a DocumentRepository::forOrder() row
+     */
+    public static function isDocumentComplete(array $document): bool
+    {
+        if (!empty($document['document_type_never_shown_to_buyer']) || !EmailDispatchService::mailSendingEnabled()) {
+            return in_array($document['status'], ['approved', 'sent'], true);
+        }
+        return $document['status'] === 'sent';
+    }
+
+    /**
+     * @return array<int, string> names of this stage's documents not yet
+     *         generated, or whose latest revision isn't complete
+     *         (isDocumentComplete()) — empty when the stage may pass
+     */
+    public static function stageDocumentBlockedBy(int $orderId, int $stageNumber): array
+    {
+        $documents = DocumentRepository::forOrder($orderId);
+        $blockedBy = [];
+        foreach (self::STAGE_DOCUMENTS[$stageNumber] ?? [] as $code) {
+            $latest = null;
+            foreach ($documents as $doc) {
+                if ($doc['document_type_code'] === $code && $doc['status'] !== 'superseded') {
+                    $latest = $doc;
+                    break;
+                }
+            }
+            if (!$latest || !self::isDocumentComplete($latest)) {
+                $blockedBy[] = $latest['document_type_name'] ?? (self::findDocumentType($code)['name'] ?? $code);
+            }
+        }
+        return $blockedBy;
+    }
+
+    /** The error shown when a stage gate is refused by stageDocumentBlockedBy(). */
+    public static function stageDocumentBlockedMessage(array $blockedBy): string
+    {
+        $what = EmailDispatchService::mailSendingEnabled() ? 'approved and sent to the buyer' : 'approved';
+        return 'This stage can only be completed once its document is ' . $what . ' — still outstanding: '
+            . implode(', ', $blockedBy) . '. Generate it if needed, then get it through Document Review & Approval.';
+    }
+
     private static function findDocumentType(string $code): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM document_types WHERE code = :code');

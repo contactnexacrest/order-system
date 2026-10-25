@@ -8,6 +8,7 @@ const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocu
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const documentRepository = require('../repositories/documentRepository');
 const buyerActionService = require('../services/buyerActionService');
+const documentGenerationService = require('../services/documentGenerationService');
 
 /**
  * Port of App\Controllers\BuyerActionController. 90-item backlog #75:
@@ -64,8 +65,10 @@ async function show(req, res) {
   // the staff-side "Record Buyer's Acknowledgement" path.
   let ocAcknowledgment = await orderOcAcknowledgmentRepository.find(order.id);
   if (!ocAcknowledgment) {
+    // Only once the OC counts as issued (approved while email is off, sent
+    // while it is on) — the same rule the Stage 4 gate itself applies.
     const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(order.id, 'OC');
-    if (ocDoc && ['approved', 'sent'].includes(ocDoc.status)) {
+    if (ocDoc && !(await documentGenerationService.stageDocumentBlockedBy(order.id, 4)).length) {
       await orderOcAcknowledgmentRepository.ensureRowExists(order.id, ocDoc.id);
       ocAcknowledgment = await orderOcAcknowledgmentRepository.find(order.id);
     }

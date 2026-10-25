@@ -88,7 +88,7 @@ describe('Order page sequential step flow', () => {
 
   it('marks earlier sub-steps done when a later one is', async () => {
     const orderId = await orderAtStep5();
-    await createTestDocument(orderId, 'PI');
+    await createTestDocument(orderId, 'PI', 'sent');
 
     const { text } = await agent.get(`/orders/${orderId}`);
 

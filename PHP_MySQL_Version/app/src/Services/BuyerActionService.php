@@ -47,7 +47,9 @@ final class BuyerActionService
             // must at least have been generated/approved so there's a
             // real document to point this record at.
             $ocDoc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
-            if ($ocDoc && in_array($ocDoc['status'], ['approved', 'sent'], true)) {
+            // Only once the OC counts as issued (approved while email is
+            // off, sent while it is on) — the same rule the Stage 4 gate applies.
+            if ($ocDoc && DocumentGenerationService::stageDocumentBlockedBy($orderId, 4) === []) {
                 OrderOcAcknowledgmentRepository::ensureRowExists($orderId, (int) $ocDoc['id']);
                 $ack = OrderOcAcknowledgmentRepository::find($orderId);
             }
@@ -57,6 +59,11 @@ final class BuyerActionService
         }
         if (!StageGateService::isUnlocked($orderId, 4)) {
             return ['ok' => false, 'message' => 'This order is not currently awaiting acknowledgement.'];
+        }
+        // Owner decision (2026-10-25): the stage completes only once the OC is
+        // approved (email off) / sent (email on) — same rule as the staff path.
+        if (DocumentGenerationService::stageDocumentBlockedBy($orderId, 4)) {
+            return ['ok' => false, 'message' => 'Your Order Confirmation has not been issued yet — please wait for it to be sent to you, then acknowledge it.'];
         }
 
         if (!OrderOcAcknowledgmentRepository::markAcknowledged($orderId, 'client_portal', null, null)) {

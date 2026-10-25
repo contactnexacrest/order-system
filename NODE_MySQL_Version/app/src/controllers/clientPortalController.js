@@ -33,6 +33,7 @@ const permissionRepository = require('../repositories/permissionRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const clientPortalService = require('../services/clientPortalService');
 const buyerActionService = require('../services/buyerActionService');
+const documentGenerationService = require('../services/documentGenerationService');
 const orderCommentService = require('../services/orderCommentService');
 const orderComplaintService = require('../services/orderComplaintService');
 const passwordPolicyService = require('../services/passwordPolicyService');
@@ -288,8 +289,10 @@ async function showOrder(req, res) {
   // acknowledgement option at all.
   let ocAcknowledgment = await orderOcAcknowledgmentRepository.find(orderId);
   if (!ocAcknowledgment) {
+    // Only once the OC counts as issued (approved while email is off, sent
+    // while it is on) — the same rule the Stage 4 gate itself applies.
     const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
-    if (ocDoc && ['approved', 'sent'].includes(ocDoc.status)) {
+    if (ocDoc && !(await documentGenerationService.stageDocumentBlockedBy(orderId, 4)).length) {
       await orderOcAcknowledgmentRepository.ensureRowExists(orderId, ocDoc.id);
       ocAcknowledgment = await orderOcAcknowledgmentRepository.find(orderId);
     }

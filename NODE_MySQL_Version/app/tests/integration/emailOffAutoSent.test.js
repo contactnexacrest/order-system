@@ -60,6 +60,13 @@ describe('Email sending off: approved documents count as sent', () => {
     await reviewWorkflowService.approve(review.id, review.reviewer_id, null);
   }
 
+  // Other files mutate the single shared QT document_types row's
+  // min_reviewers_default and don't always restore it — reset it so the
+  // single-reviewer approvals here don't depend on test execution order.
+  beforeEach(async () => {
+    await db.execute("UPDATE document_types SET min_reviewers_default = 1 WHERE code = 'QT'");
+  });
+
   beforeAll(async () => {
     originalMailSendingEnabled = await companySettingsRepository.get('mail_sending_enabled');
     agent = request.agent(app);

@@ -9,7 +9,7 @@ const ordersController = require('../../src/controllers/ordersController');
 const stageGateService = require('../../src/services/stageGateService');
 const flash = require('../../src/helpers/flash');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestDocument } = require('../support/fixtures');
 
 /**
  * Step 5 Letter-of-Credit payment leg (order.payment_method = 'LC',
@@ -107,6 +107,7 @@ describe('Step 5 LC payment leg', () => {
     expect(parseFloat(afterRecord.lc_amount)).toBe(10000);
     expect(afterRecord.lc_confirmed_at).toBeNull();
 
+    await createTestDocument(orderId, 'PI');
     const confirmReq = { params: { id: String(orderId) }, body: {}, user: { id: userId }, session: {} };
     await ordersController.confirmLcUsable(confirmReq, fakeRes());
 

@@ -20,6 +20,7 @@ const userRepository = require('../repositories/userRepository');
 const mailSenderService = require('./mailSenderService');
 const documentDataAssembler = require('./documentDataAssembler');
 const makerCheckerGuard = require('./makerCheckerGuard');
+const stageGateService = require('./stageGateService');
 const fs = require('fs');
 
 /**
@@ -397,6 +398,11 @@ async function dispatch(emailLogRow) {
     await auditLogRepository.log(null, 'EMAIL_SENT', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email);
 
     await startOcAcknowledgmentClock(document);
+    // With email sending on, the Quotation completes Stage 1 when it's sent,
+    // not when it's approved (reviewWorkflowService).
+    if (document.document_type_code === 'QT' && document.order_id !== null && document.order_id !== undefined) {
+      await stageGateService.passAndUnlockNext(document.order_id, 1, null);
+    }
   } else {
     await emailLogRepository.markFailed(emailLogRow.id);
   }

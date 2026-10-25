@@ -499,6 +499,63 @@ async function closureBlockedBy(orderId) {
 }
 
 /**
+ * The document(s) each stage produces, whose completion that stage's gate
+ * now waits on (owner decision 2026-10-25: "a stage with a generated
+ * document is not complete until that document is approved — or, with
+ * email sending on, sent"). Stage 9's own BLI + COOPREP rule is
+ * closureBlockedBy() above, unchanged.
+ */
+const STAGE_DOCUMENTS = {
+  1: ['QT'],
+  2: ['BUYERPO'],
+  3: ['PI'],
+  4: ['OC'],
+  5: ['SUPPO'],
+  6: ['FDN'],
+  7: ['PL', 'BLI'],
+  8: ['CI'],
+};
+
+/**
+ * Whether a document counts as finished for its stage: an internal
+ * never-shown-to-buyer type (SUPPO, BLI) once approved; a buyer-facing one
+ * once approved while email sending is off (approval marks it sent anyway —
+ * emailDispatchService.markSentIfMailDisabled()), but only once actually
+ * sent while email sending is on. Synchronous (mailSendingEnabled passed
+ * in) so the order page template can use it too.
+ */
+function isDocumentComplete(document, mailSendingEnabled) {
+  if (Number(document.document_type_never_shown_to_buyer) || !mailSendingEnabled) {
+    return ['approved', 'sent'].includes(document.status);
+  }
+  return document.status === 'sent';
+}
+
+/**
+ * @returns {Promise<string[]>} names of this stage's documents not yet
+ *          generated, or whose latest revision isn't complete — empty when
+ *          the stage may pass
+ */
+async function stageDocumentBlockedBy(orderId, stageNumber) {
+  const documents = await documentRepository.forOrder(orderId);
+  const mailEnabled = await emailDispatchService.mailSendingEnabled();
+  const blockedBy = [];
+  for (const code of STAGE_DOCUMENTS[stageNumber] || []) {
+    const latest = documents.find((doc) => doc.document_type_code === code && doc.status !== 'superseded') || null;
+    if (!latest || !isDocumentComplete(latest, mailEnabled)) {
+      blockedBy.push(latest ? latest.document_type_name : (((await findDocumentType(code)) || {}).name || code));
+    }
+  }
+  return blockedBy;
+}
+
+/** The error shown when a stage gate is refused by stageDocumentBlockedBy(). */
+async function stageDocumentBlockedMessage(blockedBy) {
+  const what = (await emailDispatchService.mailSendingEnabled()) ? 'approved and sent to the buyer' : 'approved';
+  return `This stage can only be completed once its document is ${what} — still outstanding: ${blockedBy.join(', ')}. Generate it if needed, then get it through Document Review & Approval.`;
+}
+
+/**
  * Public lookup for callers outside this service that need a
  * document_types.id before generate() itself runs — currently just
  * ordersController's saveSupplierPo, which must mint SUPPO's reference
@@ -1518,6 +1575,10 @@ module.exports = {
   documentTypeIdFor,
   downstreamDocumentsAtRisk,
   closureBlockedBy,
+  STAGE_DOCUMENTS,
+  isDocumentComplete,
+  stageDocumentBlockedBy,
+  stageDocumentBlockedMessage,
   templatesEnvironment,
   StageGateBlockedError,
   // Exported for tests only (Point 8 watermark fix) — Node has no

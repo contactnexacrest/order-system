@@ -198,8 +198,11 @@ async function finalizeIfFullyApproved(documentId) {
 
     // GATE-01: the QT's approval — not its mere draft generation — is
     // Stage 1's real gate (Owner Decision #1: "No stage passes until its
-    // document is approved").
-    if (document.document_type_code === 'QT') {
+    // document is approved"). With email sending on, owner decision
+    // 2026-10-25: only once it's actually sent — emailDispatchService.
+    // dispatch() passes it then instead.
+    if (document.document_type_code === 'QT'
+      && !(await documentGenerationService.stageDocumentBlockedBy(document.order_id, 1)).length) {
       await stageGateService.passAndUnlockNext(document.order_id, 1, null);
     }
   }

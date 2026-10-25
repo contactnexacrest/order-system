@@ -124,7 +124,7 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
   it('recordOcAcknowledgment succeeds without any prior send', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockStage4(orderId);
-    const documentId = await createTestDocument(orderId, 'OC', 'draft');
+    const documentId = await createTestDocument(orderId, 'OC', 'sent');
     expect(await orderOcAcknowledgmentRepository.find(orderId)).toBeNull();
     const userId = await createTestUser('Export Executive');
 
@@ -190,7 +190,7 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
     await companySettingsRepository.set('oc_ack_override_restricted', '1');
     const orderId = await createTestOrder(await createTestClient());
     await unlockStage4(orderId);
-    await createTestDocument(orderId, 'OC', 'draft');
+    await createTestDocument(orderId, 'OC', 'sent');
     const userId = await createTestUser('Export Executive'); // keeps override_buyer_acknowledgment from seed
 
     const req = await reqForUser(userId, orderId, { acknowledged_note: 'Buyer confirmed by phone.' });
@@ -213,7 +213,7 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
     await companySettingsRepository.set('oc_ack_override_restricted', '1');
     const orderId = await createTestOrder(await createTestClient());
     await unlockStage4(orderId);
-    await createTestDocument(orderId, 'OC', 'draft');
+    await createTestDocument(orderId, 'OC', 'sent');
     const userId = await createTestUser('Export Executive');
     await db.execute('UPDATE users SET is_super_admin = 1, role_id = NULL WHERE id = :id', { id: userId });
 

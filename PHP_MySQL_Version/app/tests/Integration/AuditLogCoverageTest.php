@@ -143,6 +143,7 @@ final class AuditLogCoverageTest extends DbTestCase
         self::assertSame($orderId, (int) $recordedLog['entity_id']);
         self::assertSame('1000', $recordedLog['new_value']);
 
+        $this->createTestDocument($orderId, 'PI', 'approved');
         $_POST = ['advance_cleared_at' => '2026-01-15'];
         ob_start();
         (new OrderController())->clearAdvancePayment(['id' => (string) $orderId]);
@@ -233,6 +234,8 @@ final class AuditLogCoverageTest extends DbTestCase
         for ($stage = 1; $stage <= 6; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
         }
+        $this->createTestDocument($orderId, 'PL', 'approved');
+        $this->createTestDocument($orderId, 'BLI', 'approved');
 
         $_POST = ['bl_number' => 'L23MSCU0001', 'bl_date' => '2026-06-15'];
         ob_start();

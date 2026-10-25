@@ -187,6 +187,13 @@ njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').for
 // Order detail page step/sub-step progression (current step, cascade,
 // per-sub-step ticks) — see helpers/stepFlow.js.
 njkEnv.addGlobal('computeStepFlow', require('./helpers/stepFlow').computeStepFlow);
+// A "Generate …" sub-step is only done once its document is complete —
+// approved, or sent while email sending is on (owner decision 2026-10-25,
+// documentGenerationService.isDocumentComplete()) — not merely generated.
+njkEnv.addGlobal('docComplete', (documents, code, mailSendingEnabled) => {
+  const latest = (documents || []).find((d) => d.document_type_code === code && d.status !== 'superseded');
+  return !!latest && require('./services/documentGenerationService').isDocumentComplete(latest, mailSendingEnabled);
+});
 
 // --- Session store (MySQL-backed via knex, not PHP's file-session
 // equivalent — Node is a long-running multi-connection process, so a

@@ -116,6 +116,7 @@ test.describe('Email functionality — real attempts, right recipient, right att
   test('client portal invite: the real client gets the real set-password email the moment their advance clears', async ({
     page,
   }) => {
+    test.setTimeout(180_000);
     page.on('dialog', (dialog) => dialog.accept());
     await login(page, 'admin');
 
@@ -152,21 +153,27 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await expect(page).toHaveURL(/\/orders\/\d+$/);
     const orderId = Number(page.url().match(/\/orders\/(\d+)$/)[1]);
 
-    await openStage(page, 1);
-    await docForm(page, orderId, 'QT').locator('button[type="submit"]').click();
-    await expect(page.locator('.alert')).toContainText('generated');
-    await openDocumentReviewCard(page);
-    let panel = documentPanel(page, 'QT');
-    await panel.locator('summary').click();
-    const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
-    await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
-    await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
-    await expect(page.locator('.alert')).toBeVisible();
-    await openDocumentReviewCard(page);
-    panel = documentPanel(page, 'QT');
-    await panel.locator('summary').click();
-    await panel.getByRole('button', { name: 'Approve', exact: true }).click();
-    await expect(page.locator('.alert')).toBeVisible();
+    // Each stage gate waits for its own document to be approved (mail
+    // sending off) — QT for Stage 1, Buyer PO for 2, PI for 3.
+    const generateAndApprove = async (typeCode, stageNumber) => {
+      await openStage(page, stageNumber);
+      await docForm(page, orderId, typeCode).locator('button[type="submit"]').click();
+      await expect(page.locator('.alert')).toContainText('generated');
+      await openDocumentReviewCard(page);
+      let panel = documentPanel(page, typeCode);
+      await panel.locator('summary').click();
+      const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
+      await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
+      await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
+      await expect(page.locator('.alert')).toBeVisible();
+      await openDocumentReviewCard(page);
+      panel = documentPanel(page, typeCode);
+      await panel.locator('summary').click();
+      await panel.getByRole('button', { name: 'Approve', exact: true }).click();
+      await expect(page.locator('.alert')).toBeVisible();
+    };
+    await generateAndApprove('QT', 1);
+    await generateAndApprove('BUYERPO', 2);
 
     await openStage(page, 2);
     const uploadForm = page.locator(`form[action="/orders/${orderId}/buyer-po/documents"]`);
@@ -179,6 +186,8 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await poForm.locator('input[name="buyers_po_ref"]').fill(`PO-EMAIL-${UNIQUE}`);
     await poForm.getByRole('button', { name: 'Confirm Buyer PO Received' }).click();
     await expect(page.locator('.alert')).toBeVisible();
+
+    await generateAndApprove('PI', 3);
 
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);

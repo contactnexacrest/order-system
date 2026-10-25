@@ -168,7 +168,7 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
     test('generate QT, approve, confirm Buyer PO, clear advance — all on a phone viewport, no overflow', async ({
       page,
     }) => {
-      test.setTimeout(120_000);
+      test.setTimeout(180_000);
       page.on('dialog', (dialog) => dialog.accept());
       await login(page, 'admin');
       await page.goto(`/orders/${orderId}`);
@@ -184,31 +184,38 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await expect(page.locator('.alert')).toContainText('generated');
       await assertNoHorizontalOverflow(page);
 
-      // The QT-specific review widget lives inside #document-review-approval
+      // Each document's review widget lives inside #document-review-approval
       // — a reference card, not tied to any stage stepper dot, so it
       // renders collapsed by default and needs opening explicitly before
       // reaching the nested summary descendant this is actually looking for.
       const openDocumentReviewCard = () =>
         page.locator('#document-review-approval').evaluate((el) => { el.open = true; });
-      await openDocumentReviewCard();
-      let panel = page
+      const reviewPanel = (typeCode) => page
         .locator('details:not(.step-card)')
-        .filter({ has: page.locator('summary', { hasText: /^\s*QT\s/ }) })
+        .filter({ has: page.locator('summary', { hasText: new RegExp('^\\s*' + typeCode + '\\s') }) })
         .first();
-      await panel.locator('summary').click();
-      const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
-      await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
-      await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
-      await expect(page.locator('.alert')).toBeVisible();
+      const assignSelfAndApprove = async (typeCode) => {
+        await openDocumentReviewCard();
+        let panel = reviewPanel(typeCode);
+        await panel.locator('summary').click();
+        const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
+        await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
+        await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
+        await expect(page.locator('.alert')).toBeVisible();
 
-      await openDocumentReviewCard();
-      panel = page
-        .locator('details:not(.step-card)')
-        .filter({ has: page.locator('summary', { hasText: /^\s*QT\s/ }) })
-        .first();
-      await panel.locator('summary').click();
-      await panel.getByRole('button', { name: 'Approve', exact: true }).click();
-      await expect(page.locator('.alert')).toBeVisible();
+        await openDocumentReviewCard();
+        panel = reviewPanel(typeCode);
+        await panel.locator('summary').click();
+        await panel.getByRole('button', { name: 'Approve', exact: true }).click();
+        await expect(page.locator('.alert')).toBeVisible();
+      };
+      await assignSelfAndApprove('QT');
+
+      // Each stage gate waits for its own document to be approved.
+      await openStage(2);
+      await docForm('BUYERPO').locator('button[type="submit"]').click();
+      await expect(page.locator('.alert')).toContainText('generated');
+      await assignSelfAndApprove('BUYERPO');
 
       await openStage(2);
       const uploadForm = page.locator(`form[action="/orders/${orderId}/buyer-po/documents"]`);
@@ -222,6 +229,11 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await poForm.getByRole('button', { name: 'Confirm Buyer PO Received' }).click();
       await expect(page.locator('.alert')).toContainText('unlocked');
       await assertNoHorizontalOverflow(page);
+
+      await openStage(3);
+      await docForm('PI').locator('button[type="submit"]').click();
+      await expect(page.locator('.alert')).toContainText('generated');
+      await assignSelfAndApprove('PI');
 
       await openStage(3);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);

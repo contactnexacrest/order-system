@@ -65,7 +65,7 @@ function docForm(page, orderId, typeCode) {
 // also moved to Stage 4 after the order page's stage re-sequencing),
 // re-derived directly from views/orders/show.php's own data-stage
 // sections. See 01-critical-path.spec.js's own copy of this map/comment.
-const DOC_GENERATE_STAGE = { OC: 4, SUPPO: 5, BLI: 7, CI: 8, COOPREP: 9 };
+const DOC_GENERATE_STAGE = { BUYERPO: 2, PI: 3, OC: 4, SUPPO: 5, FDN: 6, PL: 7, BLI: 7, CI: 8, COOPREP: 9 };
 
 async function generateDocument(page, orderId, typeCode, expectedBannerSubstring) {
   await openStage(page, DOC_GENERATE_STAGE[typeCode] ?? 1);
@@ -140,6 +140,21 @@ async function adminAssignSelfAndApprove(page, typeCode) {
   await expect(page.locator('.alert')).toBeVisible();
 }
 
+/**
+ * A stage's gate only passes once that stage's own document is approved,
+ * and only Admin holds approve_documents — so a role mid-stage hands over
+ * to Admin for the approval, then picks the order back up.
+ */
+async function approveAsAdmin(page, orderId, typeCode, returnToRole) {
+  await logout(page);
+  await login(page, 'admin');
+  await page.goto(`/orders/${orderId}`);
+  await adminAssignSelfAndApprove(page, typeCode);
+  await logout(page);
+  await login(page, returnToRole);
+  await page.goto(`/orders/${orderId}`);
+}
+
 // Order closure now blocks (OrderController::markFullySettled) while any
 // compliance-task or export-benefit-scheme row is unresolved — both are
 // always materialized at order creation, never left as a missing row.
@@ -203,6 +218,8 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
   test('one CIF order, each stage done by the role whose permission actually covers it', async ({ page }) => {
     page.on('dialog', (dialog) => dialog.accept());
+    // Every stage now waits on an Admin document approval before its gate.
+    test.setTimeout(360_000);
 
     await login(page, 'admin');
 
@@ -252,6 +269,9 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     });
 
     await test.step('Admin — Stage 2 Buyer PO (manage_orders)', async () => {
+      await generateDocument(page, orderId, 'BUYERPO', 'generated');
+      await adminAssignSelfAndApprove(page, 'BUYERPO');
+
       await openStage(page, 2);
       const uploadForm = page.locator(`form[action="/orders/${orderId}/buyer-po/documents"]`);
       await uploadForm.locator('input[type="file"]').setInputFiles(DUMMY_FILE);
@@ -263,6 +283,11 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await poForm.locator('input[name="buyers_po_ref"]').fill(`PO-ROLE-${UNIQUE}`);
       await poForm.getByRole('button', { name: 'Confirm Buyer PO Received' }).click();
       await expect(page.locator('.alert')).toBeVisible();
+    });
+
+    await test.step('Admin — Stage 3 PI generate + approve (Accounts Executive holds neither generate_documents nor approve_documents)', async () => {
+      await generateDocument(page, orderId, 'PI', 'generated');
+      await adminAssignSelfAndApprove(page, 'PI');
     });
 
     await logout(page);
@@ -292,13 +317,14 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await login(page, 'exportExecutive');
       await page.goto(`/orders/${orderId}`);
       await generateDocument(page, orderId, 'OC', 'generated');
+      await approveAsAdmin(page, orderId, 'OC', 'exportExecutive');
 
       await openStage(page, 4);
       const ackForm = page.locator(`form[action="/orders/${orderId}/oc-acknowledgment"]`);
       await ackForm
         .locator('textarea[name="acknowledged_note"]')
         .fill('Buyer confirmed by email reply, quoted verbatim in our records.');
-      await ackForm.getByRole('button', { name: /Record Buyer's Acknowledgement/ }).click();
+      await ackForm.getByRole('button', { name: /Record Buyer's (Email )?Acknowledgement/ }).click();
       await expect(page.locator('.alert')).toContainText('unlocked');
     });
 
@@ -322,6 +348,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await expect(page.locator('.alert')).toBeVisible();
 
       await generateDocument(page, orderId, 'SUPPO', 'generated');
+      await approveAsAdmin(page, orderId, 'SUPPO', 'exportExecutive');
 
       await openStage(page, 5);
       const ackUploadForm = page.locator(`form[action="/orders/${orderId}/supplier-po/documents"]`);
@@ -347,6 +374,9 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await termsForm.locator('input[name="freight_forwarder_name"]').fill('Role Workflow Forwarder Ltd');
       await termsForm.getByRole('button', { name: 'Save Freight Terms' }).click();
       await expect(page.locator('.alert')).toBeVisible();
+
+      await generateDocument(page, orderId, 'FDN', 'generated');
+      await approveAsAdmin(page, orderId, 'FDN', 'logisticsExecutive');
 
       await openStage(page, 6);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/freight"]`);
@@ -381,6 +411,11 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await shippingForm.getByRole('button', { name: 'Save Shipping Details' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
+      await generateDocument(page, orderId, 'PL', 'generated');
+      await approveAsAdmin(page, orderId, 'PL', 'logisticsExecutive');
+      await generateDocument(page, orderId, 'BLI', 'generated');
+      await approveAsAdmin(page, orderId, 'BLI', 'logisticsExecutive');
+
       await openStage(page, 7);
       const blForm = page.locator(`form[action="/orders/${orderId}/bl-issued"]`);
       await blForm.locator('input[name="bl_number"]').fill(`ROLE-BL-${UNIQUE}`);
@@ -394,6 +429,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await login(page, 'exportExecutive');
       await page.goto(`/orders/${orderId}`);
       await generateDocument(page, orderId, 'CI', 'generated');
+      await approveAsAdmin(page, orderId, 'CI', 'exportExecutive');
     });
 
     await logout(page);
@@ -414,20 +450,18 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
     await logout(page);
 
-    await test.step('Logistics Executive — Stage 9 generate COOPREP + BLI (generate_documents)', async () => {
+    await test.step('Logistics Executive — Stage 9 generate COOPREP (generate_documents)', async () => {
       await login(page, 'logisticsExecutive');
       await page.goto(`/orders/${orderId}`);
       await generateDocument(page, orderId, 'COOPREP', 'generated');
-      await generateDocument(page, orderId, 'BLI', 'generated');
     });
 
     await logout(page);
 
-    await test.step('Admin — Stage 9 review + approve both (approve_documents, Logistics cannot do this part)', async () => {
+    await test.step('Admin — Stage 9 review + approve COOPREP (approve_documents, Logistics cannot do this part)', async () => {
       await login(page, 'admin');
       await page.goto(`/orders/${orderId}`);
       await adminAssignSelfAndApprove(page, 'COOPREP');
-      await adminAssignSelfAndApprove(page, 'BLI');
 
       // Export Benefit Scheme Eligibility lives in the Order Financials
       // card (manage_order_financials — Admin/MD/ED only), so it's

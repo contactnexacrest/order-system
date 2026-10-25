@@ -248,53 +248,53 @@
    logic lives in helpers/stepFlow.js. #}
 {% set subStepDone = {
   's4': {
-    '4a': hasBuyerPoDoc,
+    '4a': docComplete(documents, 'BUYERPO', mailSendingEnabled),
     '4b': buyerPoDocuments and buyerPoDocuments.length > 0,
     '4c': hasBuyerPo
   },
   's5': {
     '5a': piIntake,
     '5b': piIntake and piIntake.status == 'applied',
-    '5c': docGenerated(documents, 'PI'),
+    '5c': docComplete(documents, 'PI', mailSendingEnabled),
     '5d': ((orderLcDetails and orderLcDetails.lc_amount != null) if isLcPayment else (payment and payment.advance_remittance_received_at)),
     '5e': (lcConfirmed if isLcPayment else advanceCleared)
   },
   's6': {
-    '6a': docGenerated(documents, 'OC'),
+    '6a': docComplete(documents, 'OC', mailSendingEnabled),
     '6b': buyerAcknowledged,
     '6c': 'optional'
   },
   's7': {
     '7a': supplierPo,
-    '7b': docGenerated(documents, 'SUPPO'),
+    '7b': docComplete(documents, 'SUPPO', mailSendingEnabled),
     '7c': supplierPoDocuments and supplierPoDocuments.length > 0,
     '7d': supplierSigned
   },
   's9': {
     '9a': freight,
-    '9b': docGenerated(documents, 'FDN'),
+    '9b': docComplete(documents, 'FDN', mailSendingEnabled),
     '9c': payment and payment.freight_remittance_received_at,
     '9d': freightCleared
   },
   's10': {
     '10a': packing,
-    '10b': docGenerated(documents, 'PL'),
+    '10b': docComplete(documents, 'PL', mailSendingEnabled),
     '10c': shipping,
-    '10d': docGenerated(documents, 'BLI'),
+    '10d': docComplete(documents, 'BLI', mailSendingEnabled),
     '10e': blIssued
   },
   's11': {
-    '11a': docGenerated(documents, 'CI'),
+    '11a': docComplete(documents, 'CI', mailSendingEnabled),
     '11b': shipping and shipping.scanned_bl_sent_to_buyer_at,
     '11c': payment and payment.balance_remittance_received_at,
     '11d': balanceCleared
   },
   's13': {
-    '13a': docGenerated(documents, 'COOPREP'),
+    '13a': docComplete(documents, 'COOPREP', mailSendingEnabled),
     '13b': shipping and shipping.bl_originals_received_at,
     '13c': shipping and shipping.bl_endorsed_at,
     '13d': blEndorsement,
-    '13f': docGenerated(documents, 'BLE'),
+    '13f': docComplete(documents, 'BLE', mailSendingEnabled),
     '13g': orderClosed or order.status == 'shipped_docs_sent',
     '13e': orderClosed
   }

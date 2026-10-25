@@ -1262,6 +1262,13 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision (2026-10-25): this stage completes only once its
+        // document is approved (email off) / sent (email on).
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 2)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $ref = trim((string) ($_POST['buyers_po_ref'] ?? ''));
         if ($ref === '') {
             Flash::set('error', "Buyer's PO / reference number is required to confirm this gate.");
@@ -1484,6 +1491,13 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision (2026-10-25): this stage completes only once its
+        // document is approved (email off) / sent (email on).
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 3)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         // QA-5 (GATE-05): the stage-unlock check above only proves Stage 2
         // was passed — it says nothing about whether an advance amount was
         // ever actually recorded via recordAdvancePayment(). Without this,
@@ -1611,6 +1625,13 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision (2026-10-25): this stage completes only once its
+        // document is approved (email off) / sent (email on).
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 3)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $existingLc = OrderLcDetailRepository::find($orderId);
         if (!$existingLc || $existingLc['lc_amount'] === null) {
             Flash::set('error', 'Record the LC details before confirming it usable.');
@@ -1708,6 +1729,13 @@ final class OrderController
         $orderId = (int) $params['id'];
         if (!StageGateService::isUnlocked($orderId, 4)) {
             Flash::set('error', 'Stage 4 has not been unlocked for this order yet — complete Stage 3 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // Owner decision (2026-10-25): this stage completes only once its
+        // document is approved (email off) / sent (email on).
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 4)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1965,6 +1993,13 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision (2026-10-25): ...and approved (email off) / sent
+        // (email on) — after the more specific "generate it first" checks.
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 5)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if (WetSignatureGuardService::supplierPoBlocked((int) $supplierPo['id'])) {
             Flash::set('error', 'Wet-signature required: upload the supplier\'s signed acknowledgment copy before confirming this gate.');
             header("Location: /orders/{$orderId}");
@@ -2188,6 +2223,13 @@ final class OrderController
         $user = AuthService::currentUser();
         if (!StageGateService::isUnlocked($orderId, 6)) {
             Flash::set('error', 'Stage 6 has not been unlocked for this order yet — complete Stage 5 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // Owner decision (2026-10-25): this stage completes only once its
+        // document is approved (email off) / sent (email on).
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 6)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -2457,6 +2499,13 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision (2026-10-25): this stage completes only once its
+        // document is approved (email off) / sent (email on).
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 7)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $blNumber = trim((string) ($_POST['bl_number'] ?? ''));
         $blDate = trim((string) ($_POST['bl_date'] ?? '')) ?: date('Y-m-d');
         if ($blNumber === '') {
@@ -2580,6 +2629,13 @@ final class OrderController
         $user = AuthService::currentUser();
         if (!StageGateService::isUnlocked($orderId, 8)) {
             Flash::set('error', 'Stage 8 has not been unlocked for this order yet — complete Stage 7 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // Owner decision (2026-10-25): this stage completes only once its
+        // document is approved (email off) / sent (email on).
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 8)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
             header("Location: /orders/{$orderId}");
             return;
         }

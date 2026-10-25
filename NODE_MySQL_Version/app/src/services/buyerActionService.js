@@ -7,6 +7,7 @@ const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowle
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const documentRepository = require('../repositories/documentRepository');
 const stageGateService = require('./stageGateService');
+const documentGenerationService = require('./documentGenerationService');
 const fileUploadService = require('./fileUploadService');
 
 function sanitizePathSegment(value) {
@@ -46,8 +47,10 @@ async function acknowledgeOc(orderId) {
     // emailDispatchService.dispatch()'s own recordSent() to have created.
     // Same lazy fallback ordersController.recordOcAcknowledgment() already
     // uses for the staff-side "Record Buyer's Acknowledgement" path.
+    // Only once the OC counts as issued (approved while email is off, sent
+    // while it is on) — the same rule the Stage 4 gate itself applies.
     const ocDoc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
-    if (ocDoc && ['approved', 'sent'].includes(ocDoc.status)) {
+    if (ocDoc && !(await documentGenerationService.stageDocumentBlockedBy(orderId, 4)).length) {
       await orderOcAcknowledgmentRepository.ensureRowExists(orderId, ocDoc.id);
       ack = await orderOcAcknowledgmentRepository.find(orderId);
     }
@@ -57,6 +60,11 @@ async function acknowledgeOc(orderId) {
   }
   if (!(await stageGateService.isUnlocked(orderId, 4))) {
     return { ok: false, message: 'This order is not currently awaiting acknowledgement.' };
+  }
+  // Owner decision (2026-10-25): the stage completes only once the OC is
+  // approved (email off) / sent (email on) — same rule as the staff path.
+  if ((await documentGenerationService.stageDocumentBlockedBy(orderId, 4)).length) {
+    return { ok: false, message: 'Your Order Confirmation has not been issued yet — please wait for it to be sent to you, then acknowledge it.' };
   }
 
   if (!(await orderOcAcknowledgmentRepository.markAcknowledged(orderId, 'client_portal', null, null))) {
