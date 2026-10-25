@@ -144,6 +144,11 @@ async function grantOverride(userId, permissionId, grantedBy, reason) {
   return row.id;
 }
 
+/** The row being removed, read before the delete — the only way to still know which user it was for once it's gone. */
+async function findOverride(id) {
+  return db.queryOne('SELECT * FROM user_permissions WHERE id = :id', { id });
+}
+
 /** Only ever removes a grant-only override row (is_enabled = 1) — never touches a force-disable row. */
 async function removeGrantOverride(id) {
   await db.execute('DELETE FROM user_permissions WHERE id = :id AND is_enabled = 1', { id });
@@ -218,6 +223,6 @@ async function enabledForRole(roleId) {
 
 module.exports = {
   effectivePermissions, usersWithPermission, all, allKeys, roleMatrix, activeGrantOverrides,
-  grantOverride, removeGrantOverride, find, findByKey, create, update, usageCount, deletePermission,
+  grantOverride, findOverride, removeGrantOverride, find, findByKey, create, update, usageCount, deletePermission,
   setForRole, enabledForRole,
 };

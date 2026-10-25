@@ -71,7 +71,10 @@ async function provisionIfNeeded(clientId, orderId) {
   // admin-created-account pattern.
   const randomPassword = crypto.randomBytes(16).toString('hex');
   await clientLoginRepository.create(clientId, await passwordHash.hash(randomPassword, 12), orderId);
-  await auditLogRepository.log(null, 'CLIENT_PORTAL_PROVISIONED', 'clients', clientId, null, null, null, `Triggered by order #${orderId} advance cleared`);
+  // Logged against the triggering order (not the client) so the
+  // Notification Routing Plan's order-scoped recipient resolution (that
+  // order's own assignees) can actually find it.
+  await auditLogRepository.log(null, 'CLIENT_PORTAL_PROVISIONED', 'orders', orderId, null, null, null, 'Client portal provisioned — advance cleared');
 
   await sendSetPasswordEmail(clientId, client.email, client.company_legal_name);
 

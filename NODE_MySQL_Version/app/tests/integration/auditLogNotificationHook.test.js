@@ -40,12 +40,18 @@ describe('auditLogRepository notification hook (90-item backlog item 20, non-neg
     expect(source).toContain('actionNotificationService.notify(');
   });
 
+  // Notification Routing Plan: PASSWORD_CHANGED is a "self" category
+  // action type — the only category where the catch-all + acting user's
+  // own opt-in toggle still governs recipients, exactly as the original
+  // flat design did for every action type. FIELD_EDIT (used here
+  // previously) is now a "none" category type — see
+  // notificationRouting.test.js for that pathway.
   it('notify resolves the configured catch-all address against real DB state', async () => {
     await companySettingsRepository.set('notification_email', 'ops-notify@nexacrestinternational.test');
     const userId = await createTestUser();
     await userRepository.updateNotificationPreference(userId, false);
 
-    const recipients = await actionNotificationService.notify(userId, 'FIELD_EDIT', 'orders', 1, 'incoterm_id', '1', '2', null);
+    const recipients = await actionNotificationService.notify(userId, 'PASSWORD_CHANGED', 'users', userId, null, null, null, null);
 
     expect(recipients).toEqual(['ops-notify@nexacrestinternational.test']);
 
@@ -58,7 +64,7 @@ describe('auditLogRepository notification hook (90-item backlog item 20, non-neg
     await userRepository.updateNotificationPreference(userId, true);
     const user = await userRepository.findById(userId);
 
-    const recipients = await actionNotificationService.notify(userId, 'ORDER_CREATED', 'orders', 1, null, null, null, null);
+    const recipients = await actionNotificationService.notify(userId, 'PASSWORD_CHANGED', 'users', userId, null, null, null, null);
 
     expect(recipients).toContain('ops-notify@nexacrestinternational.test');
     expect(recipients).toContain(user.email);
