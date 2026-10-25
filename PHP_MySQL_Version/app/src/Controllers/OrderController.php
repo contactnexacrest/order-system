@@ -588,6 +588,15 @@ final class OrderController
         }
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        // Owner request (2026-10-25): show the configured default instead
+        // of an "e.g." placeholder when this order has no estimate saved —
+        // the same default the New Order form pre-fills. Only fills a gap;
+        // a saved value always wins.
+        foreach (['estimated_total_cbm', 'estimated_gross_weight_kg', 'estimated_net_weight_kg'] as $__field) {
+            if ($order[$__field] === null || $order[$__field] === '') {
+                $order[$__field] = CompanySettingsRepository::get('default_' . $__field);
+            }
+        }
 
         View::render('orders/edit_details', [
             'order'           => $order,

@@ -668,9 +668,9 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   -- default — staff pre-fill these on the create form and edit per order
   -- as always; a blank setting value (cleared via Settings) falls back to
   -- leaving the field blank, same as before this existed.
-  ('default_estimated_total_cbm',        '12.5', 'number', 'order_defaults', 'Pre-fills Total CBM (m³) on the New Order form — staff edit per order as always.', 0),
-  ('default_estimated_gross_weight_kg',  '2400', 'number', 'order_defaults', 'Pre-fills Gross Weight (kg) on the New Order form — staff edit per order as always.', 0),
-  ('default_estimated_net_weight_kg',    '2100', 'number', 'order_defaults', 'Pre-fills Net Weight (kg) on the New Order form — staff edit per order as always.', 0);
+  ('default_estimated_total_cbm',        '8.2', 'number', 'order_defaults', 'Pre-fills Total CBM (m³) on the New Order form, and on Edit Order for an order with none saved — staff edit per order as always.', 0),
+  ('default_estimated_gross_weight_kg',  '27000', 'number', 'order_defaults', 'Pre-fills Gross Weight (kg) on the New Order form, and on Edit Order for an order with none saved — staff edit per order as always.', 0),
+  ('default_estimated_net_weight_kg',    '26000', 'number', 'order_defaults', 'Pre-fills Net Weight (kg) on the New Order form, and on Edit Order for an order with none saved — staff edit per order as always.', 0);
 
 -- CA / Accounting module (Phase 3) — Zoho Books sync. A separate OAuth
 -- self-client registration from zoho_client_id/etc. above (Zoho Mail and

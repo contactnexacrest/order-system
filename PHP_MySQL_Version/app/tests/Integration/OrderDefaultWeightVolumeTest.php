@@ -50,4 +50,43 @@ final class OrderDefaultWeightVolumeTest extends DbTestCase
 
         self::assertStringContainsString('name="estimated_total_cbm" value="99.9"', $html, 'a value the user already typed (surviving a validation failure) must never be clobbered by the configured default');
     }
+
+    /** Owner request (2026-10-25): a typical full container for this business. */
+    public function testSeededDefaultsAreAFullContainer(): void
+    {
+        self::assertSame('8.2', CompanySettingsRepository::get('default_estimated_total_cbm'));
+        self::assertSame('27000', CompanySettingsRepository::get('default_estimated_gross_weight_kg'));
+        self::assertSame('26000', CompanySettingsRepository::get('default_estimated_net_weight_kg'));
+    }
+
+    /**
+     * Owner request (2026-10-25): the configured default instead of an
+     * "e.g." placeholder — also on Edit Order, for an order that has no
+     * estimate saved; a saved value always wins.
+     */
+    public function testEditFormShowsTheDefaultsForAnOrderWithNoEstimateSaved(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        \App\Config\Database::connection()->exec(
+            "UPDATE orders SET estimated_total_cbm = NULL, estimated_gross_weight_kg = NULL, estimated_net_weight_kg = 25500 WHERE id = {$orderId}"
+        );
+
+        ob_start();
+        (new OrderController())->editDetails(['id' => (string) $orderId]);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('name="estimated_total_cbm" value="8.2"', $html);
+        self::assertStringContainsString('name="estimated_gross_weight_kg" value="27000"', $html);
+        self::assertMatchesRegularExpression('/name="estimated_net_weight_kg" value="25500(\.0+)?"/', $html, 'a saved value always wins over the default');
+        self::assertDoesNotMatchRegularExpression('/name="estimated_(total_cbm|gross_weight_kg|net_weight_kg)" value="[^"]*" placeholder=/', $html);
+    }
+
+    public function testCreateFormHasNoExamplePlaceholdersOnTheseFields(): void
+    {
+        ob_start();
+        (new OrderController())->create([]);
+        $html = (string) ob_get_clean();
+
+        self::assertDoesNotMatchRegularExpression('/name="estimated_(total_cbm|gross_weight_kg|net_weight_kg)" value="[^"]*" placeholder=/', $html);
+    }
 }

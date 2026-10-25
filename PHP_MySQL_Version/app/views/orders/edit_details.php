@@ -116,10 +116,10 @@
     <fieldset>
       <legend>Estimated Weight &amp; Volume <small class="muted">(shown on QT/PI — actuals confirmed later at Packing List)</small></legend>
       <div class="field-grid">
-        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($order['estimated_total_cbm'] ?? '')) ?>" placeholder="e.g., 12.5"></label>
+        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($order['estimated_total_cbm'] ?? '')) ?>"></label>
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($order['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates"></label>
-        <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_gross_weight_kg'] ?? '')) ?>" placeholder="e.g., 1200"></label>
-        <label>Net Weight (kg)<input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_net_weight_kg'] ?? '')) ?>" placeholder="e.g., 1000"></label>
+        <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_gross_weight_kg'] ?? '')) ?>"></label>
+        <label>Net Weight (kg)<input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_net_weight_kg'] ?? '')) ?>"></label>
         <label class="full">Package Type
           <select name="estimated_package_type">
             <?php foreach ($packageTypes as $o): ?>

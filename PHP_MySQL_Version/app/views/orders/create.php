@@ -98,10 +98,10 @@
     <fieldset>
       <legend>Estimated Weight &amp; Volume <small class="muted">(shown on QT/PI — actuals confirmed later at Packing List)</small></legend>
       <div class="field-grid">
-        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($old['estimated_total_cbm'] ?? '')) ?>" placeholder="e.g. 12.5"></label>
+        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($old['estimated_total_cbm'] ?? '')) ?>"></label>
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($old['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates"></label>
-        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_gross_weight_kg'] ?? '')) ?>" placeholder="e.g. 2400"></label>
-        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_net_weight_kg'] ?? '')) ?>" placeholder="e.g. 2100"></label>
+        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_gross_weight_kg'] ?? '')) ?>"></label>
+        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_net_weight_kg'] ?? '')) ?>"></label>
         <label class="full">Package Type
           <select name="estimated_package_type">
             <?php foreach ($packageTypes as $o): ?>

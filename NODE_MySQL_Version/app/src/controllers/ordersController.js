@@ -573,6 +573,15 @@ async function editDetails(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
+  // Owner request (2026-10-25): show the configured default instead of an
+  // "e.g." placeholder when this order has no estimate saved — the same
+  // default the New Order form pre-fills. Only fills a gap; a saved value
+  // always wins.
+  for (const field of ['estimated_total_cbm', 'estimated_gross_weight_kg', 'estimated_net_weight_kg']) {
+    if (order[field] === null || order[field] === undefined || order[field] === '') {
+      order[field] = await companySettingsRepository.get(`default_${field}`);
+    }
+  }
   res.renderView(
     'orders/edit_details',
     {
