@@ -107,6 +107,35 @@ final class SampleDataRepository
 
         $pdo->beginTransaction();
         try {
+            // --- Order-scoped records added after this clear routine was
+            // written (each one used to make the final DELETE FROM orders
+            // fail on its foreign key, so "Clear sample data" never worked
+            // once a sample order had any of them — and every sample order
+            // has an assignee and compliance tasks). Dependents first. ---
+            if ($orderIds) {
+                // Rows that can exist without an order are unlinked, never
+                // deleted — a bank-statement line or CA entry matched to a
+                // sample order is still real accounting data.
+                $pdo->exec(self::inQuery('UPDATE ca_bank_statement_lines SET matched_order_id = NULL WHERE matched_order_id IN (%s)', $orderIds));
+                $pdo->exec(self::inQuery('UPDATE ca_bank_statement_lines SET matched_expense_id = NULL WHERE matched_expense_id IN (SELECT id FROM ca_expenses WHERE order_id IN (%s))', $orderIds));
+                $pdo->exec(self::inQuery('UPDATE ca_expenses SET order_id = NULL WHERE order_id IN (%s)', $orderIds));
+                $pdo->exec(self::inQuery('UPDATE ca_export_benefits SET order_id = NULL WHERE order_id IN (%s)', $orderIds));
+                $pdo->exec(self::inQuery('UPDATE order_reorder_requests SET new_order_id = NULL WHERE new_order_id IN (%s)', $orderIds));
+                $pdo->exec(self::inQuery('DELETE FROM order_reorder_request_products WHERE reorder_request_id IN (SELECT id FROM order_reorder_requests WHERE source_order_id IN (%s))', $orderIds));
+                $pdo->exec(self::inQuery('DELETE FROM order_reorder_requests WHERE source_order_id IN (%s)', $orderIds));
+                $pdo->exec(self::inQuery('DELETE FROM order_complaint_replies WHERE complaint_id IN (SELECT id FROM order_complaints WHERE order_id IN (%s))', $orderIds));
+                foreach ([
+                    'order_complaints', 'client_payment_reports', 'order_annexure_terms', 'order_bl_endorsements',
+                    'order_cancellations', 'order_compliance_tasks', 'order_draft_bl_reviews',
+                    'order_export_benefit_schemes', 'order_feedback', 'order_oc_acknowledgments',
+                    // these three point at order_cost_entries, so before it
+                    'order_inspection_fees', 'order_travel_expenses', 'order_lc_details',
+                    'order_cost_entries',
+                ] as $table) {
+                    $pdo->exec(self::inQuery("DELETE FROM {$table} WHERE order_id IN (%s)", $orderIds));
+                }
+            }
+
             // --- Leaf/child rows first ---
             if ($annexureProductIds) {
                 $pdo->exec(self::inQuery('DELETE FROM order_annexure_images WHERE order_annexure_product_id IN (%s)', $annexureProductIds));
@@ -181,7 +210,7 @@ final class SampleDataRepository
                 foreach ([
                     'order_stages', 'order_products', 'order_payment_status', 'order_production',
                     'order_supplier_po', 'order_packing', 'order_crates', 'order_freight', 'order_shipping',
-                    'pi_intake_submissions', 'order_comments',
+                    'pi_intake_submissions', 'order_comments', 'order_assignees',
                 ] as $table) {
                     $pdo->exec(self::inQuery("DELETE FROM {$table} WHERE order_id IN (%s)", $orderIds));
                 }

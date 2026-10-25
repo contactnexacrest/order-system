@@ -58,11 +58,13 @@ const env = require('../config/env');
  *     orders under one client (same buyer_inquiry_ref, since that's derived
  *     from the client's own unique number): Order A1 left at Stage 1 with no
  *     documents ("start from scratch"), Order A2 pushed to Stage 2 passed /
- *     awaiting PI ("a second, independently-progressing order").
+ *     awaiting PI ("a second, independently-progressing order"), its
+ *     PI-stage intake submitted by the client and deliberately left
+ *     pending staff review (Step 5b) — the PI Intake Review queue's sample.
  *   - Client B (Meridian Home Collections) — the single most heavily
  *     instrumented order: buyer PO reference AND an actual signed-copy
- *     upload, a PI-stage intake submission deliberately left pending staff
- *     review, client-portal auto-provisioning the moment advance clears, an
+ *     upload, a PI-stage intake submission applied before its PI was
+ *     generated, client-portal auto-provisioning the moment advance clears, an
  *     Order-Confirmation review/reject/regenerate/approve cycle, a full
  *     payment-terms amendment lifecycle (request -> MD-approve -> generate
  *     -> signed copy uploaded -> active), a Supplier PO with its
@@ -157,6 +159,7 @@ async function load(userId) {
     ['Hand-carved decorative planter, Model C', '35 x 35 x 50 cm', 'Polished'],
   ]);
   await advanceSampleOrderToStage2Pending(orderA2Id, userId);
+  await submitSamplePiIntakePendingReview(orderA2Id, userId);
 
   // --- Client B: FOB, "Standard — New Buyer" preset — the single order
   // carrying every scenario a fixed 3-order set couldn't reach ---
@@ -493,6 +496,37 @@ async function advanceSampleOrderToStage2Pending(orderId, userId) {
 }
 
 /**
+ * Order A2 sits at Step 5 (PI) — its client has submitted the PI-stage form,
+ * and it waits in the PI Intake Review queue for staff to apply (Step 5b),
+ * exactly like a real unresolved one.
+ */
+async function submitSamplePiIntakePendingReview(orderId, userId) {
+  const piToken = await piIntakeRepository.createLink(orderId, userId);
+  const piSubmission = await piIntakeRepository.findValidByToken(piToken);
+  await piIntakeRepository.submit(piSubmission.id, {
+    company_legal_name: '[SAMPLE] Aurora Décor Imports',
+    billing_address: '124 Harbor Lane, Sample District, Test Country',
+    consignee_name: 'SAME',
+    consignee_address: 'SAME',
+    vat_eori_tax_no: 'GB-SAMPLE-123456789',
+    contact_person: 'Morgan Ellis',
+    email: 'aurora.buyer@sample-client.test',
+    phone: '+1-555-0100-1001',
+    notify_party: 'NIL',
+    port_of_discharge_text: 'New York, USA',
+    country_of_destination: 'United States',
+    incoterm_confirmed: 'FOB',
+    container_type_text: null,
+    payment_terms_confirmation: 'CONFIRMED — advance and balance as per the Quotation.',
+    quotation_acceptance_reference: 'We accept the Quotation as issued — no changes.',
+    coo_type: 'Non-preferential',
+    buyer_po_ref: null,
+    changes_from_quotation: 'No changes.',
+    special_document_requirements: null,
+  }, '203.0.113.41');
+}
+
+/**
  * The product/Annexure-A variety orders (Client E/F, 2026-09-23) don't need
  * to demonstrate stage depth (that's what Orders A2/B/C/D already cover) —
  * just generate the Quotation (and Annexure A, for the orders whose product
@@ -521,9 +555,11 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
   await documentGenerationService.generate(orderId, 'QT', userId);
   await stageGateService.passAndUnlockNext(orderId, 1, userId);
 
-  // A PI-stage intake link sent once the Quotation is out — the client
-  // has submitted it, but nobody's actioned it yet, so it sits in the
-  // PI Intake Review queue exactly like a real unresolved one.
+  // A PI-stage intake link sent once the Quotation is out, submitted by the
+  // client and applied by staff — this order goes on to Stage 8, so leaving
+  // it pending (as it once was) showed an order far past Step 5 with its
+  // Step 5 work still open. The pending-review sample is Order A2's, which
+  // actually sits at Step 5.
   const piToken = await piIntakeRepository.createLink(orderId, userId);
   const piSubmission = await piIntakeRepository.findValidByToken(piToken);
   await piIntakeRepository.submit(piSubmission.id, {
@@ -547,6 +583,9 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
     changes_from_quotation: 'No changes.',
     special_document_requirements: null,
   }, '203.0.113.42');
+  // Its details already match the sample client exactly, so applying changes
+  // nothing on the client record — just resolves it.
+  await piIntakeRepository.markApplied(piSubmission.id, userId);
 
   // --- Stage 2: Buyer PO — reference recorded AND the buyer's actual
   // signed copy attached (Stage 2 gate evidence beyond just a typed ref) ---
