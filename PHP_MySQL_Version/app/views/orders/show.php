@@ -1842,7 +1842,7 @@ $stepStatusIcon = static function (string $status): string {
 
   </details>
 
-  <details class="step-group" id="step-group-stage-production">
+  <details class="step-group" id="step-group-stage-production"<?= $stepCardOpen('8') . $stepCardOpen('8b') ?>>
     <summary><?= $stepStatusIcon($stepStates['8'] === 'done' && $stepStates['8b'] === 'done' ? 'done' : ($stepStates['8'] === 'locked' ? 'locked' : 'current')) ?><span class="step-group-num">STEP 8</span><h3>Production &amp; Pre-Shipment Compliance</h3></summary>
 
   <details class="step-card" id="step-production"<?= $stepCardOpen('8') ?>>

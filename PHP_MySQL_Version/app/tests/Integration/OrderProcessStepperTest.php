@@ -99,6 +99,35 @@ final class OrderProcessStepperTest extends DbTestCase
         self::assertMatchesRegularExpression('/process-step gate_passed.*?process-step-dot">1</s', $output);
     }
 
+    /**
+     * The Step 8 group box (8a Production + 8b Compliance Checklist) never
+     * carried its own `open` marker, unlike every other .step-group — so
+     * when 8b was the order's current step, the server-opened checklist
+     * card sat inside a closed group, invisible, and the on-load
+     * scroll-to-current-card had nothing to scroll to (page stayed at the
+     * top). Steps 1-7 done + checklist outstanding is exactly that state.
+     */
+    public function testStepGroup8OpensWhenComplianceChecklistIsTheCurrentStep(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->createTestDocument($orderId, 'QT', 'sent');
+        $this->createTestDocument($orderId, 'BUYERPO');
+        foreach ([1, 2, 3, 4, 5] as $stageNumber) {
+            $stage = \App\Repositories\OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
+            \App\Repositories\OrderStageRepository::passGate((int) $stage['id'], $userId);
+        }
+        \App\Repositories\OrderComplianceTaskRepository::initializeForOrder($orderId);
+
+        $_SESSION['_auth_user_id'] = $userId;
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertStringContainsString('id="compliance-checklist" open', $output);
+        self::assertStringContainsString('id="step-group-stage-production" open', $output);
+    }
+
     protected function tearDown(): void
     {
         unset($_SESSION['_auth_user_id']);

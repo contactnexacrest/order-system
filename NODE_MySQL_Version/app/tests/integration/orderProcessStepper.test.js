@@ -4,8 +4,18 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const orderStageRepository = require('../../src/repositories/orderStageRepository');
+const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
+
+async function createTestDocument(orderId, typeCode, status) {
+  const docType = await db.queryOne('SELECT id FROM document_types WHERE code = :code', { code: typeCode });
+  await db.execute(
+    `INSERT INTO documents (order_id, document_type_id, document_reference, status)
+     VALUES (:order_id, :dt, :ref, :status)`,
+    { order_id: orderId, dt: docType.id, ref: `JEST-DOC-${Math.random().toString(16).slice(2, 10)}`, status }
+  );
+}
 
 /**
  * Port of OrderProcessStepperTest.php. Point 2 (2026-10-01): "on order
@@ -93,5 +103,29 @@ describe('Order-page process stepper (Point 2)', () => {
     const res = await agent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
     expect(res.text).toMatch(/process-step gate_passed[\s\S]*?process-step-dot">1</);
+  });
+
+  /**
+   * The Step 8 group box (8a Production + 8b Compliance Checklist) never
+   * carried its own `open` marker, unlike every other .step-group — so
+   * when 8b was the order's current step, the server-opened checklist
+   * card sat inside a closed group, invisible, and the on-load
+   * scroll-to-current-card had nothing to scroll to (page stayed at the
+   * top). Steps 1-7 done + checklist outstanding is exactly that state.
+   */
+  it('opens the Step 8 group when the Compliance Checklist is the current step', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await createTestDocument(orderId, 'QT', 'sent');
+    await createTestDocument(orderId, 'BUYERPO', 'draft');
+    for (const stageNumber of [1, 2, 3, 4, 5]) {
+      const stage = await orderStageRepository.findByOrderAndStageNumber(orderId, stageNumber);
+      await orderStageRepository.passGate(stage.id, null);
+    }
+    await orderComplianceTaskRepository.initializeForOrder(orderId);
+
+    const res = await agent.get(`/orders/${orderId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('id="compliance-checklist" open');
+    expect(res.text).toContain('id="step-group-stage-production" open');
   });
 });

@@ -189,10 +189,13 @@ njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').for
 // done. A plain JS helper rather than a Nunjucks {% for %} loop: `{% set %}`
 // inside a `{% for %}` is scoped to that iteration and never leaks back out
 // to the template's outer scope, so a "first match wins" search can't be
-// written as a template-side loop here.
+// written as a template-side loop here. Most stepStates values come from
+// a {% macro %} (stepStatusFn/step123Status), which returns a SafeString
+// object, not a string — String() it, or the strict !== below is always
+// true and every order page opens (and scrolls to) Step 1 regardless.
 njkEnv.addGlobal('firstNonDoneStep', (stepStates) => {
   for (const key of Object.keys(stepStates)) {
-    if (stepStates[key] !== 'done') { return key; }
+    if (String(stepStates[key]) !== 'done') { return key; }
   }
   return 's19';
 });
