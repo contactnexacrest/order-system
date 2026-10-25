@@ -408,7 +408,7 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .step-group > summary h3{margin:0;font-size:0.98rem;font-weight:700;color:var(--navy-strong);}
 .step-group[open] > summary{border-bottom:1px solid var(--navy-soft);margin-bottom:0.3rem;padding-bottom:0.6rem;}
 .step-group:not([open]) > summary:hover{background:var(--navy-soft);margin:0 -0.9rem;padding-left:0.9rem;padding-right:0.9rem;border-radius:14px;}
-.step-group-connector{display:flex;align-items:center;gap:0.4rem;padding:0 0.3rem;color:var(--ink-soft);font-size:0.72rem;margin:-0.45rem 0;}
+.step-group-connector{display:flex;align-items:center;gap:0.4rem;padding:0 0.3rem;color:var(--ink-soft);font-size:0.72rem;}
 .step-group-connector::before{content:"\2193";color:var(--gold-strong);font-size:0.85rem;}
 .step-group > .step-card{margin:0;}
 

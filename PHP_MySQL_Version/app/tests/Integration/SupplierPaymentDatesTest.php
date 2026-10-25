@@ -81,6 +81,11 @@ final class SupplierPaymentDatesTest extends DbTestCase
     public function testMarkSupplierAdvancePaidRefusesAnImpossibleDate(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        // Order-page polish round: markSupplierAdvancePaid() now requires
+        // Stage 5 unlocked, checked before the date validation this test
+        // is actually about — unlock first so the gate added later isn't
+        // what this test ends up exercising.
+        $this->unlockThrough($orderId, 4);
         $supplierId = SupplierRepository::create(['supplier_legal_name' => 'PHPUnit Test Supplier']);
         OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-PAY-6', $this->fullSupplierPoData([
             'advance_amount_inr' => '20000',
@@ -103,6 +108,7 @@ final class SupplierPaymentDatesTest extends DbTestCase
     public function testMarkSupplierAdvancePaidRefusesAFutureDate(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThrough($orderId, 4);
         $supplierId = SupplierRepository::create(['supplier_legal_name' => 'PHPUnit Test Supplier']);
         OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-PAY-7', $this->fullSupplierPoData([
             'advance_amount_inr' => '20000',
@@ -125,6 +131,7 @@ final class SupplierPaymentDatesTest extends DbTestCase
     public function testMarkSupplierBalancePaidRefusesAMissingAmount(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThrough($orderId, 4);
         $supplierId = SupplierRepository::create(['supplier_legal_name' => 'PHPUnit Test Supplier']);
         OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-PAY-8', $this->fullSupplierPoData([
             'balance_amount_inr' => '30000',
@@ -147,6 +154,7 @@ final class SupplierPaymentDatesTest extends DbTestCase
     public function testMarkSupplierAdvancePaidPersistsADifferentActuallyPaidAmount(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThrough($orderId, 4);
         $supplierId = SupplierRepository::create(['supplier_legal_name' => 'PHPUnit Test Supplier']);
         OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-PAY-9', $this->fullSupplierPoData([
             'advance_amount_inr' => '20000',

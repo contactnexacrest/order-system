@@ -1864,25 +1864,8 @@ $stepStatusIcon = static function (string $status): string {
 
     <?php if ($pendingInspectionTask && $canManageOrderFinancials): ?>
       <h3 style="font-size:0.95em; margin-top:14px;">3rd-Party Pre-Shipment Inspection (step 8a)</h3>
-      <p class="muted small">This order has a Pre-Shipment Inspection on its Compliance Checklist (not marked not-applicable) — staff get reminded starting 7 days before the estimated shipment date above. If NexaCrest pays the inspection fee, record it below so it's included as an order expense; if the client pays it directly, there's nothing to record.</p>
-      <div class="kv-grid">
-        <div><span class="k">Fee Payer</span><span class="v"><?= $orderInspectionFee ? htmlspecialchars($orderInspectionFee['fee_payer'] === 'nexacrest' ? 'NexaCrest' : 'Client') : 'Not yet recorded' ?></span></div>
-        <div><span class="k">Fee Amount</span><span class="v"><?= $orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? number_format((float) $orderInspectionFee['fee_amount'], 2) : '—' ?></span></div>
-      </div>
-      <details>
-        <summary><?= $orderInspectionFee ? 'Edit inspection fee' : 'Record inspection fee' ?></summary>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/inspection-fee">
-          <?= Csrf::field() ?>
-          <label>Who pays the inspection fee? *
-            <select name="fee_payer" required>
-              <option value="nexacrest" <?= ($orderInspectionFee['fee_payer'] ?? '') === 'nexacrest' ? 'selected' : '' ?>>NexaCrest</option>
-              <option value="client" <?= ($orderInspectionFee['fee_payer'] ?? '') === 'client' ? 'selected' : '' ?>>Client</option>
-            </select>
-          </label>
-          <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="<?= htmlspecialchars($orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? (string) $orderInspectionFee['fee_amount'] : '') ?>"></label>
-          <button type="submit" class="btn-sm">Save</button>
-        </form>
-      </details>
+      <p class="muted small">This order has a Pre-Shipment Inspection on its Compliance Checklist (not marked not-applicable) — staff get reminded starting 7 days before the estimated shipment date above.</p>
+      <p class="muted small">Recorded under <a href="#order-financials">Order Financials</a> (Step 12) → Costs, alongside this order's other costs.</p>
     <?php endif; ?>
   </details>
 
@@ -2358,240 +2341,285 @@ $stepStatusIcon = static function (string $status): string {
     <summary><?= $stepStatusIcon($stepStates['12']) ?><span class="step-group-num">STEP 12</span><h2>Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
 
-    <h3 style="font-size:0.95em;">Export Benefit Scheme Eligibility</h3>
-    <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Closing the order (Step 13e) is blocked while any scheme here is still Pending.</p>
-    <table class="list">
-      <tr><th>Scheme</th><th>Eligibility &amp; Reason</th></tr>
-      <?php foreach ($exportBenefitEligibility as $sch): ?>
-      <tr>
-        <td><?= htmlspecialchars($sch['scheme_name']) ?></td>
-        <td>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefit-schemes" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <div class="tabs" data-tabs>
+      <div class="tabs-nav" role="tablist">
+        <button type="button" class="tab-btn" data-tab-target="order-financials-costs" aria-selected="true">Costs</button>
+        <button type="button" class="tab-btn" data-tab-target="order-financials-export-benefits" aria-selected="false">Export Benefits</button>
+        <button type="button" class="tab-btn" data-tab-target="order-financials-zoho-expenses" aria-selected="false">Zoho Expenses</button>
+        <button type="button" class="tab-btn" data-tab-target="order-financials-profitability" aria-selected="false">Profitability</button>
+        <button type="button" class="tab-btn" data-tab-target="order-financials-annexure" aria-selected="false">Internal Annexure</button>
+      </div>
+
+      <div class="tab-panel" id="order-financials-costs" data-tab-panel>
+        <?php $lcDetails = $orderLcDetails ?: ['lc_number' => null, 'lc_file_id' => null, 'bank_loan_amount' => null, 'bank_loan_interest_rate' => null, 'bank_loan_interest_paid' => null]; ?>
+        <h3 style="font-size:0.95em; margin-top:0;">Letter of Credit &amp; Bank Loan</h3>
+        <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
+        <div class="kv-grid">
+          <div><span class="k">LC Number</span><span class="v"><?= htmlspecialchars($lcDetails['lc_number'] ?? '—') ?></span></div>
+          <div><span class="k">LC Document</span><span class="v"><?php if (!empty($lcDetails['lc_file_id'])): ?><a href="/file-store/<?= (int) $lcDetails['lc_file_id'] ?>/download" target="_blank">View LC</a><?php else: ?>—<?php endif; ?></span></div>
+          <div><span class="k">Bank Loan Amount</span><span class="v"><?= $lcDetails['bank_loan_amount'] !== null ? number_format((float) $lcDetails['bank_loan_amount'], 2) : '—' ?></span></div>
+          <div><span class="k">Interest Rate</span><span class="v"><?= $lcDetails['bank_loan_interest_rate'] !== null ? number_format((float) $lcDetails['bank_loan_interest_rate'], 3) . '%' : '—' ?></span></div>
+          <div><span class="k">Interest Paid</span><span class="v"><?= $lcDetails['bank_loan_interest_paid'] !== null ? number_format((float) $lcDetails['bank_loan_interest_paid'], 2) : '—' ?></span></div>
+        </div>
+        <details>
+          <summary><?= $orderLcDetails ? 'Edit LC / bank loan details' : 'Record LC / bank loan details for this order' ?></summary>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-details" enctype="multipart/form-data">
             <?= Csrf::field() ?>
-            <input type="hidden" name="scheme_name" value="<?= htmlspecialchars($sch['scheme_name']) ?>">
-            <select name="status">
-              <?php foreach (\App\Repositories\OrderExportBenefitSchemeRepository::STATUSES as $key => $label): ?>
-              <option value="<?= htmlspecialchars($key) ?>" <?= $sch['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <input type="text" name="reason" value="<?= htmlspecialchars($sch['reason'] ?? '') ?>" placeholder="Reason — required if Not Eligible" style="flex:1;min-width:180px;">
-            <button type="submit" class="btn-sm">Save</button>
-            <?php if ($sch['resolved_at']): ?>
-            <span class="muted small"><?= htmlspecialchars($sch['resolved_at']) ?><?php if ($sch['resolved_by_name']): ?> by <?= htmlspecialchars($sch['resolved_by_name']) ?><?php endif; ?></span>
-            <?php endif; ?>
+            <label>LC Number<input type="text" name="lc_number" value="<?= htmlspecialchars($lcDetails['lc_number'] ?? '') ?>"></label>
+            <label>Final LC Document<input type="file" name="lc_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+            <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="<?= htmlspecialchars($lcDetails['bank_loan_amount'] !== null ? (string) $lcDetails['bank_loan_amount'] : '') ?>"></label>
+            <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_rate'] !== null ? (string) $lcDetails['bank_loan_interest_rate'] : '') ?>"></label>
+            <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_paid'] !== null ? (string) $lcDetails['bank_loan_interest_paid'] : '') ?>"></label>
+            <button type="submit" class="btn-sm">Save LC / Loan Details</button>
           </form>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </table>
+        </details>
 
-    <h3 style="font-size:0.95em; margin-top:14px;">Government Export Benefits Claimed</h3>
-    <?php $govtBenefitsApplicable = in_array($order['status'], ['shipped_docs_sent', 'complete'], true) && !empty($payment['balance_remittance_received_at']); ?>
-    <?php if (!$govtBenefitsApplicable): ?>
-      <p class="muted">Not applicable until the order is complete and the CI (balance) remittance has been received — government benefit schemes only come into play once the full proceeds have actually landed.</p>
-    <?php else: ?>
-    <?php if (empty($linkedExportBenefits)): ?>
-      <p class="muted">Nothing claimed against this order yet.</p>
-    <?php else: ?>
-      <table class="list">
-        <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
-        <?php foreach ($linkedExportBenefits as $b): ?>
-        <tr>
-          <td><?= htmlspecialchars((string) $b['claimed_at']) ?></td>
-          <td><?= htmlspecialchars($b['scheme_name']) ?></td>
-          <td><?= htmlspecialchars($b['reference_number'] ?? '—') ?></td>
-          <td><?= number_format((float) $b['claimed_amount'], 2) ?> <?= htmlspecialchars($b['currency_code']) ?></td>
-          <td><?= $b['received_amount'] !== null ? number_format((float) $b['received_amount'], 2) . ' ' . htmlspecialchars($b['currency_code']) : '<span class="muted">—</span>' ?></td>
-          <td><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed</span>' ?></td>
-          <td>
-            <?php if ($b['received_amount'] === null): ?>
-              <details>
-                <summary class="small">Mark received</summary>
-                <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/received">
+        <?php if ($pendingInspectionTask): ?>
+        <h3 style="font-size:0.95em; margin-top:14px;">3rd-Party Pre-Shipment Inspection (step 8a)</h3>
+        <p class="muted small">This order has a Pre-Shipment Inspection on its Compliance Checklist (not marked not-applicable) — staff get reminded starting 7 days before the estimated shipment date (Step 8a). If NexaCrest pays the inspection fee, record it below so it's included as an order expense; if the client pays it directly, there's nothing to record.</p>
+        <div class="kv-grid">
+          <div><span class="k">Fee Payer</span><span class="v"><?= $orderInspectionFee ? htmlspecialchars($orderInspectionFee['fee_payer'] === 'nexacrest' ? 'NexaCrest' : 'Client') : 'Not yet recorded' ?></span></div>
+          <div><span class="k">Fee Amount</span><span class="v"><?= $orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? number_format((float) $orderInspectionFee['fee_amount'], 2) : '—' ?></span></div>
+        </div>
+        <details>
+          <summary><?= $orderInspectionFee ? 'Edit inspection fee' : 'Record inspection fee' ?></summary>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/inspection-fee">
+            <?= Csrf::field() ?>
+            <label>Who pays the inspection fee? *
+              <select name="fee_payer" required>
+                <option value="nexacrest" <?= ($orderInspectionFee['fee_payer'] ?? '') === 'nexacrest' ? 'selected' : '' ?>>NexaCrest</option>
+                <option value="client" <?= ($orderInspectionFee['fee_payer'] ?? '') === 'client' ? 'selected' : '' ?>>Client</option>
+              </select>
+            </label>
+            <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="<?= htmlspecialchars($orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? (string) $orderInspectionFee['fee_amount'] : '') ?>"></label>
+            <button type="submit" class="btn-sm">Save</button>
+          </form>
+        </details>
+        <?php endif; ?>
+
+        <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
+        <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
+        <div class="kv-grid">
+          <div><span class="k">Factory Distance</span><span class="v"><?= $orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? number_format((float) $orderTravelExpenses['factory_distance_km'], 2) . ' km' : '—' ?></span></div>
+          <div><span class="k">Percentage</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_pct'], 2) . '%' : 'Not yet recorded' ?></span></div>
+          <div><span class="k">Amount</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_amount'], 2) : '—' ?></span></div>
+        </div>
+        <details>
+          <summary><?= $orderTravelExpenses ? 'Edit travel expenses' : 'Record travel expenses' ?></summary>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/travel-expenses">
+            <?= Csrf::field() ?>
+            <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>"></label>
+            <label>Travel Expense % of FOB Value *
+              <select name="expense_pct" required>
+                <?php $savedPct = $orderTravelExpenses ? (string) (float) $orderTravelExpenses['expense_pct'] : ''; ?>
+                <?php foreach (['5', '7', '10', '15'] as $pct): ?>
+                  <option value="<?= $pct ?>" <?= $savedPct === $pct ? 'selected' : '' ?>><?= $pct ?>%</option>
+                <?php endforeach; ?>
+                <option value="other" <?= !in_array($savedPct, ['5', '7', '10', '15'], true) && $savedPct !== '' ? 'selected' : '' ?>>Other — specify</option>
+              </select>
+            </label>
+            <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>"></label>
+            <button type="submit" class="btn-sm">Save</button>
+          </form>
+        </details>
+
+        <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
+        <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
+        <?php if (empty($orderCostEntries)): ?>
+          <p class="muted">No other costs recorded for this order yet.</p>
+        <?php else: ?>
+          <table class="list">
+            <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
+            <?php foreach ($orderCostEntries as $c): ?>
+            <tr>
+              <td><?= htmlspecialchars((string) ($c['incurred_at'] ?? '—')) ?></td>
+              <td><?= htmlspecialchars($costEntryCategories[$c['category']] ?? $c['category']) ?></td>
+              <td><?= htmlspecialchars($c['description'] ?? '—') ?></td>
+              <td><?= number_format((float) $c['amount_inr'], 2) ?></td>
+              <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
+              <td>
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries/<?= (int) $c['id'] ?>/delete" onsubmit="return confirm('Remove this cost entry?');">
                   <?= Csrf::field() ?>
-                  <label>Received Amount *<input type="text" name="received_amount" required></label>
-                  <label>Received On *<input type="date" name="received_at" value="<?= date('Y-m-d') ?>" required></label>
-                  <button type="submit" class="btn-sm">Save</button>
+                  <button type="submit" class="btn-sm btn-danger">Remove</button>
                 </form>
-              </details>
-            <?php endif; ?>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-    <?php endif; ?>
-    <details>
-      <summary>Record a new claim for this order</summary>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits">
-        <?= Csrf::field() ?>
-        <label>Scheme *
-          <select name="scheme_name" required>
-            <?php foreach ($exportBenefitSchemes as $opt): ?>
-              <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
+              </td>
+            </tr>
             <?php endforeach; ?>
-          </select>
-        </label>
-        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
-        <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
-        <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
-        <label>Currency<input type="text" name="currency_code" value="INR"></label>
-        <label>Notes<input type="text" name="notes"></label>
-        <button type="submit" class="btn-sm">Record Claim</button>
-      </form>
-    </details>
-    <?php endif; ?>
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Expenses Imported from Zoho Books</h3>
-    <?php if (empty($linkedCaExpenses)): ?>
-      <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
-    <?php else: ?>
-      <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
-        <?php foreach ($linkedCaExpenses as $e): ?>
-        <tr>
-          <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
-          <td><?= htmlspecialchars($e['category']) ?></td>
-          <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
-          <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-    <?php endif; ?>
-
-    <?php $lcDetails = $orderLcDetails ?: ['lc_number' => null, 'lc_file_id' => null, 'bank_loan_amount' => null, 'bank_loan_interest_rate' => null, 'bank_loan_interest_paid' => null]; ?>
-    <h3 style="font-size:0.95em; margin-top:14px;">Letter of Credit &amp; Bank Loan</h3>
-    <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
-    <div class="kv-grid">
-      <div><span class="k">LC Number</span><span class="v"><?= htmlspecialchars($lcDetails['lc_number'] ?? '—') ?></span></div>
-      <div><span class="k">LC Document</span><span class="v"><?php if (!empty($lcDetails['lc_file_id'])): ?><a href="/file-store/<?= (int) $lcDetails['lc_file_id'] ?>/download" target="_blank">View LC</a><?php else: ?>—<?php endif; ?></span></div>
-      <div><span class="k">Bank Loan Amount</span><span class="v"><?= $lcDetails['bank_loan_amount'] !== null ? number_format((float) $lcDetails['bank_loan_amount'], 2) : '—' ?></span></div>
-      <div><span class="k">Interest Rate</span><span class="v"><?= $lcDetails['bank_loan_interest_rate'] !== null ? number_format((float) $lcDetails['bank_loan_interest_rate'], 3) . '%' : '—' ?></span></div>
-      <div><span class="k">Interest Paid</span><span class="v"><?= $lcDetails['bank_loan_interest_paid'] !== null ? number_format((float) $lcDetails['bank_loan_interest_paid'], 2) : '—' ?></span></div>
-    </div>
-    <details>
-      <summary><?= $orderLcDetails ? 'Edit LC / bank loan details' : 'Record LC / bank loan details for this order' ?></summary>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-details" enctype="multipart/form-data">
-        <?= Csrf::field() ?>
-        <label>LC Number<input type="text" name="lc_number" value="<?= htmlspecialchars($lcDetails['lc_number'] ?? '') ?>"></label>
-        <label>Final LC Document<input type="file" name="lc_file" accept=".pdf,.jpg,.jpeg,.png"></label>
-        <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="<?= htmlspecialchars($lcDetails['bank_loan_amount'] !== null ? (string) $lcDetails['bank_loan_amount'] : '') ?>"></label>
-        <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_rate'] !== null ? (string) $lcDetails['bank_loan_interest_rate'] : '') ?>"></label>
-        <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_paid'] !== null ? (string) $lcDetails['bank_loan_interest_paid'] : '') ?>"></label>
-        <button type="submit" class="btn-sm">Save LC / Loan Details</button>
-      </form>
-    </details>
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
-      <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
-      <div class="kv-grid">
-        <div><span class="k">Factory Distance</span><span class="v"><?= $orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? number_format((float) $orderTravelExpenses['factory_distance_km'], 2) . ' km' : '—' ?></span></div>
-        <div><span class="k">Percentage</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_pct'], 2) . '%' : 'Not yet recorded' ?></span></div>
-        <div><span class="k">Amount</span><span class="v"><?= $orderTravelExpenses ? number_format((float) $orderTravelExpenses['expense_amount'], 2) : '—' ?></span></div>
+          </table>
+        <?php endif; ?>
+        <details>
+          <summary>Record a cost for this order</summary>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries">
+            <?= Csrf::field() ?>
+            <label>Category *
+              <select name="category" required>
+                <?php foreach ($costEntryCategories as $key => $label): ?>
+                  <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
+            <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
+            <label>Description<input type="text" name="description"></label>
+            <button type="submit" class="btn-sm">Record Cost</button>
+          </form>
+        </details>
       </div>
-      <details>
-        <summary><?= $orderTravelExpenses ? 'Edit travel expenses' : 'Record travel expenses' ?></summary>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/travel-expenses">
-          <?= Csrf::field() ?>
-          <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>"></label>
-          <label>Travel Expense % of FOB Value *
-            <select name="expense_pct" required>
-              <?php $savedPct = $orderTravelExpenses ? (string) (float) $orderTravelExpenses['expense_pct'] : ''; ?>
-              <?php foreach (['5', '7', '10', '15'] as $pct): ?>
-                <option value="<?= $pct ?>" <?= $savedPct === $pct ? 'selected' : '' ?>><?= $pct ?>%</option>
-              <?php endforeach; ?>
-              <option value="other" <?= !in_array($savedPct, ['5', '7', '10', '15'], true) && $savedPct !== '' ? 'selected' : '' ?>>Other — specify</option>
-            </select>
-          </label>
-          <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>"></label>
-          <button type="submit" class="btn-sm">Save</button>
-        </form>
-      </details>
 
-    <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
-    <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
-    <?php if (empty($orderCostEntries)): ?>
-      <p class="muted">No other costs recorded for this order yet.</p>
-    <?php else: ?>
-      <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
-        <?php foreach ($orderCostEntries as $c): ?>
-        <tr>
-          <td><?= htmlspecialchars((string) ($c['incurred_at'] ?? '—')) ?></td>
-          <td><?= htmlspecialchars($costEntryCategories[$c['category']] ?? $c['category']) ?></td>
-          <td><?= htmlspecialchars($c['description'] ?? '—') ?></td>
-          <td><?= number_format((float) $c['amount_inr'], 2) ?></td>
-          <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
-          <td>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries/<?= (int) $c['id'] ?>/delete" onsubmit="return confirm('Remove this cost entry?');">
+      <div class="tab-panel" id="order-financials-export-benefits" data-tab-panel>
+        <h3 style="font-size:0.95em; margin-top:0;">Export Benefit Scheme Eligibility</h3>
+        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Closing the order (Step 13e) is blocked while any scheme here is still Pending.</p>
+        <table class="list">
+          <tr><th>Scheme</th><th>Eligibility &amp; Reason</th></tr>
+          <?php foreach ($exportBenefitEligibility as $sch): ?>
+          <tr>
+            <td><?= htmlspecialchars($sch['scheme_name']) ?></td>
+            <td>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefit-schemes" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="scheme_name" value="<?= htmlspecialchars($sch['scheme_name']) ?>">
+                <select name="status">
+                  <?php foreach (\App\Repositories\OrderExportBenefitSchemeRepository::STATUSES as $key => $label): ?>
+                  <option value="<?= htmlspecialchars($key) ?>" <?= $sch['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <input type="text" name="reason" value="<?= htmlspecialchars($sch['reason'] ?? '') ?>" placeholder="Reason — required if Not Eligible" style="flex:1;min-width:180px;">
+                <button type="submit" class="btn-sm">Save</button>
+                <?php if ($sch['resolved_at']): ?>
+                <span class="muted small"><?= htmlspecialchars($sch['resolved_at']) ?><?php if ($sch['resolved_by_name']): ?> by <?= htmlspecialchars($sch['resolved_by_name']) ?><?php endif; ?></span>
+                <?php endif; ?>
+              </form>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </table>
+
+        <h3 style="font-size:0.95em; margin-top:14px;">Government Export Benefits Claimed</h3>
+        <?php $govtBenefitsApplicable = in_array($order['status'], ['shipped_docs_sent', 'complete'], true) && !empty($payment['balance_remittance_received_at']); ?>
+        <?php if (!$govtBenefitsApplicable): ?>
+          <p class="muted">Not applicable until the order is complete and the CI (balance) remittance has been received — government benefit schemes only come into play once the full proceeds have actually landed.</p>
+        <?php else: ?>
+        <?php if (empty($linkedExportBenefits)): ?>
+          <p class="muted">Nothing claimed against this order yet.</p>
+        <?php else: ?>
+          <table class="list">
+            <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
+            <?php foreach ($linkedExportBenefits as $b): ?>
+            <tr>
+              <td><?= htmlspecialchars((string) $b['claimed_at']) ?></td>
+              <td><?= htmlspecialchars($b['scheme_name']) ?></td>
+              <td><?= htmlspecialchars($b['reference_number'] ?? '—') ?></td>
+              <td><?= number_format((float) $b['claimed_amount'], 2) ?> <?= htmlspecialchars($b['currency_code']) ?></td>
+              <td><?= $b['received_amount'] !== null ? number_format((float) $b['received_amount'], 2) . ' ' . htmlspecialchars($b['currency_code']) : '<span class="muted">—</span>' ?></td>
+              <td><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed</span>' ?></td>
+              <td>
+                <?php if ($b['received_amount'] === null): ?>
+                  <details>
+                    <summary class="small">Mark received</summary>
+                    <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/received">
+                      <?= Csrf::field() ?>
+                      <label>Received Amount *<input type="text" name="received_amount" required></label>
+                      <label>Received On *<input type="date" name="received_at" value="<?= date('Y-m-d') ?>" required></label>
+                      <button type="submit" class="btn-sm">Save</button>
+                    </form>
+                  </details>
+                <?php endif; ?>
+              </td>
+            </tr>
+            <?php endforeach; ?>
+          </table>
+        <?php endif; ?>
+        <details>
+          <summary>Record a new claim for this order</summary>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits">
+            <?= Csrf::field() ?>
+            <label>Scheme *
+              <select name="scheme_name" required>
+                <?php foreach ($exportBenefitSchemes as $opt): ?>
+                  <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
+            <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+            <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
+            <label>Currency<input type="text" name="currency_code" value="INR"></label>
+            <label>Notes<input type="text" name="notes"></label>
+            <button type="submit" class="btn-sm">Record Claim</button>
+          </form>
+        </details>
+        <?php endif; ?>
+      </div>
+
+      <div class="tab-panel" id="order-financials-zoho-expenses" data-tab-panel>
+        <h3 style="font-size:0.95em; margin-top:0;">Expenses Imported from Zoho Books</h3>
+        <?php if (empty($linkedCaExpenses)): ?>
+          <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
+        <?php else: ?>
+          <table class="list">
+            <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
+            <?php foreach ($linkedCaExpenses as $e): ?>
+            <tr>
+              <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
+              <td><?= htmlspecialchars($e['category']) ?></td>
+              <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
+              <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
+            </tr>
+            <?php endforeach; ?>
+          </table>
+        <?php endif; ?>
+      </div>
+
+      <div class="tab-panel" id="order-financials-profitability" data-tab-panel>
+        <?php if ($profitability): ?>
+          <h3 style="font-size:0.95em; margin-top:0;">Profitability Summary</h3>
+          <div class="kv-grid">
+            <div><span class="k">Revenue (INR)<?= $profitability['revenue_is_estimated'] ? ' — estimated' : '' ?></span><span class="v"><?= number_format($profitability['revenue_inr'], 2) ?></span></div>
+            <div><span class="k">Govt. Export Benefits (INR)<?= $profitability['export_benefits_is_estimated'] ? ' — claimed, not yet received' : '' ?></span><span class="v"><?= number_format($profitability['export_benefits_inr'], 2) ?></span></div>
+            <div><span class="k">Supplier Cost (INR)</span><span class="v"><?= number_format($profitability['supplier_cost_inr'], 2) ?></span></div>
+            <div><span class="k">Ocean Freight (INR)</span><span class="v"><?= number_format($profitability['freight_cost_inr'], 2) ?></span></div>
+            <div><span class="k">Insurance (INR)</span><span class="v"><?= number_format($profitability['insurance_cost_inr'], 2) ?></span></div>
+            <div><span class="k">Other Costs (INR)</span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
+            <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
+            <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
+            <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
+          </div>
+          <?php if ($profitability['revenue_is_estimated']): ?>
+            <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
+          <?php endif; ?>
+        <?php else: ?>
+          <p class="muted">Not enough data recorded yet to compute profitability for this order.</p>
+        <?php endif; ?>
+      </div>
+
+      <div class="tab-panel" id="order-financials-annexure" data-tab-panel>
+        <h3 style="font-size:0.95em; margin-top:0;">Internal-Only Financial Annexure</h3>
+        <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
+        <?php if ($canManageCaInternalDoc): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/toggle" style="margin-bottom:6px;">
+            <?= Csrf::field() ?>
+            <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
+              <input type="checkbox" name="enabled" value="1" <?= !empty($order['ca_internal_doc_enabled']) ? 'checked' : '' ?> onchange="this.form.submit()">
+              Enable internal financial annexure for this order
+            </label>
+          </form>
+          <?php if (!empty($order['ca_internal_doc_enabled'])): ?>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/generate" style="display:inline;">
               <?= Csrf::field() ?>
-              <button type="submit" class="btn-sm btn-danger">Remove</button>
+              <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
             </form>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-    <?php endif; ?>
-    <details>
-      <summary>Record a cost for this order</summary>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries">
-        <?= Csrf::field() ?>
-        <label>Category *
-          <select name="category" required>
-            <?php foreach ($costEntryCategories as $key => $label): ?>
-              <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
-        <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
-        <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
-        <label>Description<input type="text" name="description"></label>
-        <button type="submit" class="btn-sm">Record Cost</button>
-      </form>
-    </details>
-
-    <?php if ($profitability): ?>
-      <h3 style="font-size:0.95em; margin-top:14px;">Profitability Summary</h3>
-      <div class="kv-grid">
-        <div><span class="k">Revenue (INR)<?= $profitability['revenue_is_estimated'] ? ' — estimated' : '' ?></span><span class="v"><?= number_format($profitability['revenue_inr'], 2) ?></span></div>
-        <div><span class="k">Govt. Export Benefits (INR)<?= $profitability['export_benefits_is_estimated'] ? ' — claimed, not yet received' : '' ?></span><span class="v"><?= number_format($profitability['export_benefits_inr'], 2) ?></span></div>
-        <div><span class="k">Supplier Cost (INR)</span><span class="v"><?= number_format($profitability['supplier_cost_inr'], 2) ?></span></div>
-        <div><span class="k">Ocean Freight (INR)</span><span class="v"><?= number_format($profitability['freight_cost_inr'], 2) ?></span></div>
-        <div><span class="k">Insurance (INR)</span><span class="v"><?= number_format($profitability['insurance_cost_inr'], 2) ?></span></div>
-        <div><span class="k">Other Costs (INR)</span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
-        <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
-        <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
-        <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
+          <?php endif; ?>
+        <?php else: ?>
+          <p class="muted small">Internal financial annexure is currently <strong><?= !empty($order['ca_internal_doc_enabled']) ? 'enabled' : 'disabled' ?></strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
+        <?php endif; ?>
+        <?php if ($caInternalDoc): ?>
+          <p class="small" style="margin-top:6px;">
+            Latest: <a href="/documents/<?= (int) $caInternalDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($caInternalDoc['document_reference']) ?></a>
+            (generated <?= htmlspecialchars((string) $caInternalDoc['generated_at']) ?>) — <span class="badge">INTERNAL ONLY — never shown to client</span>
+          </p>
+        <?php endif; ?>
       </div>
-      <?php if ($profitability['revenue_is_estimated']): ?>
-        <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
-      <?php endif; ?>
-    <?php endif; ?>
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Internal-Only Financial Annexure</h3>
-    <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
-    <?php if ($canManageCaInternalDoc): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/toggle" style="margin-bottom:6px;">
-        <?= Csrf::field() ?>
-        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
-          <input type="checkbox" name="enabled" value="1" <?= !empty($order['ca_internal_doc_enabled']) ? 'checked' : '' ?> onchange="this.form.submit()">
-          Enable internal financial annexure for this order
-        </label>
-      </form>
-      <?php if (!empty($order['ca_internal_doc_enabled'])): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/generate" style="display:inline;">
-          <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
-        </form>
-      <?php endif; ?>
-    <?php else: ?>
-      <p class="muted small">Internal financial annexure is currently <strong><?= !empty($order['ca_internal_doc_enabled']) ? 'enabled' : 'disabled' ?></strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
-    <?php endif; ?>
-    <?php if ($caInternalDoc): ?>
-      <p class="small" style="margin-top:6px;">
-        Latest: <a href="/documents/<?= (int) $caInternalDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($caInternalDoc['document_reference']) ?></a>
-        (generated <?= htmlspecialchars((string) $caInternalDoc['generated_at']) ?>) — <span class="badge">INTERNAL ONLY — never shown to client</span>
-      </p>
-    <?php endif; ?>
+    </div>
   </details>
   <?php endif; ?>
 

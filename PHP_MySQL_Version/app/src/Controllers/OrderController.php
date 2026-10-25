@@ -1962,10 +1962,23 @@ final class OrderController
         return [$date, (float) $amountRaw];
     }
 
+    /**
+     * Order-page polish round: this action only ever checked that a
+     * Supplier PO row existed — never that Stage 5 was actually
+     * unlocked, the same isUnlocked(5) gate confirmSupplierSigned() just
+     * above already requires. A direct POST on an order still at Stage 1
+     * could mark the supplier's advance as paid before Stage 4 even
+     * passed.
+     */
     public function markSupplierAdvancePaid(array $params): void
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 5)) {
+            Flash::set('error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         if (!$supplierPo) {
             Flash::set('error', 'No Supplier PO found for this order.');
@@ -1985,10 +1998,16 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /** Order-page polish round: same missing isUnlocked(5) gate as markSupplierAdvancePaid() above — see its docblock. */
     public function markSupplierBalancePaid(array $params): void
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 5)) {
+            Flash::set('error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         if (!$supplierPo) {
             Flash::set('error', 'No Supplier PO found for this order.');
@@ -2052,10 +2071,22 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
-    /** Stage 6 (CFR/CIF only): record NexaCrest's agreed freight/insurance terms before generating the FDN. */
+    /**
+     * Stage 6 (CFR/CIF only): record NexaCrest's agreed freight/insurance
+     * terms before generating the FDN. Order-page polish round: this
+     * action had no stage check at all — on an order still at Stage 1,
+     * a direct POST with just manage_shipping could save freight terms
+     * before Stage 5 ever passed. Mirrors the same isUnlocked(6) guard
+     * recordFreightPayment()/clearFreightPayment() already use below.
+     */
     public function saveFreightTerms(array $params): void
     {
         $orderId = (int) $params['id'];
+        if (!StageGateService::isUnlocked($orderId, 6)) {
+            Flash::set('error', 'Stage 6 has not been unlocked for this order yet — complete Stage 5 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderFreightRepository::upsert($orderId, [
             'confirmed_freight_rate'    => trim((string) ($_POST['confirmed_freight_rate'] ?? '')) ?: null,
             'insurance_amount'          => trim((string) ($_POST['insurance_amount'] ?? '')) ?: null,
@@ -2816,9 +2847,22 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /**
+     * Order-page polish round: all four BL-originals/endorsement actions
+     * below (Stage 9 — "COO received + BL originals endorsed", per
+     * StageGateService's own docblock) had no stage check at all — a
+     * direct POST with just manage_shipping could record/endorse BL
+     * originals on an order still at Stage 1. Same isUnlocked(9) guard
+     * closeOrder() already requires lower down this file.
+     */
     public function recordBlOriginalsReceived(array $params): void
     {
         $orderId = (int) $params['id'];
+        if (!StageGateService::isUnlocked($orderId, 9)) {
+            Flash::set('error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $count = (int) ($_POST['bl_originals_count'] ?? 3);
         OrderShippingRepository::recordBlOriginalsReceived($orderId, $count ?: 3);
         // External QA report N-08: this action never reached the audit
@@ -2828,10 +2872,16 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /** Order-page polish round: same missing isUnlocked(9) gate — see recordBlOriginalsReceived()'s docblock above. */
     public function recordBlEndorsed(array $params): void
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 9)) {
+            Flash::set('error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderShippingRepository::recordBlEndorsed($orderId, (int) $user['id']);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
@@ -2847,10 +2897,16 @@ final class OrderController
      * (see the view), but what's actually generated always reads from
      * this independently-editable row, never back from order_shipping.
      */
+    /** Order-page polish round: same missing isUnlocked(9) gate — see recordBlOriginalsReceived()'s docblock above. */
     public function saveBlEndorsement(array $params): void
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 9)) {
+            Flash::set('error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderBlEndorsementRepository::upsert($orderId, [
             'bl_number'           => trim((string) ($_POST['bl_number'] ?? '')) ?: null,
             'vessel_voyage'       => trim((string) ($_POST['vessel_voyage'] ?? '')) ?: null,
@@ -2865,10 +2921,16 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /** Order-page polish round: same missing isUnlocked(9) gate — see recordBlOriginalsReceived()'s docblock above. */
     public function generateBlEndorsement(array $params): void
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 9)) {
+            Flash::set('error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         try {
             \App\Services\DocumentGenerationService::generateBlEndorsement($orderId, (int) $user['id']);
             // External QA report N-08: this action never reached the

@@ -125,6 +125,10 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
     public function testMarkSupplierAdvancePaidIsLogged(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        // Order-page polish round: markSupplierAdvancePaid() now requires
+        // Stage 5 unlocked — see OrderPageStageGateFixesTest for the
+        // dedicated coverage of that gate itself.
+        $this->unlockThrough($orderId, 4);
         $this->createTestSupplierPo($orderId);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
         $_POST = ['amount_paid_inr' => '20000'];
@@ -139,6 +143,9 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
     public function testMarkSupplierBalancePaidIsLogged(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        // Order-page polish round: markSupplierBalancePaid() now requires
+        // Stage 5 unlocked — see OrderPageStageGateFixesTest.
+        $this->unlockThrough($orderId, 4);
         $this->createTestSupplierPo($orderId);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
         $_POST = ['amount_paid_inr' => '30000'];
@@ -153,6 +160,9 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
     public function testSaveFreightTermsIsLogged(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        // Order-page polish round: saveFreightTerms() now requires Stage 6
+        // unlocked — see OrderPageStageGateFixesTest.
+        $this->unlockThrough($orderId, 5);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
         $_POST = ['confirmed_freight_rate' => '500'];
 
@@ -220,6 +230,9 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
     public function testRecordBlOriginalsReceivedIsLogged(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        // Order-page polish round: this action now requires Stage 9
+        // unlocked — see OrderPageStageGateFixesTest.
+        $this->unlockThrough($orderId, 8);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
         $_POST = ['bl_originals_count' => '3'];
 
@@ -233,6 +246,7 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
     public function testRecordBlEndorsedIsLogged(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThrough($orderId, 8);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
 
         ob_start();
@@ -245,6 +259,7 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
     public function testSaveBlEndorsementIsLogged(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThrough($orderId, 8);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
         $_POST = ['bl_number' => 'MSCU1234567'];
 
@@ -258,6 +273,7 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
     public function testGenerateBlEndorsementIsLogged(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThrough($orderId, 8);
         $userId = $this->createTestUser('Admin');
         OrderBlEndorsementRepository::upsert($orderId, ['bl_number' => 'MSCU1234567'], $userId);
         $_SESSION['_auth_user_id'] = $userId;

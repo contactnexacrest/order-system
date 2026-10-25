@@ -10,6 +10,7 @@ use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
 use App\Repositories\OrderBlEndorsementRepository;
 use App\Services\DocumentGenerationService;
+use App\Services\StageGateService;
 use App\Tests\Support\DbTestCase;
 
 /**
@@ -22,6 +23,14 @@ use App\Tests\Support\DbTestCase;
  */
 final class BlEndorsementTest extends DbTestCase
 {
+    /** Order-page polish round: saveBlEndorsement()/generateBlEndorsement() now require Stage 9 unlocked — see OrderPageStageGateFixesTest. */
+    private function unlockThroughStage9(int $orderId): void
+    {
+        for ($stage = 1; $stage <= 8; $stage++) {
+            StageGateService::passAndUnlockNext($orderId, $stage, null);
+        }
+    }
+
     public function testUpsertCreatesThenUpdatesTheSameRow(): void
     {
         $userId = $this->createTestUser('Admin');
@@ -147,6 +156,7 @@ final class BlEndorsementTest extends DbTestCase
     {
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThroughStage9($orderId);
 
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = [
@@ -170,6 +180,7 @@ final class BlEndorsementTest extends DbTestCase
     {
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThroughStage9($orderId);
         OrderBlEndorsementRepository::upsert($orderId, ['bl_number' => 'MSCU3333333'], $userId);
 
         $_SESSION['_auth_user_id'] = $userId;
