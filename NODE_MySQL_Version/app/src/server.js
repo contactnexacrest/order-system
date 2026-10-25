@@ -41,6 +41,7 @@ const settingsController = require('./controllers/settingsController');
 const holidayController = require('./controllers/holidayController');
 const referenceDocController = require('./controllers/referenceDocController');
 const sopController = require('./controllers/sopController');
+const galleryController = require('./controllers/galleryController');
 const gettingStartedController = require('./controllers/gettingStartedController');
 const caController = require('./controllers/caController');
 const orderFinancialsController = require('./controllers/orderFinancialsController');
@@ -118,6 +119,11 @@ njkEnv.addFilter('humanDate', dates.human);
 // built-in startswith, and the PHP side's equivalent ($isActive) is a
 // plain str_starts_with(), so this is the same one-line check.
 njkEnv.addFilter('startswith', (value, prefix) => typeof value === 'string' && value.startsWith(prefix));
+// Gallery breadcrumb/folder links need their relative path percent-encoded
+// into a ?p= query value (a folder name can contain spaces/&/etc.) —
+// Nunjucks has no built-in urlencode, and PHP's view uses urlencode() for
+// the exact same links, so this mirrors that one-line call.
+njkEnv.addFilter('urlencode', (value) => encodeURIComponent(String(value ?? '')));
 // User-reported batch item 12: embeds a small JS array (a supplier's
 // factory addresses) into a data-* attribute for client-side use, the
 // same way PHP's view does an inline json_encode() — Nunjucks has no
@@ -523,6 +529,13 @@ app.get('/getting-started', requireAuth, asyncHandler(gettingStartedController.s
 app.get('/sop', requireAuth, asyncHandler(sopController.index));
 app.get('/sop-assets/:file', requireAuth, asyncHandler(sopController.asset));
 app.get('/sop/:chapter', requireAuth, asyncHandler(sopController.show));
+
+// Gallery — reads docs/gallery/** live off disk, any logged-in staff member
+// can view. No upload form: files are added directly on the server's
+// filesystem (e.g. via FTP); folders double as categories with no code
+// change needed.
+app.get('/gallery', requireAuth, asyncHandler(galleryController.index));
+app.get('/gallery/file', requireAuth, asyncHandler(galleryController.file));
 
 // NOTE: deliberately "/company-assets", not "/assets" — that path collides
 // with the static public/ folder (css/js/img), same reasoning as the PHP original.

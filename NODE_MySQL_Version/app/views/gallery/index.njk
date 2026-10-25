@@ -1,0 +1,54 @@
+<div class="card page-wide">
+  <h1>Gallery</h1>
+  <p class="muted">Browse screenshots and reference images straight off the server — a visual knowledgebase, view-only. Add more by uploading files into the <code>docs/gallery</code> folder; new folders become categories automatically.</p>
+
+  <nav class="gallery-breadcrumb" aria-label="Breadcrumb">
+    <a href="/gallery">Gallery</a>
+    {% for crumb in crumbs %}
+      <span aria-hidden="true"> / </span><a href="/gallery?p={{ crumb.path | urlencode }}">{{ crumb.name }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if parentPath !== null %}
+    <p><a href="/gallery{{ '' if parentPath === '' else '?p=' + (parentPath | urlencode) }}">&larr; Up one level</a></p>
+  {% endif %}
+
+  {% if isEmpty %}
+    <p class="muted">This folder is empty.</p>
+  {% endif %}
+
+  {% if folders | length > 0 %}
+    <div class="gallery-folders">
+      {% for folder in folders %}
+        <a class="gallery-folder" href="/gallery?p={{ folder.path | urlencode }}">
+          <span class="gallery-folder-ico" aria-hidden="true">&#128193;</span>
+          <span>{{ folder.name }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% set images = files | selectattr('isImage') | list %}
+  {% if images | length > 0 %}
+    <div class="gallery-grid">
+      {% for image in images %}
+        <a class="gallery-thumb" href="/gallery/file?p={{ image.path | urlencode }}" target="_blank" rel="noopener">
+          <img src="/gallery/file?p={{ image.path | urlencode }}" alt="{{ image.name }}" loading="lazy">
+          <span class="gallery-thumb-name">{{ image.name }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% set otherFiles = files | rejectattr('isImage') | list %}
+  {% if otherFiles | length > 0 %}
+    <ul class="gallery-file-list">
+      {% for file in otherFiles %}
+        <li>
+          <a href="/gallery/file?p={{ file.path | urlencode }}">{{ file.name }}</a>
+          <span class="muted">({{ (file.sizeBytes / 1024) | round(1) }} KB)</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>
