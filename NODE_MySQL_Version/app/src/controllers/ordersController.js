@@ -1969,8 +1969,20 @@ function validateSupplierPoPayment(req, res, orderId) {
   return { date, amount };
 }
 
+/**
+ * Order-page polish round: this action only ever checked that a
+ * Supplier PO row existed — never that Stage 5 was actually unlocked,
+ * the same isUnlocked(5) gate confirmSupplierSigned() already requires.
+ * A direct POST on an order still at Stage 1 could mark the supplier's
+ * advance as paid before Stage 4 even passed.
+ */
 async function markSupplierAdvancePaid(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  if (!(await stageGateService.isUnlocked(orderId, 5))) {
+    flash.set(req, 'error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
   if (!supplierPo) {
     flash.set(req, 'error', 'No Supplier PO found for this order.');
@@ -1990,8 +2002,14 @@ async function markSupplierAdvancePaid(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/** Order-page polish round: same missing isUnlocked(5) gate as markSupplierAdvancePaid() above — see its docblock. */
 async function markSupplierBalancePaid(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  if (!(await stageGateService.isUnlocked(orderId, 5))) {
+    flash.set(req, 'error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
   if (!supplierPo) {
     flash.set(req, 'error', 'No Supplier PO found for this order.');
@@ -2055,9 +2073,21 @@ async function uploadSupplierPoDocument(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
-/** Stage 6 (CFR/CIF only): record NexaCrest's agreed freight/insurance terms before generating the FDN. */
+/**
+ * Stage 6 (CFR/CIF only): record NexaCrest's agreed freight/insurance
+ * terms before generating the FDN. Order-page polish round: this
+ * action had no stage check at all — on an order still at Stage 1, a
+ * direct POST with just manage_shipping could save freight terms
+ * before Stage 5 ever passed. Mirrors the same isUnlocked(6) guard
+ * recordFreightPayment() already uses below.
+ */
 async function saveFreightTerms(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  if (!(await stageGateService.isUnlocked(orderId, 6))) {
+    flash.set(req, 'error', 'Stage 6 has not been unlocked for this order yet — complete Stage 5 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const body = req.body;
   await orderFreightRepository.upsert(orderId, {
     confirmed_freight_rate: str(body.confirmed_freight_rate) || null,
@@ -2787,8 +2817,21 @@ async function recordFreightFirc(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * Order-page polish round: all four BL-originals/endorsement actions
+ * below (Stage 9 — "COO received + BL originals endorsed", per
+ * stageGateService's own docblock) had no stage check at all — a
+ * direct POST with just manage_shipping could record/endorse BL
+ * originals on an order still at Stage 1. Same isUnlocked(9) guard
+ * closeOrder() already requires further down this file.
+ */
 async function recordBlOriginalsReceived(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  if (!(await stageGateService.isUnlocked(orderId, 9))) {
+    flash.set(req, 'error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const count = parseInt(req.body.bl_originals_count || 3, 10);
   await orderShippingRepository.recordBlOriginalsReceived(orderId, count || 3);
   // External QA report N-08: this action never reached the audit log,
@@ -2798,9 +2841,15 @@ async function recordBlOriginalsReceived(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/** Order-page polish round: same missing isUnlocked(9) gate — see recordBlOriginalsReceived()'s docblock above. */
 async function recordBlEndorsed(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 9))) {
+    flash.set(req, 'error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderShippingRepository.recordBlEndorsed(orderId, user.id);
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
@@ -2816,9 +2865,15 @@ async function recordBlEndorsed(req, res) {
  * but what's actually generated always reads from this independently-
  * editable row, never back from order_shipping.
  */
+/** Order-page polish round: same missing isUnlocked(9) gate — see recordBlOriginalsReceived()'s docblock above. */
 async function saveBlEndorsement(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 9))) {
+    flash.set(req, 'error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderBlEndorsementRepository.upsert(
     orderId,
     {
@@ -2837,9 +2892,15 @@ async function saveBlEndorsement(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/** Order-page polish round: same missing isUnlocked(9) gate — see recordBlOriginalsReceived()'s docblock above. */
 async function generateBlEndorsement(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 9))) {
+    flash.set(req, 'error', 'Stage 9 has not been unlocked for this order yet — complete Stage 8 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   try {
     await documentGenerationService.generateBlEndorsement(orderId, user.id);
     // External QA report N-08: this action never reached the audit

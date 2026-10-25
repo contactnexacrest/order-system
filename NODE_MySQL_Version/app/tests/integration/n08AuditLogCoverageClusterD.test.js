@@ -124,6 +124,9 @@ describe('Audit log coverage, N-08 Cluster D', () => {
 
   it('markSupplierAdvancePaid is logged', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    // Order-page polish round: markSupplierAdvancePaid() now requires
+    // Stage 5 unlocked — see orderPageStageGateFixes.test.js.
+    await unlockThrough(orderId, 4);
     await createTestSupplierPo(orderId);
     const userId = await createTestUser();
 
@@ -134,6 +137,9 @@ describe('Audit log coverage, N-08 Cluster D', () => {
 
   it('markSupplierBalancePaid is logged', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    // Order-page polish round: markSupplierBalancePaid() now requires
+    // Stage 5 unlocked — see orderPageStageGateFixes.test.js.
+    await unlockThrough(orderId, 4);
     await createTestSupplierPo(orderId);
     const userId = await createTestUser();
 
@@ -155,6 +161,9 @@ describe('Audit log coverage, N-08 Cluster D', () => {
 
   it('saveFreightTerms is logged', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    // Order-page polish round: saveFreightTerms() now requires Stage 6
+    // unlocked — see orderPageStageGateFixes.test.js.
+    await unlockThrough(orderId, 5);
     const userId = await createTestUser();
 
     await ordersController.saveFreightTerms(fakeReq(orderId, userId, { confirmed_freight_rate: '500' }), fakeRes());
@@ -213,6 +222,9 @@ describe('Audit log coverage, N-08 Cluster D', () => {
 
   it('recordBlOriginalsReceived is logged', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    // Order-page polish round: this action now requires Stage 9 unlocked
+    // — see orderPageStageGateFixes.test.js.
+    await unlockThrough(orderId, 8);
     const userId = await createTestUser();
 
     await ordersController.recordBlOriginalsReceived(fakeReq(orderId, userId, { bl_originals_count: '3' }), fakeRes());
@@ -222,6 +234,7 @@ describe('Audit log coverage, N-08 Cluster D', () => {
 
   it('recordBlEndorsed is logged', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    await unlockThrough(orderId, 8);
     const userId = await createTestUser();
 
     await ordersController.recordBlEndorsed(fakeReq(orderId, userId), fakeRes());
@@ -231,6 +244,7 @@ describe('Audit log coverage, N-08 Cluster D', () => {
 
   it('saveBlEndorsement is logged', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    await unlockThrough(orderId, 8);
     const userId = await createTestUser();
 
     await ordersController.saveBlEndorsement(fakeReq(orderId, userId, { bl_number: 'MSCU1234567' }), fakeRes());

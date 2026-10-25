@@ -1646,25 +1646,8 @@
 
     {% if pendingInspectionTask and canManageOrderFinancials %}
       <h3 style="font-size:0.95em; margin-top:14px;">3rd-Party Pre-Shipment Inspection (step 8a)</h3>
-      <p class="muted small">This order has a Pre-Shipment Inspection on its Compliance Checklist (not marked not-applicable) — staff get reminded starting 7 days before the estimated shipment date above. If NexaCrest pays the inspection fee, record it below so it's included as an order expense; if the client pays it directly, there's nothing to record.</p>
-      <div class="kv-grid">
-        <div><span class="k">Fee Payer</span><span class="v">{{ (('NexaCrest' if orderInspectionFee.fee_payer == 'nexacrest' else 'Client')) if orderInspectionFee else 'Not yet recorded' }}</span></div>
-        <div><span class="k">Fee Amount</span><span class="v">{{ orderInspectionFee.fee_amount | money if orderInspectionFee and orderInspectionFee.fee_amount != null else '—' }}</span></div>
-      </div>
-      <details>
-        <summary>{{ 'Edit inspection fee' if orderInspectionFee else 'Record inspection fee' }}</summary>
-        <form method="post" action="/orders/{{ order.id }}/inspection-fee">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Who pays the inspection fee? *
-            <select name="fee_payer" required>
-              <option value="nexacrest" {{ 'selected' if orderInspectionFee and orderInspectionFee.fee_payer == 'nexacrest' }}>NexaCrest</option>
-              <option value="client" {{ 'selected' if orderInspectionFee and orderInspectionFee.fee_payer == 'client' }}>Client</option>
-            </select>
-          </label>
-          <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="{{ orderInspectionFee.fee_amount if orderInspectionFee and orderInspectionFee.fee_amount != null else '' }}"></label>
-          <button type="submit" class="btn-sm">Save</button>
-        </form>
-      </details>
+      <p class="muted small">This order has a Pre-Shipment Inspection on its Compliance Checklist (not marked not-applicable) — staff get reminded starting 7 days before the estimated shipment date above.</p>
+      <p class="muted small">Recorded under <a href="#order-financials">Order Financials</a> (Step 12) → Costs, alongside this order's other costs.</p>
     {% endif %}
   </details>
 
@@ -2136,240 +2119,285 @@
     <summary>{{ stepStatusIcon(stepStates['s12']) }}<span class="step-group-num">STEP 12</span><h2>Closure &mdash; Financials, Benefits &amp; Costs</h2></summary>
     <p class="muted small">Everything financial about this specific order, in one place — visible only to Super Admin and roles specifically granted the "Manage order financials" permission.</p>
 
-    <h3 style="font-size:0.95em;">Export Benefit Scheme Eligibility</h3>
-    <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Closing the order (Step 13e) is blocked while any scheme here is still Pending.</p>
-    <table class="list">
-      <tr><th>Scheme</th><th>Eligibility &amp; Reason</th></tr>
-      {% for sch in exportBenefitEligibility %}
-      <tr>
-        <td>{{ sch.scheme_name }}</td>
-        <td>
-          <form method="post" action="/orders/{{ order.id }}/export-benefit-schemes" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <div class="tabs" data-tabs>
+      <div class="tabs-nav" role="tablist">
+        <button type="button" class="tab-btn" data-tab-target="order-financials-costs" aria-selected="true">Costs</button>
+        <button type="button" class="tab-btn" data-tab-target="order-financials-export-benefits" aria-selected="false">Export Benefits</button>
+        <button type="button" class="tab-btn" data-tab-target="order-financials-zoho-expenses" aria-selected="false">Zoho Expenses</button>
+        <button type="button" class="tab-btn" data-tab-target="order-financials-profitability" aria-selected="false">Profitability</button>
+        <button type="button" class="tab-btn" data-tab-target="order-financials-annexure" aria-selected="false">Internal Annexure</button>
+      </div>
+
+      <div class="tab-panel" id="order-financials-costs" data-tab-panel>
+        {% set lcDetails = orderLcDetails or { lc_number: null, lc_file_id: null, bank_loan_amount: null, bank_loan_interest_rate: null, bank_loan_interest_paid: null } %}
+        <h3 style="font-size:0.95em; margin-top:0;">Letter of Credit &amp; Bank Loan</h3>
+        <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
+        <div class="kv-grid">
+          <div><span class="k">LC Number</span><span class="v">{{ lcDetails.lc_number or '—' }}</span></div>
+          <div><span class="k">LC Document</span><span class="v">{% if lcDetails.lc_file_id %}<a href="/file-store/{{ lcDetails.lc_file_id }}/download" target="_blank">View LC</a>{% else %}—{% endif %}</span></div>
+          <div><span class="k">Bank Loan Amount</span><span class="v">{{ lcDetails.bank_loan_amount | money if lcDetails.bank_loan_amount != null else '—' }}</span></div>
+          <div><span class="k">Interest Rate</span><span class="v">{{ (lcDetails.bank_loan_interest_rate + '%') if lcDetails.bank_loan_interest_rate != null else '—' }}</span></div>
+          <div><span class="k">Interest Paid</span><span class="v">{{ lcDetails.bank_loan_interest_paid | money if lcDetails.bank_loan_interest_paid != null else '—' }}</span></div>
+        </div>
+        <details>
+          <summary>{{ 'Edit LC / bank loan details' if orderLcDetails else 'Record LC / bank loan details for this order' }}</summary>
+          <form method="post" action="/orders/{{ order.id }}/lc-details" enctype="multipart/form-data">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <input type="hidden" name="scheme_name" value="{{ sch.scheme_name }}">
-            <select name="status">
-              {% for key, label in exportBenefitEligibilityStatuses %}
-              <option value="{{ key }}" {% if sch.status == key %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <input type="text" name="reason" value="{{ sch.reason or '' }}" placeholder="Reason — required if Not Eligible" style="flex:1;min-width:180px;">
-            <button type="submit" class="btn-sm">Save</button>
-            {% if sch.resolved_at %}
-            <span class="muted small">{{ sch.resolved_at }}{% if sch.resolved_by_name %} by {{ sch.resolved_by_name }}{% endif %}</span>
-            {% endif %}
+            <label>LC Number<input type="text" name="lc_number" value="{{ lcDetails.lc_number or '' }}"></label>
+            <label>Final LC Document<input type="file" name="lc_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+            <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="{{ lcDetails.bank_loan_amount if lcDetails.bank_loan_amount != null else '' }}"></label>
+            <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="{{ lcDetails.bank_loan_interest_rate if lcDetails.bank_loan_interest_rate != null else '' }}"></label>
+            <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="{{ lcDetails.bank_loan_interest_paid if lcDetails.bank_loan_interest_paid != null else '' }}"></label>
+            <button type="submit" class="btn-sm">Save LC / Loan Details</button>
           </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+        </details>
 
-    <h3 style="font-size:0.95em; margin-top:14px;">Government Export Benefits Claimed</h3>
-    {% set govtBenefitsApplicable = (order.status == 'shipped_docs_sent' or order.status == 'complete') and payment and payment.balance_remittance_received_at %}
-    {% if not govtBenefitsApplicable %}
-      <p class="muted">Not applicable until the order is complete and the CI (balance) remittance has been received — government benefit schemes only come into play once the full proceeds have actually landed.</p>
-    {% else %}
-    {% if linkedExportBenefits.length == 0 %}
-      <p class="muted">Nothing claimed against this order yet.</p>
-    {% else %}
-      <table class="list">
-        <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
-        {% for b in linkedExportBenefits %}
-        <tr>
-          <td>{{ b.claimed_at }}</td>
-          <td>{{ b.scheme_name }}</td>
-          <td>{{ b.reference_number or '—' }}</td>
-          <td>{{ b.claimed_amount | money }} {{ b.currency_code }}</td>
-          <td>{% if b.received_amount != null %}{{ b.received_amount | money }} {{ b.currency_code }}{% else %}<span class="muted">—</span>{% endif %}</td>
-          <td>{% if b.received_amount != null %}<span class="badge good">Received</span>{% else %}<span class="badge">Claimed</span>{% endif %}</td>
-          <td>
-            {% if b.received_amount == null %}
-              <details>
-                <summary class="small">Mark received</summary>
-                <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/received">
+        {% if pendingInspectionTask %}
+        <h3 style="font-size:0.95em; margin-top:14px;">3rd-Party Pre-Shipment Inspection (step 8a)</h3>
+        <p class="muted small">This order has a Pre-Shipment Inspection on its Compliance Checklist (not marked not-applicable) — staff get reminded starting 7 days before the estimated shipment date (Step 8a). If NexaCrest pays the inspection fee, record it below so it's included as an order expense; if the client pays it directly, there's nothing to record.</p>
+        <div class="kv-grid">
+          <div><span class="k">Fee Payer</span><span class="v">{{ (('NexaCrest' if orderInspectionFee.fee_payer == 'nexacrest' else 'Client')) if orderInspectionFee else 'Not yet recorded' }}</span></div>
+          <div><span class="k">Fee Amount</span><span class="v">{{ orderInspectionFee.fee_amount | money if orderInspectionFee and orderInspectionFee.fee_amount != null else '—' }}</span></div>
+        </div>
+        <details>
+          <summary>{{ 'Edit inspection fee' if orderInspectionFee else 'Record inspection fee' }}</summary>
+          <form method="post" action="/orders/{{ order.id }}/inspection-fee">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Who pays the inspection fee? *
+              <select name="fee_payer" required>
+                <option value="nexacrest" {{ 'selected' if orderInspectionFee and orderInspectionFee.fee_payer == 'nexacrest' }}>NexaCrest</option>
+                <option value="client" {{ 'selected' if orderInspectionFee and orderInspectionFee.fee_payer == 'client' }}>Client</option>
+              </select>
+            </label>
+            <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="{{ orderInspectionFee.fee_amount if orderInspectionFee and orderInspectionFee.fee_amount != null else '' }}"></label>
+            <button type="submit" class="btn-sm">Save</button>
+          </form>
+        </details>
+        {% endif %}
+
+        {% set savedPct = (orderTravelExpenses.expense_pct | string) if orderTravelExpenses else '' %}
+        <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
+        <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
+        <div class="kv-grid">
+          <div><span class="k">Factory Distance</span><span class="v">{{ (orderTravelExpenses.factory_distance_km ~ ' km') if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '—' }}</span></div>
+          <div><span class="k">Percentage</span><span class="v">{{ (orderTravelExpenses.expense_pct ~ '%') if orderTravelExpenses else 'Not yet recorded' }}</span></div>
+          <div><span class="k">Amount</span><span class="v">{{ orderTravelExpenses.expense_amount | money if orderTravelExpenses else '—' }}</span></div>
+        </div>
+        <details>
+          <summary>{{ 'Edit travel expenses' if orderTravelExpenses else 'Record travel expenses' }}</summary>
+          <form method="post" action="/orders/{{ order.id }}/travel-expenses">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="{{ orderTravelExpenses.factory_distance_km if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '' }}"></label>
+            <label>Travel Expense % of FOB Value *
+              <select name="expense_pct" required>
+                {% for pct in ['5', '7', '10', '15'] %}
+                  <option value="{{ pct }}" {{ 'selected' if savedPct == pct }}>{{ pct }}%</option>
+                {% endfor %}
+                <option value="other" {{ 'selected' if savedPct and savedPct not in ['5', '7', '10', '15'] }}>Other — specify</option>
+              </select>
+            </label>
+            <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="{{ savedPct if savedPct and savedPct not in ['5', '7', '10', '15'] else '' }}"></label>
+            <button type="submit" class="btn-sm">Save</button>
+          </form>
+        </details>
+
+        <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
+        <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
+        {% if orderCostEntries.length == 0 %}
+          <p class="muted">No other costs recorded for this order yet.</p>
+        {% else %}
+          <table class="list">
+            <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
+            {% for c in orderCostEntries %}
+            <tr>
+              <td>{{ c.incurred_at or '—' }}</td>
+              <td>{{ costEntryCategories[c.category] or c.category }}</td>
+              <td>{{ c.description or '—' }}</td>
+              <td>{{ c.amount_inr | money }}</td>
+              <td>{{ c.recorded_by_name }}</td>
+              <td>
+                <form method="post" action="/orders/{{ order.id }}/cost-entries/{{ c.id }}/delete" onsubmit="return confirm('Remove this cost entry?');">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                  <label>Received Amount *<input type="text" name="received_amount" required></label>
-                  <label>Received On *<input type="date" name="received_at" value="{{ today() }}" required></label>
-                  <button type="submit" class="btn-sm">Save</button>
+                  <button type="submit" class="btn-sm btn-danger">Remove</button>
                 </form>
-              </details>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </table>
-    {% endif %}
-    <details>
-      <summary>Record a new claim for this order</summary>
-      <form method="post" action="/orders/{{ order.id }}/export-benefits">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Scheme *
-          <select name="scheme_name" required>
-            {% for opt in exportBenefitSchemes %}
-              <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
+              </td>
+            </tr>
             {% endfor %}
-          </select>
-        </label>
-        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
-        <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
-        <label>Claimed On *<input type="date" name="claimed_at" value="{{ today() }}" required></label>
-        <label>Currency<input type="text" name="currency_code" value="INR"></label>
-        <label>Notes<input type="text" name="notes"></label>
-        <button type="submit" class="btn-sm">Record Claim</button>
-      </form>
-    </details>
-    {% endif %}
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Expenses Imported from Zoho Books</h3>
-    {% if linkedCaExpenses.length == 0 %}
-      <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
-    {% else %}
-      <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
-        {% for e in linkedCaExpenses %}
-        <tr>
-          <td>{{ e.expense_date }}</td>
-          <td>{{ e.category }}</td>
-          <td>{{ e.vendor_name or '—' }}</td>
-          <td>{{ e.amount | money }} {{ e.currency_code }}</td>
-        </tr>
-        {% endfor %}
-      </table>
-    {% endif %}
-
-    {% set lcDetails = orderLcDetails or { lc_number: null, lc_file_id: null, bank_loan_amount: null, bank_loan_interest_rate: null, bank_loan_interest_paid: null } %}
-    <h3 style="font-size:0.95em; margin-top:14px;">Letter of Credit &amp; Bank Loan</h3>
-    <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
-    <div class="kv-grid">
-      <div><span class="k">LC Number</span><span class="v">{{ lcDetails.lc_number or '—' }}</span></div>
-      <div><span class="k">LC Document</span><span class="v">{% if lcDetails.lc_file_id %}<a href="/file-store/{{ lcDetails.lc_file_id }}/download" target="_blank">View LC</a>{% else %}—{% endif %}</span></div>
-      <div><span class="k">Bank Loan Amount</span><span class="v">{{ lcDetails.bank_loan_amount | money if lcDetails.bank_loan_amount != null else '—' }}</span></div>
-      <div><span class="k">Interest Rate</span><span class="v">{{ (lcDetails.bank_loan_interest_rate + '%') if lcDetails.bank_loan_interest_rate != null else '—' }}</span></div>
-      <div><span class="k">Interest Paid</span><span class="v">{{ lcDetails.bank_loan_interest_paid | money if lcDetails.bank_loan_interest_paid != null else '—' }}</span></div>
-    </div>
-    <details>
-      <summary>{{ 'Edit LC / bank loan details' if orderLcDetails else 'Record LC / bank loan details for this order' }}</summary>
-      <form method="post" action="/orders/{{ order.id }}/lc-details" enctype="multipart/form-data">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>LC Number<input type="text" name="lc_number" value="{{ lcDetails.lc_number or '' }}"></label>
-        <label>Final LC Document<input type="file" name="lc_file" accept=".pdf,.jpg,.jpeg,.png"></label>
-        <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="{{ lcDetails.bank_loan_amount if lcDetails.bank_loan_amount != null else '' }}"></label>
-        <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="{{ lcDetails.bank_loan_interest_rate if lcDetails.bank_loan_interest_rate != null else '' }}"></label>
-        <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="{{ lcDetails.bank_loan_interest_paid if lcDetails.bank_loan_interest_paid != null else '' }}"></label>
-        <button type="submit" class="btn-sm">Save LC / Loan Details</button>
-      </form>
-    </details>
-
-      {% set savedPct = (orderTravelExpenses.expense_pct | string) if orderTravelExpenses else '' %}
-      <h3 style="font-size:0.95em; margin-top:14px;">Travel Expenses — Factory Visits (step 11a)</h3>
-      <p class="muted small">Every order needs 3-4 trips to the factory; record the distance (for reference) and the percentage of the order's FOB value to charge as travel expenses.</p>
-      <div class="kv-grid">
-        <div><span class="k">Factory Distance</span><span class="v">{{ (orderTravelExpenses.factory_distance_km ~ ' km') if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '—' }}</span></div>
-        <div><span class="k">Percentage</span><span class="v">{{ (orderTravelExpenses.expense_pct ~ '%') if orderTravelExpenses else 'Not yet recorded' }}</span></div>
-        <div><span class="k">Amount</span><span class="v">{{ orderTravelExpenses.expense_amount | money if orderTravelExpenses else '—' }}</span></div>
+          </table>
+        {% endif %}
+        <details>
+          <summary>Record a cost for this order</summary>
+          <form method="post" action="/orders/{{ order.id }}/cost-entries">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Category *
+              <select name="category" required>
+                {% for key, label in costEntryCategories %}
+                  <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
+            <label>Date<input type="date" name="incurred_at" value="{{ today() }}"></label>
+            <label>Description<input type="text" name="description"></label>
+            <button type="submit" class="btn-sm">Record Cost</button>
+          </form>
+        </details>
       </div>
-      <details>
-        <summary>{{ 'Edit travel expenses' if orderTravelExpenses else 'Record travel expenses' }}</summary>
-        <form method="post" action="/orders/{{ order.id }}/travel-expenses">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="{{ orderTravelExpenses.factory_distance_km if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '' }}"></label>
-          <label>Travel Expense % of FOB Value *
-            <select name="expense_pct" required>
-              {% for pct in ['5', '7', '10', '15'] %}
-                <option value="{{ pct }}" {{ 'selected' if savedPct == pct }}>{{ pct }}%</option>
-              {% endfor %}
-              <option value="other" {{ 'selected' if savedPct and savedPct not in ['5', '7', '10', '15'] }}>Other — specify</option>
-            </select>
-          </label>
-          <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="{{ savedPct if savedPct and savedPct not in ['5', '7', '10', '15'] else '' }}"></label>
-          <button type="submit" class="btn-sm">Save</button>
-        </form>
-      </details>
 
-    <h3 style="font-size:0.95em; margin-top:14px;">Other Order Costs</h3>
-    <p class="muted small">Costs this order incurred that aren't tracked anywhere else in the system (ECGC insurance, buyer due diligence, CHA, documentation, port charges, inland transport, bank charges, commission, packing/crates, other) — all assumed INR. Supplier cost, ocean freight, and insurance are pulled automatically below and never entered twice here.</p>
-    {% if orderCostEntries.length == 0 %}
-      <p class="muted">No other costs recorded for this order yet.</p>
-    {% else %}
-      <table class="list">
-        <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
-        {% for c in orderCostEntries %}
-        <tr>
-          <td>{{ c.incurred_at or '—' }}</td>
-          <td>{{ costEntryCategories[c.category] or c.category }}</td>
-          <td>{{ c.description or '—' }}</td>
-          <td>{{ c.amount_inr | money }}</td>
-          <td>{{ c.recorded_by_name }}</td>
-          <td>
-            <form method="post" action="/orders/{{ order.id }}/cost-entries/{{ c.id }}/delete" onsubmit="return confirm('Remove this cost entry?');">
+      <div class="tab-panel" id="order-financials-export-benefits" data-tab-panel>
+        <h3 style="font-size:0.95em; margin-top:0;">Export Benefit Scheme Eligibility</h3>
+        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Closing the order (Step 13e) is blocked while any scheme here is still Pending.</p>
+        <table class="list">
+          <tr><th>Scheme</th><th>Eligibility &amp; Reason</th></tr>
+          {% for sch in exportBenefitEligibility %}
+          <tr>
+            <td>{{ sch.scheme_name }}</td>
+            <td>
+              <form method="post" action="/orders/{{ order.id }}/export-benefit-schemes" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="scheme_name" value="{{ sch.scheme_name }}">
+                <select name="status">
+                  {% for key, label in exportBenefitEligibilityStatuses %}
+                  <option value="{{ key }}" {% if sch.status == key %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <input type="text" name="reason" value="{{ sch.reason or '' }}" placeholder="Reason — required if Not Eligible" style="flex:1;min-width:180px;">
+                <button type="submit" class="btn-sm">Save</button>
+                {% if sch.resolved_at %}
+                <span class="muted small">{{ sch.resolved_at }}{% if sch.resolved_by_name %} by {{ sch.resolved_by_name }}{% endif %}</span>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+
+        <h3 style="font-size:0.95em; margin-top:14px;">Government Export Benefits Claimed</h3>
+        {% set govtBenefitsApplicable = (order.status == 'shipped_docs_sent' or order.status == 'complete') and payment and payment.balance_remittance_received_at %}
+        {% if not govtBenefitsApplicable %}
+          <p class="muted">Not applicable until the order is complete and the CI (balance) remittance has been received — government benefit schemes only come into play once the full proceeds have actually landed.</p>
+        {% else %}
+        {% if linkedExportBenefits.length == 0 %}
+          <p class="muted">Nothing claimed against this order yet.</p>
+        {% else %}
+          <table class="list">
+            <tr><th>Claimed</th><th>Scheme</th><th>Ref.</th><th>Claimed Amount</th><th>Received</th><th>Status</th><th></th></tr>
+            {% for b in linkedExportBenefits %}
+            <tr>
+              <td>{{ b.claimed_at }}</td>
+              <td>{{ b.scheme_name }}</td>
+              <td>{{ b.reference_number or '—' }}</td>
+              <td>{{ b.claimed_amount | money }} {{ b.currency_code }}</td>
+              <td>{% if b.received_amount != null %}{{ b.received_amount | money }} {{ b.currency_code }}{% else %}<span class="muted">—</span>{% endif %}</td>
+              <td>{% if b.received_amount != null %}<span class="badge good">Received</span>{% else %}<span class="badge">Claimed</span>{% endif %}</td>
+              <td>
+                {% if b.received_amount == null %}
+                  <details>
+                    <summary class="small">Mark received</summary>
+                    <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/received">
+                      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                      <label>Received Amount *<input type="text" name="received_amount" required></label>
+                      <label>Received On *<input type="date" name="received_at" value="{{ today() }}" required></label>
+                      <button type="submit" class="btn-sm">Save</button>
+                    </form>
+                  </details>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+        <details>
+          <summary>Record a new claim for this order</summary>
+          <form method="post" action="/orders/{{ order.id }}/export-benefits">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Scheme *
+              <select name="scheme_name" required>
+                {% for opt in exportBenefitSchemes %}
+                  <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
+            <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+            <label>Claimed On *<input type="date" name="claimed_at" value="{{ today() }}" required></label>
+            <label>Currency<input type="text" name="currency_code" value="INR"></label>
+            <label>Notes<input type="text" name="notes"></label>
+            <button type="submit" class="btn-sm">Record Claim</button>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+
+      <div class="tab-panel" id="order-financials-zoho-expenses" data-tab-panel>
+        <h3 style="font-size:0.95em; margin-top:0;">Expenses Imported from Zoho Books</h3>
+        {% if linkedCaExpenses.length == 0 %}
+          <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
+        {% else %}
+          <table class="list">
+            <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
+            {% for e in linkedCaExpenses %}
+            <tr>
+              <td>{{ e.expense_date }}</td>
+              <td>{{ e.category }}</td>
+              <td>{{ e.vendor_name or '—' }}</td>
+              <td>{{ e.amount | money }} {{ e.currency_code }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+      </div>
+
+      <div class="tab-panel" id="order-financials-profitability" data-tab-panel>
+        {% if profitability %}
+          <h3 style="font-size:0.95em; margin-top:0;">Profitability Summary</h3>
+          <div class="kv-grid">
+            <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | money }}</span></div>
+            <div><span class="k">Govt. Export Benefits (INR){% if profitability.export_benefits_is_estimated %} — claimed, not yet received{% endif %}</span><span class="v">{{ profitability.export_benefits_inr | money }}</span></div>
+            <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | money }}</span></div>
+            <div><span class="k">Ocean Freight (INR)</span><span class="v">{{ profitability.freight_cost_inr | money }}</span></div>
+            <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}</span></div>
+            <div><span class="k">Other Costs (INR)</span><span class="v">{{ profitability.other_costs_inr | money }}</span></div>
+            <div><span class="k">Total Order Cost (INR)</span><span class="v">{{ profitability.total_cost_inr | money }}</span></div>
+            <div><span class="k">Order Profit (INR)</span><span class="v">{{ profitability.profit_inr | money }}</span></div>
+            <div><span class="k">Order Margin %</span><span class="v">{% if profitability.margin_pct != null %}{{ profitability.margin_pct | money }}%{% else %}—{% endif %}</span></div>
+          </div>
+          {% if profitability.revenue_is_estimated %}
+            <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
+          {% endif %}
+        {% else %}
+          <p class="muted">Not enough data recorded yet to compute profitability for this order.</p>
+        {% endif %}
+      </div>
+
+      <div class="tab-panel" id="order-financials-annexure" data-tab-panel>
+        <h3 style="font-size:0.95em; margin-top:0;">Internal-Only Financial Annexure</h3>
+        <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
+        {% if canManageCaInternalDoc %}
+          <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/toggle" style="margin-bottom:6px;">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
+              <input type="checkbox" name="enabled" value="1" {% if order.ca_internal_doc_enabled %}checked{% endif %} onchange="this.form.submit()">
+              Enable internal financial annexure for this order
+            </label>
+          </form>
+          {% if order.ca_internal_doc_enabled %}
+            <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/generate" style="display:inline;">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <button type="submit" class="btn-sm btn-danger">Remove</button>
+              <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
             </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </table>
-    {% endif %}
-    <details>
-      <summary>Record a cost for this order</summary>
-      <form method="post" action="/orders/{{ order.id }}/cost-entries">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Category *
-          <select name="category" required>
-            {% for key, label in costEntryCategories %}
-              <option value="{{ key }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
-        <label>Date<input type="date" name="incurred_at" value="{{ today() }}"></label>
-        <label>Description<input type="text" name="description"></label>
-        <button type="submit" class="btn-sm">Record Cost</button>
-      </form>
-    </details>
-
-    {% if profitability %}
-      <h3 style="font-size:0.95em; margin-top:14px;">Profitability Summary</h3>
-      <div class="kv-grid">
-        <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | money }}</span></div>
-        <div><span class="k">Govt. Export Benefits (INR){% if profitability.export_benefits_is_estimated %} — claimed, not yet received{% endif %}</span><span class="v">{{ profitability.export_benefits_inr | money }}</span></div>
-        <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | money }}</span></div>
-        <div><span class="k">Ocean Freight (INR)</span><span class="v">{{ profitability.freight_cost_inr | money }}</span></div>
-        <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}</span></div>
-        <div><span class="k">Other Costs (INR)</span><span class="v">{{ profitability.other_costs_inr | money }}</span></div>
-        <div><span class="k">Total Order Cost (INR)</span><span class="v">{{ profitability.total_cost_inr | money }}</span></div>
-        <div><span class="k">Order Profit (INR)</span><span class="v">{{ profitability.profit_inr | money }}</span></div>
-        <div><span class="k">Order Margin %</span><span class="v">{% if profitability.margin_pct != null %}{{ profitability.margin_pct | money }}%{% else %}—{% endif %}</span></div>
+          {% endif %}
+        {% else %}
+          <p class="muted small">Internal financial annexure is currently <strong>{% if order.ca_internal_doc_enabled %}enabled{% else %}disabled{% endif %}</strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
+        {% endif %}
+        {% if caInternalDoc %}
+          <p class="small" style="margin-top:6px;">
+            Latest: <a href="/documents/{{ caInternalDoc.id }}/download?format=pdf">{{ caInternalDoc.document_reference }}</a>
+            (generated {{ caInternalDoc.generated_at }}) — <span class="badge">INTERNAL ONLY — never shown to client</span>
+          </p>
+        {% endif %}
       </div>
-      {% if profitability.revenue_is_estimated %}
-        <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
-      {% endif %}
-    {% endif %}
-
-    <h3 style="font-size:0.95em; margin-top:14px;">Internal-Only Financial Annexure</h3>
-    <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
-    {% if canManageCaInternalDoc %}
-      <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/toggle" style="margin-bottom:6px;">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
-          <input type="checkbox" name="enabled" value="1" {% if order.ca_internal_doc_enabled %}checked{% endif %} onchange="this.form.submit()">
-          Enable internal financial annexure for this order
-        </label>
-      </form>
-      {% if order.ca_internal_doc_enabled %}
-        <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/generate" style="display:inline;">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
-        </form>
-      {% endif %}
-    {% else %}
-      <p class="muted small">Internal financial annexure is currently <strong>{% if order.ca_internal_doc_enabled %}enabled{% else %}disabled{% endif %}</strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
-    {% endif %}
-    {% if caInternalDoc %}
-      <p class="small" style="margin-top:6px;">
-        Latest: <a href="/documents/{{ caInternalDoc.id }}/download?format=pdf">{{ caInternalDoc.document_reference }}</a>
-        (generated {{ caInternalDoc.generated_at }}) — <span class="badge">INTERNAL ONLY — never shown to client</span>
-      </p>
-    {% endif %}
+    </div>
   </details>
   {% endif %}
 

@@ -77,6 +77,11 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
    */
   it('markSupplierAdvancePaid refuses an impossible date', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    // Order-page polish round: markSupplierAdvancePaid() now requires
+    // Stage 5 unlocked, checked before the date validation this test is
+    // actually about — unlock first so the gate isn't what this test ends
+    // up exercising.
+    await unlockThrough(orderId, 4);
     const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
     await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-6', { advance_amount_inr: '20000' }, 'issued');
     const userId = await createTestUser('Admin');
@@ -94,6 +99,7 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
   /** External QA report R-11: a future-dated payment (2099) must be refused, not silently accepted. */
   it('markSupplierAdvancePaid refuses a future date', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    await unlockThrough(orderId, 4);
     const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
     await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-7', { advance_amount_inr: '20000' }, 'issued');
     const userId = await createTestUser('Admin');
@@ -111,6 +117,7 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
   /** External QA report R-11: the amount actually paid must now be required — this used to capture nothing at all. */
   it('markSupplierBalancePaid refuses a missing amount', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    await unlockThrough(orderId, 4);
     const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
     await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-8', { balance_amount_inr: '30000' }, 'issued');
     const userId = await createTestUser('Admin');
@@ -128,6 +135,7 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
   /** External QA report R-11: a valid date + amount through the real controller action persists both, including when the amount differs from the PO's own planned amount. */
   it('markSupplierAdvancePaid persists a different actually-paid amount', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    await unlockThrough(orderId, 4);
     const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
     await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JPAY-9', { advance_amount_inr: '20000' }, 'issued');
     const userId = await createTestUser('Admin');

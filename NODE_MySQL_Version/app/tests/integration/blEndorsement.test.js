@@ -16,6 +16,7 @@ const documentRepository = require('../../src/repositories/documentRepository');
 const fileStoreRepository = require('../../src/repositories/fileStoreRepository');
 const orderBlEndorsementRepository = require('../../src/repositories/orderBlEndorsementRepository');
 const documentGenerationService = require('../../src/services/documentGenerationService');
+const stageGateService = require('../../src/services/stageGateService');
 const ordersController = require('../../src/controllers/ordersController');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
@@ -48,6 +49,13 @@ describe('BL Endorsement (Section BC)', () => {
     res.redirect = (url) => { res.redirectedTo = url; };
     res.renderView = (view, data) => { res.renderedView = view; res.renderedData = data; };
     return res;
+  }
+
+  /** Order-page polish round: saveBlEndorsement()/generateBlEndorsement() now require Stage 9 unlocked — see orderPageStageGateFixes.test.js. */
+  async function unlockThroughStage9(orderId) {
+    for (let stage = 1; stage <= 8; stage++) {
+      await stageGateService.passAndUnlockNext(orderId, stage, null);
+    }
   }
 
   it('upsert creates then updates the same row', async () => {
@@ -148,6 +156,7 @@ describe('BL Endorsement (Section BC)', () => {
   it('saveBlEndorsement controller action upserts from the request body', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
+    await unlockThroughStage9(orderId);
 
     const req = {
       params: { id: String(orderId) },
@@ -171,6 +180,7 @@ describe('BL Endorsement (Section BC)', () => {
   it('generateBlEndorsement controller action generates when details saved', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
+    await unlockThroughStage9(orderId);
     await orderBlEndorsementRepository.upsert(orderId, { bl_number: 'MSCU3333333' }, userId);
 
     const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, session: {} };
