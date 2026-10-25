@@ -25,6 +25,7 @@ use App\Controllers\ComplaintController;
 use App\Controllers\DisputeController;
 use App\Controllers\DocumentController;
 use App\Controllers\FileStoreController;
+use App\Controllers\GalleryController;
 use App\Controllers\EmailDispatchController;
 use App\Controllers\FieldProtectionController;
 use App\Controllers\HolidayController;
@@ -90,6 +91,7 @@ $account = new AccountController();
 $annexure = new AnnexureController();
 $documents = new DocumentController();
 $fileStore = new FileStoreController();
+$gallery = new GalleryController();
 $reviews = new ReviewController();
 $emailDispatch = new EmailDispatchController();
 $amendments = new AmendmentController();
@@ -282,6 +284,13 @@ $router->get('/getting-started', [$gettingStarted, 'show'], [SessionAuth::requir
 $router->get('/sop', [$sop, 'index'], [SessionAuth::required()]);
 $router->get('/sop-assets/{file}', [$sop, 'asset'], [SessionAuth::required()]);
 $router->get('/sop/{chapter}', [$sop, 'show'], [SessionAuth::required()]);
+
+// Gallery — reads docs/gallery/** live off disk, any logged-in staff member
+// can view. No upload form: files are added directly on the server's
+// filesystem (e.g. via FTP); folders double as categories with no code
+// change needed.
+$router->get('/gallery', [$gallery, 'index'], [SessionAuth::required()]);
+$router->get('/gallery/file', [$gallery, 'file'], [SessionAuth::required()]);
 
 // NOTE: deliberately NOT "/assets" — that path collides with the static
 // public_html/assets/ folder (css/js/img). On Apache, .htaccess's -d check
