@@ -343,6 +343,13 @@ foreach ($documents as $__d) {
 $hasQtDoc = $qtDoc !== null;
 $qtSent = $hasQtDoc && $qtDoc['status'] === 'sent';
 $hasBuyerPoDoc = in_array('BUYERPO', array_column($documents, 'document_type_code'), true);
+// Once the Buyer PO stage gate has passed, the quotation was evidently sent
+// and accepted, even if it went out by email outside the app (QT left
+// 'draft') or no BUYERPO document was generated. Without this, steps 2/3
+// stayed current/locked on an order already far past them, and the
+// "first step that isn't done" below (the card opened and scrolled to on
+// every load) was stuck on Step 2.
+$quotationAccepted = $hasBuyerPoDoc || $hasBuyerPo;
 $step123Status = static function (bool $reached, bool $done) use ($orderClosed): string {
     if ($orderClosed) {
         return 'done';
@@ -358,8 +365,8 @@ $step123Status = static function (bool $reached, bool $done) use ($orderClosed):
 // card's checkmark/current-highlight/locked styling and open state.
 $stepStates = [
     '1'    => $step123Status(true, $hasQtDoc),
-    '2'    => $step123Status($hasQtDoc, $qtSent),
-    '3'    => $step123Status($qtSent, $hasBuyerPoDoc),
+    '2'    => $step123Status($hasQtDoc, $qtSent || $quotationAccepted),
+    '3'    => $step123Status($qtSent || $quotationAccepted, $quotationAccepted),
     '4'    => $stepStatus($stage2),
     '5'    => $stepStatus($stage3),
     '6'    => $stepStatus($stage4),

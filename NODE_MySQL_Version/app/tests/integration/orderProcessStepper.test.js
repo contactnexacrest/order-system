@@ -113,6 +113,28 @@ describe('Order-page process stepper (Point 2)', () => {
    * scroll-to-current-card had nothing to scroll to (page stayed at the
    * top). Steps 1-7 done + checklist outstanding is exactly that state.
    */
+  /**
+   * Steps 2/3 used to need the QT marked 'sent' in-app and a BUYERPO
+   * document — so an order whose quotation went out by email (QT left
+   * 'draft') stayed stuck on Step 2 even after the Buyer PO stage gate
+   * passed, and every page load opened and scrolled to Step 2 instead of
+   * the real current step (Step 5, Proforma Invoice).
+   */
+  it('counts steps 2 and 3 as done once the Buyer PO stage has passed', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await createTestDocument(orderId, 'QT', 'draft');
+    for (const stageNumber of [1, 2]) {
+      const stage = await orderStageRepository.findByOrderAndStageNumber(orderId, stageNumber);
+      await orderStageRepository.passGate(stage.id, null);
+    }
+
+    const res = await agent.get(`/orders/${orderId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/id="step-2-quotation-send">\s*<summary><span class="step-card-icon done"/);
+    expect(res.text).toMatch(/id="step-3-quotation-accept">\s*<summary><span class="step-card-icon done"/);
+    expect(res.text).toContain('id="step-group-stage-3" open');
+  });
+
   it('opens the Step 8 group when the Compliance Checklist is the current step', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await createTestDocument(orderId, 'QT', 'sent');

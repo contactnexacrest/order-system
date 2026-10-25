@@ -128,6 +128,33 @@ final class OrderProcessStepperTest extends DbTestCase
         self::assertStringContainsString('id="step-group-stage-production" open', $output);
     }
 
+    /**
+     * Steps 2/3 used to need the QT marked 'sent' in-app and a BUYERPO
+     * document — so an order whose quotation went out by email (QT left
+     * 'draft') stayed stuck on Step 2 even after the Buyer PO stage gate
+     * passed, and every page load opened and scrolled to Step 2 instead
+     * of the real current step (Step 5, Proforma Invoice).
+     */
+    public function testStepsTwoAndThreeCountAsDoneOnceTheBuyerPoStageHasPassed(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->createTestDocument($orderId, 'QT', 'draft');
+        foreach ([1, 2] as $stageNumber) {
+            $stage = \App\Repositories\OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
+            \App\Repositories\OrderStageRepository::passGate((int) $stage['id'], $userId);
+        }
+
+        $_SESSION['_auth_user_id'] = $userId;
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertMatchesRegularExpression('/id="step-2-quotation-send">\s*<summary><span class="step-card-icon done"/', $output);
+        self::assertMatchesRegularExpression('/id="step-3-quotation-accept">\s*<summary><span class="step-card-icon done"/', $output);
+        self::assertStringContainsString('id="step-group-stage-3" open', $output);
+    }
+
     protected function tearDown(): void
     {
         unset($_SESSION['_auth_user_id']);

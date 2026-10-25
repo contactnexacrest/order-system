@@ -211,11 +211,18 @@
 {% set hasQtDoc = docGenerated(documents, 'QT') %}
 {% set qtSent = docStatus(documents, 'QT') == 'sent' %}
 {% set hasBuyerPoDoc = docGenerated(documents, 'BUYERPO') %}
+{# Once the Buyer PO stage gate has passed, the quotation was evidently
+   sent and accepted, even if it went out by email outside the app (QT
+   left 'draft') or no BUYERPO document was generated. Without this,
+   steps 2/3 stayed current/locked on an order already far past them, and
+   firstNonDoneStep (the card opened and scrolled to on every load) was
+   stuck on Step 2. #}
+{% set quotationAccepted = hasBuyerPoDoc or hasBuyerPo %}
 {% macro step123Status(reached, done) %}{% if orderClosed %}done{% elif not reached %}locked{% elif done %}done{% else %}current{% endif %}{% endmacro %}
 {% set stepStates = {
   's1': step123Status(true, hasQtDoc),
-  's2': step123Status(hasQtDoc, qtSent),
-  's3': step123Status(qtSent, hasBuyerPoDoc),
+  's2': step123Status(hasQtDoc, qtSent or quotationAccepted),
+  's3': step123Status(qtSent or quotationAccepted, quotationAccepted),
   's4': stepStatusFn(stage2, false),
   's5': stepStatusFn(stage3, false),
   's6': stepStatusFn(stage4, false),
