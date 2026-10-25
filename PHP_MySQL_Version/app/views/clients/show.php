@@ -234,6 +234,23 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
         <p class="muted small">"Log in as this client" isn't available right now — <?= htmlspecialchars(implode(', ', $__reasons)) ?>.</p>
       <?php endif; ?>
     <?php endif; ?>
+    <?php if ($__canManageSettings): ?>
+      <?php if ($clientLogin): ?>
+        <details style="margin-top:14px">
+          <summary>Reset client-portal password</summary>
+          <p class="muted small">For a client who's locked out and can't use their own "Forgot password" email link — generates a one-time temporary password for you to hand over directly. They'll be asked to change it the next time they log in.</p>
+          <form method="post" action="/clients/<?= (int) $client['id'] ?>/reset-password" onsubmit="return confirm('Reset the client-portal password for <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>? Their current password stops working immediately. This is logged.');">
+            <?= Csrf::field() ?>
+            <label>Reason for this reset
+              <input type="text" name="reason" placeholder="e.g., Client called, forgot password, can't access email" required minlength="10">
+            </label>
+            <button type="submit" class="btn-sm">Reset password</button>
+          </form>
+        </details>
+      <?php else: ?>
+        <p class="muted small" style="margin-top:14px">This client has no portal account yet — one is provisioned automatically once their first order's advance payment clears.</p>
+      <?php endif; ?>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 

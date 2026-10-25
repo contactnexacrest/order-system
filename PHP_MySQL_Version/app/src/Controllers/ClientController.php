@@ -9,6 +9,7 @@ use App\Helpers\ReasonValidator;
 use App\Helpers\View;
 use App\Repositories\AdminOverrideRepository;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\ClientLoginRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\FileStoreRepository;
@@ -184,6 +185,7 @@ final class ClientController
             'additionalDocuments' => $additionalDocuments,
             'duplicateOfClient' => $client['duplicate_of_client_id'] ? ClientRepository::find((int) $client['duplicate_of_client_id']) : null,
             'duplicatedInto' => ClientRepository::findDuplicatesOf((int) $client['id']),
+            'clientLogin' => ClientLoginRepository::findByClientId((int) $client['id']),
         ], 'layout/base');
     }
 
@@ -625,6 +627,63 @@ final class ClientController
             ? "Staff can now log in as {$client['company_legal_name']} (if the global switch and the impersonate_client permission also allow it)."
             : "Staff can no longer log in as {$client['company_legal_name']}.");
         header("Location: /clients/{$clientId}");
+    }
+
+    /**
+     * For a non-technical client who's locked out of the portal and
+     * can't follow their own "Forgot password" email link: the client's
+     * own /client/account "Change Password" form requires their CURRENT
+     * password, so even staff impersonating them cannot set a new one —
+     * there was no path at all before this. Mirrors
+     * UserController::forceResetPassword() exactly (same temp-password
+     * generation, same reason requirement, same "shown once, hand it
+     * over directly" flash) but against client_logins instead of users.
+     * Requires client_logins to already exist (docs/schema.sql Section —
+     * ClientLoginRepository's own docblock: that row is created ONLY by
+     * ClientPortalService::provisionIfNeeded(), never here) — this resets
+     * an existing portal account, it does not provision one.
+     */
+    public function resetPortalPassword(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+
+        $login = ClientLoginRepository::findByClientId($clientId);
+        if (!$login) {
+            Flash::set('error', "{$client['company_legal_name']} has no client-portal account yet — portal access is provisioned automatically once this client's first order's advance payment clears.");
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+
+        $tempPassword = self::generateTempPassword();
+        ClientLoginRepository::updatePassword($clientId, password_hash($tempPassword, PASSWORD_DEFAULT), true);
+
+        $user = AuthService::currentUser();
+        AuditLogRepository::log((int) $user['id'], 'CLIENT_PASSWORD_ADMIN_RESET', 'clients', $clientId, null, null, null, $reason);
+
+        Flash::set('success', "Password reset for {$client['company_legal_name']}'s client-portal account. One-time temporary password: {$tempPassword} — give this to them directly; they'll be asked to change it on first login.");
+        header("Location: /clients/{$clientId}");
+    }
+
+    private static function generateTempPassword(): string
+    {
+        // Same shape as UserController::generateTempPassword() — 12
+        // random bytes -> 16-char base64url, always contains mixed case
+        // + digits, no dependency on a symbol since force_password_change
+        // means it only has to survive one login.
+        return rtrim(strtr(base64_encode(random_bytes(12)), '+/', '-_'), '=');
     }
 
     /**

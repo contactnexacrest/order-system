@@ -283,6 +283,118 @@ final class OrderFeedbackTest extends DbTestCase
         self::assertStringContainsString("hasn't submitted feedback", $output);
     }
 
+    // ---------------------------------------------------------------
+    // OrderController::recordFeedback() — staff recording feedback the
+    // client gave over the phone/in person, on their behalf
+    // ---------------------------------------------------------------
+
+    private function auditLogCount(string $actionType, int $entityId): int
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT COUNT(*) FROM audit_log WHERE action_type = :action AND entity_type = 'orders' AND entity_id = :entity_id"
+        );
+        $stmt->execute(['action' => $actionType, 'entity_id' => $entityId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function testRecordFeedbackSavesAValidRatingAndLogsItUnderItsOwnActionType(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['rating' => '4', 'comments' => 'Client called — happy overall, minor delay in replies.'];
+
+        ob_start();
+        (new OrderController())->recordFeedback(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        $row = OrderFeedbackRepository::find($orderId);
+        self::assertNotNull($row);
+        self::assertSame(4, (int) $row['rating']);
+        self::assertSame('Client called — happy overall, minor delay in replies.', $row['comments']);
+        self::assertSame('success', Flash::pull()[0]['type']);
+        self::assertSame(1, $this->auditLogCount('ORDER_FEEDBACK_RECORDED_BY_STAFF', $orderId));
+        self::assertSame(0, $this->auditLogCount('ORDER_FEEDBACK_SUBMITTED', $orderId), 'staff-entered feedback must not be mistaken for a genuine client-portal submission in the audit trail');
+    }
+
+    public function testRecordFeedbackRejectsARatingOutsideOneToFive(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->markShippedDocsSent($orderId);
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['rating' => '0'];
+
+        ob_start();
+        (new OrderController())->recordFeedback(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        self::assertNull(OrderFeedbackRepository::find($orderId));
+        self::assertSame('error', Flash::pull()[0]['type']);
+    }
+
+    public function testRecordFeedbackRefusedOnAnActiveOrder(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient()); // defaults to 'active'
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['rating' => '5', 'comments' => 'Too early.'];
+
+        ob_start();
+        (new OrderController())->recordFeedback(['id' => (string) $orderId]);
+        ob_end_clean();
+
+        self::assertNull(OrderFeedbackRepository::find($orderId));
+        self::assertSame('error', Flash::pull()[0]['type']);
+    }
+
+    public function testStaffOrderPageOffersTheRecordFeedbackFormOnceShippedWithNoPriorSubmission(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->markShippedDocsSent($orderId);
+        $_SESSION['_auth_user_id'] = $userId;
+
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertStringContainsString('action="/orders/' . $orderId . '/feedback"', $output);
+        self::assertStringContainsString('Record Feedback', $output);
+    }
+
+    public function testStaffOrderPageHidesTheRecordFeedbackFormOnAnActiveOrder(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $_SESSION['_auth_user_id'] = $userId;
+
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertStringNotContainsString('action="/orders/' . $orderId . '/feedback"', $output);
+    }
+
+    public function testStaffOrderPageHidesTheRecordFeedbackFormOnceFeedbackAlreadyExists(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $this->markShippedDocsSent($orderId);
+        OrderFeedbackRepository::upsert($orderId, $clientId, 4, 'Already on file.');
+        $_SESSION['_auth_user_id'] = $userId;
+
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertStringNotContainsString('action="/orders/' . $orderId . '/feedback"', $output);
+        self::assertStringContainsString('Already on file.', $output);
+    }
+
     public function testStaffOrderPageShowsTheSubmittedRatingAndCommentsToEveryRole(): void
     {
         // Rating/comments aren't financial data (per the standing

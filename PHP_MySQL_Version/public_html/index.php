@@ -363,6 +363,7 @@ $router->post('/clients/{id}/impersonation-allowed', [$clients, 'setImpersonatio
 $router->post('/clients/{id}/order-history-visibility', [$clients, 'setOrderHistoryVisibilityOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/document-downloads-visibility', [$clients, 'setDocumentDownloadsVisibilityOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/impersonate', [$clients, 'impersonate'], [SessionAuth::required(), PermissionCheck::requires('impersonate_client'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/reset-password', [$clients, 'resetPortalPassword'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 
 // Staff review queue for public quotation-details submissions.
 $router->get('/client-intake', [$clientIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
@@ -464,6 +465,8 @@ $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisi
 
 // docs/schema.sql Section AI — order progress chat.
 $router->post('/orders/{id}/comments', [$orderComments, 'post'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// Step 16 — staff recording feedback the client gave over the phone/in person rather than via the portal. No OrderLockGuard: feedback is only reachable once the order is shipped_docs_sent/complete, which is already past the point of being "locked" in the ordinary editing sense.
+$router->post('/orders/{id}/feedback', [$orders, 'recordFeedback'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/orders/{id}/comment-attachments/{fileId}/download', [$orderComments, 'downloadAttachment'], [SessionAuth::required(), PermissionCheck::requires('download_pdf')]);
 
 // Annexure A — Product Technical Specifications (schema tables shipped

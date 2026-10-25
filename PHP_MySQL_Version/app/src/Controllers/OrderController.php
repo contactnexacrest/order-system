@@ -33,6 +33,7 @@ use App\Repositories\OrderCommentRepository;
 use App\Repositories\OrderComplianceTaskRepository;
 use App\Repositories\OrderExportBenefitSchemeRepository;
 use App\Repositories\OrderCostEntryRepository;
+use App\Repositories\OrderFeedbackRepository;
 use App\Repositories\OrderLcDetailRepository;
 use App\Repositories\OrderCrateRepository;
 use App\Repositories\OrderFreightRepository;
@@ -1757,6 +1758,48 @@ final class OrderController
         StageGateService::passAndUnlockNext($orderId, 4, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'OC_ACKNOWLEDGED_VIA_EMAIL', 'orders', $orderId, null, null, null, $note);
         Flash::set('success', 'Buyer acknowledgement recorded. Stage 5 (Supplier PO) unlocked.');
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Step 16 (Order Feedback) for a non-technical client who tells their
+     * NexaCrest contact how the order went over the phone or in person
+     * rather than using the portal — there was no way for staff to
+     * record that before this. Same gate and the same
+     * OrderFeedbackRepository::upsert() the client's own
+     * ClientPortalController::submitFeedback() uses; logged under its own
+     * action type so the audit trail still shows it was staff-entered,
+     * not a genuine client-portal submission.
+     */
+    public function recordFeedback(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        if (!in_array($order['status'], ['shipped_docs_sent', 'complete'], true)) {
+            Flash::set('error', "Feedback can be recorded once this order's documents have been sent to the client.");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        $rating = (int) ($_POST['rating'] ?? 0);
+        if ($rating < 1 || $rating > 5) {
+            Flash::set('error', 'Choose a rating between 1 and 5 stars.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $comments = trim((string) ($_POST['comments'] ?? '')) ?: null;
+
+        OrderFeedbackRepository::upsert($orderId, (int) $order['client_id'], $rating, $comments);
+
+        $user = AuthService::currentUser();
+        AuditLogRepository::log((int) $user['id'], 'ORDER_FEEDBACK_RECORDED_BY_STAFF', 'orders', $orderId, null, null, (string) $rating, 'Feedback recorded by staff on the client\'s behalf (not submitted via the client portal).');
+
+        Flash::set('success', 'Feedback recorded for this order.');
         header("Location: /orders/{$orderId}");
     }
 

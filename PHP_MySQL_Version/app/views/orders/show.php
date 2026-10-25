@@ -2904,6 +2904,24 @@ $stepStatusIcon = static function (string $status): string {
     <summary><?= $stepStatusIcon($stepStates['16']) ?><span class="step-group-num">STEP 16</span><h2>Order Feedback</h2></summary>
     <?php if (empty($orderFeedback)): ?>
       <p class="muted">The client hasn't submitted feedback for this order yet.</p>
+      <?php if ($canManageOrders && in_array($order['status'], ['shipped_docs_sent', 'complete'], true)): ?>
+        <p class="muted small">If the client told you how the order went over the phone or in person instead of using the portal, record it here on their behalf.</p>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/feedback" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+          <?= Csrf::field() ?>
+          <label>Rating
+            <select name="rating" required>
+              <option value="">Choose a rating</option>
+              <?php for ($i = 5; $i >= 1; $i--): ?>
+                <option value="<?= $i ?>"><?= str_repeat('★', $i) ?><?= str_repeat('☆', 5 - $i) ?> (<?= $i ?>/5)</option>
+              <?php endfor; ?>
+            </select>
+          </label>
+          <label style="flex:1;min-width:220px">Comments (optional)
+            <input type="text" name="comments" placeholder="What the client told you">
+          </label>
+          <button type="submit" class="btn-sm">Record Feedback</button>
+        </form>
+      <?php endif; ?>
     <?php else: ?>
       <div class="kv-grid">
         <div><span class="k">Rating</span><span class="v"><?= str_repeat('★', (int) $orderFeedback['rating']) ?><?= str_repeat('☆', 5 - (int) $orderFeedback['rating']) ?> (<?= (int) $orderFeedback['rating'] ?>/5)</span></div>
