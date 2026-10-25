@@ -218,7 +218,8 @@ describe('Order page section order (Task #36)', () => {
   });
 
   it('Travel Expenses renders inside Order Financials, next to LC and Bank Loan', async () => {
-    const orderId = await createTestOrder(await createTestClient());
+    // The LC / bank loan block only renders for an LC-paid order.
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight');
 
     const output = await render(orderId);
 
@@ -250,5 +251,26 @@ describe('Order page section order (Task #36)', () => {
     expect(stage9Pos).toBeGreaterThan(-1);
     expect(financialsPos).toBeLessThan(stage9Pos);
     expect(output).not.toContain('Order Financials below');
+  });
+
+  it('Freight Payment is a greyed-out, non-expandable card for FOB', async () => {
+    const fob = await render(await createTestOrder(await createTestClient(), 'FOB'));
+    expect(fob).toContain('<div class="step-group step-group-disabled" id="step-group-stage-6" aria-disabled="true"');
+    expect(fob).toContain('Not applicable — FOB');
+    expect(fob).not.toContain('id="step-9a-freight-terms"');
+
+    const cif = await render(await createTestOrder(await createTestClient(), 'CIF'));
+    expect(cif).toContain('<details class="step-group" id="step-group-stage-6"');
+    expect(cif).toContain('id="step-9a-freight-terms"');
+  });
+
+  it('LC and bank loan details only show for an LC payment preset', async () => {
+    const cash = await render(await createTestOrder(await createTestClient()));
+    expect(cash).not.toContain('Letter of Credit &amp; Bank Loan</h3>');
+    expect(cash).not.toContain('Record LC / bank loan details for this order');
+
+    const lc = await render(await createTestOrder(await createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight'));
+    expect(lc).toContain('Letter of Credit &amp; Bank Loan</h3>');
+    expect(lc).toContain('Record LC / bank loan details for this order');
   });
 });

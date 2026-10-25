@@ -242,7 +242,7 @@ final class OrderLcDetailTest extends DbTestCase
 
     public function testOrderPageOffersTheLcLoanFormWithFileUpload(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight');
 
         $output = $this->render($orderId);
 
@@ -255,7 +255,7 @@ final class OrderLcDetailTest extends DbTestCase
     public function testOrderPageShowsSavedLcDetails(): void
     {
         $userId = $this->createTestUser('Admin');
-        $orderId = $this->createTestOrder($this->createTestClient());
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight');
         OrderLcDetailRepository::upsert($orderId, [
             'lc_number' => 'LC-SHOWN-1', 'lc_file_id' => null, 'bank_loan_amount' => 12345.0,
             'bank_loan_interest_rate' => 8.25, 'bank_loan_interest_paid' => 900.0,

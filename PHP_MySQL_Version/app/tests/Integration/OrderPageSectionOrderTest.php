@@ -227,7 +227,8 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
     public function testTravelExpensesRendersInsideOrderFinancialsNextToLcAndBankLoan(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
+        // The LC / bank loan block only renders for an LC-paid order.
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight');
 
         $output = $this->render($orderId);
 
@@ -260,5 +261,28 @@ final class OrderPageSectionOrderTest extends DbTestCase
         self::assertNotFalse($stage9Pos);
         self::assertLessThan($stage9Pos, $financialsPos, 'Order Financials must render before the Document Despatch & Closure steps — those steps\' own gates refer staff to it as "above"');
         self::assertStringNotContainsString('Order Financials below', $output, 'the stale "below" reference must be corrected now that Financials renders first');
+    }
+
+    public function testFreightPaymentIsAGreyedOutNonExpandableCardForFob(): void
+    {
+        $fob = $this->render($this->createTestOrder($this->createTestClient(), 'FOB'));
+        self::assertStringContainsString('<div class="step-group step-group-disabled" id="step-group-stage-6" aria-disabled="true"', $fob);
+        self::assertStringContainsString('Not applicable — FOB', $fob);
+        self::assertStringNotContainsString('id="step-9a-freight-terms"', $fob, 'nothing to expand for FOB');
+
+        $cif = $this->render($this->createTestOrder($this->createTestClient(), 'CIF'));
+        self::assertStringContainsString('<details class="step-group" id="step-group-stage-6"', $cif);
+        self::assertStringContainsString('id="step-9a-freight-terms"', $cif);
+    }
+
+    public function testLcAndBankLoanDetailsOnlyShowForAnLcPaymentPreset(): void
+    {
+        $cash = $this->render($this->createTestOrder($this->createTestClient()));
+        self::assertStringNotContainsString('Letter of Credit &amp; Bank Loan</h3>', $cash);
+        self::assertStringNotContainsString('Record LC / bank loan details for this order', $cash);
+
+        $lc = $this->render($this->createTestOrder($this->createTestClient(), 'FOB', 'Irrevocable Letter of Credit at Sight'));
+        self::assertStringContainsString('Letter of Credit &amp; Bank Loan</h3>', $lc);
+        self::assertStringContainsString('Record LC / bank loan details for this order', $lc);
     }
 }

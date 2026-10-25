@@ -141,7 +141,6 @@
 {% set buyerAcknowledged = stage4 and stage4.status == 'gate_passed' %}
 {% set supplierSigned = stage5 and stage5.status == 'gate_passed' %}
 {% set isFob = (order.incoterm_code | upper) == 'FOB' %}
-{% set freightSkipped = stage6 and stage6.status == 'skipped' %}
 {% set freightCleared = stage6 and stage6.status == 'gate_passed' %}
 {% set blIssued = stage7 and stage7.status == 'gate_passed' %}
 {% set balanceCleared = stage8 and stage8.status == 'gate_passed' %}
@@ -1783,17 +1782,20 @@
 
   </details>
 
-  {% set freightLocked = (not isFob) and ((not stage6) or stage6.status == 'locked') %}
+  {% if isFob %}
+  {# FOB: the buyer arranges and pays freight, so this whole step never applies — shown greyed out, with nothing to expand. #}
+  <div class="step-group step-group-disabled" id="step-group-stage-6" aria-disabled="true" title="Not applicable — FOB order: the buyer arranges and pays freight directly.">
+    <div class="step-group-head">{{ stepStatusIcon(stepStates['s9']) }}<span class="step-group-num">STEP 9</span><h3>Freight Payment</h3><span class="step-group-na">Not applicable — FOB</span></div>
+  </div>
+  {% else %}
+  {% set freightLocked = (not stage6) or stage6.status == 'locked' %}
 
   <details class="step-group" id="step-group-stage-6"{{ stepCardOpen('s9') }}>
     <summary>{{ stepStatusIcon(stepStates['s9']) }}<span class="step-group-num">STEP 9</span><h3>Freight Payment</h3></summary>
 
   <details class="step-card" id="step-9a-freight-terms"{{ flow.subCardOpen('s9', '9a') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9a')) }}<h2>Step 9a &middot; Save Freight Terms{{ ' (skipped — FOB)' if isFob else '' }}</h2></summary>
-    {% if isFob %}
-      <p class="muted">FOB order — buyer arranges and pays freight directly. This stage is auto-skipped once Stage 5 passes.</p>
-      {% if freightSkipped %}<p>Confirmed skipped: {{ stage6.skip_reason }}</p>{% endif %}
-    {% elif freightLocked %}
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9a')) }}<h2>Step 9a &middot; Save Freight Terms</h2></summary>
+    {% if freightLocked %}
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     {% elif not freight %}
       <form method="post" action="/orders/{{ order.id }}/freight-terms">
@@ -1817,10 +1819,8 @@
   <div class="step-group-connector">generates the debit note for the buyer</div>
 
   <details class="step-card" id="step-9b-freight-debit-note"{{ flow.subCardOpen('s9', '9b') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9b')) }}<h2>Step 9b &middot; Generate Debit Note{{ ' (skipped — FOB)' if isFob else '' }}</h2></summary>
-    {% if isFob %}
-      <p class="muted">FOB order — this stage is auto-skipped.</p>
-    {% elif freightLocked %}
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9b')) }}<h2>Step 9b &middot; Generate Debit Note</h2></summary>
+    {% if freightLocked %}
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     {% elif not freight %}
       <p class="muted">Save Freight Terms first (Step 9a).</p>
@@ -1838,10 +1838,8 @@
   <div class="step-group-connector">once their payment lands</div>
 
   <details class="step-card" id="step-9c-freight-remittance"{{ flow.subCardOpen('s9', '9c') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9c')) }}<h2>Step 9c &middot; Record Freight Remittance{{ ' (skipped — FOB)' if isFob else '' }}</h2></summary>
-    {% if isFob %}
-      <p class="muted">FOB order — this stage is auto-skipped.</p>
-    {% elif freightLocked %}
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9c')) }}<h2>Step 9c &middot; Record Freight Remittance</h2></summary>
+    {% if freightLocked %}
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     {% elif not freight %}
       <p class="muted">Save Freight Terms first (Step 9a).</p>
@@ -1864,10 +1862,8 @@
   <div class="step-group-connector">after funds are confirmed cleared</div>
 
   <details class="step-card" id="step-9d-freight-clear"{{ flow.subCardOpen('s9', '9d') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9d')) }}<h2>Step 9d &middot; Mark Freight Cleared{{ ' (skipped — FOB)' if isFob else '' }}</h2></summary>
-    {% if isFob %}
-      <p class="muted">FOB order — this stage is auto-skipped.</p>
-    {% elif freightLocked %}
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9d')) }}<h2>Step 9d &middot; Mark Freight Cleared</h2></summary>
+    {% if freightLocked %}
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     {% elif not freight %}
       <p class="muted">Save Freight Terms first (Step 9a).</p>
@@ -1885,6 +1881,7 @@
   </details>
 
   </details>
+  {% endif %}
 
   {% set packingLocked = (not stage7) or stage7.status == 'locked' %}
 
@@ -2215,6 +2212,8 @@
       </div>
 
       <div class="tab-panel" id="order-financials-costs" data-tab-panel>
+        {% if isLcPayment %}
+        {# Only an order whose payment preset is a Letter of Credit has an LC / bank loan to record. #}
         {% set lcDetails = orderLcDetails or { lc_number: null, lc_file_id: null, bank_loan_amount: null, bank_loan_interest_rate: null, bank_loan_interest_paid: null } %}
         <h3 style="font-size:0.95em; margin-top:0;">Letter of Credit &amp; Bank Loan</h3>
         <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
@@ -2237,6 +2236,7 @@
             <button type="submit" class="btn-sm">Save LC / Loan Details</button>
           </form>
         </details>
+        {% endif %}
 
         {% if pendingInspectionTask %}
         <h3 style="font-size:0.95em; margin-top:14px;">3rd-Party Pre-Shipment Inspection (step 8a)</h3>

@@ -246,7 +246,6 @@ $suppoDocGenerated = (bool) array_filter($documents, static fn(array $d): bool =
 $ciDocGenerated = (bool) array_filter($documents, static fn(array $d): bool => $d['document_type_code'] === 'CI');
 $supplierSigned = $stage5 && $stage5['status'] === 'gate_passed';
 $isFob = strtoupper((string) $order['incoterm_code']) === 'FOB';
-$freightSkipped = $stage6 && $stage6['status'] === 'skipped';
 $freightCleared = $stage6 && $stage6['status'] === 'gate_passed';
 $blIssued = $stage7 && $stage7['status'] === 'gate_passed';
 $balanceCleared = $stage8 && $stage8['status'] === 'gate_passed';
@@ -2086,17 +2085,20 @@ $stepStatusIcon = static function (string $status): string {
 
   </details>
 
-  <?php $freightLocked = !$isFob && (!$stage6 || $stage6['status'] === 'locked'); ?>
+  <?php if ($isFob): ?>
+  <?php // FOB: the buyer arranges and pays freight, so this whole step never applies — shown greyed out, with nothing to expand. ?>
+  <div class="step-group step-group-disabled" id="step-group-stage-6" aria-disabled="true" title="Not applicable — FOB order: the buyer arranges and pays freight directly.">
+    <div class="step-group-head"><?= $stepStatusIcon($stepStates['9']) ?><span class="step-group-num">STEP 9</span><h3>Freight Payment</h3><span class="step-group-na">Not applicable — FOB</span></div>
+  </div>
+  <?php else: ?>
+  <?php $freightLocked = !$stage6 || $stage6['status'] === 'locked'; ?>
 
   <details class="step-group" id="step-group-stage-6"<?= $stepCardOpen('9') ?>>
     <summary><?= $stepStatusIcon($stepStates['9']) ?><span class="step-group-num">STEP 9</span><h3>Freight Payment</h3></summary>
 
   <details class="step-card" id="step-9a-freight-terms"<?= $subCardOpen('9', '9a') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('9', '9a')) ?><h2>Step 9a &middot; Save Freight Terms<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
-    <?php if ($isFob): ?>
-      <p class="muted">FOB order — buyer arranges and pays freight directly. This stage is auto-skipped once Stage 5 passes.</p>
-      <?php if ($freightSkipped): ?><p>Confirmed skipped: <?= htmlspecialchars($stage6['skip_reason']) ?></p><?php endif; ?>
-    <?php elseif ($freightLocked): ?>
+    <summary><?= $stepStatusIcon($subStepStatus('9', '9a')) ?><h2>Step 9a &middot; Save Freight Terms</h2></summary>
+    <?php if ($freightLocked): ?>
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     <?php elseif (!$freight): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/freight-terms">
@@ -2120,10 +2122,8 @@ $stepStatusIcon = static function (string $status): string {
   <div class="step-group-connector">generates the debit note for the buyer</div>
 
   <details class="step-card" id="step-9b-freight-debit-note"<?= $subCardOpen('9', '9b') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('9', '9b')) ?><h2>Step 9b &middot; Generate Debit Note<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
-    <?php if ($isFob): ?>
-      <p class="muted">FOB order — this stage is auto-skipped.</p>
-    <?php elseif ($freightLocked): ?>
+    <summary><?= $stepStatusIcon($subStepStatus('9', '9b')) ?><h2>Step 9b &middot; Generate Debit Note</h2></summary>
+    <?php if ($freightLocked): ?>
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     <?php elseif (!$freight): ?>
       <p class="muted">Save Freight Terms first (Step 9a).</p>
@@ -2141,10 +2141,8 @@ $stepStatusIcon = static function (string $status): string {
   <div class="step-group-connector">once their payment lands</div>
 
   <details class="step-card" id="step-9c-freight-remittance"<?= $subCardOpen('9', '9c') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('9', '9c')) ?><h2>Step 9c &middot; Record Freight Remittance<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
-    <?php if ($isFob): ?>
-      <p class="muted">FOB order — this stage is auto-skipped.</p>
-    <?php elseif ($freightLocked): ?>
+    <summary><?= $stepStatusIcon($subStepStatus('9', '9c')) ?><h2>Step 9c &middot; Record Freight Remittance</h2></summary>
+    <?php if ($freightLocked): ?>
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     <?php elseif (!$freight): ?>
       <p class="muted">Save Freight Terms first (Step 9a).</p>
@@ -2167,10 +2165,8 @@ $stepStatusIcon = static function (string $status): string {
   <div class="step-group-connector">after funds are confirmed cleared</div>
 
   <details class="step-card" id="step-9d-freight-clear"<?= $subCardOpen('9', '9d') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('9', '9d')) ?><h2>Step 9d &middot; Mark Freight Cleared<?= $isFob ? ' (skipped — FOB)' : '' ?></h2></summary>
-    <?php if ($isFob): ?>
-      <p class="muted">FOB order — this stage is auto-skipped.</p>
-    <?php elseif ($freightLocked): ?>
+    <summary><?= $stepStatusIcon($subStepStatus('9', '9d')) ?><h2>Step 9d &middot; Mark Freight Cleared</h2></summary>
+    <?php if ($freightLocked): ?>
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     <?php elseif (!$freight): ?>
       <p class="muted">Save Freight Terms first (Step 9a).</p>
@@ -2187,9 +2183,10 @@ $stepStatusIcon = static function (string $status): string {
     <?php endif; ?>
   </details>
 
-  <?php $packingLocked = !$stage7 || $stage7['status'] === 'locked'; ?>
-
   </details>
+  <?php endif; ?>
+
+  <?php $packingLocked = !$stage7 || $stage7['status'] === 'locked'; ?>
 
   <details class="step-group" id="step-group-stage-7"<?= $stepCardOpen('10') ?>>
     <summary><?= $stepStatusIcon($stepStates['10']) ?><span class="step-group-num">STEP 10</span><h3>Packing &amp; BL Instruction</h3></summary>
@@ -2522,6 +2519,8 @@ $stepStatusIcon = static function (string $status): string {
       </div>
 
       <div class="tab-panel" id="order-financials-costs" data-tab-panel>
+        <?php if ($isLcPayment): ?>
+        <?php // Only an order whose payment preset is a Letter of Credit has an LC / bank loan to record. ?>
         <?php $lcDetails = $orderLcDetails ?: ['lc_number' => null, 'lc_file_id' => null, 'bank_loan_amount' => null, 'bank_loan_interest_rate' => null, 'bank_loan_interest_paid' => null]; ?>
         <h3 style="font-size:0.95em; margin-top:0;">Letter of Credit &amp; Bank Loan</h3>
         <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
@@ -2544,6 +2543,7 @@ $stepStatusIcon = static function (string $status): string {
             <button type="submit" class="btn-sm">Save LC / Loan Details</button>
           </form>
         </details>
+        <?php endif; ?>
 
         <?php if ($pendingInspectionTask): ?>
         <h3 style="font-size:0.95em; margin-top:14px;">3rd-Party Pre-Shipment Inspection (step 8a)</h3>
