@@ -99,6 +99,25 @@ final class DocumentImageOptimizerTest extends TestCase
         self::assertLessThanOrEqual(1000, max($w, $h));
     }
 
+    /**
+     * A signature/seal PNG already under the max dimension skips resizing
+     * — and that path used to drop the alpha channel, so every transparent
+     * pixel came out solid black: the "black box" behind signatures on
+     * every generated document.
+     */
+    public function testSmallTransparentPngStaysTransparentWithoutResizing(): void
+    {
+        $path = $this->tmpDir . '/signature.png';
+        $this->makeTransparentPng($path, 466, 56);
+
+        $dataUri = DocumentImageOptimizer::dataUriForEmbed($path, 'image/png');
+
+        self::assertStringStartsWith('data:image/png;base64,', $dataUri);
+        $im = imagecreatefromstring(base64_decode(explode(',', $dataUri, 2)[1]));
+        $corner = imagecolorsforindex($im, imagecolorat($im, 0, 0));
+        self::assertSame(127, $corner['alpha'], 'the transparent background must stay transparent, not turn black');
+    }
+
     public function testSvgPassesThroughUnchanged(): void
     {
         $path = $this->tmpDir . '/mark.svg';

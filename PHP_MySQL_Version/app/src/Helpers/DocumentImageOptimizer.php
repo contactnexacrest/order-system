@@ -73,6 +73,13 @@ final class DocumentImageOptimizer
 
         if ($scale >= 1.0) {
             $resized = $source;
+            // imagecreatefromstring() leaves saveAlpha off, so without this
+            // imagepng() below drops the alpha channel and every transparent
+            // pixel (typically stored as 0,0,0) comes out solid black — the
+            // "black box" behind every signature/seal small enough to skip
+            // resizing. The resize branch already sets both.
+            imagealphablending($resized, false);
+            imagesavealpha($resized, true);
         } else {
             $newWidth = max(1, (int) round($width * $scale));
             $newHeight = max(1, (int) round($height * $scale));
@@ -128,6 +135,8 @@ final class DocumentImageOptimizer
     private static function cachePathFor(string $path): string
     {
         $dir = rtrim(Env::storageBasePath(), '/') . '/pdf_image_cache';
-        return $dir . '/' . hash('sha256', $path) . '.cache';
+        // 'v2|' — bumped when render() stopped flattening transparency to
+        // black, so data URIs cached before that fix are never served again.
+        return $dir . '/' . hash('sha256', 'v2|' . $path) . '.cache';
     }
 }
