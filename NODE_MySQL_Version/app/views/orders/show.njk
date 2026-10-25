@@ -910,14 +910,16 @@
                 </table>
               {% endif %}
 
-              {% if d.status == 'approved' %}
+              {% if d.status == 'approved' and not mailSendingEnabled %}
+                <p class="muted">Email sending is turned off (Settings), so there is no Send to Buyer — documents approved from now on count as sent automatically. Send this PDF to the buyer yourself.</p>
+              {% elif d.status == 'approved' %}
                 {% if hasPendingSend %}
                   <p class="muted">A send to the buyer is already in progress for this document (see above) — no new send can be submitted until it's sent, rejected, or fails.</p>
                 {% else %}
                   <p><a href="/orders/{{ order.id }}/documents/{{ d.id }}/send" class="btn-sm btn-accent">Send to Buyer (deferred, 2-level approval)</a></p>
                 {% endif %}
               {% elif d.status == 'sent' %}
-                <p class="muted">Already sent to buyer.</p>
+                <p class="muted">{{ 'Already sent to buyer.' if (mailSendingEnabled or emailLogs.length > 0) else 'Counted as sent on approval (email sending is off) — send the PDF to the buyer yourself.' }}</p>
               {% elif d.status == 'superseded' %}
                 <p class="muted small">This revision is INVALID — superseded. It can no longer be sent; see the latest revision instead.</p>
               {% else %}
@@ -969,7 +971,7 @@
 
   <details class="step-card step-card-reference" id="step-2-quotation-send"{{ stepCardOpen('s2') }}>
     <summary>{{ stepStatusIcon(stepStates['s2']) }}<span class="step-group-num">STEP 2</span><h2>Send Quotation to Client</h2></summary>
-    <p class="muted small">Sending happens through the shared <a href="#document-review-approval">Document Review &amp; Approval</a> workflow below &mdash; every generated document (not just the Quotation) is assigned a reviewer, approved, and dispatched from that one place, regardless of which step generated it. Once the Quotation is approved there, use its own "Send to Buyer" action.</p>
+    <p class="muted small">Sending happens through the shared <a href="#document-review-approval">Document Review &amp; Approval</a> workflow below &mdash; every generated document (not just the Quotation) is assigned a reviewer, approved, and dispatched from that one place, regardless of which step generated it. {{ 'Once the Quotation is approved there, use its own "Send to Buyer" action.' if mailSendingEnabled else 'Email sending is turned off, so the Quotation counts as sent as soon as it is approved there &mdash; send the PDF to the client yourself.' | safe }}</p>
   </details>
 
   <details class="step-card step-card-reference" id="step-3-quotation-accept"{{ stepCardOpen('s3') }}>

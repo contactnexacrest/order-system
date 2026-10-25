@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Helpers\ReasonValidator;
 use App\Repositories\AuditLogRepository;
+use App\Repositories\ClientRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\EmailLogRepository;
@@ -43,6 +44,14 @@ final class EmailDispatchService
         $order = OrderRepository::find($orderId);
         if (!$order) {
             throw new \RuntimeException("Order {$orderId} not found");
+        }
+        // The order's client_email is a snapshot frozen at order creation
+        // (only re-synced by applyClientSnapshot() when a PI intake is
+        // applied) — an email added to the client record afterwards never
+        // reached it, so sends failed with "no email address on file" even
+        // though the client now has one. Fall back to the live record.
+        if (empty($order['client_email'])) {
+            $order['client_email'] = ClientRepository::find((int) $order['client_id'])['email'] ?? null;
         }
 
         $document = null;
@@ -339,23 +348,59 @@ final class EmailDispatchService
             // recordOcAcknowledgment() / ClientPortalController::
             // acknowledgeOc() / the auto_confirm_oc_acknowledgments.php cron
             // are the three ways it later resolves).
-            if ($document['document_type_code'] === 'OC' && $document['order_id'] !== null) {
-                $now = new \DateTimeImmutable();
-                // docs/schema.sql Section AU: admin-configurable, default 48
-                // (matches the original hardcoded value exactly).
-                $hours = (int) (CompanySettingsRepository::get('oc_ack_auto_confirm_hours') ?? '48');
-                \App\Repositories\OrderOcAcknowledgmentRepository::recordSent(
-                    (int) $document['order_id'],
-                    (int) $document['id'],
-                    $now->format('Y-m-d H:i:s'),
-                    $now->modify("+{$hours} hours")->format('Y-m-d H:i:s')
-                );
-            }
+            self::startOcAcknowledgmentClock($document);
         } else {
             EmailLogRepository::markFailed((int) $emailLogRow['id']);
         }
 
         return $sent;
+    }
+
+    private static function startOcAcknowledgmentClock(array $document): void
+    {
+        if ($document['document_type_code'] === 'OC' && $document['order_id'] !== null) {
+            $now = new \DateTimeImmutable();
+            // docs/schema.sql Section AU: admin-configurable, default 48
+            // (matches the original hardcoded value exactly).
+            $hours = (int) (CompanySettingsRepository::get('oc_ack_auto_confirm_hours') ?? '48');
+            \App\Repositories\OrderOcAcknowledgmentRepository::recordSent(
+                (int) $document['order_id'],
+                (int) $document['id'],
+                $now->format('Y-m-d H:i:s'),
+                $now->modify("+{$hours} hours")->format('Y-m-d H:i:s')
+            );
+        }
+    }
+
+    public static function mailSendingEnabled(): bool
+    {
+        return CompanySettingsRepository::get('mail_sending_enabled') !== '0';
+    }
+
+    /**
+     * Owner decision (2026-10-25): with mail_sending_enabled off there is
+     * no "Send to Buyer" action at all — staff send the PDF themselves
+     * outside the app — so a buyer-sendable document counts as sent the
+     * moment it is approved. Does exactly what a real send does to the
+     * document (status 'sent', the OC acknowledgment clock) minus the
+     * email itself. Internal never-shown-to-buyer types are left as-is.
+     * Called right after every point a document becomes approved.
+     */
+    public static function markSentIfMailDisabled(int $documentId): void
+    {
+        if (self::mailSendingEnabled()) {
+            return;
+        }
+        $document = DocumentRepository::find($documentId);
+        if (!$document || $document['status'] !== 'approved' || !empty($document['document_type_never_shown_to_buyer'])) {
+            return;
+        }
+        DocumentRepository::markSent($documentId);
+        self::startOcAcknowledgmentClock($document);
+        AuditLogRepository::log(
+            null, 'DOCUMENT_MARKED_SENT_MAIL_DISABLED', 'documents', $documentId, 'status', 'approved', 'sent',
+            'mail_sending_enabled is off — counted as sent on approval; staff send the PDF outside the app.'
+        );
     }
 
     /**

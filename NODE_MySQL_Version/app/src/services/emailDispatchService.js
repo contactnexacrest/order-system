@@ -2,6 +2,7 @@
 
 const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const documentRepository = require('../repositories/documentRepository');
 const emailLogRepository = require('../repositories/emailLogRepository');
@@ -110,6 +111,15 @@ async function buildPreview(orderId, documentId, templateKey, senderUserId) {
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
+  }
+  // The order's client_email is a snapshot frozen at order creation (only
+  // re-synced by applyClientSnapshot() when a PI intake is applied) — an
+  // email added to the client record afterwards never reached it, so sends
+  // failed with "no email address on file" even though the client now has
+  // one. Fall back to the live record.
+  if (!order.client_email) {
+    const client = await clientRepository.find(order.client_id);
+    order.client_email = (client && client.email) || null;
   }
 
   let document = null;
@@ -386,27 +396,59 @@ async function dispatch(emailLogRow) {
     await documentRepository.markSent(document.id);
     await auditLogRepository.log(null, 'EMAIL_SENT', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email);
 
-    // docs/schema.sql Section AE — the Order Confirmation just went out to
-    // the buyer, so this is the moment the 48-hour acknowledgment clock
-    // starts (ordersController.recordOcAcknowledgment() /
-    // clientPortalController.acknowledgeOc() / the
-    // autoConfirmOcAcknowledgments cron are the three ways it later
-    // resolves).
-    if (document.document_type_code === 'OC' && document.order_id !== null && document.order_id !== undefined) {
-      // docs/schema.sql Section AU: admin-configurable, default 48 (matches
-      // the original hardcoded value exactly).
-      const hours = parseInt((await companySettingsRepository.get('oc_ack_auto_confirm_hours')) || '48', 10);
-      // External QA report L-21/L-02: toISOString() is always UTC — see
-      // dbDateTime.formatForDb()'s docblock.
-      const now = new Date();
-      const due = new Date(now.getTime() + hours * 60 * 60 * 1000);
-      await orderOcAcknowledgmentRepository.recordSent(document.order_id, document.id, formatForDb(now), formatForDb(due));
-    }
+    await startOcAcknowledgmentClock(document);
   } else {
     await emailLogRepository.markFailed(emailLogRow.id);
   }
 
   return sent;
+}
+
+// docs/schema.sql Section AE — the Order Confirmation just went out to the
+// buyer, so this is the moment the 48-hour acknowledgment clock starts
+// (ordersController.recordOcAcknowledgment() /
+// clientPortalController.acknowledgeOc() / the autoConfirmOcAcknowledgments
+// cron are the three ways it later resolves).
+async function startOcAcknowledgmentClock(document) {
+  if (document.document_type_code === 'OC' && document.order_id !== null && document.order_id !== undefined) {
+    // docs/schema.sql Section AU: admin-configurable, default 48 (matches
+    // the original hardcoded value exactly).
+    const hours = parseInt((await companySettingsRepository.get('oc_ack_auto_confirm_hours')) || '48', 10);
+    // External QA report L-21/L-02: toISOString() is always UTC — see
+    // dbDateTime.formatForDb()'s docblock.
+    const now = new Date();
+    const due = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    await orderOcAcknowledgmentRepository.recordSent(document.order_id, document.id, formatForDb(now), formatForDb(due));
+  }
+}
+
+async function mailSendingEnabled() {
+  return (await companySettingsRepository.get('mail_sending_enabled')) !== '0';
+}
+
+/**
+ * Owner decision (2026-10-25): with mail_sending_enabled off there is no
+ * "Send to Buyer" action at all — staff send the PDF themselves outside the
+ * app — so a buyer-sendable document counts as sent the moment it is
+ * approved. Does exactly what a real send does to the document (status
+ * 'sent', the OC acknowledgment clock) minus the email itself. Internal
+ * never-shown-to-buyer types are left as-is. Called right after every point
+ * a document becomes approved.
+ */
+async function markSentIfMailDisabled(documentId) {
+  if (await mailSendingEnabled()) {
+    return;
+  }
+  const document = await documentRepository.find(documentId);
+  if (!document || document.status !== 'approved' || Number(document.document_type_never_shown_to_buyer)) {
+    return;
+  }
+  await documentRepository.markSent(documentId);
+  await startOcAcknowledgmentClock(document);
+  await auditLogRepository.log(
+    null, 'DOCUMENT_MARKED_SENT_MAIL_DISABLED', 'documents', documentId, 'status', 'approved', 'sent',
+    'mail_sending_enabled is off — counted as sent on approval; staff send the PDF outside the app.'
+  );
 }
 
 /**
@@ -446,4 +488,4 @@ async function dispatchGeneric(emailLogRow) {
   return sent;
 }
 
-module.exports = { buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride };
+module.exports = { buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled };

@@ -8,6 +8,7 @@ const documentReviewRepository = require('../repositories/documentReviewReposito
 const notificationRepository = require('../repositories/notificationRepository');
 const userRepository = require('../repositories/userRepository');
 const documentGenerationService = require('./documentGenerationService');
+const emailDispatchService = require('./emailDispatchService');
 const makerCheckerGuard = require('./makerCheckerGuard');
 const stageGateService = require('./stageGateService');
 
@@ -193,6 +194,7 @@ async function finalizeIfFullyApproved(documentId) {
     // staff/buyers could keep relying on an old copy with no way to tell
     // it apart from the current one.
     await documentGenerationService.supersedeOtherApprovedRevisions(documentId);
+    await emailDispatchService.markSentIfMailDisabled(documentId);
 
     // GATE-01: the QT's approval — not its mere draft generation — is
     // Stage 1's real gate (Owner Decision #1: "No stage passes until its

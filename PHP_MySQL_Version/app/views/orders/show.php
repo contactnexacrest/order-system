@@ -232,6 +232,10 @@ $advanceCleared = $stage3 && $stage3['status'] === 'gate_passed';
 // Usable) replaces the cash-advance leg (Record Advance Remittance / Mark
 // Advance Cleared) entirely — only one of the two ever renders.
 $isLcPayment = ($order['payment_method'] ?? 'CASH_ADVANCE') === 'LC';
+// Owner decision: with email sending off there is no "Send to Buyer"
+// action — a document counts as sent once approved
+// (EmailDispatchService::markSentIfMailDisabled()).
+$mailSendingEnabled = \App\Services\EmailDispatchService::mailSendingEnabled();
 $lcConfirmed = $orderLcDetails && $orderLcDetails['lc_confirmed_at'] !== null;
 $buyerAcknowledged = $stage4 && $stage4['status'] === 'gate_passed';
 $ocDocGenerated = (bool) array_filter($documents, static fn(array $d): bool => $d['document_type_code'] === 'OC');
@@ -1110,14 +1114,16 @@ $stepStatusIcon = static function (string $status): string {
                 </table>
               <?php endif; ?>
 
-              <?php if ($d['status'] === 'approved'): ?>
+              <?php if ($d['status'] === 'approved' && !$mailSendingEnabled): ?>
+                <p class="muted">Email sending is turned off (Settings), so there is no Send to Buyer — documents approved from now on count as sent automatically. Send this PDF to the buyer yourself.</p>
+              <?php elseif ($d['status'] === 'approved'): ?>
                 <?php if ($hasPendingSend): ?>
                   <p class="muted">A send to the buyer is already in progress for this document (see above) — no new send can be submitted until it's sent, rejected, or fails.</p>
                 <?php else: ?>
                   <p><a href="/orders/<?= (int) $order['id'] ?>/documents/<?= (int) $d['id'] ?>/send" class="btn-sm btn-accent">Send to Buyer (deferred, 2-level approval)</a></p>
                 <?php endif; ?>
               <?php elseif ($d['status'] === 'sent'): ?>
-                <p class="muted">Already sent to buyer.</p>
+                <p class="muted"><?= $mailSendingEnabled || !empty($emailLogs) ? 'Already sent to buyer.' : 'Counted as sent on approval (email sending is off) — send the PDF to the buyer yourself.' ?></p>
               <?php elseif ($d['status'] === 'superseded'): ?>
                 <p class="muted small">This revision is INVALID — superseded. It can no longer be sent; see the latest revision instead.</p>
               <?php else: ?>
@@ -1167,7 +1173,7 @@ $stepStatusIcon = static function (string $status): string {
 
   <details class="step-card step-card-reference" id="step-2-quotation-send"<?= $stepCardOpen('2') ?>>
     <summary><?= $stepStatusIcon($stepStates['2']) ?><span class="step-group-num">STEP 2</span><h2>Send Quotation to Client</h2></summary>
-    <p class="muted small">Sending happens through the shared <a href="#document-review-approval">Document Review &amp; Approval</a> workflow below &mdash; every generated document (not just the Quotation) is assigned a reviewer, approved, and dispatched from that one place, regardless of which step generated it. Once the Quotation is approved there, use its own "Send to Buyer" action.</p>
+    <p class="muted small">Sending happens through the shared <a href="#document-review-approval">Document Review &amp; Approval</a> workflow below &mdash; every generated document (not just the Quotation) is assigned a reviewer, approved, and dispatched from that one place, regardless of which step generated it. <?= $mailSendingEnabled ? 'Once the Quotation is approved there, use its own "Send to Buyer" action.' : 'Email sending is turned off, so the Quotation counts as sent as soon as it is approved there &mdash; send the PDF to the client yourself.' ?></p>
   </details>
 
   <details class="step-card step-card-reference" id="step-3-quotation-accept"<?= $stepCardOpen('3') ?>>

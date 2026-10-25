@@ -940,6 +940,10 @@ async function show(req, res) {
       assignees: assigneesForView,
       assignedUserIds: assigneesForView.map((a) => a.user_id),
       leadTimeDisplayUnit: (await companySettingsRepository.get('lead_time_display_unit')) || 'days',
+      // Owner decision: with email sending off there is no "Send to Buyer"
+      // action — a document counts as sent once approved
+      // (emailDispatchService.markSentIfMailDisabled()).
+      mailSendingEnabled: (await companySettingsRepository.get('mail_sending_enabled')) !== '0',
       products: await orderProductRepository.forOrder(orderId),
       hsCodes: await hsCodeRepository.active(),
       isPostConfirmationOrder: orderEditGuard.isPostConfirmation(order.current_stage_number),

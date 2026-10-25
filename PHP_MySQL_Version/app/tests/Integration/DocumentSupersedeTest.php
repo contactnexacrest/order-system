@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Config\Database;
+use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\DocumentReviewRepository;
 use App\Services\DocumentGenerationService;
@@ -26,6 +27,25 @@ use App\Tests\Support\DbTestCase;
  */
 final class DocumentSupersedeTest extends DbTestCase
 {
+    private ?string $originalMailSendingEnabled = null;
+
+    // These approvals are asserted to stay 'approved' — the email-on
+    // behaviour. With mail_sending_enabled off (the seed default since
+    // 2026-10-25) an approved buyer-sendable document is marked 'sent'
+    // instead; that path is covered by EmailOffAutoSentTest.
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->originalMailSendingEnabled = CompanySettingsRepository::get('mail_sending_enabled');
+        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+    }
+
+    protected function tearDown(): void
+    {
+        CompanySettingsRepository::set('mail_sending_enabled', $this->originalMailSendingEnabled, null);
+        parent::tearDown();
+    }
+
     public function testApprovingANewerRevisionSupersedesThePreviousApprovedRevision(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());

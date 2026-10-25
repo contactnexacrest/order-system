@@ -23,6 +23,7 @@ const orderProfitabilityService = require('./orderProfitabilityService');
 const termsClauseRepository = require('../repositories/termsClauseRepository');
 const userRepository = require('../repositories/userRepository');
 const documentDataAssembler = require('./documentDataAssembler');
+const emailDispatchService = require('./emailDispatchService');
 const markdownLite = require('../helpers/markdownLite');
 const { renderPdfFromHtml } = require('./pdfRenderService');
 const docxDocumentBuilder = require('./docx/docxDocumentBuilder');
@@ -1255,6 +1256,7 @@ async function generateBlEndorsement(orderId, generatedByUserId) {
 
   const documentId = await documentRepository.create(orderId, docTypeId, documentReference, revisionNumber, pdfFileId, null, generatedByUserId, signatory);
   await documentRepository.markApproved(documentId, pdfFileId);
+  await emailDispatchService.markSentIfMailDisabled(documentId);
 
   return {
     document_id: documentId,

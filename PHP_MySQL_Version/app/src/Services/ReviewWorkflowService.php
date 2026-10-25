@@ -211,6 +211,7 @@ final class ReviewWorkflowService
             // the PDF itself, or staff/buyers could keep relying on an old
             // copy with no way to tell it apart from the current one.
             DocumentGenerationService::supersedeOtherApprovedRevisions($documentId);
+            EmailDispatchService::markSentIfMailDisabled($documentId);
 
             // GATE-01: the QT's approval — not its mere draft generation —
             // is Stage 1's real gate (Owner Decision #1: "No stage passes

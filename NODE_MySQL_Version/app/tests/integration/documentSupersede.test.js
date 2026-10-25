@@ -12,6 +12,7 @@ jest.mock('../../src/services/pdfRenderService', () => ({
 }));
 
 const db = require('../../src/config/db');
+const companySettingsRepository = require('../../src/repositories/companySettingsRepository');
 const documentRepository = require('../../src/repositories/documentRepository');
 const documentReviewRepository = require('../../src/repositories/documentReviewRepository');
 const documentGenerationService = require('../../src/services/documentGenerationService');
@@ -32,7 +33,18 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * approve a review whose document is no longer the latest revision.
  */
 describe('Document supersede/invalidation cascade', () => {
+  // These approvals are asserted to stay 'approved' — the email-on
+  // behaviour. With mail_sending_enabled off (the seed default since
+  // 2026-10-25) an approved buyer-sendable document is marked 'sent'
+  // instead; that path is covered by emailOffAutoSent.test.js.
+  let originalMailSendingEnabled;
+  beforeAll(async () => {
+    originalMailSendingEnabled = await companySettingsRepository.get('mail_sending_enabled');
+    await companySettingsRepository.set('mail_sending_enabled', '1');
+  });
+
   afterAll(async () => {
+    await companySettingsRepository.set('mail_sending_enabled', originalMailSendingEnabled);
     await db.pool.end();
   });
 

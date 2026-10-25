@@ -1212,6 +1212,7 @@ final class DocumentGenerationService
             $signatory
         );
         DocumentRepository::markApproved($documentId, $pdfFileId);
+        EmailDispatchService::markSentIfMailDisabled($documentId);
 
         return [
             'document_id'        => $documentId,
