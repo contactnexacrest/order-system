@@ -78,9 +78,28 @@ changing a client's own toggle is logged as
 can do anything the client themselves could do in the portal — download
 documents, acknowledge the OC, upload the signed Buyer PO, self-report a
 payment, raise a dispute, request a reorder — with one exception: changing
-the client's own portal password still requires their current password,
-so impersonation cannot be used to take over or lock out a real client
-login.
+the client's own portal password still requires their current password
+(see below), so impersonation on its own cannot be used to take over or
+lock out a real client login.
+
+### Resetting a client's portal password
+
+A client who's genuinely locked out — forgot their password and can't
+follow (or receive) the "Forgot password" email link — has no self-service
+way back in, and impersonation doesn't help either (the client's own
+Change Password form still needs their *current* password, which staff
+never know). For exactly this case, that same client's staff-side page
+("Client Portal Access" section) has a **Reset client-portal password**
+action: enter a reason, and it generates a one-time temporary password,
+shown once in the success banner for staff to hand over directly (phone,
+in person — never emailed automatically, since the client typically
+can't be reached by email right now). The client's next login is
+required to change it, same as a staff account's own force-reset. Gated
+on `manage_company_settings` (the same permission as the toggle above,
+not `impersonate_client`), and every use is logged
+(`CLIENT_PASSWORD_ADMIN_RESET`) to the Admin/MD/ED oversight tier. Only
+works once the client already has a portal account (`client_logins`
+row) — it resets an existing login, it does not provision one early.
 
 ## Order history visibility
 
@@ -183,6 +202,14 @@ Opening an order (**View documents**) shows, top to bottom:
    feedback. Staff see the same rating and comments on that order's own
    page, and everyone holding `manage_orders` gets an in-app notification
    the moment feedback comes in.
+
+   For a client who gives feedback over the phone or in person instead of
+   through the portal, staff can record it directly from that order's own
+   "Order Feedback" step (same 1-5 rating + comments, same gate — only
+   once the order is Documents Sent or Complete). Logged under its own
+   action type (`ORDER_FEEDBACK_RECORDED_BY_STAFF`) so the audit trail
+   still shows it was staff-entered rather than a genuine client-portal
+   submission.
 
    ![Client portal — Order Feedback](./images/portal_feedback.png)
 

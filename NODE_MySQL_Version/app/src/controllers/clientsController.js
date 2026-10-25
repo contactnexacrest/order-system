@@ -2,9 +2,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const flash = require('../helpers/flash');
+const passwordHash = require('../helpers/passwordHash');
 const reasonValidator = require('../helpers/reasonValidator');
 const clientRepository = require('../repositories/clientRepository');
+const clientLoginRepository = require('../repositories/clientLoginRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderRepository = require('../repositories/orderRepository');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
@@ -189,6 +192,7 @@ async function show(req, res) {
     agreementForceExpired, agreementExpiryDate, agreementExpired, agreementActive, agreementRenewEligible,
     duplicateOfClient: client.duplicate_of_client_id ? await clientRepository.find(client.duplicate_of_client_id) : null,
     duplicatedInto: await clientRepository.findDuplicatesOf(client.id),
+    clientLogin: await clientLoginRepository.findByClientId(client.id),
   }, 'layout/base');
 }
 
@@ -672,6 +676,61 @@ async function impersonate(req, res) {
 }
 
 /**
+ * For a non-technical client who's locked out of the portal and can't
+ * follow their own "Forgot password" email link: the client's own
+ * /client/account "Change Password" form requires their CURRENT
+ * password, so even staff impersonating them cannot set a new one —
+ * there was no path at all before this. Mirrors
+ * userController.forceResetPassword() exactly (same temp-password
+ * generation, same reason requirement, same "shown once, hand it over
+ * directly" flash) but against client_logins instead of users. Requires
+ * client_logins to already exist (clientLoginRepository's own docblock:
+ * that row is created ONLY by clientPortalService.provisionIfNeeded(),
+ * never here) — this resets an existing portal account, it does not
+ * provision one.
+ */
+async function resetPortalPassword(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+
+  const login = await clientLoginRepository.findByClientId(clientId);
+  if (!login) {
+    flash.set(req, 'error', `${client.company_legal_name} has no client-portal account yet — portal access is provisioned automatically once this client's first order's advance payment clears.`);
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+
+  const reason = String(req.body.reason || '').trim();
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError) {
+    flash.set(req, 'error', reasonError);
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+
+  const tempPassword = generateTempPassword();
+  await clientLoginRepository.updatePassword(clientId, await passwordHash.hash(tempPassword), true);
+
+  const user = req.user;
+  await auditLogRepository.log(user.id, 'CLIENT_PASSWORD_ADMIN_RESET', 'clients', clientId, null, null, null, reason);
+
+  flash.set(req, 'success', `Password reset for ${client.company_legal_name}'s client-portal account. One-time temporary password: ${tempPassword} — give this to them directly; they'll be asked to change it on first login.`);
+  res.redirect(`/clients/${clientId}`);
+}
+
+// Same shape as userController.js's own generateTempPassword() — 12
+// random bytes -> 16-char base64url, always contains mixed case +
+// digits, no dependency on a symbol since force_password_change means
+// it only has to survive one login.
+function generateTempPassword() {
+  return crypto.randomBytes(12).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
  * Batch 3 #13b — a free-form extra document attached to this client
  * (not tied to one specific order), e.g. a standing NDA or a general
  * compliance certificate. Reuses file_store/fileUploadService rather
@@ -765,7 +824,7 @@ async function showRemovedAdditionalDocuments(req, res) {
 
 module.exports = {
   index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
-  setImpersonationAllowed, setOrderHistoryVisibilityOverride, setDocumentDownloadsVisibilityOverride, impersonate, uploadAdditionalDocument, deleteAdditionalDocument, showRemovedAdditionalDocuments,
+  setImpersonationAllowed, setOrderHistoryVisibilityOverride, setDocumentDownloadsVisibilityOverride, impersonate, resetPortalPassword, uploadAdditionalDocument, deleteAdditionalDocument, showRemovedAdditionalDocuments,
   uploadAgreement, forceExpireAgreement, renewAgreement, downloadAgreement,
   duplicateForm, duplicateStore,
 };

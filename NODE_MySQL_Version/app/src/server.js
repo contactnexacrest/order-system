@@ -601,6 +601,7 @@ app.post('/clients/:id/impersonation-allowed', requireAuth, requirePermission('m
 app.post('/clients/:id/order-history-visibility', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(clientsController.setOrderHistoryVisibilityOverride));
 app.post('/clients/:id/document-downloads-visibility', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(clientsController.setDocumentDownloadsVisibilityOverride));
 app.post('/clients/:id/impersonate', requireAuth, requirePermission('impersonate_client'), verifyCsrf, asyncHandler(clientsController.impersonate));
+app.post('/clients/:id/reset-password', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(clientsController.resetPortalPassword));
 
 // Staff review queue for public quotation-details submissions.
 app.get('/client-intake', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.index));
@@ -697,6 +698,9 @@ app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manag
 // docs/schema.sql Section AI — order progress chat.
 app.post('/orders/:id/comments', requireAuth, requirePermission('manage_orders'), uploadMedia.array('attachments'), verifyCsrf, asyncHandler(orderCommentController.post));
 app.get('/orders/:id/comment-attachments/:fileId/download', requireAuth, requirePermission('download_pdf'), asyncHandler(orderCommentController.downloadAttachment));
+
+// Step 16 — staff recording feedback the client gave over the phone/in person rather than via the portal. No checkOrderLock: feedback is only reachable once the order is shipped_docs_sent/complete, which is already past the point of being "locked" in the ordinary editing sense.
+app.post('/orders/:id/feedback', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.recordFeedback));
 
 // Annexure A — Product Technical Specifications (schema tables shipped
 // with no screen ever built against them; this is that missing piece).

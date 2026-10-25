@@ -1753,6 +1753,46 @@ async function recordOcAcknowledgment(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * Step 16 (Order Feedback) for a non-technical client who tells their
+ * NexaCrest contact how the order went over the phone or in person
+ * rather than using the portal — there was no way for staff to record
+ * that before this. Same gate and the same
+ * orderFeedbackRepository.upsert() the client's own
+ * clientPortalController.submitFeedback() uses; logged under its own
+ * action type so the audit trail still shows it was staff-entered, not
+ * a genuine client-portal submission.
+ */
+async function recordFeedback(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  if (!['shipped_docs_sent', 'complete'].includes(order.status)) {
+    flash.set(req, 'error', "Feedback can be recorded once this order's documents have been sent to the client.");
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  const rating = parseInt(req.body.rating, 10);
+  if (!(rating >= 1 && rating <= 5)) {
+    flash.set(req, 'error', 'Choose a rating between 1 and 5 stars.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const comments = String(req.body.comments || '').trim() || null;
+
+  await orderFeedbackRepository.upsert(orderId, order.client_id, rating, comments);
+
+  const user = req.user;
+  await auditLogRepository.log(user.id, 'ORDER_FEEDBACK_RECORDED_BY_STAFF', 'orders', orderId, null, null, String(rating), "Feedback recorded by staff on the client's behalf (not submitted via the client portal).");
+
+  flash.set(req, 'success', 'Feedback recorded for this order.');
+  res.redirect(`/orders/${orderId}`);
+}
+
 /** docs/schema.sql Section AF — per-order, staff-controlled, default off. */
 async function setDisputeButtonVisible(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -3373,7 +3413,7 @@ module.exports = {
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,
-  recordOcAcknowledgment, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
+  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

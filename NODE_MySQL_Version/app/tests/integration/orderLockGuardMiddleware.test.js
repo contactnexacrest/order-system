@@ -75,6 +75,12 @@ describe('orderLockGuard middleware (External QA report L-28)', () => {
       // a routine edit gated behind the order's own lock state; it must
       // stay reachable on any order, locked or not.
       '/orders/:id/complaints',
+      // Step 16 (Order Feedback): only reachable once the order is
+      // shipped_docs_sent/complete — by the time it's 'complete' the
+      // order is already locked, so guarding it would make it
+      // permanently unreachable, same reasoning as the cancellation
+      // routes below.
+      '/orders/:id/feedback',
       // External QA report M-09: the cancellation workflow is mark-lost's
       // sibling (a terminal action ending the order's active life, not a
       // routine edit), excluded for the same reason mark-lost is above.

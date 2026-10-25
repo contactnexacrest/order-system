@@ -2682,6 +2682,24 @@
     <summary>{{ stepStatusIcon(stepStates['s16']) }}<span class="step-group-num">STEP 16</span><h2>Order Feedback</h2></summary>
     {% if not orderFeedback %}
       <p class="muted">The client hasn't submitted feedback for this order yet.</p>
+      {% if permissions.manage_orders and order.status in ['shipped_docs_sent', 'complete'] %}
+        <p class="muted small">If the client told you how the order went over the phone or in person instead of using the portal, record it here on their behalf.</p>
+        <form method="post" action="/orders/{{ order.id }}/feedback" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Rating
+            <select name="rating" required>
+              <option value="">Choose a rating</option>
+              {% for i in range(5, 0, -1) %}
+                <option value="{{ i }}">{% for s in range(0, i) %}★{% endfor %}{% for s in range(0, 5 - i) %}☆{% endfor %} ({{ i }}/5)</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label style="flex:1;min-width:220px">Comments (optional)
+            <input type="text" name="comments" placeholder="What the client told you">
+          </label>
+          <button type="submit" class="btn-sm">Record Feedback</button>
+        </form>
+      {% endif %}
     {% else %}
       <div class="kv-grid">
         <div><span class="k">Rating</span><span class="v">{% for s in range(0, orderFeedback.rating) %}★{% endfor %}{% for s in range(0, 5 - orderFeedback.rating) %}☆{% endfor %} ({{ orderFeedback.rating }}/5)</span></div>

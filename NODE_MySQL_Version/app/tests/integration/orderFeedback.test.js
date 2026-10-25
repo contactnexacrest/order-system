@@ -217,6 +217,59 @@ describe('Order Feedback (Section BV)', () => {
   });
 
   // ---------------------------------------------------------------
+  // ordersController.recordFeedback() — staff recording feedback the
+  // client gave over the phone/in person, on their behalf
+  // ---------------------------------------------------------------
+
+  async function auditLogCount(actionType, entityId) {
+    const row = await db.queryOne(
+      "SELECT COUNT(*) AS cnt FROM audit_log WHERE action_type = :action AND entity_type = 'orders' AND entity_id = :entity_id",
+      { action: actionType, entity_id: entityId }
+    );
+    return parseInt(row.cnt, 10);
+  }
+
+  it('recordFeedback saves a valid rating and logs it under its own action type', async () => {
+    const userId = await createTestUser('Admin');
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    await markShippedDocsSent(orderId);
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { rating: '4', comments: 'Client called — happy overall, minor delay in replies.' } });
+
+    await ordersController.recordFeedback(req, fakeRes());
+
+    const row = await orderFeedbackRepository.find(orderId);
+    expect(Number(row.rating)).toBe(4);
+    expect(row.comments).toBe('Client called — happy overall, minor delay in replies.');
+    expect(flash.pull(req)[0].type).toBe('success');
+    expect(await auditLogCount('ORDER_FEEDBACK_RECORDED_BY_STAFF', orderId)).toBe(1);
+    expect(await auditLogCount('ORDER_FEEDBACK_SUBMITTED', orderId)).toBe(0);
+  });
+
+  it('recordFeedback rejects a rating outside one to five', async () => {
+    const userId = await createTestUser('Admin');
+    const orderId = await createTestOrder(await createTestClient());
+    await markShippedDocsSent(orderId);
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { rating: '0' } });
+
+    await ordersController.recordFeedback(req, fakeRes());
+
+    expect(await orderFeedbackRepository.find(orderId)).toBeNull();
+    expect(flash.pull(req)[0].type).toBe('error');
+  });
+
+  it('recordFeedback is refused on an active order', async () => {
+    const userId = await createTestUser('Admin');
+    const orderId = await createTestOrder(await createTestClient()); // defaults to 'active'
+    const req = fakeReq({ params: { id: String(orderId) }, user: { id: userId }, body: { rating: '5', comments: 'Too early.' } });
+
+    await ordersController.recordFeedback(req, fakeRes());
+
+    expect(await orderFeedbackRepository.find(orderId)).toBeNull();
+    expect(flash.pull(req)[0].type).toBe('error');
+  });
+
+  // ---------------------------------------------------------------
   // View rendering — real HTTP, through the live app (supertest)
   // ---------------------------------------------------------------
 
@@ -294,6 +347,51 @@ describe('Order Feedback (Section BV)', () => {
       expect(res.status).toBe(200);
       expect(res.text).toContain('Order Feedback');
       expect(res.text).toContain("hasn't submitted feedback");
+    });
+
+    it('staff order page offers the Record Feedback form once shipped with no prior submission', async () => {
+      const staffAgent = request.agent(app);
+      const loginPage = await staffAgent.get('/login');
+      const csrf = extractCsrf(loginPage.text);
+      await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
+
+      const orderId = await createTestOrder(await createTestClient());
+      await markShippedDocsSent(orderId);
+      const res = await staffAgent.get(`/orders/${orderId}`);
+
+      expect(res.status).toBe(200);
+      expect(res.text).toContain(`action="/orders/${orderId}/feedback"`);
+      expect(res.text).toContain('Record Feedback');
+    });
+
+    it('staff order page hides the Record Feedback form on an active order', async () => {
+      const staffAgent = request.agent(app);
+      const loginPage = await staffAgent.get('/login');
+      const csrf = extractCsrf(loginPage.text);
+      await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
+
+      const orderId = await createTestOrder(await createTestClient());
+      const res = await staffAgent.get(`/orders/${orderId}`);
+
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain(`action="/orders/${orderId}/feedback"`);
+    });
+
+    it('staff order page hides the Record Feedback form once feedback already exists', async () => {
+      const staffAgent = request.agent(app);
+      const loginPage = await staffAgent.get('/login');
+      const csrf = extractCsrf(loginPage.text);
+      await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
+
+      const clientId = await createTestClient();
+      const orderId = await createTestOrder(clientId);
+      await markShippedDocsSent(orderId);
+      await orderFeedbackRepository.upsert(orderId, clientId, 4, 'Already on file.');
+      const res = await staffAgent.get(`/orders/${orderId}`);
+
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain(`action="/orders/${orderId}/feedback"`);
+      expect(res.text).toContain('Already on file.');
     });
   });
 });
