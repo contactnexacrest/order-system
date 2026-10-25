@@ -43,6 +43,11 @@ rendered pages, not a direct controller/HTTP call.
   attachment (plain-text notifications, the client-portal invite, and a
   full document-send-to-dispatch cycle). See that file's own header
   comment for what this can and can't prove without a real SMTP server.
+- `09-form-input-kept.spec.js` — the sitewide form safety net in each
+  stack's `app.js`: typed values put back into the form after the server
+  rejects it (a duplicate email-template key), and the pre-submit checks
+  the browser's own validation misses (a required field holding only
+  spaces, a numeric field typed with a comma).
 
 This is real end-to-end coverage of the features above, not exhaustive
 coverage of the whole app — it proves these specific flows work on a

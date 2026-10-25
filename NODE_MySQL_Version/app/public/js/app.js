@@ -126,7 +126,204 @@
     }, true);
   }
 
+  // Opens every collapsed <details> around an element (a step card, a
+  // settings section...) so a form inside one can actually be seen.
+  function revealElement(el) {
+    for (var node = el.closest('details'); node; node = node.parentElement ? node.parentElement.closest('details') : null) {
+      node.open = true;
+    }
+  }
+
+  // Owner request (2026-10-25): "if any error occurs, whatever we filled
+  // earlier should not disappear". Nearly every POST handler answers a
+  // rejected submission with a redirect + error flash, which used to
+  // re-render the form empty. So every POST form's typed values are kept
+  // in this tab's sessionStorage on submit; if the next page shows an
+  // error, they're put back into the same form (matched by action) and
+  // that form is revealed. Any other outcome discards them. File inputs
+  // can't be refilled by a page (browser security) — the notice says so.
+  // Passwords, hidden fields (CSRF tokens etc.) and forms marked
+  // data-no-draft are never stored.
+  var FORM_DRAFT_KEY = 'form-drafts:v1';
+  var FORM_DRAFT_MAX_AGE_MS = 10 * 60 * 1000;
+
+  function readFormDrafts() {
+    try {
+      return JSON.parse(window.sessionStorage.getItem(FORM_DRAFT_KEY) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writeFormDrafts(drafts) {
+    try {
+      if (drafts.length) {
+        window.sessionStorage.setItem(FORM_DRAFT_KEY, JSON.stringify(drafts));
+      } else {
+        window.sessionStorage.removeItem(FORM_DRAFT_KEY);
+      }
+    } catch (e) { /* storage unavailable — nothing to keep */ }
+  }
+
+  function formsWithAction(action) {
+    return Array.prototype.filter.call(document.forms, function (f) { return f.action === action; });
+  }
+
+  function saveFormDraft(form) {
+    if (form.dataset.noDraft !== undefined || form.querySelector('input[type="password"]')) return;
+    var fields = [];
+    var hadFile = false;
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name || el.disabled) return;
+      var type = (el.type || '').toLowerCase();
+      if (type === 'file') {
+        if (el.files && el.files.length) hadFile = true;
+        return;
+      }
+      if (['hidden', 'password', 'submit', 'button', 'reset', 'image'].indexOf(type) !== -1) return;
+      if (type === 'checkbox' || type === 'radio') {
+        fields.push({ name: el.name, value: el.value, checked: el.checked });
+      } else if (type === 'select-multiple') {
+        fields.push({ name: el.name, values: Array.prototype.filter.call(el.options, function (o) { return o.selected; }).map(function (o) { return o.value; }) });
+      } else {
+        fields.push({ name: el.name, value: el.value });
+      }
+    });
+    if (!fields.length) return;
+    var drafts = readFormDrafts().filter(function (d) { return d.action !== form.action; });
+    drafts.push({ action: form.action, nth: formsWithAction(form.action).indexOf(form), at: Date.now(), hadFile: hadFile, fields: fields });
+    writeFormDrafts(drafts);
+  }
+
+  function restoreFormDraft(form, draft) {
+    var seen = {};
+    draft.fields.forEach(function (f) {
+      var matches = form.querySelectorAll('[name="' + f.name.replace(/(["\\])/g, '\\$1') + '"]');
+      if (f.checked !== undefined) {
+        Array.prototype.forEach.call(matches, function (el) {
+          if (el.value === f.value) el.checked = f.checked;
+        });
+        return;
+      }
+      // Repeated names (crate rows, product lines: name="x[]") are restored
+      // in order — the Nth saved value goes into the Nth field.
+      var i = seen[f.name] || 0;
+      seen[f.name] = i + 1;
+      var el = matches[i];
+      if (!el) return;
+      if (f.values) {
+        Array.prototype.forEach.call(el.options, function (o) { o.selected = f.values.indexOf(o.value) !== -1; });
+      } else {
+        el.value = f.value;
+      }
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    var notice = document.createElement('div');
+    notice.className = 'alert alert-info form-draft-notice';
+    notice.textContent = 'Your entries have been kept — correct the problem shown at the top of the page and submit again.' +
+      (draft.hadFile ? ' Attachments cannot be kept by the browser: please select the file again.' : '');
+    form.insertBefore(notice, form.firstChild);
+  }
+
+  function initFormDraftRestore() {
+    var drafts = readFormDrafts();
+    writeFormDrafts([]);
+    if (!drafts.length || !document.querySelector('.alert-error')) return;
+    var firstRestored = null;
+    drafts.forEach(function (draft) {
+      if (Date.now() - draft.at > FORM_DRAFT_MAX_AGE_MS) return;
+      var form = formsWithAction(draft.action)[draft.nth] || formsWithAction(draft.action)[0];
+      if (!form) return;
+      restoreFormDraft(form, draft);
+      revealElement(form);
+      firstRestored = firstRestored || form;
+    });
+    if (firstRestored && !window.location.hash) {
+      firstRestored.scrollIntoView({ block: 'center' });
+    }
+  }
+
+  // Checks a form before it is submitted, for what the browser's own
+  // validation (required/type/min/max) misses: a required field holding
+  // only spaces, a reason shorter than the server's minimum, and an
+  // amount/weight/CBM/quantity/percentage/rate typed as text that isn't a
+  // plain number ("1,200", "950 USD" — the server has no comma/unit
+  // handling). Messages appear next to the field and the submit is
+  // stopped before any confirm dialog or "Working…" state.
+  var REASON_MIN_LENGTH = 10;
+  // Matched against numeric DB columns only — estimated_package_count is
+  // deliberately free text ("TBD at packing"), so counts are listed by name.
+  var NUMERIC_FIELD_NAME = /(_amount|amount_|_inr$|_kg$|_cbm$|^cbm$|_pct$|_rate$|unit_price|quantity|^crate_count$|_days$)/;
+
+  function fieldError(el) {
+    var value = el.value.trim();
+    var name = (el.name || '').replace(/\[.*$/, '');
+    var type = (el.type || '').toLowerCase();
+    if (el.required && value === '' && (el.tagName === 'TEXTAREA' || type === 'text' || type === 'search' || type === 'email' || type === 'tel' || type === 'url')) {
+      return 'This field is required.';
+    }
+    if (/reason/i.test(name) && value !== '' && value.length < REASON_MIN_LENGTH) {
+      return 'Reason must be at least ' + REASON_MIN_LENGTH + ' characters (' + value.length + ' so far).';
+    }
+    if (type === 'text' && NUMERIC_FIELD_NAME.test(name) && value !== '' && !/^\d*\.?\d+$/.test(value)) {
+      return 'Enter a number — digits and a decimal point only (no commas, spaces or units).';
+    }
+    return null;
+  }
+
+  function showFieldError(el, message) {
+    el.classList.add('field-invalid');
+    var error = el.parentElement.querySelector('.form-field-error');
+    if (!error) {
+      error = document.createElement('small');
+      error.className = 'reason-error form-field-error';
+      el.insertAdjacentElement('afterend', error);
+    }
+    error.textContent = message;
+    // The reason field's own blur error says the same thing — keep one.
+    var reasonError = el.parentElement.querySelector('.reason-error:not(.form-field-error)');
+    if (reasonError) reasonError.remove();
+  }
+
+  function clearFieldError(el) {
+    el.classList.remove('field-invalid');
+    var error = el.parentElement.querySelector('.form-field-error');
+    if (error) error.remove();
+  }
+
+  function initSubmitValidation() {
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement) || form.noValidate) return;
+      if (e.submitter && e.submitter.formNoValidate) return;
+      var firstInvalid = null;
+      Array.prototype.forEach.call(form.elements, function (el) {
+        if (el.disabled || !('value' in el) || !el.name || (el.type || '').toLowerCase() === 'hidden') return;
+        var message = fieldError(el);
+        if (message) {
+          showFieldError(el, message);
+          firstInvalid = firstInvalid || el;
+        } else {
+          clearFieldError(el);
+        }
+      });
+      if (!firstInvalid) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      revealElement(firstInvalid);
+      firstInvalid.focus();
+    }, true);
+    document.addEventListener('input', function (e) {
+      var el = e.target;
+      if (el && el.classList && el.classList.contains('field-invalid') && !fieldError(el)) clearFieldError(el);
+    });
+  }
+
   function init() {
+    // Before initConfirmDialogs(): both listen in the capture phase, so
+    // registering this first means an invalid form is stopped before any
+    // confirm() dialog is shown for it.
+    initSubmitValidation();
     initConfirmDialogs();
 
     // Bound on document, not per-form, so every current and future POST
@@ -143,11 +340,13 @@
       var method = (form.getAttribute('method') || 'get').toLowerCase();
       if (method !== 'post') return;
       markSubmitting(form, e.submitter);
+      saveFormDraft(form);
     });
 
     initSlowDownloadLinks();
     initTableScrollShadows();
     initReasonFieldValidation();
+    initFormDraftRestore();
   }
 
   if (document.readyState === 'loading') {
