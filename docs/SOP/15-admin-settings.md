@@ -150,17 +150,54 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   other's fallback, so a connection/credential problem shows up as an
   actual error on screen instead of a silent log line. Also on this
   screen, under its own **Notifications** category: **Notification
-  Email** — a catch-all address that receives one email for every
-  action logged anywhere in the system (an order field edited, a
-  document generated, a payment recorded, an approval, and so on —
-  anything that already appears in the audit trail). Leave it blank to
-  turn this off entirely; there is no per-action on/off switch, by
-  design. Separately, every staff member has their own **Email me when
-  I perform an action in the system** toggle on their own **My Account**
-  page (on by default) — this only controls whether *that person* also
-  gets a copy of *their own* actions; it never affects the Notification
-  Email address above, which always receives everything regardless of
-  anyone's personal preference. The three **RBI
+  Email** — a catch-all address copied on every notification email the
+  system sends, across every category below (leave it blank to turn
+  this off; there's no way to opt it out of any one category). Every
+  action anywhere in the system still lands in the audit trail
+  regardless of whether an email ever goes out for it — these settings
+  only control the email, never the audit-log row.
+
+  **Notification Routing Plan** — not every one of the ~230 action
+  types this app logs is equally important to see land in an inbox, so
+  each one is routed to exactly one of five tiers, decided once per
+  action type (not configurable per-user beyond the one toggle below):
+
+  - **Order-scoped** — anything that happens on a specific order (a
+    document generated/sent, a payment recorded, a client action, a
+    stage gate passed, a dispute/complaint) goes to that order's own
+    assignees (see "Roles & Permissions" above, under the order-assignee
+    paragraph) plus the Admin/Managing
+    Director/Executive Director oversight tier as a safety net for an
+    order with nobody assigned yet. Never toggleable by anyone — this
+    is "part of the application," not a personal preference.
+  - **About one specific person** — a permission grant/revoke, a role's
+    permissions changing, an account being archived, a password reset
+    someone else triggered — goes straight to the person it's about (so
+    they never mistake a real change for a bug), plus oversight for the
+    handful of types (account archive/unarchive, Super Admin delegation)
+    where oversight also needs to know. Never toggleable.
+  - **Shared/reference data (broadcast)** — a port, HS code, payment
+    preset, product-catalog entry, or similar shared record changing
+    goes to everyone who holds the permission that actually governs
+    that data day to day (e.g. `manage_orders` for ports, `manage_hs_codes`
+    for HS codes) — not literally every account. A handful of
+    security-sensitive types (role/permission CRUD, client
+    impersonation, a financial-year lock override, deleting a user) go
+    to the Admin/MD/ED oversight tier specifically. Never toggleable.
+  - **Self only** — routine, about the acting user's own activity and
+    nobody else's (a password change, a report definition saved, an
+    account lockout). The *only* tier with a personal toggle: every
+    staff member has their own **Email me when I perform an action in
+    the system** switch on their own **My Account** page (on by default)
+    — turning it off only stops that person's copy of their own routine
+    actions; it has no effect on any other tier above, and never affects
+    the Notification Email catch-all either.
+  - **No email** — pure noise with no one depending on seeing it as an
+    email (Sample Data Playground loads, Test Mode toggles, logins,
+    a bare field edit with no narrower action type). The audit_log row
+    still gets written forever; only the email is skipped.
+
+  The three **RBI
   Purpose Code** fields (advance/balance/freight payment wires) are
   **dropdowns, not free text** — fed from the same `dropdown_options`
   admin list used elsewhere on this page (`list_key = 'rbi_purpose_code'`),
