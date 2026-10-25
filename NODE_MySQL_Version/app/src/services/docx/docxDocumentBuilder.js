@@ -54,18 +54,6 @@ function titleFor(code) {
   return map[code] || code;
 }
 
-/**
- * The kv-table checkbox-row look (BLI Sections 5/7). Plain ASCII brackets
- * rather than Unicode ballot-box glyphs (☑/☐) — those glyphs are
- * missing from Carlito and render as tofu boxes in LibreOffice/Word for
- * the (very common) unchecked state, so "[X]" / "[ ]" is the more
- * reliable real-Word-formatting equivalent of the CSS .cbx checkbox
- * square (same reasoning as the PHP build).
- */
-function checkbox(checked, label) {
-  return `${checked ? '[X] ' : '[ ] '}${label}`;
-}
-
 function starRun() {
   return ['*', { bold: true, color: 'C0392B' }];
 }
@@ -1325,11 +1313,8 @@ function renderBli(context) {
     ...C.kvTable(
       [
         { label: 'Number of Containers', value: g(shipping, 'container_count', 'To Be Confirmed') },
-        { label: 'Container Load Type *', value: `${checkbox(true, 'FCL (Full Container Load)')}    ${checkbox(false, 'LCL (Less than Container Load)')}` },
-        {
-          label: 'Container Size *',
-          value: `${checkbox(containerType.includes('20ft'), '20ft Standard')}   ${checkbox(containerType.includes('40ft') && !containerType.includes('High Cube'), '40ft Standard')}   ${checkbox(containerType.includes('High Cube'), '40ft High Cube')}`,
-        },
+        { label: 'Container Load Type *', value: containerType.includes('LCL') ? 'LCL (Less than Container Load)' : 'FCL (Full Container Load)' },
+        { label: 'Container Size *', value: containerType.includes('LCL') ? 'N/A — LCL shipment' : (containerType || 'To Be Confirmed') },
         { label: 'Container No. *', value: g(shipping, 'container_no', 'TBC — to be confirmed by shipping line after stuffing') },
         { label: 'Seal No. *', value: g(shipping, 'seal_no', 'TBC — to be confirmed after stuffing') },
         { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'To Be Confirmed'} — must match Packing List exactly` },
@@ -1365,10 +1350,7 @@ function renderBli(context) {
   children.push(
     ...C.kvTable(
       [
-        {
-          label: 'Freight Terms *',
-          value: `${checkbox(!isFob, 'Freight Prepaid (seller pays freight — CFR/CIF)')}    ${checkbox(isFob, 'Freight Collect (buyer pays freight — FOB)')}`,
-        },
+        { label: 'Freight Terms *', value: isFob ? 'Freight Collect (buyer pays freight — FOB)' : 'Freight Prepaid (seller pays freight — CFR/CIF)' },
         { label: 'Freight Amount', value: isFob ? 'N/A — Freight Collect' : `${g(freight, 'confirmed_freight_rate', 'To Be Confirmed')} ${currency}` },
       ],
       true
