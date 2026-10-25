@@ -91,21 +91,26 @@ async function openDocumentReviewCard(page) {
 }
 
 test.describe('Email functionality — real attempts, right recipient, right attachment', () => {
-  test('plain-text notifications: Login Success and Permission Denied actually attempt to send', async ({
+  // Under the Notification Routing Plan (ActionNotificationService's
+  // NONE_ACTION_TYPES), LOGIN_SUCCESS and PERMISSION_DENIED are
+  // deliberately pure noise — no email at all, audit_log row only —
+  // specifically so a routine login or a stray 403 doesn't drown out
+  // the catch-all/self-toggle recipients. This asserts that contract:
+  // both actions still happen for real, but neither attempts to send.
+  test('plain-text notifications: Login Success and Permission Denied are audit-only (no email, "none" category)', async ({
     page,
   }) => {
     const mark1 = mark();
     await login(page, 'exportExecutive');
+    await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
     const sinceLogin = sinceMark(mark1);
-    expect(sinceLogin).toContain('Login Success');
-    expect(sinceLogin).toContain('ui-test-export-exec@nexacrest.test');
+    expect(sinceLogin).not.toContain('Login Success');
 
     const mark2 = mark();
     const res = await page.request.get('/admin/permissions'); // Export Executive lacks manage_permissions
     expect(res.status()).toBe(403);
     const sincePermissionDenied = sinceMark(mark2);
-    expect(sincePermissionDenied).toContain('Permission Denied');
-    expect(sincePermissionDenied).toContain('ui-test-export-exec@nexacrest.test');
+    expect(sincePermissionDenied).not.toContain('Permission Denied');
   });
 
   test('client portal invite: the real client gets the real set-password email the moment their advance clears', async ({

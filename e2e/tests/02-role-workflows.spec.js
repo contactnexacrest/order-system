@@ -168,9 +168,19 @@ async function resolveComplianceChecklistIfNeeded(page, orderId) {
   await expect(page.locator('.alert')).toBeVisible();
 }
 
+// The Order Financials card's "Export Benefits" tab is JS-hidden
+// (Order Detail Page Polish round) until its tab button is clicked —
+// "Costs" is active by default. Each form submit is a full page
+// reload, which resets the tabs back to default, so this is called
+// again after every save.
+async function openExportBenefitsTab(page) {
+  await page.locator('[data-tab-target="order-financials-export-benefits"]').click();
+}
+
 async function resolveExportBenefitSchemes(page, orderId) {
   await page.goto(`/orders/${orderId}#order-financials`);
   await openCardAndAncestors(page, '#order-financials');
+  await openExportBenefitsTab(page);
   for (;;) {
     const pendingForm = page
       .locator(`form[action="/orders/${orderId}/export-benefit-schemes"]`)
@@ -182,6 +192,7 @@ async function resolveExportBenefitSchemes(page, orderId) {
     await form.getByRole('button', { name: 'Save' }).click();
     await expect(page.locator('.alert')).toContainText('eligibility updated');
     await openCardAndAncestors(page, '#order-financials');
+    await openExportBenefitsTab(page);
   }
 }
 
