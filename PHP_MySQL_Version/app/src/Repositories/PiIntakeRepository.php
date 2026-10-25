@@ -48,12 +48,41 @@ final class PiIntakeRepository
     public static function findValidByToken(string $rawToken): ?array
     {
         $hash = hash('sha256', $rawToken);
+        // The LEFT JOIN on client_intake_submissions: the client's own
+        // Quotation-stage answers (port, container type) are kept on their
+        // accepted intake, not the client record — the fallback when the
+        // order itself has none. (Kept out of the SQL text: an apostrophe in
+        // an SQL comment breaks named-placeholder parsing.)
         $stmt = Database::connection()->prepare(
             "SELECT pis.*, o.order_reference, o.quotation_date AS order_quotation_date,
                     c.company_legal_name AS client_company_legal_name,
                     c.billing_address AS client_billing_address,
+                    c.billing_address_line1 AS client_billing_address_line1,
+                    c.billing_address_line2 AS client_billing_address_line2,
+                    c.billing_city AS client_billing_city,
+                    c.billing_postcode AS client_billing_postcode,
+                    c.billing_country AS client_billing_country,
+                    c.consignee_same_as_buyer AS client_consignee_same_as_buyer,
                     c.consignee_name AS client_consignee_name,
                     c.consignee_address AS client_consignee_address,
+                    c.consignee_address_line1 AS client_consignee_address_line1,
+                    c.consignee_address_line2 AS client_consignee_address_line2,
+                    c.consignee_city AS client_consignee_city,
+                    c.consignee_postcode AS client_consignee_postcode,
+                    c.consignee_country AS client_consignee_country,
+                    c.consignee_vat_eori_tax_no AS client_consignee_vat_eori_tax_no,
+                    c.consignee_contact_person AS client_consignee_contact_person,
+                    c.consignee_phone AS client_consignee_phone,
+                    c.consignee_email AS client_consignee_email,
+                    c.notify_party_same_as_consignee AS client_notify_party_same_as_consignee,
+                    c.notify_party_address_line1 AS client_notify_party_address_line1,
+                    c.notify_party_address_line2 AS client_notify_party_address_line2,
+                    c.notify_party_city AS client_notify_party_city,
+                    c.notify_party_postcode AS client_notify_party_postcode,
+                    c.notify_party_country AS client_notify_party_country,
+                    c.notify_party_contact_person AS client_notify_party_contact_person,
+                    c.notify_party_phone AS client_notify_party_phone,
+                    c.notify_party_email AS client_notify_party_email,
                     c.vat_eori_tax_no AS client_vat_eori_tax_no,
                     c.contact_person AS client_contact_person,
                     c.email AS client_email,
@@ -61,9 +90,9 @@ final class PiIntakeRepository
                     c.notify_party AS client_notify_party,
                     c.country_of_destination AS client_country_of_destination,
                     c.coo_type AS client_coo_type,
-                    COALESCE(o.port_of_discharge_name, o.port_of_discharge_text) AS order_port_of_discharge,
+                    COALESCE(NULLIF(o.port_of_discharge_name, ''), NULLIF(o.port_of_discharge_text, ''), cis.port_of_discharge_text) AS order_port_of_discharge,
                     o.incoterm_code AS order_incoterm_code,
-                    o.container_type AS order_container_type,
+                    COALESCE(NULLIF(o.container_type, ''), cis.container_type_text) AS order_container_type,
                     o.advance_trigger_text AS order_advance_trigger_text,
                     o.balance_trigger_wording AS order_balance_trigger_wording,
                     o.advance_pct AS order_advance_pct,
@@ -73,6 +102,9 @@ final class PiIntakeRepository
              FROM pi_intake_submissions pis
              JOIN orders o ON o.id = pis.order_id
              JOIN clients c ON c.id = o.client_id
+             LEFT JOIN client_intake_submissions cis ON cis.id = (
+                 SELECT MAX(id) FROM client_intake_submissions WHERE converted_client_id = c.id
+             )
              WHERE pis.access_token_hash = :hash AND pis.access_token_expires_at > NOW()
                AND pis.status IN ('awaiting_client', 'rejected')"
         );
@@ -88,11 +120,38 @@ final class PiIntakeRepository
         // answered themselves — on a rejected-and-resubmitted link, the
         // client's own prior answer always wins over the client/order
         // default, since they may have deliberately corrected it.
+        // The structured billing/consignee/notify-party fields (the form was
+        // split into Line 1/Line 2/City/Postcode/Country etc. after this
+        // prefill was written) are listed too — left out, they opened empty
+        // even though the Quotation-stage intake had already captured them
+        // onto the client record.
         $prefillMap = [
             'company_legal_name'     => 'client_company_legal_name',
             'billing_address'        => 'client_billing_address',
+            'billing_address_line1'  => 'client_billing_address_line1',
+            'billing_address_line2'  => 'client_billing_address_line2',
+            'billing_city'           => 'client_billing_city',
+            'billing_postcode'       => 'client_billing_postcode',
+            'billing_country'        => 'client_billing_country',
             'consignee_name'         => 'client_consignee_name',
             'consignee_address'      => 'client_consignee_address',
+            'consignee_address_line1'   => 'client_consignee_address_line1',
+            'consignee_address_line2'   => 'client_consignee_address_line2',
+            'consignee_city'            => 'client_consignee_city',
+            'consignee_postcode'        => 'client_consignee_postcode',
+            'consignee_country'         => 'client_consignee_country',
+            'consignee_vat_eori_tax_no' => 'client_consignee_vat_eori_tax_no',
+            'consignee_contact_person'  => 'client_consignee_contact_person',
+            'consignee_phone'           => 'client_consignee_phone',
+            'consignee_email'           => 'client_consignee_email',
+            'notify_party_address_line1'  => 'client_notify_party_address_line1',
+            'notify_party_address_line2'  => 'client_notify_party_address_line2',
+            'notify_party_city'           => 'client_notify_party_city',
+            'notify_party_postcode'       => 'client_notify_party_postcode',
+            'notify_party_country'        => 'client_notify_party_country',
+            'notify_party_contact_person' => 'client_notify_party_contact_person',
+            'notify_party_phone'          => 'client_notify_party_phone',
+            'notify_party_email'          => 'client_notify_party_email',
             'vat_eori_tax_no'        => 'client_vat_eori_tax_no',
             'contact_person'         => 'client_contact_person',
             'email'                  => 'client_email',
@@ -107,6 +166,19 @@ final class PiIntakeRepository
         foreach ($prefillMap as $field => $defaultKey) {
             if (($row[$field] ?? '') === '' || $row[$field] === null) {
                 $row[$field] = $row[$defaultKey] ?? '';
+            }
+        }
+        // The two "same as" checkboxes are NOT NULL DEFAULT 1, so they can't
+        // be told apart from an answer by emptiness — on the client's first
+        // visit (never submitted) they come from the client record instead,
+        // or a client whose consignee/notify party differs would see "same
+        // as buyer" ticked and their details hidden. A rejected-and-
+        // resubmitted link keeps the client's own prior choice.
+        if ($row['submitted_at'] === null) {
+            foreach (['consignee_same_as_buyer', 'notify_party_same_as_consignee'] as $flag) {
+                if ($row['client_' . $flag] !== null) {
+                    $row[$flag] = $row['client_' . $flag];
+                }
             }
         }
 
