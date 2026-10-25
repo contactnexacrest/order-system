@@ -12,7 +12,7 @@
       <button type="button" class="btn-sm" onclick="toggleAllSettingsSections(false)">Collapse all</button>
     </div>
     {% for category, rows in grouped %}
-      <details class="collapsible-section settings-section" data-category="{{ category }}" open>
+      <details class="collapsible-section settings-section" data-category="{{ category }}">
       <summary>{{ category | capitalize }} <span class="muted small settings-section-count">({{ rows | length }})</span></summary>
       <fieldset>
         {% for row in rows %}

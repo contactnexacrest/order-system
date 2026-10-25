@@ -449,7 +449,13 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .entity-card:hover{border-color:var(--gold);}
 a.entity-card:hover{text-decoration:none;}
 .entity-card-overdue{border:1.5px solid #E8B4A3;}
-.entity-card-header{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;}
+.entity-card-header{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;}
+/* The assignee list (.tag-navy here) has no length limit — a multi-name
+   order can produce a tag wider than the card itself. The base .tag's
+   white-space:nowrap (right for the short incoterm code next to it)
+   would silently clip names off the edge instead of just wrapping them,
+   so let this one tag wrap onto its own line(s) within the card. */
+.entity-card-header .tag-navy{white-space:normal;max-width:100%;text-align:left;}
 .entity-card-title{font-size:0.9rem;font-weight:700;color:var(--ink);}
 .entity-card-sub{font-size:0.8rem;color:var(--ink-soft);font-weight:500;}
 .entity-card-footer{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding-top:0.5rem;border-top:1px solid #F3ECDD;}

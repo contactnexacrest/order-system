@@ -22,9 +22,9 @@
       <legend>Commercial &amp; Shipping Terms</legend>
       <div class="field-grid">
         <label>Incoterm *
-          <select name="incoterm_id" required>
+          <select name="incoterm_id" id="incoterm-select" required onchange="updateFreightFieldsAvailability(true)">
             {% for i in incoterms %}
-              <option value="{{ i.id }}" {{ 'selected' if old.incoterm_id and i.id == old.incoterm_id else '' }}>{{ i.code }}</option>
+              <option value="{{ i.id }}" {{ 'selected' if old.incoterm_id and i.id == old.incoterm_id else '' }} data-code="{{ i.code }}">{{ i.code }}</option>
             {% endfor %}
           </select>
         </label>
@@ -111,8 +111,8 @@
       </div>
     </fieldset>
 
-    <fieldset>
-      <legend>Indicative Freight / Insurance <small class="muted">(printed on the Quotation only for CFR/CIF)</small></legend>
+    <fieldset id="freight-insurance-fieldset">
+      <legend>Indicative Freight / Insurance <small class="muted">(printed on the Quotation only for CFR/CIF — not needed for FOB)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">order currency</span></span>)<input type="text" name="indicative_freight_amount" value="{{ old.indicative_freight_amount or '' }}" placeholder="e.g. 950"></label>
         <label>Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input type="text" name="indicative_insurance_amount" value="{{ old.indicative_insurance_amount or '' }}" placeholder="e.g. 120"></label>
@@ -199,6 +199,32 @@ function updateFreightCurrencyLabels(selectEl) {
   if (insuranceLabel) { insuranceLabel.textContent = code; }
 }
 updateFreightCurrencyLabels(document.getElementById('order-currency-select'));
+
+// User report: Freight/Insurance is only ever relevant when the seller
+// is on the hook for it (CFR/CIF etc.) — under FOB the buyer arranges
+// and pays freight directly, so these fields have nothing to record.
+// Disabling the whole <fieldset> (rather than each input) reuses the
+// existing fieldset[disabled] greyed-out styling for free, and disabled
+// inputs are simply left out of the form submission. Matches the app's
+// own is_fob rule everywhere else: incoterm_code.toUpperCase() === 'FOB'.
+function updateFreightFieldsAvailability(clearOnDisable) {
+  var incotermSelect = document.getElementById('incoterm-select');
+  var fieldset = document.getElementById('freight-insurance-fieldset');
+  if (!incotermSelect || !fieldset) { return; }
+  var opt = incotermSelect.options[incotermSelect.selectedIndex];
+  var code = ((opt && opt.getAttribute('data-code')) || '').toUpperCase();
+  var isFob = code === 'FOB';
+  fieldset.disabled = isFob;
+  if (isFob && clearOnDisable) {
+    var freightInput = fieldset.querySelector('input[name="indicative_freight_amount"]');
+    var insuranceInput = fieldset.querySelector('input[name="indicative_insurance_amount"]');
+    if (freightInput) { freightInput.value = ''; }
+    if (insuranceInput) { insuranceInput.value = ''; }
+  }
+}
+// Page load: just set the disabled state — don't clear a value the user
+// (or a failed-validation resubmit) already has sitting in the field.
+updateFreightFieldsAvailability(false);
 
 // 90-item backlog item 15: once both ports are picked, offer (never
 // force — the fields stay freely editable) a sailing lead-time suggestion

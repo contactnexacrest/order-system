@@ -2899,7 +2899,7 @@
           <div><span class="k">Compliance Checklist</span><span class="v">{{ 'No task types configured' if complianceTotal == 0 else (complianceApproved ~ ' of ' ~ complianceTotal ~ ' resolved') }} — <a href="#compliance-checklist">see checklist</a></span></div>
           {% endif %}
           <div><span class="k">Documents Generated</span><span class="v">{{ documents.length }}</span></div>
-          <div><span class="k">Client</span><span class="v">{{ order.company_legal_name }}</span></div>
+          <div><span class="k">Client</span><span class="v"><a href="/clients/{{ order.client_id }}">{{ order.company_legal_name }}</a></span></div>
           <div><span class="k">Buyer Inquiry Ref</span><span class="v">{{ order.buyer_inquiry_ref }}</span></div>
           <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v">{{ order.incoterm_code }} {{ order.port_of_loading_name or '—' }}</span></div>
           <div><span class="k">Quotation Date</span><span class="v">{{ order.quotation_date or '—' }}</span></div>

@@ -37,9 +37,9 @@
       <legend>Commercial Terms</legend>
       <div class="field-grid">
         <label>Incoterm *
-          <select name="incoterm_id" required>
+          <select name="incoterm_id" id="incoterm-select" required onchange="updateFreightFieldsAvailability(true)">
             {% for i in incoterms %}
-              <option value="{{ i.id }}" {{ 'selected' if i.id == order.incoterm_id }}>{{ i.code }}</option>
+              <option value="{{ i.id }}" {{ 'selected' if i.id == order.incoterm_id }} data-code="{{ i.code }}">{{ i.code }}</option>
             {% endfor %}
           </select>
         </label>
@@ -129,7 +129,7 @@
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset id="freight-insurance-fieldset">
       <legend>Indicative Freight / Insurance <small class="muted">(only relevant when Incoterm is not FOB)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">{{ order.currency_code or '' }}</span></span>)<input type="text" name="indicative_freight_amount" value="{{ order.indicative_freight_amount or '' }}" placeholder="e.g., 950"></label>
@@ -177,6 +177,27 @@ function updateFreightCurrencyLabels(selectEl) {
   if (insuranceLabel) { insuranceLabel.textContent = code; }
 }
 
+function updateFreightFieldsAvailability(clearOnDisable) {
+  var incotermSelect = document.getElementById('incoterm-select');
+  var fieldset = document.getElementById('freight-insurance-fieldset');
+  if (!incotermSelect || !fieldset) { return; }
+  var opt = incotermSelect.options[incotermSelect.selectedIndex];
+  var code = ((opt && opt.getAttribute('data-code')) || '').toUpperCase();
+  var isFob = code === 'FOB';
+  fieldset.disabled = isFob;
+  if (isFob && clearOnDisable) {
+    var freightInput = fieldset.querySelector('input[name="indicative_freight_amount"]');
+    var insuranceInput = fieldset.querySelector('input[name="indicative_insurance_amount"]');
+    if (freightInput) { freightInput.value = ''; }
+    if (insuranceInput) { insuranceInput.value = ''; }
+  }
+}
+// Page load: just set the disabled state — toggling the incoterm back and
+// forth without saving never wipes a value already in the fields. Saving
+// the form while FOB is selected DOES clear them: disabled inputs aren't
+// submitted, and the update stores a missing value as empty — intended,
+// since FOB never prints freight/insurance anywhere.
+updateFreightFieldsAvailability(false);
 // 90-item backlog item 15: same auto-suggest as the New Order creation
 // screen — offers, never forces, a sailing lead-time range once both
 // ports are picked. Only fills in currently-blank fields.

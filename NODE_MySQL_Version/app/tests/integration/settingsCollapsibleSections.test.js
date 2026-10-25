@@ -59,9 +59,14 @@ describe('Settings collapsible sections (90-item backlog #27)', () => {
     expect(res.text).toMatch(/<details class="collapsible-section settings-section" data-category="company"[^>]*>[\s\S]*?<fieldset>[\s\S]*?name="settings\[/);
   });
 
-  it('details sections default to open so no field is hidden on first load', async () => {
+  // Owner request (2026-10-25): "by default Company Settings should be
+  // compressed" — every section now starts collapsed (it used to start
+  // open); each browser still remembers a section the user opened
+  // (layout/base.njk's per-section open/closed persistence).
+  it('details sections default to collapsed', async () => {
     const res = await agent.get('/settings');
-
-    expect(res.text).toMatch(/<details class="collapsible-section settings-section" data-category="[^"]+"\s+open>/);
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/<details class="collapsible-section settings-section" data-category="[^"]+">/);
+    expect(res.text).not.toMatch(/<details class="collapsible-section settings-section" data-category="[^"]+"\s+open>/);
   });
 });

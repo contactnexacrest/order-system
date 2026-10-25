@@ -60,14 +60,17 @@ final class SettingsCollapsibleSectionsTest extends DbTestCase
         );
     }
 
-    public function testDetailsSectionsDefaultToOpenSoNoFieldIsHiddenOnFirstLoad(): void
+    /**
+     * Owner request (2026-10-25): "by default Company Settings should be
+     * compressed" — every section now starts collapsed (it used to start
+     * open); each browser still remembers a section the user opened
+     * (layout/base.php's per-section open/closed persistence).
+     */
+    public function testDetailsSectionsDefaultToCollapsed(): void
     {
         $html = $this->renderSettingsPage();
 
-        self::assertMatchesRegularExpression(
-            '/<details class="collapsible-section settings-section" data-category="[^"]+"\s+open>/',
-            $html,
-            'sections must default to open — collapsing is an opt-in the user chooses, not a default that hides fields on first load'
-        );
+        self::assertMatchesRegularExpression('/<details class="collapsible-section settings-section" data-category="[^"]+">/', $html);
+        self::assertDoesNotMatchRegularExpression('/<details class="collapsible-section settings-section" data-category="[^"]+"\s+open>/', $html);
     }
 }

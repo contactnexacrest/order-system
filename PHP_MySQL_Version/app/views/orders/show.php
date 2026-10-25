@@ -3198,7 +3198,7 @@ $stepStatusIcon = static function (string $status): string {
           <div><span class="k">Compliance Checklist</span><span class="v"><?= $complianceSummary['total'] === 0 ? 'No task types configured' : $complianceSummary['approved'] . ' of ' . $complianceSummary['total'] . ' resolved' ?> — <a href="#compliance-checklist">see checklist</a></span></div>
           <?php endif; ?>
           <div><span class="k">Documents Generated</span><span class="v"><?= count($documents) ?></span></div>
-          <div><span class="k">Client</span><span class="v"><?= htmlspecialchars($order['company_legal_name']) ?></span></div>
+          <div><span class="k">Client</span><span class="v"><a href="/clients/<?= (int) $order['client_id'] ?>"><?= htmlspecialchars($order['company_legal_name']) ?></a></span></div>
           <div><span class="k">Buyer Inquiry Ref</span><span class="v"><?= htmlspecialchars($order['buyer_inquiry_ref']) ?></span></div>
           <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v"><?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '—') ?></span></div>
           <div><span class="k">Quotation Date</span><span class="v"><?= htmlspecialchars($order['quotation_date'] ?? '—') ?></span></div>
