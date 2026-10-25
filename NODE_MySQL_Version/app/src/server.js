@@ -184,21 +184,9 @@ njkEnv.addGlobal('docStatus', (documents, code) => {
 njkEnv.addGlobal('annexureConfirmAttr', require('./helpers/annexureConfirmAttr').annexureConfirmAttr);
 njkEnv.addGlobal('stepBadge', require('./helpers/stepBadge').stepBadge);
 njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').formatRange);
-// Order detail page rebuild — the first user-facing step (0-19) that isn't
-// yet 'done' (the order's real current step), or 's19' once every step is
-// done. A plain JS helper rather than a Nunjucks {% for %} loop: `{% set %}`
-// inside a `{% for %}` is scoped to that iteration and never leaks back out
-// to the template's outer scope, so a "first match wins" search can't be
-// written as a template-side loop here. Most stepStates values come from
-// a {% macro %} (stepStatusFn/step123Status), which returns a SafeString
-// object, not a string — String() it, or the strict !== below is always
-// true and every order page opens (and scrolls to) Step 1 regardless.
-njkEnv.addGlobal('firstNonDoneStep', (stepStates) => {
-  for (const key of Object.keys(stepStates)) {
-    if (String(stepStates[key]) !== 'done') { return key; }
-  }
-  return 's19';
-});
+// Order detail page step/sub-step progression (current step, cascade,
+// per-sub-step ticks) — see helpers/stepFlow.js.
+njkEnv.addGlobal('computeStepFlow', require('./helpers/stepFlow').computeStepFlow);
 
 // --- Session store (MySQL-backed via knex, not PHP's file-session
 // equivalent — Node is a long-running multi-connection process, so a

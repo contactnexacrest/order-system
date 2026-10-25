@@ -1,0 +1,138 @@
+'use strict';
+
+const request = require('supertest');
+const app = require('../../src/server');
+const db = require('../../src/config/db');
+const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
+const piIntakeRepository = require('../../src/repositories/piIntakeRepository');
+const stageGateService = require('../../src/services/stageGateService');
+const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
+const { createTestClient, createTestOrder } = require('../support/fixtures');
+
+/**
+ * Port of OrderStepFlowTest.php. Owner request (2026-10-25): "after refresh
+ * I must be on the same card if sub tasks are there, or the next step open
+ * if the previous is completed ... open the lock of one door, enter the
+ * next room". Each lettered sub-step now has its own done signal; inside the
+ * current step only its first unfinished sub-step starts open (the page
+ * scrolls to it), done sub-steps show a tick, and a later step being done
+ * marks every earlier one done — except the Compliance Checklist (8b), which
+ * stays amber with its open-task count but no longer claims the page once
+ * the pipeline has moved past it.
+ */
+describe('Order page sequential step flow', () => {
+  let agent;
+
+  async function createTestDocument(orderId, typeCode, status = 'draft') {
+    const type = await db.queryOne('SELECT id FROM document_types WHERE code = :code', { code: typeCode });
+    await db.execute(
+      `INSERT INTO documents (order_id, document_type_id, document_reference, status)
+       VALUES (:order_id, :type_id, :ref, :status)`,
+      { order_id: orderId, type_id: type.id, ref: `JEST-DOC-${Math.random().toString(16).slice(2, 10)}`, status }
+    );
+  }
+
+  async function orderAtStep5() {
+    const orderId = await createTestOrder(await createTestClient());
+    await createTestDocument(orderId, 'QT', 'sent');
+    await createTestDocument(orderId, 'BUYERPO');
+    await stageGateService.passAndUnlockNext(orderId, 1, null);
+    await stageGateService.passAndUnlockNext(orderId, 2, null);
+    return orderId;
+  }
+
+  function cardIcon(html, cardId) {
+    const m = html.match(new RegExp(`id="${cardId}"[^>]*>\\s*<summary><span class="step-card-icon (\\w+)"`));
+    expect(m).not.toBeNull();
+    return m[1];
+  }
+
+  function cardIsOpen(html, cardId) {
+    return html.includes(`id="${cardId}" open>`);
+  }
+
+  beforeAll(async () => {
+    agent = request.agent(app);
+    const loginPage = await agent.get('/login');
+    const csrf = loginPage.text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
+    const loginRes = await agent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
+    expect(loginRes.status).toBe(302);
+  });
+
+  afterAll(async () => {
+    await db.pool.end();
+  });
+
+  it('ticks 5a and opens the next sub-step after the PI link is generated', async () => {
+    const orderId = await orderAtStep5();
+    await piIntakeRepository.createLink(orderId, null);
+
+    const { text } = await agent.get(`/orders/${orderId}`);
+
+    expect(cardIsOpen(text, 'step-group-stage-3')).toBe(true);
+    expect(cardIcon(text, 'step-5a-pi-form-link')).toBe('done');
+    expect(cardIsOpen(text, 'step-5a-pi-form-link')).toBe(false);
+    expect(cardIcon(text, 'step-5b-pi-intake-apply')).toBe('current');
+    expect(cardIsOpen(text, 'step-5b-pi-intake-apply')).toBe(true);
+    expect(cardIcon(text, 'step-5c-pi-generate')).toBe('locked');
+    expect(cardIsOpen(text, 'step-5c-pi-generate')).toBe(false);
+  });
+
+  it('opens only the first sub-step of Step 5 before anything is done', async () => {
+    const { text } = await agent.get(`/orders/${await orderAtStep5()}`);
+
+    expect(cardIcon(text, 'step-5a-pi-form-link')).toBe('current');
+    expect(cardIsOpen(text, 'step-5a-pi-form-link')).toBe(true);
+    expect(cardIsOpen(text, 'step-5b-pi-intake-apply')).toBe(false);
+  });
+
+  it('marks earlier sub-steps done when a later one is', async () => {
+    const orderId = await orderAtStep5();
+    await createTestDocument(orderId, 'PI');
+
+    const { text } = await agent.get(`/orders/${orderId}`);
+
+    expect(cardIcon(text, 'step-5a-pi-form-link')).toBe('done');
+    expect(cardIcon(text, 'step-5b-pi-intake-apply')).toBe('done');
+    expect(cardIcon(text, 'step-5c-pi-generate')).toBe('done');
+    expect(cardIsOpen(text, 'step-5d-payment-record')).toBe(true);
+  });
+
+  it('keeps outstanding compliance amber but opens the real next action once past it', async () => {
+    const orderId = await orderAtStep5();
+    await orderComplianceTaskRepository.initializeForOrder(orderId);
+    for (const stageNumber of [3, 4, 5, 6, 7]) {
+      await stageGateService.passAndUnlockNext(orderId, stageNumber, null);
+    }
+
+    const { text } = await agent.get(`/orders/${orderId}`);
+
+    expect(text).toContain('compliance tasks still open');
+    expect(cardIcon(text, 'compliance-checklist')).toBe('current');
+    expect(cardIsOpen(text, 'compliance-checklist')).toBe(false);
+    expect(cardIsOpen(text, 'step-group-stage-8')).toBe(true);
+  });
+
+  it('marks every earlier pipeline step done once a later one is', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await createTestDocument(orderId, 'QT', 'draft');
+    for (const stageNumber of [1, 2, 3]) {
+      await stageGateService.passAndUnlockNext(orderId, stageNumber, null);
+    }
+
+    const { text } = await agent.get(`/orders/${orderId}`);
+
+    for (const cardId of ['step-1-quotation-prepare', 'step-2-quotation-send', 'step-3-quotation-accept', 'step-group-stage-2', 'step-group-stage-3']) {
+      expect(cardIcon(text, cardId)).toBe('done');
+    }
+  });
+
+  it('shows Step 7c Attach Acknowledgment before 7d Confirm Signed', async () => {
+    const { text } = await agent.get(`/orders/${await orderAtStep5()}`);
+
+    const attach = text.indexOf('id="step-7c-supplier-po-attach"');
+    const confirm = text.indexOf('id="step-7d-supplier-po-signed"');
+    expect(attach).toBeGreaterThan(-1);
+    expect(confirm).toBeGreaterThan(attach);
+  });
+});

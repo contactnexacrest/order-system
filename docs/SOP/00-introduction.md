@@ -227,8 +227,8 @@ whichever step-card happens to be open.
 (e.g. "7a", "7b", "7c") immediately before the button itself, wherever a
 stage involves more than one action a staff member presses in
 sequence — for example Supplier PO's "Save Supplier PO Terms" (7a) →
-"Generate Supplier PO" (7b) → "Confirm Supplier Signed & Returned PO"
-(7c). This shows the literal order of operations *within* a step, not
+"Generate Supplier PO" (7b) → "Attach Supplier PO Acknowledgment" (7c)
+→ "Confirm Supplier Signed & Returned PO" (7d). This shows the literal order of operations *within* a step, not
 just which of the 9 internal stages the order is on overall (that's
 still the process stepper above) — badge numbers follow the step-card's
 own on-screen number, not the stage number. Two badges — **"4d"** (the

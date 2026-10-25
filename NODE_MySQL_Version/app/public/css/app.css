@@ -375,6 +375,9 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .order-layout{display:flex;gap:1.75rem;align-items:flex-start;}
 .step-sequence{flex:1;min-width:0;display:flex;flex-direction:column;gap:1.1rem;}
 .step-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 1.1rem;}
+/* Land a scrolled-to card (the order's current step on load) clear of the
+   sticky dev/test banner instead of tucked under it. */
+.step-card,.step-group{scroll-margin-top:56px;}
 .step-card > summary{list-style:none;cursor:pointer;padding:1rem 0;display:flex;align-items:center;gap:0.6rem;}
 .step-card > summary::-webkit-details-marker{display:none;}
 .step-card > summary h2{margin:0;font-size:1rem;font-weight:700;color:var(--ink);border-left:none;padding-left:0;}

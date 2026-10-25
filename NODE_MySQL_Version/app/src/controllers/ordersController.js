@@ -945,6 +945,7 @@ async function show(req, res) {
       // (emailDispatchService.markSentIfMailDisabled()).
       mailSendingEnabled: (await companySettingsRepository.get('mail_sending_enabled')) !== '0',
       buyerPoCopyRequired: (await companySettingsRepository.get('wet_signature_required_buyer_po')) === '1',
+      supplierPoCopyRequired: (await companySettingsRepository.get('wet_signature_required_supplier_po')) === '1',
       products: await orderProductRepository.forOrder(orderId),
       hsCodes: await hsCodeRepository.active(),
       isPostConfirmationOrder: orderEditGuard.isPostConfirmation(order.current_stage_number),
