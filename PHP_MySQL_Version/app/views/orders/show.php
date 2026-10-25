@@ -1200,35 +1200,28 @@ $stepStatusIcon = static function (string $status): string {
       <?php endif; ?>
     </details>
 
-    <div class="step-group-connector">once the buyer sends their actual PO back</div>
+    <div class="step-group-connector">once the buyer sends their signed PO back</div>
 
-    <details class="step-card" id="step-4b-buyer-po-confirm"<?= $stepCardOpen('4') ?>>
-      <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4b &middot; Confirm Buyer's PO Received</h2></summary>
-      <?php if ($hasBuyerPo): ?>
-        <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
-      <?php elseif ($stage2 && $stage2['status'] !== 'locked'): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
-          <?= Csrf::field() ?>
-          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-          <?= $stepBadge('4b') ?><button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
-        </form>
-      <?php else: ?>
-        <p class="muted">Generate the Quotation first to unlock this gate.</p>
-      <?php endif; ?>
-    </details>
-
-    <div class="step-group-connector">attach their signed copy for the file</div>
-
-    <details class="step-card" id="step-4c-buyer-po-attach"<?= $stepCardOpen('4') ?>>
-      <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4c &middot; Attach Buyer's PO Copy</h2></summary>
+    <?php
+      // Owner decision (2026-10-25): attach the buyer's signed PO copy
+      // BEFORE confirming receipt — the confirm gate already refuses
+      // without one (WetSignatureGuardService::buyerPoBlocked(), on by
+      // default), so the old order (confirm first, attach after) walked
+      // staff straight into that error.
+      $buyerPoCopyRequired = \App\Repositories\CompanySettingsRepository::get('wet_signature_required_buyer_po') === '1';
+    ?>
+    <details class="step-card" id="step-4b-buyer-po-attach"<?= $stepCardOpen('4') ?>>
+      <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4b &middot; Attach Buyer's PO Copy<?= $buyerPoCopyRequired ? '' : ' <small class="muted">(optional)</small>' ?></h2></summary>
       <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+        <p class="muted small">Upload the copy the buyer emailed you — or the buyer can upload it themselves from their client portal or the <a href="#step-6c-buyer-action-link">Buyer Action Link</a>; it then appears here.</p>
         <?php if (!empty($buyerPoDocuments)): ?>
           <table class="list" style="margin-top:8px">
-            <tr><th>File</th><th>Uploaded</th><th></th></tr>
+            <tr><th>File</th><th>Uploaded</th><th>By</th><th></th></tr>
             <?php foreach ($buyerPoDocuments as $bd): ?>
               <tr>
                 <td><?= htmlspecialchars($bd['original_filename']) ?></td>
                 <td><?= htmlspecialchars($bd['uploaded_at']) ?></td>
+                <td><?= $bd['uploaded_by'] === null ? 'The buyer (self-uploaded)' : 'Staff' ?></td>
                 <td><a href="/file-store/<?= (int) $bd['file_id'] ?>/download">Download</a></td>
               </tr>
             <?php endforeach; ?>
@@ -1237,10 +1230,29 @@ $stepStatusIcon = static function (string $status): string {
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <?= Csrf::field() ?>
           <input type="file" name="document" required>
-          <?= $stepBadge('4c') ?><button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+          <?= $stepBadge('4b') ?><button type="submit" class="btn-sm"><?= empty($buyerPoDocuments) ? 'Attach Buyer PO Copy' : 'Attach Another Copy' ?></button>
         </form>
       <?php else: ?>
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
+      <?php endif; ?>
+    </details>
+
+    <div class="step-group-connector">then confirm it to complete Step 4</div>
+
+    <details class="step-card" id="step-4c-buyer-po-confirm"<?= $stepCardOpen('4') ?>>
+      <summary><?= $stepStatusIcon($stepStates['4']) ?><h2>Step 4c &middot; Confirm Buyer's PO Received</h2></summary>
+      <?php if ($hasBuyerPo): ?>
+        <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
+      <?php elseif (!$stage2 || $stage2['status'] === 'locked'): ?>
+        <p class="muted">Generate the Quotation first to unlock this gate.</p>
+      <?php elseif ($buyerPoCopyRequired && empty($buyerPoDocuments)): ?>
+        <p class="muted">Attach the buyer's signed PO copy in Step 4b first &mdash; this step completes Step 4 and needs it on file.</p>
+      <?php else: ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
+          <?= Csrf::field() ?>
+          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+          <?= $stepBadge('4c') ?><button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+        </form>
       <?php endif; ?>
     </details>
   </details>

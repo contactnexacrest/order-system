@@ -19,7 +19,7 @@ async function attach(orderId, fileId) {
 
 async function forOrder(orderId) {
   return db.query(
-    `SELECT d.*, fs.original_filename, fs.server_path, fs.mime_type, fs.uploaded_at
+    `SELECT d.*, fs.original_filename, fs.server_path, fs.mime_type, fs.uploaded_at, fs.uploaded_by, fs.received_from
      FROM order_buyer_po_documents d JOIN file_store fs ON fs.id = d.file_id
      WHERE d.order_id = :order_id
      ORDER BY fs.uploaded_at DESC`,

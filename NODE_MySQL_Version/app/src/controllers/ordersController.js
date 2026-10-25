@@ -944,6 +944,7 @@ async function show(req, res) {
       // action — a document counts as sent once approved
       // (emailDispatchService.markSentIfMailDisabled()).
       mailSendingEnabled: (await companySettingsRepository.get('mail_sending_enabled')) !== '0',
+      buyerPoCopyRequired: (await companySettingsRepository.get('wet_signature_required_buyer_po')) === '1',
       products: await orderProductRepository.forOrder(orderId),
       hsCodes: await hsCodeRepository.active(),
       isPostConfirmationOrder: orderEditGuard.isPostConfirmation(order.current_stage_number),

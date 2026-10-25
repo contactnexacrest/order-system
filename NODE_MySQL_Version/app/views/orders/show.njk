@@ -996,35 +996,25 @@
       {% endif %}
     </details>
 
-    <div class="step-group-connector">once the buyer sends their actual PO back</div>
+    <div class="step-group-connector">once the buyer sends their signed PO back</div>
 
-    <details class="step-card" id="step-4b-buyer-po-confirm"{{ stepCardOpen('s4') }}>
-      <summary>{{ stepStatusIcon(stepStates['s4']) }}<h2>Step 4b &middot; Confirm Buyer's PO Received</h2></summary>
-      {% if hasBuyerPo %}
-        <p>Buyer PO recorded: <strong>{{ order.buyers_po_ref }}</strong></p>
-      {% elif stage2 and stage2.status != 'locked' %}
-        <form method="post" action="/orders/{{ order.id }}/buyer-po">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-          {{ stepBadge('4b') | safe }}<button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
-        </form>
-      {% else %}
-        <p class="muted">Generate the Quotation first to unlock this gate.</p>
-      {% endif %}
-    </details>
-
-    <div class="step-group-connector">attach their signed copy for the file</div>
-
-    <details class="step-card" id="step-4c-buyer-po-attach"{{ stepCardOpen('s4') }}>
-      <summary>{{ stepStatusIcon(stepStates['s4']) }}<h2>Step 4c &middot; Attach Buyer's PO Copy</h2></summary>
+    {# Owner decision (2026-10-25): attach the buyer's signed PO copy BEFORE
+       confirming receipt — the confirm gate already refuses without one
+       (wetSignatureGuardService.buyerPoBlocked(), on by default), so the
+       old order (confirm first, attach after) walked staff straight into
+       that error. #}
+    <details class="step-card" id="step-4b-buyer-po-attach"{{ stepCardOpen('s4') }}>
+      <summary>{{ stepStatusIcon(stepStates['s4']) }}<h2>Step 4b &middot; Attach Buyer's PO Copy{% if not buyerPoCopyRequired %} <small class="muted">(optional)</small>{% endif %}</h2></summary>
       {% if stage2 and stage2.status != 'locked' %}
+        <p class="muted small">Upload the copy the buyer emailed you — or the buyer can upload it themselves from their client portal or the <a href="#step-6c-buyer-action-link">Buyer Action Link</a>; it then appears here.</p>
         {% if buyerPoDocuments and buyerPoDocuments.length > 0 %}
           <table class="list" style="margin-top:8px">
-            <tr><th>File</th><th>Uploaded</th><th></th></tr>
+            <tr><th>File</th><th>Uploaded</th><th>By</th><th></th></tr>
             {% for bd in buyerPoDocuments %}
               <tr>
                 <td>{{ bd.original_filename }}</td>
                 <td>{{ bd.uploaded_at }}</td>
+                <td>{{ 'The buyer (self-uploaded)' if bd.uploaded_by === null else 'Staff' }}</td>
                 <td><a href="/file-store/{{ bd.file_id }}/download">Download</a></td>
               </tr>
             {% endfor %}
@@ -1033,7 +1023,28 @@
         <form method="post" action="/orders/{{ order.id }}/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="file" name="document" required>
-          {{ stepBadge('4c') | safe }}<button type="submit" class="btn-sm">Attach Buyer PO Copy</button>
+          {{ stepBadge('4b') | safe }}<button type="submit" class="btn-sm">{{ 'Attach Another Copy' if (buyerPoDocuments and buyerPoDocuments.length > 0) else 'Attach Buyer PO Copy' }}</button>
+        </form>
+      {% else %}
+        <p class="muted">Generate the Quotation first to unlock this gate.</p>
+      {% endif %}
+    </details>
+
+    <div class="step-group-connector">then confirm it to complete Step 4</div>
+
+    <details class="step-card" id="step-4c-buyer-po-confirm"{{ stepCardOpen('s4') }}>
+      <summary>{{ stepStatusIcon(stepStates['s4']) }}<h2>Step 4c &middot; Confirm Buyer's PO Received</h2></summary>
+      {% if hasBuyerPo %}
+        <p>Buyer PO recorded: <strong>{{ order.buyers_po_ref }}</strong></p>
+      {% elif not (stage2 and stage2.status != 'locked') %}
+        <p class="muted">Generate the Quotation first to unlock this gate.</p>
+      {% elif buyerPoCopyRequired and not (buyerPoDocuments and buyerPoDocuments.length > 0) %}
+        <p class="muted">Attach the buyer's signed PO copy in Step 4b first &mdash; this step completes Step 4 and needs it on file.</p>
+      {% else %}
+        <form method="post" action="/orders/{{ order.id }}/buyer-po">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+          {{ stepBadge('4c') | safe }}<button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
         </form>
       {% endif %}
     </details>
