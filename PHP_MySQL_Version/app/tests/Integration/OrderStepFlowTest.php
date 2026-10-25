@@ -149,4 +149,13 @@ final class OrderStepFlowTest extends DbTestCase
         self::assertNotFalse($confirm);
         self::assertLessThan($confirm, $attach);
     }
+
+    /** Owner request (2026-10-25): the active step and sub-step must stand out. */
+    public function testTheCurrentStepAndSubStepAreHighlighted(): void
+    {
+        $css = (string) file_get_contents(__DIR__ . '/../../../public_html/assets/css/app.css');
+
+        self::assertStringContainsString('.step-group:has(> summary > .step-card-icon.current){border:2px solid var(--gold);', $css);
+        self::assertStringContainsString('.step-card:has(> summary > .step-card-icon.current){border-color:var(--gold);border-left:5px solid var(--gold);', $css);
+    }
 }

@@ -72,4 +72,12 @@ describe('computeStepFlow (order page step/sub-step progression)', () => {
     expect(flow.subStepStatus('s6', '6a')).toBe('locked');
     expect(flow.subCardOpen('s6', '6a')).toBe('');
   });
+
+  // Owner request (2026-10-25): the active step and sub-step must stand out.
+  it('highlights the current step and sub-step', () => {
+    const css = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'public', 'css', 'app.css'), 'utf8');
+
+    expect(css).toContain('.step-group:has(> summary > .step-card-icon.current){border:2px solid var(--gold);');
+    expect(css).toContain('.step-card:has(> summary > .step-card-icon.current){border-color:var(--gold);border-left:5px solid var(--gold);');
+  });
 });

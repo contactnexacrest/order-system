@@ -414,6 +414,14 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .step-group-connector{display:flex;align-items:center;gap:0.4rem;padding:0 0.3rem;color:var(--ink-soft);font-size:0.72rem;}
 .step-group-connector::before{content:"\2193";color:var(--gold-strong);font-size:0.85rem;}
 .step-group > .step-card{margin:0;}
+/* Owner request (2026-10-25): the active step must stand out — driven by
+   the same "current" status icon every step/sub-step header already
+   carries, so no template changes. The current step box gets a gold frame
+   and badge; the current sub-step inside it a gold bar and warm tint. */
+.step-group:has(> summary > .step-card-icon.current){border:2px solid var(--gold);box-shadow:0 0 0 4px var(--gold-soft);background:#FFFCF5;}
+.step-group:has(> summary > .step-card-icon.current) > summary .step-group-num{background:var(--gold-strong);}
+.step-card:has(> summary > .step-card-icon.current){border-color:var(--gold);border-left:5px solid var(--gold);background:#FFF8EA;}
+.step-card:has(> summary > .step-card-icon.current) > summary h2{color:var(--gold-strong);}
 
 /* Payment Overview: real tabs (Snapshot/Ledger/Full Status are parallel
    views of the same data, not a sequence — unlike the step sub-steps
