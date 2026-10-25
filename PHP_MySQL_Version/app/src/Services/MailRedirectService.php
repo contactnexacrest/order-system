@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Config\Env;
 use App\Repositories\CompanySettingsRepository;
 
 /**
@@ -56,13 +55,12 @@ final class MailRedirectService
             }
         }
 
-        // 90-item backlog item #12: a fresh install with company_settings
-        // not yet configured previously had no default CC at all — falls
-        // back to MAIL_DEFAULT_CC_EMAIL in .env (same "DB wins if set,
-        // else .env" precedence as every other optional company setting
-        // with an .env counterpart) rather than silently doing nothing
-        // until someone remembers to set it in Company Settings.
-        $default = trim((string) CompanySettingsRepository::get('mail_default_cc_email')) ?: trim((string) Env::get('MAIL_DEFAULT_CC_EMAIL', ''));
+        // Only the Company Settings value — the old fallback to
+        // MAIL_DEFAULT_CC_EMAIL in .env is gone (owner, 2026-10-25): with it
+        // set, that address was CC'd on every action/audit notification
+        // whenever this setting was blank, which nobody needs now that each
+        // notification has its own configurable recipients.
+        $default = trim((string) CompanySettingsRepository::get('mail_default_cc_email'));
         if ($default !== '' && filter_var($default, FILTER_VALIDATE_EMAIL)) {
             $addresses[] = $default;
         }
