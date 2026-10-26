@@ -35,7 +35,17 @@ below) does. On the order page this is **6a** Generate the OC, **6b**
 Send the Buyer Action Link (the same link sent at Step 4b for the Buyer PO
 — send it again, or regenerate it if it has expired), then **6c** Record
 the Buyer's Acknowledgement — completed by the buyer
-(link or portal) or by staff.
+(link or portal) or by staff. **6b only ticks green once the OC itself is
+issued** (approved, or sent while email is on) — the link made back in 4b
+does not count for 6b before that.
+
+**The OC's money figures** (owner report 2026-10-27): Section 4 shows the
+**Total Order Value (FOB)**; Section 5 shows the **advance due** by the
+terms (e.g. 40%), the **advance actually received**, its date, and the
+**balance due = order value minus the advance actually received** — so the
+figures always add up. The Commercial Invoice uses the same balance. The
+client's acknowledgement page shows the order value, the advance paid and
+the balance due as well.
 
 Once the OC has actually been emailed, the order page shows exactly where
 things stand and offers the one thing staff can still do here — record an

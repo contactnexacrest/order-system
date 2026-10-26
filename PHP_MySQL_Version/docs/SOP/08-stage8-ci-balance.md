@@ -84,11 +84,13 @@ pattern as every other payment in this pipeline:
 
 ## What the client does (or doesn't)
 
-Nothing inside the system. The buyer receives the scanned BL copy and the
-Commercial Invoice through whatever channel staff use to send documents,
-and wires the balance payment outside the system — staff verify it against
-the bank statement and record it themselves, exactly as with every other
-payment stage.
+The buyer receives the scanned BL copy and the Commercial Invoice and wires
+the balance payment outside the system. The CI email carries the **Payment
+Action Link** (see [Chapter 3](./03-stage3-pi-advance.md#the-payment-action-link-owner-request-2026-10-27));
+there the buyer sees the **balance due — the order value minus the advance
+actually received** — downloads the CI, and sends the payment screenshot and
+transaction details. Staff can also send the link from Step 11c. Staff still
+verify against the bank statement and record the remittance themselves.
 
 ## What happens next
 

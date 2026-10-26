@@ -15,6 +15,20 @@ final class OrderPaymentStatusRepository
         )->execute(['order_id' => $orderId]);
     }
 
+    /**
+     * Owner report (2026-10-27, blocker): the balance still due is what is
+     * left of the FOB order value after the advance the bank ACTUALLY
+     * received — never FOB × balance % on its own. Before any advance is
+     * recorded it falls back to the advance due by the payment terms.
+     */
+    public static function balanceDue(float $fobTotal, float $advancePct, ?array $payment): float
+    {
+        $advance = $payment !== null && $payment['advance_amount'] !== null
+            ? (float) $payment['advance_amount']
+            : round($fobTotal * $advancePct / 100, 2);
+        return max(0.0, round($fobTotal - $advance, 2));
+    }
+
     public static function find(int $orderId): ?array
     {
         $stmt = Database::connection()->prepare(

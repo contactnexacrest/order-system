@@ -83,6 +83,7 @@ final class BuyerActionController
             }
         }
 
+        $totalFobValue = OrderProductRepository::totalFobValue($orderId);
         View::render('buyer_action/show', [
             'wrapClass' => 'intake-wrap',
             'task' => BuyerActionService::currentTask($order, $ocAcknowledgment),
@@ -91,7 +92,9 @@ final class BuyerActionController
             'token' => $params['token'],
             'order' => $order,
             'products' => OrderProductRepository::forOrder($orderId),
-            'totalFobValue' => OrderProductRepository::totalFobValue($orderId),
+            'totalFobValue' => $totalFobValue,
+            'advanceReceived' => $paymentStatus !== null && $paymentStatus['advance_amount'] !== null ? (float) $paymentStatus['advance_amount'] : null,
+            'balanceDue' => OrderPaymentStatusRepository::balanceDue($totalFobValue, (float) ($order['advance_pct'] ?? 0), $paymentStatus),
             'ocAcknowledgment' => $ocAcknowledgment,
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
             'advanceCleared' => $paymentStatus !== null && $paymentStatus['advance_cleared_at'] !== null,

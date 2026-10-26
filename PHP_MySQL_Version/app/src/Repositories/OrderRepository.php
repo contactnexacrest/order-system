@@ -726,7 +726,8 @@ final class OrderRepository
     {
         Database::connection()->prepare(
             "UPDATE orders SET status = 'shipped_docs_sent',
-                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
+                    payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
              WHERE id = :id"
         )->execute(['id' => $orderId]);
     }
@@ -743,7 +744,8 @@ final class OrderRepository
     {
         Database::connection()->prepare(
             "UPDATE orders SET status = 'complete', is_locked = 1,
-                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
+                    payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
              WHERE id = :id"
         )->execute(['id' => $orderId]);
     }
@@ -813,7 +815,8 @@ final class OrderRepository
     {
         Database::connection()->prepare(
             "UPDATE orders SET status = 'lost', is_locked = 1, lost_reason = :reason, lost_at = NOW(), lost_by = :user_id,
-                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
+                    payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
              WHERE id = :id"
         )->execute(['reason' => $reason, 'user_id' => $userId, 'id' => $orderId]);
     }
@@ -830,7 +833,8 @@ final class OrderRepository
     {
         Database::connection()->prepare(
             "UPDATE orders SET status = 'cancelled', is_locked = 1,
-                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+                    buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
+                    payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
              WHERE id = :id"
         )->execute(['id' => $orderId]);
     }
@@ -921,6 +925,51 @@ final class OrderRepository
         $stmt = Database::connection()->prepare(
             "SELECT * FROM orders
               WHERE buyer_action_token_hash = :hash AND buyer_action_token_expires_at > NOW()
+                AND status IN ('active', 'disputed')"
+        );
+        $stmt->execute(['hash' => hash('sha256', $rawToken)]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /**
+     * Owner request (2026-10-27): the no-login Payment Action Link — the
+     * client sends their payment details for the advance, freight or
+     * balance there. Same hash / encrypted copy / expiry convention as
+     * generateBuyerActionToken(); regenerating replaces the old link.
+     */
+    public static function generatePaymentActionToken(int $orderId, int $ttlDays = 180): string
+    {
+        $rawToken = bin2hex(random_bytes(32));
+        Database::connection()
+            ->prepare('UPDATE orders SET payment_action_token_hash = :hash, payment_action_token_plain = :plain, payment_action_token_expires_at = :expires WHERE id = :id')
+            ->execute([
+                'hash'    => hash('sha256', $rawToken),
+                'plain'   => \App\Services\EncryptionService::encrypt($rawToken),
+                'expires' => date('Y-m-d H:i:s', time() + ($ttlDays * 86400)),
+                'id'      => $orderId,
+            ]);
+        return $rawToken;
+    }
+
+    /** The order's live Payment Action Link token, made on first use — so every PI / Debit Note / CI email carries the same link. */
+    public static function ensurePaymentActionToken(int $orderId): string
+    {
+        $stmt = Database::connection()->prepare('SELECT payment_action_token_plain, payment_action_token_expires_at FROM orders WHERE id = :id');
+        $stmt->execute(['id' => $orderId]);
+        $row = $stmt->fetch() ?: [];
+        $plain = \App\Services\EncryptionService::decrypt($row['payment_action_token_plain'] ?? null);
+        if (!empty($plain) && !empty($row['payment_action_token_expires_at']) && strtotime((string) $row['payment_action_token_expires_at']) > time() + 86400) {
+            return $plain;
+        }
+        return self::generatePaymentActionToken($orderId);
+    }
+
+    /** Public /payment-action/{token} route's sole authorization check — same rules as findByValidBuyerActionToken(). */
+    public static function findByValidPaymentActionToken(string $rawToken): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT * FROM orders
+              WHERE payment_action_token_hash = :hash AND payment_action_token_expires_at > NOW()
                 AND status IN ('active', 'disputed')"
         );
         $stmt->execute(['hash' => hash('sha256', $rawToken)]);

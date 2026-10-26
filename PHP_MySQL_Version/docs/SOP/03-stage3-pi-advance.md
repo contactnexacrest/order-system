@@ -115,7 +115,13 @@ This is two separate steps, deliberately kept apart so a wire transfer that's
 been sent but not yet reconciled against the bank statement isn't confused
 with money that's actually landed:
 
-1. **Record Advance Remittance** — staff type the amount received, the
+1. **Record Advance Remittance** — the card shows the **advance due**
+   (e.g. *USD 3,000.00 — 40% of the order value USD 7,500.00*) and fills it
+   in. Enter what the bank actually received. An amount above the whole
+   order value is refused; an amount that differs from the advance due by
+   more than 1% (bank charges aside) needs the tick **"The amount received
+   differs from the advance due"** — so a typing mistake can't flow into
+   the Order Confirmation. Staff type the amount received, the
    date, and the **@ Exchange Rate** (₹ per 1 unit of the order
    currency) it was received at, once the buyer's T/T notification comes in. The rate is
    required and is recorded together with the remittance; the form reads
@@ -141,6 +147,38 @@ section under **Client-Reported Payments** — purely informational, and the
 page explicitly warns staff to always verify against the actual bank
 statement before recording anything above, never to record a payment based
 on the client's self-report alone.
+
+### The Payment Action Link (owner request 2026-10-27)
+
+A no-login link where the client sends their payment details: the
+transaction ID / UTR, the amount, the date, their bank, and a **screenshot
+or bank remittance advice (required)**. It shows **payment only** — never
+the Buyer PO or the Order Confirmation — and only **one payment at a time**:
+
+| Where the order is | What the client sees on the link |
+|---|---|
+| Document for the next payment not issued yet | "Nothing to pay right now", naming the next payment |
+| PI issued, advance not cleared | **Advance Payment** — Download Proforma Invoice, the amount due, the form |
+| Advance details sent | "We're checking your advance payment" (no form) |
+| Debit Note issued (CFR/CIF only), freight not cleared | **Freight & Insurance** — Download Debit Note, the amount, the form |
+| CI issued, balance not cleared | **Balance Payment** — Download Commercial Invoice, the balance due, the form |
+| Every payment cleared | "All payments received — thank you" |
+
+How the client gets it:
+
+- **Automatically in the email** — the Proforma Invoice, Debit Note and
+  Commercial Invoice emails end with *"PAYMENT DETAILS: once you have
+  completed the payment, please upload the payment screenshot together with
+  the transaction details … on this secure link"*. It is the same link
+  each time.
+- **From the order page** — Steps **5d**, **9c** and **11c** each have a
+  **Payment Action Link** box (optional, never locks a step): copy the
+  current link, or **Generate & Email Payment Link** (which replaces any
+  older link).
+
+When the client sends their details, the order team is notified. Like every
+client self-report this is **information only** — staff still check the bank
+statement and record the remittance in 5d / 9c / 11c themselves.
 
 ## Payment Snapshot and Payment Ledger
 
@@ -192,10 +230,11 @@ to see the needed things."
   no-login page (`/pi-details/{token}`) and must tick a confirmation box
   stating the details are correct before submitting — this is the same
   consent that permanently locks their data once staff accept it.
-- **The advance payment itself** happens entirely outside the system — the
-  buyer wires the funds by whatever channel their bank uses. Nothing in the
-  system notifies them to pay or tracks whether they have; staff learn about
-  it only from the actual bank statement or T/T notification.
+- **The advance payment itself** happens outside the system — the buyer
+  wires the funds. They send us the payment details (screenshot,
+  transaction ID, amount, date) on the **Payment Action Link** that comes
+  with the PI email (see above); staff still confirm against the bank
+  statement.
 - **Self-reporting a payment** (optional): once their portal login exists,
   the buyer can submit a payment report themselves — but at this exact
   point in Stage 3 they don't have a portal login yet, since it's only

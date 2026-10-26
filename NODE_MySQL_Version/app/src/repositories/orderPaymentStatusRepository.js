@@ -9,6 +9,20 @@ async function initializeForOrder(orderId, executor = db) {
   await executor.execute('INSERT INTO order_payment_status (order_id) VALUES (:order_id)', { order_id: orderId });
 }
 
+/**
+ * Owner report (2026-10-27, blocker): the balance still due is what is left
+ * of the FOB order value after the advance the bank ACTUALLY received —
+ * never FOB × balance % on its own. Before any advance is recorded it falls
+ * back to the advance due by the payment terms.
+ */
+function balanceDue(fobTotal, advancePct, payment) {
+  const fob = parseFloat(fobTotal) || 0;
+  const advance = payment && payment.advance_amount !== null && payment.advance_amount !== undefined
+    ? parseFloat(payment.advance_amount)
+    : Math.round(fob * (parseFloat(advancePct) || 0)) / 100;
+  return Math.max(0, Math.round((fob - advance) * 100) / 100);
+}
+
 async function find(orderId) {
   return db.queryOne('SELECT * FROM order_payment_status WHERE order_id = :order_id', { order_id: orderId });
 }
@@ -212,7 +226,7 @@ async function setFreightZohoSync(orderId, zohoReference) {
 }
 
 module.exports = {
-  initializeForOrder, find, recordAdvanceReceived, markAdvanceCleared, setBalanceAmount,
+  initializeForOrder, find, balanceDue, recordAdvanceReceived, markAdvanceCleared, setBalanceAmount,
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
   setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,
   setFreightInrActual, clearFreightInrActual, clearedSettlements, clearedOnDate,

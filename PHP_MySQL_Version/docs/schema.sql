@@ -696,6 +696,10 @@ CREATE TABLE orders (
   financials_costs_confirmed_by BIGINT UNSIGNED NULL,
   financials_completed_at       DATETIME NULL,
   financials_completed_by       BIGINT UNSIGNED NULL,
+  -- Owner request (2026-10-27): no-login Payment Action Link (advance / freight / balance payment details).
+  payment_action_token_hash       CHAR(64) NULL,
+  payment_action_token_plain      TEXT     NULL,
+  payment_action_token_expires_at DATETIME NULL,
 
   is_sample_data          TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real order
   created_by              BIGINT UNSIGNED NULL,
@@ -4014,3 +4018,5 @@ DELETE FROM company_settings WHERE setting_key = 'notification_email';
 UPDATE file_upload_contexts
    SET allowed_extensions = 'pdf,doc,docx,xls,xlsx,odt,ods,rtf,txt,csv,jpg,jpeg,png,gif,webp,bmp,tif,tiff,heic,eml,msg,zip'
  WHERE context_key IN ('draft_bl', 'bl_copy');
+
+CREATE INDEX idx_orders_payment_action_token ON orders(payment_action_token_hash);

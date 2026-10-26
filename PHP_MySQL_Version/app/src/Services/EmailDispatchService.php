@@ -39,6 +39,9 @@ final class EmailDispatchService
      *
      * @return array{subject:string, body:string, recipient_email:string, document:?array, order:array}
      */
+    /** Owner request (2026-10-27): appended to the PI, Debit Note and CI emails. */
+    public const PAYMENT_LINK_PARAGRAPH = "PAYMENT DETAILS: once you have completed the payment, please upload the payment screenshot together with the transaction details (Transaction ID / UTR, amount and date) on this secure link — no login needed:\n{payment_action_link}\nOur team will check them against our bank statement and confirm.";
+
     public static function buildPreview(int $orderId, ?int $documentId, string $templateKey, int $senderUserId): array
     {
         $order = OrderRepository::find($orderId);
@@ -110,9 +113,21 @@ final class EmailDispatchService
         $sender = UserRepository::findById($senderUserId);
         $tokens = self::tokensFor($order, $document, $sender);
 
+        // Owner request (2026-10-27): the PI, Debit Note and CI emails tell
+        // the client where to send their payment details — the order's
+        // Payment Action Link. Added unless an admin-edited template
+        // already places {payment_action_link} itself.
+        $body = $template['body'];
+        if ($document !== null && in_array($document['document_type_code'], ['PI', 'FDN', 'CI'], true)) {
+            $tokens['{payment_action_link}'] = rtrim(\App\Config\Env::get('APP_URL', ''), '/') . '/payment-action/' . OrderRepository::ensurePaymentActionToken($orderId);
+            if (!str_contains($body, '{payment_action_link}')) {
+                $body = rtrim($body) . "\n\n" . self::PAYMENT_LINK_PARAGRAPH;
+            }
+        }
+
         return [
             'subject'         => strtr($template['subject'], $tokens),
-            'body'            => strtr($template['body'], $tokens) . "\n\n" . strtr((string) ($template['footer'] ?? ''), $tokens),
+            'body'            => strtr($body, $tokens) . "\n\n" . strtr((string) ($template['footer'] ?? ''), $tokens),
             'recipient_email' => $order['client_email'],
             'document'        => $document,
             'order'           => $order,

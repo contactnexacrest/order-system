@@ -99,7 +99,9 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
     <p><strong>Your Acknowledgement Needed</strong> — please check the order below and confirm to proceed.</p>
     <div class="action-kv">
       <div><span class="k">Order Reference</span><span class="v"><?= htmlspecialchars($order['order_reference']) ?></span></div>
-      <div><span class="k">Total Order Value</span><span class="v"><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $totalFobValue, 2) ?></span></div>
+      <div><span class="k">Total Order Value (FOB)</span><span class="v"><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $totalFobValue, 2) ?></span></div>
+      <div><span class="k">Advance Paid</span><span class="v"><?= $advanceReceived !== null ? htmlspecialchars($order['currency_code'] ?? '') . ' ' . number_format($advanceReceived, 2) : '—' ?></span></div>
+      <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $balanceDue, 2) ?></span></div>
       <div><span class="k">Incoterm</span><span class="v"><?= htmlspecialchars($order['incoterm_code'] ?? '—') ?></span></div>
       <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '—') ?></span></div>
     </div>

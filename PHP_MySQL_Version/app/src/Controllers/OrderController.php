@@ -1216,6 +1216,44 @@ final class OrderController
     }
 
     /**
+     * Owner request (2026-10-27): the Payment Action Link — the client sends
+     * their payment details (advance / freight / balance) there. Generated
+     * from 5d, 9c or 11c like the Buyer Action Link from 4b; the same link
+     * also goes out automatically inside the PI, Debit Note and CI emails.
+     */
+    public function generatePaymentActionLink(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+
+        $user = AuthService::currentUser();
+        $link = rtrim(Env::get('APP_URL', ''), '/') . '/payment-action/' . OrderRepository::generatePaymentActionToken($orderId);
+        $clientEmail = $order['client_email'] ?: (\App\Repositories\ClientRepository::find((int) $order['client_id'])['email'] ?? null);
+        if (!empty($clientEmail)) {
+            $rendered = EmailTemplateRepository::renderOrDefault(
+                'payment_action_link',
+                ['{order_reference}' => $order['order_reference'], '{payment_action_link}' => $link],
+                'NexaCrest — send us your payment details for order {order_reference}',
+                "Hello,\n\n"
+                    . "For order {order_reference}: once you have made the payment, please send us the payment screenshot together with the transaction details (Transaction ID / UTR, amount and date) on this secure link — no login needed:\n{payment_action_link}\n\n"
+                    . "Our team will check them against our bank statement and confirm. The same link works for every payment on this order.\n\n"
+                    . "NexaCrest International Private Limited"
+            );
+            EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body']);
+        }
+
+        AuditLogRepository::log((int) $user['id'], 'PAYMENT_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Payment Action link generated' . (!empty($clientEmail) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
+        Flash::set('success', 'Payment Action link' . (!empty($clientEmail) ? " emailed to {$clientEmail}" : ' generated') . ": {$link}");
+        $returnTo = preg_match('/^step-[a-z0-9-]+$/', (string) ($_POST['return_to'] ?? '')) ? '#' . $_POST['return_to'] : '';
+        header("Location: /orders/{$orderId}{$returnTo}");
+    }
+
+    /**
      * Real gap this closes: no way existed to hand over (or archive)
      * everything on file for one order in a single action — every
      * generated document and every received/uploaded file (dispute
@@ -1484,6 +1522,24 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner report (2026-10-27, blocker): a mistyped advance flowed
+        // straight into the Order Confirmation. An advance can never exceed
+        // the whole order, and an amount that differs from the advance due
+        // must be confirmed on purpose.
+        $orderForAdvance = OrderRepository::find($orderId);
+        $fobTotal = OrderProductRepository::totalFobValue($orderId);
+        $advanceDue = round($fobTotal * (float) ($orderForAdvance['advance_pct'] ?? 0) / 100, 2);
+        $currency = (string) ($orderForAdvance['currency_code'] ?? '');
+        if ($fobTotal > 0 && $amount > $fobTotal + 0.005) {
+            Flash::set('error', sprintf('%s %s is more than the whole order value (%s %s). Check the amount the bank received.', $currency, number_format($amount, 2), $currency, number_format($fobTotal, 2)));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if ($advanceDue > 0 && abs($amount - $advanceDue) > max(1.0, $advanceDue * 0.01) && empty($_POST['confirm_amount_differs'])) {
+            Flash::set('error', sprintf('The advance due on this order is %s %s (%s%% of %s %s). You entered %s %s — if that really is what the bank received, tick "The amount received differs from the advance due" and save again.', $currency, number_format($advanceDue, 2), rtrim(rtrim(number_format((float) $orderForAdvance['advance_pct'], 2), '0'), '.'), $currency, number_format($fobTotal, 2), $currency, number_format($amount, 2)));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', $rate, (int) AuthService::currentUserId());
         AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
@@ -1563,7 +1619,7 @@ final class OrderController
 
         $fobTotal = OrderProductRepository::totalFobValue($orderId);
         $order = OrderRepository::find($orderId);
-        $balanceAmount = round($fobTotal * ((float) $order['balance_pct']) / 100, 2);
+        $balanceAmount = OrderPaymentStatusRepository::balanceDue($fobTotal, (float) $order['advance_pct'], $existingPayment);
         $balanceDueDate = $order['balance_trigger_option'] === 'A_BEFORE_SHIPMENT'
             ? null // due date is event-triggered (shipment readiness), not a fixed date, for this preset
             : date('Y-m-d', strtotime('+' . (int) $order['balance_days'] . ' days'));

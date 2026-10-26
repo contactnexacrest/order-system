@@ -11,6 +11,7 @@ use App\Controllers\AssetController;
 use App\Controllers\AuditLogController;
 use App\Controllers\AuthController;
 use App\Controllers\BuyerActionController;
+use App\Controllers\PaymentActionController;
 use App\Controllers\SupplierActionController;
 use App\Controllers\CaController;
 use App\Controllers\OrderFinancialsController;
@@ -83,6 +84,7 @@ $clientIntakeReview = new ClientIntakeReviewController();
 $piIntake = new PiIntakeController();
 $piIntakeReview = new PiIntakeReviewController();
 $buyerAction = new BuyerActionController();
+$paymentAction = new PaymentActionController();
 $supplierAction = new SupplierActionController();
 $reorderRequests = new ReorderRequestController();
 $clientPortal = new ClientPortalController();
@@ -173,6 +175,10 @@ $router->get('/buyer-action/{token}/buyer-po-document', [$buyerAction, 'download
 $router->get('/buyer-action/{token}/proforma-invoice', [$buyerAction, 'downloadProformaInvoice']);
 $router->post('/buyer-action/{token}/buyer-po', [$buyerAction, 'uploadBuyerPo'], [CsrfCheck::verify()]);
 $router->post('/buyer-action/{token}/report-payment', [$buyerAction, 'reportPayment'], [CsrfCheck::verify()]);
+// Owner request (2026-10-27): no-login Payment Action Link — payment details only.
+$router->get('/payment-action/{token}', [$paymentAction, 'show']);
+$router->get('/payment-action/{token}/document', [$paymentAction, 'downloadDocument']);
+$router->post('/payment-action/{token}/report', [$paymentAction, 'report'], [CsrfCheck::verify()]);
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -635,6 +641,7 @@ $router->get('/orders/{id}/dossier', [$orders, 'downloadDossier'], [SessionAuth:
 $router->post('/orders/{id}/pi-form-link', [$orders, 'generatePiFormLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/pi-form/skip', [$orders, 'skipPiForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/buyer-action-link', [$orders, 'generateBuyerActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment-action-link', [$orders, 'generatePaymentActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // Notifications bell.
 $router->get('/notifications', [$notifications, 'index'], [SessionAuth::required()]);

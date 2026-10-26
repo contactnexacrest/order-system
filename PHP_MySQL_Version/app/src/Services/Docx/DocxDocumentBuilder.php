@@ -510,7 +510,7 @@ final class DocxDocumentBuilder
             ['label' => 'Quotation Date *', 'value' => self::g($order, 'quotation_date', '—')],
             ['label' => 'Proforma Invoice No. *', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'Product(s) *', 'value' => implode('; ', $productList)],
-            ['label' => 'Total Order Value *', 'value' => $currency . ' ' . self::g($financial, 'total_value')],
+            ['label' => 'Total Order Value (FOB) *', 'value' => $currency . ' ' . self::g($financial, 'total_value')],
             ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
@@ -519,10 +519,11 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '4. PAYMENT STATUS');
         $paymentRows = [
-            ['label' => self::g($financial, 'advance_pct') . '% Advance (USD) *', 'value' => self::g($payment, 'advance_amount') !== '—' ? self::g($payment, 'advance_amount') : self::g($financial, 'advance_amount')],
+            ['label' => self::g($financial, 'advance_pct') . '% Advance Due (' . $currency . ') *', 'value' => self::g($financial, 'advance_amount')],
+            ['label' => 'Advance Received (' . $currency . ') *', 'value' => self::g($payment, 'advance_amount', 'To Be Confirmed')],
             ['label' => 'Advance T/T Received On *', 'value' => self::g($payment, 'advance_remittance_received_at', 'To Be Confirmed')],
-            ['label' => 'Balance Due (USD) *', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount')) . '  —  ' . self::g($financial, 'balance_terms_text')],
-            ['label' => 'Currency', 'value' => 'USD (always)'],
+            ['label' => 'Balance Due (' . $currency . ') *', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount')) . '  —  ' . self::g($financial, 'balance_terms_text')],
+            ['label' => 'Currency', 'value' => $currency],
         ];
         if (empty($order['is_fob'])) {
             $paymentRows[] = [
@@ -1424,10 +1425,10 @@ final class DocxDocumentBuilder
         $freightRemark2 = $isFob ? 'FOB: buyer arranges — write NIL' : ('CFR/CIF: Against FDN No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed'));
         $subtotalPaid = $currency . ' ' . $advanceAmt . (!$isFob && self::g($payment, 'freight_amount', null) !== '—' && self::g($payment, 'freight_amount', null) !== 'To Be Confirmed' ? ' + ' . self::g($payment, 'freight_amount') . ' (freight)' : '');
         $sectionBRows = [
-            ["\u{221A}  " . self::g($financial, 'advance_pct') . '% Advance — ' . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
+            ["\u{221A}  Advance — " . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
             ["\u{221A}  Freight & Insurance — {$freightStatus}", $freightAmtCell, $freightRemark2],
-            ['SUBTOTAL ALREADY PAID', $subtotalPaid, self::g($financial, 'advance_pct') . '% Advance' . (!$isFob ? ' + FDN (if applicable)' : '')],
-            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', '= FOB Value minus ' . self::g($financial, 'advance_pct') . "% advance received\nPayable by T/T (Telegraphic Transfer) within " . self::g($financial, 'balance_days') . " days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
+            ['SUBTOTAL ALREADY PAID', $subtotalPaid, 'Advance' . (!$isFob ? ' + FDN (if applicable)' : '')],
+            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', "= FOB Value minus advance received\nPayable by T/T (Telegraphic Transfer) within " . self::g($financial, 'balance_days') . " days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
             ['VERIFICATION', "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = " . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : 'Freight & Insurance is paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
         ];
         self::threeColFinanceTable($section, 'SECTION B — PAYMENT SETTLEMENT', $sectionBRows, DocxComponents::NAVY_MID);

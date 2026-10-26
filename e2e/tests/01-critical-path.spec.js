@@ -298,6 +298,25 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await generateDocument(page, orderId, 'PI', 'generated');
     await assignSelfAndApprove(page, 'PI');
 
+    // 5d: the client sends their payment details through the Payment
+    // Action Link — payment only, never the Buyer PO.
+    await submitStepForm(page, 3, `/orders/${orderId}/payment-action-link`, {}, /Generate & Email Payment Link/, '#step-5d-payment-record');
+    await openStage(page, 3);
+    const payLink = await page.locator('#step-5d-payment-record input[aria-label="Payment Action Link"]').inputValue();
+    const client = await page.context().browser().newPage();
+    await client.goto(new URL(page.url()).origin + new URL(payLink).pathname);
+    await expect(client.locator('h1')).toContainText('Payment Details');
+    await expect(client.locator('.action-step legend')).toContainText('Advance Payment');
+    await expect(client.locator('input[name="buyers_po_ref"]')).toHaveCount(0);
+    await expect(client.locator('input[name="amount"]')).toHaveValue('1800.00');
+    await client.locator('input[name="transaction_ref"]').fill(`UTR-${UNIQUE}`);
+    await client.locator('input[name="screenshot"]').setInputFiles(DUMMY_FILE);
+    await client.getByRole('button', { name: 'Send Payment Details' }).click();
+    await expect(client.locator('.alert')).toContainText('we have your payment details');
+    await expect(client.locator('.action-wait')).toContainText("checking your advance payment");
+    await client.close();
+
+    await page.reload();
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');

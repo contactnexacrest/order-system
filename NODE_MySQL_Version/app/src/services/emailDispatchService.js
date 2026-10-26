@@ -11,6 +11,7 @@ const fileStoreRepository = require('../repositories/fileStoreRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderRepository = require('../repositories/orderRepository');
+const env = require('../config/env');
 const orderShippingRepository = require('../repositories/orderShippingRepository');
 const { formatForDb } = require('../helpers/dbDateTime');
 const permissionRepository = require('../repositories/permissionRepository');
@@ -108,6 +109,9 @@ async function tokensFor(order, document, sender) {
  *
  * @returns {subject, body, recipient_email, document, order}
  */
+/** Owner request (2026-10-27): appended to the PI, Debit Note and CI emails. */
+const PAYMENT_LINK_PARAGRAPH = 'PAYMENT DETAILS: once you have completed the payment, please upload the payment screenshot together with the transaction details (Transaction ID / UTR, amount and date) on this secure link — no login needed:\n{payment_action_link}\nOur team will check them against our bank statement and confirm.';
+
 async function buildPreview(orderId, documentId, templateKey, senderUserId) {
   const order = await orderRepository.find(orderId);
   if (!order) {
@@ -177,9 +181,21 @@ async function buildPreview(orderId, documentId, templateKey, senderUserId) {
   const sender = await userRepository.findById(senderUserId);
   const tokens = await tokensFor(order, document, sender);
 
+  // Owner request (2026-10-27): the PI, Debit Note and CI emails tell the
+  // client where to send their payment details — the order's Payment
+  // Action Link. Added unless an admin-edited template already places
+  // {payment_action_link} itself.
+  let body = template.body;
+  if (document && ['PI', 'FDN', 'CI'].includes(document.document_type_code)) {
+    tokens['{payment_action_link}'] = `${env.get('APP_URL', '').replace(/\/+$/, '')}/payment-action/${await orderRepository.ensurePaymentActionToken(orderId)}`;
+    if (!body.includes('{payment_action_link}')) {
+      body = `${body.trimEnd()}\n\n${PAYMENT_LINK_PARAGRAPH}`;
+    }
+  }
+
   return {
     subject: strtr(template.subject, tokens),
-    body: `${strtr(template.body, tokens)}\n\n${strtr(template.footer || '', tokens)}`,
+    body: `${strtr(body, tokens)}\n\n${strtr(template.footer || '', tokens)}`,
     recipient_email: order.client_email,
     document,
     order,

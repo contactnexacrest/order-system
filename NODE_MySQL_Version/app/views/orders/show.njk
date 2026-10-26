@@ -268,7 +268,7 @@
   },
   's6': {
     '6a': docComplete(documents, 'OC', mailSendingEnabled),
-    '6b': order.buyer_action_token_hash,
+    '6b': docComplete(documents, 'OC', mailSendingEnabled) and order.buyer_action_token_hash,
     '6c': buyerAcknowledged
   },
   's7': {
@@ -1267,6 +1267,27 @@
       </form>
       {% endif %}
 {% endmacro %}
+{# Owner request (2026-10-27): the Payment Action Link — optional, never locks a
+   step. The client sends payment details there (screenshot, transaction ID,
+   amount, date); staff still verify and record below. #}
+{% macro paymentActionLinkWidget(documentName, anchor) %}
+    <div class="pay-link-box">
+      <p class="small"><strong>Payment Action Link</strong> <span class="muted">(optional)</span> — the client uploads the payment screenshot and transaction details there, no login needed. It also goes out automatically inside the {{ documentName }} email.</p>
+      {% if paymentActionFullLink %}
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" readonly value="{{ paymentActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Payment Action Link">
+          <button type="button" class="btn-sm btn-secondary" onclick="navigator.clipboard.writeText('{{ paymentActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+        </div>
+      {% endif %}
+      {% if canManageOrders %}
+      <form method="post" action="/orders/{{ order.id }}/payment-action-link" style="display:inline">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="return_to" value="{{ anchor }}">
+        <button type="submit" class="btn-sm btn-secondary">{{ 'Regenerate &amp; Email Payment Link' | safe if paymentActionFullLink else 'Generate &amp; Email Payment Link' | safe }}</button>
+      </form>
+      {% endif %}
+    </div>
+{% endmacro %}
   <details class="step-group" id="step-group-stage-2"{{ stepCardOpen('s4') }}>
     <summary>{{ stepStatusIcon(stepStates['s4']) }}<span class="step-group-num">STEP 4</span><h3>Buyer's PO</h3></summary>
 
@@ -1476,13 +1497,17 @@
     {% else %}
     <details class="step-card" id="step-5d-payment-record"{{ flow.subCardOpen('s5', '5d') }}>
       <summary>{{ stepStatusIcon(flow.subStepStatus('s5', '5d')) }}<h2>Step 5d &middot; Record Advance Remittance</h2></summary>
+      {% if not advanceCleared %}{{ paymentActionLinkWidget('Proforma Invoice', 'step-5d-payment-record') }}{% endif %}
       {% if stage3 and stage3.status != 'locked' and not advanceCleared and (not payment or payment.advance_remittance_received_at == null) %}
         {% if not permissions.manage_payments %}
           <p class="muted">Only Accounts/Export can record this payment.</p>
         {% else %}
         <form method="post" action="/orders/{{ order.id }}/payment/advance">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required data-remit-amount></label>
+          {% set advanceDue = ((fobTotal | float) * (order.advance_pct | float) / 100) | round(2) %}
+          <p class="review-banner">Advance due on this order: <strong>{{ order.currency_code or '' }} {{ advanceDue | money }}</strong> ({{ (order.advance_pct | float) }}% of the order value {{ order.currency_code or '' }} {{ (fobTotal or 0) | money }}). Enter what the bank actually received.</p>
+          <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required data-remit-amount value="{{ advanceDue.toFixed(2) if advanceDue > 0 else '' }}"></label>
+          <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the advance due (e.g. bank charges deducted) — record it anyway</label>
           <label>Received On<input type="date" name="advance_received_at"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
@@ -2074,6 +2099,7 @@
 
   <details class="step-card" id="step-9c-freight-remittance"{{ flow.subCardOpen('s9', '9c') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9c')) }}<h2>Step 9c &middot; Record Freight Remittance</h2></summary>
+    {% if not freightCleared %}{{ paymentActionLinkWidget('Debit Note', 'step-9c-freight-remittance') }}{% endif %}
     {% if freightLocked %}
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     {% elif not freight %}
@@ -2404,6 +2430,7 @@
 
   <details class="step-card" id="step-balance-record"{{ flow.subCardOpen('s11', '11c') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s11', '11c')) }}<h2>Step 11c &middot; Record Balance Remittance</h2></summary>
+    {% if not balanceCleared %}{{ paymentActionLinkWidget('Commercial Invoice', 'step-balance-record') }}{% endif %}
     {% if ciBalanceLocked %}
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     {% elif not balanceCleared and (not payment or payment.balance_remittance_received_at == null) %}

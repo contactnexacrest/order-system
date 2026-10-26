@@ -51,6 +51,7 @@ const clientIntakeController = require('./controllers/clientIntakeController');
 const clientIntakeReviewController = require('./controllers/clientIntakeReviewController');
 const piIntakeController = require('./controllers/piIntakeController');
 const buyerActionController = require('./controllers/buyerActionController');
+const paymentActionController = require('./controllers/paymentActionController');
 const supplierActionController = require('./controllers/supplierActionController');
 const piIntakeReviewController = require('./controllers/piIntakeReviewController');
 const reorderRequestController = require('./controllers/reorderRequestController');
@@ -455,6 +456,10 @@ app.get('/buyer-action/:token/buyer-po-document', asyncHandler(buyerActionContro
 app.get('/buyer-action/:token/proforma-invoice', asyncHandler(buyerActionController.downloadProformaInvoice));
 app.post('/buyer-action/:token/buyer-po', uploadLarge.single('document'), verifyCsrf, asyncHandler(buyerActionController.uploadBuyerPo));
 app.post('/buyer-action/:token/report-payment', uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(buyerActionController.reportPayment));
+// Owner request (2026-10-27): no-login Payment Action Link — payment details only.
+app.get('/payment-action/:token', asyncHandler(paymentActionController.show));
+app.get('/payment-action/:token/document', asyncHandler(paymentActionController.downloadDocument));
+app.post('/payment-action/:token/report', uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(paymentActionController.report));
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -928,6 +933,7 @@ app.get('/orders/:id/dossier', requireAuth, requirePermission('manage_orders'), 
 app.post('/orders/:id/pi-form-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generatePiFormLink));
 app.post('/orders/:id/pi-form/skip', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.skipPiForm));
 app.post('/orders/:id/buyer-action-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateBuyerActionLink));
+app.post('/orders/:id/payment-action-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generatePaymentActionLink));
 
 app.get('/notifications', requireAuth, asyncHandler(notificationController.index));
 

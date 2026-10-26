@@ -934,6 +934,15 @@ async function show(req, res) {
     buyerActionFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${buyerActionTokenPlain}`;
   }
 
+  // Owner request (2026-10-27): the Payment Action Link (5d / 9c / 11c),
+  // decrypted the same way for staff to re-copy.
+  let paymentActionFullLink = null;
+  const paymentActionTokenPlain = encryptionService.decrypt(order.payment_action_token_plain);
+  if (paymentActionTokenPlain && order.payment_action_token_expires_at
+    && parseDbDateTime(order.payment_action_token_expires_at).getTime() > Date.now()) {
+    paymentActionFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/payment-action/${paymentActionTokenPlain}`;
+  }
+
   // Owner request (2026-10-26, t4): the Step 7c Supplier Action Link,
   // decrypted the same way for staff to re-copy.
   let supplierActionFullLink = null;
@@ -1025,6 +1034,7 @@ async function show(req, res) {
       piFormFullLink,
       buyerActionLinkValid,
       buyerActionFullLink,
+      paymentActionFullLink,
       supplierActionFullLink,
       clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
       ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
@@ -1248,6 +1258,42 @@ async function generateBuyerActionLink(req, res) {
   await auditLogRepository.log(user.id, 'BUYER_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Buyer Action link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
   flash.set(req, 'success', `Buyer Action link${order.client_email ? ` emailed to ${order.client_email}` : ' generated'}: ${link}`);
   // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card.
+  const returnTo = /^step-[a-z0-9-]+$/.test(String(req.body.return_to || '')) ? `#${req.body.return_to}` : '';
+  res.redirect(`/orders/${orderId}${returnTo}`);
+}
+
+/**
+ * Owner request (2026-10-27): the Payment Action Link — the client sends
+ * their payment details (advance / freight / balance) there. Generated from
+ * 5d, 9c or 11c like the Buyer Action Link from 4b; the same link also goes
+ * out automatically inside the PI, Debit Note and CI emails.
+ */
+async function generatePaymentActionLink(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+
+  const user = req.user;
+  const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/payment-action/${await orderRepository.generatePaymentActionToken(orderId)}`;
+  const clientEmail = order.client_email || ((await clientRepository.find(order.client_id)) || {}).email || null;
+  if (clientEmail) {
+    const rendered = await emailTemplateRepository.renderOrDefault(
+      'payment_action_link',
+      { '{order_reference}': order.order_reference, '{payment_action_link}': link },
+      'NexaCrest — send us your payment details for order {order_reference}',
+      'Hello,\n\n'
+        + 'For order {order_reference}: once you have made the payment, please send us the payment screenshot together with the transaction details (Transaction ID / UTR, amount and date) on this secure link — no login needed:\n{payment_action_link}\n\n'
+        + 'Our team will check them against our bank statement and confirm. The same link works for every payment on this order.\n\n'
+        + 'NexaCrest International Private Limited'
+    );
+    await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body);
+  }
+
+  await auditLogRepository.log(user.id, 'PAYMENT_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Payment Action link generated' + (clientEmail ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
+  flash.set(req, 'success', `Payment Action link${clientEmail ? ` emailed to ${clientEmail}` : ' generated'}: ${link}`);
   const returnTo = /^step-[a-z0-9-]+$/.test(String(req.body.return_to || '')) ? `#${req.body.return_to}` : '';
   res.redirect(`/orders/${orderId}${returnTo}`);
 }
@@ -1507,6 +1553,27 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner report (2026-10-27, blocker): a mistyped advance flowed straight
+  // into the Order Confirmation. An advance can never exceed the whole
+  // order, and an amount that differs from the advance due must be
+  // confirmed on purpose.
+  const orderForAdvance = await orderRepository.find(orderId);
+  const fobTotal = parseFloat(await orderProductRepository.totalFobValue(orderId)) || 0;
+  const advancePctNum = parseFloat((orderForAdvance && orderForAdvance.advance_pct) || 0);
+  const advanceDue = Math.round(fobTotal * advancePctNum) / 100;
+  const currency = (orderForAdvance && orderForAdvance.currency_code) || '';
+  const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (fobTotal > 0 && amount > fobTotal + 0.005) {
+    flash.set(req, 'error', `${currency} ${money(amount)} is more than the whole order value (${currency} ${money(fobTotal)}). Check the amount the bank received.`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (advanceDue > 0 && Math.abs(amount - advanceDue) > Math.max(1, advanceDue * 0.01) && !req.body.confirm_amount_differs) {
+    const pctLabel = advancePctNum.toFixed(2).replace(/\.?0+$/, '');
+    flash.set(req, 'error', `The advance due on this order is ${currency} ${money(advanceDue)} (${pctLabel}% of ${currency} ${money(fobTotal)}). You entered ${currency} ${money(amount)} — if that really is what the bank received, tick "The amount received differs from the advance due" and save again.`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderPaymentStatusRepository.recordAdvanceReceived(orderId, amount, receivedAt);
   await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', rate, req.user ? req.user.id : null);
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'advance_exchange_rate', null, String(rate));
@@ -1588,7 +1655,7 @@ async function clearAdvancePayment(req, res) {
 
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
   const order = await orderRepository.find(orderId);
-  const balanceAmount = Math.round(fobTotal * (parseFloat(order.balance_pct) / 100) * 100) / 100;
+  const balanceAmount = orderPaymentStatusRepository.balanceDue(fobTotal, order.advance_pct, existingPayment);
   const balanceDueDate =
     order.balance_trigger_option === 'A_BEFORE_SHIPMENT'
       ? null // due date is event-triggered (shipment readiness), not a fixed date, for this preset
@@ -3684,7 +3751,7 @@ async function completeCancellationRefund(req, res) {
 }
 
 module.exports = {
-  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink,
+  index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink, generatePaymentActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,

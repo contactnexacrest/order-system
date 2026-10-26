@@ -75,11 +75,12 @@ two-step pattern as the advance payment in Stage 3:
 
 ## What the client does (or doesn't)
 
-Nothing inside the system. The buyer pays the freight charge by wire
-transfer against the FDN, entirely outside the system, the same as every
-other payment in this pipeline — staff verify it against the bank statement
-and record it themselves. There is no client-portal screen specific to
-freight.
+The buyer pays the freight charge by wire transfer against the Debit Note.
+The Debit Note email carries the **Payment Action Link** (see
+[Chapter 3](./03-stage3-pi-advance.md#the-payment-action-link-owner-request-2026-10-27)),
+where the buyer downloads the Debit Note and sends the payment screenshot
+and transaction details; staff can also send the link from Step 9c. Staff
+still verify against the bank statement and record it themselves.
 
 ## What happens next
 

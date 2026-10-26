@@ -552,7 +552,10 @@ $subStepDone = [
         // Owner order (2026-10-26): send the Buyer Action Link first, then the
         // acknowledgement — done whether the buyer confirms (link/portal) or
         // staff record it.
-        '6b' => !empty($order['buyer_action_token_hash']),
+        // Owner report (2026-10-27): the link is the one already made in 4b,
+        // so it only counts for 6b once the OC itself is issued — otherwise
+        // 6b (and, through it, 6a) went green right after the OC draft.
+        '6b' => $docComplete('OC') && !empty($order['buyer_action_token_hash']),
         '6c' => $buyerAcknowledged,
     ],
     '7' => [
@@ -1663,6 +1666,33 @@ $renderBuyerActionLink = function (string $badge, string $anchor) use ($order, $
     <?php endif; ?>
     <?php
 };
+// Owner request (2026-10-27): the Payment Action Link — optional, never
+// locks a step. The client sends payment details there (screenshot,
+// transaction ID, amount, date); staff still verify and record below.
+$renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $canManageOrders): void {
+    $paymentTokenPlain = \App\Services\EncryptionService::decrypt($order['payment_action_token_plain'] ?? null);
+    $paymentLinkValid = !empty($paymentTokenPlain) && !empty($order['payment_action_token_expires_at']) && strtotime((string) $order['payment_action_token_expires_at']) > time();
+    $document = \App\Services\PaymentActionService::LEGS[$leg]['document'];
+    ?>
+    <div class="pay-link-box">
+      <p class="small"><strong>Payment Action Link</strong> <span class="muted">(optional)</span> — the client uploads the payment screenshot and transaction details there, no login needed. It also goes out automatically inside the <?= htmlspecialchars($document) ?> email.</p>
+      <?php if ($paymentLinkValid): ?>
+        <?php $paymentFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/payment-action/' . $paymentTokenPlain; ?>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" readonly value="<?= htmlspecialchars($paymentFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Payment Action Link">
+          <button type="button" class="btn-sm btn-secondary" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($paymentFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+        </div>
+      <?php endif; ?>
+      <?php if ($canManageOrders): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment-action-link" style="display:inline">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="return_to" value="<?= htmlspecialchars($anchor) ?>">
+        <button type="submit" class="btn-sm btn-secondary"><?= $paymentLinkValid ? 'Regenerate &amp; Email Payment Link' : 'Generate &amp; Email Payment Link' ?></button>
+      </form>
+      <?php endif; ?>
+    </div>
+    <?php
+};
 ?>
   <details class="step-group" id="step-group-stage-2"<?= $stepCardOpen('4') ?>>
     <summary><?= $stepStatusIcon($stepStates['4']) ?><span class="step-group-num">STEP 4</span><h3>Buyer's PO</h3></summary>
@@ -1878,13 +1908,17 @@ $renderBuyerActionLink = function (string $badge, string $anchor) use ($order, $
     <?php else: ?>
     <details class="step-card" id="step-5d-payment-record"<?= $subCardOpen('5', '5d') ?>>
       <summary><?= $stepStatusIcon($subStepStatus('5', '5d')) ?><h2>Step 5d &middot; Record Advance Remittance</h2></summary>
+      <?php if (!$advanceCleared) { $renderPaymentActionLink('advance', 'step-5d-payment-record'); } ?>
       <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared && (!$payment || $payment['advance_remittance_received_at'] === null)): ?>
         <?php if (!$canManagePayments): ?>
           <p class="muted">Only Accounts/Export can record this payment.</p>
         <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance">
           <?= Csrf::field() ?>
-          <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required data-remit-amount></label>
+          <?php $advanceDue = round((float) $fobTotal * (float) ($order['advance_pct'] ?? 0) / 100, 2); ?>
+          <p class="review-banner">Advance due on this order: <strong><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format($advanceDue, 2) ?></strong> (<?= htmlspecialchars(rtrim(rtrim(number_format((float) ($order['advance_pct'] ?? 0), 2), '0'), '.')) ?>% of the order value <?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $fobTotal, 2) ?>). Enter what the bank actually received.</p>
+          <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required data-remit-amount value="<?= $advanceDue > 0 ? number_format($advanceDue, 2, '.', '') : '' ?>"></label>
+          <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the advance due (e.g. bank charges deducted) — record it anyway</label>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
@@ -2484,6 +2518,7 @@ $renderBuyerActionLink = function (string $badge, string $anchor) use ($order, $
 
   <details class="step-card" id="step-9c-freight-remittance"<?= $subCardOpen('9', '9c') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('9', '9c')) ?><h2>Step 9c &middot; Record Freight Remittance</h2></summary>
+    <?php if (!$freightCleared) { $renderPaymentActionLink('freight', 'step-9c-freight-remittance'); } ?>
     <?php if ($freightLocked): ?>
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     <?php elseif (!$freight): ?>
@@ -2818,6 +2853,7 @@ $renderBuyerActionLink = function (string $badge, string $anchor) use ($order, $
 
   <details class="step-card" id="step-balance-record"<?= $subCardOpen('11', '11c') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('11', '11c')) ?><h2>Step 11c &middot; Record Balance Remittance</h2></summary>
+    <?php if (!$balanceCleared) { $renderPaymentActionLink('balance', 'step-balance-record'); } ?>
     <?php if ($ciBalanceLocked): ?>
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     <?php elseif (!$balanceCleared && (!$payment || $payment['balance_remittance_received_at'] === null)): ?>

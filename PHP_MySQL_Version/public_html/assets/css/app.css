@@ -179,6 +179,9 @@ fieldset.intake-step{padding-top:1.25rem;}
 .action-progress li.done .dot{border-color:var(--success);background:var(--success);color:#fff;}
 .action-wait{border:1px solid var(--line);border-radius:12px;padding:1.25rem 1.4rem;margin-bottom:1rem;background:#fcfbf8;}
 .action-wait h2{margin:0 0 0.4rem;font-size:1.05rem;color:var(--success);}
+/* Owner request (2026-10-27): Payment Action Link box on 5d / 9c / 11c. */
+.pay-link-box{border:1px dashed var(--line);border-radius:10px;padding:0.6rem 0.8rem;margin:0.4rem 0 0.8rem;background:#fcfbf8;display:flex;flex-direction:column;gap:6px;}
+.pay-link-box p{margin:0;}
 @media (max-width:640px){.action-progress{flex-direction:column;}}
 .intake-note{background:var(--gold-soft);border:1px solid var(--gold);border-radius:10px;padding:0.75rem 1rem;font-size:0.82rem;color:var(--gold-strong);margin-bottom:1.25rem;}
 @media (max-width:640px){.field-grid{grid-template-columns:1fr;} .intake-wrap{max-width:552px;padding:1.75rem 1rem 1.5rem;}}

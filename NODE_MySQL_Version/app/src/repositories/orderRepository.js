@@ -7,7 +7,7 @@ const orderComplianceTaskRepository = require('./orderComplianceTaskRepository')
 const orderExportBenefitSchemeRepository = require('./orderExportBenefitSchemeRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const encryptionService = require('../services/encryptionService');
-const { formatForDb } = require('../helpers/dbDateTime');
+const { formatForDb, parseDbDateTime } = require('../helpers/dbDateTime');
 
 /**
  * Also carries incoterm_code, current_stage_number, currency_code, and
@@ -676,7 +676,8 @@ async function markShippedDocsSent(orderId) {
   await db.execute(
     `UPDATE orders
         SET status = 'shipped_docs_sent',
-            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
+            payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
       WHERE id = :id`,
     { id: orderId }
   );
@@ -695,7 +696,8 @@ async function markComplete(orderId) {
   await db.execute(
     `UPDATE orders
         SET status = 'complete', is_locked = 1,
-            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
+            payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
       WHERE id = :id`,
     { id: orderId }
   );
@@ -713,7 +715,8 @@ async function markLost(orderId, reason, userId) {
   await db.execute(
     `UPDATE orders
         SET status = 'lost', is_locked = 1, lost_reason = :reason, lost_at = NOW(), lost_by = :user_id,
-            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
+            payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
       WHERE id = :id`,
     { reason, user_id: userId, id: orderId }
   );
@@ -731,7 +734,8 @@ async function cancel(orderId) {
   await db.execute(
     `UPDATE orders
         SET status = 'cancelled', is_locked = 1,
-            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL
+            buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
+            payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
       WHERE id = :id`,
     { id: orderId }
   );
@@ -854,6 +858,47 @@ async function findByValidBuyerActionToken(rawToken) {
   );
 }
 
+/**
+ * Owner request (2026-10-27): the no-login Payment Action Link — the client
+ * sends their payment details for the advance, freight or balance there.
+ * Same hash / encrypted copy / expiry convention as
+ * generateBuyerActionToken(); regenerating replaces the old link.
+ */
+async function generatePaymentActionToken(orderId, ttlDays = 180) {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  await db.execute(
+    'UPDATE orders SET payment_action_token_hash = :hash, payment_action_token_plain = :plain, payment_action_token_expires_at = :expires WHERE id = :id',
+    {
+      hash: crypto.createHash('sha256').update(rawToken).digest('hex'),
+      plain: encryptionService.encrypt(rawToken),
+      expires: formatForDb(new Date(Date.now() + ttlDays * 86400000)),
+      id: orderId,
+    }
+  );
+  return rawToken;
+}
+
+/** The order's live Payment Action Link token, made on first use — so every PI / Debit Note / CI email carries the same link. */
+async function ensurePaymentActionToken(orderId) {
+  const row = (await db.queryOne('SELECT payment_action_token_plain, payment_action_token_expires_at FROM orders WHERE id = :id', { id: orderId })) || {};
+  const plain = encryptionService.decrypt(row.payment_action_token_plain || null);
+  if (plain && row.payment_action_token_expires_at && parseDbDateTime(row.payment_action_token_expires_at).getTime() > Date.now() + 86400000) {
+    return plain;
+  }
+  return generatePaymentActionToken(orderId);
+}
+
+/** Public /payment-action/:token route's sole authorization check — same rules as findByValidBuyerActionToken(). */
+async function findByValidPaymentActionToken(rawToken) {
+  const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  return db.queryOne(
+    `SELECT * FROM orders
+      WHERE payment_action_token_hash = :hash AND payment_action_token_expires_at > NOW()
+        AND status IN ('active', 'disputed')`,
+    { hash }
+  );
+}
+
 /** Owner decision (2026-10-26): staff record that the client won't use the PI-stage form, unlocking Step 5c. */
 async function markPiFormSkipped(orderId, userId, reason) {
   await db.execute(
@@ -902,5 +947,6 @@ module.exports = {
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, markPiFormSkipped,
+  generatePaymentActionToken, ensurePaymentActionToken, findByValidPaymentActionToken,
   markFinancialsSkipped, clearFinancialsSkipped, setCooType, setFinancialsCostsConfirmed, setFinancialsCompleted,
 };

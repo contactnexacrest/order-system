@@ -102,7 +102,7 @@
   </tr>
   <tr><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION B — PAYMENT SETTLEMENT</td></tr>
   <tr>
-    <td class="k">&#8730;&nbsp; {{ financial.advance_pct }}% Advance — {{ 'RECEIVED' if payment_status.advance_cleared_at else 'PENDING' }}</td>
+    <td class="k">&#8730;&nbsp; Advance — {{ 'RECEIVED' if payment_status.advance_cleared_at else 'PENDING' }}</td>
     <td class="v" style="text-align:right;">{{ order.currency_code }} {{ payment_status.advance_amount or financial.advance_amount }} <strong style="color:#C0392B;">*</strong></td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Received: {{ payment_status.advance_cleared_at or 'To Be Confirmed' }}<br>Against: PI No. {{ order.pi_ref or 'To Be Confirmed' }}</td>
   </tr>
@@ -114,12 +114,12 @@
   <tr>
     <td class="k" style="font-weight:bold;">SUBTOTAL ALREADY PAID</td>
     <td class="v" style="text-align:right; font-weight:bold;">{{ order.currency_code }} {{ payment_status.advance_amount or financial.advance_amount }}{% if not order.is_fob and payment_status.freight_amount %} + {{ payment_status.freight_amount }} (freight){% endif %}</td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{{ financial.advance_pct }}% Advance{% if not order.is_fob %} + Debit Note (if applicable){% endif %}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Advance{% if not order.is_fob %} + Debit Note (if applicable){% endif %}</td>
   </tr>
   <tr>
     <td class="k" style="background:#FFF3CD; font-weight:bold;">&#8594;&nbsp; BALANCE DUE NOW</td>
     <td class="v" style="background:#FFF3CD; text-align:right; font-weight:bold; color:#8A1F1F;">{{ order.currency_code }} {{ payment_status.balance_amount or financial.balance_amount }} <strong>*</strong></td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">= FOB Value minus {{ financial.advance_pct }}% advance received<br>Payable by T/T (Telegraphic Transfer). {{ financial.balance_terms_text }}<br>Payment Reference: Quote CI No. {{ meta.document_reference }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">= FOB Value minus advance received<br>Payable by T/T (Telegraphic Transfer). {{ financial.balance_terms_text }}<br>Payment Reference: Quote CI No. {{ meta.document_reference }}</td>
   </tr>
   <tr>
     <td class="k">VERIFICATION</td>

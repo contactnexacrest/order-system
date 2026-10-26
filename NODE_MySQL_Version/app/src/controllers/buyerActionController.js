@@ -75,6 +75,7 @@ async function show(req, res) {
     }
   }
 
+  const totalFobValue = await orderProductRepository.totalFobValue(order.id);
   res.renderView('buyer_action/show', {
     wrapClass: 'intake-wrap',
     task: await buyerActionService.currentTask(order, ocAcknowledgment),
@@ -83,7 +84,9 @@ async function show(req, res) {
     token: req.params.token,
     order,
     products: await orderProductRepository.forOrder(order.id),
-    totalFobValue: await orderProductRepository.totalFobValue(order.id),
+    totalFobValue,
+    advanceReceived: paymentStatus && paymentStatus.advance_amount !== null ? parseFloat(paymentStatus.advance_amount) : null,
+    balanceDue: orderPaymentStatusRepository.balanceDue(totalFobValue, order.advance_pct, paymentStatus),
     ocAcknowledgment,
     buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(order.id),
     advanceCleared: !!paymentStatus && paymentStatus.advance_cleared_at !== null,

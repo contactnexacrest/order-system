@@ -491,7 +491,7 @@ function renderOc(context) {
       { label: 'Quotation Date *', value: g(order, 'quotation_date', '—') },
       { label: 'Proforma Invoice No. *', value: g(order, 'pi_ref', '—') },
       { label: 'Product(s) *', value: productList.join('; ') },
-      { label: 'Total Order Value *', value: `${currency} ${g(financial, 'total_value')}` },
+      { label: 'Total Order Value (FOB) *', value: `${currency} ${g(financial, 'total_value')}` },
       { label: 'Incoterm', value: g(order, 'incoterm_label') },
       { label: 'Port of Loading', value: g(order, 'port_of_loading') },
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
@@ -501,10 +501,11 @@ function renderOc(context) {
 
   children.push(...C.sectionTitle('4. PAYMENT STATUS'));
   const paymentRows = [
-    { label: `${g(financial, 'advance_pct')}% Advance (USD) *`, value: g(payment, 'advance_amount') !== '—' ? g(payment, 'advance_amount') : g(financial, 'advance_amount') },
+    { label: `${g(financial, 'advance_pct')}% Advance Due (${currency}) *`, value: g(financial, 'advance_amount') },
+    { label: `Advance Received (${currency}) *`, value: g(payment, 'advance_amount', 'To Be Confirmed') },
     { label: 'Advance T/T Received On *', value: g(payment, 'advance_remittance_received_at', 'To Be Confirmed') },
-    { label: 'Balance Due (USD) *', value: `${g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount')}  —  ${g(financial, 'balance_terms_text')}` },
-    { label: 'Currency', value: 'USD (always)' },
+    { label: `Balance Due (${currency}) *`, value: `${g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount')}  —  ${g(financial, 'balance_terms_text')}` },
+    { label: 'Currency', value: currency },
   ];
   if (!order.is_fob) {
     paymentRows.push({
@@ -1523,16 +1524,16 @@ function renderCi(context) {
   const subtotalPaid = `${currency} ${advanceAmt}${!isFob && freightAmtVal !== '—' && freightAmtVal !== 'To Be Confirmed' ? ` + ${g(payment, 'freight_amount')} (freight)` : ''}`;
   const sectionBRows = [
     [
-      `√  ${g(financial, 'advance_pct')}% Advance — ${g(payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'}`,
+      `√  Advance — ${g(payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'}`,
       `${currency} ${advanceAmt} *`,
       `Received: ${g(payment, 'advance_cleared_at', 'To Be Confirmed')}\nAgainst: PI No. ${g(order, 'pi_ref', 'To Be Confirmed')}`,
     ],
     [`√  Freight & Insurance — ${freightStatus}`, freightAmtCell, freightRemark2],
-    ['SUBTOTAL ALREADY PAID', subtotalPaid, `${g(financial, 'advance_pct')}% Advance${!isFob ? ' + FDN (if applicable)' : ''}`],
+    ['SUBTOTAL ALREADY PAID', subtotalPaid, `Advance${!isFob ? ' + FDN (if applicable)' : ''}`],
     [
       '→  BALANCE DUE NOW',
       `${currency} ${balanceAmt} *`,
-      `= FOB Value minus ${g(financial, 'advance_pct')}% advance received\nPayable by T/T within ${g(financial, 'balance_days')} days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. ${g(meta, 'document_reference')}`,
+      `= FOB Value minus advance received\nPayable by T/T within ${g(financial, 'balance_days')} days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. ${g(meta, 'document_reference')}`,
       true,
     ],
     [

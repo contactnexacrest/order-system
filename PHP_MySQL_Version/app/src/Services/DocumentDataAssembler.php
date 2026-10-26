@@ -265,7 +265,12 @@ final class DocumentDataAssembler
                 'freight_amount'                  => $payment['freight_amount'] !== null ? self::formatMoney($payment['freight_amount']) : null,
                 'freight_remittance_received_at'  => self::formatDate($payment['freight_remittance_received_at']),
                 'freight_cleared_at'              => self::formatDate($payment['freight_cleared_at']),
-                'balance_amount'                  => $payment['balance_amount'] !== null ? self::formatMoney($payment['balance_amount']) : self::formatMoney($balanceAmount),
+                // Owner report (2026-10-27, blocker): until the balance itself
+                // is received, the balance due is FOB minus the advance
+                // actually received (OrderPaymentStatusRepository::balanceDue).
+                'balance_amount'                  => $payment['balance_remittance_received_at'] !== null && $payment['balance_amount'] !== null
+                    ? self::formatMoney($payment['balance_amount'])
+                    : self::formatMoney(OrderPaymentStatusRepository::balanceDue($fobValue, $advancePct, $payment)),
                 'balance_remittance_received_at'  => self::formatDate($payment['balance_remittance_received_at']),
                 'balance_cleared_at'              => self::formatDate($payment['balance_cleared_at']),
                 'balance_due_date'                => self::formatDate($payment['balance_due_date']),
