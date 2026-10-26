@@ -11,6 +11,7 @@ use App\Controllers\AssetController;
 use App\Controllers\AuditLogController;
 use App\Controllers\AuthController;
 use App\Controllers\BuyerActionController;
+use App\Controllers\SupplierActionController;
 use App\Controllers\CaController;
 use App\Controllers\OrderFinancialsController;
 use App\Controllers\ClientController;
@@ -82,6 +83,7 @@ $clientIntakeReview = new ClientIntakeReviewController();
 $piIntake = new PiIntakeController();
 $piIntakeReview = new PiIntakeReviewController();
 $buyerAction = new BuyerActionController();
+$supplierAction = new SupplierActionController();
 $reorderRequests = new ReorderRequestController();
 $clientPortal = new ClientPortalController();
 $orders = new OrderController();
@@ -161,6 +163,9 @@ $router->post('/pi-details/{token}', [$piIntake, 'submit'], [CsrfCheck::verify()
 // per-order link (see OrderController::generateBuyerActionLink()); the
 // buyer never reaches this without one. See BuyerActionController's
 // docblock and docs/schema.sql Section BG.
+// Owner request (2026-10-26, t4): no-login Supplier Action Link (Step 7c).
+$router->get('/supplier-action/{token}', [$supplierAction, 'show']);
+$router->post('/supplier-action/{token}/acknowledgment', [$supplierAction, 'uploadAcknowledgment'], [CsrfCheck::verify()]);
 $router->get('/buyer-action/{token}', [$buyerAction, 'show']);
 $router->post('/buyer-action/{token}/acknowledge-oc', [$buyerAction, 'acknowledgeOc'], [CsrfCheck::verify()]);
 $router->post('/buyer-action/{token}/buyer-po', [$buyerAction, 'uploadBuyerPo'], [CsrfCheck::verify()]);
@@ -436,6 +441,8 @@ $router->post('/orders/{id}/ca-internal-doc/toggle', [$ca, 'toggleInternalDoc'],
 $router->post('/orders/{id}/ca-internal-doc/generate', [$ca, 'generateInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits', [$orderFinancials, 'addExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits/{benefitId}/received', [$orderFinancials, 'markExportBenefitReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/financials/skip', [$orderFinancials, 'skipFinancials'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/financials/skip/undo', [$orderFinancials, 'undoSkipFinancials'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefit-schemes', [$orderFinancials, 'setExportBenefitSchemeStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/lc-details', [$orderFinancials, 'saveLcDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/inspection-fee', [$orderFinancials, 'saveInspectionFee'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -517,6 +524,8 @@ $router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigne
 $router->post('/orders/{id}/supplier-po/advance-paid', [$orders, 'markSupplierAdvancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/balance-paid', [$orders, 'markSupplierBalancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/supplier-link', [$orders, 'generateSupplierActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/ack-skip', [$orders, 'skipSupplierPoAck'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // QA-5 RBAC-04: freight/packing/shipping/BL/closure are Logistics' duty,
 // split out of manage_orders so an Accounts-only user can no longer

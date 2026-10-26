@@ -23,11 +23,16 @@ rate**.
   each time, so a single order-wide rate would misstate the gain/loss on
   whichever leg it didn't match.
 - Each box is titled **"Advance/Balance/Freight Exchange Rate"** —
-  visible to anyone with the "View INR actual" permission, editable by
-  anyone with "Add/edit INR actual".
-- It's the INR-per-unit-foreign-currency rate you're booking that leg
-  against — typically entered once that leg is about to clear, whenever
-  your accounts team fixes a working rate for it.
+  visible to anyone with the "View INR actual" permission. It reads back
+  the rate recorded **with the remittance itself** ("@ Exchange Rate" on
+  the Record Remittance form) — there is no separate "Record/Update Rate"
+  box any more, since the rate the payment was received at doesn't change
+  later.
+- If a rate was simply typed wrong, anyone with "Add/edit INR actual" can
+  open the collapsed **"Correct a wrongly typed rate"** under it: enter the
+  right rate and a reason (at least 10 characters). The correction is
+  audit-logged with the old rate, the new one and the reason. (An older
+  entry that has no rate at all shows **"Add the missing rate"** instead.)
 - **It never changes what INR actual gets recorded.** The INR actual is
   always the real, bank-confirmed figure (Phase 1). The rate only exists
   to compute what you *expected* to receive for that leg, so the

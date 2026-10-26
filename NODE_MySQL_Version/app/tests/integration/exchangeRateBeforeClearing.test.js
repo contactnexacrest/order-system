@@ -81,4 +81,32 @@ describe('Exchange rate before clearing (90-item backlog "exchange-rate-at-clear
 
     expect(res.text).toContain('name="advance_exchange_rate"');
   });
+
+  // Owner decision (2026-10-26, t4): the rate is recorded with the
+  // remittance; the separate box is only a collapsed, reasoned correction.
+  it('needs a reason to correct a recorded rate, and logs it', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await stageGateService.passAndUnlockNext(orderId, 1, null);
+    await stageGateService.passAndUnlockNext(orderId, 2, null);
+    await orderPaymentStatusRepository.initializeForOrder(orderId);
+    await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 5000.0, '2026-01-10');
+    await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, adminId);
+
+    const page = await agent.get(`/orders/${orderId}`);
+    expect(page.text).toContain('Correct a wrongly typed rate');
+    expect(page.text).not.toContain('Record Rate');
+    const csrf = extractCsrf(page.text);
+
+    await agent.post(`/orders/${orderId}/payment/advance/exchange-rate`).type('form').send({ _csrf: csrf, advance_exchange_rate: '95' });
+    expect(Number((await orderPaymentStatusRepository.find(orderId)).advance_exchange_rate)).toBe(85);
+
+    await agent.post(`/orders/${orderId}/payment/advance/exchange-rate`).type('form')
+      .send({ _csrf: csrf, advance_exchange_rate: '95', correction_reason: "Typed the wrong day's rate" });
+    expect(Number((await orderPaymentStatusRepository.find(orderId)).advance_exchange_rate)).toBe(95);
+    const logged = await db.queryOne(
+      "SELECT old_value, new_value, reason FROM audit_log WHERE entity_type = 'order_payment_status' AND entity_id = :id AND action_type = 'CA_EXCHANGE_RATE_CORRECTED'",
+      { id: orderId }
+    );
+    expect(logged).toEqual(expect.objectContaining({ new_value: '95', reason: "Typed the wrong day's rate" }));
+  });
 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Flash;
+use App\Helpers\ReasonValidator;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\OrderCostEntryRepository;
@@ -563,6 +564,49 @@ final class OrderFinancialsController
         OrderCostEntryRepository::delete($entryId);
         AuditLogRepository::log((int) $user['id'], 'ORDER_COST_ENTRY_DELETED', 'order_cost_entries', $entryId, null, $entry['category'], null);
         Flash::set('success', 'Cost entry removed.');
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
+    /**
+     * Owner request (2026-10-26, t4): Step 12 can be skipped and marked
+     * complete when there is nothing to record (reason required,
+     * audit-logged). No cost, benefit or expense is written — the figures
+     * stay blank rather than reading as 0. Export-benefit schemes still
+     * have to be answered before the order can be marked fully settled.
+     */
+    public function skipFinancials(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!OrderRepository::find($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $reason = trim((string) ($_POST['skip_reason'] ?? ''));
+        if (($error = ReasonValidator::check($reason)) !== null) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        $userId = (int) AuthService::currentUserId();
+        OrderRepository::markFinancialsSkipped($orderId, $userId, $reason);
+        AuditLogRepository::log($userId, 'ORDER_FINANCIALS_SKIPPED', 'orders', $orderId, 'financials_skipped_at', null, date('Y-m-d H:i:s'), $reason);
+        Flash::set('success', 'Step 12 marked complete without financial figures — nothing was recorded as 0. You can still add figures later.');
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
+    public function undoSkipFinancials(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        OrderRepository::clearFinancialsSkipped($orderId);
+        AuditLogRepository::log((int) AuthService::currentUserId(), 'ORDER_FINANCIALS_SKIP_UNDONE', 'orders', $orderId, 'financials_skipped_at', (string) ($order['financials_skipped_at'] ?? ''), null);
+        Flash::set('success', 'Step 12 reopened.');
         header("Location: /orders/{$orderId}#order-financials");
     }
 }

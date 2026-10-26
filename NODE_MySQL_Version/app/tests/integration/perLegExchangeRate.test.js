@@ -45,13 +45,13 @@ describe('Per-leg exchange rate (Batch 3 #3)', () => {
     await db.pool.end();
   });
 
-  async function recordLegRateViaRoute(orderId, leg, rate) {
+  async function recordLegRateViaRoute(orderId, leg, rate, extra = {}) {
     const formPage = await agent.get(`/orders/${orderId}`);
     const csrf = extractCsrf(formPage.text);
     return agent
       .post(`/orders/${orderId}/payment/${leg}/exchange-rate`)
       .type('form')
-      .send({ _csrf: csrf, [`${leg}_exchange_rate`]: String(rate) });
+      .send({ _csrf: csrf, [`${leg}_exchange_rate`]: String(rate), ...extra });
   }
 
   it("records each leg's rate independently", async () => {
@@ -88,7 +88,11 @@ describe('Per-leg exchange rate (Batch 3 #3)', () => {
     await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId);
     await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'balance', 86.0, userId);
 
+    // Owner decision (2026-10-26, t4): changing a recorded rate is a
+    // correction and needs a reason — without one nothing changes.
     await recordLegRateViaRoute(orderId, 'advance', 95.0);
+    expect(Number((await orderPaymentStatusRepository.find(orderId)).advance_exchange_rate)).toBeCloseTo(85.0, 3);
+    await recordLegRateViaRoute(orderId, 'advance', 95.0, { correction_reason: "Typed the wrong day's rate" });
 
     const payment = await orderPaymentStatusRepository.find(orderId);
     expect(Number(payment.advance_exchange_rate)).toBeCloseTo(95.0, 3);

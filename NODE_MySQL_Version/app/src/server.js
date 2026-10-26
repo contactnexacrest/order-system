@@ -51,6 +51,7 @@ const clientIntakeController = require('./controllers/clientIntakeController');
 const clientIntakeReviewController = require('./controllers/clientIntakeReviewController');
 const piIntakeController = require('./controllers/piIntakeController');
 const buyerActionController = require('./controllers/buyerActionController');
+const supplierActionController = require('./controllers/supplierActionController');
 const piIntakeReviewController = require('./controllers/piIntakeReviewController');
 const reorderRequestController = require('./controllers/reorderRequestController');
 const clientPortalController = require('./controllers/clientPortalController');
@@ -441,6 +442,9 @@ app.post('/pi-details/:token', verifyCsrf, asyncHandler(piIntakeController.submi
 // per-order link (see ordersController.generateBuyerActionLink()); the
 // buyer never reaches this without one. See buyerActionController's
 // docblock and docs/schema.sql Section BG.
+// Owner request (2026-10-26, t4): no-login Supplier Action Link (Step 7c).
+app.get('/supplier-action/:token', asyncHandler(supplierActionController.show));
+app.post('/supplier-action/:token/acknowledgment', uploadLarge.single('document'), verifyCsrf, asyncHandler(supplierActionController.uploadAcknowledgment));
 app.get('/buyer-action/:token', asyncHandler(buyerActionController.show));
 app.post('/buyer-action/:token/acknowledge-oc', verifyCsrf, asyncHandler(buyerActionController.acknowledgeOc));
 app.post('/buyer-action/:token/buyer-po', uploadLarge.single('document'), verifyCsrf, asyncHandler(buyerActionController.uploadBuyerPo));
@@ -710,6 +714,8 @@ app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('c
 app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.generateInternalDoc));
 app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
 app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
+app.post('/orders/:id/financials/skip', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.skipFinancials));
+app.post('/orders/:id/financials/skip/undo', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.undoSkipFinancials));
 app.post('/orders/:id/export-benefit-schemes', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.setExportBenefitSchemeStatus));
 app.post('/orders/:id/lc-details', requireAuth, requirePermission('manage_order_financials'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveLcDetails));
 app.post('/orders/:id/inspection-fee', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveInspectionFee));
@@ -786,6 +792,8 @@ app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manag
 app.post('/orders/:id/supplier-po/advance-paid', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierAdvancePaid));
 app.post('/orders/:id/supplier-po/balance-paid', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierBalancePaid));
 app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
+app.post('/orders/:id/supplier-po/supplier-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateSupplierActionLink));
+app.post('/orders/:id/supplier-po/ack-skip', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.skipSupplierPoAck));
 
 app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveFreightTerms));
 app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightPayment));

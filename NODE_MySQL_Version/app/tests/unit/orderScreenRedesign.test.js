@@ -170,11 +170,11 @@ describe('Order screen redesign (Point 2/4)', () => {
       stack.push(stack.length ? kind : 'panels');
     }
 
-    // Products, Payment Overview, Document Review (pinned) + the two admin cards.
-    expect(counts.direct).toBe(5);
+    // Products, Payment Overview, Document Review, Order Communication (pinned) + the two admin cards.
+    expect(counts.direct).toBe(6);
     expect(counts.phases).toBe(5);
-    // Steps 1, 2, 3, the LC card, 12, 19, Amendments, 14-18.
-    expect(counts.phaseCards).toBe(12);
+    // Steps 1, 2, 3, the LC card, 12, 19, Amendments, 14, 16-18.
+    expect(counts.phaseCards).toBe(11);
     expect(counts.groups).toBe(9);
     expect(counts.groupedCards).toBe(40);
   });

@@ -934,4 +934,19 @@ final class OrderRepository
             'UPDATE orders SET pi_form_skipped_at = NOW(), pi_form_skipped_by = :user_id, pi_form_skip_reason = :reason WHERE id = :id'
         )->execute(['user_id' => $userId, 'reason' => $reason, 'id' => $orderId]);
     }
+
+    /** Owner request (2026-10-26, t4): Step 12 marked complete without financial figures — nothing is written as 0. */
+    public static function markFinancialsSkipped(int $orderId, int $userId, string $reason): void
+    {
+        Database::connection()->prepare(
+            'UPDATE orders SET financials_skipped_at = NOW(), financials_skipped_by = :user_id, financials_skip_reason = :reason WHERE id = :id'
+        )->execute(['user_id' => $userId, 'reason' => $reason, 'id' => $orderId]);
+    }
+
+    public static function clearFinancialsSkipped(int $orderId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE orders SET financials_skipped_at = NULL, financials_skipped_by = NULL, financials_skip_reason = NULL WHERE id = :id'
+        )->execute(['id' => $orderId]);
+    }
 }

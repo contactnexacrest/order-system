@@ -1,6 +1,9 @@
 'use strict';
 
+const crypto = require('crypto');
 const db = require('../config/db');
+const encryptionService = require('../services/encryptionService');
+const { formatForDb } = require('../helpers/dbDateTime');
 
 /**
  * 90-item backlog "standalone order" follow-on: resolves the supplier's
@@ -137,4 +140,52 @@ async function paidOnDate(date) {
   );
 }
 
-module.exports = { create, findLatestForOrder, markSigned, markAdvancePaid, markBalancePaid, paidOnDate };
+/**
+ * Owner request (2026-10-26, t4): a no-login Supplier Action Link (like the
+ * Buyer Action Link) so the supplier can upload their signed PO /
+ * acknowledgment themselves. Only the sha256 hash authorizes; the
+ * encrypted copy lets staff re-copy the live link from the order page.
+ */
+async function generateActionToken(id, ttlDays = 60) {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  await db.execute(
+    'UPDATE order_supplier_po SET supplier_action_token_hash = :hash, supplier_action_token_plain = :plain, supplier_action_token_expires_at = :expires WHERE id = :id',
+    {
+      hash: crypto.createHash('sha256').update(rawToken).digest('hex'),
+      plain: encryptionService.encrypt(rawToken),
+      expires: formatForDb(new Date(Date.now() + ttlDays * 86400000)),
+      id,
+    }
+  );
+  return rawToken;
+}
+
+/** The public /supplier-action/:token route's sole authorization check — the latest PO of a live order only. */
+async function findByValidActionToken(rawToken) {
+  return db.queryOne(
+    `SELECT sp.* FROM order_supplier_po sp
+       JOIN orders o ON o.id = sp.order_id
+      WHERE sp.supplier_action_token_hash = :hash AND sp.supplier_action_token_expires_at > NOW()
+        AND o.status IN ('active', 'disputed')
+        AND sp.id = (SELECT MAX(id) FROM order_supplier_po WHERE order_id = sp.order_id)`,
+    { hash: crypto.createHash('sha256').update(String(rawToken || '')).digest('hex') }
+  );
+}
+
+/** Owner request (2026-10-26, t4): the supplier did not acknowledge the PO — staff record why (Step 7c). */
+async function markAckSkipped(id, userId, reason) {
+  await db.execute(
+    'UPDATE order_supplier_po SET ack_skipped_at = NOW(), ack_skipped_by = :user_id, ack_skip_reason = :reason WHERE id = :id',
+    { user_id: userId, reason, id }
+  );
+}
+
+async function isAckSkipped(id) {
+  const row = await db.queryOne('SELECT ack_skipped_at FROM order_supplier_po WHERE id = :id', { id });
+  return Boolean(row && row.ack_skipped_at);
+}
+
+module.exports = {
+  create, findLatestForOrder, markSigned, markAdvancePaid, markBalancePaid, paidOnDate,
+  generateActionToken, findByValidActionToken, markAckSkipped, isAckSkipped,
+};

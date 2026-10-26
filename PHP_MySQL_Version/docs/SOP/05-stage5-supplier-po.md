@@ -89,13 +89,26 @@ order:
 1. **7c · Attach Supplier PO Acknowledgment** — upload the supplier's
    actual signed copy, kept on record with version history. Like the Buyer
    PO's attachment, this **does not by itself confirm the signature or
-   pass the gate**.
+   pass the gate**. The supplier doesn't always send one back, so 7c also
+   offers two other ways forward:
+   - **Generate Supplier Link** — a no-login link (like the Buyer Action
+     Link) where the supplier uploads their signed PO / acknowledgment
+     themselves. It's emailed to the supplier when the PO has their email,
+     and shown on the card with **Copy Link** to send any other way. It
+     works for 60 days; regenerating it cancels the old one. The page shows
+     the supplier only the PO reference and what has been received — no
+     prices, no buyer. The order's team is notified when they upload, and
+     the file lands in the order's `07-supplier-po/received/` folder.
+   - **Skip — supplier did not acknowledge** — record why (reason of at
+     least 10 characters, audit-logged). This completes 7c and opens 7d
+     without an acknowledgment on file.
 2. **7d · Confirm Supplier Signed & Returned PO** — the button staff click
    once the supplier's countersigned copy is back and attached. **This is
    the action that passes Stage 5's gate** (and triggers the FOB auto-skip
    check above). While a copy is required (see the wet-signature gate
    below) this sub-step shows "Attach the supplier's signed acknowledgment
-   in Step 7c first" instead of the button until one is on file.
+   in Step 7c first" instead of the button until one is on file (or the
+   skip is recorded).
 
 > **Document-generated gate:** "Confirm Supplier Signed & Returned PO" is
 > also refused if the Supplier PO document itself was never generated —
@@ -109,7 +122,8 @@ order:
 > `wet_signature_required_supplier_po` toggle**, on unless an Admin has
 > turned it off), clicking "Confirm Supplier Signed & Returned PO" is
 > **not** enough on its own either — it's refused until at least one file
-> is also on record under "Attach Supplier PO Acknowledgment" (7c). Same
+> is also on record under "Attach Supplier PO Acknowledgment" (7c), or 7c's
+> "supplier did not acknowledge" skip is recorded with its reason. Same
 > loophole this closes as on the Buyer PO side: a stage confirmed "signed"
 > with zero physical evidence ever attached. Turn the toggle off only for
 > a workflow that genuinely doesn't need the physical copy.

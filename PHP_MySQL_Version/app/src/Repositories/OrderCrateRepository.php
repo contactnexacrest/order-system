@@ -54,4 +54,23 @@ final class OrderCrateRepository
             ]);
         }
     }
+
+    /**
+     * Owner request (2026-10-26, t4): a crate's HS code is never typed — it
+     * is the HS code of the order product the crate holds. A crate whose
+     * product is not one of the order's lines (older free-text entries)
+     * still gets the order's HS code when every line shares one.
+     *
+     * @param array<int, array<string,mixed>> $products the order's active product lines
+     */
+    public static function hsCodeFor(array $products, ?string $productDescription): ?string
+    {
+        foreach ($products as $p) {
+            if ((string) $p['description'] === (string) $productDescription) {
+                return (string) $p['hs_code'];
+            }
+        }
+        $codes = array_values(array_unique(array_map(static fn(array $p): string => (string) $p['hs_code'], $products)));
+        return count($codes) === 1 ? $codes[0] : null;
+    }
 }

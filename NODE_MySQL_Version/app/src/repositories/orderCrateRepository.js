@@ -37,4 +37,17 @@ async function replaceForOrder(orderId, crates) {
   });
 }
 
-module.exports = { forOrder, replaceForOrder };
+/**
+ * Owner request (2026-10-26, t4): a crate's HS code is never typed — it is
+ * the HS code of the order product the crate holds. A crate whose product
+ * is not one of the order's lines (older free-text entries) still gets the
+ * order's HS code when every line shares one.
+ */
+function hsCodeFor(products, productDescription) {
+  const match = products.find((p) => String(p.description) === String(productDescription ?? ''));
+  if (match) return String(match.hs_code);
+  const codes = [...new Set(products.map((p) => String(p.hs_code)))];
+  return codes.length === 1 ? codes[0] : null;
+}
+
+module.exports = { forOrder, replaceForOrder, hsCodeFor };

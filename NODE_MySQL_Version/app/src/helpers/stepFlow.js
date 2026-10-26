@@ -31,7 +31,7 @@ const PHASES = {
   production: { letter: 'B', title: 'Procurement & Production', sub: 'Supplier PO → production & estimated shipment', steps: ['s7', 's8'] },
   shipment: { letter: 'C', title: 'Shipment & Balance', sub: 'Freight → packing & BL → commercial invoice & balance', steps: ['s9', 's10', 's11'] },
   closure: { letter: 'D', title: 'Closure & Settlement', sub: 'Financials & benefits → documents despatched → fully settled', steps: ['s12', 's13', 's19'] },
-  aftersales: { letter: 'E', title: 'After-Sales & Records', sub: 'Additional documents · communication · feedback · complaints · disputes · amendments', steps: [] },
+  aftersales: { letter: 'E', title: 'After-Sales & Records', sub: 'Additional documents · feedback · complaints · disputes · amendments', steps: [] },
 };
 
 const PIPELINE_STEPS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13'];

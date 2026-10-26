@@ -80,13 +80,23 @@ final class PerLegExchangeRateTest extends DbTestCase
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $this->userId);
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', 86.0, $this->userId);
 
+        // Owner decision (2026-10-26, t4): changing a recorded rate is a
+        // correction and needs a reason — without one nothing changes.
         $_POST = ['advance_exchange_rate' => '95.0'];
+        ob_start();
+        (new OrderController())->recordAdvanceExchangeRate(['id' => (string) $orderId]);
+        ob_end_clean();
+        self::assertEqualsWithDelta(85.0, (float) OrderPaymentStatusRepository::find($orderId)['advance_exchange_rate'], 0.001, 'a correction without a reason is refused');
+
+        $_POST = ['advance_exchange_rate' => '95.0', 'correction_reason' => 'Typed the wrong day\'s rate'];
         ob_start();
         (new OrderController())->recordAdvanceExchangeRate(['id' => (string) $orderId]);
         ob_end_clean();
 
         $payment = OrderPaymentStatusRepository::find($orderId);
         self::assertEqualsWithDelta(95.0, (float) $payment['advance_exchange_rate'], 0.001, 'advance rate must have been updated');
+        $log = array_values(array_filter(\App\Repositories\AuditLogRepository::forOrder($orderId), static fn(array $r): bool => $r['action_type'] === 'CA_EXCHANGE_RATE_CORRECTED'));
+        self::assertCount(1, $log, 'the correction is audit-logged with its reason');
         self::assertEqualsWithDelta(86.0, (float) $payment['balance_exchange_rate'], 0.001, "balance rate must be untouched by an advance-leg update");
     }
 

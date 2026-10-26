@@ -6,6 +6,7 @@ const db = require('../../src/config/db');
 const flash = require('../../src/helpers/flash');
 const ordersController = require('../../src/controllers/ordersController');
 const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
+const orderCrateRepository = require('../../src/repositories/orderCrateRepository');
 const orderPaymentStatusRepository = require('../../src/repositories/orderPaymentStatusRepository');
 const orderSupplierPoRepository = require('../../src/repositories/orderSupplierPoRepository');
 const supplierRepository = require('../../src/repositories/supplierRepository');
@@ -101,6 +102,28 @@ describe('Order page flow (owner requests 2026-10-26)', () => {
     req = fakeReq({ id: String(orderId) }, { phase: 'shipment', tasks: rows('Buyer waived this check') });
     await ordersController.updateComplianceTask(req, fakeRes());
     expect(lastFlash(req)).toBe('Nothing changed on the checklist.');
+  });
+
+  it('takes a crate\'s HS code from its product, not the form', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    const insert = `INSERT INTO order_products (order_id, line_no, description, hs_code) VALUES (:o, :l, :d, :h)`;
+    await db.execute(insert, { o: orderId, l: 1, d: 'Granite slab 2cm', h: '6802.93' });
+    await db.execute(insert, { o: orderId, l: 2, d: 'Marble tile', h: '6802.91' });
+    for (let stage = 1; stage <= 6; stage++) {
+      await stageGateService.passAndUnlockNext(orderId, stage, null);
+    }
+
+    const req = fakeReq({ id: String(orderId) }, {
+      crate_no: ['C1', 'C2', 'C3'],
+      crate_product_description: ['Marble tile', 'Granite slab 2cm', 'Something typed long ago'],
+      crate_hs_code: ['9999.99', '9999.99', '9999.99'],
+    });
+    req.files = {};
+    await ordersController.savePacking(req, fakeRes());
+
+    const crates = await orderCrateRepository.forOrder(orderId);
+    expect(Object.fromEntries(crates.map((c) => [c.crate_no, c.hs_code]))).toEqual({ C1: '6802.91', C2: '6802.93', C3: null });
+    expect(orderCrateRepository.hsCodeFor([{ description: 'A', hs_code: '6802.93' }], 'old text')).toBe('6802.93');
   });
 
   it('marks only its own checklist part not applicable', async () => {

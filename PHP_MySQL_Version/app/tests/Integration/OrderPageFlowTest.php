@@ -112,6 +112,29 @@ final class OrderPageFlowTest extends DbTestCase
         self::assertSame('Nothing changed on the checklist.', $this->lastFlash(), 'unchanged rows are not re-stamped');
     }
 
+    public function testACratesHsCodeComesFromItsProductNotTheForm(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $pdo = \App\Config\Database::connection();
+        $insert = $pdo->prepare("INSERT INTO order_products (order_id, line_no, description, hs_code) VALUES (:o, :l, :d, :h)");
+        $insert->execute(['o' => $orderId, 'l' => 1, 'd' => 'Granite slab 2cm', 'h' => '6802.93']);
+        $insert->execute(['o' => $orderId, 'l' => 2, 'd' => 'Marble tile', 'h' => '6802.91']);
+        for ($stage = 1; $stage <= 6; $stage++) {
+            StageGateService::passAndUnlockNext($orderId, $stage, null);
+        }
+
+        $_POST = [
+            'crate_no' => ['C1', 'C2', 'C3'],
+            'crate_product_description' => ['Marble tile', 'Granite slab 2cm', 'Something typed long ago'],
+            'crate_hs_code' => ['9999.99', '9999.99', '9999.99'],
+        ];
+        (new OrderController())->savePacking(['id' => (string) $orderId]);
+
+        $hs = array_column(\App\Repositories\OrderCrateRepository::forOrder($orderId), 'hs_code', 'crate_no');
+        self::assertSame(['C1' => '6802.91', 'C2' => '6802.93', 'C3' => null], $hs, 'a typed HS code is ignored; an unknown product with mixed HS codes gets none');
+        self::assertSame('6802.93', \App\Repositories\OrderCrateRepository::hsCodeFor([['description' => 'A', 'hs_code' => '6802.93']], 'old text'), 'one HS code on the order covers older free-text crates');
+    }
+
     /** @param array<int, array<string,mixed>> $rows */
     private function statusOf(array $rows, int $taskTypeId): string
     {

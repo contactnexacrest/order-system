@@ -50,6 +50,15 @@ Anyone holding `manage_order_financials` sees a section titled **Closure
 order's own page, just below Payment Status. It has seven parts, top to
 bottom:
 
+**Nothing to record? Skip it.** At the bottom of the section,
+**Skip financials — mark Step 12 complete** (reason of at least 10
+characters, audit-logged) marks Step 12 done **without writing any
+figure** — costs, benefits and expenses stay blank rather than being
+saved as 0, so reports never mistake "not recorded" for "zero". Figures
+can still be added later, and **Reopen Step 12** undoes the skip. The
+export-benefit schemes still have to be answered before the order can be
+marked fully settled.
+
 ### 1. Export Benefit Scheme Eligibility
 
 Not every order qualifies for every government export-benefit scheme, so

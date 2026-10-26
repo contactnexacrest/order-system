@@ -25,6 +25,11 @@ shipment, and collecting final payment:
 buyer has been sent a copy of the Bill of Lading now that it's been
 issued — purely a record-keeping checkbox, it doesn't affect the gate.
 
+**Upload the scanned BL copy first.** On a CFR/CIF order the CI is made
+against the BL, so Step 11a shows a reminder until the scanned BL copy is
+attached in Step 10f ("Attach Scanned BL Copy"), and a download link to it
+once it is. (An FOB order raises its CI before shipment, so no reminder.)
+
 From **Documents**, **Generate Commercial Invoice** produces the CI —
 pre-filled with the actual shipped quantities and final figures rather than
 the estimates the PI was built on.

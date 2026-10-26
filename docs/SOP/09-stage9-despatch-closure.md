@@ -209,10 +209,12 @@ own starting value), **Pending Approval**, **Approved**, or **Skipped
 to this order" still needs to be recorded, not just silently left
 blank.
 
-Each row **saves on its own** (its own Save button, no page reload), so
-choices made on other rows stay as they are; the reason box appears only
-when **Skipped (Not Applicable)** is chosen, and any problem is shown
-right on that row.
+Each card has **one Save Checklist button** that saves every row at once,
+each into its own task — only the rows you changed are updated (so
+untouched rows keep their "resolved by" stamp). The reason box appears
+only when **Skipped (Not Applicable)** is chosen and must then be at least
+10 characters; if any row is invalid, **nothing** on the card is saved
+and the message names the row.
 
 For a repeat order where the whole checklist genuinely doesn't apply, a
 **"Mark all remaining tasks Not Applicable"** action (appears only while

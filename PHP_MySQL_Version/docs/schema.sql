@@ -687,6 +687,11 @@ CREATE TABLE orders (
   -- references orders(id).
   active_amendment_id     BIGINT UNSIGNED NULL,
 
+  -- Owner request (2026-10-26, t4): Step 12 skipped with a reason — no amounts written.
+  financials_skipped_at   DATETIME NULL,
+  financials_skipped_by   BIGINT UNSIGNED NULL,
+  financials_skip_reason  VARCHAR(500) NULL,
+
   is_sample_data          TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real order
   created_by              BIGINT UNSIGNED NULL,
   created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -846,8 +851,7 @@ CREATE TABLE order_production (
   production_complete_confirmed_at  TIMESTAMP NULL,
   production_complete_confirmed_by  BIGINT UNSIGNED NULL,
   FOREIGN KEY (order_id) REFERENCES orders(id),
-  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-) ENGINE=InnoDB;
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)) ENGINE=InnoDB;
 
 CREATE TABLE order_supplier_po (
   id                            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -887,10 +891,20 @@ CREATE TABLE order_supplier_po (
   required_delivery_date         DATE NULL,
   delivery_confirmation_due_date DATE NULL,
   packing_requirement            VARCHAR(255) NULL,
+  -- Owner request (2026-10-26, t4): Step 7c Supplier Action Link (sha256
+  -- hash + encrypted copy, like orders.buyer_action_token_*) and the
+  -- "supplier did not acknowledge" skip.
+  supplier_action_token_hash       CHAR(64) NULL,
+  supplier_action_token_plain      TEXT NULL,
+  supplier_action_token_expires_at DATETIME NULL,
+  ack_skipped_at                   DATETIME NULL,
+  ack_skipped_by                   BIGINT UNSIGNED NULL,
+  ack_skip_reason                  VARCHAR(500) NULL,
   status                         ENUM('draft','issued','signed','delivered','rejected','closed') NOT NULL DEFAULT 'draft',
   created_at                     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (order_id) REFERENCES orders(id),
-  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+  INDEX idx_supplier_po_action_token (supplier_action_token_hash)
 ) ENGINE=InnoDB;
 
 CREATE TABLE order_packing (

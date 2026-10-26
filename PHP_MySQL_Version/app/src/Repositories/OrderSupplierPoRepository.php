@@ -159,4 +159,53 @@ final class OrderSupplierPoRepository
         $stmt->execute(['date' => $date, 'date2' => $date]);
         return $stmt->fetchAll();
     }
+
+    /**
+     * Owner request (2026-10-26, t4): a no-login Supplier Action Link (like
+     * the Buyer Action Link) so the supplier can upload their signed PO /
+     * acknowledgment themselves. Only the sha256 hash authorizes; the
+     * encrypted copy lets staff re-copy the live link from the order page.
+     */
+    public static function generateActionToken(int $id, int $ttlDays = 60): string
+    {
+        $rawToken = bin2hex(random_bytes(32));
+        Database::connection()
+            ->prepare('UPDATE order_supplier_po SET supplier_action_token_hash = :hash, supplier_action_token_plain = :plain, supplier_action_token_expires_at = :expires WHERE id = :id')
+            ->execute([
+                'hash'    => hash('sha256', $rawToken),
+                'plain'   => \App\Services\EncryptionService::encrypt($rawToken),
+                'expires' => date('Y-m-d H:i:s', time() + ($ttlDays * 86400)),
+                'id'      => $id,
+            ]);
+        return $rawToken;
+    }
+
+    /** The public /supplier-action/{token} route's sole authorization check — the latest PO of a live order only. */
+    public static function findByValidActionToken(string $rawToken): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT sp.* FROM order_supplier_po sp
+               JOIN orders o ON o.id = sp.order_id
+              WHERE sp.supplier_action_token_hash = :hash AND sp.supplier_action_token_expires_at > NOW()
+                AND o.status IN ('active', 'disputed')
+                AND sp.id = (SELECT MAX(id) FROM order_supplier_po WHERE order_id = sp.order_id)"
+        );
+        $stmt->execute(['hash' => hash('sha256', $rawToken)]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** Owner request (2026-10-26, t4): the supplier did not acknowledge the PO — staff record why (Step 7c). */
+    public static function markAckSkipped(int $id, int $userId, string $reason): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_supplier_po SET ack_skipped_at = NOW(), ack_skipped_by = :user_id, ack_skip_reason = :reason WHERE id = :id'
+        )->execute(['user_id' => $userId, 'reason' => $reason, 'id' => $id]);
+    }
+
+    public static function isAckSkipped(int $id): bool
+    {
+        $stmt = Database::connection()->prepare('SELECT ack_skipped_at FROM order_supplier_po WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        return !empty($stmt->fetchColumn());
+    }
 }

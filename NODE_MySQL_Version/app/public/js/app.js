@@ -183,10 +183,19 @@
     });
   }
 
-  // Owner request (2026-10-26): each Compliance Checklist row saves on its
-  // own, without reloading the page — so choices made on other rows but not
-  // yet saved stay put. The reason box only shows for "Skipped", and a
-  // missing/short reason is flagged right on that row.
+  // Owner request (2026-10-26, t4): a crate's HS code is shown from the
+  // product picked on that row — read-only; the server derives it again.
+  function initCrateHsCodes() {
+    document.querySelectorAll('[data-crate-product]').forEach(function (select) {
+      var hs = select.closest('tr') && select.closest('tr').querySelector('[data-crate-hs]');
+      if (!hs) return;
+      select.addEventListener('change', function () {
+        var opt = select.options[select.selectedIndex];
+        hs.value = opt ? (opt.getAttribute('data-hs') || '') : '';
+      });
+    });
+  }
+
   function initComplianceRows() {
     // Owner request (2026-10-26): the checklist saves with one button per
     // card; each row only needs its reason box shown (and required, 10+
@@ -468,6 +477,7 @@
     initFormDraftRestore();
     initLockedSteps();
     initComplianceRows();
+    initCrateHsCodes();
     initRemittanceStatements();
     initSchemeRows();
   }

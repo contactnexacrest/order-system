@@ -2184,6 +2184,65 @@ final class OrderController
     }
 
     /**
+     * Owner request (2026-10-26, t4): Step 7c — generate (or regenerate) the
+     * no-login Supplier Action Link so the supplier can upload their signed
+     * PO / acknowledgment themselves; emailed to the supplier when the PO
+     * has their email. Staff can still upload it themselves.
+     */
+    public function generateSupplierActionLink(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
+        if (!$order || !$supplierPo) {
+            Flash::set('error', 'Save the Supplier PO terms before generating a Supplier Action Link.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $rawToken = OrderSupplierPoRepository::generateActionToken((int) $supplierPo['id']);
+        $link = rtrim(Env::get('APP_URL', ''), '/') . '/supplier-action/' . $rawToken;
+        $email = trim((string) ($supplierPo['supplier_email'] ?? ''));
+        if ($email !== '') {
+            $rendered = EmailTemplateRepository::renderOrDefault(
+                'supplier_action_link',
+                ['{supplier_po_reference}' => (string) $supplierPo['supplier_po_reference'], '{supplier_action_link}' => $link],
+                'NexaCrest — please upload your signed PO {supplier_po_reference}',
+                "Hello,\n\n"
+                    . "Please upload the signed and stamped purchase order {supplier_po_reference} (or your written acknowledgment of it) here:\n{supplier_action_link}\n\n"
+                    . "This link works for 60 days.\n\n"
+                    . "NexaCrest International Private Limited"
+            );
+            EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
+        }
+        AuditLogRepository::log((int) AuthService::currentUserId(), 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', (int) $supplierPo['id'], null, null, null, 'Supplier Action link generated' . ($email !== '' ? ' and emailed to the supplier' : ' — no supplier email on the PO, hand this link over directly'));
+        Flash::set('success', 'Supplier Action link' . ($email !== '' ? " emailed to {$email}" : ' generated') . ": {$link}");
+        header("Location: /orders/{$orderId}#step-7c-supplier-po-attach");
+    }
+
+    /** Owner request (2026-10-26, t4): Step 7c — the supplier did not acknowledge the PO; reason required, audit-logged. */
+    public function skipSupplierPoAck(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
+        if (!$supplierPo) {
+            Flash::set('error', 'Save the Supplier PO terms first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $reason = trim((string) ($_POST['skip_reason'] ?? ''));
+        if (($error = ReasonValidator::check($reason)) !== null) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}#step-7c-supplier-po-attach");
+            return;
+        }
+        $userId = (int) AuthService::currentUserId();
+        OrderSupplierPoRepository::markAckSkipped((int) $supplierPo['id'], $userId, $reason);
+        AuditLogRepository::log($userId, 'SUPPLIER_PO_ACK_SKIPPED', 'order_supplier_po', (int) $supplierPo['id'], 'ack_skipped_at', null, date('Y-m-d H:i:s'), $reason);
+        Flash::set('success', 'Recorded that the supplier did not acknowledge — Step 7d (confirm the PO) is now open.');
+        header("Location: /orders/{$orderId}#step-7d-supplier-po-signed");
+    }
+
+    /**
      * Stage 6 (CFR/CIF only): record NexaCrest's agreed freight/insurance
      * terms before generating the FDN. Order-page polish round: this
      * action had no stage check at all — on an order still at Stage 1,
@@ -2365,6 +2424,7 @@ final class OrderController
         }
 
         $crateNos = $_POST['crate_no'] ?? [];
+        $orderProducts = OrderProductRepository::forOrder($orderId);
         $crates = [];
         foreach ($crateNos as $i => $crateNo) {
             $crateNo = trim((string) $crateNo);
@@ -2380,7 +2440,8 @@ final class OrderController
                 'net_weight_kg'       => trim((string) ($_POST['crate_net_weight_kg'][$i] ?? '')) ?: null,
                 'gross_weight_kg'     => trim((string) ($_POST['crate_gross_weight_kg'][$i] ?? '')) ?: null,
                 'cbm'                 => trim((string) ($_POST['crate_cbm'][$i] ?? '')) ?: null,
-                'hs_code'             => trim((string) ($_POST['crate_hs_code'][$i] ?? '')) ?: null,
+                // Taken from the crate's product, never from the form (t4).
+                'hs_code'             => OrderCrateRepository::hsCodeFor($orderProducts, trim((string) ($_POST['crate_product_description'][$i] ?? '')) ?: null),
             ];
         }
         OrderCrateRepository::replaceForOrder($orderId, $crates);
@@ -2910,9 +2971,22 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision (2026-10-26, t4): the rate is recorded together with
+        // the remittance; changing it afterwards is a correction of a typing
+        // mistake and needs a reason, kept in the audit log.
+        $previous = $paymentStatus[$leg . '_exchange_rate'] ?? null;
+        $reason = trim((string) ($_POST['correction_reason'] ?? ''));
+        if ($previous !== null) {
+            $error = ReasonValidator::check($reason);
+            if ($error !== null) {
+                Flash::set('error', 'Correcting a recorded exchange rate needs a reason. ' . $error);
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+        }
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, $leg, $rate, (int) $user['id']);
-        AuditLogRepository::log((int) $user['id'], 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, $leg . '_exchange_rate', null, (string) $rate);
-        Flash::set('success', ucfirst($leg) . ' exchange rate recorded.');
+        AuditLogRepository::log((int) $user['id'], $previous !== null ? 'CA_EXCHANGE_RATE_CORRECTED' : 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, $leg . '_exchange_rate', $previous !== null ? (string) $previous : null, (string) $rate, $previous !== null ? $reason : null);
+        Flash::set('success', ucfirst($leg) . ($previous !== null ? ' exchange rate corrected.' : ' exchange rate recorded.'));
         header("Location: /orders/{$orderId}");
     }
 

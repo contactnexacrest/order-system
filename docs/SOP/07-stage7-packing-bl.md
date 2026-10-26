@@ -33,7 +33,10 @@ Three things happen in this section, each building toward the BL:
    defaulting to the order's own product unit when the order has one
    comparable unit across its lines), crate count, weights, CBM, packing
    date, and a crate-by-crate breakdown (marks & numbers, dimensions,
-   pieces, weight, HS code per crate). Once saved, **Generate Packing
+   pieces, weight, HS code per crate). Each crate's **Product** is picked
+   from this order's own product lines, and its **HS Code** comes from
+   that product's record — it is shown read-only and can't be typed (the
+   server sets it again on save, whatever the form sends). Once saved, **Generate Packing
    List** produces the PL document, which prints the quantity with its
    unit.
 2. **Save Shipping Details** — shipping line, vessel name, voyage number,

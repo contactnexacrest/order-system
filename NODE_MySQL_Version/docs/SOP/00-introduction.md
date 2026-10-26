@@ -247,13 +247,15 @@ steps done" bar and any alert badges:
 | **B · Procurement & Production** | 7–8: Supplier PO → production & estimated shipment |
 | **C · Shipment & Balance** | 9–11: Freight → packing & BL → Commercial Invoice & balance |
 | **D · Closure & Settlement** | 12, 13 and 19: financials & benefits → documents despatched → fully settled → Order Complete |
-| **E · After-Sales & Records** | Amendments and 14–18: additional documents, communication, feedback, complaints, disputes — usable at any time, with open complaints/disputes shown on its header |
+| **E · After-Sales & Records** | Amendments, 14 and 16–18: additional documents, feedback, complaints, disputes — usable at any time, with open complaints/disputes shown on its header |
 
 Every section starts collapsed except the one holding the order's
 current step, which opens and scrolls to that step; inside it, the
 current step opens and the rest stay collapsed — click any heading to
-open it. Products, Payment Overview and Document Review & Approval stay
-pinned above the sections; Document Review opens by itself only when a
+open it. Products, Payment Overview, Document Review & Approval and
+**Order Communication** (the conversation with the client, Step 15) stay
+pinned above the sections. Order Communication is always open, since it's
+needed at every step; Document Review opens by itself only when a
 document is waiting on someone (otherwise it shows just the number of
 documents). This is purely a layout and
 navigation change — nothing about what a section does, what permission

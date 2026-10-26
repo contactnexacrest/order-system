@@ -28,33 +28,29 @@
     {% set lockMessage = caLockMessages[leg] %}
     <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
       <strong style="font-size:0.85em;">{{ label }} Exchange Rate</strong><br>
+      {# Owner decision (2026-10-26, t4): the rate is recorded with the remittance itself, so there is no separate "Record/Update Rate" box any more — only a collapsed, reasoned correction for a mistyped rate, for inr_actual_edit holders. #}
       {% if rate != null %}
-        <span class="muted small">1 unit foreign currency = &#8377;{{ rate | rate4 }} — set {{ payment[leg ~ '_exchange_rate_set_at'] }}{% if setBy %} by {{ usersById[setBy] or ('User #' ~ setBy) }}{% endif %}. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
-        {% if lockMessage != null and not canOverrideFyLock %}
-          <br><span class="muted small">&#128274; {{ lockMessage }}</span>
-        {% elif canEditInrActual %}
+        <span class="muted small">Received @ &#8377;{{ rate | rate4 }} per 1 {{ order.currency_code or '' }} — set {{ payment[leg ~ '_exchange_rate_set_at'] }}{% if setBy %} by {{ usersById[setBy] or ('User #' ~ setBy) }}{% endif %}. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
+      {% else %}
+        <span class="muted small">No exchange rate on record for this older entry.</span>
+      {% endif %}
+      {% if canEditInrActual and lockMessage != null and not canOverrideFyLock %}
+        <br><span class="muted small">&#128274; {{ lockMessage }}</span>
+      {% elif canEditInrActual %}
+        <details class="rate-correction" style="margin-top:6px;">
+          <summary class="muted small">{{ 'Correct a wrongly typed rate' if rate != null else 'Add the missing rate' }}</summary>
           {% if lockMessage != null %}
             <p class="muted small" style="margin:6px 0 0;">&#9888; {{ lockMessage }} You hold the override permission — submitting below will be logged.</p>
           {% endif %}
           <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/exchange-rate" style="margin-top:6px;">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Update Rate<input type="text" name="{{ leg }}_exchange_rate" placeholder="e.g. 88.5000" required></label>
-            <button type="submit" class="btn-sm">{{ 'Override & Update' if lockMessage != null else 'Update' }}</button>
+            <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="{{ leg }}_exchange_rate" placeholder="e.g. 88.5000" required></label>
+            {% if rate != null %}
+            <label>Reason for the correction *<input type="text" name="correction_reason" required minlength="10" placeholder="e.g. typed 8.35 instead of 83.50"></label>
+            {% endif %}
+            <button type="submit" class="btn-sm">{{ 'Correct Rate' if rate != null else 'Save Rate' }}</button>
           </form>
-        {% endif %}
-      {% elif lockMessage != null and not canOverrideFyLock %}
-        <span class="muted small">&#128274; {{ lockMessage }}</span>
-      {% elif canEditInrActual %}
-        {% if lockMessage != null %}
-          <p class="muted small" style="margin:0 0 6px;">&#9888; {{ lockMessage }} You hold the override permission — submitting below will be logged.</p>
-        {% endif %}
-        <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/exchange-rate">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Rate (INR per unit foreign currency) *<input type="text" name="{{ leg }}_exchange_rate" placeholder="e.g. 88.5000" required></label>
-          <button type="submit" class="btn-sm">{{ 'Override & Record' if lockMessage != null else 'Record Rate' }}</button>
-        </form>
-      {% else %}
-        <span class="muted small">Not yet recorded.</span>
+        </details>
       {% endif %}
     </div>
   {% endif %}
@@ -227,6 +223,7 @@
 {% macro step123Status(reached, done) %}{% if orderClosed %}done{% elif not reached %}locked{% elif done %}done{% else %}current{% endif %}{% endmacro %}
 {# Step 13: Close Order passes Stage 9's gate, but Step 13 isn't finished
    until the order is marked fully settled (13g) — owner report 2026-10-26. #}
+{# Owner request (2026-10-26, t4): s12 is also done once Step 12 is skipped with a reason; 7c is done once the ack is on file or staff recorded the supplier did not acknowledge. #}
 {% set stepStates = {
   's1': step123Status(true, hasQtDoc),
   's2': step123Status(hasQtDoc, qtSent or quotationAccepted),
@@ -239,7 +236,7 @@
   's9': stepStatusFn(stage6, false),
   's10': stepStatusFn(stage7, false),
   's11': stepStatusFn(stage8, false),
-  's12': stepStatusFn(stage9, false),
+  's12': ('done' if order.financials_skipped_at else stepStatusFn(stage9, false)),
   's13': ('done' if orderClosed else ('locked' if (not stage9 or stage9.status == 'locked') else 'current')),
   's14': 'done',
   's15': 'done',
@@ -275,7 +272,7 @@
   's7': {
     '7a': supplierPo,
     '7b': docComplete(documents, 'SUPPO', mailSendingEnabled),
-    '7c': (supplierPoDocuments and supplierPoDocuments.length > 0) if supplierPoCopyRequired else 'optional',
+    '7c': ((supplierPoDocuments and supplierPoDocuments.length > 0) or (supplierPo and supplierPo.ack_skipped_at)) if supplierPoCopyRequired else 'optional',
     '7d': supplierSigned,
     '7e': supplierPo and supplierPo.advance_paid_at
   },
@@ -1148,6 +1145,51 @@
     {% endfor %}
   </details>
 
+  {# Owner decision (2026-10-26, t4): pinned open above the five sections — the client conversation is needed at every step. #}
+  <details class="step-card step-card-reference" id="order-updates" open>
+    <summary><h2>Order Communication <small class="muted">(with the client — any time)</small>{% if comments.length %} <span class="phase-pill">{{ comments.length }} message{{ '' if comments.length == 1 else 's' }}</span>{% endif %}</h2></summary>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.{% if permissions.generate_documents %} Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.{% endif %}</p>
+    <div class="chat-thread">
+      {% if comments.length == 0 %}
+        <p class="chat-empty">No updates posted yet.</p>
+      {% endif %}
+      {% for c in comments %}
+        {% set isStaff = c.author_type == 'staff' %}
+        <div class="chat-bubble-row {{ 'staff' if isStaff else 'client' }}">
+          <div class="chat-bubble {{ 'staff' if isStaff else 'client' }}">
+            <div class="chat-bubble-meta">
+              <span class="who">{{ 'Staff' if isStaff else 'Client' }} — {{ (c.staff_name if isStaff else c.client_name) or 'Unknown' }}</span>
+              <span>{{ c.created_at | humanDate }}{% if isStaff %}{{ ' · emailed' if c.email_sent else ' · not emailed (no client email on file)' }}{% endif %}</span>
+            </div>
+            {% if c.body %}<div class="chat-bubble-body">{{ c.body }}</div>{% endif %}
+            {% if c.attachments.length > 0 %}
+              <div class="chat-attachments">
+                {% for att in c.attachments %}
+                  {% set url = '/orders/' ~ order.id ~ '/comment-attachments/' ~ att.file_id ~ '/download' %}
+                  {% if att.mime_type and (att.mime_type | startswith('image/')) %}
+                    <a href="{{ url }}" target="_blank"><img class="chat-attachment-image" src="{{ url }}" alt="{{ att.original_filename }}"></a>
+                  {% elif att.mime_type and (att.mime_type | startswith('video/')) %}
+                    <video class="chat-attachment-video" controls src="{{ url }}"></video>
+                  {% else %}
+                    <a class="chat-attachment-file" href="{{ url }}">{{ att.original_filename }}</a>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <form class="chat-post-form" method="post" action="/orders/{{ order.id }}/comments#order-updates" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <textarea name="body" placeholder="Write an update for the client…"></textarea>
+      <div class="chat-post-form-row">
+        <input type="file" name="attachments" multiple accept="image/*,video/*,.pdf">
+        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
+      </div>
+    </form>
+  </details>
+
   {% set ph = flow.phase('booking') %}
   <details class="phase-group" id="phase-booking"{{ ' open' if ph.open else '' }}>
     {{ phaseSummary(ph) }}
@@ -1401,7 +1443,7 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required data-remit-amount></label>
           <label>Received On<input type="date" name="advance_received_at"></label>
-          <label>Exchange Rate Today * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
           {{ stepBadge('5d') | safe }}<button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
@@ -1851,6 +1893,32 @@
           <input type="file" name="document" required>
           {{ stepBadge('7c') | safe }}<button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
         </form>
+        {# Owner request (2026-10-26, t4): the supplier can upload it themselves through a no-login link (like the Buyer Action Link), and when they never acknowledge, staff record that with a reason. #}
+        <div class="supplier-action-link" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;">
+          <p class="muted small"><strong>Or let the supplier upload it:</strong> a direct link (no login) where the supplier uploads their signed PO / acknowledgment — emailed to them when the PO has their email{% if supplierPo.supplier_email %} ({{ supplierPo.supplier_email }}){% endif %}. You'll be notified when they upload.</p>
+          {% if supplierActionFullLink %}
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+              <input type="text" readonly value="{{ supplierActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
+              <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ supplierActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+            </div>
+            <p class="muted small">Valid until {{ supplierPo.supplier_action_token_expires_at | humanDate }}.</p>
+          {% endif %}
+          <form method="post" action="/orders/{{ order.id }}/supplier-po/supplier-link" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-secondary">{{ 'Regenerate Supplier Link' if supplierActionFullLink else 'Generate Supplier Link' }}</button>
+          </form>
+        </div>
+        {% if supplierPo.ack_skipped_at %}
+          <p class="small" style="margin-top:8px;">&#10003; Recorded that the supplier did not acknowledge — {{ supplierPo.ack_skip_reason }} <span class="muted">({{ supplierPo.ack_skipped_at }})</span></p>
+        {% elif not (supplierPoDocuments and supplierPoDocuments.length > 0) and supplierPo.status != 'signed' %}
+          <form method="post" action="/orders/{{ order.id }}/supplier-po/ack-skip" style="margin-top:8px;" data-confirm="Record that the supplier did not acknowledge this PO? Step 7d then opens without an acknowledgment on file.">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Skip — supplier did not acknowledge <small class="muted">(reason required)</small>
+              <input type="text" name="skip_reason" required minlength="10" placeholder="e.g. supplier confirmed by phone, will not sign">
+            </label>
+            <button type="submit" class="btn-sm">Skip Acknowledgment</button>
+          </form>
+        {% endif %}
     {% else %}
       <p class="muted">Save Supplier PO Terms first (Step 7a).</p>
     {% endif %}
@@ -1863,8 +1931,8 @@
     {% if supplierPoLocked %}
       <p class="muted">Confirm buyer acknowledgement first to unlock this gate.</p>
     {% else %}
-      {% if supplierPo and supplierPo.status != 'signed' and suppoDocGenerated and supplierPoCopyRequired and not (supplierPoDocuments and supplierPoDocuments.length > 0) %}
-        <p class="muted">Attach the supplier's signed acknowledgment in Step 7c first &mdash; this step completes Step 7 and needs it on file.</p>
+      {% if supplierPo and supplierPo.status != 'signed' and suppoDocGenerated and supplierPoCopyRequired and not (supplierPoDocuments and supplierPoDocuments.length > 0) and not supplierPo.ack_skipped_at %}
+        <p class="muted">Attach the supplier's signed acknowledgment in Step 7c first (or send them the Supplier Link, or record that they did not acknowledge) &mdash; this step completes Step 7 and needs it on file.</p>
       {% elif supplierPo and supplierPo.status != 'signed' and suppoDocGenerated %}
         <form method="post" action="/orders/{{ order.id }}/supplier-po/signed">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -1990,7 +2058,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Freight Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="freight_amount" required data-remit-amount></label>
         <label>Received On<input type="date" name="freight_received_at"></label>
-          <label>Exchange Rate Today * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
         {{ stepBadge('9c') | safe }}<button type="submit" class="btn-sm">Record Freight Remittance</button>
       </form>
@@ -2074,7 +2142,7 @@
           <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
         </div>
 
-        <p class="muted small">Crate-level breakdown (add one row per physical crate):</p>
+        <p class="muted small">Crate-level breakdown (add one row per physical crate). Pick the crate's product from this order — its HS code comes from the product record and cannot be typed here.</p>
         <table class="list">
           <tr><th>Crate No.</th><th>Marks &amp; Numbers</th><th>Product</th><th>L&times;W&times;H (cm)</th><th>Pcs</th><th>Net (kg)</th><th>Gross (kg)</th><th>CBM</th><th>HS Code</th></tr>
           {% set existingCrates = crates if crates and crates.length > 0 else [{}, {}, {}] %}
@@ -2082,13 +2150,20 @@
           <tr>
             <td><input type="text" name="crate_no[]" value="{{ c.crate_no or '' }}" style="width:70px;"></td>
             <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:130px;"></td>
-            <td><input type="text" name="crate_product_description[]" value="{{ c.product_description or '' }}" style="width:110px;"></td>
+            <td>{% set crateProduct = c.product_description or '' %}{% set crateKnown = (products | whereEq('description', crateProduct) | length) > 0 %}
+              <select name="crate_product_description[]" data-crate-product style="width:160px;">
+                <option value="" data-hs="">— Product —</option>
+                {% for p in products %}
+                <option value="{{ p.description }}" data-hs="{{ p.hs_code }}" {% if crateProduct == p.description %}selected{% endif %}>{{ p.description | truncate(60, true, '…') }}</option>
+                {% endfor %}
+                {% if crateProduct and not crateKnown %}<option value="{{ crateProduct }}" data-hs="{{ c.hs_code or '' }}" selected>{{ crateProduct }} (earlier entry)</option>{% endif %}
+              </select></td>
             <td><input type="text" name="crate_dimensions[]" value="{{ c.dimensions_lwh_cm or '' }}" style="width:80px;"></td>
             <td><input type="text" name="crate_pcs[]" value="{{ c.pcs or '' }}" style="width:50px;"></td>
             <td><input type="text" name="crate_net_weight_kg[]" value="{{ c.net_weight_kg or '' }}" style="width:70px;"></td>
             <td><input type="text" name="crate_gross_weight_kg[]" value="{{ c.gross_weight_kg or '' }}" style="width:70px;"></td>
             <td><input type="text" name="crate_cbm[]" value="{{ c.cbm or '' }}" style="width:60px;"></td>
-            <td><input type="text" name="crate_hs_code[]" value="{{ c.hs_code or '' }}" style="width:70px;"></td>
+            <td><input type="text" value="{{ c.hs_code or '' }}" data-crate-hs readonly tabindex="-1" title="Taken from the product's HS code" style="width:70px;"></td>
           </tr>
           {% endfor %}
         </table>
@@ -2264,6 +2339,13 @@
     {% if ciBalanceLocked %}
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     {% else %}
+      {# Owner request (2026-10-26, t4): the CI is made against the BL, so the scanned BL copy goes in first (FOB raises its CI before shipment, so no BL yet). #}
+      {% if isFob %}
+      {% elif not (shipping and shipping.bl_copy_file_id) %}
+        <p class="alert alert-warning">&#9888; <strong>Upload the scanned BL copy first</strong> — attach it in <a href="#step-10f-bl-issued">Step 10f</a> (Attach Scanned BL Copy), then generate the Commercial Invoice against it.</p>
+      {% else %}
+        <p class="muted small">Scanned BL copy is on file (<a href="/file-store/{{ shipping.bl_copy_file_id }}/download">download</a>) — generate the Commercial Invoice against it.</p>
+      {% endif %}
       {% if ciBlDateMismatch %}
         <p class="alert alert-warning">&#9888; Recorded BL date is <strong>{{ shipping.bl_date }}</strong>, not today. The Commercial Invoice is conventionally dated to match the BL — double-check before generating it if that's not intentional here.</p>
       {% endif %}
@@ -2309,7 +2391,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required data-remit-amount value="{{ payment.balance_amount or '' }}"></label>
         <label>Received On<input type="date" name="balance_received_at"></label>
-          <label>Exchange Rate Today * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
         {{ stepBadge('11c') | safe }}<button type="submit" class="btn-sm">Record Balance Remittance</button>
       </form>
@@ -2643,6 +2725,24 @@
         {% endif %}
       </div>
     </div>
+    {# Owner request (2026-10-26, t4): skip Step 12 with a reason — figures stay blank, never 0. #}
+    <div class="financials-skip" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;">
+      {% if order.financials_skipped_at %}
+        <p class="small">&#10003; <strong>Step 12 marked complete without financial figures</strong> on {{ order.financials_skipped_at }}{% if order.financials_skipped_by %} by {{ usersById[order.financials_skipped_by] or ('User #' ~ order.financials_skipped_by) }}{% endif %} — {{ order.financials_skip_reason }}. Nothing was recorded as 0; you can still add figures above.</p>
+        <form method="post" action="/orders/{{ order.id }}/financials/skip/undo" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm btn-secondary">Reopen Step 12</button>
+        </form>
+      {% else %}
+        <form method="post" action="/orders/{{ order.id }}/financials/skip" data-confirm="Mark Step 12 complete without recording these figures? Nothing will be saved as 0.">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Skip financials — mark Step 12 complete <small class="muted">(nothing to record here, or figures will come later — reason required; nothing is written as 0, and export-benefit schemes still need answering before Mark Fully Settled)</small>
+            <input type="text" name="skip_reason" required minlength="10" placeholder="Reason (mandatory)">
+          </label>
+          <button type="submit" class="btn-sm">Skip &amp; Mark Step 12 Complete</button>
+        </form>
+      {% endif %}
+    </div>
   </details>
   {% endif %}
 
@@ -2893,50 +2993,6 @@
       <button type="submit" class="btn-sm">Attach Document</button>
     </form>
     {% endif %}
-  </details>
-
-  <details class="step-card" id="order-updates"{{ stepCardOpen('s15') }}>
-    <summary>{{ stepStatusIcon(stepStates['s15']) }}<span class="step-group-num">STEP 15</span><h2>Order Communication</h2></summary>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.{% if permissions.generate_documents %} Need something more formal — a payment reminder, a one-off notice? <a href="/orders/{{ order.id }}/email/compose">Compose an email from a template</a>.{% endif %}</p>
-    <div class="chat-thread">
-      {% if comments.length == 0 %}
-        <p class="chat-empty">No updates posted yet.</p>
-      {% endif %}
-      {% for c in comments %}
-        {% set isStaff = c.author_type == 'staff' %}
-        <div class="chat-bubble-row {{ 'staff' if isStaff else 'client' }}">
-          <div class="chat-bubble {{ 'staff' if isStaff else 'client' }}">
-            <div class="chat-bubble-meta">
-              <span class="who">{{ 'Staff' if isStaff else 'Client' }} — {{ (c.staff_name if isStaff else c.client_name) or 'Unknown' }}</span>
-              <span>{{ c.created_at | humanDate }}{% if isStaff %}{{ ' · emailed' if c.email_sent else ' · not emailed (no client email on file)' }}{% endif %}</span>
-            </div>
-            {% if c.body %}<div class="chat-bubble-body">{{ c.body }}</div>{% endif %}
-            {% if c.attachments.length > 0 %}
-              <div class="chat-attachments">
-                {% for att in c.attachments %}
-                  {% set url = '/orders/' ~ order.id ~ '/comment-attachments/' ~ att.file_id ~ '/download' %}
-                  {% if att.mime_type and (att.mime_type | startswith('image/')) %}
-                    <a href="{{ url }}" target="_blank"><img class="chat-attachment-image" src="{{ url }}" alt="{{ att.original_filename }}"></a>
-                  {% elif att.mime_type and (att.mime_type | startswith('video/')) %}
-                    <video class="chat-attachment-video" controls src="{{ url }}"></video>
-                  {% else %}
-                    <a class="chat-attachment-file" href="{{ url }}">{{ att.original_filename }}</a>
-                  {% endif %}
-                {% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-    <form class="chat-post-form" method="post" action="/orders/{{ order.id }}/comments#order-updates" enctype="multipart/form-data">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <textarea name="body" placeholder="Write an update for the client…"></textarea>
-      <div class="chat-post-form-row">
-        <input type="file" name="attachments" multiple accept="image/*,video/*,.pdf">
-        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
-      </div>
-    </form>
   </details>
 
   <details class="step-card" id="order-feedback"{{ stepCardOpen('s16') }}>

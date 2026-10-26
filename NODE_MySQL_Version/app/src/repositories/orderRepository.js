@@ -862,9 +862,25 @@ async function markPiFormSkipped(orderId, userId, reason) {
   );
 }
 
+/** Owner request (2026-10-26, t4): Step 12 marked complete without financial figures — nothing is written as 0. */
+async function markFinancialsSkipped(orderId, userId, reason) {
+  await db.execute(
+    'UPDATE orders SET financials_skipped_at = NOW(), financials_skipped_by = :user_id, financials_skip_reason = :reason WHERE id = :id',
+    { user_id: userId, reason, id: orderId }
+  );
+}
+
+async function clearFinancialsSkipped(orderId) {
+  await db.execute(
+    'UPDATE orders SET financials_skipped_at = NULL, financials_skipped_by = NULL, financials_skip_reason = NULL WHERE id = :id',
+    { id: orderId }
+  );
+}
+
 module.exports = {
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, markPiFormSkipped,
+  markFinancialsSkipped, clearFinancialsSkipped,
 };

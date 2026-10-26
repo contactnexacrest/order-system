@@ -31,7 +31,10 @@ final class WetSignatureGuardService
 
     public static function supplierPoBlocked(int $orderSupplierPoId): bool
     {
+        // Owner request (2026-10-26, t4): a recorded "supplier did not
+        // acknowledge" (Step 7c, reason required) also clears this gate.
         return CompanySettingsRepository::get('wet_signature_required_supplier_po') === '1'
-            && empty(OrderSupplierPoDocumentRepository::forSupplierPo($orderSupplierPoId));
+            && empty(OrderSupplierPoDocumentRepository::forSupplierPo($orderSupplierPoId))
+            && !\App\Repositories\OrderSupplierPoRepository::isAckSkipped($orderSupplierPoId);
     }
 }

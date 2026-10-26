@@ -206,7 +206,7 @@ describe('Order page section order (Task #36)', () => {
 
     const output = await render(orderId);
 
-    const communicationPos = output.indexOf('<h2>Order Communication</h2>');
+    const communicationPos = output.indexOf('<h2>Order Communication ');
     const feedbackPos = output.indexOf('<h2>Order Feedback</h2>');
     const disputesPos = output.indexOf('<h2>Disputes</h2>');
 

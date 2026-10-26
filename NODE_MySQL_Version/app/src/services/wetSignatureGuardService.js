@@ -3,6 +3,7 @@
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
+const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 
 /**
  * Port of App\Services\WetSignatureGuardService — the wet-signature-required
@@ -32,7 +33,9 @@ async function supplierPoBlocked(orderSupplierPoId) {
     return false;
   }
   const docs = await orderSupplierPoDocumentRepository.forSupplierPo(orderSupplierPoId);
-  return docs.length === 0;
+  // Owner request (2026-10-26, t4): a recorded "supplier did not
+  // acknowledge" (Step 7c, reason required) also clears this gate.
+  return docs.length === 0 && !(await orderSupplierPoRepository.isAckSkipped(orderSupplierPoId));
 }
 
 module.exports = { buyerPoBlocked, supplierPoBlocked };

@@ -928,6 +928,15 @@ async function show(req, res) {
     buyerActionFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${buyerActionTokenPlain}`;
   }
 
+  // Owner request (2026-10-26, t4): the Step 7c Supplier Action Link,
+  // decrypted the same way for staff to re-copy.
+  let supplierActionFullLink = null;
+  const supplierActionTokenPlain = supplierPo ? encryptionService.decrypt(supplierPo.supplier_action_token_plain) : null;
+  if (supplierActionTokenPlain && supplierPo.supplier_action_token_expires_at
+    && parseDbDateTime(supplierPo.supplier_action_token_expires_at).getTime() > Date.now()) {
+    supplierActionFullLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/supplier-action/${supplierActionTokenPlain}`;
+  }
+
   const supplierFactoryAddressesBySupplier = await supplierFactoryAddressRepository.allGroupedBySupplier();
   // User-reported batch item 12: a flat supplierId -> [addressText] map
   // alongside the full-row one above, embedded per <option> for the
@@ -1010,6 +1019,7 @@ async function show(req, res) {
       piFormFullLink,
       buyerActionLinkValid,
       buyerActionFullLink,
+      supplierActionFullLink,
       clientPaymentReports: await clientPaymentReportRepository.forOrder(orderId),
       ocAcknowledgment: await orderOcAcknowledgmentRepository.find(orderId),
       ocDocGenerated: documents.some((d) => d.document_type_code === 'OC'),
@@ -2163,6 +2173,63 @@ async function markSupplierBalancePaid(req, res) {
  * second/corrected upload adds a new file_store row rather than
  * replacing one (schema.sql SECTION S).
  */
+/**
+ * Owner request (2026-10-26, t4): Step 7c — generate (or regenerate) the
+ * no-login Supplier Action Link so the supplier can upload their signed PO
+ * / acknowledgment themselves; emailed to the supplier when the PO has
+ * their email. Staff can still upload it themselves.
+ */
+async function generateSupplierActionLink(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  if (!order || !supplierPo) {
+    flash.set(req, 'error', 'Save the Supplier PO terms before generating a Supplier Action Link.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const rawToken = await orderSupplierPoRepository.generateActionToken(supplierPo.id);
+  const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/supplier-action/${rawToken}`;
+  const email = String(supplierPo.supplier_email || '').trim();
+  if (email !== '') {
+    const rendered = await emailTemplateRepository.renderOrDefault(
+      'supplier_action_link',
+      { '{supplier_po_reference}': String(supplierPo.supplier_po_reference), '{supplier_action_link}': link },
+      'NexaCrest — please upload your signed PO {supplier_po_reference}',
+      'Hello,\n\n'
+        + 'Please upload the signed and stamped purchase order {supplier_po_reference} (or your written acknowledgment of it) here:\n{supplier_action_link}\n\n'
+        + 'This link works for 60 days.\n\n'
+        + 'NexaCrest International Private Limited'
+    );
+    await emailService.sendPlainText(email, rendered.subject, rendered.body);
+  }
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', supplierPo.id, null, null, null, 'Supplier Action link generated' + (email !== '' ? ' and emailed to the supplier' : ' — no supplier email on the PO, hand this link over directly'));
+  flash.set(req, 'success', `Supplier Action link${email !== '' ? ` emailed to ${email}` : ' generated'}: ${link}`);
+  res.redirect(`/orders/${orderId}#step-7c-supplier-po-attach`);
+}
+
+/** Owner request (2026-10-26, t4): Step 7c — the supplier did not acknowledge the PO; reason required, audit-logged. */
+async function skipSupplierPoAck(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
+  if (!supplierPo) {
+    flash.set(req, 'error', 'Save the Supplier PO terms first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const reason = str(req.body.skip_reason);
+  const error = reasonValidator.check(reason);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect(`/orders/${orderId}#step-7c-supplier-po-attach`);
+    return;
+  }
+  await orderSupplierPoRepository.markAckSkipped(supplierPo.id, req.user.id, reason);
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_PO_ACK_SKIPPED', 'order_supplier_po', supplierPo.id, 'ack_skipped_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '), reason);
+  flash.set(req, 'success', 'Recorded that the supplier did not acknowledge — Step 7d (confirm the PO) is now open.');
+  res.redirect(`/orders/${orderId}#step-7d-supplier-po-signed`);
+}
+
 async function uploadSupplierPoDocument(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -2383,7 +2450,7 @@ async function savePacking(req, res) {
   const netW = [].concat(body.crate_net_weight_kg || []);
   const grossW = [].concat(body.crate_gross_weight_kg || []);
   const cbms = [].concat(body.crate_cbm || []);
-  const hsCodes = [].concat(body.crate_hs_code || []);
+  const orderProducts = await orderProductRepository.forOrder(orderId);
 
   const crates = [];
   for (let i = 0; i < crateNos.length; i++) {
@@ -2398,7 +2465,8 @@ async function savePacking(req, res) {
       net_weight_kg: str(netW[i]) || null,
       gross_weight_kg: str(grossW[i]) || null,
       cbm: str(cbms[i]) || null,
-      hs_code: str(hsCodes[i]) || null,
+      // Taken from the crate's product, never from the form (t4).
+      hs_code: orderCrateRepository.hsCodeFor(orderProducts, str(descs[i]) || null),
     });
   }
   await orderCrateRepository.replaceForOrder(orderId, crates);
@@ -2889,9 +2957,22 @@ async function recordLegExchangeRate(req, res, leg) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision (2026-10-26, t4): the rate is recorded together with the
+  // remittance; changing it afterwards is a correction of a typing mistake
+  // and needs a reason, kept in the audit log.
+  const previous = ops[`${leg}_exchange_rate`] ?? null;
+  const reason = str(req.body.correction_reason).trim();
+  if (previous !== null) {
+    const error = reasonValidator.check(reason);
+    if (error !== null) {
+      flash.set(req, 'error', `Correcting a recorded exchange rate needs a reason. ${error}`);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+  }
   await orderPaymentStatusRepository.setLegExchangeRate(orderId, leg, rate, user.id);
-  await auditLogRepository.log(user.id, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, `${leg}_exchange_rate`, null, String(rate));
-  flash.set(req, 'success', `${leg.charAt(0).toUpperCase()}${leg.slice(1)} exchange rate recorded.`);
+  await auditLogRepository.log(user.id, previous !== null ? 'CA_EXCHANGE_RATE_CORRECTED' : 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, `${leg}_exchange_rate`, previous !== null ? String(previous) : null, String(rate), previous !== null ? reason : null);
+  flash.set(req, 'success', `${leg.charAt(0).toUpperCase()}${leg.slice(1)} exchange rate ${previous !== null ? 'corrected' : 'recorded'}.`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -3597,7 +3678,7 @@ module.exports = {
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,
-  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
+  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

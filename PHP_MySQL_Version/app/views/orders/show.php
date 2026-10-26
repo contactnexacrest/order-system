@@ -118,33 +118,29 @@ $renderExchangeRateWidget = function (string $leg, string $label) use ($payment,
     ?>
     <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
       <strong style="font-size:0.85em;"><?= htmlspecialchars($label) ?> Exchange Rate</strong><br>
+      <?php // Owner decision (2026-10-26, t4): the rate is recorded with the remittance itself, so there is no separate "Record/Update Rate" box any more — only a collapsed, reasoned correction for a mistyped rate, for inr_actual_edit holders. ?>
       <?php if ($rate !== null): ?>
-        <span class="muted small">1 unit foreign currency = &#8377;<?= number_format((float) $rate, 4) ?> — set <?= htmlspecialchars((string) ($payment[$leg . '_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
-        <?php if ($lockMessage !== null && !$canOverrideFyLock): ?>
-          <br><span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
-        <?php elseif ($canEditInrActual): ?>
+        <span class="muted small">Received @ &#8377;<?= number_format((float) $rate, 4) ?> per 1 <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?> — set <?= htmlspecialchars((string) ($payment[$leg . '_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
+      <?php else: ?>
+        <span class="muted small">No exchange rate on record for this older entry.</span>
+      <?php endif; ?>
+      <?php if ($canEditInrActual && $lockMessage !== null && !$canOverrideFyLock): ?>
+        <br><span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
+      <?php elseif ($canEditInrActual): ?>
+        <details class="rate-correction" style="margin-top:6px;">
+          <summary class="muted small"><?= $rate !== null ? 'Correct a wrongly typed rate' : 'Add the missing rate' ?></summary>
           <?php if ($lockMessage !== null): ?>
             <p class="muted small" style="margin:6px 0 0;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
           <?php endif; ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/exchange-rate" style="margin-top:6px;">
             <?= Csrf::field() ?>
-            <label>Update Rate<input type="text" name="<?= $leg ?>_exchange_rate" placeholder="e.g. 88.5000" required></label>
-            <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Update' : 'Update' ?></button>
+            <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?>)</small><input type="number" step="0.0001" min="0.0001" name="<?= $leg ?>_exchange_rate" placeholder="e.g. 88.5000" required></label>
+            <?php if ($rate !== null): ?>
+            <label>Reason for the correction *<input type="text" name="correction_reason" required minlength="<?= \App\Helpers\ReasonValidator::MIN_LENGTH ?>" placeholder="e.g. typed 8.35 instead of 83.50"></label>
+            <?php endif; ?>
+            <button type="submit" class="btn-sm"><?= $rate !== null ? 'Correct Rate' : 'Save Rate' ?></button>
           </form>
-        <?php endif; ?>
-      <?php elseif ($lockMessage !== null && !$canOverrideFyLock): ?>
-        <span class="muted small">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
-      <?php elseif ($canEditInrActual): ?>
-        <?php if ($lockMessage !== null): ?>
-          <p class="muted small" style="margin:0 0 6px;">&#9888; <?= htmlspecialchars($lockMessage) ?> You hold the override permission — submitting below will be logged.</p>
-        <?php endif; ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/exchange-rate">
-          <?= Csrf::field() ?>
-          <label>Rate (INR per unit foreign currency) *<input type="text" name="<?= $leg ?>_exchange_rate" placeholder="e.g. 88.5000" required></label>
-          <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Record' : 'Record Rate' ?></button>
-        </form>
-      <?php else: ?>
-        <span class="muted small">Not yet recorded.</span>
+        </details>
       <?php endif; ?>
     </div>
     <?php
@@ -386,7 +382,8 @@ $stepStates = [
     '9'    => $stepStatus($stage6), // Freight Payment — auto-skipped (status 'skipped' => 'done') for FOB orders
     '10'   => $stepStatus($stage7),
     '11'   => $stepStatus($stage8),
-    '12'   => $stepStatus($stage9),
+    // Owner request (2026-10-26, t4): Step 12 can also be skipped with a reason.
+    '12'   => !empty($order['financials_skipped_at']) ? 'done' : $stepStatus($stage9),
     // Close Order passes Stage 9's gate, but Step 13 isn't finished until
     // the order is marked fully settled (13g) — owner report 2026-10-26.
     '13'   => $orderClosed ? 'done' : ($stage9 === null || $stage9['status'] === 'locked' ? 'locked' : 'current'),
@@ -557,7 +554,8 @@ $subStepDone = [
     '7' => [
         '7a' => $supplierPo !== null,
         '7b' => $docComplete('SUPPO'),
-        '7c' => $supplierPoCopyRequired ? !empty($supplierPoDocuments) : null,
+        // Owner request (2026-10-26, t4): done when the ack is on file, or staff recorded the supplier did not acknowledge.
+        '7c' => $supplierPoCopyRequired ? (!empty($supplierPoDocuments) || !empty($supplierPo['ack_skipped_at'])) : null,
         '7d' => $supplierSigned,
         '7e' => $supplierPo !== null && !empty($supplierPo['advance_paid_at']),
     ],
@@ -670,7 +668,7 @@ $phases = [
     'production' => ['B', 'Procurement & Production', 'Supplier PO → production & estimated shipment', ['7', '8']],
     'shipment'   => ['C', 'Shipment & Balance', 'Freight → packing & BL → commercial invoice & balance', ['9', '10', '11']],
     'closure'    => ['D', 'Closure & Settlement', 'Financials & benefits → documents despatched → fully settled', ['12', '13', '19']],
-    'aftersales' => ['E', 'After-Sales & Records', 'Additional documents · communication · feedback · complaints · disputes · amendments', []],
+    'aftersales' => ['E', 'After-Sales & Records', 'Additional documents · feedback · complaints · disputes · amendments', []],
 ];
 $phaseState = static function (string $key) use ($phases, $stepStates, $currentUserStep): string {
     $steps = $phases[$key][3];
@@ -1531,6 +1529,54 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php endforeach; ?>
   </details>
 
+  <?php // Owner decision (2026-10-26, t4): pinned open above the five sections — the client conversation is needed at every step. ?>
+  <details class="step-card step-card-reference" id="order-updates" open>
+    <summary><h2>Order Communication <small class="muted">(with the client — any time)</small><?php if ($comments): ?> <span class="phase-pill"><?= count($comments) ?> message<?= count($comments) === 1 ? '' : 's' ?></span><?php endif; ?></h2></summary>
+    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
+    <div class="chat-thread">
+      <?php if (empty($comments)): ?>
+        <p class="chat-empty">No updates posted yet.</p>
+      <?php endif; ?>
+      <?php foreach ($comments as $c): ?>
+        <?php $isStaff = $c['author_type'] === 'staff'; ?>
+        <div class="chat-bubble-row <?= $isStaff ? 'staff' : 'client' ?>">
+          <div class="chat-bubble <?= $isStaff ? 'staff' : 'client' ?>">
+            <div class="chat-bubble-meta">
+              <span class="who"><?= $isStaff ? 'Staff' : 'Client' ?> — <?= htmlspecialchars($isStaff ? ($c['staff_name'] ?? 'Unknown') : ($c['client_name'] ?? 'Unknown')) ?></span>
+              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?= $isStaff ? ($c['email_sent'] ? ' · emailed' : ' · not emailed (no client email on file)') : '' ?></span>
+            </div>
+            <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
+            <?php if (!empty($c['attachments'])): ?>
+              <div class="chat-attachments">
+                <?php foreach ($c['attachments'] as $att): ?>
+                  <?php
+                    $mime = (string) ($att['mime_type'] ?? '');
+                    $url = "/orders/{$order['id']}/comment-attachments/{$att['file_id']}/download";
+                  ?>
+                  <?php if (str_starts_with($mime, 'image/')): ?>
+                    <a href="<?= $url ?>" target="_blank"><img class="chat-attachment-image" src="<?= $url ?>" alt="<?= htmlspecialchars($att['original_filename']) ?>"></a>
+                  <?php elseif (str_starts_with($mime, 'video/')): ?>
+                    <video class="chat-attachment-video" controls src="<?= $url ?>"></video>
+                  <?php else: ?>
+                    <a class="chat-attachment-file" href="<?= $url ?>"><?= htmlspecialchars($att['original_filename']) ?></a>
+                  <?php endif; ?>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
+      <?= Csrf::field() ?>
+      <textarea name="body" placeholder="Write an update for the client…"></textarea>
+      <div class="chat-post-form-row">
+        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
+        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
+      </div>
+    </form>
+  </details>
+
   <details class="phase-group" id="phase-booking"<?= $phaseOpen('booking') ?>>
     <?= $phaseSummary('booking') ?>
 
@@ -1787,7 +1833,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <?= Csrf::field() ?>
           <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required data-remit-amount></label>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
-          <label>Exchange Rate Today * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
           <?= $stepBadge('5d') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
@@ -2252,6 +2298,39 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <input type="file" name="document" required>
         <?= $stepBadge('7c') ?><button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
       </form>
+      <?php
+        // Owner request (2026-10-26, t4): the supplier can upload it themselves
+        // through a no-login link (like the Buyer Action Link), and when they
+        // never acknowledge, staff record that with a reason.
+        $supplierActionTokenPlain = \App\Services\EncryptionService::decrypt($supplierPo['supplier_action_token_plain'] ?? null);
+        $supplierActionLinkValid = !empty($supplierActionTokenPlain) && !empty($supplierPo['supplier_action_token_expires_at']) && strtotime((string) $supplierPo['supplier_action_token_expires_at']) > time();
+      ?>
+      <div class="supplier-action-link" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;">
+        <p class="muted small"><strong>Or let the supplier upload it:</strong> a direct link (no login) where the supplier uploads their signed PO / acknowledgment — emailed to them when the PO has their email<?= !empty($supplierPo['supplier_email']) ? ' (' . htmlspecialchars((string) $supplierPo['supplier_email']) . ')' : '' ?>. You'll be notified when they upload.</p>
+        <?php if ($supplierActionLinkValid): ?>
+          <?php $supplierActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/supplier-action/' . $supplierActionTokenPlain; ?>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <input type="text" readonly value="<?= htmlspecialchars($supplierActionFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
+            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($supplierActionFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+          </div>
+          <p class="muted small">Valid until <?= htmlspecialchars(Dates::human($supplierPo['supplier_action_token_expires_at'])) ?>.</p>
+        <?php endif; ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/supplier-link" style="display:inline">
+          <?= Csrf::field() ?>
+          <button type="submit" class="btn-sm btn-secondary"><?= $supplierActionLinkValid ? 'Regenerate Supplier Link' : 'Generate Supplier Link' ?></button>
+        </form>
+      </div>
+      <?php if (!empty($supplierPo['ack_skipped_at'])): ?>
+        <p class="small" style="margin-top:8px;">&#10003; Recorded that the supplier did not acknowledge — <?= htmlspecialchars((string) $supplierPo['ack_skip_reason']) ?> <span class="muted">(<?= htmlspecialchars((string) $supplierPo['ack_skipped_at']) ?>)</span></p>
+      <?php elseif (empty($supplierPoDocuments) && $supplierPo['status'] !== 'signed'): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/ack-skip" style="margin-top:8px;" data-confirm="Record that the supplier did not acknowledge this PO? Step 7d then opens without an acknowledgment on file.">
+          <?= Csrf::field() ?>
+          <label>Skip — supplier did not acknowledge <small class="muted">(reason required)</small>
+            <input type="text" name="skip_reason" required minlength="<?= \App\Helpers\ReasonValidator::MIN_LENGTH ?>" placeholder="e.g. supplier confirmed by phone, will not sign">
+          </label>
+          <button type="submit" class="btn-sm">Skip Acknowledgment</button>
+        </form>
+      <?php endif; ?>
     <?php else: ?>
       <p class="muted">Save Supplier PO Terms first (Step 7a).</p>
     <?php endif; ?>
@@ -2263,8 +2342,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <summary><?= $stepStatusIcon($subStepStatus('7', '7d')) ?><h2>Step 7d &middot; Confirm Supplier Signed &amp; Returned PO</h2></summary>
     <?php if ($supplierPoLocked): ?>
       <p class="muted">Confirm buyer acknowledgement first to unlock this gate.</p>
-    <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated && $supplierPoCopyRequired && empty($supplierPoDocuments)): ?>
-      <p class="muted">Attach the supplier's signed acknowledgment in Step 7c first &mdash; this step completes Step 7 and needs it on file.</p>
+    <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated && $supplierPoCopyRequired && empty($supplierPoDocuments) && empty($supplierPo['ack_skipped_at'])): ?>
+      <p class="muted">Attach the supplier's signed acknowledgment in Step 7c first (or send them the Supplier Link, or record that they did not acknowledge) &mdash; this step completes Step 7 and needs it on file.</p>
     <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/signed">
         <?= Csrf::field() ?>
@@ -2389,7 +2468,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <?= Csrf::field() ?>
         <label>Freight Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="freight_amount" required data-remit-amount></label>
         <label>Received On<input type="date" name="freight_received_at" value="<?= date('Y-m-d') ?>"></label>
-          <label>Exchange Rate Today * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
         <?= $stepBadge('9c') ?><button type="submit" class="btn-sm">Record Freight Remittance</button>
       </form>
@@ -2477,20 +2556,27 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
         </div>
 
-        <p class="muted small">Crate-level breakdown (add one row per physical crate):</p>
+        <p class="muted small">Crate-level breakdown (add one row per physical crate). Pick the crate's product from this order — its HS code comes from the product record and cannot be typed here.</p>
         <table class="list">
           <tr><th>Crate No.</th><th>Marks &amp; Numbers</th><th>Product</th><th>L×W×H (cm)</th><th>Pcs</th><th>Net (kg)</th><th>Gross (kg)</th><th>CBM</th><th>HS Code</th></tr>
           <?php $existingCrates = $crates ?: [[], [], []]; foreach ($existingCrates as $c): ?>
           <tr>
             <td><input type="text" name="crate_no[]" value="<?= htmlspecialchars($c['crate_no'] ?? '') ?>" style="width:70px;"></td>
             <td><input type="text" name="crate_marks_numbers[]" value="<?= htmlspecialchars($c['marks_numbers'] ?? '') ?>" style="width:130px;"></td>
-            <td><input type="text" name="crate_product_description[]" value="<?= htmlspecialchars($c['product_description'] ?? '') ?>" style="width:110px;"></td>
+            <td><?php $__crateProduct = (string) ($c['product_description'] ?? ''); $__crateKnown = in_array($__crateProduct, array_map(static fn(array $p): string => (string) $p['description'], $products), true); ?>
+              <select name="crate_product_description[]" data-crate-product style="width:160px;">
+                <option value="" data-hs="">— Product —</option>
+                <?php foreach ($products as $__p): ?>
+                <option value="<?= htmlspecialchars((string) $__p['description']) ?>" data-hs="<?= htmlspecialchars((string) $__p['hs_code']) ?>" <?= $__crateProduct === (string) $__p['description'] ? 'selected' : '' ?>><?= htmlspecialchars(mb_strimwidth((string) $__p['description'], 0, 60, '…')) ?></option>
+                <?php endforeach; ?>
+                <?php if ($__crateProduct !== '' && !$__crateKnown): ?><option value="<?= htmlspecialchars($__crateProduct) ?>" data-hs="<?= htmlspecialchars((string) ($c['hs_code'] ?? '')) ?>" selected><?= htmlspecialchars($__crateProduct) ?> (earlier entry)</option><?php endif; ?>
+              </select></td>
             <td><input type="text" name="crate_dimensions[]" value="<?= htmlspecialchars($c['dimensions_lwh_cm'] ?? '') ?>" style="width:80px;"></td>
             <td><input type="text" name="crate_pcs[]" value="<?= htmlspecialchars((string) ($c['pcs'] ?? '')) ?>" style="width:50px;"></td>
             <td><input type="text" name="crate_net_weight_kg[]" value="<?= htmlspecialchars((string) ($c['net_weight_kg'] ?? '')) ?>" style="width:70px;"></td>
             <td><input type="text" name="crate_gross_weight_kg[]" value="<?= htmlspecialchars((string) ($c['gross_weight_kg'] ?? '')) ?>" style="width:70px;"></td>
             <td><input type="text" name="crate_cbm[]" value="<?= htmlspecialchars((string) ($c['cbm'] ?? '')) ?>" style="width:60px;"></td>
-            <td><input type="text" name="crate_hs_code[]" value="<?= htmlspecialchars($c['hs_code'] ?? '') ?>" style="width:70px;"></td>
+            <td><input type="text" value="<?= htmlspecialchars($c['hs_code'] ?? '') ?>" data-crate-hs readonly tabindex="-1" title="Taken from the product's HS code" style="width:70px;"></td>
           </tr>
           <?php endforeach; ?>
         </table>
@@ -2667,6 +2753,13 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php if ($ciBalanceLocked): ?>
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     <?php else: ?>
+      <?php // Owner request (2026-10-26, t4): the CI is made against the BL, so the scanned BL copy goes in first (FOB raises its CI before shipment, so no BL yet). ?>
+      <?php if ($isFob): ?>
+      <?php elseif (empty($shipping['bl_copy_file_id'])): ?>
+        <p class="alert alert-warning">&#9888; <strong>Upload the scanned BL copy first</strong> — attach it in <a href="#step-10f-bl-issued">Step 10f</a> (Attach Scanned BL Copy), then generate the Commercial Invoice against it.</p>
+      <?php else: ?>
+        <p class="muted small">Scanned BL copy is on file (<a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">download</a>) — generate the Commercial Invoice against it.</p>
+      <?php endif; ?>
       <?php if ($__ciBlDateMismatch): ?>
         <p class="alert alert-warning">&#9888; Recorded BL date is <strong><?= htmlspecialchars($shipping['bl_date']) ?></strong>, not today. The Commercial Invoice is conventionally dated to match the BL — double-check before generating it if that's not intentional here.</p>
       <?php endif; ?>
@@ -2712,7 +2805,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <?= Csrf::field() ?>
         <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required data-remit-amount value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
         <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
-          <label>Exchange Rate Today * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
         <?= $stepBadge('11c') ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
       </form>
@@ -3045,6 +3138,24 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <?php endif; ?>
       </div>
     </div>
+    <?php // Owner request (2026-10-26, t4): skip Step 12 with a reason — figures stay blank, never 0. ?>
+    <div class="financials-skip" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;">
+      <?php if (!empty($order['financials_skipped_at'])): ?>
+        <p class="small">&#10003; <strong>Step 12 marked complete without financial figures</strong> on <?= htmlspecialchars((string) $order['financials_skipped_at']) ?><?= !empty($order['financials_skipped_by']) ? ' by ' . htmlspecialchars($usersById[(int) $order['financials_skipped_by']] ?? ('User #' . (int) $order['financials_skipped_by'])) : '' ?> — <?= htmlspecialchars((string) $order['financials_skip_reason']) ?>. Nothing was recorded as 0; you can still add figures above.</p>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/financials/skip/undo" style="display:inline">
+          <?= Csrf::field() ?>
+          <button type="submit" class="btn-sm btn-secondary">Reopen Step 12</button>
+        </form>
+      <?php else: ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/financials/skip" data-confirm="Mark Step 12 complete without recording these figures? Nothing will be saved as 0.">
+          <?= Csrf::field() ?>
+          <label>Skip financials — mark Step 12 complete <small class="muted">(nothing to record here, or figures will come later — reason required; nothing is written as 0, and export-benefit schemes still need answering before Mark Fully Settled)</small>
+            <input type="text" name="skip_reason" required minlength="<?= \App\Helpers\ReasonValidator::MIN_LENGTH ?>" placeholder="Reason (mandatory)">
+          </label>
+          <button type="submit" class="btn-sm">Skip &amp; Mark Step 12 Complete</button>
+        </form>
+      <?php endif; ?>
+    </div>
   </details>
   <?php endif; ?>
 
@@ -3288,53 +3399,6 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     </form>
     <?php endif; ?>
     <p class="muted small" style="margin-top:8px;"><a href="/orders/<?= (int) $order['id'] ?>/additional-documents/removed">Show removed</a></p>
-  </details>
-
-  <details class="step-card" id="order-updates"<?= $stepCardOpen('15') ?>>
-    <summary><?= $stepStatusIcon($stepStates['15']) ?><span class="step-group-num">STEP 15</span><h2>Order Communication</h2></summary>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
-    <div class="chat-thread">
-      <?php if (empty($comments)): ?>
-        <p class="chat-empty">No updates posted yet.</p>
-      <?php endif; ?>
-      <?php foreach ($comments as $c): ?>
-        <?php $isStaff = $c['author_type'] === 'staff'; ?>
-        <div class="chat-bubble-row <?= $isStaff ? 'staff' : 'client' ?>">
-          <div class="chat-bubble <?= $isStaff ? 'staff' : 'client' ?>">
-            <div class="chat-bubble-meta">
-              <span class="who"><?= $isStaff ? 'Staff' : 'Client' ?> — <?= htmlspecialchars($isStaff ? ($c['staff_name'] ?? 'Unknown') : ($c['client_name'] ?? 'Unknown')) ?></span>
-              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?= $isStaff ? ($c['email_sent'] ? ' · emailed' : ' · not emailed (no client email on file)') : '' ?></span>
-            </div>
-            <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
-            <?php if (!empty($c['attachments'])): ?>
-              <div class="chat-attachments">
-                <?php foreach ($c['attachments'] as $att): ?>
-                  <?php
-                    $mime = (string) ($att['mime_type'] ?? '');
-                    $url = "/orders/{$order['id']}/comment-attachments/{$att['file_id']}/download";
-                  ?>
-                  <?php if (str_starts_with($mime, 'image/')): ?>
-                    <a href="<?= $url ?>" target="_blank"><img class="chat-attachment-image" src="<?= $url ?>" alt="<?= htmlspecialchars($att['original_filename']) ?>"></a>
-                  <?php elseif (str_starts_with($mime, 'video/')): ?>
-                    <video class="chat-attachment-video" controls src="<?= $url ?>"></video>
-                  <?php else: ?>
-                    <a class="chat-attachment-file" href="<?= $url ?>"><?= htmlspecialchars($att['original_filename']) ?></a>
-                  <?php endif; ?>
-                <?php endforeach; ?>
-              </div>
-            <?php endif; ?>
-          </div>
-        </div>
-      <?php endforeach; ?>
-    </div>
-    <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
-      <?= Csrf::field() ?>
-      <textarea name="body" placeholder="Write an update for the client…"></textarea>
-      <div class="chat-post-form-row">
-        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
-        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
-      </div>
-    </form>
   </details>
 
   <details class="step-card" id="order-feedback"<?= $stepCardOpen('16') ?>>

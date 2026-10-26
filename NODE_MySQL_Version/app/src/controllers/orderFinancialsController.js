@@ -534,4 +534,43 @@ async function deleteCostEntry(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
-module.exports = { addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };
+/**
+ * Owner request (2026-10-26, t4): Step 12 can be skipped and marked complete
+ * when there is nothing to record (reason required, audit-logged). No cost,
+ * benefit or expense is written — the figures stay blank rather than
+ * reading as 0. Export-benefit schemes still have to be answered before the
+ * order can be marked fully settled.
+ */
+async function skipFinancials(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await orderRepository.find(orderId))) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const reason = String(req.body.skip_reason || '').trim();
+  const error = reasonValidator.check(reason);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  await orderRepository.markFinancialsSkipped(orderId, req.user.id, reason);
+  await auditLogRepository.log(req.user.id, 'ORDER_FINANCIALS_SKIPPED', 'orders', orderId, 'financials_skipped_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '), reason);
+  flash.set(req, 'success', 'Step 12 marked complete without financial figures — nothing was recorded as 0. You can still add figures later.');
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
+async function undoSkipFinancials(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  await orderRepository.clearFinancialsSkipped(orderId);
+  await auditLogRepository.log(req.user.id, 'ORDER_FINANCIALS_SKIP_UNDONE', 'orders', orderId, 'financials_skipped_at', String(order.financials_skipped_at || ''), null);
+  flash.set(req, 'success', 'Step 12 reopened.');
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
+module.exports = { skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };

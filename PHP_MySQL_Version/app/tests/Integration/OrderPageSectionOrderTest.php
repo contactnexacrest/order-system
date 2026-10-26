@@ -214,14 +214,14 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $communicationPos = strpos($output, '<h2>Order Communication</h2>');
+        $communicationPos = strpos($output, '<h2>Order Communication ');
         $feedbackPos = strpos($output, '<h2>Order Feedback</h2>');
         $disputesPos = strpos($output, '<h2>Disputes</h2>');
 
         self::assertNotFalse($communicationPos);
         self::assertNotFalse($feedbackPos);
         self::assertNotFalse($disputesPos);
-        self::assertLessThan($feedbackPos, $communicationPos, 'Order Communication (step 15) must render before Order Feedback (step 16)');
+        self::assertLessThan($feedbackPos, $communicationPos, 'Order Communication (pinned above the sections) must render before Order Feedback (step 16)');
         self::assertLessThan($disputesPos, $feedbackPos, 'Order Feedback (step 16) must render before Disputes (step 18)');
     }
 
