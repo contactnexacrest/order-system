@@ -26,8 +26,8 @@ use App\Tests\Support\DbTestCase;
  * gap pattern, adjacent to the numbered steps). Each now fires the same
  * dual-channel pattern already established by
  * OrderCommentService::postAsClient(): an in-app NotificationRepository
- * row per manage_orders holder, plus the catch-all/acting-user email via
- * AuditLogRepository::log() -> ActionNotificationService.
+ * row per manage_orders holder (which also emails them). Since 2026-10-26
+ * the audit log itself sends no mail.
  */
 final class NotificationAuditGapsTest extends DbTestCase
 {

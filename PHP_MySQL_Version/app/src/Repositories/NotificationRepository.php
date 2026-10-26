@@ -14,13 +14,13 @@ use App\Config\Database;
  *
  * External QA report M-06: "In-app notifications also sent by e-mail."
  * create() itself fans out to the targeted user's own email (same
- * users.email_action_notifications_enabled toggle ActionNotificationService
- * already gates its own, differently-sourced emails on — this is the same
- * "does this user want notification emails" preference, just a second,
- * independent trigger for it) rather than instrumenting each of this
- * method's call sites separately. Fire-and-forget, same contract as
- * ActionNotificationService::notify(): an email failure must never break
- * the action that triggered the notification.
+ * users.email_action_notifications_enabled toggle — "does this user want
+ * notification emails") rather than instrumenting each of this method's
+ * call sites separately. Since 2026-10-26 this is the only notification
+ * email channel: the audit log no longer mails anything, so a notification
+ * is created only where a specific person needs to know or act.
+ * Fire-and-forget: an email failure must never break the action that
+ * triggered the notification.
  */
 final class NotificationRepository
 {
@@ -48,10 +48,30 @@ final class NotificationRepository
     }
 
     /**
+     * Something the client did on an order that staff now need to act on
+     * (acknowledged the OC, uploaded their PO, reported a payment):
+     * notifies that order's own assignees — or, on an order nobody is
+     * assigned to yet, everyone who manages orders, so it is never missed.
+     *
+     * @return int[] the user ids notified
+     */
+    public static function notifyOrderTeam(int $orderId, string $type, string $message): array
+    {
+        $userIds = array_map(static fn (array $a): int => (int) $a['user_id'], OrderAssigneeRepository::forOrder($orderId));
+        if ($userIds === []) {
+            $userIds = PermissionRepository::usersWithPermission('manage_orders');
+        }
+        $userIds = array_values(array_unique(array_map('intval', $userIds)));
+        foreach ($userIds as $userId) {
+            self::create($userId, null, $type, $orderId, $message);
+        }
+        return $userIds;
+    }
+
+    /**
      * @return string|null the email address actually attempted — null
      *   when the user doesn't exist, has no email, or has opted out.
-     *   Exposed (and non-void) purely for testability, same reasoning as
-     *   ActionNotificationService::notify()'s own return value.
+     *   Exposed (and non-void) purely for testability.
      */
     public static function emailNotification(int $userId, string $message): ?string
     {
@@ -60,11 +80,25 @@ final class NotificationRepository
             return null;
         }
         try {
-            \App\Services\EmailService::sendPlainText($user['email'], 'NexaCrest — New Notification', $message);
+            \App\Services\EmailService::sendPlainText($user['email'], self::emailSubject($message), $message);
         } catch (\Throwable $e) {
             // Never let a notification-email failure break the action it's reporting on.
         }
         return $user['email'];
+    }
+
+    /**
+     * The notification itself as the subject (not a generic "New
+     * Notification"), so a busy inbox shows at a glance which order and
+     * what needs doing.
+     */
+    public static function emailSubject(string $message): string
+    {
+        $line = trim((string) preg_replace('/\s+/', ' ', $message));
+        if (mb_strlen($line) > 110) {
+            $line = rtrim(mb_substr($line, 0, 107)) . '…';
+        }
+        return 'NexaCrest — ' . $line;
     }
 
     /** @return array<int, array<string,mixed>> */

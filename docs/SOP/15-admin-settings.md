@@ -144,54 +144,30 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   one for Zoho Mail if it's enabled — send one real email straight through
   that transport only, bypassing Test Mode, Mail Redirect, and each
   other's fallback, so a connection/credential problem shows up as an
-  actual error on screen instead of a silent log line. Also on this
-  screen, under its own **Notifications** category: **Notification
-  Email** — a catch-all address copied on every notification email the
-  system sends, across every category below (leave it blank to turn
-  this off; there's no way to opt it out of any one category). Every
-  action anywhere in the system still lands in the audit trail
-  regardless of whether an email ever goes out for it — these settings
-  only control the email, never the audit-log row.
+  actual error on screen instead of a silent log line.
 
-  **Notification Routing Plan** — not every one of the ~230 action
-  types this app logs is equally important to see land in an inbox, so
-  each one is routed to exactly one of five tiers, decided once per
-  action type (not configurable per-user beyond the one toggle below):
+  **Which emails staff receive** (owner decision 2026-10-26). The audit
+  trail records every action, but **recording an action never sends an
+  email** — it used to, and one order produced 90+ emails, burying the
+  few that needed someone to act. Staff now get an email only when
+  something is **waiting on them** or **a client did something on their
+  order**, and every one also appears in the in-app notification bell:
 
-  - **Order-scoped** — anything that happens on a specific order (a
-    document generated/sent, a payment recorded, a client action, a
-    stage gate passed, a dispute/complaint) goes to that order's own
-    assignees (see "Roles & Permissions" above, under the order-assignee
-    paragraph) plus the Admin/Managing
-    Director/Executive Director oversight tier as a safety net for an
-    order with nobody assigned yet. Never toggleable by anyone — this
-    is "part of the application," not a personal preference.
-  - **About one specific person** — a permission grant/revoke, a role's
-    permissions changing, an account being archived, a password reset
-    someone else triggered — goes straight to the person it's about (so
-    they never mistake a real change for a bug), plus oversight for the
-    handful of types (account archive/unarchive, Super Admin delegation)
-    where oversight also needs to know. Never toggleable.
-  - **Shared/reference data (broadcast)** — a port, HS code, payment
-    preset, product-catalog entry, or similar shared record changing
-    goes to everyone who holds the permission that actually governs
-    that data day to day (e.g. `manage_orders` for ports, `manage_hs_codes`
-    for HS codes) — not literally every account. A handful of
-    security-sensitive types (role/permission CRUD, client
-    impersonation, a financial-year lock override, deleting a user) go
-    to the Admin/MD/ED oversight tier specifically. Never toggleable.
-  - **Self only** — routine, about the acting user's own activity and
-    nobody else's (a password change, a report definition saved, an
-    account lockout). The *only* tier with a personal toggle: every
-    staff member has their own **Email me when I perform an action in
-    the system** switch on their own **My Account** page (on by default)
-    — turning it off only stops that person's copy of their own routine
-    actions; it has no effect on any other tier above, and never affects
-    the Notification Email catch-all either.
-  - **No email** — pure noise with no one depending on seeing it as an
-    email (Sample Data Playground loads, Test Mode toggles, logins,
-    a bare field edit with no narrower action type). The audit_log row
-    still gets written forever; only the email is skipped.
+  - a document was assigned to you to review, or a send waits on your
+    approval; an amendment or cancellation waits on your decision;
+  - the buyer acknowledged the OC, uploaded their signed PO, or reported
+    a payment — sent to that order's own assignees (or, while nobody is
+    assigned, to everyone who manages orders);
+  - a client submitted or corrected an intake form, posted a message,
+    raised a complaint or dispute, left feedback, or asked for a reorder.
+
+  The email's subject is the notification itself (e.g. "NexaCrest — The
+  buyer reported an advance payment on order SC/ORD/2026/014 — verify it
+  against the bank statement"), so an inbox shows at a glance what each
+  one is. Each staff member can turn these emails off on their own **My
+  Account** page (**Email me my notifications**); they still appear in
+  the bell. Client-facing emails (documents sent to the buyer, portal
+  invites, password resets) are separate and unchanged.
 
   The three **RBI
   Purpose Code** fields (advance/balance/freight payment wires) are

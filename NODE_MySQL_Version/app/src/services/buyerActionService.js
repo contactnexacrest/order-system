@@ -6,6 +6,8 @@ const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocu
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const documentRepository = require('../repositories/documentRepository');
+const notificationRepository = require('../repositories/notificationRepository');
+const orderRepository = require('../repositories/orderRepository');
 const stageGateService = require('./stageGateService');
 const documentGenerationService = require('./documentGenerationService');
 const fileUploadService = require('./fileUploadService');
@@ -76,9 +78,9 @@ async function acknowledgeOc(orderId) {
   await stageGateService.passAndUnlockNext(orderId, 4, null);
   // External QA report L-30/M-07: nothing here ever told staff a buyer
   // had acknowledged their OC — the only way to notice was to happen to
-  // reopen the order. auditLogRepository.log() already fans out to
-  // actionNotificationService for every other action in this codebase;
-  // this was simply the one self-service action that never called it.
+  // reopen the order.
+  const order = await orderRepository.find(orderId);
+  await notificationRepository.notifyOrderTeam(orderId, 'buyer_oc_acknowledged', `The buyer acknowledged the Order Confirmation on order ${(order && order.order_reference) || `#${orderId}`} — Step 7 (Supplier PO) is now open.`);
   await auditLogRepository.log(null, 'BUYER_OC_ACKNOWLEDGED', 'orders', orderId, null, null, null, 'Order Confirmation acknowledged by the client (self-service).');
   return { ok: true, message: 'Thank you — your acknowledgement has been recorded and your order is moving to production.' };
 }
@@ -110,6 +112,7 @@ async function uploadBuyerPo(req, order) {
       'Buyer PO copy (client-uploaded)'
     );
     await orderBuyerPoDocumentRepository.attach(orderId, fileId);
+    await notificationRepository.notifyOrderTeam(orderId, 'buyer_po_uploaded_by_client', `The buyer uploaded their signed PO copy on order ${order.order_reference || `#${orderId}`} — check it and confirm the Buyer PO (Step 4c).`);
     await auditLogRepository.log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', orderId, null, null, null, 'Buyer PO copy uploaded by the client via the client portal.');
     return { ok: true, message: 'Your Buyer PO copy has been uploaded.' };
   } catch (e) {
@@ -177,6 +180,7 @@ async function reportAdvancePayment(req, order) {
   // notified staff at all — the "our team will verify this" promise
   // below depended entirely on staff happening to reopen this order. See
   // acknowledgeOc()'s own comment on the same gap.
+  await notificationRepository.notifyOrderTeam(orderId, 'client_payment_reported', `The buyer reported an advance payment on order ${order.order_reference || `#${orderId}`} — verify it against the bank statement.`);
   await auditLogRepository.log(null, 'CLIENT_PAYMENT_REPORTED', 'orders', orderId, 'payment_type', null, 'advance', `Client self-reported an advance payment: ref ${transactionRef}.`);
 
   return { ok: true, message: 'Thank you — we have noted your advance payment details. Our team will verify this against our bank statement and update your order.' };

@@ -108,8 +108,11 @@ async function updateSubmission(req, res) {
   }
 
   await clientIntakeRepository.updateFromClient(submission.id, data);
-  // External QA report N-08: this action never reached the audit log, so
-  // it never notified anyone either.
+  // External QA report N-08: this action never reached the audit log or
+  // anyone's notifications.
+  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
+    await notificationRepository.create(staffUserId, null, 'client_intake_updated', null, `Quotation-stage intake corrected by the client: ${data.company_legal_name}.`);
+  }
   await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMISSION_UPDATED_BY_CLIENT', 'client_intake_submissions', submission.id, null, null, null, 'Corrected by the client via the no-login edit link.');
   res.renderView('client_intake/thank_you', { correctionLink: null, updated: true }, 'layout/bare');
 }

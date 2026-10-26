@@ -2,6 +2,8 @@
 
 const db = require('../config/db');
 const userRepository = require('./userRepository');
+const orderAssigneeRepository = require('./orderAssigneeRepository');
+const permissionRepository = require('./permissionRepository');
 const emailService = require('../services/emailService');
 
 // Full port of App\Repositories\NotificationRepository. In-app notification
@@ -11,20 +13,32 @@ const emailService = require('../services/emailService');
 // sends.
 //
 // External QA report M-06: "In-app notifications also sent by e-mail."
-// create() itself fans out to the targeted user's own email (same
-// users.email_action_notifications_enabled toggle actionNotificationService
-// already gates its own, differently-sourced emails on — this is the same
-// "does this user want notification emails" preference, just a second,
-// independent trigger for it) rather than instrumenting each of this
-// function's call sites separately. Fire-and-forget, same contract as
-// actionNotificationService.notify(): an email failure must never break
-// the action that triggered the notification.
+// create() itself fans out to the targeted user's own email (the
+// users.email_action_notifications_enabled toggle — "does this user want
+// notification emails") rather than instrumenting each of this function's
+// call sites separately. Since 2026-10-26 this is the only notification
+// email channel: the audit log no longer mails anything, so a notification
+// is created only where a specific person needs to know or act.
+// Fire-and-forget: an email failure must never break the action that
+// triggered the notification.
+
+/**
+ * The notification itself as the subject (not a generic "New
+ * Notification"), so a busy inbox shows at a glance which order and what
+ * needs doing.
+ */
+function emailSubject(message) {
+  let line = String(message).replace(/\s+/g, ' ').trim();
+  if ([...line].length > 110) {
+    line = `${[...line].slice(0, 107).join('').trimEnd()}…`;
+  }
+  return `NexaCrest — ${line}`;
+}
 
 /**
  * @returns {Promise<string|null>} the email address actually attempted —
  *   null when the user doesn't exist, has no email, or has opted out.
- *   Exposed (and non-void) purely for testability, same reasoning as
- *   actionNotificationService.notify()'s own return value.
+ *   Exposed (and non-void) purely for testability.
  */
 async function emailNotification(userId, message) {
   const user = await userRepository.findById(userId);
@@ -32,7 +46,7 @@ async function emailNotification(userId, message) {
     return null;
   }
   try {
-    await emailService.sendPlainText(user.email, 'NexaCrest — New Notification', message);
+    await emailService.sendPlainText(user.email, emailSubject(message), message);
   } catch (e) {
     // Never let a notification-email failure break the action it's reporting on.
   }
@@ -51,6 +65,26 @@ async function create(userId, roleId, type, relatedOrderId, message) {
   }
 
   return result.insertId;
+}
+
+/**
+ * Something the client did on an order that staff now need to act on
+ * (acknowledged the OC, uploaded their PO, reported a payment): notifies
+ * that order's own assignees — or, on an order nobody is assigned to yet,
+ * everyone who manages orders, so it is never missed.
+ *
+ * @returns {Promise<number[]>} the user ids notified
+ */
+async function notifyOrderTeam(orderId, type, message) {
+  let userIds = (await orderAssigneeRepository.forOrder(orderId)).map((a) => Number(a.user_id));
+  if (!userIds.length) {
+    userIds = (await permissionRepository.usersWithPermission('manage_orders')).map(Number);
+  }
+  userIds = [...new Set(userIds)];
+  for (const userId of userIds) {
+    await create(userId, null, type, orderId, message);
+  }
+  return userIds;
 }
 
 async function forUser(userId, limit = 20) {
@@ -92,4 +126,4 @@ async function existsToday(userId, type, relatedOrderId) {
   return row ? parseInt(row.c, 10) > 0 : false;
 }
 
-module.exports = { create, forUser, unreadCountForUser, markRead, markAllRead, existsToday, emailNotification };
+module.exports = { create, forUser, unreadCountForUser, markRead, markAllRead, existsToday, emailNotification, emailSubject, notifyOrderTeam };

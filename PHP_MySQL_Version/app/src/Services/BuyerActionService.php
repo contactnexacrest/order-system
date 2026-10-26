@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\DocumentRepository;
+use App\Repositories\NotificationRepository;
+use App\Repositories\OrderRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderPaymentStatusRepository;
@@ -75,12 +77,15 @@ final class BuyerActionService
         StageGateService::passAndUnlockNext($orderId, 4, null);
         // External QA report L-30/M-07: nothing here ever told staff a
         // buyer had acknowledged their OC — the only way to notice was to
-        // happen to reopen the order. AuditLogRepository::log() already
-        // fans out to ActionNotificationService for every other action in
-        // this codebase; this was simply the one self-service action that
-        // never called it.
+        // happen to reopen the order.
+        NotificationRepository::notifyOrderTeam($orderId, 'buyer_oc_acknowledged', 'The buyer acknowledged the Order Confirmation on order ' . self::orderReference($orderId) . ' — Step 7 (Supplier PO) is now open.');
         AuditLogRepository::log(null, 'BUYER_OC_ACKNOWLEDGED', 'orders', $orderId, null, null, null, 'Order Confirmation acknowledged by the client (self-service).');
         return ['ok' => true, 'message' => 'Thank you — your acknowledgement has been recorded and your order is moving to production.'];
+    }
+
+    private static function orderReference(int $orderId): string
+    {
+        return (string) (OrderRepository::find($orderId)['order_reference'] ?? "#{$orderId}");
     }
 
     /**
@@ -124,6 +129,7 @@ final class BuyerActionService
                 'Buyer PO copy (client-uploaded)'
             );
             OrderBuyerPoDocumentRepository::attach($orderId, $fileId);
+            NotificationRepository::notifyOrderTeam($orderId, 'buyer_po_uploaded_by_client', 'The buyer uploaded their signed PO copy on order ' . ($order['order_reference'] ?? "#{$orderId}") . ' — check it and confirm the Buyer PO (Step 4c).');
             AuditLogRepository::log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', $orderId, null, null, null, 'Buyer PO copy uploaded by the client via the client portal.');
             return ['ok' => true, 'message' => 'Your Buyer PO copy has been uploaded.'];
         } catch (\Throwable $e) {
@@ -194,6 +200,7 @@ final class BuyerActionService
         // never notified staff at all — the "our team will verify this"
         // promise below depended entirely on staff happening to reopen
         // this order. See acknowledgeOc()'s own comment on the same gap.
+        NotificationRepository::notifyOrderTeam($orderId, 'client_payment_reported', 'The buyer reported an advance payment on order ' . ($order['order_reference'] ?? "#{$orderId}") . ' — verify it against the bank statement.');
         AuditLogRepository::log(null, 'CLIENT_PAYMENT_REPORTED', 'orders', $orderId, 'payment_type', null, 'advance', "Client self-reported an advance payment: ref {$transactionRef}.");
 
         return ['ok' => true, 'message' => 'Thank you — we have noted your advance payment details. Our team will verify this against our bank statement and update your order.'];

@@ -18,8 +18,8 @@ use App\Tests\Support\DbTestCase;
 /**
  * External QA report N-08, Cluster A: Settings/Account/Signatories/
  * Test-Mode/Email-template/UI-template routes never called
- * AuditLogRepository::log(), so none of them ever notified anyone either
- * (every log() call fans out to ActionNotificationService). This checks
+ * AuditLogRepository::log(), so they left no audit trail
+ * (the audit trail is the record of who did what). This checks
  * the 16 of Appendix 1's 19 Cluster-A actions that are reachable without
  * a live SMTP/Zoho connection or a real HTTP file upload — testZohoEmail,
  * testSmtpEmail (both throw before reaching the log call without real

@@ -219,7 +219,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
         (new BuyerActionController())->reportPayment(['token' => $token]);
 
         $log = $this->latestLogFor('CLIENT_PAYMENT_REPORTED');
-        self::assertNotNull($log, 'a client payment self-report via the Buyer Action Link must be audit-logged (and so notified — see ActionNotificationService)');
+        self::assertNotNull($log, 'a client payment self-report via the Buyer Action Link must be audit-logged (staff are notified directly — see AuditLogSendsNoEmailTest)');
         self::assertSame($orderId, (int) $log['entity_id']);
         self::assertSame('advance', $log['new_value']);
         self::assertStringContainsString('UTR123456789', (string) $log['reason']);

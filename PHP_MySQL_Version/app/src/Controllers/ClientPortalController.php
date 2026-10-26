@@ -775,6 +775,7 @@ final class ClientPortalController
         );
         // External QA report L-30/M-07: same missing-notification gap as
         // BuyerActionService::reportAdvancePayment() — see its own comment.
+        \App\Repositories\NotificationRepository::notifyOrderTeam($orderId, 'client_payment_reported', "The buyer reported a {$paymentType} payment on order {$order['order_reference']} — verify it against the bank statement.");
         AuditLogRepository::log(null, 'CLIENT_PAYMENT_REPORTED', 'orders', $orderId, 'payment_type', null, $paymentType, "Client self-reported a {$paymentType} payment: ref {$transactionRef}.");
 
         Flash::set('success', 'Thank you — we have noted your payment details. Our team will verify this against our bank statement and update your order.');

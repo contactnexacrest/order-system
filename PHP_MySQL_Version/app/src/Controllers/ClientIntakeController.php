@@ -107,7 +107,10 @@ final class ClientIntakeController
 
         ClientIntakeRepository::updateFromClient((int) $submission['id'], $data);
         // External QA report N-08: this action never reached the audit
-        // log, so it never notified anyone either.
+        // log or anyone's notifications.
+        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
+            \App\Repositories\NotificationRepository::create($staffUserId, null, 'client_intake_updated', null, "Quotation-stage intake corrected by the client: {$data['company_legal_name']}.");
+        }
         AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMISSION_UPDATED_BY_CLIENT', 'client_intake_submissions', (int) $submission['id'], null, null, null, 'Corrected by the client via the no-login edit link.');
         View::render('client_intake/thank_you', ['correctionLink' => null, 'updated' => true], 'layout/bare');
     }

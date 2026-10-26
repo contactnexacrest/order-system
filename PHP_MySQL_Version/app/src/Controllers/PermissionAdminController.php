@@ -63,7 +63,7 @@ final class PermissionAdminController
         }
 
         $id = PermissionRepository::grantOverride($userId, $permissionId, (int) $user['id'], $reason);
-        AuditLogRepository::log((int) $user['id'], 'USER_PERMISSION_GRANTED', 'user_permissions', $id, 'permission_id', null, (string) $permissionId, $reason, $userId);
+        AuditLogRepository::log((int) $user['id'], 'USER_PERMISSION_GRANTED', 'user_permissions', $id, 'permission_id', null, (string) $permissionId, $reason);
         Flash::set('success', 'Extra permission granted.');
         header('Location: /admin/permissions');
     }
@@ -73,13 +73,11 @@ final class PermissionAdminController
         $user = AuthService::currentUser();
         $id = (int) ($params['id'] ?? 0);
         // The affected user's own id is only readable off this row before
-        // it's deleted — capture it here so the notification (routed to
-        // that specific person, per the Notification Routing Plan) can
-        // still reach them even though entity_id (this grant row's own
-        // id) no longer resolves to anything by the time notify() runs.
+        // it's deleted — captured into the audit row (entity_id is this
+        // grant row's own id, which no longer resolves once it's gone).
         $override = PermissionRepository::findOverride($id);
         PermissionRepository::removeGrantOverride($id);
-        AuditLogRepository::log((int) $user['id'], 'USER_PERMISSION_REVOKED', 'user_permissions', $id, null, null, null, null, $override !== null ? (int) $override['user_id'] : null);
+        AuditLogRepository::log((int) $user['id'], 'USER_PERMISSION_REVOKED', 'user_permissions', $id, 'user_id', $override !== null ? (string) $override['user_id'] : null, null);
         Flash::set('success', 'Extra permission removed.');
         header('Location: /admin/permissions');
     }

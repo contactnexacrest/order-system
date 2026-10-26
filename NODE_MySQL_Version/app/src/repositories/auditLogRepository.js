@@ -2,12 +2,11 @@
 
 const db = require('../config/db');
 const testModeService = require('../services/testModeService');
-const actionNotificationService = require('../services/actionNotificationService');
 
 // Port of App\Repositories\AuditLogRepository. Read-only viewer by design —
 // no function here ever updates or deletes a row.
 
-async function log(userId, actionType, entityType = null, entityId = null, fieldName = null, oldValue = null, newValue = null, reason = null, ipAddress = null, notifyTargetUserId = null) {
+async function log(userId, actionType, entityType = null, entityId = null, fieldName = null, oldValue = null, newValue = null, reason = null, ipAddress = null) {
   // Test Mode (docs/schema.sql Section V) — no audit trail for actions on
   // test-flagged records. Only the entity types that can actually resolve
   // to a test order/client are checked; everything else (settings,
@@ -27,24 +26,11 @@ async function log(userId, actionType, entityType = null, entityId = null, field
     }
   );
 
-  // Notification Routing Plan (supersedes the old flat "every action,
-  // same two recipients" design): every action logged here also fires a
-  // notification email, routed by category — see
-  // actionNotificationService's own docblock for the full rationale.
-  // notifyTargetUserId is an optional hint for the handful of "about one
-  // specific person" action types where the affected user can't be
-  // derived from entityType/entityId alone (e.g. a permission grant/
-  // revoke row, which may already be deleted by the time this runs) —
-  // every other call site leaves it null. Wrapped so a notification
-  // failure (bad SMTP config, a transient DB hiccup reading
-  // company_settings/users) can never break the action this audit-log
-  // call is reporting on; actionNotificationService.notify() itself also
-  // guards its own per-recipient sends.
-  try {
-    await actionNotificationService.notify(userId, actionType, entityType, entityId, fieldName, oldValue, newValue, reason, notifyTargetUserId);
-  } catch (e) {
-    // Intentionally swallowed — see comment above.
-  }
+  // Owner decision (2026-10-26): the audit log is a record, never a mail
+  // trigger. It used to email every logged action (90+ mails for one
+  // order, so the few that needed someone to act got lost). Mail that asks
+  // a person to do something goes out explicitly via
+  // notificationRepository.create() at the action itself.
 }
 
 async function search({ entityType = null, entityId = null, userId = null, actionType = null, dateFrom = null, dateTo = null, limit = 100, offset = 0 } = {}) {

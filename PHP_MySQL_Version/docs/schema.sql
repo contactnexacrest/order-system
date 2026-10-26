@@ -3979,3 +3979,12 @@ ALTER TABLE orders
 
 ALTER TABLE compliance_task_types
   ADD COLUMN phase ENUM('order','shipment') NOT NULL DEFAULT 'shipment' AFTER name;
+
+-- ============================================================================
+-- SECTION CB — AUDIT LOG NO LONGER SENDS EMAIL (owner decision 2026-10-26)
+-- ============================================================================
+-- The audit log is a record only. The per-action notification emails (and
+-- the company_settings.notification_email catch-all that received a copy of
+-- every one) are gone; notification email now comes only from the targeted
+-- notifications table (someone needs to know or act).
+DELETE FROM company_settings WHERE setting_key = 'notification_email';

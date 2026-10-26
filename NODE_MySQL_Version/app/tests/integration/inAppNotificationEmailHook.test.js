@@ -8,10 +8,9 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
 /**
  * External QA report M-06: "In-app notifications also sent by e-mail."
  * notificationRepository.create() must also email the targeted user,
- * gated by the same users.email_action_notifications_enabled toggle
- * actionNotificationService's own, differently-sourced emails already use
- * (see auditLogNotificationHook.test.js for that half) — a second,
- * independent trigger for the same per-user preference, not a new toggle.
+ * gated by the users.email_action_notifications_enabled toggle. Since
+ * 2026-10-26 this is the only notification email channel (the audit log
+ * sends none — see auditLogSendsNoEmail.test.js).
  * Port of PHP's InAppNotificationEmailHookTest.
  */
 describe('In-app notification email hook (External QA report M-06)', () => {

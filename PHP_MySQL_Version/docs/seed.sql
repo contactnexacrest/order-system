@@ -617,13 +617,6 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('rbi_purpose_code_balance', 'P0102', 'string', 'rbi', 'RBI purpose code for balance payment wires.', 0),
   ('rbi_purpose_code_freight', 'P0602', 'string', 'rbi', 'RBI purpose code for freight/insurance payment wires.', 0),
   ('default_currency',      'USD', 'string', 'defaults', 'Default quotation currency.', 0),
-  -- User-reported batch item 20: catch-all address that receives one
-  -- email per audit-logged action system-wide (ActionNotificationService,
-  -- hooked into AuditLogRepository::log() — the single choke point every
-  -- meaningful action already funnels through). Blank = notification
-  -- emails are skipped entirely (no SMTP recipient to send to), same as
-  -- every other optional email address setting in this table.
-  ('notification_email',    '', 'email', 'notifications', 'Catch-all address that receives an email for every action logged in the system (order/client/document/payment changes, approvals, etc.) — leave blank to disable. Each staff member can separately opt in/out of also receiving a copy of their own actions via Account > Notifications.', 0),
   ('storage_base_path',     'PLACEHOLDER — must match STORAGE_BASE_PATH in .env', 'string', 'system', 'Documentation only — the app reads the real path from .env, not from this row, so it can never drift out of sync with the filesystem.', 0),
   ('quantity_shortfall_tolerance_pct', '5.00',  'number', 'tolerances', 'Allowed shortfall percentage before a quantity variance is flagged.', 0),
   ('lut_alert_days_x',      '30', 'number', 'alerts', 'Days before LUT expiry to raise an alert.', 0),

@@ -55,7 +55,7 @@ async function grantOverride(req, res) {
   }
 
   const id = await permissionRepository.grantOverride(userId, permissionId, user.id, reason);
-  await auditLogRepository.log(user.id, 'USER_PERMISSION_GRANTED', 'user_permissions', id, 'permission_id', null, String(permissionId), reason, null, userId);
+  await auditLogRepository.log(user.id, 'USER_PERMISSION_GRANTED', 'user_permissions', id, 'permission_id', null, String(permissionId), reason);
   flash.set(req, 'success', 'Extra permission granted.');
   res.redirect('/admin/permissions');
 }
@@ -64,13 +64,11 @@ async function removeOverride(req, res) {
   const user = req.user;
   const id = parseInt(req.params.id, 10) || 0;
   // The affected user's own id is only readable off this row before it's
-  // deleted — capture it here so the notification (routed to that
-  // specific person, per the Notification Routing Plan) can still reach
-  // them even though entity_id (this grant row's own id) no longer
-  // resolves to anything by the time notify() runs.
+  // deleted — captured into the audit row (entity_id is this grant row's
+  // own id, which no longer resolves once it's gone).
   const override = await permissionRepository.findOverride(id);
   await permissionRepository.removeGrantOverride(id);
-  await auditLogRepository.log(user.id, 'USER_PERMISSION_REVOKED', 'user_permissions', id, null, null, null, null, null, override ? override.user_id : null);
+  await auditLogRepository.log(user.id, 'USER_PERMISSION_REVOKED', 'user_permissions', id, 'user_id', override ? String(override.user_id) : null, null);
   flash.set(req, 'success', 'Extra permission removed.');
   res.redirect('/admin/permissions');
 }

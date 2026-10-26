@@ -569,6 +569,7 @@ async function reportPayment(req, res) {
   );
   // External QA report L-30/M-07: same missing-notification gap as
   // buyerActionService.reportAdvancePayment() — see its own comment.
+  await notificationRepository.notifyOrderTeam(orderId, 'client_payment_reported', `The buyer reported a ${paymentType} payment on order ${order.order_reference} — verify it against the bank statement.`);
   await auditLogRepository.log(null, 'CLIENT_PAYMENT_REPORTED', 'orders', orderId, 'payment_type', null, paymentType, `Client self-reported a ${paymentType} payment: ref ${transactionRef}.`);
 
   flash.set(req, 'success', 'Thank you — we have noted your payment details. Our team will verify this against our bank statement and update your order.');

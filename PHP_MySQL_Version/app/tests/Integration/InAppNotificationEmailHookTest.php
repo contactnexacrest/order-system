@@ -11,10 +11,9 @@ use App\Tests\Support\DbTestCase;
 /**
  * External QA report M-06: "In-app notifications also sent by e-mail."
  * NotificationRepository::create() must also email the targeted user,
- * gated by the same users.email_action_notifications_enabled toggle
- * ActionNotificationService's own, differently-sourced emails already use
- * (see AuditLogNotificationHookTest for that half) — a second, independent
- * trigger for the same per-user preference, not a new toggle.
+ * gated by the users.email_action_notifications_enabled toggle. Since
+ * 2026-10-26 this is the only notification email channel (the audit log
+ * sends none — see AuditLogSendsNoEmailTest).
  */
 final class InAppNotificationEmailHookTest extends DbTestCase
 {

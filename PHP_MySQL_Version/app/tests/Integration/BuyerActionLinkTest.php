@@ -233,7 +233,7 @@ final class BuyerActionLinkTest extends DbTestCase
         );
         $stmt->execute(['t' => 'BUYER_OC_ACKNOWLEDGED']);
         $log = $stmt->fetch();
-        self::assertNotFalse($log, 'a buyer self-service OC acknowledgment must be audit-logged (and so notified — see ActionNotificationService)');
+        self::assertNotFalse($log, 'a buyer self-service OC acknowledgment must be audit-logged (staff are notified directly — see AuditLogSendsNoEmailTest)');
         self::assertSame($orderId, (int) $log['entity_id']);
     }
 
