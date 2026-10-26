@@ -3253,24 +3253,19 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        // Owner request (2026-10-26): each checklist row saves on its own
-        // without reloading the page (so other rows' unsaved choices stay put)
-        // — the page's script posts with X-Requested-With and gets JSON back.
-        $wantsJson = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
-        $respond = static function (bool $ok, string $message, array $extra = []) use ($wantsJson, $orderId): void {
-            if ($wantsJson) {
-                if (!$ok) {
-                    http_response_code(422);
-                }
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => $ok, 'message' => $message] + $extra);
-                return;
-            }
+        $respond = static function (bool $ok, string $message) use ($orderId): void {
             Flash::set($ok ? 'success' : 'error', $message);
             header("Location: /orders/{$orderId}#compliance-checklist");
         };
         if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'close_orders')) {
             $respond(false, 'You do not have permission to update the compliance checklist.');
+            return;
+        }
+
+        // Owner request (2026-10-26, t4): one Save button per checklist card
+        // posts every row as tasks[i][...]; each row lands in its own task.
+        if (isset($_POST['tasks']) && is_array($_POST['tasks'])) {
+            $this->saveComplianceChecklist($orderId, $user, $_POST['tasks'], (string) ($_POST['phase'] ?? ''));
             return;
         }
 
@@ -3289,11 +3284,54 @@ final class OrderController
 
         OrderComplianceTaskRepository::setStatus($orderId, $taskTypeId, $status, $status === 'skipped' ? $skipReason : null, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', $orderId, 'compliance_task:' . $taskTypeId, null, $status, $status === 'skipped' ? $skipReason : null);
-        $summary = OrderComplianceTaskRepository::summaryForOrder($orderId);
-        $respond(true, 'Saved — ' . OrderComplianceTaskRepository::STATUSES[$status] . '.', [
-            'resolved_text' => date('Y-m-d H:i:s') . ' by ' . ($user['name'] ?? 'you'),
-            'outstanding' => $summary['outstanding'],
-        ]);
+        $respond(true, 'Saved — ' . OrderComplianceTaskRepository::STATUSES[$status] . '.');
+    }
+
+    /**
+     * Saves a whole compliance checklist card at once. All-or-nothing: if
+     * any row is invalid (unknown status, or Skipped without a reason)
+     * nothing is written. Only rows whose status or reason changed are
+     * updated, so untouched rows keep their resolved-by stamp.
+     */
+    private function saveComplianceChecklist(int $orderId, array $user, array $rows, string $phase): void
+    {
+        $anchor = $phase === 'shipment' ? 'compliance-checklist-shipment' : 'compliance-checklist';
+        $fail = static function (string $message) use ($orderId, $anchor): void {
+            Flash::set('error', $message);
+            header("Location: /orders/{$orderId}#{$anchor}");
+        };
+        $current = [];
+        foreach (OrderComplianceTaskRepository::forOrder($orderId) as $ct) {
+            $current[(int) $ct['task_type_id']] = $ct;
+        }
+
+        $changes = [];
+        foreach ($rows as $row) {
+            $taskTypeId = (int) ($row['task_type_id'] ?? 0);
+            $status = trim((string) ($row['status'] ?? ''));
+            $reason = trim((string) ($row['skip_reason'] ?? ''));
+            if (!isset($current[$taskTypeId]) || !array_key_exists($status, OrderComplianceTaskRepository::STATUSES)) {
+                $fail('Select a valid status for every compliance task.');
+                return;
+            }
+            $name = (string) $current[$taskTypeId]['task_type_name'];
+            if ($status === 'skipped' && mb_strlen($reason) < ReasonValidator::MIN_LENGTH) {
+                $fail('"' . $name . '" is marked Skipped — give a reason of at least ' . ReasonValidator::MIN_LENGTH . ' characters. Nothing was saved.');
+                return;
+            }
+            $reason = $status === 'skipped' ? $reason : null;
+            $before = $current[$taskTypeId];
+            if ($before['status'] !== $status || ($status === 'skipped' && (string) ($before['skip_reason'] ?? '') !== $reason)) {
+                $changes[] = [$taskTypeId, (string) $before['status'], $status, $reason];
+            }
+        }
+
+        foreach ($changes as [$taskTypeId, $from, $status, $reason]) {
+            OrderComplianceTaskRepository::setStatus($orderId, $taskTypeId, $status, $reason, (int) $user['id']);
+            AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', $orderId, 'compliance_task:' . $taskTypeId, $from, $status, $reason);
+        }
+        Flash::set('success', $changes === [] ? 'Nothing changed on the checklist.' : 'Checklist saved — ' . count($changes) . ' task(s) updated.');
+        header("Location: /orders/{$orderId}#{$anchor}");
     }
 
     /**

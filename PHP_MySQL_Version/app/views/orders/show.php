@@ -721,28 +721,32 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <details class="step-card step-card-parallel" id="<?= $phase === 'order' ? 'compliance-checklist' : 'compliance-checklist-shipment' ?>"<?= $open ?>>
     <summary><?= $stepStatusIcon($status) ?><h2><?= $title ?><?php if ($outstanding > 0): ?> <small class="muted">(<span data-compliance-outstanding><?= $outstanding ?></span> open)</small><?php endif; ?></h2></summary>
     <p class="muted small">Runs alongside the steps below — it never locks them. Every task must be resolved (approved or skipped with a reason) before the order can be marked fully settled. The task list is managed from <?= $canManageComplianceTaskTypes ? '<a href="/compliance-task-types">Compliance Task Types</a>' : 'Compliance Task Types' ?> (Admin-only).</p>
-    <table class="list">
-      <tr><th>Task</th><th>Status &amp; Details</th></tr>
-      <?php foreach ($tasks as $ct): ?>
-      <tr>
-        <td><?= htmlspecialchars($ct['task_type_name']) ?></td>
-        <td>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/compliance-tasks" class="compliance-row-form" data-no-draft style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <?= \App\Helpers\Csrf::field() ?>
-            <input type="hidden" name="task_type_id" value="<?= (int) $ct['task_type_id'] ?>">
-            <select name="status" aria-label="<?= htmlspecialchars($ct['task_type_name']) ?> status">
+    <?php // Owner request (2026-10-26): one Save for the whole card — every row is posted together and each is stored on its own task. ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/compliance-tasks" class="compliance-card-form" data-no-draft>
+      <?= \App\Helpers\Csrf::field() ?>
+      <input type="hidden" name="phase" value="<?= htmlspecialchars($phase) ?>">
+      <table class="list">
+        <tr><th>Task</th><th>Status</th><th>Reason <small class="muted">(only if Skipped)</small></th></tr>
+        <?php foreach ($tasks as $__i => $ct): ?>
+        <tr data-compliance-row>
+          <td><?= htmlspecialchars($ct['task_type_name']) ?>
+            <input type="hidden" name="tasks[<?= (int) $__i ?>][task_type_id]" value="<?= (int) $ct['task_type_id'] ?>">
+            <?php if ($ct['resolved_at']): ?><br><span class="muted small"><?= htmlspecialchars($ct['resolved_at']) ?><?php if ($ct['resolved_by_name']): ?> by <?= htmlspecialchars($ct['resolved_by_name']) ?><?php endif; ?></span><?php endif; ?>
+          </td>
+          <td>
+            <select name="tasks[<?= (int) $__i ?>][status]" data-compliance-status aria-label="<?= htmlspecialchars($ct['task_type_name']) ?> status" style="min-width:170px;">
               <?php foreach (\App\Repositories\OrderComplianceTaskRepository::STATUSES as $key => $label): ?>
               <option value="<?= htmlspecialchars($key) ?>" <?= $ct['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
               <?php endforeach; ?>
             </select>
-            <input type="text" name="skip_reason" class="compliance-skip-reason" value="<?= htmlspecialchars($ct['skip_reason'] ?? '') ?>" placeholder="Why is it not applicable? (required)" style="flex:1;min-width:200px;<?= $ct['status'] === 'skipped' ? '' : 'display:none;' ?>">
-            <button type="submit" class="btn-sm">Save</button>
-            <span class="compliance-row-result muted small"><?php if ($ct['resolved_at']): ?><?= htmlspecialchars($ct['resolved_at']) ?><?php if ($ct['resolved_by_name']): ?> by <?= htmlspecialchars($ct['resolved_by_name']) ?><?php endif; ?><?php endif; ?></span>
-          </form>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </table>
+          </td>
+          <td><input type="text" name="tasks[<?= (int) $__i ?>][skip_reason]" class="compliance-skip-reason" data-compliance-reason value="<?= htmlspecialchars($ct['skip_reason'] ?? '') ?>" placeholder="Why is it not applicable?"></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+      <button type="submit" class="btn-sm">Save Checklist</button>
+      <span class="muted small">Saves every row at once — only the rows you changed are updated.</span>
+    </form>
     <?php if ($outstanding > 0): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/compliance-tasks/mark-all-na" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;" data-confirm="Mark every outstanding task in this checklist Not Applicable? Use this for a repeat order where these tasks genuinely do not apply.">
       <?= \App\Helpers\Csrf::field() ?>

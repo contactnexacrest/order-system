@@ -770,8 +770,14 @@ async function downloadDocument(req, res) {
   }
   // A client only ever sees the FINAL, approved/sent PDF of a
   // customer-facing document type — never a draft, never an internal-only
-  // DOCX, regardless of what's asked for in the URL.
-  if (!['approved', 'sent'].includes(document.status) || document.document_type_category === 'internal') {
+  // DOCX, regardless of what's asked for in the URL. An allow-list, not a
+  // block-list (owner review 2026-10-26): the old check refused only
+  // category 'internal', so a guessed id could still fetch a 'procurement'
+  // document (Supplier PO with its INR prices, COO Prep Sheet). CAFIN and
+  // every never-shown-to-buyer type are refused however the id is reached.
+  if (!['approved', 'sent'].includes(document.status)
+    || document.document_type_category !== 'customer_facing'
+    || Number(document.document_type_never_shown_to_buyer)) {
     res.status(404).send('Document not found.');
     return;
   }

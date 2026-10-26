@@ -187,60 +187,28 @@
   // yet saved stay put. The reason box only shows for "Skipped", and a
   // missing/short reason is flagged right on that row.
   function initComplianceRows() {
-    document.querySelectorAll('form.compliance-row-form').forEach(function (form) {
-      var status = form.querySelector('select[name="status"]');
-      var reason = form.querySelector('input[name="skip_reason"]');
-      var result = form.querySelector('.compliance-row-result');
-      var button = form.querySelector('button[type="submit"]');
+    // Owner request (2026-10-26): the checklist saves with one button per
+    // card; each row only needs its reason box shown (and required, 10+
+    // characters) while it is marked Skipped.
+    document.querySelectorAll('[data-compliance-row]').forEach(function (row) {
+      var status = row.querySelector('[data-compliance-status]');
+      var reason = row.querySelector('[data-compliance-reason]');
+      if (!status || !reason) return;
       function syncReason() {
-        if (!reason || !status) return;
         var skipped = status.value === 'skipped';
         reason.style.display = skipped ? '' : 'none';
         reason.required = skipped;
-        // The sitewide reason hint/error sits next to the box — hide it too.
-        form.querySelectorAll('.reason-hint, .reason-error').forEach(function (el) {
+        if (skipped) {
+          reason.setAttribute('minlength', String(REASON_MIN_LENGTH));
+        } else {
+          reason.removeAttribute('minlength');
+        }
+        row.querySelectorAll('.reason-hint, .reason-error').forEach(function (el) {
           el.style.display = skipped ? '' : 'none';
         });
       }
-      function show(message, isError) {
-        if (!result) return;
-        result.textContent = message;
-        result.className = 'compliance-row-result small ' + (isError ? 'form-field-error' : 'compliance-row-saved');
-      }
-      if (status) status.addEventListener('change', syncReason);
+      status.addEventListener('change', syncReason);
       syncReason();
-      form.addEventListener('submit', function (e) {
-        // The page-wide pre-submit check (registered earlier) may already
-        // have refused this submit — respect that and stay put.
-        var refused = e.defaultPrevented;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        if (refused) return;
-        if (status && status.value === 'skipped' && reason && reason.value.trim().length < REASON_MIN_LENGTH) {
-          show('Give a reason of at least ' + REASON_MIN_LENGTH + ' characters to mark this Not Applicable.', true);
-          reason.focus();
-          return;
-        }
-        if (button) button.disabled = true;
-        show('Saving…', false);
-        fetch(form.action, {
-          method: 'POST',
-          body: new FormData(form),
-          headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-          credentials: 'same-origin'
-        }).then(function (res) {
-          return res.json().catch(function () { return { ok: false, message: 'Could not save — please reload the page and try again.' }; });
-        }).then(function (data) {
-          show(data.ok ? '\u2713 ' + data.message + (data.resolved_text ? ' ' + data.resolved_text : '') : (data.message || data.error || 'Could not save.'), !data.ok);
-          if (data.ok && typeof data.outstanding === 'number') {
-            document.querySelectorAll('[data-compliance-total-outstanding]').forEach(function (el) { el.textContent = data.outstanding; });
-          }
-        }).catch(function () {
-          show('Could not save — check your connection and try again.', true);
-        }).then(function () {
-          if (button) button.disabled = false;
-        });
-      }, true);
     });
   }
 

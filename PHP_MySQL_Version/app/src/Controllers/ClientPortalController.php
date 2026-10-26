@@ -810,7 +810,14 @@ final class ClientPortalController
         // A client only ever sees the FINAL, approved/sent PDF of a
         // customer-facing document type — never a draft, never an
         // internal-only DOCX, regardless of what's asked for in the URL.
-        if (!in_array($document['status'], ['approved', 'sent'], true) || $document['document_type_category'] === 'internal') {
+        // An allow-list, not a block-list (owner review 2026-10-26): the
+        // old check refused only category 'internal', so a guessed id could
+        // still fetch a 'procurement' document (Supplier PO with its INR
+        // prices, COO Prep Sheet). CAFIN and every never-shown-to-buyer type
+        // are refused however the id is reached.
+        if (!in_array($document['status'], ['approved', 'sent'], true)
+            || $document['document_type_category'] !== 'customer_facing'
+            || !empty($document['document_type_never_shown_to_buyer'])) {
             http_response_code(404);
             echo 'Document not found.';
             return;

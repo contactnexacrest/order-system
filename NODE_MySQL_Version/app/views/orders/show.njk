@@ -363,28 +363,33 @@
   <details class="step-card step-card-parallel" id="{{ 'compliance-checklist' if phase == 'order' else 'compliance-checklist-shipment' }}"{{ ' open' if (outstanding > 0 and step == currentUserStep) else '' }}>
     <summary>{{ stepStatusIcon(status) }}<h2>{{ 'Compliance — with the Supplier PO' if phase == 'order' else 'Compliance — before shipment' }}{% if outstanding > 0 %} <small class="muted">(<span data-compliance-outstanding>{{ outstanding }}</span> open)</small>{% endif %}</h2></summary>
     <p class="muted small">Runs alongside the steps below — it never locks them. Every task must be resolved (approved or skipped with a reason) before the order can be marked fully settled. The task list is managed from {% if permissions.manage_compliance_task_types %}<a href="/compliance-task-types">Compliance Task Types</a>{% else %}Compliance Task Types{% endif %} (Admin-only).</p>
-    <table class="list">
-      <tr><th>Task</th><th>Status &amp; Details</th></tr>
-      {% for ct in tasks %}
-      <tr>
-        <td>{{ ct.task_type_name }}</td>
-        <td>
-          <form method="post" action="/orders/{{ order.id }}/compliance-tasks" class="compliance-row-form" data-no-draft style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <input type="hidden" name="task_type_id" value="{{ ct.task_type_id }}">
-            <select name="status" aria-label="{{ ct.task_type_name }} status">
+    {# Owner request (2026-10-26): one Save for the whole card — every row is posted together and each is stored on its own task. #}
+    <form method="post" action="/orders/{{ order.id }}/compliance-tasks" class="compliance-card-form" data-no-draft>
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="phase" value="{{ phase }}">
+      <table class="list">
+        <tr><th>Task</th><th>Status</th><th>Reason <small class="muted">(only if Skipped)</small></th></tr>
+        {% for ct in tasks %}
+        {% set i = loop.index0 %}
+        <tr data-compliance-row>
+          <td>{{ ct.task_type_name }}
+            <input type="hidden" name="tasks[{{ i }}][task_type_id]" value="{{ ct.task_type_id }}">
+            {% if ct.resolved_at %}<br><span class="muted small">{{ ct.resolved_at }}{% if ct.resolved_by_name %} by {{ ct.resolved_by_name }}{% endif %}</span>{% endif %}
+          </td>
+          <td>
+            <select name="tasks[{{ i }}][status]" data-compliance-status aria-label="{{ ct.task_type_name }} status" style="min-width:170px;">
               {% for key, label in complianceStatuses %}
               <option value="{{ key }}" {% if ct.status == key %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
-            <input type="text" name="skip_reason" class="compliance-skip-reason" value="{{ ct.skip_reason or '' }}" placeholder="Why is it not applicable? (required)" style="flex:1;min-width:200px;{{ '' if ct.status == 'skipped' else 'display:none;' }}">
-            <button type="submit" class="btn-sm">Save</button>
-            <span class="compliance-row-result muted small">{% if ct.resolved_at %}{{ ct.resolved_at }}{% if ct.resolved_by_name %} by {{ ct.resolved_by_name }}{% endif %}{% endif %}</span>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+          </td>
+          <td><input type="text" name="tasks[{{ i }}][skip_reason]" class="compliance-skip-reason" data-compliance-reason value="{{ ct.skip_reason or '' }}" placeholder="Why is it not applicable?"></td>
+        </tr>
+        {% endfor %}
+      </table>
+      <button type="submit" class="btn-sm">Save Checklist</button>
+      <span class="muted small">Saves every row at once — only the rows you changed are updated.</span>
+    </form>
     {% if outstanding > 0 %}
     <form method="post" action="/orders/{{ order.id }}/compliance-tasks/mark-all-na" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;" data-confirm="Mark every outstanding task in this checklist Not Applicable? Use this for a repeat order where these tasks genuinely do not apply.">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">

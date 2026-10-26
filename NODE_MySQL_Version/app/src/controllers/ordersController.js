@@ -3226,20 +3226,19 @@ async function markFullySettled(req, res) {
 async function updateComplianceTask(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
-  // Owner request (2026-10-26): each checklist row saves on its own without
-  // reloading the page (so other rows' unsaved choices stay put) — the
-  // page's script posts with X-Requested-With and gets JSON back.
-  const wantsJson = String(req.get ? (req.get('X-Requested-With') || '') : '').toLowerCase() === 'xmlhttprequest';
-  const respond = (ok, message, extra = {}) => {
-    if (wantsJson) {
-      res.status(ok ? 200 : 422).json({ ok, message, ...extra });
-      return;
-    }
+  const respond = (ok, message) => {
     flash.set(req, ok ? 'success' : 'error', message);
     res.redirect(`/orders/${orderId}#compliance-checklist`);
   };
   if (!req.permissions || !req.permissions.close_orders) {
     respond(false, 'You do not have permission to update the compliance checklist.');
+    return;
+  }
+
+  // Owner request (2026-10-26, t4): one Save button per checklist card
+  // posts every row as tasks[i][...]; each row lands in its own task.
+  if (req.body.tasks && typeof req.body.tasks === 'object') {
+    await saveComplianceChecklist(req, res, orderId, user, Object.values(req.body.tasks), str(req.body.phase));
     return;
   }
 
@@ -3258,11 +3257,53 @@ async function updateComplianceTask(req, res) {
 
   await orderComplianceTaskRepository.setStatus(orderId, taskTypeId, status, status === 'skipped' ? skipReason : null, user.id);
   await auditLogRepository.log(user.id, 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', orderId, `compliance_task:${taskTypeId}`, null, status, status === 'skipped' ? skipReason : null);
-  const summary = await orderComplianceTaskRepository.summaryForOrder(orderId);
-  respond(true, `Saved — ${orderComplianceTaskRepository.STATUSES[status]}.`, {
-    resolved_text: `${new Date().toISOString().slice(0, 19).replace('T', ' ')} by ${user.name || 'you'}`,
-    outstanding: summary.outstanding,
-  });
+  respond(true, `Saved — ${orderComplianceTaskRepository.STATUSES[status]}.`);
+
+}
+
+/**
+ * Saves a whole compliance checklist card at once. All-or-nothing: if any
+ * row is invalid (unknown status, or Skipped without a reason) nothing is
+ * written. Only rows whose status or reason changed are updated, so
+ * untouched rows keep their resolved-by stamp.
+ */
+async function saveComplianceChecklist(req, res, orderId, user, rows, phase) {
+  const anchor = phase === 'shipment' ? 'compliance-checklist-shipment' : 'compliance-checklist';
+  const fail = (message) => {
+    flash.set(req, 'error', message);
+    res.redirect(`/orders/${orderId}#${anchor}`);
+  };
+  const current = new Map();
+  for (const ct of await orderComplianceTaskRepository.forOrder(orderId)) {
+    current.set(Number(ct.task_type_id), ct);
+  }
+
+  const changes = [];
+  for (const row of rows) {
+    const taskTypeId = parseInt((row || {}).task_type_id, 10) || 0;
+    const status = str(row.status);
+    let reason = str(row.skip_reason).trim();
+    if (!current.has(taskTypeId) || !Object.prototype.hasOwnProperty.call(orderComplianceTaskRepository.STATUSES, status)) {
+      fail('Select a valid status for every compliance task.');
+      return;
+    }
+    if (status === 'skipped' && reason.length < reasonValidator.MIN_LENGTH) {
+      fail(`"${current.get(taskTypeId).task_type_name}" is marked Skipped — give a reason of at least ${reasonValidator.MIN_LENGTH} characters. Nothing was saved.`);
+      return;
+    }
+    reason = status === 'skipped' ? reason : null;
+    const before = current.get(taskTypeId);
+    if (before.status !== status || (status === 'skipped' && String(before.skip_reason || '') !== reason)) {
+      changes.push([taskTypeId, before.status, status, reason]);
+    }
+  }
+
+  for (const [taskTypeId, from, status, reason] of changes) {
+    await orderComplianceTaskRepository.setStatus(orderId, taskTypeId, status, reason, user.id);
+    await auditLogRepository.log(user.id, 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', orderId, `compliance_task:${taskTypeId}`, from, status, reason);
+  }
+  flash.set(req, 'success', changes.length === 0 ? 'Nothing changed on the checklist.' : `Checklist saved — ${changes.length} task(s) updated.`);
+  res.redirect(`/orders/${orderId}#${anchor}`);
 }
 
 /**

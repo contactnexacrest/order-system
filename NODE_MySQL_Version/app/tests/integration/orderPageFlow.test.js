@@ -17,8 +17,8 @@ const { createTestClient, createTestOrder, createTestDocument } = require('../su
 /**
  * Port of OrderPageFlowTest.php. Owner requests (2026-10-26) for the order
  * page flow: a remittance is recorded together with the day's exchange
- * rate; each Compliance Checklist row saves on its own (JSON, no page
- * reload) and "Mark All N/A" works per checklist part; the supplier's
+ * rate; one Save stores every Compliance Checklist row of a
+ * card and "Mark All N/A" works per checklist part; the supplier's
  * balance can still be paid long after Stage 5 passed; the document section
  * flags anything waiting on someone and every Generate button says when its
  * document already exists.
@@ -74,25 +74,33 @@ describe('Order page flow (owner requests 2026-10-26)', () => {
     expect(lastFlash(req)).toContain("Received USD 1,800.00 at today's exchange rate of ₹83.2500 (= ₹149,850.00).");
   });
 
-  it('saves each compliance row on its own as JSON', async () => {
+  it('stores every compliance row of a card with one Save', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await orderComplianceTaskRepository.initializeForOrder(orderId);
     const tasks = await orderComplianceTaskRepository.forOrder(orderId);
-    const ajax = { 'X-Requested-With': 'XMLHttpRequest' };
+    expect(tasks.length).toBeGreaterThanOrEqual(2);
+    const rows = (secondReason) => ({
+      0: { task_type_id: String(tasks[0].task_type_id), status: 'approved', skip_reason: '' },
+      1: { task_type_id: String(tasks[1].task_type_id), status: 'skipped', skip_reason: secondReason },
+    });
+    const statusOf = async (id) => (await orderComplianceTaskRepository.forOrder(orderId)).find((t) => t.task_type_id === id).status;
 
-    let req = fakeReq({ id: String(orderId) }, { task_type_id: String(tasks[0].task_type_id), status: 'skipped', skip_reason: '' }, ajax);
-    let res = fakeRes();
-    await ordersController.updateComplianceTask(req, res);
-    expect(res.statusCode).toBe(422);
-    expect(res.body.ok).toBe(false);
-    expect(res.body.message).toContain('reason is required');
+    let req = fakeReq({ id: String(orderId) }, { phase: 'shipment', tasks: rows('short') });
+    await ordersController.updateComplianceTask(req, fakeRes());
+    expect(lastFlash(req)).toContain('Nothing was saved');
+    expect(await statusOf(tasks[0].task_type_id)).toBe('not_started');
 
-    req = fakeReq({ id: String(orderId) }, { task_type_id: String(tasks[0].task_type_id), status: 'approved' }, ajax);
-    res = fakeRes();
+    req = fakeReq({ id: String(orderId) }, { phase: 'shipment', tasks: rows('Buyer waived this check') });
+    const res = fakeRes();
     await ordersController.updateComplianceTask(req, res);
-    expect(res.body.ok).toBe(true);
-    expect(res.body.outstanding).toBe(tasks.length - 1);
-    expect(req.session._flash).toBeUndefined();
+    expect(lastFlash(req)).toBe('Checklist saved — 2 task(s) updated.');
+    expect(res.redirectedTo).toBe(`/orders/${orderId}#compliance-checklist-shipment`);
+    expect(await statusOf(tasks[0].task_type_id)).toBe('approved');
+    expect(await statusOf(tasks[1].task_type_id)).toBe('skipped');
+
+    req = fakeReq({ id: String(orderId) }, { phase: 'shipment', tasks: rows('Buyer waived this check') });
+    await ordersController.updateComplianceTask(req, fakeRes());
+    expect(lastFlash(req)).toBe('Nothing changed on the checklist.');
   });
 
   it('marks only its own checklist part not applicable', async () => {

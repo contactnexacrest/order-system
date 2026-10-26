@@ -14,8 +14,8 @@ use App\Tests\Support\DbTestCase;
 
 /**
  * Owner requests (2026-10-26) for the order page flow: a remittance is
- * recorded together with the day's exchange rate; each Compliance Checklist
- * row saves on its own (JSON, no page reload) and "Mark All N/A" works per
+ * recorded together with the day's exchange rate; one Save stores every
+ * Compliance Checklist row of a card and "Mark All N/A" works per
  * checklist part; the supplier's balance can still be paid long after
  * Stage 5 passed; the document section flags anything waiting on someone
  * and every Generate button says when its document already exists.
@@ -84,27 +84,43 @@ final class OrderPageFlowTest extends DbTestCase
         self::assertStringContainsString("Received USD 1,800.00 at today's exchange rate of ₹83.2500 (= ₹149,850.00).", $this->lastFlash());
     }
 
-    public function testEachComplianceRowSavesOnItsOwnAsJson(): void
+    public function testOneSaveStoresEveryComplianceRowOfTheCard(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderComplianceTaskRepository::initializeForOrder($orderId);
-        $tasks = OrderComplianceTaskRepository::forOrder($orderId);
-        $_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
+        $tasks = array_values(OrderComplianceTaskRepository::forOrder($orderId));
+        self::assertGreaterThanOrEqual(2, count($tasks));
+        $rows = static fn(string $secondReason): array => [
+            ['task_type_id' => (string) $tasks[0]['task_type_id'], 'status' => 'approved', 'skip_reason' => ''],
+            ['task_type_id' => (string) $tasks[1]['task_type_id'], 'status' => 'skipped', 'skip_reason' => $secondReason],
+        ];
 
-        $_POST = ['task_type_id' => (string) $tasks[0]['task_type_id'], 'status' => 'skipped', 'skip_reason' => ''];
-        ob_start();
+        $_POST = ['phase' => 'shipment', 'tasks' => $rows('short')];
         (new OrderController())->updateComplianceTask(['id' => (string) $orderId]);
-        $refused = json_decode((string) ob_get_clean(), true);
-        self::assertFalse($refused['ok']);
-        self::assertStringContainsString('reason is required', $refused['message']);
+        self::assertStringContainsString('Nothing was saved', $this->lastFlash());
+        $after = OrderComplianceTaskRepository::forOrder($orderId);
+        self::assertSame('not_started', $this->statusOf($after, (int) $tasks[0]['task_type_id']), 'all-or-nothing: the valid row is not saved either');
 
-        $_POST = ['task_type_id' => (string) $tasks[0]['task_type_id'], 'status' => 'approved'];
-        ob_start();
+        $_POST = ['phase' => 'shipment', 'tasks' => $rows('Buyer waived this check')];
         (new OrderController())->updateComplianceTask(['id' => (string) $orderId]);
-        $saved = json_decode((string) ob_get_clean(), true);
-        self::assertTrue($saved['ok']);
-        self::assertSame(count($tasks) - 1, $saved['outstanding']);
-        self::assertArrayNotHasKey('_flash', $_SESSION, 'a JSON save leaves no flash behind for the next page');
+        self::assertSame('Checklist saved — 2 task(s) updated.', $this->lastFlash());
+        $after = OrderComplianceTaskRepository::forOrder($orderId);
+        self::assertSame('approved', $this->statusOf($after, (int) $tasks[0]['task_type_id']));
+        self::assertSame('skipped', $this->statusOf($after, (int) $tasks[1]['task_type_id']));
+
+        (new OrderController())->updateComplianceTask(['id' => (string) $orderId]);
+        self::assertSame('Nothing changed on the checklist.', $this->lastFlash(), 'unchanged rows are not re-stamped');
+    }
+
+    /** @param array<int, array<string,mixed>> $rows */
+    private function statusOf(array $rows, int $taskTypeId): string
+    {
+        foreach ($rows as $row) {
+            if ((int) $row['task_type_id'] === $taskTypeId) {
+                return (string) $row['status'];
+            }
+        }
+        return '';
     }
 
     public function testMarkAllNotApplicableOnlyTouchesItsOwnChecklistPart(): void

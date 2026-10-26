@@ -34,8 +34,8 @@ function fakeReq(userId, body = {}, params = {}) {
 const tempFiles = [];
 
 /** Unlike tests/support/fixtures.js's createTestFile(), this writes a real file at server_path too, so a "downloads are visible" case can reach an actual 200 instead of 404-ing on "file missing from storage". */
-async function createSentDocumentWithRealPdf(orderId) {
-  const docType = await db.queryOne("SELECT id FROM document_types WHERE code = 'QT'");
+async function createSentDocumentWithRealPdf(orderId, typeCode = 'QT') {
+  const docType = await db.queryOne('SELECT id FROM document_types WHERE code = :code', { code: typeCode });
   const filePath = path.join(os.tmpdir(), `jest-m02-test-file-${Math.random().toString(16).slice(2, 10)}.pdf`);
   fs.writeFileSync(filePath, '%PDF-1.4 test');
   tempFiles.push(filePath);
@@ -48,8 +48,8 @@ async function createSentDocumentWithRealPdf(orderId) {
 
   const docResult = await db.execute(
     `INSERT INTO documents (order_id, document_type_id, document_reference, status, pdf_file_id)
-     VALUES (:order_id, :dt, 'SC/QT/TEST/001', 'sent', :pdf)`,
-    { order_id: orderId, dt: docType.id, pdf: fileResult.insertId }
+     VALUES (:order_id, :dt, :ref, 'sent', :pdf)`,
+    { order_id: orderId, dt: docType.id, ref: `SC/${typeCode}/TEST/${Math.random().toString(16).slice(2, 8)}`, pdf: fileResult.insertId }
   );
   return docResult.insertId;
 }
@@ -144,6 +144,28 @@ describe('Client document downloads visibility (External QA report M-02)', () =>
 
     const downloadRes = await agent.get(`/client/documents/${documentId}/download`);
     expect(downloadRes.status).toBe(200);
+  });
+
+  // Owner review (2026-10-26): "CAFIN must not go to the client at any
+  // cost". The download only serves customer-facing types — CAFIN, the
+  // Supplier PO (INR prices) and the COO Prep Sheet are refused even for the
+  // order's own client, with downloads on and the document 'sent'.
+  it('never lets the client download internal or procurement documents', async () => {
+    const email = `jest-m02-internal-${Math.random().toString(16).slice(2, 8)}@nexacrest.test`;
+    const password = 'JestM02Test123!';
+    const clientId = await createTestClient(email);
+    await createTestClientLogin(clientId, password);
+    const orderId = await createTestOrder(clientId);
+    await clientRepository.setDocumentDownloadsVisibilityOverride(clientId, true);
+    const agent = request.agent(app);
+    const loginPage = await agent.get('/client/login');
+    await agent.post('/client/login').type('form').send({ _csrf: extractCsrf(loginPage.text), email, password });
+
+    for (const code of ['CAFIN', 'SUPPO', 'COOPREP', 'BLI']) {
+      const documentId = await createSentDocumentWithRealPdf(orderId, code);
+      const res = await agent.get(`/client/documents/${documentId}/download`);
+      expect([code, res.status]).toEqual([code, 404]);
+    }
   });
 
   it('setDocumentDownloadsVisibilityOverride 404s for a missing client', async () => {

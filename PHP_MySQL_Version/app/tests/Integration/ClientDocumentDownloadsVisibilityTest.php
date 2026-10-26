@@ -47,10 +47,12 @@ final class ClientDocumentDownloadsVisibilityTest extends DbTestCase
     }
 
     /** Unlike DbTestCase::createTestFile(), this writes a real file at server_path too, so a "downloads are visible" test can reach an actual success instead of 404-ing on "file missing from storage". */
-    private function createSentDocumentWithRealPdf(int $orderId): int
+    private function createSentDocumentWithRealPdf(int $orderId, string $typeCode = 'QT'): int
     {
         $pdo = Database::connection();
-        $docTypeId = (int) $pdo->query("SELECT id FROM document_types WHERE code = 'QT'")->fetchColumn();
+        $docTypeStmt = $pdo->prepare('SELECT id FROM document_types WHERE code = :code');
+        $docTypeStmt->execute(['code' => $typeCode]);
+        $docTypeId = (int) $docTypeStmt->fetchColumn();
 
         $path = sys_get_temp_dir() . '/phpunit-m02-test-file-' . bin2hex(random_bytes(4)) . '.pdf';
         file_put_contents($path, '%PDF-1.4 test');
@@ -70,9 +72,9 @@ final class ClientDocumentDownloadsVisibilityTest extends DbTestCase
 
         $stmt = $pdo->prepare(
             "INSERT INTO documents (order_id, document_type_id, document_reference, status, pdf_file_id)
-             VALUES (:order_id, :dt, 'SC/QT/TEST/001', 'sent', :pdf)"
+             VALUES (:order_id, :dt, :ref, 'sent', :pdf)"
         );
-        $stmt->execute(['order_id' => $orderId, 'dt' => $docTypeId, 'pdf' => $fileId]);
+        $stmt->execute(['order_id' => $orderId, 'dt' => $docTypeId, 'ref' => 'SC/' . $typeCode . '/TEST/' . bin2hex(random_bytes(3)), 'pdf' => $fileId]);
         return (int) $pdo->lastInsertId();
     }
 
@@ -161,6 +163,29 @@ final class ClientDocumentDownloadsVisibilityTest extends DbTestCase
         ob_end_clean();
 
         self::assertNotSame(404, http_response_code());
+    }
+
+    /**
+     * Owner review (2026-10-26): "CAFIN must not go to the client at any
+     * cost". The download only serves customer-facing types — CAFIN, the
+     * Supplier PO (INR prices) and the COO Prep Sheet are refused even for
+     * the order's own client, with downloads on and the document 'sent'.
+     */
+    public function testInternalAndProcurementDocumentsAreNeverDownloadableByTheClient(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        ClientRepository::setDocumentDownloadsVisibilityOverride($clientId, true);
+        $_SESSION['_client_portal_client_id'] = $clientId;
+
+        foreach (['CAFIN', 'SUPPO', 'COOPREP', 'BLI'] as $code) {
+            $documentId = $this->createSentDocumentWithRealPdf($orderId, $code);
+            http_response_code(200);
+            ob_start();
+            (new ClientPortalController())->downloadDocument(['id' => (string) $documentId]);
+            ob_end_clean();
+            self::assertSame(404, http_response_code(), "{$code} must never reach the client");
+        }
     }
 
     public function testSetOverrideControllerActionWritesTheValueAndAuditLog(): void
