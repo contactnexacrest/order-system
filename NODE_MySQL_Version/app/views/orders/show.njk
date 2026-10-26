@@ -1505,7 +1505,7 @@
         <form method="post" action="/orders/{{ order.id }}/payment/advance">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           {% set advanceDue = ((fobTotal | float) * (order.advance_pct | float) / 100) | round(2) %}
-          <p class="review-banner">Advance due on this order: <strong>{{ order.currency_code or '' }} {{ advanceDue | money }}</strong> ({{ (order.advance_pct | float) }}% of the order value {{ order.currency_code or '' }} {{ (fobTotal or 0) | money }}). Enter what the bank actually received.</p>
+          <p class="advance-due-note">Advance due on this order: <strong>{{ order.currency_code or '' }} {{ advanceDue | money }}</strong> ({{ (order.advance_pct | float) }}% of the order value {{ order.currency_code or '' }} {{ (fobTotal or 0) | money }}). Enter what the bank actually received.</p>
           <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required data-remit-amount value="{{ advanceDue.toFixed(2) if advanceDue > 0 else '' }}"></label>
           <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the advance due (e.g. bank charges deducted) — record it anyway</label>
           <label>Received On<input type="date" name="advance_received_at"></label>
