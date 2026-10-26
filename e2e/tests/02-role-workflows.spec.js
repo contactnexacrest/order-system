@@ -215,19 +215,18 @@ async function resolveExportBenefitSchemes(page, orderId) {
   await page.goto(`/orders/${orderId}#order-financials`);
   await openCardAndAncestors(page, '#order-financials');
   await openExportBenefitsTab(page);
-  for (;;) {
-    const pendingForm = page
-      .locator(`form[action="/orders/${orderId}/export-benefit-schemes"]`)
-      .filter({ has: page.locator('select[name="status"] option[value="pending"][selected]') });
-    if (await pendingForm.count() === 0) { break; }
-    const form = pendingForm.first();
-    await form.locator('select[name="status"]').selectOption('not_eligible');
-    await form.locator('input[name="reason"]').fill('Not applicable to this smoke-test order');
-    await form.getByRole('button', { name: 'Save' }).click();
-    await expect(page.locator('.alert')).toContainText('eligibility updated');
-    await openCardAndAncestors(page, '#order-financials');
-    await openExportBenefitsTab(page);
+  // One form, every scheme at once (owner request 2026-10-26).
+  const form = page.locator(`form[action="/orders/${orderId}/export-benefit-schemes"]`);
+  const pendingRows = form.locator('tr').filter({ has: page.locator('select[data-scheme-status] option[value="pending"][selected]') });
+  const count = await pendingRows.count();
+  if (count === 0) { return; }
+  for (let i = 0; i < count; i++) {
+    const row = pendingRows.nth(i);
+    await row.locator('input[data-scheme-reason]').fill('Not applicable to this smoke-test order');
+    await row.locator('select[data-scheme-status]').selectOption('not_eligible');
   }
+  await form.getByRole('button', { name: 'Save All Schemes' }).click();
+  await expect(page.locator('.alert')).toContainText('eligibility saved');
 }
 
 
@@ -544,11 +543,11 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       // this card, so Logistics Executive can do it themselves).
       await resolveComplianceChecklistIfNeeded(page, orderId);
 
-      // 13b–13f: original BLs received, endorsed, endorsement details, printed (manage_shipping).
+      // 13b–13e: original BLs received, endorsement details saved, printed, originals endorsed.(manage_shipping).
       await submitStepForm(page, 9, `/orders/${orderId}/bl-originals-received`, {}, /Record Original BLs Received/);
-      await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsed`, {}, /Mark Original BLs Endorsed/);
       await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsement`, { bl_number: `ROLE-BL-${UNIQUE}` }, /Save BL Endorsement Details/);
       await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsement/generate`, {}, /Generate \/ Print BL Endorsement/);
+      await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsed`, {}, /Mark Original BLs Endorsed/);
 
       await openStage(page, 9);
       const closeForm = page.locator(`form[action="/orders/${orderId}/close"]`);

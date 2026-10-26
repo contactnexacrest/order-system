@@ -72,6 +72,24 @@ $usersById = [];
 foreach ($activeUsers as $u) {
     $usersById[(int) $u['id']] = $u['name'];
 }
+// Owner request (2026-10-26): a remittance is recorded together with the
+// day's exchange rate, and once recorded the card reads it back as one
+// statement — "we received X at today's exchange rate of Y".
+$remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment, $order): string {
+    $amount = $payment[$leg . '_amount'] ?? null;
+    $rate = $payment[$leg . '_exchange_rate'] ?? null;
+    $receivedAt = $payment[$leg . '_remittance_received_at'] ?? null;
+    $currency = htmlspecialchars((string) ($order['currency_code'] ?? ''));
+    $text = 'Received ' . $currency . ' ' . number_format((float) $amount, 2)
+        . ($receivedAt ? ' on ' . htmlspecialchars(date('d M Y', strtotime((string) $receivedAt))) : '');
+    $text .= $rate !== null
+        ? ' at today\'s exchange rate of &#8377;' . number_format((float) $rate, 4) . ' (= &#8377;' . number_format((float) $amount * (float) $rate, 2) . ').'
+        : ' — exchange rate not recorded yet (record it below).';
+    $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
+    $after = $clearedAt ? 'Cleared on ' . date('d M Y', strtotime((string) $clearedAt)) . '.' : $nextStep;
+    return '<p class="remit-recorded"><strong>&#10003; ' . $text . '</strong> <span class="muted">' . htmlspecialchars($after) . '</span></p>';
+};
+
 // Batch 3 #3 — each settlement leg carries its own exchange rate (advance/
 // balance/freight each clear on their own date, at their own market
 // rate), so the rate widget is rendered per-leg, right alongside that
@@ -263,24 +281,12 @@ $paymentLegs = [
     ['label' => 'Freight', 'amount' => $payment['freight_amount'] ?? null, 'received_at' => $payment['freight_remittance_received_at'] ?? null, 'cleared_at' => $payment['freight_cleared_at'] ?? null],
     ['label' => 'Balance', 'amount' => $payment['balance_amount'] ?? null, 'received_at' => $payment['balance_remittance_received_at'] ?? null, 'cleared_at' => $payment['balance_cleared_at'] ?? null],
 ];
-$ledgerEvents = [];
-foreach ($paymentLegs as $leg) {
-    if ($leg['received_at'] !== null) {
-        $ledgerEvents[] = ['date' => $leg['received_at'], 'event' => "{$leg['label']} Remittance Received", 'amount' => $leg['amount'], 'source' => 'Staff-recorded'];
-    }
-    if ($leg['cleared_at'] !== null) {
-        $ledgerEvents[] = ['date' => $leg['cleared_at'], 'event' => "{$leg['label']} Cleared", 'amount' => $leg['amount'], 'source' => 'Staff-recorded'];
-    }
-}
-foreach ($clientPaymentReports as $r) {
-    $ledgerEvents[] = [
-        'date' => $r['payment_date'] ?? $r['reported_at'],
-        'event' => ucfirst($r['payment_type']) . ' Payment Reported by Client',
-        'amount' => $r['amount'],
-        'source' => $r['status'] === 'reviewed' ? 'Client-reported (reviewed)' : 'Client-reported (new)',
-    ];
-}
-usort($ledgerEvents, static fn(array $a, array $b): int => strcmp((string) $a['date'], (string) $b['date']));
+// Owner decision (2026-10-26): the full ledger (supplier payments, every
+// expense, export benefits, INR values and the net) only for
+// manage_order_financials holders — see OrderLedgerService.
+$ledger = \App\Services\OrderLedgerService::forOrder((int) $order['id'], (string) ($order['currency_code'] ?? ''), !empty($canManageOrderFinancials));
+$ledgerEvents = $ledger['rows'];
+$ledgerTotals = $ledger['totals'];
 $paymentLegsResolved = count(array_filter($paymentLegs, static fn(array $l): bool => $l['cleared_at'] !== null));
 $paymentLegsApplicable = count(array_filter($paymentLegs, static fn(array $l): bool => $l['amount'] !== null || $l['received_at'] !== null));
 
@@ -381,7 +387,9 @@ $stepStates = [
     '10'   => $stepStatus($stage7),
     '11'   => $stepStatus($stage8),
     '12'   => $stepStatus($stage9),
-    '13'   => $stepStatus($stage9),
+    // Close Order passes Stage 9's gate, but Step 13 isn't finished until
+    // the order is marked fully settled (13g) — owner report 2026-10-26.
+    '13'   => $orderClosed ? 'done' : ($stage9 === null || $stage9['status'] === 'locked' ? 'locked' : 'current'),
     '14'   => 'done', // reference/upload card — never gated
     '15'   => 'done',
     '16'   => 'done',
@@ -576,11 +584,11 @@ $subStepDone = [
     '13' => [
         '13a' => $docComplete('COOPREP'),
         '13b' => $shipping !== null && !empty($shipping['bl_originals_received_at']),
-        '13c' => $shipping !== null && !empty($shipping['bl_endorsed_at']),
-        '13d' => $blEndorsement !== null,
-        '13f' => $docComplete('BLE'),
-        '13g' => $orderClosed || $order['status'] === 'shipped_docs_sent',
-        '13e' => $orderClosed,
+        '13c' => $blEndorsement !== null,
+        '13d' => $docComplete('BLE'),
+        '13e' => $shipping !== null && !empty($shipping['bl_endorsed_at']),
+        '13f' => $orderClosed || $order['status'] === 'shipped_docs_sent',
+        '13g' => $orderClosed,
     ],
 ];
 // Supplier payments (owner request 2026-10-26: their own sub-steps) are
@@ -740,7 +748,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       </form>
     <?php endforeach; ?>
   </div>
-  <form method="post" action="/orders/<?= (int) $order['id'] ?>/assignees" class="btn-row" style="margin-top:4px;align-items:center;">
+  <form method="post" action="/orders/<?= (int) $order['id'] ?>/assignees" class="btn-row" style="margin-top:4px;margin-bottom:16px;align-items:center;">
     <?= Csrf::field() ?>
     <label class="muted small" style="margin:0;">Add assignee
       <select name="user_id" style="margin-left:4px;">
@@ -1071,23 +1079,40 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
       <div class="tab-panel" id="payment-overview-ledger" data-tab-panel>
         <h3>Ledger</h3>
-      <p class="muted">A single, read-only history of every payment-related event recorded against this order — consolidating what's otherwise scattered across Payment Status and Client-Reported Payments. Nothing here can be edited; use the forms in each payment step to record new events.</p>
+      <p class="muted">A single, read-only history of every money event recorded against this order<?= $ledgerTotals !== null ? ' — received from the buyer, paid to the supplier, every expense and any export benefit' : '' ?>. Nothing here can be edited; use the forms in each step to record new events.</p>
       <?php if (empty($ledgerEvents)): ?>
       <p class="muted small">No payment events recorded yet.</p>
       <?php else: ?>
-      <table class="list">
-        <tr><th>Date</th><th>Event</th><?php if ($canViewPaymentAmounts): ?><th>Amount</th><?php endif; ?><th>Source</th></tr>
+      <?php $__showAmounts = $canViewPaymentAmounts || $ledgerTotals !== null; ?>
+      <div class="table-scroll" style="overflow-x:auto;">
+      <table class="list ledger-table">
+        <tr><th>Date</th><th>Event</th><?php if ($__showAmounts): ?><th>Amount</th><?php endif; ?><?php if ($ledgerTotals !== null): ?><th>In (&#8377;)</th><th>Out (&#8377;)</th><?php endif; ?><th>Source</th></tr>
         <?php foreach ($ledgerEvents as $ev): ?>
-        <tr>
-          <td><?= htmlspecialchars((string) $ev['date']) ?></td>
-          <td><?= htmlspecialchars($ev['event']) ?></td>
-          <?php if ($canViewPaymentAmounts): ?>
-          <td><?= $ev['amount'] !== null ? number_format((float) $ev['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></td>
+        <tr class="ledger-<?= htmlspecialchars($ev['direction']) ?>">
+          <td><?= htmlspecialchars(substr((string) $ev['date'], 0, 10)) ?></td>
+          <td><?= htmlspecialchars($ev['event']) ?><?php if ($ledgerTotals !== null && $ev['rate'] !== null): ?><br><span class="muted small">at &#8377;<?= number_format((float) $ev['rate'], 4) ?> per <?= htmlspecialchars($ev['currency']) ?><?= $ev['inr_basis'] === 'actual' ? ' — INR actual recorded' : '' ?></span><?php endif; ?></td>
+          <?php if ($__showAmounts): ?>
+          <td><?= $ev['amount'] !== null ? number_format((float) $ev['amount'], 2) . ' ' . htmlspecialchars($ev['currency']) : '—' ?></td>
+          <?php endif; ?>
+          <?php if ($ledgerTotals !== null): ?>
+          <td><?= $ev['direction'] === 'in' && $ev['inr'] !== null ? number_format((float) $ev['inr'], 2) : ($ev['direction'] === 'in' ? '<span class="muted small">no rate</span>' : '') ?></td>
+          <td><?= $ev['direction'] === 'out' ? number_format((float) $ev['inr'], 2) : '' ?></td>
           <?php endif; ?>
           <td><?= htmlspecialchars($ev['source']) ?></td>
         </tr>
         <?php endforeach; ?>
       </table>
+      </div>
+      <?php endif; ?>
+      <?php if ($ledgerTotals !== null): ?>
+      <div class="kv-grid ledger-totals">
+        <div><span class="k">Received from buyer</span><span class="v"><?= number_format($ledgerTotals['buyer_foreign'], 2) ?> <?= htmlspecialchars($order['currency_code'] ?? '') ?> = &#8377;<?= number_format($ledgerTotals['buyer_inr'], 2) ?></span></div>
+        <div><span class="k">Export benefits received</span><span class="v">&#8377;<?= number_format($ledgerTotals['benefits_inr'], 2) ?></span></div>
+        <div><span class="k">Paid to supplier</span><span class="v">&#8377;<?= number_format($ledgerTotals['supplier_inr'], 2) ?></span></div>
+        <div><span class="k">Expenses</span><span class="v">&#8377;<?= number_format($ledgerTotals['expenses_inr'], 2) ?></span></div>
+        <div class="full"><span class="k">Net so far</span><span class="v"><strong>&#8377;<?= number_format($ledgerTotals['net_inr'], 2) ?></strong></span></div>
+      </div>
+      <p class="muted small">INR uses each remittance's INR actual when recorded, otherwise the exchange rate recorded with it<?= $ledgerTotals['buyer_without_rate'] > 0 ? ' — ' . (int) $ledgerTotals['buyer_without_rate'] . ' remittance(s) have no rate yet and are left out of the INR totals' : '' ?>. Shown only to staff with the Order Financials permission.</p>
       <?php endif; ?>
       </div>
 
@@ -1100,6 +1125,25 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <div><span class="k">Advance Cleared</span><span class="v"><?= htmlspecialchars($payment['advance_cleared_at'] ?? '—') ?></span></div>
         <div><span class="k">Balance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['balance_amount'] !== null ? number_format((float) $payment['balance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
         <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($payment['balance_due_date'] ?? 'event-triggered') ?></span></div>
+        <div><span class="k">Balance T/T Received</span><span class="v"><?= htmlspecialchars($payment['balance_remittance_received_at'] ?? '—') ?></span></div>
+        <div><span class="k">Balance Cleared</span><span class="v"><?= htmlspecialchars($payment['balance_cleared_at'] ?? '—') ?></span></div>
+        <?php if ($payment['freight_amount'] !== null || $payment['freight_remittance_received_at'] !== null): ?>
+        <div><span class="k">Freight Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['freight_amount'] !== null ? number_format((float) $payment['freight_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
+        <div><span class="k">Freight Cleared</span><span class="v"><?= htmlspecialchars($payment['freight_cleared_at'] ?? '—') ?></span></div>
+        <?php endif; ?>
+        <?php if ($canViewPaymentAmounts || $ledgerTotals !== null): ?>
+        <?php foreach (['advance' => 'Advance', 'freight' => 'Freight', 'balance' => 'Balance'] as $__leg => $__label): ?>
+        <?php if ($payment[$__leg . '_exchange_rate'] !== null): ?>
+        <div><span class="k"><?= $__label ?> Exchange Rate</span><span class="v">&#8377;<?= number_format((float) $payment[$__leg . '_exchange_rate'], 4) ?> per <?= htmlspecialchars($order['currency_code'] ?? '') ?></span></div>
+        <?php endif; ?>
+        <?php endforeach; ?>
+        <?php endif; ?>
+        <?php if ($ledgerTotals !== null): ?>
+        <div><span class="k">Supplier Advance Paid</span><span class="v"><?= !empty($supplierPo['advance_paid_at']) ? '&#8377;' . number_format((float) ($supplierPo['advance_paid_amount_inr'] ?? $supplierPo['advance_amount_inr'] ?? 0), 2) . ' on ' . htmlspecialchars((string) $supplierPo['advance_paid_at']) : '—' ?></span></div>
+        <div><span class="k">Supplier Balance Paid</span><span class="v"><?= !empty($supplierPo['balance_paid_at']) ? '&#8377;' . number_format((float) ($supplierPo['balance_paid_amount_inr'] ?? $supplierPo['balance_amount_inr'] ?? 0), 2) . ' on ' . htmlspecialchars((string) $supplierPo['balance_paid_at']) : '—' ?></span></div>
+        <div><span class="k">Expenses Recorded</span><span class="v">&#8377;<?= number_format($ledgerTotals['expenses_inr'], 2) ?></span></div>
+        <div><span class="k">Net So Far</span><span class="v">&#8377;<?= number_format($ledgerTotals['net_inr'], 2) ?></span></div>
+        <?php endif; ?>
       </div>
       <?php endif; ?>
       <p class="muted small">Advance (or LC) is recorded from Step 5 above; Freight and Balance are recorded from their own steps below.</p>
@@ -1704,7 +1748,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
         <p class="muted">Record the Buyer PO first to unlock this gate.</p>
       <?php elseif ($payment && $payment['advance_remittance_received_at'] !== null): ?>
-        <p class="muted">Already recorded — see Step 5e to mark it cleared.</p>
+        <?= $remittanceRecordedNote('advance', 'Next: Step 5e — mark it cleared once the bank confirms.') ?>
       <?php endif; ?>
 
       <?php $renderInrActualWidget('advance', 'Advance Payment'); ?>
@@ -2292,12 +2336,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
         <?= $stepBadge('9c') ?><button type="submit" class="btn-sm">Record Freight Remittance</button>
       </form>
-    <?php elseif ($freightCleared): ?>
-      <p>Freight payment cleared.</p>
+    <?php else: ?>
+      <?= $remittanceRecordedNote('freight', 'Next: Step 9d — mark it cleared once the bank confirms.') ?>
       <?php $renderInrActualWidget('freight', 'Freight Payment'); ?>
       <?php $renderExchangeRateWidget('freight', 'Freight Payment'); ?>
-    <?php else: ?>
-      <p class="muted">Already recorded — see Step 9d to mark it cleared.</p>
     <?php endif; ?>
   </details>
 
@@ -2524,7 +2566,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php if (!$latestDraftRound || $latestDraftRound['status'] !== 'pending'): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/draft-bl" enctype="multipart/form-data">
           <?= Csrf::field() ?>
-          <label>Draft BL from CHA *<input type="file" name="draft_bl" accept=".pdf" required></label>
+          <label>Draft BL from CHA *<input type="file" name="draft_bl" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip" required></label>
           <button type="submit" class="btn-sm">Log Draft BL for Review</button>
         </form>
       <?php endif; ?>
@@ -2533,7 +2575,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <?= Csrf::field() ?>
         <label>BL Number *<input type="text" name="bl_number" required></label>
         <label>BL Date<input type="date" name="bl_date" value="<?= date('Y-m-d') ?>"></label>
-        <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png"></label>
+        <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
         <?= $stepBadge('10f') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
       </form>
     <?php else: ?>
@@ -2543,7 +2585,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-copy" enctype="multipart/form-data">
           <?= Csrf::field() ?>
-          <label>Scanned BL Copy<input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png" required></label>
+          <label>Scanned BL Copy<input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip" required></label>
           <button type="submit" class="btn-sm">Attach Scanned BL Copy</button>
         </form>
       <?php endif; ?>
@@ -2618,10 +2660,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <?= $stepBadge('11c') ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
       </form>
       <?php endif; ?>
-    <?php elseif ($balanceCleared): ?>
-      <p>Balance payment already cleared.</p>
     <?php else: ?>
-      <p class="muted">Already recorded — see the next step to mark it cleared.</p>
+      <?= $remittanceRecordedNote('balance', 'Next: mark it cleared once the bank confirms.') ?>
     <?php endif; ?>
     <?php if (!$ciBalanceLocked): ?>
       <?php $renderInrActualWidget('balance', 'Balance Payment'); ?>
@@ -2789,31 +2829,33 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
       <div class="tab-panel" id="order-financials-export-benefits" data-tab-panel>
         <h3 style="font-size:0.95em; margin-top:0;">Export Benefit Scheme Eligibility</h3>
-        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Closing the order (Step 13e) is blocked while any scheme here is still Pending.</p>
-        <table class="list">
-          <tr><th>Scheme</th><th>Eligibility &amp; Reason</th></tr>
-          <?php foreach ($exportBenefitEligibility as $sch): ?>
-          <tr>
-            <td><?= htmlspecialchars($sch['scheme_name']) ?></td>
-            <td>
-              <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefit-schemes" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <?= Csrf::field() ?>
-                <input type="hidden" name="scheme_name" value="<?= htmlspecialchars($sch['scheme_name']) ?>">
-                <select name="status">
+        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Marking the order fully settled (Step 13g) is blocked while any scheme here is still Pending.</p>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefit-schemes">
+          <?= Csrf::field() ?>
+          <table class="list">
+            <tr><th>Scheme</th><th>Eligibility</th><th>Reason <small class="muted">(required if Not Eligible)</small></th></tr>
+            <?php foreach ($exportBenefitEligibility as $__i => $sch): ?>
+            <tr>
+              <td><?= htmlspecialchars($sch['scheme_name']) ?>
+                <input type="hidden" name="schemes[<?= (int) $__i ?>][scheme_name]" value="<?= htmlspecialchars($sch['scheme_name']) ?>">
+                <?php if ($sch['resolved_at']): ?>
+                <br><span class="muted small"><?= htmlspecialchars($sch['resolved_at']) ?><?php if ($sch['resolved_by_name']): ?> by <?= htmlspecialchars($sch['resolved_by_name']) ?><?php endif; ?></span>
+                <?php endif; ?>
+              </td>
+              <td>
+                <select name="schemes[<?= (int) $__i ?>][status]" data-scheme-status style="min-width:140px;">
                   <?php foreach (\App\Repositories\OrderExportBenefitSchemeRepository::STATUSES as $key => $label): ?>
                   <option value="<?= htmlspecialchars($key) ?>" <?= $sch['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                   <?php endforeach; ?>
                 </select>
-                <input type="text" name="reason" value="<?= htmlspecialchars($sch['reason'] ?? '') ?>" placeholder="Reason — required if Not Eligible" style="flex:1;min-width:180px;">
-                <button type="submit" class="btn-sm">Save</button>
-                <?php if ($sch['resolved_at']): ?>
-                <span class="muted small"><?= htmlspecialchars($sch['resolved_at']) ?><?php if ($sch['resolved_by_name']): ?> by <?= htmlspecialchars($sch['resolved_by_name']) ?><?php endif; ?></span>
-                <?php endif; ?>
-              </form>
-            </td>
-          </tr>
-          <?php endforeach; ?>
-        </table>
+              </td>
+              <td><input type="text" name="schemes[<?= (int) $__i ?>][reason]" value="<?= htmlspecialchars($sch['reason'] ?? '') ?>" placeholder="Why it doesn't apply to this order" data-scheme-reason></td>
+            </tr>
+            <?php endforeach; ?>
+          </table>
+          <button type="submit" class="btn-sm">Save All Schemes</button>
+          <span class="muted small">Saves every row at once — only the rows you changed are updated.</span>
+        </form>
 
         <h3 style="font-size:0.95em; margin-top:14px;">Government Export Benefits Claimed</h3>
         <?php $govtBenefitsApplicable = in_array($order['status'], ['shipped_docs_sent', 'complete'], true) && !empty($payment['balance_remittance_received_at']); ?>
@@ -2952,10 +2994,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     // DocumentGenerationService::closureBlockedBy()'s docblock and
     // OrderController::closeOrder()), not just a display-only hint.
     $__closeBlockedBy = $despatchLocked ? [] : DocumentGenerationService::closureBlockedBy((int) $order['id']);
-    // Badge lettering here intentionally skips 'e' — Mark Fully Settled
-    // (11e) was already established before this card was split further,
-    // and it's the one action in this sequence that happens LAST
-    // (after Close Order), so its letter doesn't sort before the rest.
+    // Owner sequence (2026-10-26): 13c save the endorsement, 13d print it,
+    // 13e mark the originals endorsed, 13f close, 13g fully settled.
   ?>
 
   <details class="step-group" id="step-group-stage-9"<?= $stepCardOpen('13') ?>>
@@ -2997,28 +3037,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php endif; ?>
   </details>
 
-  <div class="step-group-connector">endorse them over to the buyer's bank</div>
+  <div class="step-group-connector">write up the endorsement</div>
 
-  <details class="step-card" id="step-11c-bl-endorsed-mark"<?= $subCardOpen('13', '13c') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('13', '13c')) ?><h2>Step 13c &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
-    <?php if ($despatchLocked): ?>
-      <p class="muted">Clear the balance payment first to unlock this gate.</p>
-    <?php elseif ($canManageShipping && $shipping && $shipping['bl_originals_received_at'] && !$shipping['bl_endorsed_at']): ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsed">
-        <?= Csrf::field() ?>
-        <?= $stepBadge('13c') ?><button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
-      </form>
-    <?php elseif ($shipping && $shipping['bl_endorsed_at']): ?>
-      <p class="muted small">Original BLs endorsed.</p>
-    <?php else: ?>
-      <p class="muted">Record the original BLs received first (Step 13b).</p>
-    <?php endif; ?>
-  </details>
-
-  <div class="step-group-connector">save who endorsed it and when</div>
-
-  <details class="step-card" id="step-11d-bl-endorsement-save"<?= $subCardOpen('13', '13d') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('13', '13d')) ?><h2>Step 13d &middot; Save BL Endorsement Details</h2></summary>
+  <details class="step-card" id="step-11d-bl-endorsement-save"<?= $subCardOpen('13', '13c') ?>>
+    <summary><?= $stepStatusIcon($subStepStatus('13', '13c')) ?><h2>Step 13c &middot; Save BL Endorsement Details</h2></summary>
     <?php if ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif ($canManageShipping && $shipping && $shipping['bl_originals_received_at']): ?>
@@ -3030,7 +3052,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <label>Port of Loading<input type="text" name="port_of_loading" value="<?= htmlspecialchars($blEndorsement['port_of_loading'] ?? $order['port_of_loading_name'] ?? 'Chennai, India') ?>"></label>
         <label>Port of Discharge<input type="text" name="port_of_discharge" value="<?= htmlspecialchars($blEndorsement['port_of_discharge'] ?? $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '') ?>"></label>
         <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="<?= htmlspecialchars($blEndorsement['date_of_endorsement'] ?? date('Y-m-d')) ?>"></label>
-        <?= $stepBadge('13d') ?><button type="submit" class="btn-sm">Save BL Endorsement Details</button>
+        <?= $stepBadge('13c') ?><button type="submit" class="btn-sm">Save BL Endorsement Details</button>
       </form>
     <?php else: ?>
       <p class="muted">Record the original BLs received first (Step 13b).</p>
@@ -3039,14 +3061,14 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
   <div class="step-group-connector">print the endorsement for the courier pack</div>
 
-  <details class="step-card" id="step-11f-bl-endorsement-generate"<?= $subCardOpen('13', '13f') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('13', '13f')) ?><h2>Step 13f &middot; Generate / Print BL Endorsement</h2></summary>
+  <details class="step-card" id="step-11f-bl-endorsement-generate"<?= $subCardOpen('13', '13d') ?>>
+    <summary><?= $stepStatusIcon($subStepStatus('13', '13d')) ?><h2>Step 13d &middot; Generate / Print BL Endorsement</h2></summary>
     <?php if ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif ($blEndorsement): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsement/generate" style="margin-top:8px;">
         <?= Csrf::field() ?>
-        <?= $stepBadge('13f') ?><button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
+        <?= $stepBadge('13d') ?><button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
       </form>
       <?php if ($blEndorsementDoc): ?>
         <p class="small" style="margin-top:6px;">
@@ -3055,16 +3077,34 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         </p>
       <?php endif; ?>
     <?php else: ?>
-      <p class="muted">Save BL Endorsement Details first (Step 13d).</p>
+      <p class="muted">Save BL Endorsement Details first (Step 13c).</p>
+    <?php endif; ?>
+  </details>
+
+  <div class="step-group-connector">endorse the original BLs over to the buyer's bank</div>
+
+  <details class="step-card" id="step-11c-bl-endorsed-mark"<?= $subCardOpen('13', '13e') ?>>
+    <summary><?= $stepStatusIcon($subStepStatus('13', '13e')) ?><h2>Step 13e &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
+    <?php if ($despatchLocked): ?>
+      <p class="muted">Clear the balance payment first to unlock this gate.</p>
+    <?php elseif ($canManageShipping && $shipping && $shipping['bl_originals_received_at'] && !$shipping['bl_endorsed_at']): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsed">
+        <?= Csrf::field() ?>
+        <?= $stepBadge('13e') ?><button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
+      </form>
+    <?php elseif ($shipping && $shipping['bl_endorsed_at']): ?>
+      <p class="muted small">Original BLs endorsed.</p>
+    <?php else: ?>
+      <p class="muted">Record the original BLs received first (Step 13b).</p>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">once documents are despatched to the buyer</div>
 
-  <details class="step-card" id="step-11g-close-order"<?= $subCardOpen('13', '13g') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('13', '13g')) ?><h2>Step 13g &middot; Close Order (Document Despatch)</h2></summary>
+  <details class="step-card" id="step-11g-close-order"<?= $subCardOpen('13', '13f') ?>>
+    <summary><?= $stepStatusIcon($subStepStatus('13', '13f')) ?><h2>Step 13f &middot; Close Order (Document Despatch)</h2></summary>
     <?php if ($orderClosed || $order['status'] === 'shipped_docs_sent'): ?>
-      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — see Step 13e to mark this order fully settled.</p>
+      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — see Step 13g to mark this order fully settled.</p>
     <?php elseif ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif (!$canCloseOrders): ?>
@@ -3079,22 +3119,22 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
           <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
         </label>
-        <?= $stepBadge('13g') ?><button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
+        <?= $stepBadge('13f') ?><button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
       </form>
       <?php endif; ?>
     <?php else: ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
-        <?= $stepBadge('13g') ?><button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
+        <?= $stepBadge('13f') ?><button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
     <?php endif; ?>
   </details>
 
   <div class="step-group-connector">last — once the balance has actually cleared too</div>
 
-  <details class="step-card" id="step-despatch"<?= $subCardOpen('13', '13e') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('13', '13e')) ?><h2>Step 13e &middot; Mark Fully Settled</h2></summary>
+  <details class="step-card" id="step-despatch"<?= $subCardOpen('13', '13g') ?>>
+    <summary><?= $stepStatusIcon($subStepStatus('13', '13g')) ?><h2>Step 13g &middot; Mark Fully Settled</h2></summary>
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
     <?php elseif ($order['status'] === 'shipped_docs_sent'): ?>
@@ -3102,7 +3142,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php if ($canCloseOrders): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <?= Csrf::field() ?>
-        <?= $stepBadge('13e') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
+        <?= $stepBadge('13g') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
       <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials above).</p>
       <?php if ($canEditLockedData): ?>
@@ -3122,7 +3162,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <p class="muted">Only Export/Logistics can mark this order fully settled.</p>
       <?php endif; ?>
     <?php else: ?>
-      <p class="muted">Close the order first (Step 13g).</p>
+      <p class="muted">Close the order first (Step 13f).</p>
     <?php endif; ?>
   </details>
 
@@ -3227,7 +3267,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <p class="muted">The client hasn't submitted feedback for this order yet.</p>
       <?php if ($canManageOrders && in_array($order['status'], ['shipped_docs_sent', 'complete'], true)): ?>
         <p class="muted small">If the client told you how the order went over the phone or in person instead of using the portal, record it here on their behalf.</p>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/feedback" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/feedback">
           <?= Csrf::field() ?>
           <label>Rating
             <select name="rating" required>
@@ -3237,9 +3277,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               <?php endfor; ?>
             </select>
           </label>
-          <label style="flex:1;min-width:220px">Comments (optional)
-            <input type="text" name="comments" placeholder="What the client told you">
+          <label>Feedback / testimonial
+            <textarea name="comments" rows="4"><?= htmlspecialchars($testimonialSuggestion ?? '') ?></textarea>
           </label>
+          <p class="muted small">A suggested testimonial written from this order's details — change it to what the client actually told you before recording it.</p>
           <button type="submit" class="btn-sm">Record Feedback</button>
         </form>
       <?php endif; ?>
@@ -3285,7 +3326,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
     <?php else: ?>
-      <p class="muted">Not yet complete — finish Step 13e above (Mark Fully Settled) to close this order.</p>
+      <p class="muted">Not yet complete — finish Step 13g above (Mark Fully Settled) to close this order.</p>
     <?php endif; ?>
   </details>
 

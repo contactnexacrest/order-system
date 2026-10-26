@@ -230,7 +230,8 @@
             <?php endfor; ?>
           </select>
         </label>
-        <label>Comments<textarea name="comments" rows="3" placeholder="Optional"><?= htmlspecialchars($orderFeedback['comments'] ?? '') ?></textarea></label>
+        <label>Your feedback / testimonial<textarea name="comments" rows="5"><?= htmlspecialchars(!empty($orderFeedback) ? (string) ($orderFeedback['comments'] ?? '') : ($testimonialSuggestion ?? '')) ?></textarea></label>
+        <p class="muted small"><?= !empty($orderFeedback) ? 'This is the feedback you left — if you want to modify it, please update it above.' : 'We have written a suggestion from your order to get you started — if you want to modify the feedback/testimonial, please update it above.' ?></p>
         <button type="submit"><?= !empty($orderFeedback) ? 'Update Feedback' : 'Submit Feedback' ?></button>
       </form>
       <?php if (!empty($orderFeedback)): ?>

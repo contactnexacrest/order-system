@@ -133,6 +133,24 @@ describe('Order page sequential step flow', () => {
     expect(cardIsOpen(text, 'step-5c-pi-generate')).toBe(true);
   });
 
+  it('keeps Mark Fully Settled current after the order is closed', async () => {
+    // Owner report (2026-10-26): Close Order passes Stage 9's gate, which
+    // used to paint all of Step 13 done — including 13g Mark Fully Settled.
+    const orderId = await orderAtStep5();
+    for (const stageNumber of [3, 4, 5, 6, 7, 8, 9]) {
+      await stageGateService.passAndUnlockNext(orderId, stageNumber, null);
+    }
+    await db.execute("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id", { id: orderId });
+
+    const { text } = await agent.get(`/orders/${orderId}`);
+
+    expect(cardIcon(text, 'step-group-stage-9')).toBe('current');
+    expect(cardIcon(text, 'step-11g-close-order')).toBe('done');
+    expect(cardIcon(text, 'step-despatch')).toBe('current');
+    expect(text.indexOf('id="step-11c-bl-endorsed-mark"')).toBeLessThan(text.indexOf('id="step-despatch"'));
+    expect(text.indexOf('id="step-11f-bl-endorsement-generate"')).toBeLessThan(text.indexOf('id="step-11c-bl-endorsed-mark"'));
+  });
+
   it('marks every earlier pipeline step done once a later one is', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await createTestDocument(orderId, 'QT', 'draft');

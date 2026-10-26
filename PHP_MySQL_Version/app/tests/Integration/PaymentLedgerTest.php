@@ -88,7 +88,7 @@ final class PaymentLedgerTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringContainsString('Payment Reported by Client', $output);
+        self::assertStringContainsString('payment reported by the client', $output);
         self::assertStringContainsString('Client-reported', $output);
     }
 

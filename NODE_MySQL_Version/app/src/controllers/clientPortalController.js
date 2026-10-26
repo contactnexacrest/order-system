@@ -17,6 +17,7 @@ const disputeRepository = require('../repositories/disputeRepository');
 const orderComplaintRepository = require('../repositories/orderComplaintRepository');
 const orderComplaintReplyRepository = require('../repositories/orderComplaintReplyRepository');
 const orderFeedbackRepository = require('../repositories/orderFeedbackRepository');
+const testimonialSuggestionService = require('../services/testimonialSuggestionService');
 const documentRepository = require('../repositories/documentRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
@@ -318,6 +319,7 @@ async function showOrder(req, res) {
     // this page's own form submits to.
     advanceCleared: !!paymentStatus && paymentStatus.advance_cleared_at !== null,
     orderFeedback: await orderFeedbackRepository.find(orderId),
+    testimonialSuggestion: await testimonialSuggestionService.forOrder(orderId),
     orderComplaints: await complaintsWithReplies(orderId),
   }, 'layout/client');
 }

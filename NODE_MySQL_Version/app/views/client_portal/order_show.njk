@@ -221,7 +221,8 @@
             {% endfor %}
           </select>
         </label>
-        <label>Comments<textarea name="comments" rows="3" placeholder="Optional">{{ orderFeedback.comments or '' }}</textarea></label>
+        <label>Your feedback / testimonial<textarea name="comments" rows="5">{% if orderFeedback %}{{ orderFeedback.comments or '' }}{% else %}{{ testimonialSuggestion or '' }}{% endif %}</textarea></label>
+        <p class="muted small">{% if orderFeedback %}This is the feedback you left — if you want to modify it, please update it above.{% else %}We have written a suggestion from your order to get you started — if you want to modify the feedback/testimonial, please update it above.{% endif %}</p>
         <button type="submit">{{ 'Update Feedback' if orderFeedback else 'Submit Feedback' }}</button>
       </form>
       {% if orderFeedback %}

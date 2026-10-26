@@ -38,4 +38,14 @@ function human(value) {
   return `${datePart}, ${String(h12).padStart(2, '0')}:${minute} ${ampm}`;
 }
 
-module.exports = { human };
+/** 'YYYY-MM-DD[ HH:MM:SS]' -> '26 Oct 2026' — mirrors PHP's date('d M Y'). */
+function short(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) {
+    return value ? String(value) : '';
+  }
+  const [, year, month, day] = match;
+  return `${day} ${MONTHS[parseInt(month, 10) - 1].slice(0, 3)} ${year}`;
+}
+
+module.exports = { human, short };

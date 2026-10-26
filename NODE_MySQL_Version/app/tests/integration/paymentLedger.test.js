@@ -53,7 +53,7 @@ describe('Payment Overview (order page)', () => {
     expect(res.text).toContain('id="payment-overview-snapshot"');
     expect(res.text).toContain('id="payment-overview-ledger"');
     expect(res.text).toMatch(/5,000\.00\s*USD/);
-    expect(res.text).toContain('Advance Remittance Received');
+    expect(res.text).toContain('Advance remittance received from buyer');
   });
 
   it('ledger includes client-reported payments chronologically', async () => {
@@ -64,7 +64,7 @@ describe('Payment Overview (order page)', () => {
 
     const res = await agent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Payment Reported by Client');
+    expect(res.text).toContain('payment reported by the client');
     expect(res.text).toContain('Client-reported');
   });
 

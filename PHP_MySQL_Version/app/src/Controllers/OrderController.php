@@ -1025,6 +1025,7 @@ final class OrderController
             // docs/schema.sql Section BV — rating/comments aren't financial
             // data, so this isn't gated behind manage_order_financials.
             'orderFeedback' => \App\Repositories\OrderFeedbackRepository::find($orderId),
+            'testimonialSuggestion' => \App\Services\TestimonialSuggestionService::forOrder($orderId),
         ], 'layout/base');
     }
 

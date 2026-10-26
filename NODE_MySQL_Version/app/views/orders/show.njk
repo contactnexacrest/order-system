@@ -10,6 +10,17 @@
    BEFORE clearing, as an anticipatory estimate, not after. Gated on the
    leg's amount being on record (received) instead of cleared — the same
    point "about to clear" first becomes true. #}
+{# Owner request (2026-10-26): a remittance is recorded together with the
+   day's exchange rate, and once recorded the card reads it back as one
+   statement — "we received X at today's exchange rate of Y". #}
+{% macro remittanceRecordedNote(leg, nextStep) %}
+  {% set amount = payment[leg ~ '_amount'] %}
+  {% set rate = payment[leg ~ '_exchange_rate'] %}
+  {% set receivedAt = payment[leg ~ '_remittance_received_at'] %}
+  {% set clearedAt = payment[leg ~ '_cleared_at'] %}
+  <p class="remit-recorded"><strong>&#10003; Received {{ order.currency_code or '' }} {{ amount | money }}{% if receivedAt %} on {{ receivedAt | shortDate }}{% endif %}{% if rate != null %} at today's exchange rate of &#8377;{{ rate | rate4 }} (= &#8377;{{ (amount * rate) | money }}).{% else %} — exchange rate not recorded yet (record it below).{% endif %}</strong> <span class="muted">{% if clearedAt %}Cleared on {{ clearedAt | shortDate }}.{% else %}{{ nextStep }}{% endif %}</span></p>
+{% endmacro %}
+
 {% macro exchangeRateWidget(leg, label) %}
   {% if canViewInrActual and payment[leg ~ '_amount'] != null %}
     {% set rate = payment[leg ~ '_exchange_rate'] %}
@@ -159,15 +170,11 @@
   { label: 'Freight', amount: payment.freight_amount if payment else null, received_at: payment.freight_remittance_received_at if payment else null, cleared_at: payment.freight_cleared_at if payment else null },
   { label: 'Balance', amount: payment.balance_amount if payment else null, received_at: payment.balance_remittance_received_at if payment else null, cleared_at: payment.balance_cleared_at if payment else null }
 ] %}
-{% set ledgerEvents = [] %}
-{% for leg in paymentLegs %}
-  {% if leg.received_at %}{% set ledgerEvents = (ledgerEvents.push({ date: leg.received_at, event: leg.label ~ ' Remittance Received', amount: leg.amount, source: 'Staff-recorded' }), ledgerEvents) %}{% endif %}
-  {% if leg.cleared_at %}{% set ledgerEvents = (ledgerEvents.push({ date: leg.cleared_at, event: leg.label ~ ' Cleared', amount: leg.amount, source: 'Staff-recorded' }), ledgerEvents) %}{% endif %}
-{% endfor %}
-{% for r in (clientPaymentReports or []) %}
-  {% set ledgerEvents = (ledgerEvents.push({ date: (r.payment_date or r.reported_at), event: (r.payment_type | capitalize) ~ ' Payment Reported by Client', amount: r.amount, source: 'Client-reported (reviewed)' if r.status == 'reviewed' else 'Client-reported (new)' }), ledgerEvents) %}
-{% endfor %}
-{% set ledgerEvents = ledgerEvents | sort(attribute='date') %}
+{# Owner decision (2026-10-26): the full ledger (supplier payments, every
+   expense, export benefits, INR values and the net) only for
+   manage_order_financials holders — see orderLedgerService. #}
+{% set ledgerEvents = ledger.rows %}
+{% set ledgerTotals = ledger.totals %}
 {% set paymentLegsResolved = 0 %}
 {% set paymentLegsApplicable = 0 %}
 {% for leg in paymentLegs %}
@@ -218,6 +225,8 @@
    stuck on Step 2. #}
 {% set quotationAccepted = hasBuyerPoDoc or hasBuyerPo %}
 {% macro step123Status(reached, done) %}{% if orderClosed %}done{% elif not reached %}locked{% elif done %}done{% else %}current{% endif %}{% endmacro %}
+{# Step 13: Close Order passes Stage 9's gate, but Step 13 isn't finished
+   until the order is marked fully settled (13g) — owner report 2026-10-26. #}
 {% set stepStates = {
   's1': step123Status(true, hasQtDoc),
   's2': step123Status(hasQtDoc, qtSent or quotationAccepted),
@@ -231,7 +240,7 @@
   's10': stepStatusFn(stage7, false),
   's11': stepStatusFn(stage8, false),
   's12': stepStatusFn(stage9, false),
-  's13': stepStatusFn(stage9, false),
+  's13': ('done' if orderClosed else ('locked' if (not stage9 or stage9.status == 'locked') else 'current')),
   's14': 'done',
   's15': 'done',
   's16': 'done',
@@ -293,11 +302,11 @@
   's13': {
     '13a': docComplete(documents, 'COOPREP', mailSendingEnabled),
     '13b': shipping and shipping.bl_originals_received_at,
-    '13c': shipping and shipping.bl_endorsed_at,
-    '13d': blEndorsement,
-    '13f': docComplete(documents, 'BLE', mailSendingEnabled),
-    '13g': orderClosed or order.status == 'shipped_docs_sent',
-    '13e': orderClosed
+    '13c': blEndorsement,
+    '13d': docComplete(documents, 'BLE', mailSendingEnabled),
+    '13e': shipping and shipping.bl_endorsed_at,
+    '13f': orderClosed or order.status == 'shipped_docs_sent',
+    '13g': orderClosed
   }
 } %}
 {# Owner decision (2026-10-26): staff can skip the PI-stage form when the
@@ -422,7 +431,7 @@
       </form>
     {% endfor %}
   </div>
-  <form method="post" action="/orders/{{ order.id }}/assignees" class="btn-row" style="margin-top:4px;align-items:center;">
+  <form method="post" action="/orders/{{ order.id }}/assignees" class="btn-row" style="margin-top:4px;margin-bottom:16px;align-items:center;">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <label class="muted small" style="margin:0;">Add assignee
       <select name="user_id" style="margin-left:4px;">
@@ -747,23 +756,40 @@
 
       <div class="tab-panel" id="payment-overview-ledger" data-tab-panel>
         <h3>Ledger</h3>
-      <p class="muted">A single, read-only history of every payment-related event recorded against this order — consolidating what's otherwise scattered across Payment Status and Client-Reported Payments. Nothing here can be edited; use the forms in each payment step to record new events.</p>
+      <p class="muted">A single, read-only history of every money event recorded against this order{% if ledgerTotals %} — received from the buyer, paid to the supplier, every expense and any export benefit{% endif %}. Nothing here can be edited; use the forms in each step to record new events.</p>
       {% if ledgerEvents.length == 0 %}
       <p class="muted small">No payment events recorded yet.</p>
       {% else %}
-      <table class="list">
-        <tr><th>Date</th><th>Event</th>{% if canViewPaymentAmounts %}<th>Amount</th>{% endif %}<th>Source</th></tr>
+      {% set showLedgerAmounts = canViewPaymentAmounts or ledgerTotals %}
+      <div class="table-scroll" style="overflow-x:auto;">
+      <table class="list ledger-table">
+        <tr><th>Date</th><th>Event</th>{% if showLedgerAmounts %}<th>Amount</th>{% endif %}{% if ledgerTotals %}<th>In (&#8377;)</th><th>Out (&#8377;)</th>{% endif %}<th>Source</th></tr>
         {% for ev in ledgerEvents %}
-        <tr>
-          <td>{{ ev.date }}</td>
-          <td>{{ ev.event }}</td>
-          {% if canViewPaymentAmounts %}
-          <td>{{ (ev.amount | money) ~ ' ' ~ (order.currency_code or '') if ev.amount != null else '—' }}</td>
+        <tr class="ledger-{{ ev.direction }}">
+          <td>{{ ev.date | truncate(10, true, '') }}</td>
+          <td>{{ ev.event }}{% if ledgerTotals and ev.rate != null %}<br><span class="muted small">at &#8377;{{ ev.rate | rate4 }} per {{ ev.currency }}{% if ev.inr_basis == 'actual' %} — INR actual recorded{% endif %}</span>{% endif %}</td>
+          {% if showLedgerAmounts %}
+          <td>{{ (ev.amount | money) ~ ' ' ~ ev.currency if ev.amount != null else '—' }}</td>
+          {% endif %}
+          {% if ledgerTotals %}
+          <td>{% if ev.direction == 'in' and ev.inr != null %}{{ ev.inr | money }}{% elif ev.direction == 'in' %}<span class="muted small">no rate</span>{% endif %}</td>
+          <td>{% if ev.direction == 'out' %}{{ ev.inr | money }}{% endif %}</td>
           {% endif %}
           <td>{{ ev.source }}</td>
         </tr>
         {% endfor %}
       </table>
+      </div>
+      {% endif %}
+      {% if ledgerTotals %}
+      <div class="kv-grid ledger-totals">
+        <div><span class="k">Received from buyer</span><span class="v">{{ ledgerTotals.buyer_foreign | money }} {{ order.currency_code or '' }} = &#8377;{{ ledgerTotals.buyer_inr | money }}</span></div>
+        <div><span class="k">Export benefits received</span><span class="v">&#8377;{{ ledgerTotals.benefits_inr | money }}</span></div>
+        <div><span class="k">Paid to supplier</span><span class="v">&#8377;{{ ledgerTotals.supplier_inr | money }}</span></div>
+        <div><span class="k">Expenses</span><span class="v">&#8377;{{ ledgerTotals.expenses_inr | money }}</span></div>
+        <div class="full"><span class="k">Net so far</span><span class="v"><strong>&#8377;{{ ledgerTotals.net_inr | money }}</strong></span></div>
+      </div>
+      <p class="muted small">INR uses each remittance's INR actual when recorded, otherwise the exchange rate recorded with it{% if ledgerTotals.buyer_without_rate > 0 %} — {{ ledgerTotals.buyer_without_rate }} remittance(s) have no rate yet and are left out of the INR totals{% endif %}. Shown only to staff with the Order Financials permission.</p>
       {% endif %}
       </div>
 
@@ -776,6 +802,25 @@
         <div><span class="k">Advance Cleared</span><span class="v">{{ payment.advance_cleared_at or '—' }}</span></div>
         <div><span class="k">Balance Amount</span><span class="v">{% if not canViewPaymentAmounts %}Only shown to Accounts/Logistics/Export staff{% else %}{{ (payment.balance_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.balance_amount != null else '—' }}{% endif %}</span></div>
         <div><span class="k">Balance Due</span><span class="v">{{ payment.balance_due_date or 'event-triggered' }}</span></div>
+        <div><span class="k">Balance T/T Received</span><span class="v">{{ payment.balance_remittance_received_at or '—' }}</span></div>
+        <div><span class="k">Balance Cleared</span><span class="v">{{ payment.balance_cleared_at or '—' }}</span></div>
+        {% if payment.freight_amount != null or payment.freight_remittance_received_at %}
+        <div><span class="k">Freight Amount</span><span class="v">{% if not canViewPaymentAmounts %}Only shown to Accounts/Logistics/Export staff{% else %}{{ (payment.freight_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.freight_amount != null else '—' }}{% endif %}</span></div>
+        <div><span class="k">Freight Cleared</span><span class="v">{{ payment.freight_cleared_at or '—' }}</span></div>
+        {% endif %}
+        {% if canViewPaymentAmounts or ledgerTotals %}
+        {% for leg, legLabel in { advance: 'Advance', freight: 'Freight', balance: 'Balance' } %}
+        {% if payment[leg ~ '_exchange_rate'] != null %}
+        <div><span class="k">{{ legLabel }} Exchange Rate</span><span class="v">&#8377;{{ payment[leg ~ '_exchange_rate'] | rate4 }} per {{ order.currency_code or '' }}</span></div>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+        {% if ledgerTotals %}
+        <div><span class="k">Supplier Advance Paid</span><span class="v">{% if supplierPo and supplierPo.advance_paid_at %}&#8377;{{ (supplierPo.advance_paid_amount_inr if supplierPo.advance_paid_amount_inr != null else (supplierPo.advance_amount_inr or 0)) | money }} on {{ supplierPo.advance_paid_at }}{% else %}—{% endif %}</span></div>
+        <div><span class="k">Supplier Balance Paid</span><span class="v">{% if supplierPo and supplierPo.balance_paid_at %}&#8377;{{ (supplierPo.balance_paid_amount_inr if supplierPo.balance_paid_amount_inr != null else (supplierPo.balance_amount_inr or 0)) | money }} on {{ supplierPo.balance_paid_at }}{% else %}—{% endif %}</span></div>
+        <div><span class="k">Expenses Recorded</span><span class="v">&#8377;{{ ledgerTotals.expenses_inr | money }}</span></div>
+        <div><span class="k">Net So Far</span><span class="v">&#8377;{{ ledgerTotals.net_inr | money }}</span></div>
+        {% endif %}
       </div>
       {% endif %}
       <p class="muted small">Advance (or LC) is recorded from Step 5 above; Freight and Balance are recorded from their own steps below.</p>
@@ -1351,7 +1396,7 @@
       {% elif not stage3 or stage3.status == 'locked' %}
         <p class="muted">Record the Buyer PO first to unlock this gate.</p>
       {% elif payment and payment.advance_remittance_received_at != null %}
-        <p class="muted">Already recorded — see Step 5e to mark it cleared.</p>
+        {{ remittanceRecordedNote('advance', 'Next: Step 5e — mark it cleared once the bank confirms.') }}
       {% endif %}
 
       {{ inrActualWidget('advance', 'Advance Payment') }}
@@ -1924,12 +1969,10 @@
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
         {{ stepBadge('9c') | safe }}<button type="submit" class="btn-sm">Record Freight Remittance</button>
       </form>
-    {% elif freightCleared %}
-      <p>Freight payment cleared.</p>
+    {% else %}
+      {{ remittanceRecordedNote('freight', 'Next: Step 9d — mark it cleared once the bank confirms.') }}
       {{ inrActualWidget('freight', 'Freight Payment') }}
       {{ exchangeRateWidget('freight', 'Freight Payment') }}
-    {% else %}
-      <p class="muted">Already recorded — see Step 9d to mark it cleared.</p>
     {% endif %}
   </details>
 
@@ -2154,7 +2197,7 @@
       {% if not latestDraftRound or latestDraftRound.status != 'pending' %}
         <form method="post" action="/orders/{{ order.id }}/draft-bl" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Draft BL from CHA *<input type="file" name="draft_bl" accept=".pdf" required></label>
+          <label>Draft BL from CHA *<input type="file" name="draft_bl" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip" required></label>
           <button type="submit" class="btn-sm">Log Draft BL for Review</button>
         </form>
       {% endif %}
@@ -2163,7 +2206,7 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date"></label>
-          <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png"></label>
+          <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
           {{ stepBadge('10f') | safe }}<button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
       {% else %}
@@ -2173,7 +2216,7 @@
         {% else %}
           <form method="post" action="/orders/{{ order.id }}/bl-copy" enctype="multipart/form-data">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Scanned BL Copy<input type="file" name="bl_copy" accept=".pdf,.jpg,.jpeg,.png" required></label>
+            <label>Scanned BL Copy<input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip" required></label>
             <button type="submit" class="btn-sm">Attach Scanned BL Copy</button>
           </form>
         {% endif %}
@@ -2246,10 +2289,8 @@
         {{ stepBadge('11c') | safe }}<button type="submit" class="btn-sm">Record Balance Remittance</button>
       </form>
       {% endif %}
-    {% elif balanceCleared %}
-      <p>Balance payment already cleared.</p>
     {% else %}
-      <p class="muted">Already recorded — see the next step to mark it cleared.</p>
+      {{ remittanceRecordedNote('balance', 'Next: mark it cleared once the bank confirms.') }}
     {% endif %}
     {% if not ciBalanceLocked %}
       {{ inrActualWidget('balance', 'Balance Payment') }}
@@ -2417,31 +2458,33 @@
 
       <div class="tab-panel" id="order-financials-export-benefits" data-tab-panel>
         <h3 style="font-size:0.95em; margin-top:0;">Export Benefit Scheme Eligibility</h3>
-        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Closing the order (Step 13e) is blocked while any scheme here is still Pending.</p>
-        <table class="list">
-          <tr><th>Scheme</th><th>Eligibility &amp; Reason</th></tr>
-          {% for sch in exportBenefitEligibility %}
-          <tr>
-            <td>{{ sch.scheme_name }}</td>
-            <td>
-              <form method="post" action="/orders/{{ order.id }}/export-benefit-schemes" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <input type="hidden" name="scheme_name" value="{{ sch.scheme_name }}">
-                <select name="status">
+        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Marking the order fully settled (Step 13g) is blocked while any scheme here is still Pending.</p>
+        <form method="post" action="/orders/{{ order.id }}/export-benefit-schemes">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <table class="list">
+            <tr><th>Scheme</th><th>Eligibility</th><th>Reason <small class="muted">(required if Not Eligible)</small></th></tr>
+            {% for sch in exportBenefitEligibility %}
+            <tr>
+              <td>{{ sch.scheme_name }}
+                <input type="hidden" name="schemes[{{ loop.index0 }}][scheme_name]" value="{{ sch.scheme_name }}">
+                {% if sch.resolved_at %}
+                <br><span class="muted small">{{ sch.resolved_at }}{% if sch.resolved_by_name %} by {{ sch.resolved_by_name }}{% endif %}</span>
+                {% endif %}
+              </td>
+              <td>
+                <select name="schemes[{{ loop.index0 }}][status]" data-scheme-status style="min-width:140px;">
                   {% for key, label in exportBenefitEligibilityStatuses %}
                   <option value="{{ key }}" {% if sch.status == key %}selected{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </select>
-                <input type="text" name="reason" value="{{ sch.reason or '' }}" placeholder="Reason — required if Not Eligible" style="flex:1;min-width:180px;">
-                <button type="submit" class="btn-sm">Save</button>
-                {% if sch.resolved_at %}
-                <span class="muted small">{{ sch.resolved_at }}{% if sch.resolved_by_name %} by {{ sch.resolved_by_name }}{% endif %}</span>
-                {% endif %}
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </table>
+              </td>
+              <td><input type="text" name="schemes[{{ loop.index0 }}][reason]" value="{{ sch.reason or '' }}" placeholder="Why it doesn't apply to this order" data-scheme-reason></td>
+            </tr>
+            {% endfor %}
+          </table>
+          <button type="submit" class="btn-sm">Save All Schemes</button>
+          <span class="muted small">Saves every row at once — only the rows you changed are updated.</span>
+        </form>
 
         <h3 style="font-size:0.95em; margin-top:14px;">Government Export Benefits Claimed</h3>
         {% set govtBenefitsApplicable = (order.status == 'shipped_docs_sent' or order.status == 'complete') and payment and payment.balance_remittance_received_at %}
@@ -2613,28 +2656,10 @@
     {% endif %}
   </details>
 
-  <div class="step-group-connector">endorse them over to the buyer's bank</div>
+  <div class="step-group-connector">write up the endorsement</div>
 
-  <details class="step-card" id="step-11c-bl-endorsed-mark"{{ flow.subCardOpen('s13', '13c') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13c')) }}<h2>Step 13c &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
-    {% if despatchLocked %}
-      <p class="muted">Clear the balance payment first to unlock this gate.</p>
-    {% elif permissions.manage_shipping and shipping and shipping.bl_originals_received_at and not shipping.bl_endorsed_at %}
-      <form method="post" action="/orders/{{ order.id }}/bl-endorsed">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge('13c') | safe }}<button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
-      </form>
-    {% elif shipping and shipping.bl_endorsed_at %}
-      <p class="muted small">Original BLs endorsed.</p>
-    {% else %}
-      <p class="muted">Record the original BLs received first (Step 13b).</p>
-    {% endif %}
-  </details>
-
-  <div class="step-group-connector">save who endorsed it and when</div>
-
-  <details class="step-card" id="step-11d-bl-endorsement-save"{{ flow.subCardOpen('s13', '13d') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13d')) }}<h2>Step 13d &middot; Save BL Endorsement Details</h2></summary>
+  <details class="step-card" id="step-11d-bl-endorsement-save"{{ flow.subCardOpen('s13', '13c') }}>
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13c')) }}<h2>Step 13c &middot; Save BL Endorsement Details</h2></summary>
     {% if despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif permissions.manage_shipping and shipping and shipping.bl_originals_received_at %}
@@ -2646,7 +2671,7 @@
         <label>Port of Loading<input type="text" name="port_of_loading" value="{{ blEndorsement.port_of_loading or order.port_of_loading_name or 'Chennai, India' }}"></label>
         <label>Port of Discharge<input type="text" name="port_of_discharge" value="{{ blEndorsement.port_of_discharge or order.port_of_discharge_name or order.port_of_discharge_text or '' }}"></label>
         <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="{{ blEndorsement.date_of_endorsement or today() }}"></label>
-        {{ stepBadge('13d') | safe }}<button type="submit" class="btn-sm">Save BL Endorsement Details</button>
+        {{ stepBadge('13c') | safe }}<button type="submit" class="btn-sm">Save BL Endorsement Details</button>
       </form>
     {% else %}
       <p class="muted">Record the original BLs received first (Step 13b).</p>
@@ -2655,14 +2680,14 @@
 
   <div class="step-group-connector">print the endorsement for the courier pack</div>
 
-  <details class="step-card" id="step-11f-bl-endorsement-generate"{{ flow.subCardOpen('s13', '13f') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13f')) }}<h2>Step 13f &middot; Generate / Print BL Endorsement</h2></summary>
+  <details class="step-card" id="step-11f-bl-endorsement-generate"{{ flow.subCardOpen('s13', '13d') }}>
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13d')) }}<h2>Step 13d &middot; Generate / Print BL Endorsement</h2></summary>
     {% if despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif blEndorsement %}
       <form method="post" action="/orders/{{ order.id }}/bl-endorsement/generate" style="margin-top:8px;">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge('13f') | safe }}<button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
+        {{ stepBadge('13d') | safe }}<button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
       </form>
       {% if blEndorsementDoc %}
         <p class="small" style="margin-top:6px;">
@@ -2671,16 +2696,34 @@
         </p>
       {% endif %}
     {% else %}
-      <p class="muted">Save BL Endorsement Details first (Step 13d).</p>
+      <p class="muted">Save BL Endorsement Details first (Step 13c).</p>
+    {% endif %}
+  </details>
+
+  <div class="step-group-connector">endorse the original BLs over to the buyer's bank</div>
+
+  <details class="step-card" id="step-11c-bl-endorsed-mark"{{ flow.subCardOpen('s13', '13e') }}>
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13e')) }}<h2>Step 13e &middot; Mark Original BLs Endorsed by NexaCrest</h2></summary>
+    {% if despatchLocked %}
+      <p class="muted">Clear the balance payment first to unlock this gate.</p>
+    {% elif permissions.manage_shipping and shipping and shipping.bl_originals_received_at and not shipping.bl_endorsed_at %}
+      <form method="post" action="/orders/{{ order.id }}/bl-endorsed">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        {{ stepBadge('13e') | safe }}<button type="submit" class="btn-sm">Mark Original BLs Endorsed by NexaCrest</button>
+      </form>
+    {% elif shipping and shipping.bl_endorsed_at %}
+      <p class="muted small">Original BLs endorsed.</p>
+    {% else %}
+      <p class="muted">Record the original BLs received first (Step 13b).</p>
     {% endif %}
   </details>
 
   <div class="step-group-connector">once documents are despatched to the buyer</div>
 
-  <details class="step-card" id="step-11g-close-order"{{ flow.subCardOpen('s13', '13g') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13g')) }}<h2>Step 13g &middot; Close Order (Document Despatch)</h2></summary>
+  <details class="step-card" id="step-11g-close-order"{{ flow.subCardOpen('s13', '13f') }}>
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13f')) }}<h2>Step 13f &middot; Close Order (Document Despatch)</h2></summary>
     {% if orderClosed or order.status == 'shipped_docs_sent' %}
-      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }} — see Step 13e to mark this order fully settled.</p>
+      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }} — see Step 13g to mark this order fully settled.</p>
     {% elif despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif not permissions.close_orders %}
@@ -2695,22 +2738,22 @@
         <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
           <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
         </label>
-        {{ stepBadge('13g') | safe }}<button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
+        {{ stepBadge('13f') | safe }}<button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
       </form>
       {% endif %}
     {% else %}
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
-        {{ stepBadge('13g') | safe }}<button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
+        {{ stepBadge('13f') | safe }}<button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
     {% endif %}
   </details>
 
   <div class="step-group-connector">last — once the balance has actually cleared too</div>
 
-  <details class="step-card" id="step-despatch"{{ flow.subCardOpen('s13', '13e') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13e')) }}<h2>Step 13e &middot; Mark Fully Settled</h2></summary>
+  <details class="step-card" id="step-despatch"{{ flow.subCardOpen('s13', '13g') }}>
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13g')) }}<h2>Step 13g &middot; Mark Fully Settled</h2></summary>
     {% if orderClosed %}
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }}</p>
     {% elif order.status == 'shipped_docs_sent' %}
@@ -2718,7 +2761,7 @@
       {% if permissions.close_orders %}
       <form method="post" action="/orders/{{ order.id }}/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge('13e') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
+        {{ stepBadge('13g') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
       <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials above).</p>
       {% if permissions.edit_locked_data %}
@@ -2738,7 +2781,7 @@
       <p class="muted">Only Export/Logistics can mark this order fully settled.</p>
       {% endif %}
     {% else %}
-      <p class="muted">Close the order first (Step 13g).</p>
+      <p class="muted">Close the order first (Step 13f).</p>
     {% endif %}
   </details>
 
@@ -2855,7 +2898,7 @@
       <p class="muted">The client hasn't submitted feedback for this order yet.</p>
       {% if permissions.manage_orders and order.status in ['shipped_docs_sent', 'complete'] %}
         <p class="muted small">If the client told you how the order went over the phone or in person instead of using the portal, record it here on their behalf.</p>
-        <form method="post" action="/orders/{{ order.id }}/feedback" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <form method="post" action="/orders/{{ order.id }}/feedback">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Rating
             <select name="rating" required>
@@ -2865,9 +2908,10 @@
               {% endfor %}
             </select>
           </label>
-          <label style="flex:1;min-width:220px">Comments (optional)
-            <input type="text" name="comments" placeholder="What the client told you">
+          <label>Feedback / testimonial
+            <textarea name="comments" rows="4">{{ testimonialSuggestion or '' }}</textarea>
           </label>
+          <p class="muted small">A suggested testimonial written from this order's details — change it to what the client actually told you before recording it.</p>
           <button type="submit" class="btn-sm">Record Feedback</button>
         </form>
       {% endif %}
@@ -2913,7 +2957,7 @@
     {% if orderClosed %}
     <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
     {% else %}
-    <p class="muted">Not yet complete — finish Step 13e above (Mark Fully Settled) to close this order.</p>
+    <p class="muted">Not yet complete — finish Step 13g above (Mark Fully Settled) to close this order.</p>
     {% endif %}
   </details>
 

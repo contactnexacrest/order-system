@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
@@ -129,6 +130,11 @@ async function setExportBenefitSchemeStatus(req, res) {
   }
   const user = req.user;
 
+  if (req.body.schemes && typeof req.body.schemes === 'object') {
+    await saveAllExportBenefitSchemes(req, res, orderId, user.id);
+    return;
+  }
+
   const schemeName = String(req.body.scheme_name || '').trim();
   const status = String(req.body.status || '').trim();
   if (schemeName === '' || !Object.prototype.hasOwnProperty.call(orderExportBenefitSchemeRepository.STATUSES, status) || status === 'pending') {
@@ -147,6 +153,59 @@ async function setExportBenefitSchemeStatus(req, res) {
   await orderExportBenefitSchemeRepository.setStatus(orderId, schemeName, status, status === 'not_eligible' ? reason : null, user.id);
   await auditLogRepository.log(user.id, 'EXPORT_BENEFIT_SCHEME_STATUS_UPDATED', 'orders', orderId, `export_benefit_scheme:${schemeName}`, null, status, status === 'not_eligible' ? reason : null);
   flash.set(req, 'success', `${schemeName} eligibility updated.`);
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
+/**
+ * Owner request (2026-10-26): every scheme's eligibility saved in one
+ * submit instead of one Save per row. Rows still left Pending are
+ * untouched; only rows whose status or reason actually changed are written
+ * (and audit-logged). All or nothing — if any row is invalid, nothing is
+ * saved and the error names each scheme to fix.
+ */
+async function saveAllExportBenefitSchemes(req, res, orderId, userId) {
+  const repo = orderExportBenefitSchemeRepository;
+  const current = {};
+  for (const row of await repo.forOrder(orderId)) {
+    current[row.scheme_name] = row;
+  }
+
+  const changes = [];
+  const errors = [];
+  for (const row of Object.values(req.body.schemes)) {
+    const schemeName = String((row && row.scheme_name) || '').trim();
+    const status = String((row && row.status) || '').trim();
+    const reason = String((row && row.reason) || '').trim();
+    if (!current[schemeName] || !Object.prototype.hasOwnProperty.call(repo.STATUSES, status)) {
+      errors.push(`select a valid status for ${schemeName || 'every scheme'}`);
+      continue;
+    }
+    if (status === 'pending') {
+      continue;
+    }
+    if (status === 'not_eligible' && [...reason].length < reasonValidator.MIN_LENGTH) {
+      errors.push(`${schemeName} needs a reason of at least ${reasonValidator.MIN_LENGTH} characters to be Not Eligible`);
+      continue;
+    }
+    const storedReason = status === 'not_eligible' ? reason : null;
+    if (current[schemeName].status === status && (current[schemeName].reason ?? null) === storedReason) {
+      continue;
+    }
+    changes.push([schemeName, status, storedReason]);
+  }
+
+  if (errors.length) {
+    flash.set(req, 'error', `Nothing saved — ${errors.join('; ')}.`);
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  for (const [schemeName, status, storedReason] of changes) {
+    await repo.setStatus(orderId, schemeName, status, storedReason, userId);
+    await auditLogRepository.log(userId, 'EXPORT_BENEFIT_SCHEME_STATUS_UPDATED', 'orders', orderId, `export_benefit_scheme:${schemeName}`, current[schemeName].status, status, storedReason);
+  }
+  flash.set(req, 'success', changes.length
+    ? `Export benefit eligibility saved for ${changes.map((c) => c[0]).join(', ')}.`
+    : 'No changes to save.');
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 

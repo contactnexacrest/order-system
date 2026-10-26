@@ -143,6 +143,26 @@ final class OrderStepFlowTest extends DbTestCase
         self::assertTrue($this->cardIsOpen($output, 'step-5c-pi-generate'));
     }
 
+    public function testMarkFullySettledStaysCurrentAfterTheOrderIsClosed(): void
+    {
+        // Owner report (2026-10-26): Close Order passes Stage 9's gate, which
+        // used to paint all of Step 13 done — including 13g Mark Fully
+        // Settled, still waiting to be done.
+        $orderId = $this->orderAtStep5();
+        foreach ([3, 4, 5, 6, 7, 8, 9] as $stageNumber) {
+            StageGateService::passAndUnlockNext($orderId, $stageNumber, $this->userId);
+        }
+        \App\Config\Database::connection()->prepare("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id")->execute(['id' => $orderId]);
+
+        $output = $this->render($orderId);
+
+        self::assertSame('current', $this->cardIcon($output, 'step-group-stage-9'));
+        self::assertSame('done', $this->cardIcon($output, 'step-11g-close-order'));
+        self::assertSame('current', $this->cardIcon($output, 'step-despatch'));
+        self::assertLessThan(strpos($output, 'id="step-despatch"'), strpos($output, 'id="step-11c-bl-endorsed-mark"'), '13e (endorsed) comes before 13g');
+        self::assertLessThan(strpos($output, 'id="step-11c-bl-endorsed-mark"'), strpos($output, 'id="step-11f-bl-endorsement-generate"'), '13d (print) comes before 13e (endorsed)');
+    }
+
     public function testLaterStepDoneMarksEveryEarlierPipelineStepDone(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());

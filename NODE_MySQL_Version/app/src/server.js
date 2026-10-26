@@ -116,6 +116,7 @@ const njkEnv = nunjucks.configure(viewsDir, {
 njkEnv.addFilter('maskEmail', mask.maskEmail);
 njkEnv.addFilter('maskPhone', mask.maskPhone);
 njkEnv.addFilter('humanDate', dates.human);
+njkEnv.addFilter('shortDate', dates.short);
 // Nunjucks 3's selectattr/rejectattr only test truthiness — these filter a
 // list of objects by an attribute's exact value instead.
 njkEnv.addFilter('whereEq', (list, attr, value) => (list || []).filter((item) => item && item[attr] === value));

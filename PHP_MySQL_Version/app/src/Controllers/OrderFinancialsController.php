@@ -134,6 +134,11 @@ final class OrderFinancialsController
         }
         $user = AuthService::currentUser();
 
+        if (isset($_POST['schemes']) && is_array($_POST['schemes'])) {
+            $this->saveAllExportBenefitSchemes($orderId, (int) $user['id']);
+            return;
+        }
+
         $schemeName = trim((string) ($_POST['scheme_name'] ?? ''));
         $status = trim((string) ($_POST['status'] ?? ''));
         if ($schemeName === '' || !array_key_exists($status, \App\Repositories\OrderExportBenefitSchemeRepository::STATUSES) || $status === 'pending') {
@@ -152,6 +157,60 @@ final class OrderFinancialsController
         \App\Repositories\OrderExportBenefitSchemeRepository::setStatus($orderId, $schemeName, $status, $status === 'not_eligible' ? $reason : null, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'EXPORT_BENEFIT_SCHEME_STATUS_UPDATED', 'orders', $orderId, 'export_benefit_scheme:' . $schemeName, null, $status, $status === 'not_eligible' ? $reason : null);
         Flash::set('success', "{$schemeName} eligibility updated.");
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
+    /**
+     * Owner request (2026-10-26): every scheme's eligibility saved in one
+     * submit instead of one Save per row. Rows still left Pending are
+     * untouched; only rows whose status or reason actually changed are
+     * written (and audit-logged). All or nothing — if any row is invalid,
+     * nothing is saved and the error names each scheme to fix.
+     */
+    private function saveAllExportBenefitSchemes(int $orderId, int $userId): void
+    {
+        $repo = \App\Repositories\OrderExportBenefitSchemeRepository::class;
+        $current = [];
+        foreach ($repo::forOrder($orderId) as $row) {
+            $current[$row['scheme_name']] = $row;
+        }
+
+        $changes = [];
+        $errors = [];
+        foreach ($_POST['schemes'] as $row) {
+            $schemeName = trim((string) ($row['scheme_name'] ?? ''));
+            $status = trim((string) ($row['status'] ?? ''));
+            $reason = trim((string) ($row['reason'] ?? ''));
+            if (!isset($current[$schemeName]) || !array_key_exists($status, $repo::STATUSES)) {
+                $errors[] = 'select a valid status for ' . ($schemeName !== '' ? $schemeName : 'every scheme');
+                continue;
+            }
+            if ($status === 'pending') {
+                continue;
+            }
+            if ($status === 'not_eligible' && mb_strlen($reason) < \App\Helpers\ReasonValidator::MIN_LENGTH) {
+                $errors[] = "{$schemeName} needs a reason of at least " . \App\Helpers\ReasonValidator::MIN_LENGTH . ' characters to be Not Eligible';
+                continue;
+            }
+            $storedReason = $status === 'not_eligible' ? $reason : null;
+            if ($current[$schemeName]['status'] === $status && ($current[$schemeName]['reason'] ?? null) === $storedReason) {
+                continue;
+            }
+            $changes[] = [$schemeName, $status, $storedReason];
+        }
+
+        if ($errors !== []) {
+            Flash::set('error', 'Nothing saved — ' . implode('; ', $errors) . '.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        foreach ($changes as [$schemeName, $status, $storedReason]) {
+            $repo::setStatus($orderId, $schemeName, $status, $storedReason, $userId);
+            AuditLogRepository::log($userId, 'EXPORT_BENEFIT_SCHEME_STATUS_UPDATED', 'orders', $orderId, 'export_benefit_scheme:' . $schemeName, $current[$schemeName]['status'], $status, $storedReason);
+        }
+        Flash::set('success', $changes === []
+            ? 'No changes to save.'
+            : 'Export benefit eligibility saved for ' . implode(', ', array_column($changes, 0)) . '.');
         header("Location: /orders/{$orderId}#order-financials");
     }
 

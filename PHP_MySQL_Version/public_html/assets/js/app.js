@@ -136,6 +136,27 @@
   // Owner request (2026-10-26): a remittance is recorded together with the
   // day's exchange rate — this spells out what will be saved: "We received
   // USD 1,800.00 at today's exchange rate of ₹83.2500 = ₹149,850.00".
+  // Export benefit schemes (saved all at once): a row's reason is required
+  // (10+ characters) only while that row is marked Not Eligible.
+  function initSchemeRows() {
+    document.querySelectorAll('[data-scheme-status]').forEach(function (select) {
+      var row = select.closest('tr');
+      var reason = row && row.querySelector('[data-scheme-reason]');
+      if (!reason) return;
+      var sync = function () {
+        var needed = select.value === 'not_eligible';
+        reason.required = needed;
+        if (needed) {
+          reason.setAttribute('minlength', '10');
+        } else {
+          reason.removeAttribute('minlength');
+        }
+      };
+      select.addEventListener('change', sync);
+      sync();
+    });
+  }
+
   function initRemittanceStatements() {
     document.querySelectorAll('[data-remit-statement]').forEach(function (line) {
       var form = line.closest('form');
@@ -479,6 +500,7 @@
     initLockedSteps();
     initComplianceRows();
     initRemittanceStatements();
+    initSchemeRows();
   }
 
   if (document.readyState === 'loading') {

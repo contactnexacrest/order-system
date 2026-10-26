@@ -3986,3 +3986,10 @@ ALTER TABLE compliance_task_types
 -- every one) are gone; notification email now comes only from the targeted
 -- notifications table (someone needs to know or act).
 DELETE FROM company_settings WHERE setting_key = 'notification_email';
+
+-- ============================================================================
+-- SECTION CC — DRAFT / SCANNED BL ACCEPT ANY COMMON FILE (owner request 2026-10-26)
+-- ============================================================================
+UPDATE file_upload_contexts
+   SET allowed_extensions = 'pdf,doc,docx,xls,xlsx,odt,ods,rtf,txt,csv,jpg,jpeg,png,gif,webp,bmp,tif,tiff,heic,eml,msg,zip'
+ WHERE context_key IN ('draft_bl', 'bl_copy');

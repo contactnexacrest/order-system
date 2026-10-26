@@ -314,6 +314,7 @@ final class ClientPortalController
             // which this page's own form submits to.
             'advanceCleared' => $paymentStatus !== null && $paymentStatus['advance_cleared_at'] !== null,
             'orderFeedback' => \App\Repositories\OrderFeedbackRepository::find($orderId),
+            'testimonialSuggestion' => \App\Services\TestimonialSuggestionService::forOrder($orderId),
             'orderComplaints' => self::complaintsWithReplies($orderId),
         ], 'layout/client');
     }

@@ -43,6 +43,8 @@ const orderCostEntryRepository = require('../repositories/orderCostEntryReposito
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderTravelExpenseRepository = require('../repositories/orderTravelExpenseRepository');
 const orderFeedbackRepository = require('../repositories/orderFeedbackRepository');
+const testimonialSuggestionService = require('../services/testimonialSuggestionService');
+const orderLedgerService = require('../services/orderLedgerService');
 const orderCrateRepository = require('../repositories/orderCrateRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPackingRepository = require('../repositories/orderPackingRepository');
@@ -1041,6 +1043,8 @@ async function show(req, res) {
       // the user's own ask that this specific section stay
       // Super-Admin-plus-explicitly-granted-roles only.
       canManageOrderFinancials: !!req.permissions.manage_order_financials,
+      // Owner decision (2026-10-26): the full ledger only for manage_order_financials holders.
+      ledger: await orderLedgerService.forOrder(orderId, order.currency_code || '', !!req.permissions.manage_order_financials),
       orderCostEntries: req.permissions.manage_order_financials ? await orderCostEntryRepository.forOrder(orderId) : [],
       costEntryCategories: orderCostEntryRepository.CATEGORIES,
       // Not gated on manage_order_financials like the cost-entry fields
@@ -1059,6 +1063,7 @@ async function show(req, res) {
       // docs/schema.sql Section BV — rating/comments aren't financial
       // data, so this isn't gated behind manage_order_financials.
       orderFeedback: await orderFeedbackRepository.find(orderId),
+      testimonialSuggestion: await testimonialSuggestionService.forOrder(orderId),
     },
     'layout/base'
   );

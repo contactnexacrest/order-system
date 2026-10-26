@@ -31,21 +31,27 @@ Stage 9 unlocks the moment the balance payment clears in Stage 8:
 
 ![Stage 9 section — unlocked, nothing recorded yet](./images/s9_before.png)
 
-Two optional record-keeping steps, then the closing action:
+On the order page this is **Step 13**, worked in this order (owner
+sequence, 2026-10-26) — each sub-step opens once the one before it is
+done:
 
-1. **Record Original BLs Received from CHA** — how many original Bill of
-   Lading copies came back from the Customs House Agent.
-2. **Mark Original BLs Endorsed by NexaCrest** — confirms NexaCrest has
-   endorsed them (signed over) ready to hand to the buyer.
+- **13a · Generate COO Prep Sheet** (internal worksheet for the
+  Certificate of Origin).
+- **13b · Record Original BLs Received from CHA** — how many original
+  Bill of Lading copies came back from the Customs House Agent.
+- **13c · Save BL Endorsement Details** — who to endorse to, BL/vessel/
+  voyage, ports and date.
+- **13d · Generate / Print BL Endorsement** — the printable endorsement
+  for the reverse of each original BL.
+- **13e · Mark Original BLs Endorsed by NexaCrest** — confirms the
+  originals have been endorsed (signed over) ready for the buyer.
+- **13f · Close Order (Document Despatch)** — below.
+- **13g · Mark Fully Settled** — the final close (see "Closing the order
+  — two phases" below). Step 13 shows its green tick only once this is
+  done; until then 13g stays the current, highlighted step even though
+  Close Order has passed the stage gate.
 
 ![Stage 9 section — originals received and endorsed](./images/s9_originals_endorsed.png)
-
-> **Neither of these two steps is actually required to close the order** —
-> notice in the screenshot above that **Close Order** was available from the
-> very start of this stage, before either box was ticked. They exist to keep
-> a record of the physical document handling, but the system trusts staff to
-> follow the real-world process in the right order rather than enforcing it
-> as a hard rule here.
 
 **Close Order — Complete Document Set Couriered to Buyer**: staff enter
 the courier tracking number for the package containing the buyer's
