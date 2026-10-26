@@ -9,6 +9,7 @@ const orderPaymentStatusRepository = require('../repositories/orderPaymentStatus
 const documentRepository = require('../repositories/documentRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const orderRepository = require('../repositories/orderRepository');
+const orderStageRepository = require('../repositories/orderStageRepository');
 const stageGateService = require('./stageGateService');
 const documentGenerationService = require('./documentGenerationService');
 const fileUploadService = require('./fileUploadService');
@@ -138,13 +139,15 @@ async function uploadBuyerPo(req, order) {
 }
 
 /**
- * Owner request (2026-10-26): the Buyer PO generated in Step 4a, once it is
- * issued (approved, or sent while email is on) — what the buyer downloads
- * from the Buyer Action Link to sign. Null until then.
+ * Owner request (2026-10-26): a document the buyer can download from the
+ * Buyer Action Link — the Buyer PO generated in Step 4a (to sign) or the
+ * Proforma Invoice (to pay against) — once it is issued (approved, or sent
+ * while email is on). Null until then, and for any other type.
  */
-async function issuedBuyerPoDocument(orderId) {
-  const latest = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'BUYERPO');
-  if (!latest || !latest.pdf_file_id || (await documentGenerationService.stageDocumentBlockedBy(orderId, 2)).length > 0) {
+async function issuedBuyerDocument(orderId, typeCode) {
+  const stage = { BUYERPO: 2, PI: 3 }[typeCode];
+  const latest = stage ? await documentRepository.findLatestForOrderAndTypeCode(orderId, typeCode) : null;
+  if (!latest || !latest.pdf_file_id || (await documentGenerationService.stageDocumentBlockedBy(orderId, stage)).length > 0) {
     return null;
   }
   const document = await documentRepository.find(latest.id);
@@ -154,6 +157,38 @@ async function issuedBuyerPoDocument(orderId) {
     return null;
   }
   return document;
+}
+
+/**
+ * Owner request (2026-10-26): the Buyer Action Link shows the client one
+ * clear step at a time — the Purchase Order while Step 4 is open, then the
+ * advance payment once the PI is issued, then the Order Confirmation —
+ * never a later step before its turn. One of: buyer_po, waiting_pi,
+ * advance, advance_reported, waiting, oc, done.
+ */
+async function currentTask(order, ocAcknowledgment) {
+  const orderId = order.id;
+  const passed = async (n) => ((await orderStageRepository.findByOrderAndStageNumber(orderId, n)) || {}).status === 'gate_passed';
+  if (!(await passed(2))) {
+    return 'buyer_po';
+  }
+  if (!(await passed(3)) && !(await advanceAlreadyCleared(orderId))) {
+    if ((order.payment_method || 'CASH_ADVANCE') === 'LC') {
+      return 'waiting';
+    }
+    if (!(await issuedBuyerDocument(orderId, 'PI'))) {
+      return 'waiting_pi';
+    }
+    const reports = await clientPaymentReportRepository.forOrder(orderId);
+    if (reports.some((r) => r.payment_type === 'advance' && r.status === 'new')) {
+      return 'advance_reported';
+    }
+    return 'advance';
+  }
+  if (ocAcknowledgment && ocAcknowledgment.acknowledged_at === null) {
+    return 'oc';
+  }
+  return (await passed(4)) ? 'done' : 'waiting';
 }
 
 /**
@@ -222,4 +257,4 @@ async function reportAdvancePayment(req, order) {
   return { ok: true, message: 'Thank you — we have noted your advance payment details. Our team will verify this against our bank statement and update your order.' };
 }
 
-module.exports = { acknowledgeOc, uploadBuyerPo, issuedBuyerPoDocument, reportAdvancePayment };
+module.exports = { acknowledgeOc, uploadBuyerPo, issuedBuyerDocument, currentTask, reportAdvancePayment };

@@ -89,14 +89,21 @@ back to staff to copy and hand over directly. The link works for 90 days,
 and generating a new one immediately invalidates whichever one came
 before it — there is only ever one live link per order. Opening it needs
 no login at all. The page is laid out like the Quotation details form —
-a wide card, a summary bar (products, order value, Incoterm) and numbered
-sections with a status on each: **1 · Your Purchase Order** (download the
-Buyer PO, upload it signed with the PO number — see [Chapter
-2](./02-stage2-buyer-po.md)), **2 · Order Confirmation** (the order summary
-and the acknowledge button, once the OC is issued), and — while the
-advance payment hasn't cleared yet — an Advance Payment self-report form
-(90-item backlog #48; see [Chapter 3](./03-stage3-pi-advance.md)) — nothing
-else; no documents, other payment figures, or chat, which stay
+a wide card and a summary bar (products, order value, Incoterm) — and
+**shows the client only the one thing they need to do right now** (owner
+request 2026-10-26), with a 3-step strip on top (Purchase Order → Advance
+Payment → Order Confirmation) marking what's done and what's current:
+
+| Where the order is | What the client sees |
+|---|---|
+| Step 4 open | **1 · Your Purchase Order** — download the Buyer PO, upload it signed with the PO number ([Chapter 2](./02-stage2-buyer-po.md)) |
+| PO done, PI not issued yet | "Nothing to do right now — we're preparing your Proforma Invoice" |
+| PI issued, advance not cleared | **2 · Advance Payment** — **Download Proforma Invoice**, then the payment self-report form (90-item backlog #48; see [Chapter 3](./03-stage3-pi-advance.md)) |
+| Payment details sent, being checked | "We're checking your payment" |
+| OC issued, awaiting acknowledgement | **3 · Order Confirmation** — the order summary and the acknowledge button |
+| Nothing pending | "All set — thank you" |
+
+Nothing else; no documents, other payment figures, or chat, which stay
 portal-login-only. Acknowledging or uploading through this link goes
 through the exact same checks and writes as the portal path above, so it
 counts identically toward Stage 4's gate. The Buyer PO upload form itself

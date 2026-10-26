@@ -452,6 +452,7 @@ app.post('/supplier-action/:token/acknowledgment', uploadLarge.single('document'
 app.get('/buyer-action/:token', asyncHandler(buyerActionController.show));
 app.post('/buyer-action/:token/acknowledge-oc', verifyCsrf, asyncHandler(buyerActionController.acknowledgeOc));
 app.get('/buyer-action/:token/buyer-po-document', asyncHandler(buyerActionController.downloadBuyerPo));
+app.get('/buyer-action/:token/proforma-invoice', asyncHandler(buyerActionController.downloadProformaInvoice));
 app.post('/buyer-action/:token/buyer-po', uploadLarge.single('document'), verifyCsrf, asyncHandler(buyerActionController.uploadBuyerPo));
 app.post('/buyer-action/:token/report-payment', uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(buyerActionController.reportPayment));
 

@@ -83,11 +83,11 @@ final class BuyerActionController
             }
         }
 
-        $buyerPoStage = \App\Repositories\OrderStageRepository::findByOrderAndStageNumber($orderId, 2);
         View::render('buyer_action/show', [
             'wrapClass' => 'intake-wrap',
-            'issuedBuyerPo' => BuyerActionService::issuedBuyerPoDocument($orderId),
-            'buyerPoConfirmed' => $buyerPoStage !== null && $buyerPoStage['status'] === 'gate_passed',
+            'task' => BuyerActionService::currentTask($order, $ocAcknowledgment),
+            'issuedBuyerPo' => BuyerActionService::issuedBuyerDocument($orderId, 'BUYERPO'),
+            'issuedPi' => BuyerActionService::issuedBuyerDocument($orderId, 'PI'),
             'token' => $params['token'],
             'order' => $order,
             'products' => OrderProductRepository::forOrder($orderId),
@@ -138,16 +138,27 @@ final class BuyerActionController
     }
 
     /**
-     * Owner request (2026-10-26): the buyer downloads the Buyer PO from the
-     * link to sign it — only once it is issued, and only that document.
+     * Owner request (2026-10-26): from the link the buyer downloads the Buyer
+     * PO (to sign) and, later, the Proforma Invoice (to pay against) — each
+     * only once issued, and nothing else.
      */
     public function downloadBuyerPo(array $params): void
+    {
+        $this->downloadIssued($params, 'BUYERPO');
+    }
+
+    public function downloadProformaInvoice(array $params): void
+    {
+        $this->downloadIssued($params, 'PI');
+    }
+
+    private function downloadIssued(array $params, string $typeCode): void
     {
         $order = $this->orderOrExpired((string) ($params['token'] ?? ''));
         if (!$order) {
             return;
         }
-        $document = BuyerActionService::issuedBuyerPoDocument((int) $order['id']);
+        $document = BuyerActionService::issuedBuyerDocument((int) $order['id'], $typeCode);
         \App\Helpers\StoredFileDownload::send($document ? (int) $document['pdf_file_id'] : null);
     }
 }

@@ -12,6 +12,7 @@ use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderRepository;
+use App\Services\StageGateService;
 use App\Tests\Support\DbTestCase;
 
 /**
@@ -164,7 +165,11 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
     // View rendering — buyer_action/show.php
     // ---------------------------------------------------------------
 
-    public function testShowRendersTheAdvancePaymentSectionAndTheUploadFormBeforeAdvanceClears(): void
+    /**
+     * Owner request (2026-10-26): the link shows one step at a time — while
+     * Step 4 is open only the Purchase Order upload, never the payment form.
+     */
+    public function testWhileStep4IsOpenOnlyThePurchaseOrderStepShows(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         $token = OrderRepository::generateBuyerActionToken($orderId);
@@ -173,12 +178,36 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
         (new BuyerActionController())->show(['token' => $token]);
         $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('Advance Payment', $html);
-        self::assertStringContainsString('Submit Payment Details', $html);
         self::assertStringContainsString('name="document"', $html);
+        self::assertStringContainsString('name="buyers_po_ref"', $html);
+        self::assertStringNotContainsString('Submit Payment Details', $html);
     }
 
-    public function testShowOmitsTheAdvancePaymentSectionAndTheUploadFormOnceAdvanceHasCleared(): void
+    public function testOnceThePiIsIssuedOnlyTheAdvancePaymentStepShows(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        foreach ([1, 2] as $stage) {
+            StageGateService::passAndUnlockNext($orderId, $stage, null);
+        }
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+        $render = static function () use ($token): string {
+            ob_start();
+            (new BuyerActionController())->show(['token' => $token]);
+            return (string) ob_get_clean();
+        };
+
+        $waiting = $render();
+        self::assertStringContainsString("We're preparing your Proforma Invoice", $waiting);
+        self::assertStringNotContainsString('Submit Payment Details', $waiting);
+
+        $this->createTestDocument($orderId, 'PI', 'sent', $this->createTestFile($orderId));
+        $html = $render();
+        self::assertStringContainsString('Submit Payment Details', $html);
+        self::assertStringContainsString('/proforma-invoice', $html);
+        self::assertStringNotContainsString('name="buyers_po_ref"', $html, 'the PO step is done — not shown again');
+    }
+
+    public function testShowOmitsThePaymentFormAndTheUploadFormOnceAdvanceHasCleared(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->markAdvanceCleared($orderId);
@@ -188,7 +217,6 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
         (new BuyerActionController())->show(['token' => $token]);
         $html = (string) ob_get_clean();
 
-        self::assertStringNotContainsString('Advance Payment', $html);
         self::assertStringNotContainsString('Submit Payment Details', $html);
         self::assertStringNotContainsString('name="document"', $html);
         self::assertStringContainsString('already cleared', $html);

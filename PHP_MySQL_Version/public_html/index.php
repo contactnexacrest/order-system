@@ -170,6 +170,7 @@ $router->post('/supplier-action/{token}/acknowledgment', [$supplierAction, 'uplo
 $router->get('/buyer-action/{token}', [$buyerAction, 'show']);
 $router->post('/buyer-action/{token}/acknowledge-oc', [$buyerAction, 'acknowledgeOc'], [CsrfCheck::verify()]);
 $router->get('/buyer-action/{token}/buyer-po-document', [$buyerAction, 'downloadBuyerPo']);
+$router->get('/buyer-action/{token}/proforma-invoice', [$buyerAction, 'downloadProformaInvoice']);
 $router->post('/buyer-action/{token}/buyer-po', [$buyerAction, 'uploadBuyerPo'], [CsrfCheck::verify()]);
 $router->post('/buyer-action/{token}/report-payment', [$buyerAction, 'reportPayment'], [CsrfCheck::verify()]);
 

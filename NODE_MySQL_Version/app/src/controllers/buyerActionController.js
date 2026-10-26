@@ -8,7 +8,6 @@ const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocu
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const documentRepository = require('../repositories/documentRepository');
 const buyerActionService = require('../services/buyerActionService');
-const orderStageRepository = require('../repositories/orderStageRepository');
 const { sendStoredFile } = require('../helpers/sendStoredFile');
 const documentGenerationService = require('../services/documentGenerationService');
 
@@ -76,11 +75,11 @@ async function show(req, res) {
     }
   }
 
-  const buyerPoStage = await orderStageRepository.findByOrderAndStageNumber(order.id, 2);
   res.renderView('buyer_action/show', {
     wrapClass: 'intake-wrap',
-    issuedBuyerPo: await buyerActionService.issuedBuyerPoDocument(order.id),
-    buyerPoConfirmed: !!buyerPoStage && buyerPoStage.status === 'gate_passed',
+    task: await buyerActionService.currentTask(order, ocAcknowledgment),
+    issuedBuyerPo: await buyerActionService.issuedBuyerDocument(order.id, 'BUYERPO'),
+    issuedPi: await buyerActionService.issuedBuyerDocument(order.id, 'PI'),
     token: req.params.token,
     order,
     products: await orderProductRepository.forOrder(order.id),
@@ -128,16 +127,20 @@ async function reportPayment(req, res) {
 }
 
 /**
- * Owner request (2026-10-26): the buyer downloads the Buyer PO from the
- * link to sign it — only once it is issued, and only that document.
+ * Owner request (2026-10-26): from the link the buyer downloads the Buyer
+ * PO (to sign) and, later, the Proforma Invoice (to pay against) — each only
+ * once issued, and nothing else.
  */
-async function downloadBuyerPo(req, res) {
+async function downloadIssued(req, res, typeCode) {
   const order = await orderOrExpired(req, res, req.params.token);
   if (!order) {
     return;
   }
-  const document = await buyerActionService.issuedBuyerPoDocument(order.id);
+  const document = await buyerActionService.issuedBuyerDocument(order.id, typeCode);
   await sendStoredFile(res, document ? document.pdf_file_id : null);
 }
 
-module.exports = { show, acknowledgeOc, uploadBuyerPo, reportPayment, downloadBuyerPo };
+const downloadBuyerPo = (req, res) => downloadIssued(req, res, 'BUYERPO');
+const downloadProformaInvoice = (req, res) => downloadIssued(req, res, 'PI');
+
+module.exports = { show, acknowledgeOc, uploadBuyerPo, reportPayment, downloadBuyerPo, downloadProformaInvoice };

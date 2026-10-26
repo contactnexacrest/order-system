@@ -12,6 +12,7 @@ use App\Repositories\OrderRepository;
 use App\Repositories\OrderBuyerPoDocumentRepository;
 use App\Repositories\OrderOcAcknowledgmentRepository;
 use App\Repositories\OrderPaymentStatusRepository;
+use App\Repositories\OrderStageRepository;
 
 /**
  * 90-item backlog #75: the OC-acknowledgment and Buyer-PO-upload write
@@ -157,14 +158,16 @@ final class BuyerActionService
     }
 
     /**
-     * Owner request (2026-10-26): the Buyer PO generated in Step 4a, once
-     * it is issued (approved, or sent while email is on) — what the buyer
-     * downloads from the Buyer Action Link to sign. Null until then.
+     * Owner request (2026-10-26): a document the buyer can download from the
+     * Buyer Action Link — the Buyer PO generated in Step 4a (to sign) or the
+     * Proforma Invoice (to pay against) — once it is issued (approved, or
+     * sent while email is on). Null until then, and for any other type.
      */
-    public static function issuedBuyerPoDocument(int $orderId): ?array
+    public static function issuedBuyerDocument(int $orderId, string $typeCode): ?array
     {
-        $latest = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'BUYERPO');
-        if (!$latest || empty($latest['pdf_file_id']) || DocumentGenerationService::stageDocumentBlockedBy($orderId, 2) !== []) {
+        $stage = ['BUYERPO' => 2, 'PI' => 3][$typeCode] ?? null;
+        $latest = $stage !== null ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, $typeCode) : null;
+        if (!$latest || empty($latest['pdf_file_id']) || DocumentGenerationService::stageDocumentBlockedBy($orderId, $stage) !== []) {
             return null;
         }
         $document = DocumentRepository::find((int) $latest['id']);
@@ -174,6 +177,41 @@ final class BuyerActionService
             return null;
         }
         return $document;
+    }
+
+    /**
+     * Owner request (2026-10-26): the Buyer Action Link shows the client one
+     * clear step at a time — the Purchase Order while Step 4 is open, then
+     * the advance payment once the PI is issued, then the Order
+     * Confirmation — never a later step before its turn.
+     *
+     * @return 'buyer_po'|'waiting_pi'|'advance'|'advance_reported'|'waiting'|'oc'|'done'
+     */
+    public static function currentTask(array $order, ?array $ocAcknowledgment): string
+    {
+        $orderId = (int) $order['id'];
+        $passed = static fn(int $n): bool => (OrderStageRepository::findByOrderAndStageNumber($orderId, $n)['status'] ?? null) === 'gate_passed';
+        if (!$passed(2)) {
+            return 'buyer_po';
+        }
+        if (!$passed(3) && !self::advanceAlreadyCleared($orderId)) {
+            if (($order['payment_method'] ?? 'CASH_ADVANCE') === 'LC') {
+                return 'waiting';
+            }
+            if (self::issuedBuyerDocument($orderId, 'PI') === null) {
+                return 'waiting_pi';
+            }
+            foreach (ClientPaymentReportRepository::forOrder($orderId) as $report) {
+                if ($report['payment_type'] === 'advance' && $report['status'] === 'new') {
+                    return 'advance_reported';
+                }
+            }
+            return 'advance';
+        }
+        if ($ocAcknowledgment !== null && $ocAcknowledgment['acknowledged_at'] === null) {
+            return 'oc';
+        }
+        return $passed(4) ? 'done' : 'waiting';
     }
 
     /**

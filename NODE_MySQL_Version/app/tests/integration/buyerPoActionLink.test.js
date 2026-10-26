@@ -70,6 +70,29 @@ describe('Buyer PO Action Link (Step 4b)', () => {
     expect((await orderRepository.find(orderId)).buyers_po_ref).toBe('PO-BUYER-42');
     expect(await orderBuyerPoDocumentRepository.forOrder(orderId)).toHaveLength(1);
     page = await agent.get(`/buyer-action/${token}`);
-    expect(page.text).toContain('we have your signed Purchase Order');
+    expect(page.text).toContain('We have your signed Purchase Order');
+    expect(page.text).not.toContain('name="buyers_po_ref"');
+  });
+
+  // Owner request (2026-10-26): one step at a time on the link.
+  it('shows only the payment step once the PI is issued, and waits before that', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    for (const stage of [1, 2]) {
+      await stageGateService.passAndUnlockNext(orderId, stage, null);
+    }
+    const token = await orderRepository.generateBuyerActionToken(orderId);
+
+    let page = await request(app).get(`/buyer-action/${token}`);
+    expect(page.text).toContain("We're preparing your Proforma Invoice");
+    expect(page.text).not.toContain('Submit Payment Details');
+    expect(page.text).not.toContain('name="buyers_po_ref"');
+
+    const documentId = await createTestDocument(orderId, 'PI', 'sent');
+    await db.execute('UPDATE documents SET pdf_file_id = :f WHERE id = :id', { f: await createTestFile(orderId, clientId), id: documentId });
+    page = await request(app).get(`/buyer-action/${token}`);
+    expect(page.text).toContain('Submit Payment Details');
+    expect(page.text).toContain(`/buyer-action/${token}/proforma-invoice`);
+    expect(page.text).not.toContain('name="buyers_po_ref"');
   });
 });

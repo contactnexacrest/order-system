@@ -282,7 +282,10 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await buyer.locator('form[action$="/buyer-po"] input[type="file"]').setInputFiles(DUMMY_FILE);
     await buyer.getByRole('button', { name: 'Upload Signed PO' }).click();
     await expect(buyer.locator('.alert')).toContainText(`(PO-SMOKE-${UNIQUE}) has been received`);
-    await expect(buyer.locator('.action-status.done').first()).toContainText('Received');
+    // One step at a time: the PO is ticked off and the page waits for the PI.
+    await expect(buyer.locator('.action-progress li.done')).toContainText('Purchase Order');
+    await expect(buyer.locator('.action-wait')).toContainText("preparing your Proforma Invoice");
+    await expect(buyer.locator('input[name="buyers_po_ref"]')).toHaveCount(0);
     await buyer.close();
 
     await page.reload();

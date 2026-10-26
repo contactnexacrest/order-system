@@ -1,36 +1,43 @@
-{# Owner request (2026-10-26): same look as the Quotation/PI details forms —
-   a wide card, a summary bar and numbered sections — instead of one narrow
-   column. Sections appear in the order the buyer needs them. #}
-{% set ocPending = ocAcknowledgment and ocAcknowledgment.acknowledged_at == null %}
-{% set ocDone = ocAcknowledgment and ocAcknowledgment.acknowledged_at != null %}
-{% set nextNum = 1 %}
+{# Owner request (2026-10-26): same look as the Quotation/PI details forms,
+   and only ONE thing for the client to do at a time — task (from
+   buyerActionService.currentTask()) picks the section; the strip on top
+   shows where they are: Purchase Order → Advance Payment → Order Confirmation. #}
+{% set payState = 'todo' if task in ['buyer_po', 'waiting_pi'] else ('current' if task in ['advance', 'advance_reported'] else 'done') %}
+{% if task == 'waiting' and not advanceCleared and order.payment_method == 'LC' %}{% set payState = 'current' %}{% endif %}
+{% set progress = [
+  ['Purchase Order', 'current' if task == 'buyer_po' else 'done'],
+  ['Advance Payment', payState],
+  ['Order Confirmation', 'current' if task == 'oc' else ('done' if task == 'done' else 'todo')]
+] %}
 <div class="card">
   <h1>Your Order {{ order.order_reference or ('#' ~ order.id) }}</h1>
-  <p class="muted">For {{ order.company_legal_name or '' }} — everything you need to do on this order, in one place. No login needed.</p>
+  <p class="muted">For {{ order.company_legal_name or '' }} — no login needed. We'll show you just the one thing to do next.</p>
   <div class="intake-summary">
     <span>&#128230; {{ products.length }} product line{{ '' if products.length == 1 else 's' }}</span>
     <span>&#128176; {{ order.currency_code or '' }} {{ totalFobValue | money }}</span>
     <span>&#128674; {{ order.incoterm_code or '—' }}{% if order.port_of_discharge_name %} · {{ order.port_of_discharge_name }}{% endif %}</span>
   </div>
 
+  <ol class="action-progress" aria-label="Your steps">
+    {% for item in progress %}
+      <li class="{{ item[1] }}"><span class="dot">{% if item[1] == 'done' %}&#10003;{% else %}{{ loop.index }}{% endif %}</span>{{ item[0] }}</li>
+    {% endfor %}
+  </ol>
+
+  {% if task == 'buyer_po' %}
   <fieldset class="intake-step action-step">
-    <legend><span class="intake-step-num">{{ nextNum }}</span> Your Purchase Order
-      {% if buyerPoConfirmed %}<span class="action-status done">&#10003; Received</span>{% elif buyerPoDocuments.length %}<span class="action-status">Received — being checked</span>{% else %}<span class="action-status todo">Action needed</span>{% endif %}
+    <legend><span class="intake-step-num">1</span> Your Purchase Order
+      {% if buyerPoDocuments.length %}<span class="action-status">Received — being checked</span>{% else %}<span class="action-status todo">Action needed</span>{% endif %}
     </legend>
-    {% set nextNum = nextNum + 1 %}
-    {% if buyerPoConfirmed %}
-      <p>Thank you — we have your signed Purchase Order{% if order.buyers_po_ref and order.buyers_po_ref != 'NIL' %} <strong>{{ order.buyers_po_ref }}</strong>{% endif %}. Nothing more is needed here.</p>
+    <ol class="action-howto">
+      <li><strong>Download</strong> the Purchase Order we prepared for you.</li>
+      <li><strong>Sign and stamp</strong> it.</li>
+      <li><strong>Upload</strong> the signed copy below with your PO number.</li>
+    </ol>
+    {% if issuedBuyerPo %}
+      <p><a class="btn btn-secondary" href="/buyer-action/{{ token }}/buyer-po-document">&#11015; Download Purchase Order ({{ issuedBuyerPo.document_reference }})</a></p>
     {% else %}
-      <ol class="action-howto">
-        <li><strong>Download</strong> the Purchase Order we prepared for you.</li>
-        <li><strong>Sign and stamp</strong> it.</li>
-        <li><strong>Upload</strong> the signed copy below with your PO number.</li>
-      </ol>
-      {% if issuedBuyerPo %}
-        <p><a class="btn btn-secondary" href="/buyer-action/{{ token }}/buyer-po-document">&#11015; Download Purchase Order ({{ issuedBuyerPo.document_reference }})</a></p>
-      {% else %}
-        <p class="intake-note">Your Purchase Order is being prepared — you can already upload your own signed PO below if you have one.</p>
-      {% endif %}
+      <p class="intake-note">Your Purchase Order is being prepared — you can already upload your own signed PO below if you have one.</p>
     {% endif %}
     {% if buyerPoDocuments.length %}
       <table class="list">
@@ -45,52 +52,28 @@
     {% endif %}
     {% if advanceCleared %}
       <p class="muted small">The advance payment has already cleared, so uploads here are closed. Contact your NexaCrest representative if you need to send an updated copy.</p>
-    {% elif not buyerPoConfirmed %}
-      <form method="post" action="/buyer-action/{{ token }}/buyer-po" enctype="multipart/form-data">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <div class="field-grid">
-          <label>Your PO Number *<input type="text" name="buyers_po_ref" required placeholder="e.g., PO-2026-0142"></label>
-          <label>Signed Purchase Order *<input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
-        </div>
-        <button type="submit">Upload Signed PO</button>
-      </form>
-    {% endif %}
-  </fieldset>
-
-  {% if ocPending or ocDone %}
-  <fieldset class="intake-step action-step">
-    <legend><span class="intake-step-num">{{ nextNum }}</span> Order Confirmation
-      {% if ocDone %}<span class="action-status done">&#10003; Acknowledged</span>{% else %}<span class="action-status todo">Action needed</span>{% endif %}
-    </legend>
-    {% set nextNum = nextNum + 1 %}
-    {% if ocDone %}
-      <p>Thank you — you acknowledged the Order Confirmation on {{ ocAcknowledgment.acknowledged_at | humanDate }}.</p>
     {% else %}
-      <p><strong>Your Acknowledgement Needed</strong> — please check the order below and confirm to proceed.</p>
-      <div class="action-kv">
-        <div><span class="k">Order Reference</span><span class="v">{{ order.order_reference }}</span></div>
-        <div><span class="k">Total Order Value</span><span class="v">{{ order.currency_code or '' }} {{ totalFobValue | money }}</span></div>
-        <div><span class="k">Incoterm</span><span class="v">{{ order.incoterm_code or '—' }}</span></div>
-        <div><span class="k">Port of Discharge</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or '—' }}</span></div>
+    <form method="post" action="/buyer-action/{{ token }}/buyer-po" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="field-grid">
+        <label>Your PO Number *<input type="text" name="buyers_po_ref" required placeholder="e.g., PO-2026-0142"></label>
+        <label>Signed Purchase Order *<input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
       </div>
-      <table class="list">
-        <tr><th>Product</th><th>Quantity</th></tr>
-        {% for p in products %}
-        <tr><td>{{ p.description }}</td><td>{{ p.quantity }} {{ p.unit or '' }}</td></tr>
-        {% endfor %}
-      </table>
-      <form method="post" action="/buyer-action/{{ token }}/acknowledge-oc">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <button type="submit" class="btn-success">I acknowledge and confirm to proceed</button>
-      </form>
+      <button type="submit">Upload Signed PO</button>
+    </form>
     {% endif %}
   </fieldset>
-  {% endif %}
 
-  {% if not advanceCleared %}
+  {% elif task == 'advance' %}
   <fieldset class="intake-step action-step">
-    <legend><span class="intake-step-num">{{ nextNum }}</span> Advance Payment <small class="muted">(once you've paid)</small></legend>
-    <p class="muted small">Made your advance payment? Tell us the transaction details — our team checks it against our bank statement before updating your order. Once it clears you'll also get client portal access.</p>
+    <legend><span class="intake-step-num">2</span> Advance Payment <span class="action-status todo">Action needed</span></legend>
+    <ol class="action-howto">
+      <li><strong>Download</strong> your Proforma Invoice and pay the advance shown on it.</li>
+      <li><strong>Tell us</strong> the transaction details below — our team checks them against our bank statement.</li>
+    </ol>
+    {% if issuedPi %}
+      <p><a class="btn btn-secondary" href="/buyer-action/{{ token }}/proforma-invoice">&#11015; Download Proforma Invoice ({{ issuedPi.document_reference }})</a></p>
+    {% endif %}
     <form method="post" action="/buyer-action/{{ token }}/report-payment" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
@@ -103,7 +86,46 @@
       <button type="submit">Submit Payment Details</button>
     </form>
   </fieldset>
+
+  {% elif task == 'oc' %}
+  <fieldset class="intake-step action-step">
+    <legend><span class="intake-step-num">3</span> Order Confirmation <span class="action-status todo">Action needed</span></legend>
+    <p><strong>Your Acknowledgement Needed</strong> — please check the order below and confirm to proceed.</p>
+    <div class="action-kv">
+      <div><span class="k">Order Reference</span><span class="v">{{ order.order_reference }}</span></div>
+      <div><span class="k">Total Order Value</span><span class="v">{{ order.currency_code or '' }} {{ totalFobValue | money }}</span></div>
+      <div><span class="k">Incoterm</span><span class="v">{{ order.incoterm_code or '—' }}</span></div>
+      <div><span class="k">Port of Discharge</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or '—' }}</span></div>
+    </div>
+    <table class="list">
+      <tr><th>Product</th><th>Quantity</th></tr>
+      {% for p in products %}
+      <tr><td>{{ p.description }}</td><td>{{ p.quantity }} {{ p.unit or '' }}</td></tr>
+      {% endfor %}
+    </table>
+    <form method="post" action="/buyer-action/{{ token }}/acknowledge-oc">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-success">I acknowledge and confirm to proceed</button>
+    </form>
+  </fieldset>
+
+  {% else %}
+  <div class="action-wait">
+    {% if task == 'waiting_pi' %}
+      <h2>&#10003; Thank you — nothing to do right now</h2>
+      <p>We have your signed Purchase Order{% if order.buyers_po_ref and order.buyers_po_ref != 'NIL' %} <strong>{{ order.buyers_po_ref }}</strong>{% endif %}. We're preparing your Proforma Invoice and will email you when it's ready — then this same link will show you how to pay the advance.</p>
+    {% elif task == 'advance_reported' %}
+      <h2>&#10003; Thank you — we're checking your payment</h2>
+      <p>We've received your advance payment details and our team is verifying them against our bank statement. We'll email you as soon as it's confirmed.</p>
+    {% elif task == 'done' %}
+      <h2>&#10003; All set — thank you</h2>
+      <p>There's nothing left for you to do on this link. Your order is moving ahead; we'll keep you updated by email and in your <a href="/client/login">client portal</a>.</p>
+    {% else %}
+      <h2>&#10003; Thank you — nothing to do right now</h2>
+      <p>Your order is with our team. We'll email you when there's something for you to do next — this same link will show it.</p>
+    {% endif %}
+  </div>
   {% endif %}
 
-  <p class="muted small">Need to see your full order, documents, or message our team? <a href="/client/login">Log in to your client portal</a> (set up automatically once your advance payment clears).</p>
+  <p class="muted small">Questions? Reply to the email this link came with{% if task != 'buyer_po' %}, or <a href="/client/login">log in to your client portal</a> once your advance payment has cleared{% endif %}.</p>
 </div>

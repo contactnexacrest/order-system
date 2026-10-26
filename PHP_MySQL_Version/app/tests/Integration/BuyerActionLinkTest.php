@@ -135,7 +135,8 @@ final class BuyerActionLinkTest extends DbTestCase
         $html = (string) ob_get_clean();
 
         self::assertStringContainsString('Your Acknowledgement Needed', $html);
-        self::assertStringContainsString('Your Purchase Order', $html);
+        // Owner request (2026-10-26): one step at a time — the PO upload is long done here.
+        self::assertStringNotContainsString('name="buyers_po_ref"', $html);
     }
 
     public function testShowOmitsOcAckBannerWhenNothingIsPending(): void
@@ -298,7 +299,7 @@ final class BuyerActionLinkTest extends DbTestCase
         $documentId = $this->createTestDocument($orderId, 'BUYERPO', 'in_review', $fileId);
         $token = OrderRepository::generateBuyerActionToken($orderId);
 
-        self::assertNull(\App\Services\BuyerActionService::issuedBuyerPoDocument($orderId), 'not downloadable while still in review');
+        self::assertNull(\App\Services\BuyerActionService::issuedBuyerDocument($orderId, 'BUYERPO'), 'not downloadable while still in review');
         ob_start();
         (new BuyerActionController())->show(['token' => $token]);
         $html = (string) ob_get_clean();
@@ -306,11 +307,11 @@ final class BuyerActionLinkTest extends DbTestCase
         self::assertStringContainsString('name="buyers_po_ref"', $html, 'the buyer is asked for their PO number with the signed copy');
 
         \App\Config\Database::connection()->prepare("UPDATE documents SET status = 'approved' WHERE id = :id")->execute(['id' => $documentId]);
-        $issued = \App\Services\BuyerActionService::issuedBuyerPoDocument($orderId);
+        $issued = \App\Services\BuyerActionService::issuedBuyerDocument($orderId, 'BUYERPO');
         if (\App\Services\EmailDispatchService::mailSendingEnabled()) {
             self::assertNull($issued, 'with email on, the Buyer PO counts as issued only once sent');
             \App\Config\Database::connection()->prepare("UPDATE documents SET status = 'sent' WHERE id = :id")->execute(['id' => $documentId]);
-            $issued = \App\Services\BuyerActionService::issuedBuyerPoDocument($orderId);
+            $issued = \App\Services\BuyerActionService::issuedBuyerDocument($orderId, 'BUYERPO');
         }
         self::assertSame($documentId, (int) $issued['id']);
         ob_start();
