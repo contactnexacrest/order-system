@@ -45,6 +45,27 @@ final class OrderStorageFoldersTest extends DbTestCase
         self::assertFileExists($path);
     }
 
+    public function testBothThePdfAndTheWordFileGoToTheDocumentsOwnStepFolder(): void
+    {
+        // PDF is always generated; the Word (.docx) copy is optional — wherever
+        // either is written, it is the document's own step folder.
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $userId = $this->createTestUser('Admin');
+
+        foreach (['QT' => '/01-quotation/generated/', 'BLI' => '/10-packing-and-bl/generated/'] as $code => $folder) {
+            $pdfOnly = DocumentGenerationService::generate($orderId, $code, $userId, null, false, true);
+            self::assertNull($pdfOnly['docx_file_id'] ?? null, "{$code}: no Word file unless asked for");
+            self::assertStringContainsString($folder, (string) FileStoreRepository::find((int) $pdfOnly['pdf_file_id'])['server_path']);
+
+            $both = DocumentGenerationService::generate($orderId, $code, $userId, null, true, true);
+            foreach (['pdf_file_id', 'docx_file_id'] as $key) {
+                $path = (string) FileStoreRepository::find((int) $both[$key])['server_path'];
+                self::assertStringContainsString($folder, $path, "{$code} {$key}");
+                self::assertFileExists($path);
+            }
+        }
+    }
+
     public function testTheReorganizerMapsOldFoldersToTheirStep(): void
     {
         $old = '/srv/storage/clients/NC-1/SC-ORD-1/';

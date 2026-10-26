@@ -59,6 +59,26 @@ describe('Order storage folders follow the order page steps', () => {
     expect(fs.existsSync(file.server_path)).toBe(true);
   });
 
+  it('puts both the PDF and the Word file in the document\'s own step folder', async () => {
+    // PDF is always generated; the Word (.docx) copy is optional — wherever
+    // either is written, it is the document's own step folder.
+    const orderId = await createTestOrder(await createTestClient());
+    const userId = await createTestUser('Admin');
+
+    for (const [code, folder] of [['QT', '/01-quotation/generated/'], ['BLI', '/10-packing-and-bl/generated/']]) {
+      const pdfOnly = await documentGenerationService.generate(orderId, code, userId, null, false, true);
+      expect(pdfOnly.docx_file_id ?? null).toBeNull();
+      expect((await fileStoreRepository.find(pdfOnly.pdf_file_id)).server_path).toContain(folder);
+
+      const both = await documentGenerationService.generate(orderId, code, userId, null, true, true);
+      for (const key of ['pdf_file_id', 'docx_file_id']) {
+        const file = await fileStoreRepository.find(both[key]);
+        expect([code, key, file.server_path.includes(folder)]).toEqual([code, key, true]);
+        expect(fs.existsSync(file.server_path)).toBe(true);
+      }
+    }
+  });
+
   it('maps old folders to their step when reorganising', () => {
     const old = '/srv/storage/clients/NC-1/SC-ORD-1/';
     expect(orderFileReorganizer.targetFolder(`${old}pi/generated/a.pdf`, ORDER, 'QT'))
