@@ -350,6 +350,7 @@ app.use((req, res, next) => {
       unreadCount: req.unreadCount || 0,
       clientIntakePendingCount: req.clientIntakePendingCount || 0,
       piIntakePendingCount: req.piIntakePendingCount || 0,
+      myReviewsPendingCount: req.myReviewsPendingCount || 0,
       emailApprovalsPendingCount: req.emailApprovalsPendingCount || 0,
       settingsExpiryWarningCount: req.settingsExpiryWarningCount || 0,
       testModeEnabled: req.testModeEnabled || false,

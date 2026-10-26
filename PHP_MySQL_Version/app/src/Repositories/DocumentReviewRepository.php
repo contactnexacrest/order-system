@@ -65,6 +65,18 @@ final class DocumentReviewRepository
         return $stmt->fetchAll();
     }
 
+    /** How many reviews are waiting on this reviewer — the "My Reviews" nav badge; same rows as pendingForReviewer(). */
+    public static function pendingCountForReviewer(int $reviewerId): int
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*) FROM document_reviews dr
+             JOIN documents d ON d.id = dr.document_id
+             WHERE dr.reviewer_id = :reviewer_id AND dr.status = \'pending\' AND d.status != \'superseded\''
+        );
+        $stmt->execute(['reviewer_id' => $reviewerId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public static function approve(int $id, ?string $comments): void
     {
         Database::connection()->prepare(

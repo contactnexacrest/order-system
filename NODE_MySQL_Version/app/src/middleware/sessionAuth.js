@@ -10,6 +10,7 @@ const permissionRepository = require('../repositories/permissionRepository');
 const superAdminService = require('../services/superAdminService');
 const notificationRepository = require('../repositories/notificationRepository');
 const clientIntakeRepository = require('../repositories/clientIntakeRepository');
+const documentReviewRepository = require('../repositories/documentReviewRepository');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
 const emailLogRepository = require('../repositories/emailLogRepository');
 const dashboardRepository = require('../repositories/dashboardRepository');
@@ -121,6 +122,9 @@ function required() {
       req.clientIntakePendingCount = 0;
       req.piIntakePendingCount = 0;
     }
+
+    // Same live-count badge on My Reviews: documents waiting on this user's own review.
+    req.myReviewsPendingCount = await documentReviewRepository.pendingCountForReviewer(user.id);
 
     // User-reported batch item 16: same live-COUNT badge pattern as the
     // Quotation/PI Intake Review links above — only queried for staff

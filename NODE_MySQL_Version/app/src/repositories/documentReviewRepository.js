@@ -43,6 +43,17 @@ async function pendingForReviewer(reviewerId) {
   );
 }
 
+/** How many reviews are waiting on this reviewer — the "My Reviews" nav badge; same rows as pendingForReviewer(). */
+async function pendingCountForReviewer(reviewerId) {
+  const row = await db.queryOne(
+    `SELECT COUNT(*) AS c FROM document_reviews dr
+     JOIN documents d ON d.id = dr.document_id
+     WHERE dr.reviewer_id = :reviewer_id AND dr.status = 'pending' AND d.status != 'superseded'`,
+    { reviewer_id: reviewerId }
+  );
+  return parseInt(row.c, 10);
+}
+
 async function approve(id, comments) {
   await db.execute("UPDATE document_reviews SET status = 'approved', comments = :comments, reviewed_at = NOW() WHERE id = :id", { comments, id });
 }
@@ -66,4 +77,4 @@ async function countRejected(documentId) {
   return parseInt(row.c, 10);
 }
 
-module.exports = { assign, forDocument, find, pendingForReviewer, approve, reject, countPending, countApproved, countRejected };
+module.exports = { assign, forDocument, find, pendingForReviewer, pendingCountForReviewer, approve, reject, countPending, countApproved, countRejected };
