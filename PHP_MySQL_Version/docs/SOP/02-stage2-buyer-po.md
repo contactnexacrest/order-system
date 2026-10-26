@@ -25,7 +25,7 @@ Step 4 on the order page has three sub-steps, done in order:
 2. **4b · Attach Buyer PO Copy** — keep the buyer's actual signed PO on
    file. Staff upload the copy the buyer emailed, **or the buyer uploads
    it themselves** from their client portal or the Buyer Action Link
-   (Step 6c); either way it appears in this list, marked "The buyer
+   (Step 6b); either way it appears in this list, marked "The buyer
    (self-uploaded)" or "Staff". Every upload is kept, nothing
    overwritten. Attaching a copy does **not** set the reference number or
    pass the gate on its own.

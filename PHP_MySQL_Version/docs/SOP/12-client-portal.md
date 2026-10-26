@@ -195,7 +195,12 @@ Opening an order (**View documents**) shows, top to bottom:
    [Complaints](./19-complaints.md) for the complete picture, including
    who at NexaCrest sees and answers it.
 8. **Order Feedback** — always available too: a 1-5 star rating plus
-   optional comments on how this specific order went, distinct from the
+   a feedback/testimonial box on how this specific order went. The box
+   starts with a suggested testimonial written from that order's own
+   details (product, quantity, destination port) — different wording per
+   order, never the text this client left on an earlier order — with the
+   note "if you want to modify the feedback/testimonial, please update it
+   above" underneath (owner request 2026-10-26), distinct from the
    running Order Updates/Complaint conversations above. Submitting it
    again later replaces the earlier rating/comments rather than adding a
    second entry — there's no reason to stop a client revising their own

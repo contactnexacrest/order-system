@@ -262,7 +262,7 @@ final class SampleDataService
         self::attachSampleAnnexureImage(
             $orderE2Id,
             $blankAnnexureId,
-            'clients/' . self::pathSafe((string) $orderE2['client_unique_number']) . '/' . self::pathSafe((string) $orderE2['order_reference']) . '/annexure',
+            \App\Helpers\OrderStorage::folder($orderE2, 'annexure'),
             'Monument Blank - reference photo.png',
             $userId
         );
@@ -277,7 +277,7 @@ final class SampleDataService
         self::attachSampleAnnexureImage(
             $orderE2Id,
             $headstoneAnnexureId,
-            'clients/' . self::pathSafe((string) $orderE2['client_unique_number']) . '/' . self::pathSafe((string) $orderE2['order_reference']) . '/annexure',
+            \App\Helpers\OrderStorage::folder($orderE2, 'annexure'),
             'Headstone - reference photo.png',
             $userId
         );
@@ -299,7 +299,7 @@ final class SampleDataService
         self::attachSampleAnnexureImage(
             $orderE3Id,
             $monumentSetAnnexureId,
-            'clients/' . self::pathSafe((string) $orderE3['client_unique_number']) . '/' . self::pathSafe((string) $orderE3['order_reference']) . '/annexure',
+            \App\Helpers\OrderStorage::folder($orderE3, 'annexure'),
             'Complete Monument Set - reference photo.png',
             $userId
         );
@@ -631,7 +631,7 @@ final class SampleDataService
         $buyerPoFileId = self::attachSamplePlaceholderFile(
             null,
             $orderId,
-            'clients/' . self::pathSafe((string) $order['client_unique_number']) . '/' . self::pathSafe((string) $order['order_reference']) . '/buyer_po',
+            \App\Helpers\OrderStorage::forReceived($order, 'buyer_po'),
             'Buyer PO SAMPLE-BUYER-PO-0002 (signed).pdf',
             'Buyer',
             'Buyer PO copy',
@@ -698,7 +698,7 @@ final class SampleDataService
         $signedCopyFileId = self::attachSamplePlaceholderFile(
             null,
             $orderId,
-            'clients/' . self::pathSafe((string) $order['client_unique_number']) . '/' . self::pathSafe((string) $order['order_reference']) . '/amendments/' . self::pathSafe((string) $amendment['amendment_reference']) . '/signed',
+            \App\Helpers\OrderStorage::folder($order, 'amendments', \App\Helpers\OrderStorage::segment((string) $amendment['amendment_reference']) . '/received'),
             'Countersigned Amendment ' . $amendment['amendment_reference'] . '.pdf',
             'Buyer',
             'Countersigned Payment Terms Amendment Agreement',
@@ -738,7 +738,7 @@ final class SampleDataService
         $supplierAckFileId = self::attachSamplePlaceholderFile(
             null,
             $orderId,
-            'clients/' . self::pathSafe((string) $order['client_unique_number']) . '/' . self::pathSafe((string) $order['order_reference']) . '/supplier_po',
+            \App\Helpers\OrderStorage::forReceived($order, 'supplier_po'),
             'Supplier PO ' . $supplierPoReference . ' (acknowledged).pdf',
             'Supplier',
             'Supplier PO acknowledgment',
@@ -761,7 +761,7 @@ final class SampleDataService
         $buyerApprovalFileId = self::attachSamplePlaceholderFile(
             null,
             $orderId,
-            'clients/' . self::pathSafe((string) $order['client_unique_number']) . '/' . self::pathSafe((string) $order['order_reference']) . '/packing',
+            \App\Helpers\OrderStorage::forReceived($order, 'packing_bl'),
             'Buyer approval - quantity shortfall.pdf',
             'Buyer',
             'Quantity shortfall approval',
@@ -953,7 +953,7 @@ final class SampleDataService
         $evidenceFileId = self::attachSamplePlaceholderFile(
             null,
             $orderId,
-            'clients/' . self::pathSafe((string) $order['client_unique_number']) . '/' . self::pathSafe((string) $order['order_reference']) . '/disputes/' . $disputeId,
+            \App\Helpers\OrderStorage::folder($order, 'disputes', (string) $disputeId),
             'Buyer shortage claim - photos and destuffing report.pdf',
             'Buyer',
             'Dispute-related document',
@@ -1097,7 +1097,7 @@ final class SampleDataService
     private static function addSampleOrderComments(int $orderId, int $clientId, int $userId): void
     {
         $order = OrderRepository::find($orderId);
-        $subPath = 'clients/' . self::pathSafe((string) $order['client_unique_number']) . '/' . self::pathSafe((string) $order['order_reference']) . '/comment_attachments';
+        $subPath = \App\Helpers\OrderStorage::folder($order, 'order_updates');
 
         $c1 = OrderCommentRepository::create($orderId, 'staff', $userId, null, 'Good news — production on your order has started and is progressing on schedule. We will share progress photos shortly.');
         OrderCommentRepository::markEmailSent($c1);
@@ -1124,10 +1124,5 @@ final class SampleDataService
         OrderCommentRepository::markEmailSent($c3);
 
         OrderCommentRepository::create($orderId, 'client', null, $clientId, 'Thank you for resolving this so quickly — much appreciated.');
-    }
-
-    private static function pathSafe(string $value): string
-    {
-        return preg_replace('/[^A-Za-z0-9_-]+/', '-', $value);
     }
 }

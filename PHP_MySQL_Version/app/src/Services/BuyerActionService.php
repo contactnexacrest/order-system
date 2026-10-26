@@ -120,7 +120,7 @@ final class BuyerActionService
             $fileId = FileUploadService::handleUpload(
                 'document',
                 'buyer_po_copy',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/buyer_po',
+                \App\Helpers\OrderStorage::forReceived($order, 'buyer_po'),
                 (int) $order['client_id'],
                 $orderId,
                 null,
@@ -172,7 +172,7 @@ final class BuyerActionService
                 $screenshotFileId = FileUploadService::handleUpload(
                     'screenshot',
                     'received_remittance',
-                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/client_payment_reports',
+                    \App\Helpers\OrderStorage::folder($order, 'payments'),
                     (int) $order['client_id'],
                     $orderId,
                     null,

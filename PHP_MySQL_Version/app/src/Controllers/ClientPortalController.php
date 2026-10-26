@@ -454,9 +454,7 @@ final class ClientPortalController
 
         $body = trim((string) ($_POST['body'] ?? ''));
         try {
-            $subPath = 'clients/' . FileUploadService::sanitizePathSegment((string) $order['client_unique_number'])
-                . '/' . FileUploadService::sanitizePathSegment((string) $order['order_reference'])
-                . '/comment_attachments';
+            $subPath = \App\Helpers\OrderStorage::folder($order, 'order_updates');
             $fileIds = FileUploadService::handleMultipleUploads(
                 'attachments',
                 'order_comment_media',
@@ -748,7 +746,7 @@ final class ClientPortalController
                 $screenshotFileId = FileUploadService::handleUpload(
                     'screenshot',
                     'received_remittance',
-                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/client_payment_reports',
+                    \App\Helpers\OrderStorage::folder($order, 'payments'),
                     $clientId,
                     $orderId,
                     null,

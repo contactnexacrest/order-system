@@ -116,7 +116,7 @@ final class AnnexureController
                 $fileId = FileUploadService::handleUpload(
                     'image',
                     'product_image',
-                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/annexure',
+                    \App\Helpers\OrderStorage::folder($order, 'annexure'),
                     null,
                     $orderId,
                     (int) AuthService::currentUser()['id']
@@ -190,7 +190,7 @@ final class AnnexureController
             $fileId = FileUploadService::handleUpload(
                 'image',
                 'product_image',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/annexure',
+                \App\Helpers\OrderStorage::folder($order, 'annexure'),
                 null,
                 $orderId,
                 (int) AuthService::currentUser()['id']

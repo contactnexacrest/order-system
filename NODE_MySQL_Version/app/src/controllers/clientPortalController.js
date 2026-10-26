@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const orderStorage = require('../helpers/orderStorage');
 const crypto = require('crypto');
 
 const env = require('../config/env');
@@ -46,9 +47,6 @@ function todayYmd() {
   return todayIst();
 }
 
-function sanitizePathSegment(value) {
-  return String(value).replace(/[^A-Za-z0-9_-]+/g, '-');
-}
 
 /**
  * Port of App\Controllers\ClientPortalController. The client-facing
@@ -442,7 +440,7 @@ async function postComment(req, res) {
 
   const body = String(req.body.body || '').trim();
   try {
-    const subPath = `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/comment_attachments`;
+    const subPath = orderStorage.folder(order, 'order_updates');
     const fileIds = await fileUploadService.handleMultipleUploads(
       req,
       'attachments',
@@ -543,7 +541,7 @@ async function reportPayment(req, res) {
         req,
         'screenshot',
         'received_remittance',
-        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/client_payment_reports`,
+        orderStorage.folder(order, 'payments'),
         clientId,
         orderId,
         null,

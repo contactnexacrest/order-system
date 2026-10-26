@@ -154,7 +154,7 @@ final class AmendmentController
             $fileId = FileUploadService::handleUpload(
                 'signed_copy',
                 'amendment_signed_copy',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/amendments/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $amendment['amendment_reference']) . '/signed',
+                \App\Helpers\OrderStorage::folder($order, 'amendments', \App\Helpers\OrderStorage::segment((string) $amendment['amendment_reference']) . '/received'),
                 null,
                 (int) $amendment['order_id'],
                 (int) AuthService::currentUser()['id'],

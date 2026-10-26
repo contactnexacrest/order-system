@@ -1338,7 +1338,7 @@ final class OrderController
             $fileId = FileUploadService::handleUpload(
                 'document',
                 'buyer_po_copy',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/buyer_po',
+                \App\Helpers\OrderStorage::forReceived($order, 'buyer_po'),
                 null,
                 $orderId,
                 (int) AuthService::currentUser()['id'],
@@ -1387,7 +1387,7 @@ final class OrderController
             $fileId = FileUploadService::handleUpload(
                 'document',
                 'order_additional_document',
-                'clients/' . FileUploadService::sanitizePathSegment((string) $order['client_unique_number']) . '/' . FileUploadService::sanitizePathSegment((string) $order['order_reference']) . '/additional_documents',
+                \App\Helpers\OrderStorage::folder($order, 'additional_documents'),
                 null,
                 $orderId,
                 (int) AuthService::currentUser()['id'],
@@ -1620,7 +1620,7 @@ final class OrderController
                 $lcFileId = FileUploadService::handleUpload(
                     'lc_file',
                     'order_lc_copy',
-                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/lc',
+                    \App\Helpers\OrderStorage::folder($order, 'lc'),
                     null,
                     $orderId,
                     (int) $user['id'],
@@ -2164,7 +2164,7 @@ final class OrderController
             $fileId = FileUploadService::handleUpload(
                 'document',
                 'supplier_po_ack',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/supplier_po',
+                \App\Helpers\OrderStorage::forReceived($order, 'supplier_po'),
                 null,
                 $orderId,
                 (int) AuthService::currentUser()['id'],
@@ -2348,7 +2348,7 @@ final class OrderController
                 $fileId = FileUploadService::handleUpload(
                     'buyer_approval',
                     'buyer_approval',
-                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/packing',
+                    \App\Helpers\OrderStorage::forReceived($order, 'packing_bl'),
                     null,
                     $orderId,
                     (int) AuthService::currentUser()['id'],
@@ -2463,7 +2463,7 @@ final class OrderController
             $fileId = FileUploadService::handleUpload(
                 'draft_bl',
                 'draft_bl',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/shipping',
+                \App\Helpers\OrderStorage::forReceived($order, 'packing_bl'),
                 null,
                 $orderId,
                 (int) $user['id'],
@@ -2558,7 +2558,7 @@ final class OrderController
                 $fileId = FileUploadService::handleUpload(
                     'bl_copy',
                     'bl_copy',
-                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/shipping',
+                    \App\Helpers\OrderStorage::forReceived($order, 'packing_bl'),
                     null,
                     $orderId,
                     (int) $user['id'],
@@ -2594,7 +2594,7 @@ final class OrderController
             $fileId = FileUploadService::handleUpload(
                 'bl_copy',
                 'bl_copy',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/shipping',
+                \App\Helpers\OrderStorage::forReceived($order, 'packing_bl'),
                 null,
                 $orderId,
                 (int) $user['id'],

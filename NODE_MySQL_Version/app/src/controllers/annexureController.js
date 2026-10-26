@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const orderStorage = require('../helpers/orderStorage');
 const orderAnnexureRepository = require('../repositories/orderAnnexureRepository');
 const orderAnnexureTermsRepository = require('../repositories/orderAnnexureTermsRepository');
 const orderRepository = require('../repositories/orderRepository');
@@ -19,9 +20,6 @@ const VALID_MODES = ['SPEC', 'TERMS', 'BOTH'];
 // created before that flag existed on the New Order form can turn it on
 // here).
 
-function sanitizePathSegment(value) {
-  return String(value == null ? '' : value).replace(/[^A-Za-z0-9_-]+/g, '-');
-}
 
 async function index(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -105,7 +103,7 @@ async function createProduct(req, res) {
         req,
         'image',
         'product_image',
-        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/annexure`,
+        orderStorage.folder(order, 'annexure'),
         null,
         orderId,
         req.user.id
@@ -176,7 +174,7 @@ async function uploadImage(req, res) {
       req,
       'image',
       'product_image',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/annexure`,
+      orderStorage.folder(order, 'annexure'),
       null,
       orderId,
       req.user.id

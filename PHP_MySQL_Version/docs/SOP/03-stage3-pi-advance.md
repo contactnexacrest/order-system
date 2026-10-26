@@ -111,9 +111,13 @@ This is two separate steps, deliberately kept apart so a wire transfer that's
 been sent but not yet reconciled against the bank statement isn't confused
 with money that's actually landed:
 
-1. **Record Advance Remittance** — staff type the amount received and the
-   date, once the buyer's T/T notification comes in. This does **not** pass
-   the gate yet:
+1. **Record Advance Remittance** — staff type the amount received, the
+   date, and **today's exchange rate** (₹ per 1 unit of the order
+   currency), once the buyer's T/T notification comes in. The rate is
+   required and is recorded together with the remittance; the form reads
+   back "Received USD 1,800.00 at today's exchange rate of ₹83.2500
+   (= ₹149,850.00)" as you type. The freight and balance remittances work
+   the same way. This does **not** pass the gate yet:
 
    ![Payment Status after recording, before clearing](./images/s3_payment_status_recorded.png)
 
@@ -153,6 +157,20 @@ freight and balance legs happen in later stages):
   It is purely a read-only history; nothing here can be edited — use the
   forms in Payment Status (or the freight/balance equivalents at their own
   stages) to record a new event.
+
+  **Full ledger for Order Financials holders** (owner decision
+  2026-10-26): staff with `manage_order_financials` (Admin/MD/ED by
+  default) see every money event on the order in the same table — each
+  buyer remittance with the exchange rate recorded with it and its INR
+  value, the supplier's advance and balance payments, every expense
+  (ECGC premium, inspection fee, travel, CHA, port and bank charges, …),
+  and any export benefit claimed/received — with **In (₹)** / **Out (₹)**
+  columns and totals underneath: received from the buyer, export benefits,
+  paid to the supplier, expenses, and the **net so far**. Everyone else
+  keeps the buyer-receipts view above. **Full Status** likewise shows the
+  freight leg and exchange rates, plus supplier payments, expenses and net
+  for the same Order Financials holders. Every figure comes from the
+  order's own records.
 
 **Amounts are permission-gated**, the same way as Payment Status itself:
 anyone who can view the order sees each leg's status, but the actual

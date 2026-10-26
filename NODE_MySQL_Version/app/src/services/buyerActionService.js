@@ -1,6 +1,7 @@
 'use strict';
 
 const auditLogRepository = require('../repositories/auditLogRepository');
+const orderStorage = require('../helpers/orderStorage');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowledgmentRepository');
@@ -12,9 +13,6 @@ const stageGateService = require('./stageGateService');
 const documentGenerationService = require('./documentGenerationService');
 const fileUploadService = require('./fileUploadService');
 
-function sanitizePathSegment(value) {
-  return String(value == null ? '' : value).replace(/[^A-Za-z0-9_-]+/g, '-');
-}
 
 /**
  * Port of App\Services\BuyerActionService. 90-item backlog #75: the
@@ -103,7 +101,7 @@ async function uploadBuyerPo(req, order) {
       req,
       'document',
       'buyer_po_copy',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/buyer_po`,
+      orderStorage.forReceived(order, 'buyer_po'),
       order.client_id,
       orderId,
       null,
@@ -152,7 +150,7 @@ async function reportAdvancePayment(req, order) {
         req,
         'screenshot',
         'received_remittance',
-        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/client_payment_reports`,
+        orderStorage.folder(order, 'payments'),
         order.client_id,
         orderId,
         null,

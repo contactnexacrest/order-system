@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const orderStorage = require('../helpers/orderStorage');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const disputeDocumentRepository = require('../repositories/disputeDocumentRepository');
@@ -16,9 +17,6 @@ const workingDaysCalculator = require('../services/workingDaysCalculator');
 // Port of App\Controllers\DisputeController. Spec Section 16 — Dispute
 // Management.
 
-function sanitizePathSegment(value) {
-  return String(value == null ? '' : value).replace(/[^A-Za-z0-9_-]+/g, '-');
-}
 
 function todayYmd() {
   const d = new Date();
@@ -195,7 +193,7 @@ async function uploadDocument(req, res) {
       req,
       'document',
       'dispute_document',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/disputes/${disputeId}`,
+      orderStorage.folder(order, 'disputes', String(disputeId)),
       null,
       dispute.order_id,
       req.user.id,

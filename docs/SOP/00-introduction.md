@@ -134,8 +134,37 @@ Annexure product photo — ends up on disk nested under two reference
 numbers, never under the human-readable name you'd expect:
 
 ```
-{STORAGE_BASE_PATH}/clients/{client_unique_number}/{order_reference}/{purpose}/{random-id}.{ext}
+{STORAGE_BASE_PATH}/clients/{client_unique_number}/{order_reference}/{step folder}/{random-id}.{ext}
 ```
+
+**The step folders match the order page** (owner request 2026-10-26), so
+the folder a file sits in is the step it belongs to:
+
+```
+01-quotation/            generated/ (QT, Annexure A) · annexure-images/
+04-buyer-po/             generated/ (Buyer PO) · received/ (the buyer's signed copies)
+05-proforma-invoice/     generated/ (PI) · lc/ (LC copies)
+06-order-confirmation/   generated/ (OC)
+07-supplier-po/          generated/ (Supplier PO) · received/ (supplier's acknowledgment)
+09-freight/              generated/ (Freight Debit Note)
+10-packing-and-bl/       generated/ (Packing List, BL Instruction) · received/ (draft BLs, scanned BL, packing approvals)
+11-commercial-invoice/   generated/ (CI)
+12-financials/           generated/ (CA financial annexure — internal)
+13-closure/              generated/ (COO Prep Sheet, BL Endorsement)
+payments/                client-reported payment proofs
+amendments/{ref}/        generated/ · received/ (signed copy)
+disputes/{id}/ · order-updates/ · additional-documents/ · checklists/ · reference/
+```
+
+A generated document always goes to its **own** step's folder, whatever
+stage the order is at — a Quotation regenerated late in the order still
+lands in `01-quotation/generated/`. Older files were filed by the stage the
+order happened to be at; the one-off tidy-up tool
+(`php app/cron/reorganize_order_files.php`, or
+`node src/jobs/reorganizeOrderFiles.js` on the Node build) moves them into
+this layout — run it without arguments first to see every planned move,
+then again with `--apply`. Take a backup of the storage folder and the
+database before applying.
 
 - **`client_unique_number`** (shown on screen as **"Buyer Inquiry Ref"**)
   is generated **once**, when the client is first created, and reused on
@@ -144,12 +173,9 @@ numbers, never under the human-readable name you'd expect:
   their fifth order still carries the same Buyer Inquiry Ref as their first.
 - **`order_reference`** is generated **once per order** instead, and is
   what actually distinguishes one order from another for the same client.
-- **`{purpose}`** is a short, fixed subfolder naming what the file actually
-  is — `{stage_slug}/generated` for a system-generated document (QT, PI,
-  BL Instruction Sheet, …, nested one level deeper under whichever stage
-  generated it), `annexure` for an Annexure product photo, `disputes/{id}`
-  for a dispute's supporting document, and so on for every other upload
-  context.
+- **`{step folder}`** is the order-page step the file belongs to, as
+  listed above — `generated/` inside it for documents the system produced,
+  `received/` for files that came in from the buyer, supplier or CHA.
 - **`{random-id}.{ext}`** — the actual filename on disk is always a random
   identifier, generated fresh for that one file, never the document's own
   reference number (e.g. `SC/QT/2026/1809001`) and never the name the file

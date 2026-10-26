@@ -91,7 +91,7 @@ correctly once the password is changed.
 - `public_html/` — the web root. Only this folder is ever URL-reachable.
 - `storage/` — asset files (placeholder logo/signature/seal/watermark/email
   header images already in place) and, once you generate documents,
-  per-order folders under `storage/clients/<client>/<order>/<stage>/generated/`.
+  per-order folders under `storage/clients/<client>/<order>/<step>/generated/` — one folder per order-page step (`01-quotation/`, `04-buyer-po/`, … see SOP chapter 0, "How files are named and stored on disk").
 - `.gitignore` — added in the Phase E follow-up: excludes `app/.env` (real
   secrets — SMTP/DB credentials, encryption keys), `app/vendor/`
   (Composer-regenerated), and generated per-order documents under

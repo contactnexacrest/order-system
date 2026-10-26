@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const orderStorage = require('../helpers/orderStorage');
 const flash = require('../helpers/flash');
 const orderCommentRepository = require('../repositories/orderCommentRepository');
 const orderRepository = require('../repositories/orderRepository');
@@ -18,7 +19,7 @@ async function post(req, res) {
     if (!order) {
       throw new Error(`Order ${orderId} not found`);
     }
-    const subPath = `clients/${fileUploadService.sanitizePathSegment(order.client_unique_number)}/${fileUploadService.sanitizePathSegment(order.order_reference)}/comment_attachments`;
+    const subPath = orderStorage.folder(order, 'order_updates');
     const fileIds = await fileUploadService.handleMultipleUploads(
       req,
       'attachments',

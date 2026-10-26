@@ -67,7 +67,7 @@ Three things happen in this section, each building toward the BL:
    checking goes through its own review loop here, before the real BL is
    ever confirmed:
 
-   - **Log Draft BL for Review** — upload the CHA's draft (PDF). This
+   - **Log Draft BL for Review** — upload the CHA's draft (PDF, Word, Excel, an image, an email or a zip — any common format). This
      starts a new, numbered round.
    - For that round, staff decide **Approve** or **Request Revision**
      (with notes explaining what needs to change). A revision request

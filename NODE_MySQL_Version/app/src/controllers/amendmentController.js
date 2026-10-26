@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const orderStorage = require('../helpers/orderStorage');
 const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const amendmentRepository = require('../repositories/amendmentRepository');
@@ -12,9 +13,6 @@ const fileUploadService = require('../services/fileUploadService');
 // Port of App\Controllers\AmendmentController. Spec Section 8 — Payment
 // Terms Amendment System (SC/AMD).
 
-function sanitizePathSegment(value) {
-  return String(value == null ? '' : value).replace(/[^A-Za-z0-9_-]+/g, '-');
-}
 
 async function index(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -140,7 +138,7 @@ async function uploadSignedCopy(req, res) {
       req,
       'signed_copy',
       'amendment_signed_copy',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/amendments/${sanitizePathSegment(amendment.amendment_reference)}/signed`,
+      orderStorage.folder(order, 'amendments', `${orderStorage.segment(amendment.amendment_reference)}/received`),
       null,
       amendment.order_id,
       req.user.id,

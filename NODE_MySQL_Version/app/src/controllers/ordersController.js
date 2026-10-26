@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const orderStorage = require('../helpers/orderStorage');
 const JSZip = require('jszip');
 const db = require('../config/db');
 const { parseDbDateTime } = require('../helpers/dbDateTime');
@@ -92,9 +93,6 @@ function addDaysYmd(fromYmd, days) {
   return d.toISOString().slice(0, 10);
 }
 
-function sanitizePathSegment(value) {
-  return String(value == null ? '' : value).replace(/[^A-Za-z0-9_-]+/g, '-');
-}
 
 function str(v, fallback = '') {
   return String(v ?? fallback).trim();
@@ -1352,7 +1350,7 @@ async function uploadBuyerPoDocument(req, res) {
       req,
       'document',
       'buyer_po_copy',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/buyer_po`,
+      orderStorage.forReceived(order, 'buyer_po'),
       null,
       orderId,
       req.user.id,
@@ -1400,7 +1398,7 @@ async function uploadAdditionalDocument(req, res) {
       req,
       'document',
       'order_additional_document',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/additional_documents`,
+      orderStorage.folder(order, 'additional_documents'),
       null,
       orderId,
       req.user.id,
@@ -1639,7 +1637,7 @@ async function recordLcDetails(req, res) {
         req,
         'lc_file',
         'order_lc_copy',
-        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/lc`,
+        orderStorage.folder(order, 'lc'),
         null,
         orderId,
         user.id,
@@ -2180,7 +2178,7 @@ async function uploadSupplierPoDocument(req, res) {
       req,
       'document',
       'supplier_po_ack',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/supplier_po`,
+      orderStorage.forReceived(order, 'supplier_po'),
       null,
       orderId,
       req.user.id,
@@ -2361,7 +2359,7 @@ async function savePacking(req, res) {
         req,
         'buyer_approval',
         'buyer_approval',
-        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/packing`,
+        orderStorage.forReceived(order, 'packing_bl'),
         null,
         orderId,
         req.user.id,
@@ -2483,7 +2481,7 @@ async function uploadDraftBl(req, res) {
       req,
       'draft_bl',
       'draft_bl',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/shipping`,
+      orderStorage.forReceived(order, 'packing_bl'),
       null,
       orderId,
       user.id,
@@ -2577,7 +2575,7 @@ async function recordBlIssued(req, res) {
         req,
         'bl_copy',
         'bl_copy',
-        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/shipping`,
+        orderStorage.forReceived(order, 'packing_bl'),
         null,
         orderId,
         user.id,
@@ -2612,7 +2610,7 @@ async function attachBlCopy(req, res) {
       req,
       'bl_copy',
       'bl_copy',
-      `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/shipping`,
+      orderStorage.forReceived(order, 'packing_bl'),
       null,
       orderId,
       req.user.id,

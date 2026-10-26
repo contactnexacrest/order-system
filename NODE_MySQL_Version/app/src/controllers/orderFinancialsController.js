@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const orderStorage = require('../helpers/orderStorage');
 const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
@@ -16,9 +17,6 @@ const caFyLockGuard = require('../services/caFyLockGuard');
 const fileUploadService = require('../services/fileUploadService');
 const { todayIst } = require('../helpers/dbDateTime');
 
-function sanitizePathSegment(value) {
-  return String(value == null ? '' : value).replace(/[^A-Za-z0-9_-]+/g, '-');
-}
 
 /**
  * Port of App\Controllers\OrderFinancialsController (docs/schema.sql
@@ -307,7 +305,7 @@ async function saveLcDetails(req, res) {
         req,
         'lc_file',
         'order_lc_copy',
-        `clients/${sanitizePathSegment(order.client_unique_number)}/${sanitizePathSegment(order.order_reference)}/lc`,
+        orderStorage.folder(order, 'lc'),
         null,
         orderId,
         user.id,

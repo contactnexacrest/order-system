@@ -204,7 +204,7 @@ final class DisputeController
             $fileId = FileUploadService::handleUpload(
                 'document',
                 'dispute_document',
-                'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/disputes/' . $disputeId,
+                \App\Helpers\OrderStorage::folder($order, 'disputes', (string) $disputeId),
                 null,
                 (int) $dispute['order_id'],
                 (int) AuthService::currentUser()['id'],

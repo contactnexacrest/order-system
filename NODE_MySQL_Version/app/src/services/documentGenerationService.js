@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const nunjucks = require('nunjucks');
 
 const env = require('../config/env');
+const orderStorage = require('../helpers/orderStorage');
 const documentImageOptimizer = require('../helpers/documentImageOptimizer');
 const db = require('../config/db');
 const amendmentRepository = require('../repositories/amendmentRepository');
@@ -263,10 +264,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   const html = twig.render(templateFile, context);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
-  const clientNumber = sanitizePathSegment(order.client_unique_number);
-  const orderRef = sanitizePathSegment(order.order_reference);
-  const stageSlug = sanitizePathSegment(order.current_stage_slug || 'stage');
-  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, stageSlug, 'generated');
+  const targetDir = path.join(storageBase, orderStorage.forGeneratedDocument(order, documentTypeCode));
   fs.mkdirSync(targetDir, { recursive: true });
 
   // documentReference itself keeps its real "/" separators (that's the
@@ -713,10 +711,7 @@ async function finalizeApproval(documentId) {
   const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
-  const clientNumber = sanitizePathSegment(order.client_unique_number);
-  const orderRef = sanitizePathSegment(order.order_reference);
-  const stageSlug = sanitizePathSegment(order.current_stage_slug || 'stage');
-  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, stageSlug, 'generated');
+  const targetDir = path.join(storageBase, orderStorage.forGeneratedDocument(order, documentTypeCode));
   fs.mkdirSync(targetDir, { recursive: true });
 
   const filenameSafeReference = document.document_reference !== null ? document.document_reference.replace(/\//g, '-') : documentTypeCode;
@@ -868,10 +863,7 @@ async function markSuperseded(documentId) {
   const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
-  const clientNumber = sanitizePathSegment(order.client_unique_number);
-  const orderRef = sanitizePathSegment(order.order_reference);
-  const stageSlug = sanitizePathSegment(order.current_stage_slug || 'stage');
-  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, stageSlug, 'generated');
+  const targetDir = path.join(storageBase, orderStorage.forGeneratedDocument(order, documentTypeCode));
   fs.mkdirSync(targetDir, { recursive: true });
 
   const filenameSafeReference = document.document_reference !== null ? document.document_reference.replace(/\//g, '-') : documentTypeCode;
@@ -1043,10 +1035,7 @@ async function generateAmendment(amendmentId, generatedByUserId) {
   const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
-  const clientNumber = sanitizePathSegment(order.client_unique_number);
-  const orderRef = sanitizePathSegment(order.order_reference);
-  const amdRefSafe = sanitizePathSegment(amendment.amendment_reference);
-  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, 'amendments', amdRefSafe, 'generated');
+  const targetDir = path.join(storageBase, orderStorage.folder(order, 'amendments', `${orderStorage.segment(amendment.amendment_reference)}/generated`));
   fs.mkdirSync(targetDir, { recursive: true });
   const amdUuidName = uuidFilename('pdf');
   const pdfPath = path.join(targetDir, amdUuidName);
@@ -1180,9 +1169,7 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
   const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
-  const clientNumber = sanitizePathSegment(order.client_unique_number);
-  const orderRef = sanitizePathSegment(order.order_reference);
-  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, 'internal-ca', 'generated');
+  const targetDir = path.join(storageBase, orderStorage.forGeneratedDocument(order, 'CAFIN'));
   fs.mkdirSync(targetDir, { recursive: true });
 
   const filenameSafeReference = documentReference.replace(/\//g, '-');
@@ -1288,9 +1275,7 @@ async function generateBlEndorsement(orderId, generatedByUserId) {
   const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');
-  const clientNumber = sanitizePathSegment(order.client_unique_number);
-  const orderRef = sanitizePathSegment(order.order_reference);
-  const targetDir = path.join(storageBase, 'clients', clientNumber, orderRef, 'bl-endorsement', 'generated');
+  const targetDir = path.join(storageBase, orderStorage.forGeneratedDocument(order, 'BLE'));
   fs.mkdirSync(targetDir, { recursive: true });
 
   const filenameSafeReference = documentReference.replace(/\//g, '-');
@@ -1523,13 +1508,10 @@ function applyReplacements(text, replacements) {
   return out;
 }
 
-function sanitizePathSegment(value) {
-  return String(value ?? '').replace(/[^A-Za-z0-9_-]+/g, '-') || 'x';
-}
-
 /**
  * Spec Section 14 — "PDF filenames = UUIDs — never guessable." The folder
- * path (clients/{client}/{order}/{stage}/generated/) stays human-navigable
+ * path (clients/{client}/{order}/{step}/generated/ — see helpers/orderStorage)
+ * stays human-navigable
  * — that's just organization, never web-reachable since storage/ sits
  * outside the app's static-file root — but the leaf filename itself must
  * not be derivable from the document reference the way

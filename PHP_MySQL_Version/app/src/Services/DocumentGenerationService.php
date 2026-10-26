@@ -160,10 +160,7 @@ final class DocumentGenerationService
         $html = $twig->render($templateFile, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
-        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
-        $orderRef = self::sanitizePathSegment($order['order_reference']);
-        $stageSlug = self::sanitizePathSegment($order['current_stage_slug'] ?? 'stage');
-        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/{$stageSlug}/generated";
+        $targetDir = $storageBase . '/' . \App\Helpers\OrderStorage::forGeneratedDocument($order, $documentTypeCode);
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);
         }
@@ -648,10 +645,7 @@ final class DocumentGenerationService
         $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
-        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
-        $orderRef = self::sanitizePathSegment($order['order_reference']);
-        $stageSlug = self::sanitizePathSegment($order['current_stage_slug'] ?? 'stage');
-        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/{$stageSlug}/generated";
+        $targetDir = $storageBase . '/' . \App\Helpers\OrderStorage::forGeneratedDocument($order, $documentTypeCode);
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);
         }
@@ -810,10 +804,7 @@ final class DocumentGenerationService
         $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
-        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
-        $orderRef = self::sanitizePathSegment($order['order_reference']);
-        $stageSlug = self::sanitizePathSegment($order['current_stage_slug'] ?? 'stage');
-        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/{$stageSlug}/generated";
+        $targetDir = $storageBase . '/' . \App\Helpers\OrderStorage::forGeneratedDocument($order, $documentTypeCode);
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);
         }
@@ -991,10 +982,7 @@ final class DocumentGenerationService
         $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
-        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
-        $orderRef = self::sanitizePathSegment($order['order_reference']);
-        $amdRefSafe = self::sanitizePathSegment($amendment['amendment_reference']);
-        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/amendments/{$amdRefSafe}/generated";
+        $targetDir = $storageBase . '/' . \App\Helpers\OrderStorage::folder($order, 'amendments', \App\Helpers\OrderStorage::segment((string) $amendment['amendment_reference']) . '/generated');
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);
         }
@@ -1123,9 +1111,7 @@ final class DocumentGenerationService
         $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
-        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
-        $orderRef = self::sanitizePathSegment($order['order_reference']);
-        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/internal-ca/generated";
+        $targetDir = $storageBase . '/' . \App\Helpers\OrderStorage::forGeneratedDocument($order, 'CAFIN');
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);
         }
@@ -1243,9 +1229,7 @@ final class DocumentGenerationService
         $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');
-        $clientNumber = self::sanitizePathSegment($order['client_unique_number']);
-        $orderRef = self::sanitizePathSegment($order['order_reference']);
-        $targetDir = "{$storageBase}/clients/{$clientNumber}/{$orderRef}/bl-endorsement/generated";
+        $targetDir = $storageBase . '/' . \App\Helpers\OrderStorage::forGeneratedDocument($order, 'BLE');
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0755, true);
         }
@@ -1656,14 +1640,10 @@ final class DocumentGenerationService
      * SUPPO/COOPREP/AMD/CAFIN/CHECKLIST* — none of those are buyer-facing
      * contracts, so there is nothing here for a buyer to need defined).
      */
-    private static function sanitizePathSegment(string $value): string
-    {
-        return preg_replace('/[^A-Za-z0-9_-]+/', '-', $value) ?? 'x';
-    }
-
     /**
      * Spec Section 14 — "PDF filenames = UUIDs — never guessable." The
-     * folder path (clients/{client}/{order}/{stage}/generated/) stays
+     * folder path (clients/{client}/{order}/{step}/generated/ — see
+     * App\Helpers\OrderStorage) stays
      * human-navigable — that's just organization, never web-reachable
      * since storage/ sits outside public_html/ — but the leaf filename
      * itself must not be derivable from the document reference the way

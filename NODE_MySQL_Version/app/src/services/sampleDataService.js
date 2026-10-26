@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const orderStorage = require('../helpers/orderStorage');
 const fs = require('fs');
 
 const clientRepository = require('../repositories/clientRepository');
@@ -251,7 +252,7 @@ async function load(userId) {
   await attachSampleAnnexureImage(
     orderE2Id,
     blankAnnexureId,
-    `clients/${pathSafe(orderE2.client_unique_number)}/${pathSafe(orderE2.order_reference)}/annexure`,
+    orderStorage.folder(orderE2, 'annexure'),
     'Monument Blank - reference photo.png',
     userId
   );
@@ -266,7 +267,7 @@ async function load(userId) {
   await attachSampleAnnexureImage(
     orderE2Id,
     headstoneAnnexureId,
-    `clients/${pathSafe(orderE2.client_unique_number)}/${pathSafe(orderE2.order_reference)}/annexure`,
+    orderStorage.folder(orderE2, 'annexure'),
     'Headstone - reference photo.png',
     userId
   );
@@ -288,7 +289,7 @@ async function load(userId) {
   await attachSampleAnnexureImage(
     orderE3Id,
     monumentSetAnnexureId,
-    `clients/${pathSafe(orderE3.client_unique_number)}/${pathSafe(orderE3.order_reference)}/annexure`,
+    orderStorage.folder(orderE3, 'annexure'),
     'Complete Monument Set - reference photo.png',
     userId
   );
@@ -594,7 +595,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
   const buyerPoFileId = await attachSamplePlaceholderFile(
     null,
     orderId,
-    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/buyer_po`,
+    orderStorage.forReceived(order, 'buyer_po'),
     'Buyer PO SAMPLE-BUYER-PO-0002 (signed).pdf',
     'Buyer',
     'Buyer PO copy',
@@ -661,7 +662,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
   const signedCopyFileId = await attachSamplePlaceholderFile(
     null,
     orderId,
-    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/amendments/${pathSafe(amendment.amendment_reference)}/signed`,
+    orderStorage.folder(order, 'amendments', `${orderStorage.segment(amendment.amendment_reference)}/received`),
     `Countersigned Amendment ${amendment.amendment_reference}.pdf`,
     'Buyer',
     'Countersigned Payment Terms Amendment Agreement',
@@ -700,7 +701,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
   const supplierAckFileId = await attachSamplePlaceholderFile(
     null,
     orderId,
-    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/supplier_po`,
+    orderStorage.forReceived(order, 'supplier_po'),
     `Supplier PO ${supplierPoReference} (acknowledged).pdf`,
     'Supplier',
     'Supplier PO acknowledgment',
@@ -723,7 +724,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
   const buyerApprovalFileId = await attachSamplePlaceholderFile(
     null,
     orderId,
-    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/packing`,
+    orderStorage.forReceived(order, 'packing_bl'),
     'Buyer approval - quantity shortfall.pdf',
     'Buyer',
     'Quantity shortfall approval',
@@ -906,7 +907,7 @@ async function addSampleDispute(orderId, userId) {
   const evidenceFileId = await attachSamplePlaceholderFile(
     null,
     orderId,
-    `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/disputes/${disputeId}`,
+    orderStorage.folder(order, 'disputes', String(disputeId)),
     'Buyer shortage claim - photos and destuffing report.pdf',
     'Buyer',
     'Dispute-related document',
@@ -1033,7 +1034,7 @@ async function attachSamplePngFile(orderId, subPath, originalFilename, uploadedB
  */
 async function addSampleOrderComments(orderId, clientId, userId) {
   const order = await orderRepository.find(orderId);
-  const subPath = `clients/${pathSafe(order.client_unique_number)}/${pathSafe(order.order_reference)}/comment_attachments`;
+  const subPath = orderStorage.folder(order, 'order_updates');
 
   const c1 = await orderCommentRepository.create(orderId, 'staff', userId, null, 'Good news — production on your order has started and is progressing on schedule. We will share progress photos shortly.');
   await orderCommentRepository.markEmailSent(c1);
@@ -1061,9 +1062,6 @@ async function addSampleDisputeComments(orderId, clientId, userId) {
   await orderCommentRepository.create(orderId, 'client', null, clientId, 'Thank you for resolving this so quickly — much appreciated.');
 }
 
-function pathSafe(value) {
-  return String(value ?? '').replace(/[^A-Za-z0-9_-]+/g, '-');
-}
 
 function formatDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

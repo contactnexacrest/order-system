@@ -60,7 +60,7 @@ Bluehost shared hosting only exposes one web root (typically `public_html`); eve
 ├── storage/                        ← OUTSIDE web root — exactly the structure in spec Section 3:
 │   ├── assets/{logos,signatures,seals,watermarks,email_headers}/
 │   ├── products/{product_code}/images/
-│   ├── clients/{client_unique_number}/{order_reference}/stage_N_slug/{generated,received}/
+│   ├── clients/{client_unique_number}/{order_reference}/NN-step-name/{generated,received}/   (01-quotation … 13-closure — see helpers OrderStorage)
 │   ├── internal/{checklists,sops,process_refs}/
 │   └── temp/{session_id}/
 │

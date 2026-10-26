@@ -65,6 +65,13 @@ below) or **Not Eligible** (a reason is required, same "not applicable
 still needs recording" rule as everywhere else in this system) — there
 is no path back to Pending once resolved.
 
+All schemes are edited in **one table and saved together** with **Save
+All Schemes** (owner request 2026-10-26): each row shows its current
+value from the database, a row's reason is required (10+ characters)
+only while it's set to Not Eligible, rows left Pending are untouched,
+and only the rows you actually changed are updated. If any row is
+invalid, nothing is saved and the message names each scheme to fix.
+
 Resolving a scheme is logged to the order's own
 [Audit Log](./13-document-review-approval.md) under
 `EXPORT_BENEFIT_SCHEME_STATUS_UPDATED`. **Closing the order (Mark Fully

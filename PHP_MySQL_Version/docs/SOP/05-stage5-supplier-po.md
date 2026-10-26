@@ -116,8 +116,11 @@ order:
 
 Below the signing actions, staff with the Order Financials permission
 (the same one that unlocks the Order Profitability Sheet — Admin/MD/ED
-and Super Admin by default) see a **Supplier Payments** section:
-**Mark Advance Paid** and **Mark Balance Paid**, each with its own date.
+and Super Admin by default) record the supplier's payments as two sub-steps of their own:
+**7e · Supplier Advance Paid** (the last card of Step 7) and
+**10a · Supplier Balance Paid** (the first card of Step 10, before
+packing — it can be marked any time after the Supplier PO, even long
+after this stage has passed), each with its own date and amount.
 Previously only the amount owed to a supplier was ever recorded —
 nothing tracked whether or when it was actually paid, so "today's
 supplier payments" had no data to report on at all. Each button

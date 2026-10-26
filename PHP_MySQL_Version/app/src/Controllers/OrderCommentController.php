@@ -25,9 +25,7 @@ final class OrderCommentController
             if (!$order) {
                 throw new \RuntimeException("Order {$orderId} not found");
             }
-            $subPath = 'clients/' . FileUploadService::sanitizePathSegment((string) $order['client_unique_number'])
-                . '/' . FileUploadService::sanitizePathSegment((string) $order['order_reference'])
-                . '/comment_attachments';
+            $subPath = \App\Helpers\OrderStorage::folder($order, 'order_updates');
             $fileIds = FileUploadService::handleMultipleUploads(
                 'attachments',
                 'order_comment_media',

@@ -31,21 +31,27 @@ Stage 9 unlocks the moment the balance payment clears in Stage 8:
 
 ![Stage 9 section — unlocked, nothing recorded yet](./images/s9_before.png)
 
-Two optional record-keeping steps, then the closing action:
+On the order page this is **Step 13**, worked in this order (owner
+sequence, 2026-10-26) — each sub-step opens once the one before it is
+done:
 
-1. **Record Original BLs Received from CHA** — how many original Bill of
-   Lading copies came back from the Customs House Agent.
-2. **Mark Original BLs Endorsed by NexaCrest** — confirms NexaCrest has
-   endorsed them (signed over) ready to hand to the buyer.
+- **13a · Generate COO Prep Sheet** (internal worksheet for the
+  Certificate of Origin).
+- **13b · Record Original BLs Received from CHA** — how many original
+  Bill of Lading copies came back from the Customs House Agent.
+- **13c · Save BL Endorsement Details** — who to endorse to, BL/vessel/
+  voyage, ports and date.
+- **13d · Generate / Print BL Endorsement** — the printable endorsement
+  for the reverse of each original BL.
+- **13e · Mark Original BLs Endorsed by NexaCrest** — confirms the
+  originals have been endorsed (signed over) ready for the buyer.
+- **13f · Close Order (Document Despatch)** — below.
+- **13g · Mark Fully Settled** — the final close (see "Closing the order
+  — two phases" below). Step 13 shows its green tick only once this is
+  done; until then 13g stays the current, highlighted step even though
+  Close Order has passed the stage gate.
 
 ![Stage 9 section — originals received and endorsed](./images/s9_originals_endorsed.png)
-
-> **Neither of these two steps is actually required to close the order** —
-> notice in the screenshot above that **Close Order** was available from the
-> very start of this stage, before either box was ticked. They exist to keep
-> a record of the physical document handling, but the system trusts staff to
-> follow the real-world process in the right order rather than enforcing it
-> as a hard rule here.
 
 **Close Order — Complete Document Set Couriered to Buyer**: staff enter
 the courier tracking number for the package containing the buyer's
@@ -182,14 +188,18 @@ as many times as needed if the underlying order data changes.
 
 ## Compliance Checklist
 
-A "Compliance Checklist" panel sits on every order's own page as **Step
-8b** (alongside "Production & Estimated Shipment" as 8a, under the
-shared "Production & Pre-Shipment Compliance" group — see [Stage
-5](./05-stage5-supplier-po.md#production--estimated-shipment--and-where-its-history-lives))
-tracking pre-closure compliance tasks — ECGC Cover, Pre-Shipment
+The "Compliance Checklist" is split in two by **when the task is done**
+(set per task type by Admin in
+[Compliance Task Types](./15-admin-settings.md) — "With the Supplier PO"
+or "Before shipment"): the **with-the-Supplier-PO** part (Due Diligence,
+ECGC Cover by default) is the first card of **Step 7**, and the
+**before-shipment** part (Fumigation, Phytosanitary, Pre-Shipment
+Inspection by default) is the first card of **Step 10**. Outstanding
+tasks show amber but run alongside the other sub-steps — they never lock
+them. Together they keep
+track of pre-closure compliance tasks — ECGC Cover, Pre-Shipment
 Inspection, Fumigation Certificate, Phytosanitary Certificate, Due
-Diligence by default; Admin can add more from
-[Compliance Task Types](./15-admin-settings.md). **A real row for every
+Diligence by default; Admin can add more. **A real row for every
 active task type is written the moment the order is created** — never
 left as a missing row standing in for "not applicable," so a report run
 directly against the underlying table always has an explicit value for
@@ -199,10 +209,15 @@ own starting value), **Pending Approval**, **Approved**, or **Skipped
 to this order" still needs to be recorded, not just silently left
 blank.
 
+Each row **saves on its own** (its own Save button, no page reload), so
+choices made on other rows stay as they are; the reason box appears only
+when **Skipped (Not Applicable)** is chosen, and any problem is shown
+right on that row.
+
 For a repeat order where the whole checklist genuinely doesn't apply, a
 **"Mark all remaining tasks Not Applicable"** action (appears only while
 something is still outstanding) resolves every currently-unresolved task
-in one submit with one shared reason, instead of skipping each task
+in that part of the checklist in one submit with one shared reason, instead of skipping each task
 individually.
 
 Visibility of the whole panel, and every status change on it (including

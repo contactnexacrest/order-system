@@ -312,7 +312,7 @@ final class OrderFinancialsController
                 $lcFileId = FileUploadService::handleUpload(
                     'lc_file',
                     'order_lc_copy',
-                    'clients/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['client_unique_number']) . '/' . preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $order['order_reference']) . '/lc',
+                    \App\Helpers\OrderStorage::folder($order, 'lc'),
                     null,
                     $orderId,
                     (int) $user['id'],
