@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
+const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
 const orderPaymentStatusRepository = require('../../src/repositories/orderPaymentStatusRepository');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
@@ -123,10 +124,18 @@ describe('Nav links match their own route permissions (External QA report U-01)'
     const { agent, userId } = await loginAs('Logistics Executive');
     const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, userId);
 
-    const res = await agent.get(`/orders/${orderId}`);
+    // The Compliance Checklist card (shown to close_orders holders) names
+    // where its task list is managed — a link only for those who can open
+    // /compliance-task-types (Admin-only), plain text for everyone else.
+    await orderComplianceTaskRepository.initializeForOrder(orderId);
 
-    if (res.text.includes('Pre-closure compliance tasks')) {
-      expect(res.text).not.toContain('href="/compliance-task-types"');
-    }
+    const res = await agent.get(`/orders/${orderId}`);
+    expect(res.text).toContain('id="compliance-checklist"');
+    expect(res.text).toContain('managed from Compliance Task Types');
+    expect(res.text).not.toContain('href="/compliance-task-types"');
+
+    const admin = await loginAs('Admin');
+    const adminRes = await admin.agent.get(`/orders/${orderId}`);
+    expect(adminRes.text).toContain('<a href="/compliance-task-types">Compliance Task Types</a>');
   });
 });

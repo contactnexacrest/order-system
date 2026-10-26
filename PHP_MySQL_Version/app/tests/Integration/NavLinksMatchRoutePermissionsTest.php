@@ -125,17 +125,27 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
 
     public function testExportOrLogisticsSeesCompliancTaskTypesAsPlainTextOnAnOrderPage(): void
     {
+        // The Compliance Checklist card (shown to close_orders holders) names
+        // where its task list is managed — a link only for those who can
+        // open /compliance-task-types (Admin-only), plain text for everyone else.
         $orderId = $this->createTestOrder($this->createTestClient());
-        $_SESSION['_auth_user_id'] = $this->createTestUser('Logistics Executive');
+        \App\Repositories\OrderComplianceTaskRepository::initializeForOrder($orderId);
 
+        $logisticsUserId = $this->createTestUser('Logistics Executive');
+        // Non-oversight roles only open orders assigned to them.
+        \App\Repositories\OrderAssigneeRepository::add($orderId, $logisticsUserId, null);
+        $_SESSION['_auth_user_id'] = $logisticsUserId;
         ob_start();
-        (new OrderController())->show(['id' => $orderId]);
+        (new OrderController())->show(['id' => (string) $orderId]);
         $html = (string) ob_get_clean();
+        self::assertStringContainsString('id="compliance-checklist"', $html, 'Logistics Executive holds close_orders, so the checklist is shown');
+        self::assertStringContainsString('managed from Compliance Task Types', $html);
+        self::assertStringNotContainsString('href="/compliance-task-types"', $html, 'Logistics Executive has close_orders but not manage_compliance_task_types');
 
-        if (str_contains($html, 'Pre-closure compliance tasks')) {
-            self::assertStringNotContainsString('href="/compliance-task-types"', $html, 'Logistics Executive has close_orders but not manage_compliance_task_types');
-        } else {
-            self::markTestSkipped('Compliance tasks section not rendered for this order/stage state.');
-        }
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $html = (string) ob_get_clean();
+        self::assertStringContainsString('<a href="/compliance-task-types">Compliance Task Types</a>', $html, 'Admin can manage the task types, so it is a link');
     }
 }
