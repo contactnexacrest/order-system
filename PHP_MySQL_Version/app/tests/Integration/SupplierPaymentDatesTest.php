@@ -208,7 +208,9 @@ final class SupplierPaymentDatesTest extends DbTestCase
 
         $before = $this->render($orderId);
         self::assertStringContainsString('/supplier-po/advance-paid', $before);
-        self::assertStringContainsString('/supplier-po/balance-paid', $before);
+        // Owner report (2026-10-27): the balance waits for the planned advance.
+        self::assertStringNotContainsString('/supplier-po/balance-paid', $before);
+        self::assertStringContainsString('Record the supplier <strong>advance</strong> first', $before);
 
         OrderSupplierPoRepository::markAdvancePaid($supplierPoId, '2026-10-20', $this->createTestUser('Admin'), 20000.0);
 

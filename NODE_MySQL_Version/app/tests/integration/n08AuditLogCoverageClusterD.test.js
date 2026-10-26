@@ -107,7 +107,7 @@ describe('Audit log coverage, N-08 Cluster D', () => {
     const supplierId = await supplierRepository.create({ supplier_legal_name: 'N08 Test Supplier' });
     const userId = await createTestUser();
 
-    await ordersController.createSupplierFactoryAddress(fakeReq(orderId, userId, { address: '123 Factory Road' }, { supplierId: String(supplierId) }), fakeRes());
+    await supplierController.addFactoryAddress(fakeReq(supplierId, userId, { address: '123 Factory Road' }), fakeRes());
 
     expect((await lastAuditLogAction()).action_type).toBe('SUPPLIER_FACTORY_ADDRESS_CREATED');
   });
@@ -118,7 +118,7 @@ describe('Audit log coverage, N-08 Cluster D', () => {
     const addressId = await supplierFactoryAddressRepository.create(supplierId, '123 Factory Road', null);
     const userId = await createTestUser();
 
-    await ordersController.deleteSupplierFactoryAddress(fakeReq(orderId, userId, {}, { addressId: String(addressId) }), fakeRes());
+    await supplierController.deleteFactoryAddress(fakeReq(supplierId, userId, {}, { addressId: String(addressId) }), fakeRes());
 
     expect((await lastAuditLogAction()).action_type).toBe('SUPPLIER_FACTORY_ADDRESS_DELETED');
   });
@@ -167,7 +167,9 @@ describe('Audit log coverage, N-08 Cluster D', () => {
     await unlockThrough(orderId, 5);
     const userId = await createTestUser();
 
-    await ordersController.saveFreightTerms(fakeReq(orderId, userId, { confirmed_freight_rate: '500' }), fakeRes());
+    const partnerId = await supplierRepository.create({ supplier_legal_name: 'N08 Forwarder' });
+    await supplierRepository.setTypes(partnerId, [supplierRepository.LOGISTICS_TYPE]);
+    await ordersController.saveFreightTerms(fakeReq(orderId, userId, { confirmed_freight_rate: '500', freight_forwarder_supplier_id: String(partnerId) }), fakeRes());
 
     expect((await lastAuditLogAction()).action_type).toBe('ORDER_FREIGHT_TERMS_SAVED');
   });

@@ -79,4 +79,20 @@ async function availableFinancialYears() {
   return financialYear.labelsPresentIn(rows.map((r) => r.claimed_at));
 }
 
-module.exports = { record, find, all, forOrder, markReceived, totalClaimed, totalReceived, availableFinancialYears };
+/** Owner request (2026-10-27): fix a wrongly typed claim — every field at once; a null received amount clears the receipt. */
+async function correct(id, referenceNumber, claimedAmount, claimedAt, receivedAmount, receivedAt) {
+  await db.execute(
+    `UPDATE ca_export_benefits
+        SET reference_number = :ref, claimed_amount = :claimed, claimed_at = :claimed_at,
+            received_amount = :received, received_at = :received_at
+      WHERE id = :id`,
+    { ref: referenceNumber, claimed: claimedAmount, claimed_at: claimedAt, received: receivedAmount, received_at: receivedAmount === null ? null : receivedAt, id }
+  );
+}
+
+/** Owner request (2026-10-27): remove a claim recorded by mistake (the full row and the reason go to the audit log). */
+async function remove(id) {
+  await db.execute('DELETE FROM ca_export_benefits WHERE id = :id', { id });
+}
+
+module.exports = { correct, remove, record, find, all, forOrder, markReceived, totalClaimed, totalReceived, availableFinancialYears };

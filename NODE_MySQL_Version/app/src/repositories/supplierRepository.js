@@ -143,6 +143,30 @@ async function markTest(id) {
   await db.execute('UPDATE suppliers SET is_test_data = 1 WHERE id = :id', { id });
 }
 
+/**
+ * Owner request (2026-10-27): logistics partners (freight forwarders) live
+ * in the same directory under this type — Step 9a picks one, Step 7a's
+ * supplier list leaves them out.
+ */
+const LOGISTICS_TYPE = 'Logistics Partner (Freight Forwarder)';
+
+/** Active suppliers that hold the logistics type. */
+async function logisticsPartners() {
+  return all(false, LOGISTICS_TYPE);
+}
+
+/** Active suppliers for a Supplier PO — everyone but logistics-only partners, with the logistics type removed from each `types` list. */
+async function goodsSuppliers() {
+  const out = [];
+  for (const s of await all()) {
+    const types = s.types.filter((t) => t !== LOGISTICS_TYPE);
+    if (types.length === 0 && s.types.length > 0) continue;
+    out.push({ ...s, types });
+  }
+  return out;
+}
+
 module.exports = {
+  LOGISTICS_TYPE, logisticsPartners, goodsSuppliers,
   all, find, create, update, setTypes, toggleActive, isUsedOnAnOrder, idsUsedOnOrders, remove, markSample, markTest,
 };

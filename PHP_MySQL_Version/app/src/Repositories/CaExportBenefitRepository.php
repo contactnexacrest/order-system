@@ -91,6 +91,26 @@ final class CaExportBenefitRepository
         )->execute(['amount' => $receivedAmount, 'received_at' => $receivedAt, 'id' => $id]);
     }
 
+    /** Owner request (2026-10-27): fix a wrongly typed claim — every field at once; a null received amount clears the receipt. */
+    public static function correct(int $id, ?string $referenceNumber, float $claimedAmount, string $claimedAt, ?float $receivedAmount, ?string $receivedAt): void
+    {
+        Database::connection()->prepare(
+            'UPDATE ca_export_benefits
+                SET reference_number = :ref, claimed_amount = :claimed, claimed_at = :claimed_at,
+                    received_amount = :received, received_at = :received_at
+              WHERE id = :id'
+        )->execute([
+            'ref' => $referenceNumber, 'claimed' => $claimedAmount, 'claimed_at' => $claimedAt,
+            'received' => $receivedAmount, 'received_at' => $receivedAmount === null ? null : $receivedAt, 'id' => $id,
+        ]);
+    }
+
+    /** Owner request (2026-10-27): remove a claim recorded by mistake (the full row and the reason go to the audit log). */
+    public static function delete(int $id): void
+    {
+        Database::connection()->prepare('DELETE FROM ca_export_benefits WHERE id = :id')->execute(['id' => $id]);
+    }
+
     public static function totalClaimed(): float
     {
         return (float) Database::connection()->query('SELECT COALESCE(SUM(claimed_amount), 0) FROM ca_export_benefits')->fetchColumn();

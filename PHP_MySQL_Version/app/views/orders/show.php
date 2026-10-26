@@ -483,6 +483,13 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $order,
         return;
     }
     echo '<p class="muted small">Planned ' . strtolower($label) . ': &#8377;' . htmlspecialchars((string) ($planned ?? '—')) . ' (from the Supplier PO terms).</p>';
+    // Owner report (2026-10-27): the supplier advance was never recorded
+    // because nothing asked for it — the balance now waits for it whenever
+    // the Supplier PO terms plan an advance.
+    if ($leg === 'balance' && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
+        echo '<p class="review-banner warn">&#9888; Record the supplier <strong>advance</strong> first (<a href="#step-7e-supplier-advance-paid">Step 7e</a>) — the Supplier PO terms plan an advance of &#8377;' . htmlspecialchars((string) $supplierPo['advance_amount_inr']) . '.</p>';
+        return;
+    }
     if (!$canManageSupplierPayments) {
         echo '<p class="muted small">Recorded by Accounts (needs the "Manage supplier payments" permission).</p>';
         return;
@@ -2076,47 +2083,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php else: ?>
       <p class="muted small">
         Suppliers come from the Suppliers directory<?php if ($canManageSuppliers): ?> — <a href="/suppliers" target="_blank" rel="noopener">add or manage suppliers</a> (opens in a new tab; reload this page afterwards)<?php else: ?> — ask an Admin/MD/ED to add a new supplier there<?php endif; ?>.
-        The supplier's details are copied onto this order when you save the terms, so later edits in the directory never change this order.
+        The supplier's details (and factory addresses) are copied onto this order when you save the terms, so later edits in the directory never change this order. Factory addresses are added or removed only on the supplier's own page in the directory.
       </p>
       <?php if (empty($suppliers)): ?>
         <p class="small" style="color:var(--danger);font-weight:600;">No active suppliers yet. <?= $canManageSuppliers ? '<a href="/suppliers/create" target="_blank" rel="noopener">Add the first supplier</a>, then reload this page.' : 'Ask an Admin/MD/ED to add one in the Suppliers directory.' ?></p>
-      <?php endif; ?>
-
-      <?php if (!empty($suppliers)): ?>
-      <details>
-        <summary>Manage factory addresses</summary>
-        <?php foreach ($suppliers as $sup): ?>
-          <div class="card-nested">
-            <strong><?= htmlspecialchars($sup['supplier_legal_name']) ?></strong>
-            <?php $supAddresses = $supplierFactoryAddressesBySupplier[(int) $sup['id']] ?? []; ?>
-            <?php if (!empty($supAddresses)): ?>
-              <table class="list">
-                <tr><th>Label</th><th>Address</th><th></th></tr>
-                <?php foreach ($supAddresses as $fa): ?>
-                  <tr>
-                    <td><?= htmlspecialchars($fa['label'] ?? '—') ?></td>
-                    <td><?= htmlspecialchars($fa['address']) ?></td>
-                    <td>
-                      <form method="post" action="/orders/<?= (int) $order['id'] ?>/suppliers/factory-addresses/<?= (int) $fa['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove this factory address?');">
-                        <?= Csrf::field() ?>
-                        <button type="submit" class="btn-sm btn-danger">&times;</button>
-                      </form>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              </table>
-            <?php else: ?>
-              <p class="muted small">No factory addresses added yet.</p>
-            <?php endif; ?>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/suppliers/<?= (int) $sup['id'] ?>/factory-addresses" class="field-grid">
-              <?= Csrf::field() ?>
-              <label>Label <small class="muted">(optional)</small><input type="text" name="label" placeholder="e.g. Udaipur Factory"></label>
-              <label>Address *<input type="text" name="address" required placeholder="e.g. Plot 12, Industrial Area, Udaipur, Rajasthan"></label>
-              <button type="submit" class="btn-sm">Add Factory Address</button>
-            </form>
-          </div>
-        <?php endforeach; ?>
-      </details>
       <?php endif; ?>
 
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po" id="supplier-po-form">
@@ -2481,8 +2451,16 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?= Csrf::field() ?>
         <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
         <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
-        <label>Freight Forwarder Name<input type="text" name="freight_forwarder_name"></label>
-        <label>Freight Forwarder Contact<input type="text" name="freight_forwarder_contact"></label>
+        <?php // Owner request (2026-10-27): the forwarder comes from the Suppliers directory, like the supplier in 7a. ?>
+        <label>Logistics Partner (Freight Forwarder) *
+          <select name="freight_forwarder_supplier_id" required>
+            <option value="">Select logistics partner…</option>
+            <?php foreach ($logisticsPartners as $lp): ?>
+              <option value="<?= (int) $lp['id'] ?>"><?= htmlspecialchars($lp['supplier_legal_name']) ?><?= !empty($lp['contact_person']) ? ' — ' . htmlspecialchars($lp['contact_person']) : '' ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <p class="muted small">Logistics partners come from the Suppliers directory (type "<?= htmlspecialchars(\App\Repositories\SupplierRepository::LOGISTICS_TYPE) ?>")<?php if ($canManageSuppliers): ?> — <a href="/suppliers/create" target="_blank" rel="noopener">add one</a> (opens in a new tab; reload this page afterwards)<?php else: ?> — ask an Admin/MD/ED to add one there<?php endif; ?>. Their name and contact are copied onto this order.</p>
         <?= $stepBadge('9a') ?><button type="submit" class="btn-sm">Save Freight Terms</button>
       </form>
     <?php else: ?>
@@ -2490,6 +2468,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div><span class="k">Confirmed Rate</span><span class="v"><?= $freight['confirmed_freight_rate'] !== null ? htmlspecialchars($freight['confirmed_freight_rate']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
         <div><span class="k">Insurance</span><span class="v"><?= $freight['insurance_amount'] !== null ? htmlspecialchars($freight['insurance_amount']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : 'NIL' ?></span></div>
         <div><span class="k">Forwarder</span><span class="v"><?= htmlspecialchars($freight['freight_forwarder_name'] ?? '—') ?></span></div>
+        <div><span class="k">Forwarder Contact</span><span class="v"><?= htmlspecialchars($freight['freight_forwarder_contact'] ?? '—') ?></span></div>
       </div>
       <p class="muted small">Terms already saved — see Step 9b to generate the debit note.</p>
     <?php endif; ?>
@@ -3186,6 +3165,32 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </table>
         <button type="submit" class="btn-sm"<?= $__benefitsApplicable || $__finWaiting > 0 ? '' : ' disabled' ?>>Save Benefits</button>
       </form>
+      <?php endif; ?>
+      <?php // Owner request (2026-10-27): a wrongly typed claim can be corrected or deleted (reason required, audit-logged). ?>
+      <?php if (!empty($orderBenefitClaims) && $__benefitsApplicable): ?>
+      <details class="fin-more-claim" id="financials-12c-corrections">
+        <summary class="muted small">Correct or delete a recorded claim (typed a wrong amount? fix it here — a reason is required)</summary>
+        <?php foreach ($orderBenefitClaims as $b): ?>
+          <div class="card-nested fin-correct-claim">
+            <strong><?= htmlspecialchars($b['scheme_name']) ?></strong> <span class="muted small">— claimed &#8377;<?= number_format((float) $b['claimed_amount'], 2) ?> on <?= htmlspecialchars((string) $b['claimed_at']) ?><?= $b['received_amount'] !== null ? ', received &#8377;' . number_format((float) $b['received_amount'], 2) : '' ?></span>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/correct" class="field-grid">
+              <?= Csrf::field() ?>
+              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="<?= htmlspecialchars((string) $b['claimed_amount']) ?>"></label>
+              <label>Claimed On *<input type="date" name="claimed_at" required value="<?= htmlspecialchars((string) $b['claimed_at']) ?>"></label>
+              <label>Claim Ref.<input type="text" name="reference_number" value="<?= htmlspecialchars((string) ($b['reference_number'] ?? '')) ?>"></label>
+              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="<?= htmlspecialchars((string) ($b['received_amount'] ?? '')) ?>"></label>
+              <label>Received On<input type="date" name="received_at" value="<?= htmlspecialchars((string) ($b['received_at'] ?? date('Y-m-d'))) ?>"></label>
+              <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
+              <div><button type="submit" class="btn-sm">Save Correction</button></div>
+            </form>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/delete" class="fin-delete-claim" onsubmit="return confirm('Delete this <?= htmlspecialchars($b['scheme_name'], ENT_QUOTES) ?> claim? This cannot be undone (it stays in the audit log).');">
+              <?= Csrf::field() ?>
+              <input type="text" name="reason" required minlength="10" placeholder="Reason for deleting (e.g. recorded twice by mistake)" aria-label="Reason for deleting the <?= htmlspecialchars($b['scheme_name']) ?> claim">
+              <button type="submit" class="btn-sm btn-danger">Delete Claim</button>
+            </form>
+          </div>
+        <?php endforeach; ?>
+      </details>
       <?php endif; ?>
       <?php if ($__benefitsApplicable): ?>
       <details class="fin-more-claim">

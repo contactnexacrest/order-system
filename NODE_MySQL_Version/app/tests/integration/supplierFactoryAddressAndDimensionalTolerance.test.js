@@ -69,7 +69,7 @@ describe('Supplier factory addresses + Dimensional Tolerance dropdown (user-repo
     const page = await agent.get(`/orders/${orderId}`);
     const csrf = extractCsrf(page.text);
     const addRes = await agent
-      .post(`/orders/${orderId}/suppliers/${supplierId}/factory-addresses`)
+      .post(`/suppliers/${supplierId}/factory-addresses`)
       .type('form')
       .send({ _csrf: csrf, address: 'Plot 12, Industrial Area, Udaipur, Rajasthan', label: 'Udaipur Factory' });
     expect(addRes.status).toBe(302);
@@ -85,9 +85,10 @@ describe('Supplier factory addresses + Dimensional Tolerance dropdown (user-repo
     const optionTag = res.text.slice(optionPos, optionPos + 400);
     expect(optionTag).toContain('Plot 12, Industrial Area, Udaipur, Rajasthan');
 
-    const manageSectionPos = res.text.indexOf('Manage factory addresses');
-    expect(manageSectionPos).toBeGreaterThan(-1);
-    expect(res.text.slice(manageSectionPos, manageSectionPos + 2000)).toContain('Udaipur Factory');
+    // Owner request (2026-10-27): addresses are managed only in the
+    // Suppliers directory — the order page no longer edits them.
+    expect(res.text).not.toContain('Manage factory addresses');
+    expect(res.text).not.toContain('/factory-addresses');
   });
 
   it('a factory address can be removed', async () => {
@@ -98,7 +99,7 @@ describe('Supplier factory addresses + Dimensional Tolerance dropdown (user-repo
     const page = await agent.get(`/orders/${orderId}`);
     const csrf = extractCsrf(page.text);
     const delRes = await agent
-      .post(`/orders/${orderId}/suppliers/factory-addresses/${addressId}/delete`)
+      .post(`/suppliers/${supplierId}/factory-addresses/${addressId}/delete`)
       .type('form')
       .send({ _csrf: csrf });
     expect(delRes.status).toBe(302);

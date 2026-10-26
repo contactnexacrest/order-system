@@ -183,6 +183,11 @@ fieldset.intake-step{padding-top:1.25rem;}
 .pay-link-box{border:1px dashed var(--line);border-radius:10px;padding:0.6rem 0.8rem;margin:0.4rem 0 0.8rem;background:#fcfbf8;display:flex;flex-direction:column;gap:6px;}
 .pay-link-box p{margin:0;}
 .advance-due-note{background:#eef3fb;border-radius:8px;padding:0.5rem 0.75rem;margin:0 0 0.6rem;font-size:0.9rem;}
+/* Owner request (2026-10-27): correct / delete a recorded benefit claim. */
+.fin-correct-claim{margin:0.5rem 0;}
+.fin-correct-claim .field-grid{margin-top:0.4rem;}
+.fin-delete-claim{display:flex;gap:6px;align-items:center;margin-top:0.4rem;}
+.fin-delete-claim input{flex:1;}
 @media (max-width:640px){.action-progress{flex-direction:column;}}
 .intake-note{background:var(--gold-soft);border:1px solid var(--gold);border-radius:10px;padding:0.75rem 1rem;font-size:0.82rem;color:var(--gold-strong);margin-bottom:1.25rem;}
 @media (max-width:640px){.field-grid{grid-template-columns:1fr;} .intake-wrap{max-width:552px;padding:1.75rem 1rem 1.5rem;}}

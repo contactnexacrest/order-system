@@ -118,6 +118,107 @@ final class OrderFinancialsController
     }
 
     /**
+     * Owner request (2026-10-27): a wrongly typed claim can be corrected or
+     * deleted — reason required, the old and new figures audit-logged, and
+     * the CA financial-year lock respected for both the old and new dates.
+     *
+     * @return array{0: array, 1: array, 2: int, 3: ?int}|null the claim, the user, user id and role id — null once a response was sent
+     */
+    private function benefitForChange(array $params, string $field): ?array
+    {
+        $orderId = (int) $params['id'];
+        $benefitId = (int) $params['benefitId'];
+        $benefit = CaExportBenefitRepository::find($benefitId);
+        if (!$benefit || (int) $benefit['order_id'] !== $orderId) {
+            http_response_code(404);
+            echo 'Benefit claim not found for this order.';
+            return null;
+        }
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}#financials-12c");
+            return null;
+        }
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((string) $benefit['claimed_at'], (int) $user['id'], $roleId, 'ca_export_benefits', $benefitId, $field)) {
+            header("Location: /orders/{$orderId}#financials-12c");
+            return null;
+        }
+        return [$benefit, $user, (int) $user['id'], $roleId];
+    }
+
+    public function correctExportBenefit(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $found = $this->benefitForChange($params, 'correct');
+        if ($found === null) {
+            return;
+        }
+        [$benefit, , $userId, $roleId] = $found;
+        $back = "Location: /orders/{$orderId}#financials-12c";
+
+        $claimed = trim((string) ($_POST['claimed_amount'] ?? ''));
+        $claimedAt = trim((string) ($_POST['claimed_at'] ?? ''));
+        $received = trim((string) ($_POST['received_amount'] ?? ''));
+        $receivedAt = trim((string) ($_POST['received_at'] ?? ''));
+        $isDate = static fn(string $d): bool => \DateTimeImmutable::createFromFormat('!Y-m-d', $d) !== false;
+        if (!is_numeric($claimed) || (float) $claimed <= 0 || !$isDate($claimedAt)) {
+            Flash::set('error', 'Enter the claimed amount and the date it was claimed — nothing was changed.');
+            header($back);
+            return;
+        }
+        if ($received !== '' && (!is_numeric($received) || (float) $received < 0 || !$isDate($receivedAt))) {
+            Flash::set('error', 'Enter a valid received amount and date (or leave the received amount empty if nothing has arrived yet) — nothing was changed.');
+            header($back);
+            return;
+        }
+        if (!CaFyLockGuard::allow($claimedAt, $userId, $roleId, 'ca_export_benefits', (int) $benefit['id'], 'correct')
+            || ($received !== '' && !CaFyLockGuard::allow($receivedAt, $userId, $roleId, 'ca_export_benefits', (int) $benefit['id'], 'correct'))) {
+            header($back);
+            return;
+        }
+
+        $reference = trim((string) ($_POST['reference_number'] ?? '')) ?: null;
+        CaExportBenefitRepository::correct((int) $benefit['id'], $reference, (float) $claimed, $claimedAt, $received !== '' ? (float) $received : null, $received !== '' ? $receivedAt : null);
+        $describe = static fn(array $b): string => sprintf(
+            'claimed %s on %s (ref %s), received %s',
+            number_format((float) $b['claimed_amount'], 2, '.', ''),
+            $b['claimed_at'],
+            $b['reference_number'] ?? '—',
+            $b['received_amount'] !== null ? number_format((float) $b['received_amount'], 2, '.', '') . ' on ' . $b['received_at'] : 'nothing'
+        );
+        $after = CaExportBenefitRepository::find((int) $benefit['id']);
+        AuditLogRepository::log($userId, 'CA_EXPORT_BENEFIT_CORRECTED', 'ca_export_benefits', (int) $benefit['id'], $benefit['scheme_name'], $describe($benefit), $describe($after), trim((string) $_POST['reason']));
+        Flash::set('success', "{$benefit['scheme_name']} claim corrected.");
+        header($back);
+    }
+
+    public function deleteExportBenefit(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $found = $this->benefitForChange($params, 'delete');
+        if ($found === null) {
+            return;
+        }
+        [$benefit, , $userId] = $found;
+        CaExportBenefitRepository::delete((int) $benefit['id']);
+        AuditLogRepository::log(
+            $userId,
+            'CA_EXPORT_BENEFIT_DELETED',
+            'ca_export_benefits',
+            (int) $benefit['id'],
+            $benefit['scheme_name'],
+            sprintf('claimed %s on %s (ref %s), received %s', number_format((float) $benefit['claimed_amount'], 2, '.', ''), $benefit['claimed_at'], $benefit['reference_number'] ?? '—', $benefit['received_amount'] !== null ? number_format((float) $benefit['received_amount'], 2, '.', '') : 'nothing'),
+            null,
+            trim((string) $_POST['reason'])
+        );
+        Flash::set('success', "{$benefit['scheme_name']} claim deleted.");
+        header("Location: /orders/{$orderId}#financials-12c");
+    }
+
+    /**
      * Eligibility decision for a government export-benefit scheme —
      * separate from (and a precondition of) actually recording a claim
      * above. 'not_eligible' requires a reason, same deliberate

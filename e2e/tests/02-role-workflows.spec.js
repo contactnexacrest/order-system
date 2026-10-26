@@ -288,6 +288,8 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
     await test.step('Admin adds the supplier to the Suppliers directory (manage_suppliers — Export Executive does not hold it)', async () => {
       await addSupplierInDirectory(page, `Role Workflow Quarry ${UNIQUE}`, ['Quarry Owner']);
+      // Step 9a picks the freight forwarder from the directory too.
+      await addSupplierInDirectory(page, `Role Workflow Forwarder ${UNIQUE}`, ['Logistics Partner (Freight Forwarder)']);
       await page.goto(`/orders/${orderId}`);
     });
 
@@ -406,7 +408,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       const termsForm = page.locator(`form[action="/orders/${orderId}/freight-terms"]`);
       await termsForm.locator('input[name="confirmed_freight_rate"]').fill('950');
       await termsForm.locator('input[name="insurance_amount"]').fill('120');
-      await termsForm.locator('input[name="freight_forwarder_name"]').fill('Role Workflow Forwarder Ltd');
+      await termsForm.locator('select[name="freight_forwarder_supplier_id"]').selectOption({ label: `Role Workflow Forwarder ${UNIQUE}` });
       await termsForm.getByRole('button', { name: 'Save Freight Terms' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 

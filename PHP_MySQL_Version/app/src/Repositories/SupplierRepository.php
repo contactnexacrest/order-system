@@ -15,6 +15,37 @@ use App\Config\Database;
  */
 final class SupplierRepository
 {
+    /**
+     * Owner request (2026-10-27): logistics partners (freight forwarders)
+     * live in the same directory under this type — Step 9a picks one,
+     * Step 7a's supplier list leaves them out.
+     */
+    public const LOGISTICS_TYPE = 'Logistics Partner (Freight Forwarder)';
+
+    /** @return array<int, array<string,mixed>> active suppliers that hold the logistics type */
+    public static function logisticsPartners(): array
+    {
+        return self::all(false, self::LOGISTICS_TYPE);
+    }
+
+    /**
+     * @return array<int, array<string,mixed>> active suppliers for a Supplier PO — everyone but
+     *   logistics-only partners, with the logistics type itself removed from each `types` list
+     */
+    public static function goodsSuppliers(): array
+    {
+        $out = [];
+        foreach (self::all() as $s) {
+            $types = array_values(array_filter($s['types'], static fn($t) => $t !== self::LOGISTICS_TYPE));
+            if ($types === [] && $s['types'] !== []) {
+                continue;
+            }
+            $s['types'] = $types;
+            $out[] = $s;
+        }
+        return $out;
+    }
+
     /** Directory columns written by create()/update(), besides the name. */
     private const FIELDS = [
         'address', 'city', 'state', 'gstin', 'pan', 'contact_person', 'contact_person_phone',

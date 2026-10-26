@@ -58,7 +58,7 @@ final class SupplierFactoryAddressAndDimensionalToleranceTest extends DbTestCase
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
         $_POST = ['address' => 'Plot 12, Industrial Area, Udaipur, Rajasthan', 'label' => 'Udaipur Factory'];
         ob_start();
-        (new OrderController())->createSupplierFactoryAddress(['id' => (string) $orderId, 'supplierId' => (string) $supplierId]);
+        (new \App\Controllers\SupplierController())->addFactoryAddress(['id' => (string) $supplierId]);
         ob_end_clean();
 
         $addresses = SupplierFactoryAddressRepository::forSupplier($supplierId);
@@ -72,10 +72,10 @@ final class SupplierFactoryAddressAndDimensionalToleranceTest extends DbTestCase
         $optionTag = substr($output, $optionPos, 400);
         self::assertStringContainsString('Plot 12, Industrial Area, Udaipur, Rajasthan', $optionTag);
 
-        // Also listed in the "Manage factory addresses" table.
-        $manageSectionPos = strpos($output, 'Manage factory addresses');
-        self::assertNotFalse($manageSectionPos);
-        self::assertStringContainsString('Udaipur Factory', substr($output, $manageSectionPos, 2000));
+        // Owner request (2026-10-27): addresses are managed only in the
+        // Suppliers directory — the order page no longer edits them.
+        self::assertStringNotContainsString('Manage factory addresses', $output);
+        self::assertStringNotContainsString('/factory-addresses', $output);
     }
 
     public function testFactoryAddressCanBeRemoved(): void
@@ -86,7 +86,7 @@ final class SupplierFactoryAddressAndDimensionalToleranceTest extends DbTestCase
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
 
         ob_start();
-        (new OrderController())->deleteSupplierFactoryAddress(['id' => (string) $orderId, 'addressId' => (string) $addressId]);
+        (new \App\Controllers\SupplierController())->deleteFactoryAddress(['id' => (string) $supplierId, 'addressId' => (string) $addressId]);
         ob_end_clean();
 
         self::assertNull(SupplierFactoryAddressRepository::find($addressId));

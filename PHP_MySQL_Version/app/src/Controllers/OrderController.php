@@ -978,7 +978,8 @@ final class OrderController
             'emailLogByDocument' => $emailLogByDocument,
             'activeUsers' => UserRepository::listActive(),
             'fobTotal' => OrderProductRepository::totalFobValue($orderId),
-            'suppliers' => SupplierRepository::all(),
+            'suppliers' => SupplierRepository::goodsSuppliers(),
+            'logisticsPartners' => SupplierRepository::logisticsPartners(),
             'supplierPo' => $supplierPo,
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
             'supplierPoDocuments' => $supplierPo ? OrderSupplierPoDocumentRepository::forSupplierPo((int) $supplierPo['id']) : [],
@@ -2016,47 +2017,6 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
-    /**
-     * User-reported batch item 12 — a supplier can have several factory/
-     * delivery addresses. Also managed on the supplier's own page in the
-     * Suppliers directory; kept here as a quick add while preparing a
-     * Supplier PO.
-     */
-    public function createSupplierFactoryAddress(array $params): void
-    {
-        $orderId = (int) $params['id'];
-        $supplierId = (int) $params['supplierId'];
-        if (!SupplierRepository::find($supplierId)) {
-            Flash::set('error', 'Supplier not found.');
-            header("Location: /orders/{$orderId}");
-            return;
-        }
-        $address = trim((string) ($_POST['address'] ?? ''));
-        if ($address === '') {
-            Flash::set('error', 'Factory address is required.');
-            header("Location: /orders/{$orderId}");
-            return;
-        }
-        $addressId = SupplierFactoryAddressRepository::create($supplierId, $address, trim((string) ($_POST['label'] ?? '')) ?: null);
-        // External QA report N-08: this action never reached the audit
-        // log, so it never notified anyone either.
-        AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_FACTORY_ADDRESS_CREATED', 'supplier_factory_addresses', $addressId, null, null, $address);
-        Flash::set('success', 'Factory address added.');
-        header("Location: /orders/{$orderId}");
-    }
-
-    public function deleteSupplierFactoryAddress(array $params): void
-    {
-        $orderId = (int) $params['id'];
-        $addressId = (int) $params['addressId'];
-        SupplierFactoryAddressRepository::delete($addressId);
-        // External QA report N-08: this action never reached the audit
-        // log, so it never notified anyone either.
-        AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_FACTORY_ADDRESS_DELETED', 'supplier_factory_addresses', $addressId, null, null, null);
-        Flash::set('success', 'Factory address removed.');
-        header("Location: /orders/{$orderId}");
-    }
-
     /** Stage 5->6 gate: supplier signs, stamps and returns the Supplier PO. Auto-skips Stage 6 for FOB orders. */
     public function confirmSupplierSigned(array $params): void
     {
@@ -2194,6 +2154,13 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner report (2026-10-27): the supplier advance was never recorded
+        // — the balance waits for it whenever the terms plan an advance.
+        if ((float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
+            Flash::set('error', 'Record the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹' . number_format((float) $supplierPo['advance_amount_inr'], 2) . '.');
+            header("Location: /orders/{$orderId}#step-7e-supplier-advance-paid");
+            return;
+        }
         $validated = $this->validateSupplierPoPayment($orderId);
         if ($validated === null) {
             return;
@@ -2326,11 +2293,26 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner request (2026-10-27): the forwarder is a logistics partner
+        // picked from the Suppliers directory (like the supplier in 7a);
+        // its name and contact are copied onto this order.
+        $partner = SupplierRepository::find((int) ($_POST['freight_forwarder_supplier_id'] ?? 0));
+        if (!$partner || !$partner['is_active'] || !in_array(SupplierRepository::LOGISTICS_TYPE, $partner['types'], true)) {
+            Flash::set('error', 'Choose the logistics partner (freight forwarder) from the Suppliers directory.');
+            header("Location: /orders/{$orderId}#step-9a-freight-terms");
+            return;
+        }
+        $contact = implode(' · ', array_filter([
+            $partner['contact_person'] ?? null,
+            $partner['contact_person_phone'] ?: ($partner['phone'] ?? null),
+            $partner['email'] ?? null,
+        ]));
         OrderFreightRepository::upsert($orderId, [
             'confirmed_freight_rate'    => trim((string) ($_POST['confirmed_freight_rate'] ?? '')) ?: null,
             'insurance_amount'          => trim((string) ($_POST['insurance_amount'] ?? '')) ?: null,
-            'freight_forwarder_name'    => trim((string) ($_POST['freight_forwarder_name'] ?? '')) ?: null,
-            'freight_forwarder_contact' => trim((string) ($_POST['freight_forwarder_contact'] ?? '')) ?: null,
+            'freight_forwarder_name'    => $partner['supplier_legal_name'],
+            'freight_forwarder_contact' => $contact !== '' ? $contact : null,
+            'freight_forwarder_supplier_id' => (int) $partner['id'],
         ]);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.

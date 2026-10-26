@@ -728,6 +728,8 @@ app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, require
 app.post('/orders/:id/financials/costs-confirmed', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.confirmCosts));
 app.post('/orders/:id/financials/complete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.completeFinancials));
 app.post('/orders/:id/export-benefits/save-all', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveExportBenefits));
+app.post('/orders/:id/export-benefits/:benefitId/correct', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.correctExportBenefit));
+app.post('/orders/:id/export-benefits/:benefitId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.deleteExportBenefit));
 app.post('/orders/:id/financials/skip', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.skipFinancials));
 app.post('/orders/:id/financials/skip/undo', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.undoSkipFinancials));
 app.post('/orders/:id/export-benefit-schemes', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.setExportBenefitSchemeStatus));
@@ -795,8 +797,6 @@ app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePerm
 
 app.post('/orders/:id/oc-acknowledgment', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordOcAcknowledgment));
 
-app.post('/orders/:id/suppliers/:supplierId/factory-addresses', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.createSupplierFactoryAddress));
-app.post('/orders/:id/suppliers/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteSupplierFactoryAddress));
 app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
 app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
 // External QA report Q-ROLE-3: split out of manage_order_financials so

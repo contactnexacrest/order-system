@@ -1003,7 +1003,9 @@ async function show(req, res) {
       emailLogByDocument,
       activeUsers,
       fobTotal: await orderProductRepository.totalFobValue(orderId),
-      suppliers: await supplierRepository.all(),
+      suppliers: await supplierRepository.goodsSuppliers(),
+      logisticsPartners: await supplierRepository.logisticsPartners(),
+      logisticsType: supplierRepository.LOGISTICS_TYPE,
       supplierPo,
       buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(orderId),
       supplierPoDocuments: supplierPo ? await orderSupplierPoDocumentRepository.forSupplierPo(supplierPo.id) : [],
@@ -2053,45 +2055,6 @@ async function saveSupplierPo(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
-/**
- * User-reported batch item 12 — a supplier can have several factory/
- * delivery addresses. Also managed on the supplier's own page in the
- * Suppliers directory; kept here as a quick add while preparing a
- * Supplier PO.
- */
-async function createSupplierFactoryAddress(req, res) {
-  const orderId = parseInt(req.params.id, 10);
-  const supplierId = parseInt(req.params.supplierId, 10);
-  if (!(await supplierRepository.find(supplierId))) {
-    flash.set(req, 'error', 'Supplier not found.');
-    res.redirect(`/orders/${orderId}`);
-    return;
-  }
-  const address = str(req.body.address);
-  if (address === '') {
-    flash.set(req, 'error', 'Factory address is required.');
-    res.redirect(`/orders/${orderId}`);
-    return;
-  }
-  const addressId = await supplierFactoryAddressRepository.create(supplierId, address, str(req.body.label) || null);
-  // External QA report N-08: this action never reached the audit log,
-  // so it never notified anyone either.
-  await auditLogRepository.log(req.user.id, 'SUPPLIER_FACTORY_ADDRESS_CREATED', 'supplier_factory_addresses', addressId, null, null, address);
-  flash.set(req, 'success', 'Factory address added.');
-  res.redirect(`/orders/${orderId}`);
-}
-
-async function deleteSupplierFactoryAddress(req, res) {
-  const orderId = parseInt(req.params.id, 10);
-  const addressId = parseInt(req.params.addressId, 10);
-  await supplierFactoryAddressRepository.remove(addressId);
-  // External QA report N-08: this action never reached the audit log,
-  // so it never notified anyone either.
-  await auditLogRepository.log(req.user.id, 'SUPPLIER_FACTORY_ADDRESS_DELETED', 'supplier_factory_addresses', addressId, null, null, null);
-  flash.set(req, 'success', 'Factory address removed.');
-  res.redirect(`/orders/${orderId}`);
-}
-
 /** Stage 5->6 gate: supplier signs, stamps and returns the Supplier PO. Auto-skips Stage 6 for FOB orders. */
 async function confirmSupplierSigned(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -2227,6 +2190,13 @@ async function markSupplierBalancePaid(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner report (2026-10-27): the supplier advance was never recorded —
+  // the balance waits for it whenever the terms plan an advance.
+  if (parseFloat(supplierPo.advance_amount_inr || 0) > 0 && !supplierPo.advance_paid_at) {
+    flash.set(req, 'error', `Record the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹${Number(supplierPo.advance_amount_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`);
+    res.redirect(`/orders/${orderId}#step-7e-supplier-advance-paid`);
+    return;
+  }
   const validated = validateSupplierPoPayment(req, res, orderId);
   if (!validated) {
     return;
@@ -2357,11 +2327,22 @@ async function saveFreightTerms(req, res) {
     return;
   }
   const body = req.body;
+  // Owner request (2026-10-27): the forwarder is a logistics partner picked
+  // from the Suppliers directory (like the supplier in 7a); its name and
+  // contact are copied onto this order.
+  const partner = await supplierRepository.find(parseInt(body.freight_forwarder_supplier_id, 10) || 0);
+  if (!partner || !Number(partner.is_active) || !partner.types.includes(supplierRepository.LOGISTICS_TYPE)) {
+    flash.set(req, 'error', 'Choose the logistics partner (freight forwarder) from the Suppliers directory.');
+    res.redirect(`/orders/${orderId}#step-9a-freight-terms`);
+    return;
+  }
+  const contact = [partner.contact_person, partner.contact_person_phone || partner.phone, partner.email].filter(Boolean).join(' · ');
   await orderFreightRepository.upsert(orderId, {
     confirmed_freight_rate: str(body.confirmed_freight_rate) || null,
     insurance_amount: str(body.insurance_amount) || null,
-    freight_forwarder_name: str(body.freight_forwarder_name) || null,
-    freight_forwarder_contact: str(body.freight_forwarder_contact) || null,
+    freight_forwarder_name: partner.supplier_legal_name,
+    freight_forwarder_contact: contact || null,
+    freight_forwarder_supplier_id: partner.id,
   });
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
@@ -3755,7 +3736,7 @@ module.exports = {
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,
-  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,
+  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

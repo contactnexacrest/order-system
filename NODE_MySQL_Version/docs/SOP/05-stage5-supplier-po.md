@@ -42,16 +42,18 @@ one that owns the quarry or the factory itself), **Trader**, and
 A supplier can hold **more than one** type in the directory (e.g. Quarry
 Owner *and* Factory Owner). When the supplier picked on **Save Supplier PO
 Terms** has several, a **Supplier Type for this order** dropdown appears and
-staff choose the one that applies — it is what prints on the Supplier PO. A
+staff choose the one that applies — it is what prints on the Supplier PO. Logistics partners (type "Logistics Partner (Freight Forwarder)") are left out of this list — they are picked in Step 9a instead. A
 supplier with a single type has it recorded automatically.
 
 **Delivery Location** is a dropdown of the *selected supplier's own*
 factory addresses, repopulating the moment a different supplier is
 picked — a supplier with none yet shows only **Other (not listed) —
 specify**, which reveals a free-text box. A supplier's factory addresses
-are managed on its own page in the Suppliers directory, and can also be
-added from the **Manage factory addresses** section on the order page —
-a label (optional) plus the address; each added address is immediately available in every
+are managed **only** on its own page in the Suppliers directory (by users
+with the "Manage suppliers" permission) — a label (optional) plus the
+address. The order page no longer adds or removes factory addresses (owner
+request 2026-10-27), so nobody preparing a Supplier PO can delete an
+existing address or type in a random one. Each address is immediately available in every
 Supplier PO Terms form's Delivery Location dropdown for that supplier,
 on this order and any other. Whatever Delivery Location text was
 actually selected or typed is saved directly onto that Supplier PO's own
@@ -137,6 +139,10 @@ and Super Admin by default) record the supplier's payments as two sub-steps of t
 **10a · Supplier Balance Paid** (the first card of Step 10, before
 packing — it can be marked any time after the Supplier PO, even long
 after this stage has passed), each with its own date and amount.
+**When the Supplier PO terms plan an advance, 10a waits for 7e** (owner
+report 2026-10-27): the balance card shows "Record the supplier advance
+first (Step 7e)" until the advance is recorded, so the advance can't be
+forgotten. Suppliers whose terms plan no advance go straight to 10a.
 Previously only the amount owed to a supplier was ever recorded —
 nothing tracked whether or when it was actually paid, so "today's
 supplier payments" had no data to report on at all. Each button

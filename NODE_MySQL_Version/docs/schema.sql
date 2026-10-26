@@ -958,6 +958,7 @@ CREATE TABLE order_freight (
   insurance_amount          DECIMAL(14,2) NULL,
   freight_forwarder_name    VARCHAR(255) NULL,
   freight_forwarder_contact VARCHAR(255) NULL,
+  freight_forwarder_supplier_id BIGINT UNSIGNED NULL,  -- owner request 2026-10-27: the logistics partner picked from the Suppliers directory
   gst_treatment             ENUM('NIL','IGST_18') NULL,
   fdn_document_id           BIGINT UNSIGNED NULL,  -- FK added after documents table
   freight_cleared_at        TIMESTAMP NULL,

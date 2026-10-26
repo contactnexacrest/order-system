@@ -117,6 +117,14 @@ claims once the documents are sent and the balance remittance is
 received. **Record another claim** (under the table) covers a second
 claim on the same scheme or a scheme not listed.
 
+**Typed a wrong amount, or recorded a claim twice?** Open **Correct or
+delete a recorded claim** under the table (owner request 2026-10-27). Each
+claim there can be corrected (claimed amount, date, reference, received
+amount and date — empty the received amount if the money hasn't actually
+arrived) with **Save Correction**, or removed with **Delete Claim**. Both
+need a reason of at least 10 characters, both are written to the audit log
+with the old and new figures, and both respect the CA financial-year lock.
+
 ### 3. Expenses Imported from Zoho Books
 
 Every expense linked to this order (see

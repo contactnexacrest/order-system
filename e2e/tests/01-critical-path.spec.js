@@ -351,6 +351,8 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   await test.step('Stage 5 — Supplier PO: add supplier, save terms, generate doc, sign', async () => {
     // Two types, so the Supplier PO form asks which applies to this order.
     await addSupplierInDirectory(page, `Smoke Test Quarry ${UNIQUE}`, ['Quarry Owner', 'Factory Owner']);
+    // Step 9a picks the freight forwarder from the directory too.
+    await addSupplierInDirectory(page, `Smoke Test Forwarder ${UNIQUE}`, ['Logistics Partner (Freight Forwarder)']);
     await page.goto(`/orders/${orderId}`);
 
     await openStage(page, 5);
@@ -386,7 +388,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     const termsForm = page.locator(`form[action="/orders/${orderId}/freight-terms"]`);
     await termsForm.locator('input[name="confirmed_freight_rate"]').fill('950');
     await termsForm.locator('input[name="insurance_amount"]').fill('120');
-    await termsForm.locator('input[name="freight_forwarder_name"]').fill('Smoke Test Forwarder Ltd');
+    await termsForm.locator('select[name="freight_forwarder_supplier_id"]').selectOption({ label: `Smoke Test Forwarder ${UNIQUE}` });
     await termsForm.getByRole('button', { name: 'Save Freight Terms' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 

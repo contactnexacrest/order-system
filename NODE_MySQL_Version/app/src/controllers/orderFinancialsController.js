@@ -114,6 +114,84 @@ async function markExportBenefitReceived(req, res) {
 }
 
 /**
+ * Owner request (2026-10-27): a wrongly typed claim can be corrected or
+ * deleted — reason required, the old and new figures audit-logged, and the
+ * CA financial-year lock respected for both the old and new dates. Returns
+ * the claim, or null once a response was sent.
+ */
+async function benefitForChange(req, res, field) {
+  const orderId = parseInt(req.params.id, 10);
+  const benefitId = parseInt(req.params.benefitId, 10);
+  const benefit = await caExportBenefitRepository.find(benefitId);
+  if (!benefit || Number(benefit.order_id || 0) !== orderId) {
+    res.status(404).send('Benefit claim not found for this order.');
+    return null;
+  }
+  const error = reasonValidator.check(req.body.reason);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect(`/orders/${orderId}#financials-12c`);
+    return null;
+  }
+  if (!(await caFyLockGuard.allow(req, String(benefit.claimed_at), 'ca_export_benefits', benefitId, field))) {
+    res.redirect(`/orders/${orderId}#financials-12c`);
+    return null;
+  }
+  return benefit;
+}
+
+function describeBenefit(b) {
+  const money = (n) => Number(n).toFixed(2);
+  return `claimed ${money(b.claimed_amount)} on ${b.claimed_at} (ref ${b.reference_number || '—'}), received ${b.received_amount !== null ? `${money(b.received_amount)} on ${b.received_at}` : 'nothing'}`;
+}
+
+async function correctExportBenefit(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const benefit = await benefitForChange(req, res, 'correct');
+  if (!benefit) {
+    return;
+  }
+  const back = `/orders/${orderId}#financials-12c`;
+  const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(new Date(d).getTime());
+  const claimed = String(req.body.claimed_amount || '').trim();
+  const claimedAt = String(req.body.claimed_at || '').trim();
+  const received = String(req.body.received_amount || '').trim();
+  const receivedAt = String(req.body.received_at || '').trim();
+  if (Number.isNaN(Number(claimed)) || !(Number(claimed) > 0) || !isDate(claimedAt)) {
+    flash.set(req, 'error', 'Enter the claimed amount and the date it was claimed — nothing was changed.');
+    res.redirect(back);
+    return;
+  }
+  if (received !== '' && (Number.isNaN(Number(received)) || Number(received) < 0 || !isDate(receivedAt))) {
+    flash.set(req, 'error', 'Enter a valid received amount and date (or leave the received amount empty if nothing has arrived yet) — nothing was changed.');
+    res.redirect(back);
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, claimedAt, 'ca_export_benefits', benefit.id, 'correct'))
+    || (received !== '' && !(await caFyLockGuard.allow(req, receivedAt, 'ca_export_benefits', benefit.id, 'correct')))) {
+    res.redirect(back);
+    return;
+  }
+  await caExportBenefitRepository.correct(benefit.id, String(req.body.reference_number || '').trim() || null, parseFloat(claimed), claimedAt, received !== '' ? parseFloat(received) : null, received !== '' ? receivedAt : null);
+  const after = await caExportBenefitRepository.find(benefit.id);
+  await auditLogRepository.log(req.user.id, 'CA_EXPORT_BENEFIT_CORRECTED', 'ca_export_benefits', benefit.id, benefit.scheme_name, describeBenefit(benefit), describeBenefit(after), String(req.body.reason).trim());
+  flash.set(req, 'success', `${benefit.scheme_name} claim corrected.`);
+  res.redirect(back);
+}
+
+async function deleteExportBenefit(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const benefit = await benefitForChange(req, res, 'delete');
+  if (!benefit) {
+    return;
+  }
+  await caExportBenefitRepository.remove(benefit.id);
+  await auditLogRepository.log(req.user.id, 'CA_EXPORT_BENEFIT_DELETED', 'ca_export_benefits', benefit.id, benefit.scheme_name, describeBenefit(benefit), null, String(req.body.reason).trim());
+  flash.set(req, 'success', `${benefit.scheme_name} claim deleted.`);
+  res.redirect(`/orders/${orderId}#financials-12c`);
+}
+
+/**
  * Eligibility decision for a government export-benefit scheme —
  * separate from (and a precondition of) actually recording a claim
  * above. 'not_eligible' requires a reason, same deliberate "never
@@ -721,4 +799,4 @@ async function saveExportBenefits(req, res) {
   back();
 }
 
-module.exports = { confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };
+module.exports = { correctExportBenefit, deleteExportBenefit, confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };

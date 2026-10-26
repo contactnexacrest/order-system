@@ -102,7 +102,7 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
         $_POST = ['address' => '123 Factory Road'];
 
         ob_start();
-        (new OrderController())->createSupplierFactoryAddress(['id' => (string) $orderId, 'supplierId' => (string) $supplierId]);
+        (new \App\Controllers\SupplierController())->addFactoryAddress(['id' => (string) $supplierId]);
         ob_end_clean();
 
         self::assertSame('SUPPLIER_FACTORY_ADDRESS_CREATED', $this->lastAuditLogAction()['action_type']);
@@ -116,7 +116,7 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
 
         ob_start();
-        (new OrderController())->deleteSupplierFactoryAddress(['id' => (string) $orderId, 'addressId' => (string) $addressId]);
+        (new \App\Controllers\SupplierController())->deleteFactoryAddress(['id' => (string) $supplierId, 'addressId' => (string) $addressId]);
         ob_end_clean();
 
         self::assertSame('SUPPLIER_FACTORY_ADDRESS_DELETED', $this->lastAuditLogAction()['action_type']);
@@ -164,7 +164,9 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
         // unlocked — see OrderPageStageGateFixesTest.
         $this->unlockThrough($orderId, 5);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
-        $_POST = ['confirmed_freight_rate' => '500'];
+        $partnerId = SupplierRepository::create(['supplier_legal_name' => 'N08 Forwarder']);
+        SupplierRepository::setTypes($partnerId, [SupplierRepository::LOGISTICS_TYPE]);
+        $_POST = ['confirmed_freight_rate' => '500', 'freight_forwarder_supplier_id' => (string) $partnerId];
 
         ob_start();
         (new OrderController())->saveFreightTerms(['id' => (string) $orderId]);
