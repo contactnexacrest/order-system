@@ -215,7 +215,11 @@ Infrastructure (QA-2) is live on both stacks:
   `tests/Unit/` is for dependency-free pure-logic classes (validators,
   calculators) — most of this codebase's classes are static services over
   a shared PDO connection, so **integration-style tests against the real
-  schema are the primary tool here**, not mocking.
+  schema are the primary tool here**, not mocking. A few tests read the
+  generated PDFs themselves (page count, running footer, clause wording)
+  and need `pdfinfo`/`pdftotext` from **poppler-utils** on the machine
+  running the tests (`apt install poppler-utils`). Without them those
+  tests fail with a message saying so; they are never silently skipped.
 - **Node**: Jest 30 + Supertest, `npm test`. `tests/unit/` mocks
   repositories for pure service logic; `tests/integration/` uses
   Supertest against the real Express app plus a disposable database

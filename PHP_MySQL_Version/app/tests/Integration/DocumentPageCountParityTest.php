@@ -60,7 +60,7 @@ final class DocumentPageCountParityTest extends DbTestCase
         $pageCount = $this->pdfPageCount((int) $result['pdf_file_id']);
 
         if ($pageCount === null) {
-            self::markTestSkipped('pdfinfo is not available in this environment.');
+            self::fail('Could not read the generated PDF with pdfinfo — install poppler-utils (e.g. apt install poppler-utils), which these PDF checks require, or the PDF itself is unreadable.');
         }
         self::assertSame(6, $pageCount, 'PHP Quotation page count for a 1-line order drifted — see class docblock for the known DOMPDF/Chromium density gap before assuming this is a regression.');
     }
@@ -77,7 +77,7 @@ final class DocumentPageCountParityTest extends DbTestCase
         $pageCount = $this->pdfPageCount((int) $result['pdf_file_id']);
 
         if ($pageCount === null) {
-            self::markTestSkipped('pdfinfo is not available in this environment.');
+            self::fail('Could not read the generated PDF with pdfinfo — install poppler-utils (e.g. apt install poppler-utils), which these PDF checks require, or the PDF itself is unreadable.');
         }
         self::assertSame(9, $pageCount, 'PHP Quotation page count for a 60-line order drifted — see class docblock for the known DOMPDF/Chromium density gap before assuming this is a regression.');
     }

@@ -67,13 +67,13 @@ final class ContinuationPageFooterTest extends DbTestCase
         $pageCount = $this->pdfPageCount((int) $result['pdf_file_id']);
 
         if ($pageCount === null) {
-            self::markTestSkipped('pdfinfo is not available in this environment.');
+            self::fail('Could not read the generated PDF with pdfinfo — install poppler-utils (e.g. apt install poppler-utils), which these PDF checks require, or the PDF itself is unreadable.');
         }
         self::assertGreaterThan(1, $pageCount, 'this many product lines must force the Quotation past one page for this test to mean anything');
 
         $page2Text = $this->pdfTextForPage((int) $result['pdf_file_id'], 2);
         if ($page2Text === null) {
-            self::markTestSkipped('pdftotext is not available in this environment.');
+            self::fail('Could not read the generated PDF with pdftotext — install poppler-utils (e.g. apt install poppler-utils), which these PDF checks require, or the PDF itself is unreadable.');
         }
         self::assertStringContainsString($document['document_reference'], $page2Text, 'the running footer must carry the document reference on every continuation page');
         self::assertStringContainsString('Page 2 of ' . $pageCount, $page2Text, 'the running footer must carry the page x/y on every continuation page');

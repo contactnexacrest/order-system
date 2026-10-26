@@ -52,7 +52,7 @@ final class NaturalStoneClauseWordingTest extends DbTestCase
         $text = @shell_exec('pdftotext ' . escapeshellarg($file['server_path']) . ' - 2>/dev/null');
 
         if ($text === null || $text === false || trim($text) === '') {
-            self::markTestSkipped('pdftotext is not available in this environment.');
+            self::fail('Could not read the generated PDF with pdftotext — install poppler-utils (e.g. apt install poppler-utils), which these PDF checks require, or the PDF itself is unreadable.');
         }
 
         self::assertStringNotContainsString('Grade A', $text, "{$documentTypeCode} must not print 'Grade A' anywhere");
