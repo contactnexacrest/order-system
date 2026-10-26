@@ -65,6 +65,7 @@ async function show(req, res) {
     paymentTermsPlaceholder: buildPaymentTermsPlaceholder(submission),
     quotationAcceptancePlaceholder: await buildQuotationAcceptancePlaceholder(submission),
     incoterms,
+    cooTypes: await lookupRepository.dropdownOptions('coo_type'),
     incotermIsOther: incotermValue !== '' && !incoterms.some((i) => i.code === incotermValue),
   }, 'layout/bare');
 }

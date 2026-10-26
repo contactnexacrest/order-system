@@ -190,6 +190,8 @@ njkEnv.addGlobal('docStatus', (documents, code) => {
 });
 njkEnv.addGlobal('annexureConfirmAttr', require('./helpers/annexureConfirmAttr').annexureConfirmAttr);
 njkEnv.addGlobal('stepBadge', require('./helpers/stepBadge').stepBadge);
+// Owner report (2026-10-26): pre-selects a dropdown_options value the client typed loosely (e.g. "GSP Form A").
+njkEnv.addGlobal('matchOption', (rows, value) => require('./repositories/lookupRepository').matchOption((rows || []).map((r) => r.option_value), value));
 njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').formatRange);
 // Order detail page step/sub-step progression (current step, cascade,
 // per-sub-step ticks) — see helpers/stepFlow.js.

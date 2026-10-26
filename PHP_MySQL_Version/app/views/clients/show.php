@@ -57,6 +57,7 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
       <div><span class="k">Consignee</span><span class="v"><?= htmlspecialchars($client['consignee_name'] ?? 'SAME') ?></span></div>
       <div><span class="k">VAT / EORI</span><span class="v"><?= htmlspecialchars($client['vat_eori_tax_no'] ?? '—') ?></span></div>
       <div><span class="k">Country of Destination</span><span class="v"><?= htmlspecialchars($client['country_of_destination'] ?? '—') ?></span></div>
+      <div><span class="k">Certificate of Origin Type</span><span class="v"><?= htmlspecialchars($client['coo_type'] ?? '—') ?></span></div>
       <div><span class="k">Contact Person</span><span class="v"><?= htmlspecialchars($client['contact_person'] ?? '—') ?></span></div>
       <div><span class="k">Email</span><span class="v"><?= $canViewFullEmail ? htmlspecialchars($client['email'] ?? '—') : '<span class="masked-value">' . htmlspecialchars(Mask::email($client['email'] ?? null)) . '</span>' ?></span></div>
       <div><span class="k">Phone</span><span class="v"><?= $canViewFullEmail ? htmlspecialchars($client['phone'] ?? '—') : '<span class="masked-value">' . htmlspecialchars(Mask::phone($client['phone'] ?? null)) . '</span>' ?></span></div>

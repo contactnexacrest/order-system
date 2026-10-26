@@ -16,6 +16,7 @@
           <?= htmlspecialchars($s['country_of_destination']) ?>
           <?php if ($s['port_of_discharge_text']): ?><br><span class="muted small">Port: <?= htmlspecialchars($s['port_of_discharge_text']) ?></span><?php endif; ?>
           <?php if ($s['incoterm_preference']): ?><br><span class="muted small">Incoterm: <?= htmlspecialchars($s['incoterm_preference']) ?></span><?php endif; ?>
+          <?php if (!empty($s['coo_type'])): ?><br><span class="muted small">COO: <?= htmlspecialchars($s['coo_type']) ?></span><?php endif; ?>
         </td>
         <td><?= htmlspecialchars((string) $s['submitted_at']) ?></td>
         <td>

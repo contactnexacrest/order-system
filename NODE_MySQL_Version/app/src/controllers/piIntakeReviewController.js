@@ -83,7 +83,8 @@ async function accept(req, res) {
     email: submission.email,
     phone: submission.phone,
     country_of_destination: submission.country_of_destination,
-    coo_type: submission.coo_type,
+    // Owner report (2026-10-26): a blank answer ("not sure") keeps the COO type already on file.
+    coo_type: submission.coo_type ? submission.coo_type : ((await clientRepository.find(order.client_id)) || {}).coo_type ?? null,
     // Section BB — the client's own self-service Consignee/Notify Party
     // split from the PI-details form, carried through verbatim to the
     // exact same clientRepository.update() columns the admin Clients
@@ -119,6 +120,11 @@ async function accept(req, res) {
   await orderRepository.applyClientSnapshot(order.id, order.client_id);
   if (submission.buyer_po_ref) {
     await orderRepository.setBuyersPoRef(order.id, submission.buyer_po_ref);
+  }
+  // Owner report (2026-10-26): the COO type the client confirmed is what
+  // this order's documents print, not just the client record.
+  if (submission.coo_type) {
+    await orderRepository.setCooType(order.id, submission.coo_type);
   }
 
   // docs/schema.sql Section AC — the client explicitly consented to this

@@ -36,6 +36,7 @@ async function show(req, res) {
   res.renderView('client_intake/form', {
     wrapClass: 'intake-wrap',
     containerTypes: await lookupRepository.dropdownOptions('container_type'),
+    cooTypes: await lookupRepository.dropdownOptions('coo_type'),
     incoterms: await lookupRepository.incoterms(),
     countries: countryList.names(),
   }, 'layout/bare');
@@ -84,6 +85,7 @@ async function showEdit(req, res) {
     token: req.params.token,
     wrapClass: 'intake-wrap',
     containerTypes: await lookupRepository.dropdownOptions('container_type'),
+    cooTypes: await lookupRepository.dropdownOptions('coo_type'),
     incoterms,
     incotermIsOther: incotermValue !== '' && !incoterms.some((i) => i.code === incotermValue),
     countries,

@@ -52,9 +52,25 @@ async function sanitizeOption(listKey, value) {
   if (value === '' || value === 'To Be Confirmed') {
     return value;
   }
-  const options = await dropdownOptions(listKey);
-  const valid = options.some((row) => row.option_value === value);
-  return valid ? value : '';
+  return matchOption((await dropdownOptions(listKey)).map((row) => row.option_value), value);
 }
 
-module.exports = { incoterms, currencies, ports, paymentPresets, stagesMaster, roles, dropdownOptions, sanitizeOption };
+/**
+ * Owner report (2026-10-26): a client typing "GSP Form A" or
+ * "non-preferential" on the Quotation/PI details forms lost their answer
+ * entirely, because only an exact match to "GSP Form A (Preferential)" /
+ * "Non-Preferential" was kept. Matches ignoring case and spacing, and
+ * accepts the start of an option's name; returns the option's own
+ * spelling, or '' when nothing (or more than one option) fits.
+ */
+function matchOption(options, value) {
+  const norm = (v) => String(v ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const wanted = norm(value);
+  if (wanted === '') return '';
+  const exact = options.find((o) => norm(o) === wanted);
+  if (exact !== undefined) return String(exact);
+  const starts = options.filter((o) => norm(o).startsWith(wanted));
+  return starts.length === 1 ? String(starts[0]) : '';
+}
+
+module.exports = { incoterms, currencies, ports, paymentPresets, stagesMaster, roles, dropdownOptions, sanitizeOption, matchOption };

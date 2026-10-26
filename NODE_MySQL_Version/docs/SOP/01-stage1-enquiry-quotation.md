@@ -146,7 +146,14 @@ created.
 order-creation form itself uses, e.g. Non-Preferential), not a free-text
 field — this keeps the value consistent with whatever CAPEXIL actually
 issues, rather than depending on each buyer or staff member typing the
-same term the same way.
+same term the same way. The client's own Quotation details and PI details
+forms use the same dropdown (plus "Not sure — please confirm with me"),
+and an older loosely typed answer such as "GSP Form A" is matched to its
+option rather than dropped. Whatever the client chose follows them: it is
+saved on the client record when the request is accepted (shown on the
+client's page as **Certificate of Origin Type**), the New Order form
+starts with it selected, and the order page's At a Glance panel shows the
+order's own value.
 
 This same **Same as Buyer?** self-service — not just a staff-only admin
 screen — is also built into the two client-facing forms that create or

@@ -328,6 +328,12 @@ async function create(req, res) {
   // every order anyway. Only fills a gap; never overwrites a value
   // already in `old` (a validation retry, or the intake-prefill block
   // above, both win as-is).
+  // Owner report (2026-10-26): start from the COO type the client gave us
+  // (Quotation/PI details or their client record).
+  if (preselectedClientId && old.coo_type === undefined) {
+    const clientCoo = String(((await clientRepository.find(preselectedClientId)) || {}).coo_type || '');
+    if (clientCoo !== '' && clientCoo !== 'To Be Confirmed') old.coo_type = clientCoo;
+  }
   if (old.estimated_total_cbm === undefined) old.estimated_total_cbm = await companySettingsRepository.get('default_estimated_total_cbm');
   if (old.estimated_gross_weight_kg === undefined) old.estimated_gross_weight_kg = await companySettingsRepository.get('default_estimated_gross_weight_kg');
   if (old.estimated_net_weight_kg === undefined) old.estimated_net_weight_kg = await companySettingsRepository.get('default_estimated_net_weight_kg');

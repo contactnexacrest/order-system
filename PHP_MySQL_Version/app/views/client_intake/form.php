@@ -77,7 +77,14 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
           <input type="text" name="port_of_discharge_text" placeholder="Optional — we'll advise">
         </label>
         <label class="full">Certificate of Origin Type
-          <input type="text" name="coo_type" placeholder="e.g., GSP Form A">
+          <?php // Owner report (2026-10-26): a dropdown of the real options, so what the client picks is kept exactly. ?>
+          <?php $__coo = \App\Repositories\LookupRepository::matchOption(array_column($cooTypes ?? [], 'option_value'), (string) ('')); ?>
+          <select name="coo_type">
+            <option value="">Not sure — please confirm with me</option>
+            <?php foreach (($cooTypes ?? []) as $__o): ?>
+              <option value="<?= htmlspecialchars($__o['option_value']) ?>" <?= $__coo === $__o['option_value'] ? 'selected' : '' ?>><?= htmlspecialchars($__o['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
           <small class="muted">GSP Form A (preferential) / Non-preferential — confirm with your customs broker if unsure</small>
         </label>
       </div>

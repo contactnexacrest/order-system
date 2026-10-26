@@ -15,6 +15,7 @@
           {{ s.country_of_destination }}
           {% if s.port_of_discharge_text %}<br><span class="muted small">Port: {{ s.port_of_discharge_text }}</span>{% endif %}
           {% if s.incoterm_preference %}<br><span class="muted small">Incoterm: {{ s.incoterm_preference }}</span>{% endif %}
+          {% if s.coo_type %}<br><span class="muted small">COO: {{ s.coo_type }}</span>{% endif %}
         </td>
         <td>{{ s.submitted_at }}</td>
         <td>

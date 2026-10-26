@@ -36,6 +36,7 @@
       <div><span class="k">Consignee</span><span class="v">{{ client.consignee_name or 'SAME' }}</span></div>
       <div><span class="k">VAT / EORI</span><span class="v">{{ client.vat_eori_tax_no or '—' }}</span></div>
       <div><span class="k">Country of Destination</span><span class="v">{{ client.country_of_destination or '—' }}</span></div>
+      <div><span class="k">Certificate of Origin Type</span><span class="v">{{ client.coo_type or '—' }}</span></div>
       <div><span class="k">Contact Person</span><span class="v">{{ client.contact_person or '—' }}</span></div>
       <div><span class="k">Email</span><span class="v">{% if permissions.view_client_email_full %}{{ client.email or '—' }}{% else %}<span class="masked-value">{{ client.email | maskEmail }}</span>{% endif %}</span></div>
       <div><span class="k">Phone</span><span class="v">{% if permissions.view_client_email_full %}{{ client.phone or '—' }}{% else %}<span class="masked-value">{{ client.phone | maskPhone }}</span>{% endif %}</span></div>

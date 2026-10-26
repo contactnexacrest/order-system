@@ -83,7 +83,33 @@ final class LookupRepository
         if ($value === '' || $value === 'To Be Confirmed') {
             return $value;
         }
-        $valid = array_column(self::dropdownOptions($listKey), 'option_value');
-        return in_array($value, $valid, true) ? $value : '';
+        return self::matchOption(array_column(self::dropdownOptions($listKey), 'option_value'), $value);
+    }
+
+    /**
+     * Owner report (2026-10-26): a client typing "GSP Form A" or
+     * "non-preferential" on the Quotation/PI details forms lost their
+     * answer entirely, because only an exact match to "GSP Form A
+     * (Preferential)" / "Non-Preferential" was kept. Matches ignoring
+     * case and spacing, and accepts the start of an option's name;
+     * returns the option's own spelling, or '' when nothing (or more than
+     * one option) fits.
+     *
+     * @param string[] $options
+     */
+    public static function matchOption(array $options, string $value): string
+    {
+        $norm = static fn(string $v): string => strtolower((string) preg_replace('/\s+/', ' ', trim($v)));
+        $wanted = $norm($value);
+        if ($wanted === '') {
+            return '';
+        }
+        foreach ($options as $option) {
+            if ($norm((string) $option) === $wanted) {
+                return (string) $option;
+            }
+        }
+        $starts = array_values(array_filter($options, static fn($o): bool => str_starts_with($norm((string) $o), $wanted)));
+        return count($starts) === 1 ? (string) $starts[0] : '';
     }
 }

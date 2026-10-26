@@ -329,6 +329,14 @@ final class OrderController
         // figure on nearly every order anyway. Only fills a gap; never
         // overwrites a value already in $old (a validation retry, or the
         // intake-prefill block above, both win as-is).
+        // Owner report (2026-10-26): start from the COO type the client gave
+        // us (Quotation/PI details or their client record).
+        if ($preselectedClientId && !isset($old['coo_type'])) {
+            $__clientCoo = (string) (ClientRepository::find($preselectedClientId)['coo_type'] ?? '');
+            if ($__clientCoo !== '' && $__clientCoo !== 'To Be Confirmed') {
+                $old['coo_type'] = $__clientCoo;
+            }
+        }
         $old['estimated_total_cbm'] ??= CompanySettingsRepository::get('default_estimated_total_cbm');
         $old['estimated_gross_weight_kg'] ??= CompanySettingsRepository::get('default_estimated_gross_weight_kg');
         $old['estimated_net_weight_kg'] ??= CompanySettingsRepository::get('default_estimated_net_weight_kg');

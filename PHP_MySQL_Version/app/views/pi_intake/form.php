@@ -164,7 +164,14 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
           <textarea name="quotation_acceptance_reference" placeholder="<?= htmlspecialchars($quotationAcceptancePlaceholder) ?>" required><?= htmlspecialchars($submission['quotation_acceptance_reference'] ?? $quotationAcceptancePlaceholder) ?></textarea>
         </label>
         <label>Certificate of Origin Type <span class="info-bubble" tabindex="0" title="A certificate confirming the goods' country of manufacture, often required for customs/preferential duty. GSP Form A = preferential rate under a trade scheme (if your country qualifies); Non-preferential = standard certificate of origin. Leave blank if you're not sure — we'll confirm with you.">&#9432;</span>
-          <input type="text" name="coo_type" value="<?= htmlspecialchars($submission['coo_type'] ?? '') ?>" placeholder="GSP Form A / Non-preferential — leave blank if unsure">
+          <?php // Owner report (2026-10-26): a dropdown of the real options, so what the client picks is kept exactly. ?>
+          <?php $__coo = \App\Repositories\LookupRepository::matchOption(array_column($cooTypes ?? [], 'option_value'), (string) ($submission['coo_type'] ?? '')); ?>
+          <select name="coo_type">
+            <option value="">Not sure — please confirm with me</option>
+            <?php foreach (($cooTypes ?? []) as $__o): ?>
+              <option value="<?= htmlspecialchars($__o['option_value']) ?>" <?= $__coo === $__o['option_value'] ? 'selected' : '' ?>><?= htmlspecialchars($__o['option_value']) ?></option>
+            <?php endforeach; ?>
+          </select>
         </label>
         <label>Buyer PO / Reference No.
           <input type="text" name="buyer_po_ref" value="<?= htmlspecialchars($submission['buyer_po_ref'] ?? '') ?>" placeholder="Write NIL if none">

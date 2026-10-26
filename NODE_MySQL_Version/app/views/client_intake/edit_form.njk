@@ -59,7 +59,14 @@
           <input type="text" name="port_of_discharge_text" value="{{ submission.port_of_discharge_text or '' }}" placeholder="Optional — we'll advise">
         </label>
         <label class="full">Certificate of Origin Type
-          <input type="text" name="coo_type" value="{{ submission.coo_type or '' }}" placeholder="e.g., GSP Form A">
+          {# Owner report (2026-10-26): a dropdown of the real options, so what the client picks is kept exactly. #}
+          {% set cooPicked = matchOption(cooTypes, submission.coo_type or '') %}
+          <select name="coo_type">
+            <option value="">Not sure — please confirm with me</option>
+            {% for o in cooTypes %}
+              <option value="{{ o.option_value }}" {% if cooPicked == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
+            {% endfor %}
+          </select>
           <small class="muted">GSP Form A (preferential) / Non-preferential — confirm with your customs broker if unsure</small>
         </label>
       </div>

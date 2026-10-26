@@ -88,10 +88,14 @@ confused with each other — where staff either:
   correction immediately and permanently — a later, unrelated edit to the
   client record (or an acceptance on a different order for the same
   client) never reaches back into it. Everything else on the submission
-  (payment-terms confirmation, confirmed Incoterm/port/COO,
+  (payment-terms confirmation, confirmed Incoterm/port,
   quotation-acceptance reference, any changes from the quotation) stays
   visible on the order for staff to read before generating the PI, but is
-  never auto-written into the order's own structured fields.
+  never auto-written into the order's own structured fields — except the
+  **Certificate of Origin Type**: the one the client confirmed is written
+  onto the client record *and* this order, so the PI, CI and Certificate
+  of Origin worksheet print it. A blank ("not sure") answer keeps the
+  value already on file.
 - **Reject** (with a reason) — the buyer can resubmit via the same link.
 
 ### Generating the PI

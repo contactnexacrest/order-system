@@ -29,6 +29,7 @@ final class ClientIntakeController
         View::render('client_intake/form', [
             'wrapClass' => 'intake-wrap',
             'containerTypes' => LookupRepository::dropdownOptions('container_type'),
+            'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
             'incoterms' => LookupRepository::incoterms(),
             'countries' => CountryList::names(),
         ], 'layout/bare');
@@ -85,6 +86,7 @@ final class ClientIntakeController
             'token' => $params['token'],
             'wrapClass' => 'intake-wrap',
             'containerTypes' => LookupRepository::dropdownOptions('container_type'),
+            'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
             'incoterms' => LookupRepository::incoterms(),
             'countries' => CountryList::names(),
         ], 'layout/bare');

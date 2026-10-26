@@ -949,4 +949,10 @@ final class OrderRepository
             'UPDATE orders SET financials_skipped_at = NULL, financials_skipped_by = NULL, financials_skip_reason = NULL WHERE id = :id'
         )->execute(['id' => $orderId]);
     }
+
+    public static function setCooType(int $orderId, string $cooType): void
+    {
+        Database::connection()->prepare('UPDATE orders SET coo_type = :coo_type WHERE id = :id')
+            ->execute(['coo_type' => $cooType, 'id' => $orderId]);
+    }
 }

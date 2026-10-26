@@ -158,7 +158,14 @@
           <textarea name="quotation_acceptance_reference" placeholder="{{ quotationAcceptancePlaceholder }}" required>{{ submission.quotation_acceptance_reference or quotationAcceptancePlaceholder }}</textarea>
         </label>
         <label>Certificate of Origin Type <span class="info-bubble" tabindex="0" title="A certificate confirming the goods' country of manufacture, often required for customs/preferential duty. GSP Form A = preferential rate under a trade scheme (if your country qualifies); Non-preferential = standard certificate of origin. Leave blank if you're not sure — we'll confirm with you.">&#9432;</span>
-          <input type="text" name="coo_type" value="{{ submission.coo_type or '' }}" placeholder="GSP Form A / Non-preferential — leave blank if unsure">
+          {# Owner report (2026-10-26): a dropdown of the real options, so what the client picks is kept exactly. #}
+          {% set cooPicked = matchOption(cooTypes, submission.coo_type or '') %}
+          <select name="coo_type">
+            <option value="">Not sure — please confirm with me</option>
+            {% for o in cooTypes %}
+              <option value="{{ o.option_value }}" {% if cooPicked == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
+            {% endfor %}
+          </select>
         </label>
         <label>Buyer PO / Reference No.
           <input type="text" name="buyer_po_ref" value="{{ submission.buyer_po_ref or '' }}" placeholder="Write NIL if none">

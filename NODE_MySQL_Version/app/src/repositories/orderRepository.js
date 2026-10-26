@@ -877,10 +877,14 @@ async function clearFinancialsSkipped(orderId) {
   );
 }
 
+async function setCooType(orderId, cooType) {
+  await db.execute('UPDATE orders SET coo_type = :coo_type WHERE id = :id', { coo_type: cooType, id: orderId });
+}
+
 module.exports = {
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, markPiFormSkipped,
-  markFinancialsSkipped, clearFinancialsSkipped,
+  markFinancialsSkipped, clearFinancialsSkipped, setCooType,
 };

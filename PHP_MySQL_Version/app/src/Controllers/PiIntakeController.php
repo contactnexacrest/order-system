@@ -37,6 +37,7 @@ final class PiIntakeController
             'paymentTermsPlaceholder' => self::buildPaymentTermsPlaceholder($submission),
             'quotationAcceptancePlaceholder' => self::buildQuotationAcceptancePlaceholder($submission),
             'incoterms' => LookupRepository::incoterms(),
+            'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
         ], 'layout/bare');
     }
 
