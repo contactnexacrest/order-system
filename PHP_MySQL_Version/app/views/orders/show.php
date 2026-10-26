@@ -2756,7 +2756,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php // Owner request (2026-10-26, t4): the CI is made against the BL, so the scanned BL copy goes in first (FOB raises its CI before shipment, so no BL yet). ?>
       <?php if ($isFob): ?>
       <?php elseif (empty($shipping['bl_copy_file_id'])): ?>
-        <p class="alert alert-warning">&#9888; <strong>Upload the scanned BL copy first</strong> — attach it in <a href="#step-10f-bl-issued">Step 10f</a> (Attach Scanned BL Copy), then generate the Commercial Invoice against it.</p>
+        <p class="review-banner warn bl-copy-first">&#9888; <strong>Upload the scanned BL copy first</strong> — attach it in <a href="#step-10f-bl-issued">Step 10f</a> (Attach Scanned BL Copy), then generate the Commercial Invoice against it.</p>
       <?php else: ?>
         <p class="muted small">Scanned BL copy is on file (<a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">download</a>) — generate the Commercial Invoice against it.</p>
       <?php endif; ?>
