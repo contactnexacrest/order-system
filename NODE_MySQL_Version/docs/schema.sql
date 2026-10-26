@@ -692,6 +692,11 @@ CREATE TABLE orders (
   financials_skipped_at   DATETIME NULL,
   financials_skipped_by   BIGINT UNSIGNED NULL,
   financials_skip_reason  VARCHAR(500) NULL,
+  -- Owner request (2026-10-26): Step 12 sub-steps — 12a costs marked complete, 12d Step 12 marked complete.
+  financials_costs_confirmed_at DATETIME NULL,
+  financials_costs_confirmed_by BIGINT UNSIGNED NULL,
+  financials_completed_at       DATETIME NULL,
+  financials_completed_by       BIGINT UNSIGNED NULL,
 
   is_sample_data          TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real order
   created_by              BIGINT UNSIGNED NULL,

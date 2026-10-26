@@ -202,19 +202,10 @@ async function submitStepForm(page, stageNumber, action, fields, buttonName, sco
   await expect(page.locator('.alert')).toBeVisible();
 }
 
-// The Order Financials card's "Export Benefits" tab is JS-hidden
-// (Order Detail Page Polish round) until its tab button is clicked —
-// "Costs" is active by default. Each form submit is a full page
-// reload, which resets the tabs back to default, so this is called
-// again after every save.
-async function openExportBenefitsTab(page) {
-  await page.locator('[data-tab-target="order-financials-export-benefits"]').click();
-}
-
 async function resolveExportBenefitSchemes(page, orderId) {
-  await page.goto(`/orders/${orderId}#order-financials`);
-  await openCardAndAncestors(page, '#order-financials');
-  await openExportBenefitsTab(page);
+  // Owner decision (2026-10-26): eligibility is Step 12b (#financials-12b).
+  await page.goto(`/orders/${orderId}#financials-12b`);
+  await openCardAndAncestors(page, '#financials-12b');
   // One form, every scheme at once (owner request 2026-10-26).
   const form = page.locator(`form[action="/orders/${orderId}/export-benefit-schemes"]`);
   const pendingRows = form.locator('tr').filter({ has: page.locator('select[data-scheme-status] option[value="pending"][selected]') });

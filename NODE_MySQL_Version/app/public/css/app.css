@@ -144,6 +144,20 @@ fieldset.intake-step{padding-top:1.25rem;}
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 1.25rem;}
 .field-grid label.full{grid-column:1 / -1;}
 .field-grid label{margin-bottom:0.9rem;}
+/* Owner request (2026-10-26): Step 12 in guided sub-steps (12a–12d) with the money picture on top. */
+.fin-progress{margin-left:auto;font-size:0.78rem;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
+.fin-sub-summary{margin-left:auto;font-size:0.8rem;font-weight:500;color:var(--ink-soft);white-space:nowrap;padding-left:0.75rem;}
+.fin-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin:0.5rem 0 1rem;}
+.fin-kpi{background:var(--panel-tint);border-radius:12px;padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:0.15rem;}
+.fin-kpi .l{font-size:0.75rem;color:var(--ink-soft);}
+.fin-kpi .v{font-size:1.05rem;font-weight:700;color:var(--navy);}
+.fin-kpi.good .v{color:var(--success);}
+.fin-add-cost{border:1px dashed var(--line);border-radius:12px;padding:0.75rem 0.9rem;margin:0.9rem 0;background:#fffdf8;}
+.fin-add-cost-pick{font-weight:700;color:var(--navy);}
+.fin-add-cost-pick select{max-width:420px;}
+.fin-confirm{display:flex;flex-wrap:wrap;align-items:center;gap:0.6rem;margin-top:0.9rem;padding-top:0.75rem;border-top:1px solid var(--line);}
+.fin-benefits input{min-width:110px;}
+@media (max-width:900px){.fin-kpis{grid-template-columns:1fr 1fr;} .fin-sub-summary{display:none;}}
 /* Owner request (2026-10-26): Buyer/Supplier Action Link pages — same look as the intake forms. */
 .action-step legend{flex-wrap:wrap;}
 .action-status{margin-left:0.4rem;font-size:0.72rem;font-weight:700;padding:0.15rem 0.6rem;border-radius:999px;background:var(--navy-soft);color:var(--navy);}

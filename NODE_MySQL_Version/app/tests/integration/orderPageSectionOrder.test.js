@@ -226,16 +226,19 @@ describe('Order page section order (Task #36)', () => {
     const financialsPos = output.indexOf('id="order-financials"');
     const lcPos = output.indexOf('Letter of Credit &amp; Bank Loan</h3>');
     const travelPos = output.indexOf('Travel Expenses — Factory Visits');
-    const otherCostsPos = output.indexOf('Other Order Costs</h3>');
+    const costsPos = output.indexOf('id="financials-12a"');
+    const eligibilityPos = output.indexOf('id="financials-12b"');
     const productionPos = output.indexOf('<h2>Step 8 &middot; Production &amp; Estimated Shipment</h2>');
 
     expect(financialsPos).toBeGreaterThan(-1);
     expect(lcPos).toBeGreaterThan(-1);
     expect(travelPos).toBeGreaterThan(-1);
-    expect(otherCostsPos).toBeGreaterThan(-1);
-    expect(travelPos).toBeGreaterThan(financialsPos);
-    expect(travelPos).toBeGreaterThan(lcPos);
-    expect(travelPos).toBeLessThan(otherCostsPos);
+    // Owner decision (2026-10-26): Step 12a Order Costs holds travel and LC/loan under its one "+ Add a cost".
+    for (const pos of [travelPos, lcPos]) {
+      expect(pos).toBeGreaterThan(costsPos);
+      expect(pos).toBeLessThan(eligibilityPos);
+    }
+    expect(costsPos).toBeGreaterThan(financialsPos);
     expect(productionPos).toBeLessThan(travelPos);
   });
 

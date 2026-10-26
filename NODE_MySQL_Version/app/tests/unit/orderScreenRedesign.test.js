@@ -173,9 +173,9 @@ describe('Order screen redesign (Point 2/4)', () => {
     // Products, Payment Overview, Document Review, Order Communication (pinned) + the two admin cards.
     expect(counts.direct).toBe(6);
     expect(counts.phases).toBe(5);
-    // Steps 1, 2, 3, the LC card, 12, 19, Amendments, 14, 16-18.
-    expect(counts.phaseCards).toBe(11);
-    expect(counts.groups).toBe(9);
-    expect(counts.groupedCards).toBe(41);
+    // Steps 1, 2, 3, the LC card, 19, Amendments, 14, 16-18 (Step 12 is a step-group, 12a-12d).
+    expect(counts.phaseCards).toBe(10);
+    expect(counts.groups).toBe(10);
+    expect(counts.groupedCards).toBe(45);
   });
 });

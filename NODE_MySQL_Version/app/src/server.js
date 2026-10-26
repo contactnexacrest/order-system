@@ -190,6 +190,7 @@ njkEnv.addGlobal('docStatus', (documents, code) => {
 });
 njkEnv.addGlobal('annexureConfirmAttr', require('./helpers/annexureConfirmAttr').annexureConfirmAttr);
 njkEnv.addGlobal('stepBadge', require('./helpers/stepBadge').stepBadge);
+njkEnv.addGlobal('financialsStep', require('./helpers/financialsStep').financialsStep);
 // Owner report (2026-10-26): pre-selects a dropdown_options value the client typed loosely (e.g. "GSP Form A").
 njkEnv.addGlobal('matchOption', (rows, value) => require('./repositories/lookupRepository').matchOption((rows || []).map((r) => r.option_value), value));
 njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').formatRange);
@@ -718,6 +719,9 @@ app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('c
 app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.generateInternalDoc));
 app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
 app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
+app.post('/orders/:id/financials/costs-confirmed', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.confirmCosts));
+app.post('/orders/:id/financials/complete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.completeFinancials));
+app.post('/orders/:id/export-benefits/save-all', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveExportBenefits));
 app.post('/orders/:id/financials/skip', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.skipFinancials));
 app.post('/orders/:id/financials/skip/undo', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.undoSkipFinancials));
 app.post('/orders/:id/export-benefit-schemes', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.setExportBenefitSchemeStatus));

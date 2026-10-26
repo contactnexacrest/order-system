@@ -167,19 +167,10 @@ async function skipPiForm(page, orderId) {
   await expect(page.locator('.alert')).toContainText('PI-stage form skipped');
 }
 
-// The Order Financials card's "Export Benefits" tab is JS-hidden
-// (Order Detail Page Polish round) until its tab button is clicked —
-// "Costs" is active by default. Each form submit is a full page
-// reload, which resets the tabs back to default, so this is called
-// again after every save.
-async function openExportBenefitsTab(page) {
-  await page.locator('[data-tab-target="order-financials-export-benefits"]').click();
-}
-
 async function resolveExportBenefitSchemes(page, orderId) {
-  await page.goto(`/orders/${orderId}#order-financials`);
-  await openCardAndAncestors(page, '#order-financials');
-  await openExportBenefitsTab(page);
+  // Owner decision (2026-10-26): eligibility is Step 12b (#financials-12b).
+  await page.goto(`/orders/${orderId}#financials-12b`);
+  await openCardAndAncestors(page, '#financials-12b');
   // One form, every scheme at once (owner request 2026-10-26).
   const form = page.locator(`form[action="/orders/${orderId}/export-benefit-schemes"]`);
   const pendingRows = form.locator('tr').filter({ has: page.locator('select[data-scheme-status] option[value="pending"][selected]') });
@@ -474,6 +465,16 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   await test.step('Mark Fully Settled — phase 2 of closure, the real completion', async () => {
     await resolveComplianceChecklistIfNeeded(page, orderId);
     await resolveExportBenefitSchemes(page, orderId);
+
+    // Owner decision (2026-10-26): Step 12 is guided — 12a costs marked
+    // complete, 12b answered above, then 12d completes Step 12.
+    await page.goto(`/orders/${orderId}#financials-12a`);
+    await openCardAndAncestors(page, '#financials-12a');
+    await page.locator('#financials-12a').getByRole('button', { name: /Costs are complete/ }).click();
+    await expect(page.locator('.alert')).toContainText('Costs marked complete');
+    await openCardAndAncestors(page, '#financials-12d');
+    await page.locator('#financials-12d').getByRole('button', { name: 'Mark Step 12 complete', exact: true }).click();
+    await expect(page.locator('.alert')).toContainText('Step 12 complete');
 
     await openStage(page, 9);
     const settleForm = page.locator(`form[action="/orders/${orderId}/mark-fully-settled"]`);

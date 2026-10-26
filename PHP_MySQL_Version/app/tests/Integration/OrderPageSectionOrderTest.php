@@ -235,16 +235,19 @@ final class OrderPageSectionOrderTest extends DbTestCase
         $financialsPos = strpos($output, 'id="order-financials"');
         $lcPos = strpos($output, 'Letter of Credit &amp; Bank Loan</h3>');
         $travelPos = strpos($output, 'Travel Expenses — Factory Visits');
-        $otherCostsPos = strpos($output, 'Other Order Costs</h3>');
+        $costsPos = strpos($output, 'id="financials-12a"');
+        $eligibilityPos = strpos($output, 'id="financials-12b"');
         $productionPos = strpos($output, '<h2>Step 8 &middot; Production &amp; Estimated Shipment</h2>');
 
         self::assertNotFalse($financialsPos);
         self::assertNotFalse($lcPos);
         self::assertNotFalse($travelPos);
-        self::assertNotFalse($otherCostsPos);
-        self::assertGreaterThan($financialsPos, $travelPos, 'Travel Expenses must render inside the Order Financials panel');
-        self::assertGreaterThan($lcPos, $travelPos, 'Travel Expenses must render after Letter of Credit & Bank Loan');
-        self::assertLessThan($otherCostsPos, $travelPos, 'Travel Expenses must render before Other Order Costs');
+        // Owner decision (2026-10-26): Step 12a Order Costs holds travel and LC/loan under its one "+ Add a cost".
+        foreach (['Travel Expenses' => $travelPos, 'Letter of Credit & Bank Loan' => $lcPos] as $label => $pos) {
+            self::assertGreaterThan($costsPos, $pos, "{$label} must render inside Step 12a Order Costs");
+            self::assertLessThan($eligibilityPos, $pos, "{$label} must render before Step 12b");
+        }
+        self::assertGreaterThan($financialsPos, $costsPos);
         self::assertLessThan($travelPos, $productionPos, 'Production & Estimated Shipment must render before Order Financials (and Travel Expenses within it) — Travel Expenses moved out of that section into Financials, not the other way round');
     }
 

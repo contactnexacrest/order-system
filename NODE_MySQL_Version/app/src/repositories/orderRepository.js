@@ -881,10 +881,26 @@ async function setCooType(orderId, cooType) {
   await db.execute('UPDATE orders SET coo_type = :coo_type WHERE id = :id', { coo_type: cooType, id: orderId });
 }
 
+/** Owner request (2026-10-26): Step 12a — costs marked complete (null user clears it). */
+async function setFinancialsCostsConfirmed(orderId, userId) {
+  await db.execute(
+    `UPDATE orders SET financials_costs_confirmed_at = ${userId === null ? 'NULL' : 'NOW()'}, financials_costs_confirmed_by = :user_id WHERE id = :id`,
+    { user_id: userId, id: orderId }
+  );
+}
+
+/** Owner request (2026-10-26): Step 12d — Step 12 marked complete (null user reopens it). */
+async function setFinancialsCompleted(orderId, userId) {
+  await db.execute(
+    `UPDATE orders SET financials_completed_at = ${userId === null ? 'NULL' : 'NOW()'}, financials_completed_by = :user_id WHERE id = :id`,
+    { user_id: userId, id: orderId }
+  );
+}
+
 module.exports = {
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, markPiFormSkipped,
-  markFinancialsSkipped, clearFinancialsSkipped, setCooType,
+  markFinancialsSkipped, clearFinancialsSkipped, setCooType, setFinancialsCostsConfirmed, setFinancialsCompleted,
 };

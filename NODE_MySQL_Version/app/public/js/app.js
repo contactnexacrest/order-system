@@ -183,6 +183,22 @@
     });
   }
 
+  // Owner request (2026-10-26): Step 12a's single "+ Add a cost" — the type
+  // picked shows its own form; the rest stay hidden.
+  function initFinCostPicker() {
+    document.querySelectorAll('[data-fin-cost-type]').forEach(function (select) {
+      var box = select.closest('.fin-add-cost');
+      if (!box) return;
+      function sync() {
+        box.querySelectorAll('[data-fin-cost-form]').forEach(function (form) {
+          form.hidden = form.getAttribute('data-fin-cost-form') !== select.value;
+        });
+      }
+      select.addEventListener('change', sync);
+      sync();
+    });
+  }
+
   // Owner request (2026-10-26, t4): a crate's HS code is shown from the
   // product picked on that row — read-only; the server derives it again.
   function initCrateHsCodes() {
@@ -478,6 +494,7 @@
     initLockedSteps();
     initComplianceRows();
     initCrateHsCodes();
+    initFinCostPicker();
     initRemittanceStatements();
     initSchemeRows();
   }

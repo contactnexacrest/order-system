@@ -1009,6 +1009,8 @@ final class OrderController
             'canDeleteInrActual' => $canDeleteInrActual,
             'canViewCaLinks' => $canViewCaLinks,
             'linkedExportBenefits' => $canViewCaLinks ? CaExportBenefitRepository::forOrder($orderId) : [],
+            // Owner request (2026-10-26): Step 12c lists this order's claims for manage_order_financials holders.
+            'orderBenefitClaims' => $canManageOrderFinancials ? CaExportBenefitRepository::forOrder($orderId) : [],
             'linkedCaExpenses' => $canViewCaLinks ? CaExpenseRepository::forOrder($orderId) : [],
             'canManageCaInternalDoc' => $canManageCaInternalDoc,
             'caInternalDoc' => $canViewCaLinks ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN') : null,

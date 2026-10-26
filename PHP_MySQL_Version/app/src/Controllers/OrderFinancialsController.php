@@ -609,4 +609,162 @@ final class OrderFinancialsController
         Flash::set('success', 'Step 12 reopened.');
         header("Location: /orders/{$orderId}#order-financials");
     }
+
+    /**
+     * Owner request (2026-10-26): Step 12 in guided sub-steps. 12a — the
+     * order's costs are marked complete (or reopened to add more).
+     */
+    public function confirmCosts(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!OrderRepository::find($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $userId = (int) AuthService::currentUserId();
+        $reopen = ($_POST['action'] ?? '') === 'reopen';
+        OrderRepository::setFinancialsCostsConfirmed($orderId, $reopen ? null : $userId);
+        AuditLogRepository::log($userId, $reopen ? 'ORDER_COSTS_REOPENED' : 'ORDER_COSTS_CONFIRMED', 'orders', $orderId, 'financials_costs_confirmed_at', null, null);
+        Flash::set('success', $reopen ? 'Costs reopened (12a).' : 'Costs marked complete (12a). Next: export benefit eligibility (12b).');
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
+    /**
+     * 12d — Step 12 marked complete once costs are confirmed (12a) and
+     * every scheme's eligibility is answered (12b). Benefit money (12c)
+     * can still arrive later and be recorded then.
+     */
+    public function completeFinancials(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $userId = (int) AuthService::currentUserId();
+        if (($_POST['action'] ?? '') === 'reopen') {
+            OrderRepository::setFinancialsCompleted($orderId, null);
+            AuditLogRepository::log($userId, 'ORDER_FINANCIALS_REOPENED', 'orders', $orderId, 'financials_completed_at', null, null);
+            Flash::set('success', 'Step 12 reopened.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        $missing = [];
+        if (empty($order['financials_costs_confirmed_at'])) {
+            $missing[] = 'mark the costs complete (12a)';
+        }
+        if (\App\Repositories\OrderExportBenefitSchemeRepository::summaryForOrder($orderId)['pending'] > 0) {
+            $missing[] = 'answer every scheme\'s eligibility (12b)';
+        }
+        if ($missing !== []) {
+            Flash::set('error', 'Before completing Step 12: ' . implode(' and ', $missing) . '.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        OrderRepository::setFinancialsCompleted($orderId, $userId);
+        AuditLogRepository::log($userId, 'ORDER_FINANCIALS_COMPLETED', 'orders', $orderId, 'financials_completed_at', null, date('Y-m-d H:i:s'));
+        Flash::set('success', 'Step 12 complete. Benefit money still to come can be recorded in 12c whenever it arrives.');
+        header("Location: /orders/{$orderId}#order-financials");
+    }
+
+    /**
+     * 12c — one Save for the benefits table: a row with no claim yet and a
+     * claimed amount records the claim; a row whose claim is still waiting
+     * and has a received amount records the money. All rows are checked
+     * before anything is written.
+     */
+    public function saveExportBenefits(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $isDate = static fn(string $d): bool => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $d);
+        $isAmount = static fn(string $a, bool $allowZero): bool => is_numeric($a) && ($allowZero ? (float) $a >= 0 : (float) $a > 0);
+        $fail = static function (string $message) use ($orderId): void {
+            Flash::set('error', $message . ' Nothing was saved.');
+            header("Location: /orders/{$orderId}#financials-12c");
+        };
+
+        $claims = [];
+        $receipts = [];
+        foreach ((array) ($_POST['benefits'] ?? []) as $row) {
+            $benefitId = (int) ($row['benefit_id'] ?? 0);
+            $receivedAmount = trim((string) ($row['received_amount'] ?? ''));
+            $receivedAt = trim((string) ($row['received_at'] ?? ''));
+            if ($benefitId === 0) {
+                $claimedAmount = trim((string) ($row['claimed_amount'] ?? ''));
+                if ($claimedAmount === '') {
+                    continue;
+                }
+                $scheme = trim((string) ($row['scheme_name'] ?? ''));
+                $claimedAt = trim((string) ($row['claimed_at'] ?? ''));
+                if ($scheme === '' || !$isAmount($claimedAmount, false) || !$isDate($claimedAt)) {
+                    $fail("{$scheme}: enter the claimed amount and the date it was claimed.");
+                    return;
+                }
+                $claims[] = [$scheme, trim((string) ($row['reference_number'] ?? '')) ?: null, (float) $claimedAmount, $claimedAt, $receivedAmount, $receivedAt];
+                continue;
+            }
+            $benefit = CaExportBenefitRepository::find($benefitId);
+            if (!$benefit || (int) ($benefit['order_id'] ?? 0) !== $orderId) {
+                $fail('A claim on this form does not belong to this order.');
+                return;
+            }
+            if ($receivedAmount !== '' && $benefit['received_amount'] === null) {
+                $receipts[] = [$benefitId, $receivedAmount, $receivedAt];
+            }
+        }
+        foreach ([...array_map(static fn($c) => [$c[4], $c[5], $c[0]], $claims), ...array_map(static fn($r) => [$r[1], $r[2], 'A claim'], $receipts)] as [$amount, $at, $label]) {
+            if ($amount !== '' && (!$isAmount($amount, true) || !$isDate($at))) {
+                $fail("{$label}: enter the received amount and the date it was received.");
+                return;
+            }
+        }
+        if ($claims === [] && $receipts === []) {
+            Flash::set('success', 'Nothing new to save in 12c.');
+            header("Location: /orders/{$orderId}#financials-12c");
+            return;
+        }
+        $payment = \App\Repositories\OrderPaymentStatusRepository::find($orderId);
+        if ($claims !== [] && (!in_array($order['status'], ['shipped_docs_sent', 'complete'], true) || empty($payment['balance_remittance_received_at']))) {
+            $fail('Claims can be recorded once the documents are sent (13f) and the balance remittance is received.');
+            return;
+        }
+        foreach ($claims as [$scheme, , , $claimedAt, $receivedAmount, $receivedAt]) {
+            if (!CaFyLockGuard::allow($claimedAt, (int) $user['id'], $roleId, 'ca_export_benefits', 0, 'record')
+                || ($receivedAmount !== '' && !CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'ca_export_benefits', 0, 'mark_received'))) {
+                header("Location: /orders/{$orderId}#financials-12c");
+                return;
+            }
+        }
+        foreach ($receipts as [$benefitId, , $receivedAt]) {
+            if (!CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'ca_export_benefits', $benefitId, 'mark_received')) {
+                header("Location: /orders/{$orderId}#financials-12c");
+                return;
+            }
+        }
+
+        foreach ($claims as [$scheme, $reference, $claimedAmount, $claimedAt, $receivedAmount, $receivedAt]) {
+            $id = CaExportBenefitRepository::record($orderId, $scheme, $reference, $claimedAmount, $claimedAt, 'INR', null, (int) $user['id']);
+            AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', $id, null, null, $scheme);
+            if ($receivedAmount !== '') {
+                $receipts[] = [$id, $receivedAmount, $receivedAt];
+            }
+        }
+        foreach ($receipts as [$benefitId, $receivedAmount, $receivedAt]) {
+            CaExportBenefitRepository::markReceived($benefitId, (float) $receivedAmount, $receivedAt);
+            AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', $benefitId, null, null, $receivedAmount);
+        }
+        Flash::set('success', 'Benefits saved — ' . count($claims) . ' claim(s) recorded, ' . count($receipts) . ' receipt(s) recorded.');
+        header("Location: /orders/{$orderId}#financials-12c");
+    }
 }

@@ -573,4 +573,152 @@ async function undoSkipFinancials(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
-module.exports = { skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };
+/**
+ * Owner request (2026-10-26): Step 12 in guided sub-steps. 12a — the
+ * order's costs are marked complete (or reopened to add more).
+ */
+async function confirmCosts(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await orderRepository.find(orderId))) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const reopen = req.body.action === 'reopen';
+  await orderRepository.setFinancialsCostsConfirmed(orderId, reopen ? null : req.user.id);
+  await auditLogRepository.log(req.user.id, reopen ? 'ORDER_COSTS_REOPENED' : 'ORDER_COSTS_CONFIRMED', 'orders', orderId, 'financials_costs_confirmed_at', null, null);
+  flash.set(req, 'success', reopen ? 'Costs reopened (12a).' : 'Costs marked complete (12a). Next: export benefit eligibility (12b).');
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
+/**
+ * 12d — Step 12 marked complete once costs are confirmed (12a) and every
+ * scheme's eligibility is answered (12b). Benefit money (12c) can still
+ * arrive later and be recorded then.
+ */
+async function completeFinancials(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  if (req.body.action === 'reopen') {
+    await orderRepository.setFinancialsCompleted(orderId, null);
+    await auditLogRepository.log(req.user.id, 'ORDER_FINANCIALS_REOPENED', 'orders', orderId, 'financials_completed_at', null, null);
+    flash.set(req, 'success', 'Step 12 reopened.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  const missing = [];
+  if (!order.financials_costs_confirmed_at) {
+    missing.push('mark the costs complete (12a)');
+  }
+  if ((await orderExportBenefitSchemeRepository.summaryForOrder(orderId)).pending > 0) {
+    missing.push("answer every scheme's eligibility (12b)");
+  }
+  if (missing.length) {
+    flash.set(req, 'error', `Before completing Step 12: ${missing.join(' and ')}.`);
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  await orderRepository.setFinancialsCompleted(orderId, req.user.id);
+  await auditLogRepository.log(req.user.id, 'ORDER_FINANCIALS_COMPLETED', 'orders', orderId, 'financials_completed_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '));
+  flash.set(req, 'success', 'Step 12 complete. Benefit money still to come can be recorded in 12c whenever it arrives.');
+  res.redirect(`/orders/${orderId}#order-financials`);
+}
+
+/**
+ * 12c — one Save for the benefits table: a row with no claim yet and a
+ * claimed amount records the claim; a row whose claim is still waiting and
+ * has a received amount records the money. All rows are checked before
+ * anything is written.
+ */
+async function saveExportBenefits(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const back = () => res.redirect(`/orders/${orderId}#financials-12c`);
+  const fail = (message) => {
+    flash.set(req, 'error', `${message} Nothing was saved.`);
+    back();
+  };
+  const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const isAmount = (a, allowZero) => a !== '' && !Number.isNaN(Number(a)) && (allowZero ? Number(a) >= 0 : Number(a) > 0);
+  const text = (v) => String(v ?? '').trim();
+
+  const claims = [];
+  const receipts = [];
+  for (const row of Object.values(req.body.benefits || {})) {
+    const benefitId = parseInt(row.benefit_id, 10) || 0;
+    const receivedAmount = text(row.received_amount);
+    const receivedAt = text(row.received_at);
+    if (benefitId === 0) {
+      const claimedAmount = text(row.claimed_amount);
+      if (claimedAmount === '') continue;
+      const scheme = text(row.scheme_name);
+      const claimedAt = text(row.claimed_at);
+      if (scheme === '' || !isAmount(claimedAmount, false) || !isDate(claimedAt)) {
+        fail(`${scheme}: enter the claimed amount and the date it was claimed.`);
+        return;
+      }
+      claims.push({ scheme, reference: text(row.reference_number) || null, claimedAmount: parseFloat(claimedAmount), claimedAt, receivedAmount, receivedAt });
+      continue;
+    }
+    const benefit = await caExportBenefitRepository.find(benefitId);
+    if (!benefit || Number(benefit.order_id) !== orderId) {
+      fail('A claim on this form does not belong to this order.');
+      return;
+    }
+    if (receivedAmount !== '' && benefit.received_amount === null) {
+      receipts.push({ benefitId, receivedAmount, receivedAt });
+    }
+  }
+  for (const [amount, at, label] of [...claims.map((c) => [c.receivedAmount, c.receivedAt, c.scheme]), ...receipts.map((r) => [r.receivedAmount, r.receivedAt, 'A claim'])]) {
+    if (amount !== '' && (!isAmount(amount, true) || !isDate(at))) {
+      fail(`${label}: enter the received amount and the date it was received.`);
+      return;
+    }
+  }
+  if (!claims.length && !receipts.length) {
+    flash.set(req, 'success', 'Nothing new to save in 12c.');
+    back();
+    return;
+  }
+  const payment = await orderPaymentStatusRepository.find(orderId);
+  if (claims.length && (!['shipped_docs_sent', 'complete'].includes(order.status) || !payment || !payment.balance_remittance_received_at)) {
+    fail('Claims can be recorded once the documents are sent (13f) and the balance remittance is received.');
+    return;
+  }
+  for (const c of claims) {
+    if (!(await caFyLockGuard.allow(req, c.claimedAt, 'ca_export_benefits', 0, 'record'))
+      || (c.receivedAmount !== '' && !(await caFyLockGuard.allow(req, c.receivedAt, 'ca_export_benefits', 0, 'mark_received')))) {
+      back();
+      return;
+    }
+  }
+  for (const r of receipts) {
+    if (!(await caFyLockGuard.allow(req, r.receivedAt, 'ca_export_benefits', r.benefitId, 'mark_received'))) {
+      back();
+      return;
+    }
+  }
+
+  for (const c of claims) {
+    const id = await caExportBenefitRepository.record(orderId, c.scheme, c.reference, c.claimedAmount, c.claimedAt, 'INR', null, req.user.id);
+    await auditLogRepository.log(req.user.id, 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', id, null, null, c.scheme);
+    if (c.receivedAmount !== '') {
+      receipts.push({ benefitId: id, receivedAmount: c.receivedAmount, receivedAt: c.receivedAt });
+    }
+  }
+  for (const r of receipts) {
+    await caExportBenefitRepository.markReceived(r.benefitId, parseFloat(r.receivedAmount), r.receivedAt);
+    await auditLogRepository.log(req.user.id, 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', r.benefitId, null, null, r.receivedAmount);
+  }
+  flash.set(req, 'success', `Benefits saved — ${claims.length} claim(s) recorded, ${receipts.length} receipt(s) recorded.`);
+  back();
+}
+
+module.exports = { confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };
