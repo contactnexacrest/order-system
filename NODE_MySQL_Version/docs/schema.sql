@@ -3913,3 +3913,48 @@ CREATE TABLE order_complaint_replies (
 ALTER TABLE order_supplier_po
   ADD COLUMN advance_paid_amount_inr DECIMAL(14,2) NULL,
   ADD COLUMN balance_paid_amount_inr DECIMAL(14,2) NULL;
+
+-- ================================================================
+-- SECTION BZ — SUPPLIERS DIRECTORY (added 2026-10-26)
+-- ================================================================
+-- A dedicated Suppliers admin screen (same shape as Logistics Partners,
+-- Section AQ) replaces the order page's inline "Add Supplier" form.
+-- suppliers gains the contact fields Logistics Partners already has; a
+-- supplier can hold several types (supplier_type_links — the text of a
+-- dropdown_options('supplier_type') option, no FK, same convention as
+-- every other stored option text), replacing the single
+-- suppliers.supplier_type column. order_supplier_po keeps the order
+-- self-contained: it snapshots the new contact fields too, and its
+-- supplier_type holds the ONE type chosen for that order. See
+-- docs/migrations/2026-10-26-suppliers-directory.sql.
+-- ================================================================
+ALTER TABLE suppliers
+  ADD COLUMN city                    VARCHAR(120) NULL AFTER address,
+  ADD COLUMN state                   VARCHAR(120) NULL AFTER city,
+  ADD COLUMN contact_person_phone    VARCHAR(30)  NULL AFTER contact_person,
+  ADD COLUMN contact_person_whatsapp VARCHAR(30)  NULL AFTER contact_person_phone,
+  ADD COLUMN email                   VARCHAR(255) NULL AFTER phone,
+  ADD COLUMN whatsapp_number         VARCHAR(30)  NULL AFTER email,
+  ADD COLUMN notes                   VARCHAR(1000) NULL,
+  ADD COLUMN created_by              BIGINT UNSIGNED NULL,
+  ADD COLUMN updated_at              TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  ADD CONSTRAINT fk_suppliers_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+  DROP COLUMN supplier_type;
+
+CREATE TABLE supplier_type_links (
+  supplier_id   BIGINT UNSIGNED NOT NULL,
+  supplier_type VARCHAR(50) NOT NULL,
+  PRIMARY KEY (supplier_id, supplier_type),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+ALTER TABLE order_supplier_po
+  ADD COLUMN supplier_email                   VARCHAR(255) NULL AFTER supplier_phone,
+  ADD COLUMN supplier_whatsapp_number         VARCHAR(30)  NULL AFTER supplier_email,
+  ADD COLUMN supplier_city                    VARCHAR(120) NULL AFTER supplier_address,
+  ADD COLUMN supplier_state                   VARCHAR(120) NULL AFTER supplier_city,
+  ADD COLUMN supplier_contact_person_phone    VARCHAR(30)  NULL AFTER supplier_contact_person,
+  ADD COLUMN supplier_contact_person_whatsapp VARCHAR(30)  NULL AFTER supplier_contact_person_phone;
+
+INSERT INTO permissions (permission_key, name, description, category) VALUES
+  ('manage_suppliers', 'Manage suppliers', 'Add, edit, deactivate and delete suppliers (and their types and factory addresses) in the Suppliers directory the Supplier PO picks from. Same tier as manage_logistics_partners: Admin/MD/ED and Super Admin only by default.', 'catalog');

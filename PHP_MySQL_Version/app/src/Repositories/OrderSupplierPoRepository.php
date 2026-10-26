@@ -12,45 +12,57 @@ final class OrderSupplierPoRepository
      * 90-item backlog "standalone order" follow-on: resolves the
      * supplier's identity details ONCE, at Supplier PO creation — never
      * re-read from `suppliers` again. Mirrors OrderRepository's own
-     * resolveSnapshot() for incoterm/currency/port/preset.
+     * resolveSnapshot() for incoterm/currency/port/preset. A supplier can
+     * hold several types, so the ONE type that applies to this order is
+     * passed in by the caller and recorded here.
      *
      * @return array<string,mixed>
      */
-    private static function resolveSupplierSnapshot(int $supplierId): array
+    private static function resolveSupplierSnapshot(int $supplierId, ?string $supplierType): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT supplier_legal_name, address, gstin, pan, contact_person, phone, supplier_type FROM suppliers WHERE id = :id'
+            'SELECT supplier_legal_name, address, city, state, gstin, pan, contact_person, contact_person_phone,
+                    contact_person_whatsapp, phone, email, whatsapp_number
+             FROM suppliers WHERE id = :id'
         );
         $stmt->execute(['id' => $supplierId]);
         $supplier = $stmt->fetch() ?: [];
 
         return [
-            'supplier_legal_name'     => $supplier['supplier_legal_name'] ?? null,
-            'supplier_address'        => $supplier['address'] ?? null,
-            'supplier_gstin'          => $supplier['gstin'] ?? null,
-            'supplier_pan'            => $supplier['pan'] ?? null,
-            'supplier_contact_person' => $supplier['contact_person'] ?? null,
-            'supplier_phone'          => $supplier['phone'] ?? null,
-            'supplier_type'           => $supplier['supplier_type'] ?? null,
+            'supplier_legal_name'              => $supplier['supplier_legal_name'] ?? null,
+            'supplier_address'                 => $supplier['address'] ?? null,
+            'supplier_city'                    => $supplier['city'] ?? null,
+            'supplier_state'                   => $supplier['state'] ?? null,
+            'supplier_gstin'                   => $supplier['gstin'] ?? null,
+            'supplier_pan'                     => $supplier['pan'] ?? null,
+            'supplier_contact_person'          => $supplier['contact_person'] ?? null,
+            'supplier_contact_person_phone'    => $supplier['contact_person_phone'] ?? null,
+            'supplier_contact_person_whatsapp' => $supplier['contact_person_whatsapp'] ?? null,
+            'supplier_phone'                   => $supplier['phone'] ?? null,
+            'supplier_email'                   => $supplier['email'] ?? null,
+            'supplier_whatsapp_number'         => $supplier['whatsapp_number'] ?? null,
+            'supplier_type'                    => $supplierType,
         ];
     }
 
     public static function create(int $orderId, int $supplierId, string $supplierPoReference, array $data, string $status = 'issued'): int
     {
         $pdo = Database::connection();
-        $snapshot = self::resolveSupplierSnapshot($supplierId);
+        $snapshot = self::resolveSupplierSnapshot($supplierId, $data['supplier_type'] ?? null);
         $stmt = $pdo->prepare(
             'INSERT INTO order_supplier_po
-                (order_id, supplier_id, supplier_legal_name, supplier_address, supplier_gstin, supplier_pan,
-                 supplier_contact_person, supplier_phone, supplier_type,
+                (order_id, supplier_id, supplier_legal_name, supplier_address, supplier_city, supplier_state,
+                 supplier_gstin, supplier_pan, supplier_contact_person, supplier_contact_person_phone,
+                 supplier_contact_person_whatsapp, supplier_phone, supplier_email, supplier_whatsapp_number, supplier_type,
                  supplier_po_reference, material_stone_type, grade, surface_finish,
                  dimensions, dimensional_tolerance, quantity, unit, colour_reference, special_requirements,
                  unit_price_inr, basic_value_inr, gst_rate_pct, gst_amount_inr, total_payable_inr,
                  advance_pct, advance_amount_inr, balance_amount_inr,
                  delivery_location, required_delivery_date, packing_requirement, status)
              VALUES
-                (:order_id, :supplier_id, :supplier_legal_name, :supplier_address, :supplier_gstin, :supplier_pan,
-                 :supplier_contact_person, :supplier_phone, :supplier_type,
+                (:order_id, :supplier_id, :supplier_legal_name, :supplier_address, :supplier_city, :supplier_state,
+                 :supplier_gstin, :supplier_pan, :supplier_contact_person, :supplier_contact_person_phone,
+                 :supplier_contact_person_whatsapp, :supplier_phone, :supplier_email, :supplier_whatsapp_number, :supplier_type,
                  :ref, :material, :grade, :finish,
                  :dimensions, :tolerance, :quantity, :unit, :colour, :special,
                  :unit_price, :basic_value, :gst_rate, :gst_amount, :total_payable,
@@ -60,13 +72,7 @@ final class OrderSupplierPoRepository
         $stmt->execute([
             'order_id'    => $orderId,
             'supplier_id' => $supplierId,
-            'supplier_legal_name'     => $snapshot['supplier_legal_name'],
-            'supplier_address'        => $snapshot['supplier_address'],
-            'supplier_gstin'          => $snapshot['supplier_gstin'],
-            'supplier_pan'            => $snapshot['supplier_pan'],
-            'supplier_contact_person' => $snapshot['supplier_contact_person'],
-            'supplier_phone'          => $snapshot['supplier_phone'],
-            'supplier_type'           => $snapshot['supplier_type'],
+        ] + $snapshot + [
             'ref'         => $supplierPoReference,
             'status'      => $status,
             'material'    => $data['material_stone_type'] ?? null,

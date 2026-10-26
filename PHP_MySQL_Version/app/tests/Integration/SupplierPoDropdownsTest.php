@@ -63,16 +63,18 @@ final class SupplierPoDropdownsTest extends DbTestCase
         }
     }
 
-    public function testSupplierPoFormRendersClarifiedSupplierTypeOptions(): void
+    public function testSupplierFormRendersClarifiedSupplierTypeOptions(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->unlockThroughStage4($orderId);
+        // Supplier types are now picked on the Suppliers directory form
+        // (docs/schema.sql Section BZ), not an inline form on the order page.
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        ob_start();
+        (new \App\Controllers\SupplierController())->createForm([]);
+        $output = (string) ob_get_clean();
 
-        $output = $this->renderOrderShow($orderId);
-
-        self::assertStringContainsString('>Factory Owner<', $output, 'new Factory Owner supplier type must be offered');
-        self::assertStringContainsString('>Processor (Job-Work Basis)<', $output, 'Processor must be clarified, not left as the ambiguous bare label');
-        self::assertStringNotContainsString('>Processor</option>', $output, 'the old ambiguous bare "Processor" label must no longer appear — it was renamed for clarity');
+        self::assertStringContainsString('value="Factory Owner"', $output, 'new Factory Owner supplier type must be offered');
+        self::assertStringContainsString('value="Processor (Job-Work Basis)"', $output, 'Processor must be clarified, not left as the ambiguous bare label');
+        self::assertStringNotContainsString('value="Processor"', $output, 'the old ambiguous bare "Processor" label must no longer appear — it was renamed for clarity');
     }
 
     public function testSupplierPoFormWiresAutoCalculationHooks(): void

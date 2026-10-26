@@ -674,6 +674,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
   const suppoTypeId = await documentGenerationService.documentTypeIdFor('SUPPO');
   const supplierPoReference = await referenceNumberService.generateDocumentRef(suppoTypeId);
   await orderSupplierPoRepository.create(orderId, supplierId, supplierPoReference, {
+    supplier_type: 'Quarry Owner',
     material_stone_type: 'Natural Granite, Absolute Black',
     grade: 'Grade A',
     surface_finish: 'Natural/Sandblasted',
@@ -791,6 +792,7 @@ async function advanceSampleOrderToStage9(orderId, supplierId, userId) {
   const suppoTypeId = await documentGenerationService.documentTypeIdFor('SUPPO');
   const supplierPoReference = await referenceNumberService.generateDocumentRef(suppoTypeId);
   await orderSupplierPoRepository.create(orderId, supplierId, supplierPoReference, {
+    supplier_type: 'Quarry Owner',
     material_stone_type: 'Natural Granite, Kadapa Black',
     grade: 'Grade A',
     surface_finish: 'Flamed',
@@ -936,7 +938,10 @@ async function createSampleSupplier() {
     pan: 'SAMPL0000A',
     contact_person: 'Sample Supplier Contact',
     phone: '+91-00000-00000',
-    supplier_type: 'Quarry',
+    email: 'sample.supplier@example.com',
+    city: 'Sample City',
+    state: 'Test State',
+    types: ['Quarry Owner', 'Factory Owner'],
   });
   await supplierRepository.markSample(supplierId);
   return supplierId;

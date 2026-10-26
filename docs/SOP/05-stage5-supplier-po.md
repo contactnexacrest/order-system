@@ -21,9 +21,13 @@ knows who the supplier is.
 
 ## What staff do
 
-Stage 5 unlocks the moment Stage 4's gate passes. If no supplier exists yet
-for this material, add one first, then fill in the Supplier PO's material
-specification and commercial terms in the same section:
+Stage 5 unlocks the moment Stage 4's gate passes. Suppliers are picked from
+the **Suppliers** directory (Admin → Suppliers — see
+[Chapter 15](./15-admin-settings.md#admin--settings)); there is no longer an
+"add supplier" form on the order page. If the supplier isn't listed yet,
+someone with the `manage_suppliers` permission (Admin/MD/ED by default) adds
+it there first — the order page links straight to it. Then pick the supplier
+and fill in the Supplier PO's material specification and commercial terms:
 
 ![Stage 5 section — add supplier and fill in Supplier PO terms](./images/s5_before_supplier.png)
 
@@ -35,24 +39,31 @@ Supplier Type offers **Quarry Owner**, **Processor (Job-Work Basis)**
 (a unit that processes material supplied by/on behalf of someone else, not
 one that owns the quarry or the factory itself), **Trader**, and
 **Factory Owner** — four genuinely distinct roles, not overlapping labels.
+A supplier can hold **more than one** type in the directory (e.g. Quarry
+Owner *and* Factory Owner). When the supplier picked on **Save Supplier PO
+Terms** has several, a **Supplier Type for this order** dropdown appears and
+staff choose the one that applies — it is what prints on the Supplier PO. A
+supplier with a single type has it recorded automatically.
 
 **Delivery Location** is a dropdown of the *selected supplier's own*
 factory addresses, repopulating the moment a different supplier is
 picked — a supplier with none yet shows only **Other (not listed) —
-specify**, which reveals a free-text box. Staff add a supplier's factory
-addresses from the **Manage factory addresses** section, just below
-**Add a new supplier** — a label (optional) plus the address, one
-supplier at a time; each added address is immediately available in every
+specify**, which reveals a free-text box. A supplier's factory addresses
+are managed on its own page in the Suppliers directory, and can also be
+added from the **Manage factory addresses** section on the order page —
+a label (optional) plus the address; each added address is immediately available in every
 Supplier PO Terms form's Delivery Location dropdown for that supplier,
 on this order and any other. Whatever Delivery Location text was
 actually selected or typed is saved directly onto that Supplier PO's own
 record — editing or removing a factory address later never changes a
 Supplier PO that already used it. 90-item backlog "standalone order"
 follow-on: the same holds for the supplier's own legal name, address,
-GSTIN, PAN, contact person, and phone — picking a supplier on **Save
-Supplier PO Terms** copies those details onto that Supplier PO's own
-record at that moment, so a later correction to the supplier's own
-details never changes a Supplier PO already saved against them.
+city/state, GSTIN, PAN, phone, email, WhatsApp, contact person (with their
+phone/WhatsApp), and the supplier type chosen for this order — picking a
+supplier on **Save Supplier PO Terms** copies those details onto that
+Supplier PO's own record at that moment, so the order is self-contained:
+editing, deactivating or deleting the supplier in the directory later
+never changes a Supplier PO already saved against them.
 
 **Basic Value, GST Amount, Total Payable, Advance Amount, and Balance
 Amount auto-calculate** as Quantity, Unit Price, GST Rate, and Advance %

@@ -712,6 +712,7 @@ final class SampleDataService
             (int) DocumentGenerationService::documentTypeIdFor('SUPPO')
         );
         OrderSupplierPoRepository::create($orderId, $supplierId, $supplierPoReference, [
+            'supplier_type' => 'Quarry Owner',
             'material_stone_type'   => 'Natural Granite, Absolute Black',
             'grade'                 => 'Grade A',
             'surface_finish'        => 'Natural/Sandblasted',
@@ -834,6 +835,7 @@ final class SampleDataService
             (int) DocumentGenerationService::documentTypeIdFor('SUPPO')
         );
         OrderSupplierPoRepository::create($orderId, $supplierId, $supplierPoReference, [
+            'supplier_type' => 'Quarry Owner',
             'material_stone_type'   => 'Natural Granite, Kadapa Black',
             'grade'                 => 'Grade A',
             'surface_finish'        => 'Flamed',
@@ -985,7 +987,10 @@ final class SampleDataService
             'pan'                 => 'SAMPL0000A',
             'contact_person'      => 'Sample Supplier Contact',
             'phone'               => '+91-00000-00000',
-            'supplier_type'       => 'Quarry',
+            'email'               => 'sample.supplier@example.com',
+            'city'                => 'Sample City',
+            'state'               => 'Test State',
+            'types'               => ['Quarry Owner', 'Factory Owner'],
         ]);
         SupplierRepository::markSample($supplierId);
         return $supplierId;

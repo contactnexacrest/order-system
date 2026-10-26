@@ -158,6 +158,9 @@ async function carrySupplierPoForward(sourceOrderId, newOrderId, createdBy) {
     sourceSupplierPo.supplier_id,
     newReference,
     {
+      // The type chosen for the source order carries over; the rest of
+      // the supplier's details are re-read as of today.
+      supplier_type: sourceSupplierPo.supplier_type,
       material_stone_type: sourceSupplierPo.material_stone_type,
       grade: sourceSupplierPo.grade,
       surface_finish: sourceSupplierPo.surface_finish,

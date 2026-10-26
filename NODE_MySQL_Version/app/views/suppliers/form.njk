@@ -1,0 +1,101 @@
+{% set isEdit = supplier != null %}
+{% set selectedTypes = supplier.types if isEdit else [] %}
+<div class="card page-wide">
+  <p class="muted small"><a href="/suppliers">&larr; Back to Suppliers</a></p>
+  <h1>{{ ('Edit Supplier — ' + supplier.supplier_legal_name) if isEdit else 'Add Supplier' }}</h1>
+  {% if isEdit and usedOnAnOrder %}
+    <p class="muted small">This supplier has been used on an order. Changes here apply to new Supplier POs only — orders that already saved their Supplier PO terms keep the details they recorded.</p>
+  {% endif %}
+  <form method="post" action="{{ ('/suppliers/' + supplier.id + '/update') if isEdit else '/suppliers' }}">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <fieldset>
+      <legend>Supplier Details</legend>
+      <div class="field-grid">
+        <label class="full">Supplier Legal Name *
+          <input type="text" name="supplier_legal_name" value="{{ supplier.supplier_legal_name if isEdit else '' }}" placeholder="e.g., Shree Granite Quarries Pvt Ltd" required>
+        </label>
+        <div class="full">
+          <span class="field-label">Supplier Type(s) * <small class="muted">— tick every type that applies</small></span>
+          <div style="display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:4px;">
+            {% for type in supplierTypes %}
+              <label class="checkbox-row" style="display:inline-flex;align-items:center;gap:6px;width:auto;margin:0;font-weight:normal;">
+                <input type="checkbox" name="types[]" value="{{ type }}" {{ 'checked' if type in selectedTypes else '' }}> {{ type }}
+              </label>
+            {% endfor %}
+          </div>
+          <small class="muted">The list is managed under Dropdown Options (Supplier Type).</small>
+        </div>
+        <label class="full">Address
+          <input type="text" name="address" value="{{ supplier.address if isEdit and supplier.address else '' }}" placeholder="e.g., Survey No. 45, Quarry Road">
+        </label>
+        <label>City
+          <input type="text" name="city" value="{{ supplier.city if isEdit and supplier.city else '' }}" placeholder="e.g., Udaipur">
+        </label>
+        <label>State
+          <input type="text" name="state" value="{{ supplier.state if isEdit and supplier.state else '' }}" placeholder="e.g., Rajasthan">
+        </label>
+        <label>Phone
+          <input type="text" name="phone" value="{{ supplier.phone if isEdit and supplier.phone else '' }}" placeholder="e.g., +91 98765 43210">
+        </label>
+        <label>WhatsApp Number
+          <input type="text" name="whatsapp_number" value="{{ supplier.whatsapp_number if isEdit and supplier.whatsapp_number else '' }}" placeholder="e.g., +91 98765 43210">
+        </label>
+        <label>Email
+          <input type="email" name="email" value="{{ supplier.email if isEdit and supplier.email else '' }}" placeholder="e.g., name@example.com">
+        </label>
+        <label>Contact Person — Name
+          <input type="text" name="contact_person" value="{{ supplier.contact_person if isEdit and supplier.contact_person else '' }}" placeholder="e.g., Ramesh Kumar">
+        </label>
+        <label>Contact Person — Phone
+          <input type="text" name="contact_person_phone" value="{{ supplier.contact_person_phone if isEdit and supplier.contact_person_phone else '' }}" placeholder="e.g., +91 98765 43210">
+        </label>
+        <label>Contact Person — WhatsApp
+          <input type="text" name="contact_person_whatsapp" value="{{ supplier.contact_person_whatsapp if isEdit and supplier.contact_person_whatsapp else '' }}" placeholder="e.g., +91 98765 43210">
+        </label>
+        <label>GSTIN
+          <input type="text" name="gstin" value="{{ supplier.gstin if isEdit and supplier.gstin else '' }}" placeholder="e.g., 08AAAAA0000A1Z5">
+        </label>
+        <label>PAN
+          <input type="text" name="pan" value="{{ supplier.pan if isEdit and supplier.pan else '' }}" placeholder="e.g., AAAAA0000A">
+        </label>
+      </div>
+    </fieldset>
+    <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — material specialities, capacity, payment terms, etc.">{{ supplier.notes if isEdit and supplier.notes else '' }}</textarea></label>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm btn-success">{{ 'Save Changes' if isEdit else 'Add Supplier' }}</button>
+      <a href="/suppliers" class="btn-sm btn-secondary">Cancel</a>
+    </div>
+  </form>
+
+  {% if isEdit %}
+  <div class="section" id="factory-addresses">
+    <h2 style="font-size:1rem;">Factory Addresses</h2>
+    <p class="muted small">Offered as the Delivery Location when saving Supplier PO terms for this supplier. Removing one never changes a Supplier PO that already recorded it.</p>
+    {% if factoryAddresses.length %}
+      <table class="list">
+        <tr><th>Label</th><th>Address</th><th></th></tr>
+        {% for fa in factoryAddresses %}
+          <tr>
+            <td>{{ fa.label or '—' }}</td>
+            <td>{{ fa.address }}</td>
+            <td>
+              <form method="post" action="/suppliers/{{ supplier.id }}/factory-addresses/{{ fa.id }}/delete" style="display:inline" onsubmit="return confirm('Remove this factory address?');">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" class="btn-sm btn-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <p class="muted small">No factory addresses added yet.</p>
+    {% endif %}
+    <form method="post" action="/suppliers/{{ supplier.id }}/factory-addresses" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Label <small class="muted">(optional)</small><input type="text" name="label" placeholder="e.g. Udaipur Factory"></label>
+      <label>Address *<input type="text" name="address" required placeholder="e.g. Plot 12, Industrial Area, Udaipur, Rajasthan"></label>
+      <button type="submit" class="btn-sm">Add Factory Address</button>
+    </form>
+  </div>
+  {% endif %}
+</div>

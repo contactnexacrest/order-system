@@ -40,14 +40,22 @@ ALTER TABLE order_supplier_po
 -- with today's (now-drifted) live values, defeating the entire point
 -- of this migration.
 -- ================================================================
-UPDATE order_supplier_po sp
-  JOIN suppliers s ON s.id = sp.supplier_id
-SET
-  sp.supplier_legal_name    = s.supplier_legal_name,
-  sp.supplier_address       = s.address,
-  sp.supplier_gstin         = s.gstin,
-  sp.supplier_pan           = s.pan,
-  sp.supplier_contact_person = s.contact_person,
-  sp.supplier_phone         = s.phone,
-  sp.supplier_type          = s.supplier_type
-WHERE sp.supplier_legal_name IS NULL;
+-- Guarded: 2026-10-26-suppliers-directory.sql later drops
+-- suppliers.supplier_type (moved to supplier_type_links). Once that has
+-- run, every Supplier PO row already carries its snapshot, so the
+-- backfill has nothing left to do.
+SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'supplier_type');
+SET @sql := IF(@c = 1,
+  'UPDATE order_supplier_po sp
+     JOIN suppliers s ON s.id = sp.supplier_id
+   SET
+     sp.supplier_legal_name     = s.supplier_legal_name,
+     sp.supplier_address        = s.address,
+     sp.supplier_gstin          = s.gstin,
+     sp.supplier_pan            = s.pan,
+     sp.supplier_contact_person = s.contact_person,
+     sp.supplier_phone          = s.phone,
+     sp.supplier_type           = s.supplier_type
+   WHERE sp.supplier_legal_name IS NULL',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

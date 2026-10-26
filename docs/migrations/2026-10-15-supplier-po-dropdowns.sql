@@ -50,9 +50,11 @@ UPDATE dropdown_options
 SET option_value = 'Processor (Job-Work Basis)'
 WHERE list_key = 'supplier_type' AND option_value = 'Processor';
 
-UPDATE suppliers
-SET supplier_type = 'Processor (Job-Work Basis)'
-WHERE supplier_type = 'Processor';
+-- Guarded: 2026-10-26-suppliers-directory.sql later moves supplier types
+-- into supplier_type_links and drops suppliers.supplier_type.
+SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'supplier_type');
+SET @sql := IF(@c = 1, 'UPDATE suppliers SET supplier_type = ''Processor (Job-Work Basis)'' WHERE supplier_type = ''Processor''', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- --- Part 3: new surface_finish / gst_rate option lists ---------------
 INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)

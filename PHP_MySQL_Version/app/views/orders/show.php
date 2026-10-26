@@ -14,6 +14,7 @@ $currentUser = AuthService::currentUser();
 $canViewReports = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_reports');
 $canEditLockedData = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'edit_locked_data');
 $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_orders');
+$canManageSuppliers = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_suppliers');
 // QA-5 RBAC-03/04: duty-specific split of manage_orders — see docs/seed.sql.
 $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_payments');
 // External QA report Q-ROLE-1: clearing a buyer payment (confirming the
@@ -1689,6 +1690,7 @@ $stepStatusIcon = static function (string $status): string {
     <?php elseif ($supplierPo): ?>
       <div class="kv-grid">
         <div><span class="k">Supplier</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_legal_name']) ?></span></div>
+        <div><span class="k">Supplier Type</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_type'] ?? '—') ?></span></div>
         <div><span class="k">Supplier PO Ref</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_po_reference']) ?></span></div>
         <div><span class="k">Material</span><span class="v"><?= htmlspecialchars($supplierPo['material_stone_type'] ?? '—') ?></span></div>
         <div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div>
@@ -1696,29 +1698,13 @@ $stepStatusIcon = static function (string $status): string {
       </div>
       <p class="muted small">Terms already saved — see Step 7b to generate the document.</p>
     <?php else: ?>
-      <details open>
-        <summary>Add a new supplier</summary>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/suppliers">
-          <?= Csrf::field() ?>
-          <div class="field-grid">
-            <label>Supplier Legal Name *<input type="text" name="supplier_legal_name" required></label>
-            <label>Address<input type="text" name="address"></label>
-            <label>GSTIN<input type="text" name="gstin"></label>
-            <label>PAN<input type="text" name="pan"></label>
-            <label>Contact Person<input type="text" name="contact_person"></label>
-            <label>Phone<input type="text" name="phone"></label>
-            <label>Supplier Type
-              <select name="supplier_type">
-                <option value="">—</option>
-                <?php foreach ($supplierTypes as $opt): ?>
-                  <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </label>
-          </div>
-          <button type="submit" class="btn-sm">Add Supplier</button>
-        </form>
-      </details>
+      <p class="muted small">
+        Suppliers come from the Suppliers directory<?php if ($canManageSuppliers): ?> — <a href="/suppliers" target="_blank" rel="noopener">add or manage suppliers</a> (opens in a new tab; reload this page afterwards)<?php else: ?> — ask an Admin/MD/ED to add a new supplier there<?php endif; ?>.
+        The supplier's details are copied onto this order when you save the terms, so later edits in the directory never change this order.
+      </p>
+      <?php if (empty($suppliers)): ?>
+        <p class="small" style="color:var(--danger);font-weight:600;">No active suppliers yet. <?= $canManageSuppliers ? '<a href="/suppliers/create" target="_blank" rel="noopener">Add the first supplier</a>, then reload this page.' : 'Ask an Admin/MD/ED to add one in the Suppliers directory.' ?></p>
+      <?php endif; ?>
 
       <?php if (!empty($suppliers)): ?>
       <details>
@@ -1765,9 +1751,13 @@ $stepStatusIcon = static function (string $status): string {
             <option value="">Select supplier…</option>
             <?php foreach ($suppliers as $sup): ?>
               <?php $supAddressesForOption = $supplierFactoryAddressesBySupplier[(int) $sup['id']] ?? []; ?>
-              <option value="<?= (int) $sup['id'] ?>" data-addresses="<?= htmlspecialchars(json_encode(array_map(static fn(array $a): string => $a['address'], $supAddressesForOption)) ?: '[]') ?>"><?= htmlspecialchars($sup['supplier_legal_name']) ?></option>
+              <option value="<?= (int) $sup['id'] ?>" data-addresses="<?= htmlspecialchars(json_encode(array_map(static fn(array $a): string => $a['address'], $supAddressesForOption)) ?: '[]') ?>" data-types="<?= htmlspecialchars(json_encode($sup['types']) ?: '[]') ?>"><?= htmlspecialchars($sup['supplier_legal_name']) ?><?= $sup['types'] ? ' — ' . htmlspecialchars(implode(', ', $sup['types'])) : '' ?></option>
             <?php endforeach; ?>
           </select>
+        </label>
+        <label id="spo-supplier-type-field" style="display:none">Supplier Type for this order *
+          <select name="supplier_type" id="spo-supplier-type-select"></select>
+          <small class="muted">This supplier has more than one type — pick the one that applies to this order. It prints on the Supplier PO.</small>
         </label>
         <label>Material / Stone Type<input type="text" name="material_stone_type" placeholder="e.g., Black Granite"></label>
         <label>Grade<input type="text" name="grade" value="Grade A"></label>
@@ -1863,6 +1853,38 @@ $stepStatusIcon = static function (string $status): string {
         // fallback — same dropdown-with-other-fallback pattern as the
         // Incoterm fields on the client-facing intake forms.
         var supplierSelect = document.getElementById('spo-supplier-select');
+
+        // A supplier can hold several types: when the selected one has more
+        // than one, staff pick which applies to this order (it prints on the
+        // Supplier PO). With one type it's recorded automatically.
+        var typeField = document.getElementById('spo-supplier-type-field');
+        var typeSelect = document.getElementById('spo-supplier-type-select');
+        if (supplierSelect && typeField && typeSelect) {
+          function repopulateTypeOptions() {
+            var opt = supplierSelect.options[supplierSelect.selectedIndex];
+            var types = [];
+            try { types = opt && opt.dataset.types ? JSON.parse(opt.dataset.types) : []; } catch (e) { types = []; }
+            typeSelect.innerHTML = '';
+            if (types.length > 1) {
+              var blank = document.createElement('option');
+              blank.value = '';
+              blank.textContent = '— Select —';
+              typeSelect.appendChild(blank);
+            }
+            types.forEach(function (t) {
+              var o = document.createElement('option');
+              o.value = t;
+              o.textContent = t;
+              typeSelect.appendChild(o);
+            });
+            var multiple = types.length > 1;
+            typeField.style.display = multiple ? '' : 'none';
+            typeSelect.required = multiple;
+          }
+          supplierSelect.addEventListener('change', repopulateTypeOptions);
+          repopulateTypeOptions();
+        }
+
         var deliverySelect = document.getElementById('spo-delivery-location-select');
         var deliveryInput = document.getElementById('spo-delivery-location-input');
         if (supplierSelect && deliverySelect && deliveryInput) {
@@ -1911,6 +1933,7 @@ $stepStatusIcon = static function (string $status): string {
     <?php elseif ($supplierPo): ?>
       <div class="kv-grid">
         <div><span class="k">Supplier</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_legal_name']) ?></span></div>
+        <div><span class="k">Supplier Type</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_type'] ?? '—') ?></span></div>
         <div><span class="k">Supplier PO Ref</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_po_reference']) ?></span></div>
         <div><span class="k">Material</span><span class="v"><?= htmlspecialchars($supplierPo['material_stone_type'] ?? '—') ?></span></div>
         <div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div>

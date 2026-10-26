@@ -31,6 +31,7 @@ $settingsExpiryWarnings = $canSettings ? \App\Repositories\DashboardRepository::
 $settingsExpiryWarningCount = ($settingsExpiryWarnings['lut'] ? 1 : 0) + ($settingsExpiryWarnings['rcmc'] ? 1 : 0);
 $canManageHsCodes = $can('manage_hs_codes');
 $canManageLogisticsPartners = $can('manage_logistics_partners');
+$canManageSuppliers = $can('manage_suppliers');
 $canManagePorts = $can('manage_ports');
 $canManagePaymentPresets = $can('manage_payment_presets');
 $canManageComplianceTaskTypes = $can('manage_compliance_task_types');
@@ -87,7 +88,7 @@ $insightsGroupVisible = $canReports || $canAudit;
 // there was nothing to open), even though the route itself worked fine
 // if they knew the direct URL.
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
-    || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners || $canManagePaymentPresets
+    || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners || $canManageSuppliers || $canManagePaymentPresets
     || $canManageHsCodes || $canManageComplianceTaskTypes || $canManageDropdownOptions || $canManageEmailTemplates;
 
 // Sidebar redesign (2026-09-23, "cover all" UI pass) — highlights the
@@ -103,7 +104,7 @@ $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/c
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
-    || $isActive('/logistics-partners') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports');
+    || $isActive('/logistics-partners') || $isActive('/suppliers') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -178,6 +179,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>
           <?php if ($canManageHsCodes): ?><a href="/hs-codes" class="<?= $isActive('/hs-codes') ? 'active' : '' ?>">HS Codes</a><?php endif; ?>
           <?php if ($canManageLogisticsPartners): ?><a href="/logistics-partners" class="<?= $isActive('/logistics-partners') ? 'active' : '' ?>">Logistics Partners</a><?php endif; ?>
+          <?php if ($canManageSuppliers): ?><a href="/suppliers" class="<?= $isActive('/suppliers') ? 'active' : '' ?>">Suppliers</a><?php endif; ?>
           <?php if ($canManagePorts): ?><a href="/ports" class="<?= $isActive('/ports') ? 'active' : '' ?>">Ports</a><?php endif; ?>
           <?php if ($canManagePaymentPresets): ?><a href="/payment-presets" class="<?= $isActive('/payment-presets') ? 'active' : '' ?>">Payment Presets</a><?php endif; ?>
           <?php if ($canManageComplianceTaskTypes): ?><a href="/compliance-task-types" class="<?= $isActive('/compliance-task-types') ? 'active' : '' ?>">Compliance Task Types</a><?php endif; ?>

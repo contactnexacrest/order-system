@@ -261,6 +261,20 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   paperwork side. This directory is standalone for now — a quick
   "who do we call for this" lookup — not yet wired into a specific order
   or Order Cost Entry.
+- **Suppliers** (`/suppliers`) — the supplier directory every Supplier PO
+  is raised against, gated by its own `manage_suppliers` permission (same
+  tier as Logistics Partners: Admin/MD/ED and Super Admin by default).
+  Built the same way as Logistics Partners: filter by type, search by
+  name, add, edit, deactivate/reactivate. A supplier can hold **several
+  types** (Quarry Owner, Processor (Job-Work Basis), Trader, Factory
+  Owner — the list itself is edited under Dropdown Options), and carries
+  address/city/state, phone, WhatsApp, email, a contact person with phone
+  and WhatsApp, GSTIN, PAN, notes, and its factory addresses. A
+  deactivated supplier drops out of the Supplier PO supplier list but
+  stays on old orders. **Delete** is only offered for a supplier never
+  used on an order — once used, deactivate it instead. Edits here never
+  change an existing order: each Supplier PO keeps its own copy of the
+  supplier's details from when its terms were saved.
 - **Ports** (`/ports`) — the Port of Loading / Port of Discharge options
   offered on the New Order form, gated by its own `manage_ports`
   permission (same tier as Logistics Partners: Admin/MD/ED and Super

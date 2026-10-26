@@ -211,6 +211,20 @@ async function resolveExportBenefitSchemes(page, orderId) {
   }
 }
 
+
+// Suppliers live in the Suppliers directory (manage_suppliers — Admin/MD/
+// ED), not an inline form on the order page; adding one lands on its
+// edit page with a success banner.
+async function addSupplierInDirectory(page, name, types) {
+  await page.goto('/suppliers/create');
+  await page.locator('input[name="supplier_legal_name"]').fill(name);
+  for (const type of types) {
+    await page.locator(`input[name="types[]"][value="${type}"]`).check();
+  }
+  await page.getByRole('button', { name: 'Add Supplier' }).click();
+  await expect(page.locator('.alert')).toContainText('added to the suppliers directory');
+}
+
 test.describe.serial('Deep per-role pipeline workflows', () => {
   let orderId;
   let clientEmail;
@@ -261,6 +275,11 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     await test.step('Admin assigns Export Executive and Logistics Executive to the order up front — both need it concurrently later', async () => {
       await addAssigneeTo(page, orderId, 'exportExecutive');
       await addAssigneeTo(page, orderId, 'logisticsExecutive');
+    });
+
+    await test.step('Admin adds the supplier to the Suppliers directory (manage_suppliers — Export Executive does not hold it)', async () => {
+      await addSupplierInDirectory(page, `Role Workflow Quarry ${UNIQUE}`, ['Quarry Owner']);
+      await page.goto(`/orders/${orderId}`);
     });
 
     await test.step('Admin — Stage 1 (QT generate + self-review-approve, needs approve_documents)', async () => {
@@ -328,13 +347,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await expect(page.locator('.alert')).toContainText('unlocked');
     });
 
-    await test.step('Export Executive — Stage 5 Supplier PO: add supplier, terms, generate, sign (manage_orders)', async () => {
-      await openStage(page, 5);
-      const supplierForm = page.locator(`form[action="/orders/${orderId}/suppliers"]`);
-      await supplierForm.locator('input[name="supplier_legal_name"]').fill(`Role Workflow Quarry ${UNIQUE}`);
-      await supplierForm.getByRole('button', { name: /Add Supplier/i }).click();
-      await expect(page.locator('.alert')).toBeVisible();
-
+    await test.step('Export Executive — Stage 5 Supplier PO: pick supplier, terms, generate, sign (manage_orders)', async () => {
       await openStage(page, 5);
       const spoForm = page.locator('form#supplier-po-form');
       const supplierValue = await spoForm

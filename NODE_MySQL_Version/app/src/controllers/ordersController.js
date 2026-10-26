@@ -991,7 +991,6 @@ async function show(req, res) {
       shipping: await orderShippingRepository.find(orderId),
       draftBlReviews: await orderDraftBlReviewRepository.forOrder(orderId),
       production: await orderProductionRepository.find(orderId),
-      supplierTypes: await lookupRepository.dropdownOptions('supplier_type'),
       units: await lookupRepository.dropdownOptions('unit'),
       surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
       gstRates: await lookupRepository.dropdownOptions('gst_rate'),
@@ -1866,8 +1865,19 @@ async function saveSupplierPo(req, res) {
     return;
   }
   const supplierId = parseInt(req.body.supplier_id || 0, 10);
-  if (!supplierId) {
-    flash.set(req, 'error', 'Select or add a supplier first.');
+  const supplier = supplierId ? await supplierRepository.find(supplierId) : null;
+  if (!supplier || !Number(supplier.is_active)) {
+    flash.set(req, 'error', 'Select an active supplier from the Suppliers directory first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // A supplier can hold several types; the Supplier PO records the ONE
+  // that applies to this order (picked automatically when it has one).
+  let supplierType = str(req.body.supplier_type);
+  if (supplier.types.length === 1) {
+    supplierType = supplier.types[0];
+  } else if (supplier.types.length > 0 && !supplier.types.includes(supplierType)) {
+    flash.set(req, 'error', `Choose which of ${supplier.supplier_legal_name}'s supplier types applies to this order.`);
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1882,6 +1892,7 @@ async function saveSupplierPo(req, res) {
 
   const body = req.body;
   await orderSupplierPoRepository.create(orderId, supplierId, supplierPoReference, {
+    supplier_type: supplierType || null,
     material_stone_type: str(body.material_stone_type) || null,
     grade: str(body.grade) || 'Grade A',
     surface_finish: str(body.surface_finish) || null,
@@ -1910,38 +1921,11 @@ async function saveSupplierPo(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
-async function createSupplier(req, res) {
-  const orderId = parseInt(req.params.id, 10);
-  const name = str(req.body.supplier_legal_name);
-  if (name === '') {
-    flash.set(req, 'error', 'Supplier legal name is required.');
-    res.redirect(`/orders/${orderId}`);
-    return;
-  }
-  const supplierId = await supplierRepository.create({
-    supplier_legal_name: name,
-    address: str(req.body.address) || null,
-    gstin: str(req.body.gstin) || null,
-    pan: str(req.body.pan) || null,
-    contact_person: str(req.body.contact_person) || null,
-    phone: str(req.body.phone) || null,
-    supplier_type: str(req.body.supplier_type) || null,
-  });
-  if (await testModeService.isEnabled()) {
-    await supplierRepository.markTest(supplierId);
-  }
-  // External QA report N-08: this action never reached the audit log,
-  // so it never notified anyone either.
-  await auditLogRepository.log(req.user.id, 'SUPPLIER_CREATED', 'suppliers', supplierId, null, null, name);
-  flash.set(req, 'success', `Supplier "${name}" added.`);
-  res.redirect(`/orders/${orderId}`);
-}
-
 /**
  * User-reported batch item 12 — a supplier can have several factory/
- * delivery addresses; added from the order page (suppliers have no
- * dedicated admin screen of their own) the same way a new supplier
- * itself is.
+ * delivery addresses. Also managed on the supplier's own page in the
+ * Suppliers directory; kept here as a quick add while preparing a
+ * Supplier PO.
  */
 async function createSupplierFactoryAddress(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -3492,7 +3476,7 @@ module.exports = {
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,
-  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, createSupplier, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
+  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

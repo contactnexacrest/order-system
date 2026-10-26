@@ -2,6 +2,7 @@
 
 const db = require('../../src/config/db');
 const ordersController = require('../../src/controllers/ordersController');
+const supplierController = require('../../src/controllers/supplierController');
 const clientPaymentReportRepository = require('../../src/repositories/clientPaymentReportRepository');
 const supplierRepository = require('../../src/repositories/supplierRepository');
 const supplierFactoryAddressRepository = require('../../src/repositories/supplierFactoryAddressRepository');
@@ -93,10 +94,10 @@ describe('Audit log coverage, N-08 Cluster D', () => {
   });
 
   it('createSupplier is logged', async () => {
-    const orderId = await createTestOrder(await createTestClient());
+    // Suppliers are now added in the Suppliers directory, not from the order page.
     const userId = await createTestUser();
 
-    await ordersController.createSupplier(fakeReq(orderId, userId, { supplier_legal_name: 'N08 New Supplier' }), fakeRes());
+    await supplierController.create(fakeReq(0, userId, { supplier_legal_name: 'N08 New Supplier', types: ['Trader'] }), fakeRes());
 
     expect((await lastAuditLogAction()).action_type).toBe('SUPPLIER_CREATED');
   });

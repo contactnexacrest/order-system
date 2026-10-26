@@ -55,10 +55,17 @@ describe('Standalone Supplier PO snapshot (90-item backlog "standalone order" fo
       pan: 'PAN-ORIG',
       contact_person: 'Original Contact',
       phone: '9000000000',
-      supplier_type: 'Manufacturer',
+      email: 'orig@example.com',
+      whatsapp_number: '9111111111',
+      city: 'Udaipur',
+      state: 'Rajasthan',
+      contact_person_phone: '9222222222',
+      contact_person_whatsapp: '9333333333',
+      types: ['Quarry Owner', 'Factory Owner'],
     });
     const orderId = await createTestOrder(await createTestClient());
-    await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-SNAP-1', fullSupplierPoData());
+    // The supplier holds two types; the order records the one chosen for it.
+    await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-SNAP-1', fullSupplierPoData({ supplier_type: 'Factory Owner' }));
 
     const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
 
@@ -68,7 +75,13 @@ describe('Standalone Supplier PO snapshot (90-item backlog "standalone order" fo
     expect(supplierPo.supplier_pan).toBe('PAN-ORIG');
     expect(supplierPo.supplier_contact_person).toBe('Original Contact');
     expect(supplierPo.supplier_phone).toBe('9000000000');
-    expect(supplierPo.supplier_type).toBe('Manufacturer');
+    expect(supplierPo.supplier_email).toBe('orig@example.com');
+    expect(supplierPo.supplier_whatsapp_number).toBe('9111111111');
+    expect(supplierPo.supplier_city).toBe('Udaipur');
+    expect(supplierPo.supplier_state).toBe('Rajasthan');
+    expect(supplierPo.supplier_contact_person_phone).toBe('9222222222');
+    expect(supplierPo.supplier_contact_person_whatsapp).toBe('9333333333');
+    expect(supplierPo.supplier_type).toBe('Factory Owner');
   });
 
   it('editing the suppliers table does not change an existing Supplier PO', async () => {

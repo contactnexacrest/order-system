@@ -32,6 +32,7 @@ use App\Controllers\HolidayController;
 use App\Controllers\HsCodeController;
 use App\Controllers\ComplianceTaskTypeController;
 use App\Controllers\LogisticsPartnerController;
+use App\Controllers\SupplierController;
 use App\Controllers\PortController;
 use App\Controllers\PortRouteController;
 use App\Controllers\DropdownOptionController;
@@ -100,6 +101,7 @@ $complaints = new ComplaintController();
 $holidays = new HolidayController();
 $hsCodes = new HsCodeController();
 $logisticsPartners = new LogisticsPartnerController();
+$suppliersDirectory = new SupplierController();
 $ports = new PortController();
 $portRoutes = new PortRouteController();
 $dropdownOptions = new DropdownOptionController();
@@ -207,6 +209,16 @@ $router->get('/logistics-partners/{id}/edit', [$logisticsPartners, 'editForm'], 
 $router->post('/logistics-partners/{id}/update', [$logisticsPartners, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/toggle', [$logisticsPartners, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/delete', [$logisticsPartners, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+// Suppliers directory (docs/schema.sql Section BZ) — same shape as Logistics Partners.
+$router->get('/suppliers', [$suppliersDirectory, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers')]);
+$router->get('/suppliers/create', [$suppliersDirectory, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers')]);
+$router->post('/suppliers', [$suppliersDirectory, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+$router->get('/suppliers/{id}/edit', [$suppliersDirectory, 'editForm'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers')]);
+$router->post('/suppliers/{id}/update', [$suppliersDirectory, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+$router->post('/suppliers/{id}/toggle', [$suppliersDirectory, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+$router->post('/suppliers/{id}/delete', [$suppliersDirectory, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+$router->post('/suppliers/{id}/factory-addresses', [$suppliersDirectory, 'addFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+$router->post('/suppliers/{id}/factory-addresses/{addressId}/delete', [$suppliersDirectory, 'deleteFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 
 $router->get('/ports', [$ports, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_ports')]);
 $router->get('/ports/create', [$ports, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_ports')]);
@@ -493,7 +505,6 @@ $router->post('/orders/{id}/annexure/images/{imageId}/remove', [$annexure, 'remo
 // --- Phase C: Stages 4-9 ---
 $router->post('/orders/{id}/oc-acknowledgment', [$orders, 'recordOcAcknowledgment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/suppliers', [$orders, 'createSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/suppliers/{supplierId}/factory-addresses', [$orders, 'createSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/suppliers/factory-addresses/{addressId}/delete', [$orders, 'deleteSupplierFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);

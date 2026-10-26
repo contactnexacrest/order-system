@@ -1,0 +1,63 @@
+<div class="card page-wide">
+  <h1>Suppliers</h1>
+  <p class="muted">The directory of suppliers a Supplier PO is raised against. A supplier can hold more than one type (e.g. Quarry Owner and Factory Owner). Editing or deleting a supplier here never changes an order that has already saved its Supplier PO terms — the order keeps its own copy of the supplier's details.</p>
+
+  <div class="section">
+    <form method="get" action="/suppliers" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">
+      <label style="display:inline-block;width:auto;">Type
+        <select name="type" onchange="this.form.submit()">
+          <option value="">All types</option>
+          {% for type in supplierTypes %}
+            <option value="{{ type }}" {{ 'selected' if filterType == type else '' }}>{{ type }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label style="display:inline-block;width:auto;">Search
+        <input type="text" name="q" value="{{ search }}" placeholder="Supplier name">
+      </label>
+      <button type="submit" class="btn-sm btn-secondary">Search</button>
+      {% if filterType or search %}<a href="/suppliers" class="btn-sm btn-secondary">Clear</a>{% endif %}
+      <a href="/suppliers/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Supplier</a>
+    </form>
+
+    <table class="list">
+      <tr><th>Supplier</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr>
+      {% if not suppliers.length %}
+      <tr><td colspan="8" class="muted">{{ 'No suppliers match this filter.' if (filterType or search) else 'No suppliers yet — add the first one above.' }}</td></tr>
+      {% endif %}
+      {% for s in suppliers %}
+      {% set location = [s.city, s.state] | select | join(', ') %}
+      <tr>
+        <td>{{ s.supplier_legal_name }}{% if s.email %}<br><small class="muted">{{ s.email }}</small>{% endif %}</td>
+        <td>{{ s.types | join(', ') if s.types.length else '—' }}</td>
+        <td>{{ location or '—' }}</td>
+        <td>
+          {{ s.phone or '—' }}
+          {% if s.whatsapp_number %}<br><small class="muted">WhatsApp: {{ s.whatsapp_number }}</small>{% endif %}
+        </td>
+        <td>
+          {{ s.contact_person or '—' }}
+          {% if s.contact_person_phone %}<br><small class="muted">{{ s.contact_person_phone }}</small>{% endif %}
+        </td>
+        <td>{{ s.gstin or '—' }}</td>
+        <td><span class="badge {{ 'badge-active' if s.is_active else 'badge-inactive' }}">{{ 'Active' if s.is_active else 'Inactive' }}</span></td>
+        <td>
+          <a href="/suppliers/{{ s.id }}/edit" class="btn-sm btn-secondary">Edit</a>
+          <form method="post" action="/suppliers/{{ s.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if s.is_active else 'Reactivate' }} ' + {{ s.supplier_legal_name | dump }} + '?{{ ' It will no longer appear in the Supplier PO supplier list.' if s.is_active else '' }}');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm {{ 'btn-danger' if s.is_active else 'btn-success' }}">{{ 'Deactivate' if s.is_active else 'Reactivate' }}</button>
+          </form>
+          {% if s.id in usedIds %}
+            <small class="muted" title="Used on an order — deactivate it instead.">Used on orders</small>
+          {% else %}
+          <form method="post" action="/suppliers/{{ s.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete ' + {{ s.supplier_legal_name | dump }} + ' and its factory addresses from the directory? This cannot be undone.');">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-danger">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>

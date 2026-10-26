@@ -46,10 +46,17 @@ final class StandaloneSupplierPoSnapshotTest extends DbTestCase
             'pan' => 'PAN-ORIG',
             'contact_person' => 'Original Contact',
             'phone' => '9000000000',
-            'supplier_type' => 'Manufacturer',
+            'email' => 'orig@example.com',
+            'whatsapp_number' => '9111111111',
+            'city' => 'Udaipur',
+            'state' => 'Rajasthan',
+            'contact_person_phone' => '9222222222',
+            'contact_person_whatsapp' => '9333333333',
+            'types' => ['Quarry Owner', 'Factory Owner'],
         ]);
         $orderId = $this->createTestOrder($this->createTestClient());
-        OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-SNAP-1', $this->fullSupplierPoData());
+        // The supplier holds two types; the order records the one chosen for it.
+        OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-SNAP-1', $this->fullSupplierPoData(['supplier_type' => 'Factory Owner']));
 
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
 
@@ -59,7 +66,13 @@ final class StandaloneSupplierPoSnapshotTest extends DbTestCase
         self::assertSame('PAN-ORIG', $supplierPo['supplier_pan']);
         self::assertSame('Original Contact', $supplierPo['supplier_contact_person']);
         self::assertSame('9000000000', $supplierPo['supplier_phone']);
-        self::assertSame('Manufacturer', $supplierPo['supplier_type']);
+        self::assertSame('orig@example.com', $supplierPo['supplier_email']);
+        self::assertSame('9111111111', $supplierPo['supplier_whatsapp_number']);
+        self::assertSame('Udaipur', $supplierPo['supplier_city']);
+        self::assertSame('Rajasthan', $supplierPo['supplier_state']);
+        self::assertSame('9222222222', $supplierPo['supplier_contact_person_phone']);
+        self::assertSame('9333333333', $supplierPo['supplier_contact_person_whatsapp']);
+        self::assertSame('Factory Owner', $supplierPo['supplier_type']);
     }
 
     public function testEditingTheSuppliersTableDoesNotChangeAnExistingSupplierPo(): void

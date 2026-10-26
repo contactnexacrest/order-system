@@ -83,12 +83,12 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
 
     public function testCreateSupplierIsLogged(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
+        // Suppliers are now added in the Suppliers directory, not from the order page.
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
-        $_POST = ['supplier_legal_name' => 'N08 New Supplier'];
+        $_POST = ['supplier_legal_name' => 'N08 New Supplier', 'types' => ['Trader']];
 
         ob_start();
-        (new OrderController())->createSupplier(['id' => (string) $orderId]);
+        (new \App\Controllers\SupplierController())->create([]);
         ob_end_clean();
 
         self::assertSame('SUPPLIER_CREATED', $this->lastAuditLogAction()['action_type']);

@@ -163,6 +163,20 @@ async function resolveExportBenefitSchemes(page, orderId) {
   }
 }
 
+
+// Suppliers live in the Suppliers directory (manage_suppliers — Admin/MD/
+// ED), not an inline form on the order page; adding one lands on its
+// edit page with a success banner.
+async function addSupplierInDirectory(page, name, types) {
+  await page.goto('/suppliers/create');
+  await page.locator('input[name="supplier_legal_name"]').fill(name);
+  for (const type of types) {
+    await page.locator(`input[name="types[]"][value="${type}"]`).check();
+  }
+  await page.getByRole('button', { name: 'Add Supplier' }).click();
+  await expect(page.locator('.alert')).toContainText('added to the suppliers directory');
+}
+
 test('staff can create a CIF order and walk it through all 9 stage gates to completion', async ({ page }) => {
   // Every stage now generates and approves its own document before its
   // gate — well past the suite's 60s default.
@@ -269,11 +283,9 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   });
 
   await test.step('Stage 5 — Supplier PO: add supplier, save terms, generate doc, sign', async () => {
-    await openStage(page, 5);
-    const supplierForm = page.locator(`form[action="/orders/${orderId}/suppliers"]`);
-    await supplierForm.locator('input[name="supplier_legal_name"]').fill(`Smoke Test Quarry ${UNIQUE}`);
-    await supplierForm.getByRole('button', { name: /Add Supplier/i }).click();
-    await expect(page.locator('.alert')).toBeVisible();
+    // Two types, so the Supplier PO form asks which applies to this order.
+    await addSupplierInDirectory(page, `Smoke Test Quarry ${UNIQUE}`, ['Quarry Owner', 'Factory Owner']);
+    await page.goto(`/orders/${orderId}`);
 
     await openStage(page, 5);
     const spoForm = page.locator('form#supplier-po-form');
@@ -282,6 +294,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
       .first()
       .getAttribute('value');
     await spoForm.locator('select[name="supplier_id"]').selectOption(supplierValue);
+    await spoForm.locator('select[name="supplier_type"]').selectOption('Quarry Owner');
     await spoForm.locator('input[name="quantity"]').fill('100');
     await spoForm.locator('input[name="unit_price_inr"]').fill('450.00');
     await spoForm.getByRole('button', { name: 'Save Supplier PO Terms' }).click();

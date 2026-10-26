@@ -980,7 +980,6 @@ final class OrderController
             'shipping'  => OrderShippingRepository::find($orderId),
             'draftBlReviews' => OrderDraftBlReviewRepository::forOrder($orderId),
             'production' => OrderProductionRepository::find($orderId),
-            'supplierTypes' => LookupRepository::dropdownOptions('supplier_type'),
             'units' => LookupRepository::dropdownOptions('unit'),
             'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
             'gstRates' => LookupRepository::dropdownOptions('gst_rate'),
@@ -1856,8 +1855,19 @@ final class OrderController
             return;
         }
         $supplierId = (int) ($_POST['supplier_id'] ?? 0);
-        if (!$supplierId) {
-            Flash::set('error', 'Select or add a supplier first.');
+        $supplier = $supplierId ? SupplierRepository::find($supplierId) : null;
+        if (!$supplier || !$supplier['is_active']) {
+            Flash::set('error', 'Select an active supplier from the Suppliers directory first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // A supplier can hold several types; the Supplier PO records the ONE
+        // that applies to this order (picked automatically when it has one).
+        $supplierType = trim((string) ($_POST['supplier_type'] ?? ''));
+        if (count($supplier['types']) === 1) {
+            $supplierType = $supplier['types'][0];
+        } elseif ($supplier['types'] !== [] && !in_array($supplierType, $supplier['types'], true)) {
+            Flash::set('error', "Choose which of {$supplier['supplier_legal_name']}'s supplier types applies to this order.");
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -1871,6 +1881,7 @@ final class OrderController
         }
 
         OrderSupplierPoRepository::create($orderId, $supplierId, $supplierPoReference, [
+            'supplier_type'         => $supplierType !== '' ? $supplierType : null,
             'material_stone_type'   => trim((string) ($_POST['material_stone_type'] ?? '')) ?: null,
             'grade'                 => trim((string) ($_POST['grade'] ?? '')) ?: 'Grade A',
             'surface_finish'        => trim((string) ($_POST['surface_finish'] ?? '')) ?: null,
@@ -1899,39 +1910,11 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
-    public function createSupplier(array $params): void
-    {
-        $orderId = (int) $params['id'];
-        $name = trim((string) ($_POST['supplier_legal_name'] ?? ''));
-        if ($name === '') {
-            Flash::set('error', 'Supplier legal name is required.');
-            header("Location: /orders/{$orderId}");
-            return;
-        }
-        $supplierId = SupplierRepository::create([
-            'supplier_legal_name' => $name,
-            'address'             => trim((string) ($_POST['address'] ?? '')) ?: null,
-            'gstin'               => trim((string) ($_POST['gstin'] ?? '')) ?: null,
-            'pan'                 => trim((string) ($_POST['pan'] ?? '')) ?: null,
-            'contact_person'      => trim((string) ($_POST['contact_person'] ?? '')) ?: null,
-            'phone'               => trim((string) ($_POST['phone'] ?? '')) ?: null,
-            'supplier_type'       => trim((string) ($_POST['supplier_type'] ?? '')) ?: null,
-        ]);
-        if (TestModeService::isEnabled()) {
-            SupplierRepository::markTest($supplierId);
-        }
-        // External QA report N-08: this action never reached the audit
-        // log, so it never notified anyone either.
-        AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_CREATED', 'suppliers', $supplierId, null, null, $name);
-        Flash::set('success', "Supplier \"{$name}\" added.");
-        header("Location: /orders/{$orderId}");
-    }
-
     /**
      * User-reported batch item 12 — a supplier can have several factory/
-     * delivery addresses; added from the order page (suppliers have no
-     * dedicated admin screen of their own) the same way a new supplier
-     * itself is.
+     * delivery addresses. Also managed on the supplier's own page in the
+     * Suppliers directory; kept here as a quick add while preparing a
+     * Supplier PO.
      */
     public function createSupplierFactoryAddress(array $params): void
     {

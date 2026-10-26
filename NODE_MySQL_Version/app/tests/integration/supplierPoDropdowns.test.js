@@ -74,16 +74,15 @@ describe('Supplier PO dropdowns (90-item backlog #51a)', () => {
     }
   });
 
-  it('Supplier PO form renders clarified Supplier Type options', async () => {
-    const orderId = await createTestOrder(await createTestClient());
-    await unlockThroughStage4(orderId);
-
-    const res = await agent.get(`/orders/${orderId}`);
+  it('Supplier form renders clarified Supplier Type options', async () => {
+    // Supplier types are now picked on the Suppliers directory form
+    // (docs/schema.sql Section BZ), not an inline form on the order page.
+    const res = await agent.get('/suppliers/create');
     expect(res.status).toBe(200);
 
-    expect(res.text).toContain('>Factory Owner<');
-    expect(res.text).toContain('>Processor (Job-Work Basis)<');
-    expect(res.text).not.toContain('>Processor</option>');
+    expect(res.text).toContain('value="Factory Owner"');
+    expect(res.text).toContain('value="Processor (Job-Work Basis)"');
+    expect(res.text).not.toContain('value="Processor"');
   });
 
   it('Supplier PO form wires auto-calculation hooks', async () => {

@@ -79,6 +79,7 @@ const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const logisticsPartnerController = require('./controllers/logisticsPartnerController');
+const supplierController = require('./controllers/supplierController');
 const portController = require('./controllers/portController');
 const portRouteController = require('./controllers/portRouteController');
 const paymentPresetController = require('./controllers/paymentPresetController');
@@ -468,6 +469,16 @@ app.get('/logistics-partners/:id/edit', requireAuth, requirePermission('manage_l
 app.post('/logistics-partners/:id/update', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.update));
 app.post('/logistics-partners/:id/toggle', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.toggleActive));
 app.post('/logistics-partners/:id/delete', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.remove));
+// Suppliers directory (docs/schema.sql Section BZ) — same shape as Logistics Partners.
+app.get('/suppliers', requireAuth, requirePermission('manage_suppliers'), asyncHandler(supplierController.index));
+app.get('/suppliers/create', requireAuth, requirePermission('manage_suppliers'), asyncHandler(supplierController.createForm));
+app.post('/suppliers', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.create));
+app.get('/suppliers/:id/edit', requireAuth, requirePermission('manage_suppliers'), asyncHandler(supplierController.editForm));
+app.post('/suppliers/:id/update', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.update));
+app.post('/suppliers/:id/toggle', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.toggleActive));
+app.post('/suppliers/:id/delete', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.remove));
+app.post('/suppliers/:id/factory-addresses', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.addFactoryAddress));
+app.post('/suppliers/:id/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.deleteFactoryAddress));
 
 app.get('/ports', requireAuth, requirePermission('manage_ports'), asyncHandler(portController.index));
 app.get('/ports/create', requireAuth, requirePermission('manage_ports'), asyncHandler(portController.createForm));
@@ -727,7 +738,6 @@ app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePerm
 
 app.post('/orders/:id/oc-acknowledgment', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordOcAcknowledgment));
 
-app.post('/orders/:id/suppliers', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.createSupplier));
 app.post('/orders/:id/suppliers/:supplierId/factory-addresses', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.createSupplierFactoryAddress));
 app.post('/orders/:id/suppliers/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteSupplierFactoryAddress));
 app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
