@@ -96,6 +96,15 @@ async function uploadBuyerPo(req, order) {
     return { ok: false, message: 'The advance payment has already cleared, so self-service Buyer PO upload is now closed. Contact your NexaCrest representative if you need to submit an updated copy.' };
   }
 
+  // Owner request (2026-10-26): while Step 4 is still open the buyer gives
+  // their PO number with the signed copy, and Step 4 completes by itself —
+  // the same as staff attaching (4c) and confirming (4d).
+  const awaitingPo = await stageGateService.isUnlocked(orderId, 2);
+  const poRef = String((req.body && req.body.buyers_po_ref) || '').trim();
+  if (awaitingPo && poRef === '') {
+    return { ok: false, message: 'Please enter your Purchase Order number together with the signed copy.' };
+  }
+
   try {
     const fileId = await fileUploadService.handleUpload(
       req,
@@ -110,12 +119,41 @@ async function uploadBuyerPo(req, order) {
       'Buyer PO copy (client-uploaded)'
     );
     await orderBuyerPoDocumentRepository.attach(orderId, fileId);
-    await notificationRepository.notifyOrderTeam(orderId, 'buyer_po_uploaded_by_client', `The buyer uploaded their signed PO copy on order ${order.order_reference || `#${orderId}`} — check it and confirm the Buyer PO (Step 4c).`);
-    await auditLogRepository.log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', orderId, null, null, null, 'Buyer PO copy uploaded by the client via the client portal.');
-    return { ok: true, message: 'Your Buyer PO copy has been uploaded.' };
   } catch (e) {
     return { ok: false, message: e.message };
   }
+  await auditLogRepository.log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', orderId, null, null, poRef !== '' ? poRef : null, 'Buyer PO copy uploaded by the client.');
+  const reference = order.order_reference || `#${orderId}`;
+
+  if (awaitingPo && (await documentGenerationService.stageDocumentBlockedBy(orderId, 2)).length === 0) {
+    await orderRepository.setBuyersPoRef(orderId, poRef);
+    await stageGateService.passAndUnlockNext(orderId, 2, null);
+    await auditLogRepository.log(null, 'BUYER_PO_CONFIRMED_BY_CLIENT', 'orders', orderId, 'buyers_po_ref', null, poRef, 'The buyer uploaded their signed PO with its number — Step 4 completed.');
+    await notificationRepository.notifyOrderTeam(orderId, 'buyer_po_uploaded_by_client', `The buyer uploaded their signed PO (${poRef}) on order ${reference} — Step 4 is complete and Stage 3 (PI) is open.`);
+    return { ok: true, message: `Thank you — your signed Purchase Order (${poRef}) has been received. We'll be in touch with your Proforma Invoice.` };
+  }
+
+  await notificationRepository.notifyOrderTeam(orderId, 'buyer_po_uploaded_by_client', `The buyer uploaded their signed PO copy${poRef !== '' ? ` (${poRef})` : ''} on order ${reference} — check it and confirm the Buyer PO (Step 4d).`);
+  return { ok: true, message: 'Your Buyer PO copy has been uploaded.' };
+}
+
+/**
+ * Owner request (2026-10-26): the Buyer PO generated in Step 4a, once it is
+ * issued (approved, or sent while email is on) — what the buyer downloads
+ * from the Buyer Action Link to sign. Null until then.
+ */
+async function issuedBuyerPoDocument(orderId) {
+  const latest = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'BUYERPO');
+  if (!latest || !latest.pdf_file_id || (await documentGenerationService.stageDocumentBlockedBy(orderId, 2)).length > 0) {
+    return null;
+  }
+  const document = await documentRepository.find(latest.id);
+  if (!document || !['approved', 'sent'].includes(document.status)
+    || document.document_type_category !== 'customer_facing'
+    || Number(document.document_type_never_shown_to_buyer)) {
+    return null;
+  }
+  return document;
 }
 
 /**
@@ -184,4 +222,4 @@ async function reportAdvancePayment(req, order) {
   return { ok: true, message: 'Thank you — we have noted your advance payment details. Our team will verify this against our bank statement and update your order.' };
 }
 
-module.exports = { acknowledgeOc, uploadBuyerPo, reportAdvancePayment };
+module.exports = { acknowledgeOc, uploadBuyerPo, issuedBuyerPoDocument, reportAdvancePayment };

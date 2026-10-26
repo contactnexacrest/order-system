@@ -11,9 +11,9 @@ use App\Services\StageGateService;
 use App\Tests\Support\DbTestCase;
 
 /**
- * Owner decision (2026-10-25): Step 4 runs 4a Generate Buyer's PO -> 4b
+ * Owner decision (2026-10-25): Step 4 runs 4a Generate Buyer's PO -> (4b Buyer PO Action Link, 2026-10-26) -> 4c
  * Attach Buyer's PO Copy (staff upload, or the buyer's own portal/Buyer
- * Action Link upload) -> 4c Confirm Buyer's PO Received, which completes
+ * Action Link upload) -> 4d Confirm Buyer's PO Received, which completes
  * the step. The confirm gate already refused without a copy
  * (wet_signature_required_buyer_po, on by default), but the page used to
  * show Confirm (4b) before Attach (4c), walking staff into that error.
@@ -53,18 +53,18 @@ final class BuyerPoStepOrderTest extends DbTestCase
     {
         $output = $this->render($this->orderAtStage2());
 
-        $attach = strpos($output, 'id="step-4b-buyer-po-attach"');
-        $confirm = strpos($output, 'id="step-4c-buyer-po-confirm"');
+        $attach = strpos($output, 'id="step-4c-buyer-po-attach"');
+        $confirm = strpos($output, 'id="step-4d-buyer-po-confirm"');
         self::assertNotFalse($attach);
         self::assertNotFalse($confirm);
-        self::assertLessThan($confirm, $attach, '4b Attach must come before 4c Confirm');
+        self::assertLessThan($confirm, $attach, '4c Attach must come before 4d Confirm');
     }
 
     public function testConfirmAsksForTheCopyFirstWhenNoneIsAttached(): void
     {
         $output = $this->render($this->orderAtStage2());
 
-        self::assertStringContainsString("Attach the buyer's signed PO copy in Step 4b first", $output);
+        self::assertStringContainsString("Attach the buyer's signed PO copy in Step 4c first", $output);
         self::assertStringNotContainsString('Confirm Buyer PO Received</button>', $output);
     }
 

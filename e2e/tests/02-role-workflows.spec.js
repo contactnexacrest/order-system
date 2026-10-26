@@ -192,9 +192,9 @@ async function resolveComplianceChecklistIfNeeded(page, orderId) {
 // the walk goes card by card. Submits the one form posting to `action`
 // (its card must already be unlocked), filling `fields` first, and waits
 // for the real page reload.
-async function submitStepForm(page, stageNumber, action, fields, buttonName) {
+async function submitStepForm(page, stageNumber, action, fields, buttonName, scope = '') {
   await openStage(page, stageNumber);
-  const form = page.locator(`form[action="${action}"]`);
+  const form = page.locator(`${scope} form[action="${action}"]`.trim());
   for (const [name, value] of Object.entries(fields || {})) {
     await form.locator(`[name="${name}"]`).fill(value);
   }
@@ -367,7 +367,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await approveAsAdmin(page, orderId, 'OC', 'exportExecutive');
 
       // 6b: the buyer's action link; 6c: their acknowledgement.
-      await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /Generate Buyer Action Link/);
+      await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /(Generate|Regenerate) Buyer Action Link/, '#step-6b-buyer-action-link');
 
       await openStage(page, 4);
       const ackForm = page.locator(`form[action="/orders/${orderId}/oc-acknowledgment"]`);

@@ -176,6 +176,6 @@ describe('Order screen redesign (Point 2/4)', () => {
     // Steps 1, 2, 3, the LC card, 12, 19, Amendments, 14, 16-18.
     expect(counts.phaseCards).toBe(11);
     expect(counts.groups).toBe(9);
-    expect(counts.groupedCards).toBe(40);
+    expect(counts.groupedCards).toBe(41);
   });
 });

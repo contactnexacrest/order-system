@@ -1,22 +1,39 @@
+{# Owner request (2026-10-26): same look as the Quotation/PI details forms — a wide card, a summary bar and numbered sections. #}
 <div class="card">
   <h1>Purchase Order {{ supplierPo.supplier_po_reference }}</h1>
-  <p class="muted">From {{ companyName }} to {{ supplierPo.supplier_legal_name or 'you' }}</p>
+  <p class="muted">From {{ companyName }} to {{ supplierPo.supplier_legal_name or 'you' }}. No login needed.</p>
+  <div class="intake-summary">
+    <span>&#128196; PO {{ supplierPo.supplier_po_reference }}</span>
+    <span>{% if documents.length %}&#9989; Signed copy received{% else %}&#9203; Waiting for your signed copy{% endif %}</span>
+  </div>
 
-  <div class="section">
-    <h2>Signed PO / Acknowledgment</h2>
-    <p>Please upload the purchase order signed and stamped by you, or your written acknowledgment of it. You can upload more than one file.</p>
+  <fieldset class="intake-step action-step">
+    <legend><span class="intake-step-num">1</span> Signed PO / Acknowledgment
+      {% if documents.length %}<span class="action-status done">&#10003; Received</span>{% else %}<span class="action-status todo">Action needed</span>{% endif %}
+    </legend>
+    <ol class="action-howto">
+      <li><strong>Download</strong> the purchase order.</li>
+      <li><strong>Sign and stamp</strong> it (or write your acknowledgment).</li>
+      <li><strong>Upload</strong> it below — you can upload more than one file.</li>
+    </ol>
+    {% if issuedSupplierPo %}
+      <p><a class="btn btn-secondary" href="/supplier-action/{{ token }}/po-document">&#11015; Download Purchase Order ({{ issuedSupplierPo.document_reference }})</a></p>
+    {% endif %}
     {% if documents.length %}
-      <p class="small"><strong>Received so far:</strong></p>
-      <ul class="small">
+      <table class="list">
+        <tr><th>Received so far</th><th>Uploaded</th></tr>
         {% for d in documents %}
-          <li>{{ d.original_filename }} — {{ d.uploaded_at }}</li>
+          <tr><td>{{ d.original_filename }}</td><td>{{ d.uploaded_at }}</td></tr>
         {% endfor %}
-      </ul>
+      </table>
     {% endif %}
     <form method="post" action="/supplier-action/{{ token }}/acknowledgment" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Signed PO or acknowledgment <input type="file" name="document" required></label>
-      <button type="submit" class="btn-sm">Upload</button>
+      <div class="field-grid">
+        <label class="full">Signed PO or acknowledgment *<input type="file" name="document" required></label>
+      </div>
+      <button type="submit">Upload</button>
     </form>
-  </div>
+  </fieldset>
+  <p class="muted small">Questions about this purchase order? Reply to the email it came with.</p>
 </div>

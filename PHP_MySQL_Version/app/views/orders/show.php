@@ -529,9 +529,12 @@ foreach ($latestDocByCode as $__code => $__doc) {
 $subStepDone = [
     '4' => [
         '4a' => $docComplete('BUYERPO'),
-        // When the wet-signature setting makes the copy optional, it never locks 4c.
-        '4b' => $buyerPoCopyRequired ? !empty($buyerPoDocuments) : null,
-        '4c' => $hasBuyerPo,
+        // Owner request (2026-10-26): the Buyer PO Action Link is optional —
+        // done once sent, and never locks 4c (staff can always attach).
+        '4b' => !empty($order['buyer_action_token_hash']) ? true : null,
+        // When the wet-signature setting makes the copy optional, it never locks 4d.
+        '4c' => $buyerPoCopyRequired ? !empty($buyerPoDocuments) : null,
+        '4d' => $hasBuyerPo,
     ],
     '5' => [
         // Skipping the PI-stage form (client won't use it) completes both.
@@ -1626,6 +1629,40 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   </details>
 
 
+<?php
+// Owner request (2026-10-26): the Buyer Action Link is sent at Step 4b (the
+// buyer downloads the Buyer PO, uploads it signed with their PO number and
+// Step 4 completes) and again at 6b for the OC acknowledgement — one link,
+// rendered by this one widget in both places.
+$renderBuyerActionLink = function (string $badge, string $anchor) use ($order, $canManageOrders, $stepBadge): void {
+    // QA-5 L-24: buyer_action_token_plain is encrypted at rest
+    // (EncryptionService) — decrypt it here, the one place it's ever
+    // rendered back to staff.
+    $buyerActionTokenPlain = \App\Services\EncryptionService::decrypt($order['buyer_action_token_plain'] ?? null);
+    $buyerActionLinkValid = !empty($buyerActionTokenPlain) && !empty($order['buyer_action_token_expires_at']) && strtotime((string) $order['buyer_action_token_expires_at']) > time();
+    ?>
+    <?php if ($buyerActionLinkValid): ?>
+      <?php $buyerActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $buyerActionTokenPlain; ?>
+      <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
+        <span>Current link (valid until <?= htmlspecialchars(Dates::human($order['buyer_action_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" readonly value="<?= htmlspecialchars($buyerActionFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Buyer Action Link">
+          <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($buyerActionFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+        </div>
+      </div>
+    <?php else: ?>
+      <p class="muted small">No active link — generate one below.</p>
+    <?php endif; ?>
+    <?php if ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-action-link" style="display:inline">
+      <?= Csrf::field() ?>
+      <input type="hidden" name="return_to" value="<?= htmlspecialchars($anchor) ?>">
+      <?= $stepBadge($badge) ?><button type="submit" class="btn-sm"><?= $buyerActionLinkValid ? 'Regenerate Buyer Action Link' : 'Generate Buyer Action Link' ?></button>
+    </form>
+    <?php endif; ?>
+    <?php
+};
+?>
   <details class="step-group" id="step-group-stage-2"<?= $stepCardOpen('4') ?>>
     <summary><?= $stepStatusIcon($stepStates['4']) ?><span class="step-group-num">STEP 4</span><h3>Buyer's PO</h3></summary>
 
@@ -1644,6 +1681,21 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php endif; ?>
     </details>
 
+    <div class="step-group-connector">send the buyer their PO to sign</div>
+
+    <details class="step-card" id="step-4b-buyer-po-link"<?= $subCardOpen('4', '4b') ?>>
+      <summary><?= $stepStatusIcon($subStepStatus('4', '4b')) ?><h2>Step 4b &middot; Send Buyer PO Action Link <small class="muted">(optional)</small></h2></summary>
+      <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+        <p class="muted small">A no-login link for the buyer: they <strong>download the Buyer PO</strong> generated in 4a, sign it, and <strong>upload the signed copy with their PO number</strong> — Step 4 then completes by itself and you're notified. Emailed to the client when they have an email on file. If the buyer can't, attach and confirm it yourself in 4c/4d as before.</p>
+        <?php if (!$docComplete('BUYERPO')): ?>
+          <p class="review-banner warn">&#9888; The Buyer PO (4a) isn't approved<?= $mailSendingOn ? '/sent' : '' ?> yet — the buyer can't download it until it is.</p>
+        <?php endif; ?>
+        <?php $renderBuyerActionLink('4b', 'step-4b-buyer-po-link'); ?>
+      <?php else: ?>
+        <p class="muted">Generate the Quotation first to unlock this gate.</p>
+      <?php endif; ?>
+    </details>
+
     <div class="step-group-connector">once the buyer sends their signed PO back</div>
 
     <?php
@@ -1653,10 +1705,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       // default), so the old order (confirm first, attach after) walked
       // staff straight into that error.
     ?>
-    <details class="step-card" id="step-4b-buyer-po-attach"<?= $subCardOpen('4', '4b') ?>>
-      <summary><?= $stepStatusIcon($subStepStatus('4', '4b')) ?><h2>Step 4b &middot; Attach Buyer's PO Copy<?= $buyerPoCopyRequired ? '' : ' <small class="muted">(optional)</small>' ?></h2></summary>
+    <details class="step-card" id="step-4c-buyer-po-attach"<?= $subCardOpen('4', '4c') ?>>
+      <summary><?= $stepStatusIcon($subStepStatus('4', '4c')) ?><h2>Step 4c &middot; Attach Buyer's PO Copy<?= $buyerPoCopyRequired ? '' : ' <small class="muted">(optional)</small>' ?></h2></summary>
       <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
-        <p class="muted small">Upload the copy the buyer emailed you — or the buyer can upload it themselves from their client portal or the <a href="#step-6c-buyer-action-link">Buyer Action Link</a>; it then appears here.</p>
+        <p class="muted small">Upload the copy the buyer emailed you — or the buyer can upload it themselves through the <a href="#step-4b-buyer-po-link">Buyer Action Link (4b)</a> or their client portal; it then appears here.</p>
         <?php if (!empty($buyerPoDocuments)): ?>
           <table class="list" style="margin-top:8px">
             <tr><th>File</th><th>Uploaded</th><th>By</th><th></th></tr>
@@ -1673,7 +1725,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <?= Csrf::field() ?>
           <input type="file" name="document" required>
-          <?= $stepBadge('4b') ?><button type="submit" class="btn-sm"><?= empty($buyerPoDocuments) ? 'Attach Buyer PO Copy' : 'Attach Another Copy' ?></button>
+          <?= $stepBadge('4c') ?><button type="submit" class="btn-sm"><?= empty($buyerPoDocuments) ? 'Attach Buyer PO Copy' : 'Attach Another Copy' ?></button>
         </form>
       <?php else: ?>
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
@@ -1682,19 +1734,19 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
     <div class="step-group-connector">then confirm it to complete Step 4</div>
 
-    <details class="step-card" id="step-4c-buyer-po-confirm"<?= $subCardOpen('4', '4c') ?>>
-      <summary><?= $stepStatusIcon($subStepStatus('4', '4c')) ?><h2>Step 4c &middot; Confirm Buyer's PO Received</h2></summary>
+    <details class="step-card" id="step-4d-buyer-po-confirm"<?= $subCardOpen('4', '4d') ?>>
+      <summary><?= $stepStatusIcon($subStepStatus('4', '4d')) ?><h2>Step 4d &middot; Confirm Buyer's PO Received</h2></summary>
       <?php if ($hasBuyerPo): ?>
         <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
       <?php elseif (!$stage2 || $stage2['status'] === 'locked'): ?>
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
       <?php elseif ($buyerPoCopyRequired && empty($buyerPoDocuments)): ?>
-        <p class="muted">Attach the buyer's signed PO copy in Step 4b first &mdash; this step completes Step 4 and needs it on file.</p>
+        <p class="muted">Attach the buyer's signed PO copy in Step 4c first &mdash; this step completes Step 4 and needs it on file.</p>
       <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
           <?= Csrf::field() ?>
           <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-          <?= $stepBadge('4c') ?><button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+          <?= $stepBadge('4d') ?><button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
         </form>
       <?php endif; ?>
     </details>
@@ -1911,37 +1963,9 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <div class="step-group-connector">send the buyer their action link</div>
 
   <details class="step-card" id="step-6b-buyer-action-link"<?= $subCardOpen('6', '6b') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('6', '6b')) ?><h2>Step 6b &middot; Generate Buyer Action Link</h2></summary>
-    <?php
-      // 90-item backlog #75: a public, no-login link covering both this
-      // stage's OC acknowledgement and the client-portal Buyer PO upload
-      // — for a buyer who hasn't been provisioned a portal account yet
-      // (or doesn't want to log in just for these two actions).
-      // QA-5 L-24: buyer_action_token_plain is encrypted at rest
-      // (EncryptionService) — decrypt it here, the one place it's ever
-      // rendered back to staff.
-      $buyerActionTokenPlain = \App\Services\EncryptionService::decrypt($order['buyer_action_token_plain'] ?? null);
-      $buyerActionLinkValid = !empty($buyerActionTokenPlain) && !empty($order['buyer_action_token_expires_at']) && strtotime((string) $order['buyer_action_token_expires_at']) > time();
-    ?>
-    <p class="muted small">A direct link the buyer can use to acknowledge the Order Confirmation and/or upload their signed Buyer PO — without needing a client-portal account. Useful before portal access is provisioned (Stage 3 → 4), or for a buyer who'd rather not log in at all.</p>
-    <?php if ($buyerActionLinkValid): ?>
-      <?php $buyerActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $buyerActionTokenPlain; ?>
-      <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
-        <span>Current link (valid until <?= htmlspecialchars(Dates::human($order['buyer_action_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" readonly value="<?= htmlspecialchars($buyerActionFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
-          <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($buyerActionFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
-        </div>
-      </div>
-    <?php else: ?>
-      <p class="muted small">No active link — generate one below.</p>
-    <?php endif; ?>
-    <?php if ($canManageOrders): ?>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-action-link" style="display:inline">
-      <?= Csrf::field() ?>
-      <?= $stepBadge('6b') ?><button type="submit" class="btn-sm"><?= $buyerActionLinkValid ? 'Regenerate Buyer Action Link' : 'Generate Buyer Action Link' ?></button>
-    </form>
-    <?php endif; ?>
+    <summary><?= $stepStatusIcon($subStepStatus('6', '6b')) ?><h2>Step 6b &middot; Send Buyer Action Link (OC acknowledgement)</h2></summary>
+    <p class="muted small">The same Buyer Action Link the buyer used for their PO (Step 4b) also lets them acknowledge this Order Confirmation — send it again, or regenerate it if it has expired.</p>
+    <?php $renderBuyerActionLink('6b', 'step-6b-buyer-action-link'); ?>
   </details>
 
   <div class="step-group-connector">the buyer acknowledges (link or portal) — or staff record it</div>

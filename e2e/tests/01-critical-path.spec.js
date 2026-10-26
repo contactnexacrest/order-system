@@ -143,9 +143,9 @@ async function resolveComplianceChecklistIfNeeded(page, orderId) {
 // Owner rule (2026-10-26): every sub-step waits for the one before it, so
 // the walk below goes card by card. Submits the one form posting to
 // `action` (its card must already be unlocked), filling `fields` first.
-async function submitStepForm(page, stageNumber, action, fields, buttonName) {
+async function submitStepForm(page, stageNumber, action, fields, buttonName, scope = '') {
   await openStage(page, stageNumber);
-  const form = page.locator(`form[action="${action}"]`);
+  const form = page.locator(`${scope} form[action="${action}"]`.trim());
   for (const [name, value] of Object.entries(fields || {})) {
     await form.locator(`[name="${name}"]`).fill(value);
   }
@@ -267,21 +267,36 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await assignSelfAndApprove(page, 'QT');
   });
 
-  await test.step('Stage 2 — Buyer PO: generate + approve, wet-signature upload, then confirm receipt', async () => {
+  await test.step('Stage 2 — Buyer PO: generate + approve, then the buyer signs it through the Buyer PO Action Link (4b)', async () => {
     await generateDocument(page, orderId, 'BUYERPO', 'generated');
     await assignSelfAndApprove(page, 'BUYERPO');
 
+    // Owner request (2026-10-26): staff send the link (4b); the buyer
+    // downloads the Buyer PO, uploads it signed with their PO number, and
+    // Step 4 completes by itself — no staff attach/confirm needed.
+    await submitStepForm(page, 2, `/orders/${orderId}/buyer-action-link`, {}, /Generate Buyer Action Link/, '#step-4b-buyer-po-link');
     await openStage(page, 2);
-    const uploadForm = page.locator(`form[action="/orders/${orderId}/buyer-po/documents"]`);
-    await uploadForm.locator('input[type="file"]').setInputFiles(DUMMY_FILE);
-    await uploadForm.getByRole('button', { name: 'Attach Buyer PO Copy' }).click();
-    await expect(page.locator('.alert')).toBeVisible();
+    const link = await page.locator('#step-4b-buyer-po-link input[aria-label="Buyer Action Link"]').inputValue();
 
+    const buyer = await page.context().browser().newPage();
+    // Open the link's path on the server under test (APP_URL can differ locally).
+    await buyer.goto(new URL(page.url()).origin + new URL(link).pathname);
+    await expect(buyer.locator('h1')).toContainText('Your Order');
+    const [download] = await Promise.all([
+      buyer.waitForEvent('download'),
+      buyer.getByRole('link', { name: /Download Purchase Order/ }).click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/\.pdf$/i);
+    await buyer.locator('input[name="buyers_po_ref"]').fill(`PO-SMOKE-${UNIQUE}`);
+    await buyer.locator('form[action$="/buyer-po"] input[type="file"]').setInputFiles(DUMMY_FILE);
+    await buyer.getByRole('button', { name: 'Upload Signed PO' }).click();
+    await expect(buyer.locator('.alert')).toContainText(`(PO-SMOKE-${UNIQUE}) has been received`);
+    await expect(buyer.locator('.action-status.done').first()).toContainText('Received');
+    await buyer.close();
+
+    await page.reload();
     await openStage(page, 2);
-    const poForm = page.locator(`form[action="/orders/${orderId}/buyer-po"]`);
-    await poForm.locator('input[name="buyers_po_ref"]').fill(`PO-SMOKE-${UNIQUE}`);
-    await poForm.getByRole('button', { name: 'Confirm Buyer PO Received' }).click();
-    await expect(page.locator('.alert')).toBeVisible();
+    await expect(page.locator('#step-4d-buyer-po-confirm')).toContainText(`Buyer PO recorded: PO-SMOKE-${UNIQUE}`);
   });
 
   await test.step('Stage 3 — PI & Advance Payment: PI approved, record then clear', async () => {
@@ -309,7 +324,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await assignSelfAndApprove(page, 'OC');
 
     // 6b: send the buyer their action link; 6c: record their acknowledgement.
-    await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /Generate Buyer Action Link/);
+    await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /(Generate|Regenerate) Buyer Action Link/, '#step-6b-buyer-action-link');
 
     await openStage(page, 4);
     const ackForm = page.locator(`form[action="/orders/${orderId}/oc-acknowledgment"]`);

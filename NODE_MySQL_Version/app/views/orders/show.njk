@@ -251,11 +251,13 @@
    (it just follows its step). Cascade / current step / current sub-step
    logic lives in helpers/stepFlow.js. #}
 {% set piFormSkipped = order.pi_form_skipped_at %}
+{# Owner request (2026-10-26): 4b (Buyer PO Action Link) is optional — done once sent, never locks 4c. #}
 {% set subStepDone = {
   's4': {
     '4a': docComplete(documents, 'BUYERPO', mailSendingEnabled),
-    '4b': (buyerPoDocuments and buyerPoDocuments.length > 0) if buyerPoCopyRequired else 'optional',
-    '4c': hasBuyerPo
+    '4b': (true if order.buyer_action_token_hash else 'optional'),
+    '4c': (buyerPoDocuments and buyerPoDocuments.length > 0) if buyerPoCopyRequired else 'optional',
+    '4d': hasBuyerPo
   },
   's5': {
     '5a': piIntake or piFormSkipped,
@@ -1241,6 +1243,30 @@
   </details>
 
 
+{# Owner request (2026-10-26): the Buyer Action Link is sent at Step 4b (the
+   buyer downloads the Buyer PO, uploads it signed with their PO number and
+   Step 4 completes) and again at 6b for the OC acknowledgement — one link,
+   rendered by this one macro in both places. #}
+{% macro buyerActionLinkWidget(badge, anchor) %}
+      {% if buyerActionLinkValid %}
+        <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
+          <span>Current link (valid until {{ order.buyer_action_token_expires_at | humanDate }}) — copy and send however you like, no need to regenerate:</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" readonly value="{{ buyerActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Buyer Action Link">
+            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ buyerActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+          </div>
+        </div>
+      {% else %}
+        <p class="muted small">No active link — generate one below.</p>
+      {% endif %}
+      {% if canManageOrders %}
+      <form method="post" action="/orders/{{ order.id }}/buyer-action-link" style="display:inline">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="return_to" value="{{ anchor }}">
+        {{ stepBadge(badge) | safe }}<button type="submit" class="btn-sm">{{ 'Regenerate Buyer Action Link' if buyerActionLinkValid else 'Generate Buyer Action Link' }}</button>
+      </form>
+      {% endif %}
+{% endmacro %}
   <details class="step-group" id="step-group-stage-2"{{ stepCardOpen('s4') }}>
     <summary>{{ stepStatusIcon(stepStates['s4']) }}<span class="step-group-num">STEP 4</span><h3>Buyer's PO</h3></summary>
 
@@ -1257,6 +1283,21 @@
       {% endif %}
     </details>
 
+    <div class="step-group-connector">send the buyer their PO to sign</div>
+
+    <details class="step-card" id="step-4b-buyer-po-link"{{ flow.subCardOpen('s4', '4b') }}>
+      <summary>{{ stepStatusIcon(flow.subStepStatus('s4', '4b')) }}<h2>Step 4b &middot; Send Buyer PO Action Link <small class="muted">(optional)</small></h2></summary>
+      {% if stage2 and stage2.status != 'locked' %}
+        <p class="muted small">A no-login link for the buyer: they <strong>download the Buyer PO</strong> generated in 4a, sign it, and <strong>upload the signed copy with their PO number</strong> — Step 4 then completes by itself and you're notified. Emailed to the client when they have an email on file. If the buyer can't, attach and confirm it yourself in 4c/4d as before.</p>
+        {% if not docComplete(documents, 'BUYERPO', mailSendingEnabled) %}
+          <p class="review-banner warn">&#9888; The Buyer PO (4a) isn't approved{{ '/sent' if mailSendingEnabled else '' }} yet — the buyer can't download it until it is.</p>
+        {% endif %}
+        {{ buyerActionLinkWidget('4b', 'step-4b-buyer-po-link') }}
+      {% else %}
+        <p class="muted">Generate the Quotation first to unlock this gate.</p>
+      {% endif %}
+    </details>
+
     <div class="step-group-connector">once the buyer sends their signed PO back</div>
 
     {# Owner decision (2026-10-25): attach the buyer's signed PO copy BEFORE
@@ -1264,10 +1305,10 @@
        (wetSignatureGuardService.buyerPoBlocked(), on by default), so the
        old order (confirm first, attach after) walked staff straight into
        that error. #}
-    <details class="step-card" id="step-4b-buyer-po-attach"{{ flow.subCardOpen('s4', '4b') }}>
-      <summary>{{ stepStatusIcon(flow.subStepStatus('s4', '4b')) }}<h2>Step 4b &middot; Attach Buyer's PO Copy{% if not buyerPoCopyRequired %} <small class="muted">(optional)</small>{% endif %}</h2></summary>
+    <details class="step-card" id="step-4c-buyer-po-attach"{{ flow.subCardOpen('s4', '4c') }}>
+      <summary>{{ stepStatusIcon(flow.subStepStatus('s4', '4c')) }}<h2>Step 4c &middot; Attach Buyer's PO Copy{% if not buyerPoCopyRequired %} <small class="muted">(optional)</small>{% endif %}</h2></summary>
       {% if stage2 and stage2.status != 'locked' %}
-        <p class="muted small">Upload the copy the buyer emailed you — or the buyer can upload it themselves from their client portal or the <a href="#step-6c-buyer-action-link">Buyer Action Link</a>; it then appears here.</p>
+        <p class="muted small">Upload the copy the buyer emailed you — or the buyer can upload it themselves through the <a href="#step-4b-buyer-po-link">Buyer Action Link (4b)</a> or their client portal; it then appears here.</p>
         {% if buyerPoDocuments and buyerPoDocuments.length > 0 %}
           <table class="list" style="margin-top:8px">
             <tr><th>File</th><th>Uploaded</th><th>By</th><th></th></tr>
@@ -1284,7 +1325,7 @@
         <form method="post" action="/orders/{{ order.id }}/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="file" name="document" required>
-          {{ stepBadge('4b') | safe }}<button type="submit" class="btn-sm">{{ 'Attach Another Copy' if (buyerPoDocuments and buyerPoDocuments.length > 0) else 'Attach Buyer PO Copy' }}</button>
+          {{ stepBadge('4c') | safe }}<button type="submit" class="btn-sm">{{ 'Attach Another Copy' if (buyerPoDocuments and buyerPoDocuments.length > 0) else 'Attach Buyer PO Copy' }}</button>
         </form>
       {% else %}
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
@@ -1293,19 +1334,19 @@
 
     <div class="step-group-connector">then confirm it to complete Step 4</div>
 
-    <details class="step-card" id="step-4c-buyer-po-confirm"{{ flow.subCardOpen('s4', '4c') }}>
-      <summary>{{ stepStatusIcon(flow.subStepStatus('s4', '4c')) }}<h2>Step 4c &middot; Confirm Buyer's PO Received</h2></summary>
+    <details class="step-card" id="step-4d-buyer-po-confirm"{{ flow.subCardOpen('s4', '4d') }}>
+      <summary>{{ stepStatusIcon(flow.subStepStatus('s4', '4d')) }}<h2>Step 4d &middot; Confirm Buyer's PO Received</h2></summary>
       {% if hasBuyerPo %}
         <p>Buyer PO recorded: <strong>{{ order.buyers_po_ref }}</strong></p>
       {% elif not (stage2 and stage2.status != 'locked') %}
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
       {% elif buyerPoCopyRequired and not (buyerPoDocuments and buyerPoDocuments.length > 0) %}
-        <p class="muted">Attach the buyer's signed PO copy in Step 4b first &mdash; this step completes Step 4 and needs it on file.</p>
+        <p class="muted">Attach the buyer's signed PO copy in Step 4c first &mdash; this step completes Step 4 and needs it on file.</p>
       {% else %}
         <form method="post" action="/orders/{{ order.id }}/buyer-po">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-          {{ stepBadge('4c') | safe }}<button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+          {{ stepBadge('4d') | safe }}<button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
         </form>
       {% endif %}
     </details>
@@ -1519,25 +1560,9 @@
   <div class="step-group-connector">send the buyer their action link</div>
 
   <details class="step-card" id="step-6b-buyer-action-link"{{ flow.subCardOpen('s6', '6b') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s6', '6b')) }}<h2>Step 6b &middot; Generate Buyer Action Link</h2></summary>
-      <p class="muted small">A direct link the buyer can use to acknowledge the Order Confirmation and/or upload their signed Buyer PO — without needing a client-portal account. Useful before portal access is provisioned (Stage 3 → 4), or for a buyer who'd rather not log in at all.</p>
-      {% if buyerActionLinkValid %}
-        <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
-          <span>Current link (valid until {{ order.buyer_action_token_expires_at | humanDate }}) — copy and send however you like, no need to regenerate:</span>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input type="text" readonly value="{{ buyerActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
-            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ buyerActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
-          </div>
-        </div>
-      {% else %}
-        <p class="muted small">No active link — generate one below.</p>
-      {% endif %}
-      {% if canManageOrders %}
-      <form method="post" action="/orders/{{ order.id }}/buyer-action-link" style="display:inline">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge('6b') | safe }}<button type="submit" class="btn-sm">{{ 'Regenerate Buyer Action Link' if buyerActionLinkValid else 'Generate Buyer Action Link' }}</button>
-      </form>
-      {% endif %}
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s6', '6b')) }}<h2>Step 6b &middot; Send Buyer Action Link (OC acknowledgement)</h2></summary>
+      <p class="muted small">The same Buyer Action Link the buyer used for their PO (Step 4b) also lets them acknowledge this Order Confirmation — send it again, or regenerate it if it has expired.</p>
+      {{ buyerActionLinkWidget('6b', 'step-6b-buyer-action-link') }}
   </details>
 
   <div class="step-group-connector">the buyer acknowledges (link or portal) — or staff record it</div>

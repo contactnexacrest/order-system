@@ -97,7 +97,7 @@ final class StepBadgeTest extends DbTestCase
 
         $badgeStage = [
             '1a' => 1,
-            '4a' => 2, '4b' => 2, '4c' => 2,
+            '4a' => 2, '4b' => 2, '4c' => 2, '4d' => 2,
             '5c' => 3, '5d' => 3, '5e' => 3,
             '6a' => 4, '6c' => 4,
             '7a' => 5, '7b' => 5, '7c' => 5, '7d' => 5, '7e' => 5,

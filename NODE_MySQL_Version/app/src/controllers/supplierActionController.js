@@ -9,6 +9,8 @@ const orderRepository = require('../repositories/orderRepository');
 const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const fileUploadService = require('../services/fileUploadService');
+const documentRepository = require('../repositories/documentRepository');
+const { sendStoredFile } = require('../helpers/sendStoredFile');
 
 /**
  * Port of App\Controllers\SupplierActionController. Owner request
@@ -18,8 +20,9 @@ const fileUploadService = require('../services/fileUploadService');
  * per-PO token (orderSupplierPoRepository.generateActionToken()/
  * findByValidActionToken()).
  *
- * Deliberately shows nothing about the buyer, prices or other documents:
- * just whose PO it is, what has been received so far, and the upload.
+ * Deliberately shows nothing about the buyer or any other document: just
+ * whose PO it is, a download of that Supplier PO once issued, what has
+ * been received so far, and the upload.
  */
 async function poOrExpired(res, token) {
   const supplierPo = await orderSupplierPoRepository.findByValidActionToken(token || '');
@@ -36,6 +39,8 @@ async function show(req, res) {
     return;
   }
   res.renderView('supplier_action/show', {
+    wrapClass: 'intake-wrap',
+    issuedSupplierPo: await issuedSupplierPoDocument(supplierPo.order_id),
     token: req.params.token,
     supplierPo,
     companyName: (await companySettingsRepository.get('legal_name')) || 'NexaCrest',
@@ -74,4 +79,25 @@ async function uploadAcknowledgment(req, res) {
   res.redirect(`/supplier-action/${token}`);
 }
 
-module.exports = { show, uploadAcknowledgment };
+/**
+ * Owner request (2026-10-26): the supplier downloads the Supplier PO
+ * (generated in Step 7b) from the link to sign it — only once issued.
+ */
+async function issuedSupplierPoDocument(orderId) {
+  const latest = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'SUPPO');
+  if (!latest || !latest.pdf_file_id || !['approved', 'sent'].includes(latest.status)) {
+    return null;
+  }
+  return latest;
+}
+
+async function downloadSupplierPo(req, res) {
+  const supplierPo = await poOrExpired(res, req.params.token);
+  if (!supplierPo) {
+    return;
+  }
+  const document = await issuedSupplierPoDocument(supplierPo.order_id);
+  await sendStoredFile(res, document ? document.pdf_file_id : null);
+}
+
+module.exports = { show, uploadAcknowledgment, downloadSupplierPo };

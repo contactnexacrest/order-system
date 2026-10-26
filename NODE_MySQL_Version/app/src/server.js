@@ -446,9 +446,11 @@ app.post('/pi-details/:token', verifyCsrf, asyncHandler(piIntakeController.submi
 // docblock and docs/schema.sql Section BG.
 // Owner request (2026-10-26, t4): no-login Supplier Action Link (Step 7c).
 app.get('/supplier-action/:token', asyncHandler(supplierActionController.show));
+app.get('/supplier-action/:token/po-document', asyncHandler(supplierActionController.downloadSupplierPo));
 app.post('/supplier-action/:token/acknowledgment', uploadLarge.single('document'), verifyCsrf, asyncHandler(supplierActionController.uploadAcknowledgment));
 app.get('/buyer-action/:token', asyncHandler(buyerActionController.show));
 app.post('/buyer-action/:token/acknowledge-oc', verifyCsrf, asyncHandler(buyerActionController.acknowledgeOc));
+app.get('/buyer-action/:token/buyer-po-document', asyncHandler(buyerActionController.downloadBuyerPo));
 app.post('/buyer-action/:token/buyer-po', uploadLarge.single('document'), verifyCsrf, asyncHandler(buyerActionController.uploadBuyerPo));
 app.post('/buyer-action/:token/report-payment', uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(buyerActionController.reportPayment));
 

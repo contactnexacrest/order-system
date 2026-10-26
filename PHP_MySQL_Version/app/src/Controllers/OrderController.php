@@ -1199,7 +1199,7 @@ final class OrderController
                 ['{order_reference}' => $order['order_reference'], '{buyer_action_link}' => $link],
                 'NexaCrest — acknowledge your order / upload your Buyer PO',
                 "Hello,\n\n"
-                    . "To acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order {order_reference}, please visit:\n{buyer_action_link}\n\n"
+                    . "For order {order_reference}, please use this link to download your Purchase Order, upload the signed copy with your PO number, and acknowledge your Order Confirmation once you receive it:\n{buyer_action_link}\n\n"
                     . "This link works for 90 days.\n\n"
                     . "NexaCrest International Private Limited"
             );
@@ -1208,7 +1208,9 @@ final class OrderController
 
         AuditLogRepository::log((int) $user['id'], 'BUYER_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Buyer Action link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
         Flash::set('success', "Buyer Action link" . (!empty($order['client_email']) ? " emailed to {$order['client_email']}" : ' generated') . ": {$link}");
-        header("Location: /orders/{$orderId}");
+        // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card.
+        $returnTo = preg_match('/^step-[a-z0-9-]+$/', (string) ($_POST['return_to'] ?? '')) ? '#' . $_POST['return_to'] : '';
+        header("Location: /orders/{$orderId}{$returnTo}");
     }
 
     /**

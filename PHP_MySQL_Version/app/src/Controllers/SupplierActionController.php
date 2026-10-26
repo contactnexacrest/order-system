@@ -21,8 +21,9 @@ use App\Services\FileUploadService;
  * Authorization is the per-PO token
  * (OrderSupplierPoRepository::generateActionToken()/findByValidActionToken()).
  *
- * Deliberately shows nothing about the buyer, prices or other documents:
- * just whose PO it is, what has been received so far, and the upload.
+ * Deliberately shows nothing about the buyer or any other document: just
+ * whose PO it is, a download of that Supplier PO once issued, what has
+ * been received so far, and the upload.
  */
 final class SupplierActionController
 {
@@ -44,6 +45,8 @@ final class SupplierActionController
             return;
         }
         View::render('supplier_action/show', [
+            'wrapClass' => 'intake-wrap',
+            'issuedSupplierPo' => self::issuedSupplierPoDocument((int) $supplierPo['order_id']),
             'token' => $token,
             'supplierPo' => $supplierPo,
             'companyName' => CompanySettingsRepository::get('legal_name') ?: 'NexaCrest',
@@ -80,5 +83,28 @@ final class SupplierActionController
             Flash::set('error', $e->getMessage());
         }
         header("Location: /supplier-action/{$token}");
+    }
+
+    /**
+     * Owner request (2026-10-26): the supplier downloads the Supplier PO
+     * (generated in Step 7b) from the link to sign it — only once issued.
+     */
+    private static function issuedSupplierPoDocument(int $orderId): ?array
+    {
+        $latest = \App\Repositories\DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'SUPPO');
+        if (!$latest || empty($latest['pdf_file_id']) || !in_array($latest['status'], ['approved', 'sent'], true)) {
+            return null;
+        }
+        return $latest;
+    }
+
+    public function downloadSupplierPo(array $params): void
+    {
+        $supplierPo = $this->poOrExpired((string) ($params['token'] ?? ''));
+        if (!$supplierPo) {
+            return;
+        }
+        $document = self::issuedSupplierPoDocument((int) $supplierPo['order_id']);
+        \App\Helpers\StoredFileDownload::send($document ? (int) $document['pdf_file_id'] : null);
     }
 }

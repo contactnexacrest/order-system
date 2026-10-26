@@ -144,6 +144,17 @@ fieldset.intake-step{padding-top:1.25rem;}
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 1.25rem;}
 .field-grid label.full{grid-column:1 / -1;}
 .field-grid label{margin-bottom:0.9rem;}
+/* Owner request (2026-10-26): Buyer/Supplier Action Link pages — same look as the intake forms. */
+.action-step legend{flex-wrap:wrap;}
+.action-status{margin-left:0.4rem;font-size:0.72rem;font-weight:700;padding:0.15rem 0.6rem;border-radius:999px;background:var(--navy-soft);color:var(--navy);}
+.action-status.done{background:var(--success-soft);color:var(--success);}
+.action-status.todo{background:var(--gold-soft);color:var(--gold-strong);}
+.action-howto{margin:0 0 1rem;padding-left:1.25rem;line-height:1.9;}
+.action-kv{display:grid;grid-template-columns:1fr 1fr;gap:0.6rem 1.25rem;margin:0.5rem 0 1rem;}
+.action-kv div{display:flex;flex-direction:column;background:var(--panel-tint);border-radius:10px;padding:0.55rem 0.8rem;}
+.action-kv .k{font-size:0.75rem;color:var(--ink-soft);}
+.action-kv .v{font-weight:600;}
+@media (max-width:640px){.action-kv{grid-template-columns:1fr;}}
 .intake-note{background:var(--gold-soft);border:1px solid var(--gold);border-radius:10px;padding:0.75rem 1rem;font-size:0.82rem;color:var(--gold-strong);margin-bottom:1.25rem;}
 @media (max-width:640px){.field-grid{grid-template-columns:1fr;} .intake-wrap{max-width:552px;padding:1.75rem 1rem 1.5rem;}}
 .bare-brand{display:flex;align-items:center;justify-content:center;gap:10px;font-size:1.2rem;font-weight:700;letter-spacing:-0.01em;color:var(--navy);margin-bottom:1.25rem;}

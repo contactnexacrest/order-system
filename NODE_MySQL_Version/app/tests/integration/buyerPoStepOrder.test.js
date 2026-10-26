@@ -10,8 +10,8 @@ const { createTestClient, createTestOrder, createTestFile } = require('../suppor
 
 /**
  * Port of BuyerPoStepOrderTest.php. Owner decision (2026-10-25): Step 4
- * runs 4a Generate Buyer's PO -> 4b Attach Buyer's PO Copy (staff upload,
- * or the buyer's own portal/Buyer Action Link upload) -> 4c Confirm
+ * runs 4a Generate Buyer's PO -> (4b Buyer PO Action Link, 2026-10-26) -> 4c Attach Buyer's PO Copy (staff upload,
+ * or the buyer's own portal/Buyer Action Link upload) -> 4d Confirm
  * Buyer's PO Received, which completes the step. The confirm gate already
  * refused without a copy (wet_signature_required_buyer_po, on by default),
  * but the page used to show Confirm (4b) before Attach (4c), walking staff
@@ -38,11 +38,11 @@ describe('Step 4 Buyer PO sub-step order', () => {
     await db.pool.end();
   });
 
-  it('shows Attach Copy (4b) before Confirm Received (4c)', async () => {
+  it('shows Attach Copy (4c) before Confirm Received (4d)', async () => {
     const res = await agent.get(`/orders/${await orderAtStage2()}`);
 
-    const attach = res.text.indexOf('id="step-4b-buyer-po-attach"');
-    const confirm = res.text.indexOf('id="step-4c-buyer-po-confirm"');
+    const attach = res.text.indexOf('id="step-4c-buyer-po-attach"');
+    const confirm = res.text.indexOf('id="step-4d-buyer-po-confirm"');
     expect(attach).toBeGreaterThan(-1);
     expect(confirm).toBeGreaterThan(attach);
   });
@@ -50,7 +50,7 @@ describe('Step 4 Buyer PO sub-step order', () => {
   it('asks for the copy first when none is attached', async () => {
     const res = await agent.get(`/orders/${await orderAtStage2()}`);
 
-    expect(res.text).toContain("Attach the buyer's signed PO copy in Step 4b first");
+    expect(res.text).toContain("Attach the buyer's signed PO copy in Step 4c first");
     expect(res.text).not.toContain('Confirm Buyer PO Received</button>');
   });
 

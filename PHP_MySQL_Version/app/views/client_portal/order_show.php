@@ -71,6 +71,7 @@
     <?php else: ?>
       <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/buyer-po" enctype="multipart/form-data">
         <?= Csrf::field() ?>
+        <label>Your PO Number <small class="muted">(needed with your first signed copy)</small><input type="text" name="buyers_po_ref" placeholder="e.g., PO-2026-0142"></label>
         <label>Upload Buyer PO (signed) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
         <button type="submit" class="btn-sm">Upload</button>
       </form>

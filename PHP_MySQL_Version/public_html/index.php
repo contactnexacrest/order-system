@@ -165,9 +165,11 @@ $router->post('/pi-details/{token}', [$piIntake, 'submit'], [CsrfCheck::verify()
 // docblock and docs/schema.sql Section BG.
 // Owner request (2026-10-26, t4): no-login Supplier Action Link (Step 7c).
 $router->get('/supplier-action/{token}', [$supplierAction, 'show']);
+$router->get('/supplier-action/{token}/po-document', [$supplierAction, 'downloadSupplierPo']);
 $router->post('/supplier-action/{token}/acknowledgment', [$supplierAction, 'uploadAcknowledgment'], [CsrfCheck::verify()]);
 $router->get('/buyer-action/{token}', [$buyerAction, 'show']);
 $router->post('/buyer-action/{token}/acknowledge-oc', [$buyerAction, 'acknowledgeOc'], [CsrfCheck::verify()]);
+$router->get('/buyer-action/{token}/buyer-po-document', [$buyerAction, 'downloadBuyerPo']);
 $router->post('/buyer-action/{token}/buyer-po', [$buyerAction, 'uploadBuyerPo'], [CsrfCheck::verify()]);
 $router->post('/buyer-action/{token}/report-payment', [$buyerAction, 'reportPayment'], [CsrfCheck::verify()]);
 

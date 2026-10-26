@@ -135,7 +135,7 @@ final class BuyerActionLinkTest extends DbTestCase
         $html = (string) ob_get_clean();
 
         self::assertStringContainsString('Your Acknowledgement Needed', $html);
-        self::assertStringContainsString('Buyer PO', $html);
+        self::assertStringContainsString('Your Purchase Order', $html);
     }
 
     public function testShowOmitsOcAckBannerWhenNothingIsPending(): void
@@ -148,7 +148,7 @@ final class BuyerActionLinkTest extends DbTestCase
         $html = (string) ob_get_clean();
 
         self::assertStringNotContainsString('Your Acknowledgement Needed', $html);
-        self::assertStringContainsString('Buyer PO', $html);
+        self::assertStringContainsString('Your Purchase Order', $html);
     }
 
     /**
@@ -270,6 +270,52 @@ final class BuyerActionLinkTest extends DbTestCase
         $flash = Flash::pull();
         self::assertSame('error', $flash[0]['type']);
         self::assertStringContainsString('No file was uploaded', $flash[0]['message']);
+    }
+
+    // ---------------------------------------------------------------
+    // Owner request (2026-10-26): Step 4b Buyer PO Action Link
+    // ---------------------------------------------------------------
+
+    public function testWhileStep4IsOpenTheBuyerMustGiveTheirPoNumber(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        StageGateService::passAndUnlockNext($orderId, 1, null);
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+
+        $_POST = ['buyers_po_ref' => ''];
+        (new BuyerActionController())->uploadBuyerPo(['token' => $token]);
+
+        $flash = Flash::pull();
+        self::assertSame('error', $flash[0]['type']);
+        self::assertStringContainsString('Purchase Order number', $flash[0]['message']);
+    }
+
+    public function testTheBuyerCanDownloadTheBuyerPoOnlyOnceItIsIssued(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        StageGateService::passAndUnlockNext($orderId, 1, null);
+        $fileId = $this->createTestFile($orderId);
+        $documentId = $this->createTestDocument($orderId, 'BUYERPO', 'in_review', $fileId);
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+
+        self::assertNull(\App\Services\BuyerActionService::issuedBuyerPoDocument($orderId), 'not downloadable while still in review');
+        ob_start();
+        (new BuyerActionController())->show(['token' => $token]);
+        $html = (string) ob_get_clean();
+        self::assertStringNotContainsString('/buyer-po-document', $html);
+        self::assertStringContainsString('name="buyers_po_ref"', $html, 'the buyer is asked for their PO number with the signed copy');
+
+        \App\Config\Database::connection()->prepare("UPDATE documents SET status = 'approved' WHERE id = :id")->execute(['id' => $documentId]);
+        $issued = \App\Services\BuyerActionService::issuedBuyerPoDocument($orderId);
+        if (\App\Services\EmailDispatchService::mailSendingEnabled()) {
+            self::assertNull($issued, 'with email on, the Buyer PO counts as issued only once sent');
+            \App\Config\Database::connection()->prepare("UPDATE documents SET status = 'sent' WHERE id = :id")->execute(['id' => $documentId]);
+            $issued = \App\Services\BuyerActionService::issuedBuyerPoDocument($orderId);
+        }
+        self::assertSame($documentId, (int) $issued['id']);
+        ob_start();
+        (new BuyerActionController())->show(['token' => $token]);
+        self::assertStringContainsString('/buyer-action/' . $token . '/buyer-po-document', (string) ob_get_clean());
     }
 
     public function testUploadBuyerPoWithAnInvalidTokenIsRefused(): void

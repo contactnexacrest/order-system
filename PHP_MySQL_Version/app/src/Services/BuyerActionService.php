@@ -116,6 +116,15 @@ final class BuyerActionService
             return ['ok' => false, 'message' => 'The advance payment has already cleared, so self-service Buyer PO upload is now closed. Contact your NexaCrest representative if you need to submit an updated copy.'];
         }
 
+        // Owner request (2026-10-26): while Step 4 is still open the buyer
+        // gives their PO number with the signed copy, and Step 4 completes
+        // by itself — the same as staff attaching (4c) and confirming (4d).
+        $awaitingPo = StageGateService::isUnlocked($orderId, 2);
+        $poRef = trim((string) ($_POST['buyers_po_ref'] ?? ''));
+        if ($awaitingPo && $poRef === '') {
+            return ['ok' => false, 'message' => 'Please enter your Purchase Order number together with the signed copy.'];
+        }
+
         try {
             $fileId = FileUploadService::handleUpload(
                 'document',
@@ -129,12 +138,42 @@ final class BuyerActionService
                 'Buyer PO copy (client-uploaded)'
             );
             OrderBuyerPoDocumentRepository::attach($orderId, $fileId);
-            NotificationRepository::notifyOrderTeam($orderId, 'buyer_po_uploaded_by_client', 'The buyer uploaded their signed PO copy on order ' . ($order['order_reference'] ?? "#{$orderId}") . ' — check it and confirm the Buyer PO (Step 4c).');
-            AuditLogRepository::log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', $orderId, null, null, null, 'Buyer PO copy uploaded by the client via the client portal.');
-            return ['ok' => true, 'message' => 'Your Buyer PO copy has been uploaded.'];
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         }
+        AuditLogRepository::log(null, 'BUYER_PO_UPLOADED_BY_CLIENT', 'orders', $orderId, null, null, $poRef !== '' ? $poRef : null, 'Buyer PO copy uploaded by the client.');
+        $reference = $order['order_reference'] ?? "#{$orderId}";
+
+        if ($awaitingPo && DocumentGenerationService::stageDocumentBlockedBy($orderId, 2) === []) {
+            OrderRepository::setBuyersPoRef($orderId, $poRef);
+            StageGateService::passAndUnlockNext($orderId, 2, null);
+            AuditLogRepository::log(null, 'BUYER_PO_CONFIRMED_BY_CLIENT', 'orders', $orderId, 'buyers_po_ref', null, $poRef, 'The buyer uploaded their signed PO with its number — Step 4 completed.');
+            NotificationRepository::notifyOrderTeam($orderId, 'buyer_po_uploaded_by_client', "The buyer uploaded their signed PO ({$poRef}) on order {$reference} — Step 4 is complete and Stage 3 (PI) is open.");
+            return ['ok' => true, 'message' => "Thank you — your signed Purchase Order ({$poRef}) has been received. We'll be in touch with your Proforma Invoice."];
+        }
+
+        NotificationRepository::notifyOrderTeam($orderId, 'buyer_po_uploaded_by_client', "The buyer uploaded their signed PO copy" . ($poRef !== '' ? " ({$poRef})" : '') . " on order {$reference} — check it and confirm the Buyer PO (Step 4d).");
+        return ['ok' => true, 'message' => 'Your Buyer PO copy has been uploaded.'];
+    }
+
+    /**
+     * Owner request (2026-10-26): the Buyer PO generated in Step 4a, once
+     * it is issued (approved, or sent while email is on) — what the buyer
+     * downloads from the Buyer Action Link to sign. Null until then.
+     */
+    public static function issuedBuyerPoDocument(int $orderId): ?array
+    {
+        $latest = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'BUYERPO');
+        if (!$latest || empty($latest['pdf_file_id']) || DocumentGenerationService::stageDocumentBlockedBy($orderId, 2) !== []) {
+            return null;
+        }
+        $document = DocumentRepository::find((int) $latest['id']);
+        if (!$document || !in_array($document['status'], ['approved', 'sent'], true)
+            || $document['document_type_category'] !== 'customer_facing'
+            || !empty($document['document_type_never_shown_to_buyer'])) {
+            return null;
+        }
+        return $document;
     }
 
     /**

@@ -83,7 +83,11 @@ final class BuyerActionController
             }
         }
 
+        $buyerPoStage = \App\Repositories\OrderStageRepository::findByOrderAndStageNumber($orderId, 2);
         View::render('buyer_action/show', [
+            'wrapClass' => 'intake-wrap',
+            'issuedBuyerPo' => BuyerActionService::issuedBuyerPoDocument($orderId),
+            'buyerPoConfirmed' => $buyerPoStage !== null && $buyerPoStage['status'] === 'gate_passed',
             'token' => $params['token'],
             'order' => $order,
             'products' => OrderProductRepository::forOrder($orderId),
@@ -131,5 +135,19 @@ final class BuyerActionController
         $result = BuyerActionService::reportAdvancePayment($order);
         Flash::set($result['ok'] ? 'success' : 'error', $result['message']);
         header("Location: /buyer-action/{$token}");
+    }
+
+    /**
+     * Owner request (2026-10-26): the buyer downloads the Buyer PO from the
+     * link to sign it — only once it is issued, and only that document.
+     */
+    public function downloadBuyerPo(array $params): void
+    {
+        $order = $this->orderOrExpired((string) ($params['token'] ?? ''));
+        if (!$order) {
+            return;
+        }
+        $document = BuyerActionService::issuedBuyerPoDocument((int) $order['id']);
+        \App\Helpers\StoredFileDownload::send($document ? (int) $document['pdf_file_id'] : null);
     }
 }

@@ -95,9 +95,11 @@ order:
      Link) where the supplier uploads their signed PO / acknowledgment
      themselves. It's emailed to the supplier when the PO has their email,
      and shown on the card with **Copy Link** to send any other way. It
-     works for 60 days; regenerating it cancels the old one. The page shows
-     the supplier only the PO reference and what has been received — no
-     prices, no buyer. The order's team is notified when they upload, and
+     works for 60 days; regenerating it cancels the old one. The page (laid
+     out like the Quotation details form) shows the supplier only their PO
+     reference, a **Download Purchase Order** button once the Supplier PO
+     is approved/sent, and what has been received — nothing about the
+     buyer. The order's team is notified when they upload, and
      the file lands in the order's `07-supplier-po/received/` folder.
    - **Skip — supplier did not acknowledge** — record why (reason of at
      least 10 characters, audit-logged). This completes 7c and opens 7d

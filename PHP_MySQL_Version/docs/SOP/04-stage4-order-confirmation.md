@@ -32,8 +32,9 @@ see [Document Review & Approval](./13-document-review-approval.md) for that
 full workflow. Generating or even approving the OC does **not** pass Stage
 4's gate by itself; only the acknowledgment (by whichever of the three paths
 below) does. On the order page this is **6a** Generate the OC, **6b**
-Generate the Buyer Action Link (the link the buyer acknowledges through),
-then **6c** Record the Buyer's Acknowledgement — completed by the buyer
+Send the Buyer Action Link (the same link sent at Step 4b for the Buyer PO
+— send it again, or regenerate it if it has expired), then **6c** Record
+the Buyer's Acknowledgement — completed by the buyer
 (link or portal) or by staff.
 
 Once the OC has actually been emailed, the order page shows exactly where
@@ -87,8 +88,12 @@ emailed to them automatically, and either way the link is also flashed
 back to staff to copy and hand over directly. The link works for 90 days,
 and generating a new one immediately invalidates whichever one came
 before it — there is only ever one live link per order. Opening it needs
-no login at all: the buyer sees exactly the acknowledge button (if
-something is awaiting it), the Buyer PO upload form, and — while the
+no login at all. The page is laid out like the Quotation details form —
+a wide card, a summary bar (products, order value, Incoterm) and numbered
+sections with a status on each: **1 · Your Purchase Order** (download the
+Buyer PO, upload it signed with the PO number — see [Chapter
+2](./02-stage2-buyer-po.md)), **2 · Order Confirmation** (the order summary
+and the acknowledge button, once the OC is issued), and — while the
 advance payment hasn't cleared yet — an Advance Payment self-report form
 (90-item backlog #48; see [Chapter 3](./03-stage3-pi-advance.md)) — nothing
 else; no documents, other payment figures, or chat, which stay

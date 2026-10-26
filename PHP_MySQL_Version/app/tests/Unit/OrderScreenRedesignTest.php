@@ -224,7 +224,7 @@ final class OrderScreenRedesignTest extends TestCase
         $this->assertSame(5, $phaseCount, 'Expected the five major sections: Order Booking, Procurement & Production, Shipment & Balance, Closure & Settlement, After-Sales & Records.');
         $this->assertSame(11, $phaseStepCardCount, 'Expected 11 standalone step-cards directly inside the sections (Steps 1, 2, 3, the LC card, 12, 19, Amendments, 14, 16-18 — Order Communication is pinned above them).');
         $this->assertSame(9, $groupCount, 'Expected exactly 9 step-group boxes inside the sections (Step 4, 5, 6, 7, 8 (Production), 9-freight, 10-packing/BL, 11 (CI&Balance), 13 (Documents & Settlement)).');
-        $this->assertSame(40, $groupedStepCardCount, 'Expected exactly 40 step-cards nested inside a step-group box — every lettered sub-step card written in the page body.');
+        $this->assertSame(41, $groupedStepCardCount, 'Expected exactly 41 step-cards nested inside a step-group box — every lettered sub-step card written in the page body.');
     }
 
     private function readCss(): string
