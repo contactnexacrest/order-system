@@ -926,4 +926,12 @@ final class OrderRepository
         $stmt->execute(['hash' => hash('sha256', $rawToken)]);
         return $stmt->fetch() ?: null;
     }
+
+    /** Owner decision (2026-10-26): staff record that the client won't use the PI-stage form, unlocking Step 5c. */
+    public static function markPiFormSkipped(int $orderId, int $userId, string $reason): void
+    {
+        Database::connection()->prepare(
+            'UPDATE orders SET pi_form_skipped_at = NOW(), pi_form_skipped_by = :user_id, pi_form_skip_reason = :reason WHERE id = :id'
+        )->execute(['user_id' => $userId, 'reason' => $reason, 'id' => $orderId]);
+    }
 }

@@ -126,13 +126,45 @@ async function openCardAndAncestors(page, selector) {
 // Order closure now blocks (OrderController::markFullySettled) while any
 // compliance-task or export-benefit-scheme row is unresolved — both are
 // always materialized at order creation, never left as a missing row.
+// The checklist is split in two (Step 7: with the Supplier PO; Step 10:
+// before shipment), each card with its own "Mark All N/A".
 async function resolveComplianceChecklistIfNeeded(page, orderId) {
-  await openCardAndAncestors(page, '#compliance-checklist');
-  const markAllNaForm = page.locator(`form[action="/orders/${orderId}/compliance-tasks/mark-all-na"]`);
-  if (await markAllNaForm.count() === 0) { return; }
-  await markAllNaForm.locator('input[name="skip_reason"]').fill('Not applicable to this smoke-test order');
-  await markAllNaForm.getByRole('button', { name: 'Mark All N/A' }).click();
+  for (const cardId of ['#compliance-checklist', '#compliance-checklist-shipment']) {
+    if (await page.locator(cardId).count() === 0) { continue; }
+    await openCardAndAncestors(page, cardId);
+    const markAllNaForm = page.locator(`${cardId} form[action="/orders/${orderId}/compliance-tasks/mark-all-na"]`);
+    if (await markAllNaForm.count() === 0) { continue; }
+    await markAllNaForm.locator('input[name="skip_reason"]').fill('Not applicable to this smoke-test order');
+    await markAllNaForm.getByRole('button', { name: 'Mark All N/A' }).click();
+    await expect(page.locator('.alert')).toBeVisible();
+  }
+}
+
+// Owner rule (2026-10-26): every sub-step waits for the one before it, so
+// the walk below goes card by card. Submits the one form posting to
+// `action` (its card must already be unlocked), filling `fields` first.
+async function submitStepForm(page, stageNumber, action, fields, buttonName) {
+  await openStage(page, stageNumber);
+  const form = page.locator(`form[action="${action}"]`);
+  for (const [name, value] of Object.entries(fields || {})) {
+    await form.locator(`[name="${name}"]`).fill(value);
+  }
+  // Wait for the real page reload — a submit the browser refused (a
+  // required field left empty) then fails here instead of passing on an
+  // older banner.
+  await Promise.all([page.waitForEvent('load'), form.getByRole('button', { name: buttonName }).click()]);
   await expect(page.locator('.alert')).toBeVisible();
+}
+
+// Step 5c (Generate PI) stays locked until the client's PI-stage form is
+// applied — this smoke order's client never uses it, so staff skip it.
+async function skipPiForm(page, orderId) {
+  await openStage(page, 3);
+  const skip = page.locator('details.pi-form-skip').first();
+  await skip.locator('summary').click();
+  await skip.locator('input[name="skip_reason"]').fill('Smoke-test client — details unchanged from the Quotation');
+  await skip.getByRole('button', { name: /Skip PI Form/ }).click();
+  await expect(page.locator('.alert')).toContainText('PI-stage form skipped');
 }
 
 // The Order Financials card's "Export Benefits" tab is JS-hidden
@@ -254,14 +286,18 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   });
 
   await test.step('Stage 3 — PI & Advance Payment: PI approved, record then clear', async () => {
+    await skipPiForm(page, orderId);
     await generateDocument(page, orderId, 'PI', 'generated');
     await assignSelfAndApprove(page, 'PI');
 
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
+    // The day's exchange rate is recorded together with the remittance.
+    await recordForm.locator('input[name="advance_exchange_rate"]').fill('90.1234');
+    await expect(recordForm.locator('[data-remit-statement]')).toContainText("at today's exchange rate of");
     await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
-    await expect(page.locator('.alert')).toBeVisible();
+    await expect(page.locator('.alert')).toContainText("Received EUR 1,800.00 at today's exchange rate of ₹90.1234");
 
     await openStage(page, 3);
     const clearForm = page.locator(`form[action="/orders/${orderId}/payment/advance/clear"]`);
@@ -272,6 +308,9 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   await test.step('Stage 4 — Order Confirmation: generate OC, record acknowledgement', async () => {
     await generateDocument(page, orderId, 'OC', 'generated');
     await assignSelfAndApprove(page, 'OC');
+
+    // 6b: send the buyer their action link; 6c: record their acknowledgement.
+    await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /Generate Buyer Action Link/);
 
     await openStage(page, 4);
     const ackForm = page.locator(`form[action="/orders/${orderId}/oc-acknowledgment"]`);
@@ -330,6 +369,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await openStage(page, 6);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/freight"]`);
     await recordForm.locator('input[name="freight_amount"]').fill('1070.00');
+    await recordForm.locator('input[name="freight_exchange_rate"]').fill('90.5');
     await recordForm.getByRole('button', { name: 'Record Freight Remittance' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
@@ -339,7 +379,11 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await expect(page.locator('.alert')).toContainText('unlocked');
   });
 
-  await test.step('Stage 7 — Packing & BL Instruction: pack, ship, confirm BL', async () => {
+  await test.step('Stage 7 — Packing & BL Instruction: supplier balance, pack, PL, ship, BLI, confirm BL', async () => {
+    // 10a: the supplier's balance is paid before packing starts.
+    await submitStepForm(page, 7, `/orders/${orderId}/supplier-po/balance-paid`, { amount_paid_inr: '45000' }, 'Mark Balance Paid');
+    await expect(page.locator('.alert')).toContainText('balance payment recorded');
+
     await openStage(page, 7);
     const packingForm = page.locator(`form[action="/orders/${orderId}/packing"]`);
     await packingForm.locator('input[name="actual_quantity_packed"]').fill('100');
@@ -349,6 +393,9 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await packingForm.locator('input[name="total_cbm"]').fill('12.5');
     await packingForm.getByRole('button', { name: 'Save Packing & Crates' }).click();
     await expect(page.locator('.alert')).toBeVisible();
+
+    await generateDocument(page, orderId, 'PL', 'generated');
+    await assignSelfAndApprove(page, 'PL');
 
     await openStage(page, 7);
     const shippingForm = page.locator(`form[action="/orders/${orderId}/shipping"]`);
@@ -360,8 +407,6 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await shippingForm.getByRole('button', { name: 'Save Shipping Details' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
-    await generateDocument(page, orderId, 'PL', 'generated');
-    await assignSelfAndApprove(page, 'PL');
     await generateDocument(page, orderId, 'BLI', 'generated');
     await assignSelfAndApprove(page, 'BLI');
 
@@ -376,8 +421,12 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await generateDocument(page, orderId, 'CI', 'generated');
     await assignSelfAndApprove(page, 'CI');
 
+    // 11b: the scanned BL copy goes to the buyer before the balance comes in.
+    await submitStepForm(page, 8, `/orders/${orderId}/scanned-bl-sent`, {}, /Mark Scanned BL Copy Sent/);
+
     await openStage(page, 8);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
+    await recordForm.locator('input[name="balance_exchange_rate"]').fill('91');
     await recordForm.getByRole('button', { name: 'Record Balance Remittance' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
@@ -390,6 +439,12 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   await test.step('Stage 9 — Document Despatch & Closure: COO Prep approved, then close', async () => {
     await generateDocument(page, orderId, 'COOPREP', 'generated');
     await assignSelfAndApprove(page, 'COOPREP');
+
+    // 13b–13f: original BLs received, endorsed, endorsement details, printed.
+    await submitStepForm(page, 9, `/orders/${orderId}/bl-originals-received`, {}, /Record Original BLs Received/);
+    await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsed`, {}, /Mark Original BLs Endorsed/);
+    await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsement`, { bl_number: `SMOKE-BL-${UNIQUE}` }, /Save BL Endorsement Details/);
+    await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsement/generate`, {}, /Generate \/ Print BL Endorsement/);
 
     await openStage(page, 9);
     const closeForm = page.locator(`form[action="/orders/${orderId}/close"]`);

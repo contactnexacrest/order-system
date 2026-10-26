@@ -156,7 +156,7 @@ describe('Order page section order (Task #36)', () => {
 
     const output = await render(orderId);
 
-    const stage7Pos = output.indexOf('Step 10b &middot; Generate Packing List</h2>');
+    const stage7Pos = output.indexOf('Step 10c &middot; Generate Packing List</h2>');
     const plGeneratePos = output.indexOf('Generate Packing List</button>');
 
     expect(stage7Pos).toBeGreaterThan(-1);

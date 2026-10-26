@@ -161,7 +161,7 @@ final class OrderPageSectionOrderTest extends DbTestCase
 
         $output = $this->render($orderId);
 
-        $stage7Pos = strpos($output, 'Step 10b &middot; Generate Packing List</h2>');
+        $stage7Pos = strpos($output, 'Step 10c &middot; Generate Packing List</h2>');
         $plGeneratePos = strpos($output, 'Generate Packing List</button>');
 
         self::assertNotFalse($stage7Pos);

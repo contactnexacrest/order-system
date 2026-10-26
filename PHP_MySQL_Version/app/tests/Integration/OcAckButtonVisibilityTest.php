@@ -45,7 +45,7 @@ final class OcAckButtonVisibilityTest extends DbTestCase
         $output = ob_get_clean();
 
         self::assertStringContainsString(
-            "Record Buyer's Acknowledgement (unlocks Stage 5)",
+            "Record Buyer's Acknowledgement (unlocks Step 7)",
             $output,
             'the override button must be visible even though the OC was only generated, not emailed'
         );
@@ -86,6 +86,6 @@ final class OcAckButtonVisibilityTest extends DbTestCase
         $output = ob_get_clean();
 
         self::assertStringContainsString('Order Confirmation emailed to the buyer on', $output);
-        self::assertStringContainsString("Record Buyer's Email Acknowledgement (unlocks Stage 5)", $output);
+        self::assertStringContainsString("Record Buyer's Email Acknowledgement (unlocks Step 7)", $output);
     }
 }

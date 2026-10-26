@@ -4,6 +4,7 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
+const orderRepository = require('../../src/repositories/orderRepository');
 const piIntakeRepository = require('../../src/repositories/piIntakeRepository');
 const stageGateService = require('../../src/services/stageGateService');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
@@ -16,9 +17,9 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * next room". Each lettered sub-step now has its own done signal; inside the
  * current step only its first unfinished sub-step starts open (the page
  * scrolls to it), done sub-steps show a tick, and a later step being done
- * marks every earlier one done — except the Compliance Checklist (8b), which
- * stays amber with its open-task count but no longer claims the page once
- * the pipeline has moved past it.
+ * marks every earlier one done. Since 2026-10-26 a sub-step waiting on the
+ * one before it is locked (data-locked) and the Compliance Checklist runs
+ * alongside Steps 7 and 10 without ever locking them.
  */
 describe('Order page sequential step flow', () => {
   let agent;
@@ -98,19 +99,38 @@ describe('Order page sequential step flow', () => {
     expect(cardIsOpen(text, 'step-5d-payment-record')).toBe(true);
   });
 
-  it('keeps outstanding compliance amber but opens the real next action once past it', async () => {
+  it('runs outstanding compliance alongside the steps and never locks them', async () => {
+    // Owner request (2026-10-26): the checklist sits at the start of Steps 7
+    // and 10, split by phase; outstanding tasks stay amber but never lock the
+    // sub-steps next to them.
     const orderId = await orderAtStep5();
     await orderComplianceTaskRepository.initializeForOrder(orderId);
-    for (const stageNumber of [3, 4, 5, 6, 7]) {
+    for (const stageNumber of [3, 4, 5, 6]) {
       await stageGateService.passAndUnlockNext(orderId, stageNumber, null);
     }
 
     const { text } = await agent.get(`/orders/${orderId}`);
 
-    expect(text).toContain('compliance tasks still open');
+    expect(cardIcon(text, 'step-7d-supplier-po-signed')).toBe('done');
     expect(cardIcon(text, 'compliance-checklist')).toBe('current');
-    expect(cardIsOpen(text, 'compliance-checklist')).toBe(false);
-    expect(cardIsOpen(text, 'step-group-stage-8')).toBe(true);
+    expect(cardIcon(text, 'compliance-checklist-shipment')).toBe('current');
+    expect(cardIsOpen(text, 'compliance-checklist-shipment')).toBe(true);
+    expect(text).not.toContain('id="step-10a-supplier-balance-paid" data-locked');
+  });
+
+  it('locks a sub-step that waits on the one before it', async () => {
+    // Owner rule (2026-10-26): the PI can't be generated until the client's
+    // PI-stage form is applied or skipped.
+    const orderId = await orderAtStep5();
+
+    let { text } = await agent.get(`/orders/${orderId}`);
+    expect(text).toContain('id="step-5c-pi-generate" data-locked="Complete Step 5a first"');
+
+    await orderRepository.markPiFormSkipped(orderId, null, 'Repeat buyer, nothing changed');
+    ({ text } = await agent.get(`/orders/${orderId}`));
+    expect(cardIcon(text, 'step-5b-pi-intake-apply')).toBe('done');
+    expect(text).not.toContain('id="step-5c-pi-generate" data-locked');
+    expect(cardIsOpen(text, 'step-5c-pi-generate')).toBe(true);
   });
 
   it('marks every earlier pipeline step done once a later one is', async () => {

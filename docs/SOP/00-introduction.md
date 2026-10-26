@@ -201,8 +201,9 @@ buttons, and 9-stage tracker at the top — those never move. Below that,
 the page lays out every section as its own numbered step-card, in the
 exact order staff actually work through an order (Quotation → Buyer PO
 → PI-Stage Intake → PI & Advance Payment → Order Confirmation →
-Supplier PO → Production & Pre-Shipment Compliance (production status
-plus the Compliance Checklist) → Freight Payment → Packing & BL
+Supplier PO (opening with the with-the-Supplier-PO part of the
+Compliance Checklist, ending with the supplier's advance payment) →
+Production & Estimated Shipment → Freight Payment → Packing & BL
 Instruction → Commercial Invoice & Balance → Closure — Financials,
 Benefits & Costs → Closure — Documents & Settlement → Additional
 Documents → Communication → Feedback → Complaints → Disputes → Order
@@ -231,12 +232,15 @@ sequence — for example Supplier PO's "Save Supplier PO Terms" (7a) →
 → "Confirm Supplier Signed & Returned PO" (7d). This shows the literal order of operations *within* a step, not
 just which of the 9 internal stages the order is on overall (that's
 still the process stepper above) — badge numbers follow the step-card's
-own on-screen number, not the stage number. Two badges — **"4d"** (the
-PI Form Link) and **"4c"** (the Buyer Action Link) — are deliberately
-not tied to their own stage's lock status and appear from the very
-first page load regardless of where the order actually stands: both are
-optional, never-blocking alternate channels, exactly as their own
-chapters already describe them. The badge is purely a labelling aid — it
+own on-screen number, not the stage number.
+
+**Sub-steps open one at a time.** Inside a step, a sub-step can't be
+opened or used until the one before it is complete — it shows greyed
+with a 🔒 "Complete Step 5a first" note. Where a sub-step genuinely may
+not apply, it offers its own way past: e.g. the PI-stage form (5a/5b)
+has **"Skip PI Form — go to Generate PI"** with a short reason. The
+Compliance Checklist cards are the exception: they run alongside and
+never lock anything. The badge is purely a labelling aid — it
 changes no permission, no gate, and no button's underlying behaviour.
 
 **"At a Glance" is the order's own persistent summary panel, not just

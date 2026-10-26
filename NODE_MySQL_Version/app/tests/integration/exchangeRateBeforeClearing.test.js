@@ -63,7 +63,9 @@ describe('Exchange rate before clearing (90-item backlog "exchange-rate-at-clear
     const res = await agent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
 
-    expect(res.text).not.toContain('name="advance_exchange_rate"');
+    // The remittance form itself now asks for the day's rate alongside the
+    // amount; what must not appear yet is the separate CA rate box.
+    expect(res.text).not.toContain('/payment/advance/exchange-rate"');
   });
 
   it('still offers the advance exchange rate form after clearing', async () => {

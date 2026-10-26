@@ -116,6 +116,10 @@ const njkEnv = nunjucks.configure(viewsDir, {
 njkEnv.addFilter('maskEmail', mask.maskEmail);
 njkEnv.addFilter('maskPhone', mask.maskPhone);
 njkEnv.addFilter('humanDate', dates.human);
+// Nunjucks 3's selectattr/rejectattr only test truthiness — these filter a
+// list of objects by an attribute's exact value instead.
+njkEnv.addFilter('whereEq', (list, attr, value) => (list || []).filter((item) => item && item[attr] === value));
+njkEnv.addFilter('whereNotIn', (list, attr, values) => (list || []).filter((item) => item && !values.includes(item[attr])));
 // Sidebar active-link highlighting (layout/base.njk) — Nunjucks has no
 // built-in startswith, and the PHP side's equivalent ($isActive) is a
 // plain str_starts_with(), so this is the same one-line check.
@@ -194,6 +198,37 @@ njkEnv.addGlobal('computeStepFlow', require('./helpers/stepFlow').computeStepFlo
 njkEnv.addGlobal('docComplete', (documents, code, mailSendingEnabled) => {
   const latest = (documents || []).find((d) => d.document_type_code === code && d.status !== 'superseded');
   return !!latest && require('./services/documentGenerationService').isDocumentComplete(latest, mailSendingEnabled);
+});
+
+// Owner request (2026-10-26): before generating a document that already
+// exists, say so — so a new revision is a deliberate choice, not a mistake.
+njkEnv.addGlobal('docAlreadyNote', (documents, code) => {
+  const doc = (documents || []).find((d) => d.document_type_code === code && d.status !== 'superseded');
+  if (!doc) {
+    return '';
+  }
+  return new nunjucks.runtime.SafeString(`<span class="doc-already-note">&#9888; Already generated: ${escapeHtml(String(doc.document_reference || code))} Rev.${Number(doc.revision_number) || 0} (${escapeHtml(String(doc.status))}) — have a look in <a href="#document-review-approval">Document Review &amp; Approval</a> before generating a new one.</span>`);
+});
+// Owner request (2026-10-26): anything still waiting on someone in the
+// document section is flagged on it, so nobody moves on and misses it.
+njkEnv.addGlobal('docPendingActions', (documents, mailSendingEnabled) => {
+  const seen = new Set();
+  const items = [];
+  for (const doc of documents || []) {
+    if (doc.status === 'superseded' || seen.has(doc.document_type_code)) {
+      continue;
+    }
+    seen.add(doc.document_type_code);
+    const label = `${doc.document_type_code} ${doc.document_reference || ''}`;
+    if (doc.status === 'draft') {
+      items.push(`${label} — generated, no reviewer assigned yet`);
+    } else if (doc.status === 'in_review') {
+      items.push(`${label} — waiting for approval`);
+    } else if (doc.status === 'approved' && mailSendingEnabled && !Number(doc.document_type_never_shown_to_buyer)) {
+      items.push(`${label} — approved, not yet sent to the buyer`);
+    }
+  }
+  return items;
 });
 
 // --- Session store (MySQL-backed via knex, not PHP's file-session
@@ -872,6 +907,7 @@ app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHan
 app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));
 app.get('/orders/:id/dossier', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.downloadDossier));
 app.post('/orders/:id/pi-form-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generatePiFormLink));
+app.post('/orders/:id/pi-form/skip', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.skipPiForm));
 app.post('/orders/:id/buyer-action-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateBuyerActionLink));
 
 app.get('/notifications', requireAuth, asyncHandler(notificationController.index));

@@ -155,7 +155,7 @@ final class CommercialDocumentGateTest extends DbTestCase
         $this->unlockThroughStage8($orderId);
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         $this->createTestDocument($orderId, 'CI', 'approved');
-        $_POST = ['balance_amount' => '1000', 'balance_received_at' => '2026-05-01'];
+        $_POST = ['balance_amount' => '1000', 'balance_received_at' => '2026-05-01', 'balance_exchange_rate' => '84'];
 
         (new OrderController())->recordBalancePayment(['id' => (string) $orderId]);
 

@@ -130,6 +130,21 @@ final class StageGateService
         return $stage !== null && $stage['status'] === 'in_progress';
     }
 
+    /**
+     * True once a stage is in progress or already passed (order still
+     * active) — for actions that stay valid after the gate, like paying the
+     * supplier's balance before packing, long after Stage 5 passed.
+     */
+    public static function isReachedOrPassed(int $orderId, int $stageNumber): bool
+    {
+        $order = OrderRepository::find($orderId);
+        if ($order === null || $order['status'] !== 'active') {
+            return false;
+        }
+        $stage = OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
+        return $stage !== null && in_array($stage['status'], ['in_progress', 'gate_passed'], true);
+    }
+
     /** Current stage's status/number for an order, for UI gating decisions. */
     public static function currentStage(int $orderId): ?array
     {

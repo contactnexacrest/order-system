@@ -38,8 +38,8 @@ describe('BLI/COOPREP get their own explained section (90-item backlog #38/#55)'
     expect(countOccurrences(source, 'document_type" value="BLI"')).toBe(1);
   });
 
-  it('BL Instruction Sheet section sits after Shipping/Vessel Details, inside its own Step 10d step-card', () => {
-    const stage7Start = source.indexOf('id="step-10a-packing"');
+  it('BL Instruction Sheet section sits after Shipping/Vessel Details, inside its own Step 10e step-card', () => {
+    const stage7Start = source.indexOf('id="step-10b-packing"');
     const stage8Start = source.indexOf('id="step-ci-generate"');
     const shippingPos = source.indexOf('Save Shipping Details');
     const bliPos = source.indexOf('BL Instruction Sheet (for your CHA');

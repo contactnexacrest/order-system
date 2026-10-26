@@ -14,9 +14,9 @@ use App\Tests\Support\DbTestCase;
  * sequence skipped straight past "Generate Packing List" — it had no
  * step badge at all, unlike every other document-generate button in
  * that panel. "Generate Packing List" is now its own single-purpose
- * step-card (Step 10b, right after Step 10a "Save Packing & Crates",
+ * step-card (Step 10c, right after Step 10b "Save Packing & Crates",
  * both split out of what used to be one shared DB Stage 7 card) — it
- * carries the 10b badge matching that card's own heading.
+ * carries the 10c badge matching that card's own heading.
  */
 final class PackingListStepBadgeTest extends DbTestCase
 {
@@ -46,7 +46,7 @@ final class PackingListStepBadgeTest extends DbTestCase
         $output = (string) ob_get_clean();
 
         self::assertMatchesRegularExpression(
-            '#<span class="step-badge"[^>]*>10b</span>\s*<button[^>]*>Generate Packing List</button>#',
+            '#<span class="step-badge"[^>]*>10c</span>\s*<button[^>]*>Generate Packing List</button>#',
             $output,
             'Generate Packing List must carry its own step badge, same as every other document-generate button in this panel'
         );

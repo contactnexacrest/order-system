@@ -4,6 +4,7 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const orderStageRepository = require('../../src/repositories/orderStageRepository');
+const stageGateService = require('../../src/services/stageGateService');
 const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
@@ -106,14 +107,6 @@ describe('Order-page process stepper (Point 2)', () => {
   });
 
   /**
-   * The Step 8 group box (8a Production + 8b Compliance Checklist) never
-   * carried its own `open` marker, unlike every other .step-group — so
-   * when 8b was the order's current step, the server-opened checklist
-   * card sat inside a closed group, invisible, and the on-load
-   * scroll-to-current-card had nothing to scroll to (page stayed at the
-   * top). Steps 1-7 done + checklist outstanding is exactly that state.
-   */
-  /**
    * Steps 2/3 used to need the QT marked 'sent' in-app and a BUYERPO
    * document — so an order whose quotation went out by email (QT left
    * 'draft') stayed stuck on Step 2 even after the Buyer PO stage gate
@@ -135,19 +128,23 @@ describe('Order-page process stepper (Point 2)', () => {
     expect(res.text).toContain('id="step-group-stage-3" open');
   });
 
-  it('opens the Step 8 group when the Compliance Checklist is the current step', async () => {
+  it('opens the Compliance Checklist inside Step 7 while tasks are outstanding', async () => {
+    // Owner request (2026-10-26): the checklist is split by phase — the
+    // "with the Supplier PO" part sits at the start of Step 7 and opens with
+    // it while anything there is still outstanding.
     const orderId = await createTestOrder(await createTestClient());
     await createTestDocument(orderId, 'QT', 'sent');
     await createTestDocument(orderId, 'BUYERPO', 'draft');
-    for (const stageNumber of [1, 2, 3, 4, 5]) {
-      const stage = await orderStageRepository.findByOrderAndStageNumber(orderId, stageNumber);
-      await orderStageRepository.passGate(stage.id, null);
+    for (const stageNumber of [1, 2, 3, 4]) {
+      await stageGateService.passAndUnlockNext(orderId, stageNumber, null);
     }
     await orderComplianceTaskRepository.initializeForOrder(orderId);
 
     const res = await agent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
+    expect(res.text).toContain('id="step-group-stage-5" open');
     expect(res.text).toContain('id="compliance-checklist" open');
-    expect(res.text).toContain('id="step-group-stage-production" open');
+    expect(res.text.indexOf('id="compliance-checklist"')).toBeLessThan(res.text.indexOf('id="step-7a-supplier-po-terms"'));
+    expect(res.text).toContain('id="compliance-checklist-shipment"');
   });
 });

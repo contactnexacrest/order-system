@@ -98,7 +98,10 @@ final class OrderScreenRedesignTest extends TestCase
         // step-sequence wrapper as its own step-card — nothing was
         // dropped, only re-parented and re-labelled with the user's own
         // 0-17 step numbering.
-        $sectionCountTotal = substr_count($html, '<details class="step-card');
+        // Counted from the page body: shared card helpers defined in the
+        // template's PHP header (e.g. the two Compliance Checklist cards,
+        // rendered inside Steps 7 and 10) aren't sections of their own.
+        $sectionCountTotal = substr_count(substr($html, (int) strpos($html, '<div class="card page-wide">')), '<details class="step-card');
         $afterPanels = substr($html, $panelsStart);
         $sectionCountInsidePanels = substr_count($afterPanels, '<details class="step-card');
         $this->assertSame($sectionCountTotal, $sectionCountInsidePanels);
@@ -209,8 +212,8 @@ final class OrderScreenRedesignTest extends TestCase
             $directStepCardCount,
             'Expected exactly 17 standalone step-card panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01). (Was 19 before the Compliance Checklist moved from its own standalone reference card into Step 8\'s group as "8b" — -1 for the standalone card removed, -1 for Step 8\'s former standalone card becoming that group\'s "8a".)'
         );
-        $this->assertSame(9, $groupCount, 'Expected exactly 9 step-group wrapper boxes (Step 4, 5, 6, 7, 8 (Production & Compliance), 9-freight, 10-packing/BL, 11 (CI&Balance), 13 (Documents & Settlement)) as direct children of #order-panels.');
-        $this->assertSame(39, $groupedStepCardCount, 'Expected exactly 39 step-cards nested one level inside a step-group box — together with the 17 standalone ones, every one of the 56 individual step/sub-step cards.');
+        $this->assertSame(9, $groupCount, 'Expected exactly 9 step-group wrapper boxes (Step 4, 5, 6, 7, 8 (Production), 9-freight, 10-packing/BL, 11 (CI&Balance), 13 (Documents & Settlement)) as direct children of #order-panels.');
+        $this->assertSame(40, $groupedStepCardCount, 'Expected exactly 40 step-cards nested one level inside a step-group box — together with the 17 standalone ones, every one of the 57 individual step/sub-step cards written in the page body. (Was 39: +1 Step 7e Supplier Advance Paid, +1 Step 10a Supplier Balance Paid, -1 the old Step 8b Compliance Checklist, now two shared cards rendered from a helper at the start of Steps 7 and 10.)');
     }
 
     private function readCss(): string

@@ -614,3 +614,13 @@ a.entity-card:hover{text-decoration:none;}
 .gallery-thumb-name{display:block;font-size:0.76rem;padding:0.4rem 0.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .gallery-file-list{list-style:none;padding:0;margin:1rem 0 0;}
 .gallery-file-list li{padding:0.4rem 0;border-bottom:1px solid var(--line);}
+
+/* Owner rule (2026-10-26): a sub-step waiting on the one before it is
+   greyed out and can't be expanded until that one is complete. */
+details.step-card[data-locked]{opacity:0.6;background:#F4F2EE;}
+details.step-card[data-locked] > summary{cursor:not-allowed;pointer-events:none;}
+.step-locked-note{margin-left:auto;font-size:0.75rem;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
+.compliance-row-saved{color:var(--success,#2e7d32);font-weight:600;}
+/* Owner request (2026-10-26): a Generate button whose document already exists says so. */
+.doc-already-note{display:block;margin-top:6px;font-size:0.78rem;color:var(--gold-strong);}
+.doc-pending-badge{background:var(--gold-strong);vertical-align:middle;}

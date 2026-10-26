@@ -4,6 +4,13 @@
   <form method="post" action="/compliance-task-types">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <label>Task Name * <input type="text" name="name" required placeholder="e.g. ECGC Cover, Pre-Shipment Inspection"></label>
+    <label>When is it done? *
+      <select name="phase" required>
+        {% for key, label in phases %}
+          <option value="{{ key }}" {{ 'selected' if key == 'shipment' else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Add Task Type</button>
       <a href="/compliance-task-types" class="btn-sm btn-secondary">Cancel</a>

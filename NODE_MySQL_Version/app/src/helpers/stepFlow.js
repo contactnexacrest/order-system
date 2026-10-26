@@ -14,6 +14,14 @@
  * true and every order page opens Step 1 regardless.
  */
 
+const { SafeString } = require('nunjucks').runtime;
+
+// Supplier payments (owner request 2026-10-26: their own sub-steps) are
+// money that has or hasn't actually gone out — they always show their own
+// real status, never take part in the "later done means earlier done" rule,
+// and a finished step never paints them done.
+const HONEST_SUB_STEPS = new Set(['7e', '10a']);
+
 const PIPELINE_STEPS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13'];
 
 /**
@@ -29,10 +37,7 @@ function computeStepFlow(rawStepStates, rawSubStepDone) {
 
   // Owner rule (2026-10-25): "when a later step is completed, the previous
   // ones must be completed" — once any later pipeline step is done, every
-  // earlier one shows done too. The Compliance Checklist (s8b) is the one
-  // deliberate exception: real paperwork the stage gates don't require, so
-  // it stays honest (amber, with its open-task count) rather than claiming
-  // tasks nobody did.
+  // earlier one shows done too.
   let laterDone = false;
   for (const key of [...PIPELINE_STEPS].reverse()) {
     if (laterDone) {
@@ -43,14 +48,9 @@ function computeStepFlow(rawStepStates, rawSubStepDone) {
   }
 
   // The step whose card starts open: the first one not yet done, or 's19'
-  // once everything is. An outstanding checklist (s8b) no longer claims the
-  // page once the pipeline has moved past it (Step 9 onward reached).
-  const pipelineMovedPast8b = stepStates.s9 !== 'locked';
+  // once everything is.
   let currentUserStep = 's19';
   for (const key of Object.keys(stepStates)) {
-    if (key === 's8b' && pipelineMovedPast8b) {
-      continue;
-    }
     if (stepStates[key] !== 'done') {
       currentUserStep = key;
       break;
@@ -69,6 +69,9 @@ function computeStepFlow(rawStepStates, rawSubStepDone) {
     }
     let laterSubDone = false;
     for (const sub of Object.keys(subs).reverse()) {
+      if (HONEST_SUB_STEPS.has(sub)) {
+        continue;
+      }
       if (laterSubDone && subs[sub] !== null) {
         subs[sub] = true;
       } else if (subs[sub] === true) {
@@ -92,6 +95,9 @@ function computeStepFlow(rawStepStates, rawSubStepDone) {
     subStepStatus(step, sub) {
       const parent = stepStates[step];
       const done = subStepDone[step] ? subStepDone[step][sub] : undefined;
+      if (HONEST_SUB_STEPS.has(sub) && parent === 'done' && done !== null && done !== undefined) {
+        return done ? 'done' : 'current';
+      }
       if (parent !== 'current' || done === null || done === undefined) {
         return parent;
       }
@@ -104,7 +110,20 @@ function computeStepFlow(rawStepStates, rawSubStepDone) {
     // (the page scrolls to it), so after any action the page lands on the
     // card that's next. A step with no unfinished sub-step left keeps the old
     // behaviour (all its cards open).
+    //
+    // Owner rule (2026-10-26): a sub-step can't be opened or used until the
+    // one before it is complete. A waiting sub-step (or every sub-step of a
+    // step not reached yet) renders data-locked: greyed, can't be expanded.
+    // Optional sub-steps (no done signal of their own) never lock.
     subCardOpen(step, sub) {
+      const signal = subStepDone[step] ? subStepDone[step][sub] : undefined;
+      const hasSignal = signal !== null && signal !== undefined;
+      if ((hasSignal || stepStates[step] === 'locked') && this.subStepStatus(step, sub) === 'locked') {
+        const waitingOn = stepStates[step] === 'locked' ? 'the previous step' : `Step ${currentSubStep[step]}`;
+        // Marked safe: the attribute's own quotes must reach the page as-is
+        // (the text is fixed wording plus a sub-step id, never user input).
+        return new SafeString(` data-locked="Complete ${waitingOn} first"`);
+      }
       if (step !== currentUserStep) {
         return '';
       }

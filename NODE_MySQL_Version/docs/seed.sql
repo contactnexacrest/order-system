@@ -1470,12 +1470,12 @@ INSERT INTO reference_library_documents (title, file_path, file_original_name, f
 -- COMPLIANCE TASK TYPES — the defaults the checklist on every order ships
 -- with; Admin can add more later from the Compliance Task Types screen.
 -- ================================================================
-INSERT INTO compliance_task_types (name) VALUES
-  ('ECGC Cover'),
-  ('Pre-Shipment Inspection'),
-  ('Fumigation Certificate'),
-  ('Phytosanitary Certificate'),
-  ('Due Diligence');
+INSERT INTO compliance_task_types (name, phase) VALUES
+  ('ECGC Cover', 'order'),
+  ('Pre-Shipment Inspection', 'shipment'),
+  ('Fumigation Certificate', 'shipment'),
+  ('Phytosanitary Certificate', 'shipment'),
+  ('Due Diligence', 'order');
 
 -- ================================================================
 -- MAIL REDIRECT & CC (Section AS) — off by default (mail_redirect_enabled

@@ -133,7 +133,7 @@ final class AuditLogCoverageTest extends DbTestCase
         StageGateService::passAndUnlockNext($orderId, 1, null);
         StageGateService::passAndUnlockNext($orderId, 2, null);
 
-        $_POST = ['advance_amount' => '1000.00', 'advance_received_at' => '2026-01-10'];
+        $_POST = ['advance_amount' => '1000.00', 'advance_received_at' => '2026-01-10', 'advance_exchange_rate' => '83.5'];
         ob_start();
         (new OrderController())->recordAdvancePayment(['id' => (string) $orderId]);
         ob_end_clean();
@@ -165,7 +165,7 @@ final class AuditLogCoverageTest extends DbTestCase
         }
         $this->createTestDocument($orderId, 'CI', 'approved');
 
-        $_POST = ['balance_amount' => '1500.00', 'balance_received_at' => '2026-03-01'];
+        $_POST = ['balance_amount' => '1500.00', 'balance_received_at' => '2026-03-01', 'balance_exchange_rate' => '84'];
         ob_start();
         (new OrderController())->recordBalancePayment(['id' => (string) $orderId]);
         ob_end_clean();

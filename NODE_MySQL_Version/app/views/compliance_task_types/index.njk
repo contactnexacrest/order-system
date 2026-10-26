@@ -6,13 +6,14 @@
     <p><a href="/compliance-task-types/create" class="btn-sm btn-accent">Add Task Type</a></p>
 
     <table class="list">
-      <tr><th>Task Name</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Task Name</th><th>When</th><th>Status</th><th>Actions</th></tr>
       {% if taskTypes.length == 0 %}
-      <tr><td colspan="3" class="muted">No compliance task types yet — add the first one above.</td></tr>
+      <tr><td colspan="4" class="muted">No compliance task types yet — add the first one above.</td></tr>
       {% endif %}
       {% for t in taskTypes %}
       <tr>
         <td>{{ t.name }}</td>
+        <td>{{ phases[t.phase or 'shipment'] or t.phase }}</td>
         <td><span class="badge {{ 'badge-active' if t.is_active else 'badge-inactive' }}">{{ 'Active' if t.is_active else 'Inactive' }}</span></td>
         <td class="action-buttons">
           <a href="/compliance-task-types/{{ t.id }}/edit" class="btn-sm btn-secondary">Edit</a>

@@ -23,16 +23,27 @@ async function find(id) {
   return db.queryOne('SELECT * FROM compliance_task_types WHERE id = :id', { id });
 }
 
-async function create(name, createdBy) {
+/**
+ * Owner request (2026-10-26): the checklist is split by when each task is
+ * done — with the Supplier PO (Due Diligence, ECGC Cover...) or before
+ * shipment (Fumigation, Phytosanitary, Pre-Shipment Inspection...).
+ */
+const PHASES = {
+  order: 'With the Supplier PO (Step 7)',
+  shipment: 'Before shipment (Step 10)',
+};
+
+async function create(name, createdBy, phase = 'shipment') {
   const result = await db.execute(
-    'INSERT INTO compliance_task_types (name, created_by) VALUES (:name, :created_by)',
-    { name, created_by: createdBy }
+    'INSERT INTO compliance_task_types (name, phase, created_by) VALUES (:name, :phase, :created_by)',
+    { name, phase, created_by: createdBy }
   );
   return result.insertId;
 }
 
-async function update(id, name) {
-  await db.execute('UPDATE compliance_task_types SET name = :name WHERE id = :id', { name, id });
+/** `phase` null/undefined keeps the task type's current phase. */
+async function update(id, name, phase = null) {
+  await db.execute('UPDATE compliance_task_types SET name = :name, phase = COALESCE(:phase, phase) WHERE id = :id', { name, phase, id });
 }
 
 async function toggleActive(id) {
@@ -44,4 +55,4 @@ async function remove(id) {
   await db.execute('DELETE FROM compliance_task_types WHERE id = :id', { id });
 }
 
-module.exports = { all, find, create, update, toggleActive, remove };
+module.exports = { PHASES, all, find, create, update, toggleActive, remove };

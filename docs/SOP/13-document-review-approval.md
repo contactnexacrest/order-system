@@ -13,6 +13,16 @@ repeating here: **a stage gate passing and a document being approved are
 two completely separate things.** A document can sit in draft for days
 while the order moves several stages ahead — that's expected, not broken.
 
+On the order page, the **Document Review & Approval** section opens on
+its own whenever the order has documents (and stays collapsed while it
+has none). Its heading shows **"N need(s) action"** when a document is
+waiting on someone — generated but no reviewer assigned yet, waiting for
+approval, or (with email sending on) approved but not yet sent to the
+buyer — and each one is listed at the top of the section. Every
+**Generate** button also says when that document already exists
+("⚠ Already generated: REF Rev.N (status)"), so a duplicate isn't
+created by accident.
+
 ## The system does this automatically
 
 - A document is created as a **draft** the instant it's generated — nothing

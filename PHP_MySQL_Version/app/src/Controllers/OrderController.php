@@ -1133,6 +1133,33 @@ final class OrderController
     }
 
     /**
+     * Owner decision (2026-10-26): Step 5c (Generate PI) stays locked until
+     * the client's PI-stage form is applied (5b) — so when a client won't
+     * use the form, staff record that here (reason required, audit-logged),
+     * which completes 5a/5b and unlocks 5c.
+     */
+    public function skipPiForm(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!OrderRepository::find($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $reason = trim((string) ($_POST['skip_reason'] ?? ''));
+        if (($error = ReasonValidator::check($reason)) !== null) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}#step-5b-pi-intake-apply");
+            return;
+        }
+        $userId = (int) AuthService::currentUserId();
+        OrderRepository::markPiFormSkipped($orderId, $userId, $reason);
+        AuditLogRepository::log($userId, 'PI_FORM_SKIPPED', 'orders', $orderId, 'pi_form_skipped_at', null, date('Y-m-d H:i:s'), $reason);
+        Flash::set('success', "PI-stage form skipped — Step 5c (Generate Proforma Invoice) is now open.");
+        header("Location: /orders/{$orderId}");
+    }
+
+    /**
      * 90-item backlog #75: generates (or regenerates) the public, no-login
      * Buyer Action link — lets the buyer acknowledge their Order
      * Confirmation and upload their signed Buyer PO copy without logging
@@ -1436,7 +1463,17 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner request (2026-10-26): the day's exchange rate is recorded
+        // together with the remittance itself.
+        $rate = (float) ($_POST['advance_exchange_rate'] ?? 0);
+        if ($rate <= 0) {
+            Flash::set('error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', $rate, (int) AuthService::currentUserId());
+        AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
         // External QA report L-23: advance payment recording was never audit-logged.
         AuditLogRepository::log(AuthService::currentUserId(), 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'advance_amount', null, (string) $amount);
 
@@ -1450,7 +1487,7 @@ final class OrderController
             ClientRepository::lockData((int) $order['client_id'], 'Auto-locked: advance remittance recorded before client PI-details consent');
         }
 
-        Flash::set('success', 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -2044,7 +2081,9 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        if (!StageGateService::isUnlocked($orderId, 5)) {
+        // Supplier payments stay valid after Stage 5 passes — the balance is
+        // paid later, before packing (Step 10a).
+        if (!StageGateService::isReachedOrPassed($orderId, 5)) {
             Flash::set('error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
             header("Location: /orders/{$orderId}");
             return;
@@ -2073,7 +2112,9 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        if (!StageGateService::isUnlocked($orderId, 5)) {
+        // Supplier payments stay valid after Stage 5 passes — the balance is
+        // paid later, before packing (Step 10a).
+        if (!StageGateService::isReachedOrPassed($orderId, 5)) {
             Flash::set('error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
             header("Location: /orders/{$orderId}");
             return;
@@ -2191,11 +2232,21 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner request (2026-10-26): the day's exchange rate is recorded
+        // together with the remittance itself.
+        $rate = (float) ($_POST['freight_exchange_rate'] ?? 0);
+        if ($rate <= 0) {
+            Flash::set('error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::recordFreightReceived($orderId, $amount, $receivedAt);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'freight', $rate, (int) AuthService::currentUserId());
+        AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'freight_exchange_rate', null, (string) $rate);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
         AuditLogRepository::log(AuthService::currentUserId(), 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'freight_amount', null, (string) $amount);
-        Flash::set('success', 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -2598,10 +2649,20 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner request (2026-10-26): the day's exchange rate is recorded
+        // together with the remittance itself.
+        $rate = (float) ($_POST['balance_exchange_rate'] ?? 0);
+        if ($rate <= 0) {
+            Flash::set('error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderPaymentStatusRepository::recordBalanceReceived($orderId, $amount, $receivedAt);
+        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', $rate, (int) AuthService::currentUserId());
+        AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'balance_exchange_rate', null, (string) $rate);
         // External QA report L-23: balance payment recording was never audit-logged.
         AuditLogRepository::log(AuthService::currentUserId(), 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'balance_amount', null, (string) $amount);
-        Flash::set('success', 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -3191,31 +3252,47 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        // Owner request (2026-10-26): each checklist row saves on its own
+        // without reloading the page (so other rows' unsaved choices stay put)
+        // — the page's script posts with X-Requested-With and gets JSON back.
+        $wantsJson = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+        $respond = static function (bool $ok, string $message, array $extra = []) use ($wantsJson, $orderId): void {
+            if ($wantsJson) {
+                if (!$ok) {
+                    http_response_code(422);
+                }
+                header('Content-Type: application/json');
+                echo json_encode(['ok' => $ok, 'message' => $message] + $extra);
+                return;
+            }
+            Flash::set($ok ? 'success' : 'error', $message);
+            header("Location: /orders/{$orderId}#compliance-checklist");
+        };
         if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'close_orders')) {
-            Flash::set('error', 'You do not have permission to update the compliance checklist.');
-            header("Location: /orders/{$orderId}");
+            $respond(false, 'You do not have permission to update the compliance checklist.');
             return;
         }
 
         $taskTypeId = (int) ($_POST['task_type_id'] ?? 0);
         $status = trim((string) ($_POST['status'] ?? ''));
         if ($taskTypeId <= 0 || !array_key_exists($status, OrderComplianceTaskRepository::STATUSES)) {
-            Flash::set('error', 'Select a valid compliance task and status.');
-            header("Location: /orders/{$orderId}#compliance-checklist");
+            $respond(false, 'Select a valid compliance task and status.');
             return;
         }
 
         $skipReason = trim((string) ($_POST['skip_reason'] ?? ''));
         if ($status === 'skipped' && $skipReason === '') {
-            Flash::set('error', 'A reason is required to mark a compliance task as not applicable/skipped.');
-            header("Location: /orders/{$orderId}#compliance-checklist");
+            $respond(false, 'A reason is required to mark a compliance task as not applicable/skipped.');
             return;
         }
 
         OrderComplianceTaskRepository::setStatus($orderId, $taskTypeId, $status, $status === 'skipped' ? $skipReason : null, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', $orderId, 'compliance_task:' . $taskTypeId, null, $status, $status === 'skipped' ? $skipReason : null);
-        Flash::set('success', 'Compliance checklist updated.');
-        header("Location: /orders/{$orderId}#compliance-checklist");
+        $summary = OrderComplianceTaskRepository::summaryForOrder($orderId);
+        $respond(true, 'Saved — ' . OrderComplianceTaskRepository::STATUSES[$status] . '.', [
+            'resolved_text' => date('Y-m-d H:i:s') . ' by ' . ($user['name'] ?? 'you'),
+            'outstanding' => $summary['outstanding'],
+        ]);
     }
 
     /**
@@ -3242,9 +3319,12 @@ final class OrderController
             return;
         }
 
+        // Each checklist card (Step 7 / Step 10) offers this for its own phase.
+        $phase = (string) ($_POST['phase'] ?? '');
         $outstanding = array_filter(
             OrderComplianceTaskRepository::forOrder($orderId),
-            static fn(array $ct): bool => $ct['status'] === 'not_started' || $ct['status'] === 'pending_approval'
+            static fn(array $ct): bool => ($ct['status'] === 'not_started' || $ct['status'] === 'pending_approval')
+                && ($phase === '' || $ct['phase'] === $phase)
         );
         foreach ($outstanding as $ct) {
             OrderComplianceTaskRepository::setStatus($orderId, (int) $ct['task_type_id'], 'skipped', $skipReason, (int) $user['id']);
@@ -3509,5 +3589,18 @@ final class OrderController
         }
         Flash::set('success', 'Order status/lock overridden.');
         header("Location: /orders/{$orderId}");
+    }
+
+    /** "Received USD 1,800.00 at today's exchange rate of ₹83.2500 (= ₹149,850.00)." — the remittance + rate just recorded. */
+    private function remittanceStatement(int $orderId, float $amount, float $rate): string
+    {
+        $currency = (string) (OrderRepository::find($orderId)['currency_code'] ?? '');
+        return sprintf(
+            'Received %s %s at today\'s exchange rate of ₹%s (= ₹%s).',
+            $currency,
+            number_format($amount, 2),
+            number_format($rate, 4),
+            number_format($amount * $rate, 2)
+        );
     }
 }

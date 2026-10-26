@@ -83,7 +83,11 @@ describe('Order screen redesign (Point 2/4)', () => {
     // step-sequence wrapper as its own step-card — nothing was dropped,
     // only re-parented and re-labelled with the user's own 0-17 step
     // numbering.
-    const sectionCountTotal = (html.match(/<details class="step-card/g) || []).length;
+    // Counted from the page body: shared card macros defined above it
+    // (e.g. the two Compliance Checklist cards, rendered inside Steps 7 and
+    // 10) aren't sections of their own.
+    const bodyStart = html.indexOf('<div class="card page-wide">');
+    const sectionCountTotal = (html.slice(bodyStart).match(/<details class="step-card/g) || []).length;
     const afterPanels = html.slice(panelsStart);
     const sectionCountInsidePanels = (afterPanels.match(/<details class="step-card/g) || []).length;
     expect(sectionCountInsidePanels).toBe(sectionCountTotal);
@@ -167,6 +171,9 @@ describe('Order screen redesign (Point 2/4)', () => {
 
     expect(directStepCardCount).toBe(17);
     expect(groupCount).toBe(9);
-    expect(groupedStepCardCount).toBe(39);
+    // 40 since 2026-10-26: +1 Step 7e Supplier Advance Paid, +1 Step 10a
+    // Supplier Balance Paid, -1 the old Step 8b Compliance Checklist (now two
+    // cards rendered from a shared macro at the start of Steps 7 and 10).
+    expect(groupedStepCardCount).toBe(40);
   });
 });

@@ -31,7 +31,10 @@ through the normal review/approval/send cycle before it reaches the buyer —
 see [Document Review & Approval](./13-document-review-approval.md) for that
 full workflow. Generating or even approving the OC does **not** pass Stage
 4's gate by itself; only the acknowledgment (by whichever of the three paths
-below) does.
+below) does. On the order page this is **6a** Generate the OC, **6b**
+Generate the Buyer Action Link (the link the buyer acknowledges through),
+then **6c** Record the Buyer's Acknowledgement — completed by the buyer
+(link or portal) or by staff.
 
 Once the OC has actually been emailed, the order page shows exactly where
 things stand and offers the one thing staff can still do here — record an

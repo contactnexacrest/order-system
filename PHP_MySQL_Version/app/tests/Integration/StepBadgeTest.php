@@ -53,14 +53,14 @@ final class StepBadgeTest extends DbTestCase
 
         self::assertStringContainsString('<span class="step-badge" title="Step 1a">1a</span>', $output);
         // A freshly-created order has only Stage 1 unlocked. 5a (PI Form
-        // Link) and 6c (Buyer Action Link) are deliberate exceptions —
+        // Link) and 6b (Buyer Action Link) are deliberate exceptions —
         // both are optional, never-blocking alternate channels available
         // from the very first render regardless of stage ("entirely
         // optional and never blocks anything" per docs/SOP), not part of
         // the gated sequence — so every OTHER badge must be absent.
         self::assertStringContainsString('title="Step 5a"', $output);
-        self::assertStringContainsString('title="Step 6c"', $output);
-        $stripped = preg_replace('/class="step-badge" title="Step (1a|5a|6c)">[^<]*<\/span>/', '', $output);
+        self::assertStringContainsString('title="Step 6b"', $output);
+        $stripped = preg_replace('/class="step-badge" title="Step (1a|5a|6b)">[^<]*<\/span>/', '', $output);
         self::assertStringNotContainsString('class="step-badge"', $stripped, 'no other step badge may leak onto a brand-new order');
     }
 
@@ -71,7 +71,7 @@ final class StepBadgeTest extends DbTestCase
         // than what has actually unlocked so far — the literal promise of
         // this feature ("staff can't skip or forget a step" also means
         // staff are never shown a later step before an earlier one). 5a
-        // and 6c are excluded as documented above — they are intentionally
+        // and 6b are excluded as documented above — they are intentionally
         // not stage-gated. The order-detail-page rebuild relabelled every
         // badge to the user's own step numbering rather than the DB's
         // stage_number, so a badge's own digit prefix no longer equals its
@@ -99,10 +99,10 @@ final class StepBadgeTest extends DbTestCase
             '1a' => 1,
             '4a' => 2, '4b' => 2, '4c' => 2,
             '5c' => 3, '5d' => 3, '5e' => 3,
-            '6a' => 4, '6b' => 4,
-            '7a' => 5, '7b' => 5, '7c' => 5, '7d' => 5,
+            '6a' => 4, '6c' => 4,
+            '7a' => 5, '7b' => 5, '7c' => 5, '7d' => 5, '7e' => 5,
             '9a' => 6, '9b' => 6, '9c' => 6, '9d' => 6,
-            '10a' => 7, '10b' => 7, '10c' => 7, '10d' => 7, '10e' => 7,
+            '10a' => 7, '10b' => 7, '10c' => 7, '10d' => 7, '10e' => 7, '10f' => 7,
             '11a' => 8, '11b' => 8, '11c' => 8, '11d' => 8,
             '13a' => 9, '13b' => 9, '13c' => 9, '13d' => 9, '13e' => 9, '13f' => 9, '13g' => 9,
         ];
@@ -114,7 +114,7 @@ final class StepBadgeTest extends DbTestCase
             $output = $this->render($orderId);
             preg_match_all('/class="step-badge" title="Step ([0-9a-z]+)"/', $output, $matches);
             foreach ($matches[1] as $badge) {
-                if ($badge === '5a' || $badge === '6c') {
+                if ($badge === '5a' || $badge === '6b') {
                     continue;
                 }
                 self::assertArrayHasKey($badge, $badgeStage, "unrecognised step badge '{$badge}' — update this test's badge-to-stage map");

@@ -854,9 +854,17 @@ async function findByValidBuyerActionToken(rawToken) {
   );
 }
 
+/** Owner decision (2026-10-26): staff record that the client won't use the PI-stage form, unlocking Step 5c. */
+async function markPiFormSkipped(orderId, userId, reason) {
+  await db.execute(
+    'UPDATE orders SET pi_form_skipped_at = NOW(), pi_form_skipped_by = :user_id, pi_form_skip_reason = :reason WHERE id = :id',
+    { user_id: userId, reason, id: orderId }
+  );
+}
+
 module.exports = {
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
-  generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot,
+  generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, markPiFormSkipped,
 };

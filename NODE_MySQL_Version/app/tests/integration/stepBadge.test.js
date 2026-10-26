@@ -40,7 +40,7 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
     }
   }
 
-  // 5a (PI Form Link) and 6c (Buyer Action Link) are deliberate exceptions
+  // 5a (PI Form Link) and 6b (Buyer Action Link) are deliberate exceptions
   // — both are optional, never-blocking alternate channels available from
   // the very first render regardless of stage ("entirely optional and
   // never blocks anything" per docs/SOP), not part of the gated sequence.
@@ -53,9 +53,9 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
 
     expect(res.text).toContain('<span class="step-badge" title="Step 1a">1a</span>');
     expect(res.text).toContain('title="Step 5a"');
-    expect(res.text).toContain('title="Step 6c"');
+    expect(res.text).toContain('title="Step 6b"');
 
-    const stripped = res.text.replace(/class="step-badge" title="Step (1a|5a|6c)">[^<]*<\/span>/g, '');
+    const stripped = res.text.replace(/class="step-badge" title="Step (1a|5a|6b)">[^<]*<\/span>/g, '');
     expect(stripped).not.toContain('class="step-badge"');
   });
 
@@ -87,10 +87,10 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
       '1a': 1,
       '4a': 2, '4b': 2, '4c': 2,
       '5c': 3, '5d': 3, '5e': 3,
-      '6a': 4, '6b': 4,
-      '7a': 5, '7b': 5, '7c': 5, '7d': 5,
+      '6a': 4, '6c': 4,
+      '7a': 5, '7b': 5, '7c': 5, '7d': 5, '7e': 5,
       '9a': 6, '9b': 6, '9c': 6, '9d': 6,
-      '10a': 7, '10b': 7, '10c': 7, '10d': 7, '10e': 7,
+      '10a': 7, '10b': 7, '10c': 7, '10d': 7, '10e': 7, '10f': 7,
       '11a': 8, '11b': 8, '11c': 8, '11d': 8,
       '13a': 9, '13b': 9, '13c': 9, '13d': 9, '13e': 9, '13f': 9, '13g': 9,
     };
@@ -104,7 +104,7 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
       const matches = [...res.text.matchAll(/class="step-badge" title="Step ([0-9a-z]+)"/g)];
       for (const match of matches) {
         const badge = match[1];
-        if (badge === '5a' || badge === '6c') { continue; }
+        if (badge === '5a' || badge === '6b') { continue; }
         expect(badgeStage).toHaveProperty(badge);
         expect(badgeStage[badge]).toBeLessThanOrEqual(reachedStage);
       }

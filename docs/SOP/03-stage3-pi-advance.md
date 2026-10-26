@@ -111,9 +111,13 @@ This is two separate steps, deliberately kept apart so a wire transfer that's
 been sent but not yet reconciled against the bank statement isn't confused
 with money that's actually landed:
 
-1. **Record Advance Remittance** — staff type the amount received and the
-   date, once the buyer's T/T notification comes in. This does **not** pass
-   the gate yet:
+1. **Record Advance Remittance** — staff type the amount received, the
+   date, and **today's exchange rate** (₹ per 1 unit of the order
+   currency), once the buyer's T/T notification comes in. The rate is
+   required and is recorded together with the remittance; the form reads
+   back "Received USD 1,800.00 at today's exchange rate of ₹83.2500
+   (= ₹149,850.00)" as you type. The freight and balance remittances work
+   the same way. This does **not** pass the gate yet:
 
    ![Payment Status after recording, before clearing](./images/s3_payment_status_recorded.png)
 

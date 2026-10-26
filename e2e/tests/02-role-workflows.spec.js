@@ -174,12 +174,31 @@ async function openCardAndAncestors(page, selector) {
   });
 }
 
+// The checklist is split in two (Step 7: with the Supplier PO; Step 10:
+// before shipment), each card with its own "Mark All N/A".
 async function resolveComplianceChecklistIfNeeded(page, orderId) {
-  await openCardAndAncestors(page, '#compliance-checklist');
-  const markAllNaForm = page.locator(`form[action="/orders/${orderId}/compliance-tasks/mark-all-na"]`);
-  if (await markAllNaForm.count() === 0) { return; }
-  await markAllNaForm.locator('input[name="skip_reason"]').fill('Not applicable to this smoke-test order');
-  await markAllNaForm.getByRole('button', { name: 'Mark All N/A' }).click();
+  for (const cardId of ['#compliance-checklist', '#compliance-checklist-shipment']) {
+    if (await page.locator(cardId).count() === 0) { continue; }
+    await openCardAndAncestors(page, cardId);
+    const markAllNaForm = page.locator(`${cardId} form[action="/orders/${orderId}/compliance-tasks/mark-all-na"]`);
+    if (await markAllNaForm.count() === 0) { continue; }
+    await markAllNaForm.locator('input[name="skip_reason"]').fill('Not applicable to this smoke-test order');
+    await markAllNaForm.getByRole('button', { name: 'Mark All N/A' }).click();
+    await expect(page.locator('.alert')).toBeVisible();
+  }
+}
+
+// Owner rule (2026-10-26): every sub-step waits for the one before it, so
+// the walk goes card by card. Submits the one form posting to `action`
+// (its card must already be unlocked), filling `fields` first, and waits
+// for the real page reload.
+async function submitStepForm(page, stageNumber, action, fields, buttonName) {
+  await openStage(page, stageNumber);
+  const form = page.locator(`form[action="${action}"]`);
+  for (const [name, value] of Object.entries(fields || {})) {
+    await form.locator(`[name="${name}"]`).fill(value);
+  }
+  await Promise.all([page.waitForEvent('load'), form.getByRole('button', { name: buttonName }).click()]);
   await expect(page.locator('.alert')).toBeVisible();
 }
 
@@ -305,6 +324,15 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     });
 
     await test.step('Admin — Stage 3 PI generate + approve (Accounts Executive holds neither generate_documents nor approve_documents)', async () => {
+      // 5c stays locked until the client's PI-stage form is applied — this
+      // client won't use it, so staff skip it (reason required).
+      await openStage(page, 3);
+      const skip = page.locator('details.pi-form-skip').first();
+      await skip.locator('summary').click();
+      await skip.locator('input[name="skip_reason"]').fill('Role-workflow client — details unchanged from the Quotation');
+      await skip.getByRole('button', { name: /Skip PI Form/ }).click();
+      await expect(page.locator('.alert')).toContainText('PI-stage form skipped');
+
       await generateDocument(page, orderId, 'PI', 'generated');
       await adminAssignSelfAndApprove(page, 'PI');
     });
@@ -317,6 +345,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await openStage(page, 3);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
       await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
+      await recordForm.locator('input[name="advance_exchange_rate"]').fill('90.25');
       await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
@@ -337,6 +366,9 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await page.goto(`/orders/${orderId}`);
       await generateDocument(page, orderId, 'OC', 'generated');
       await approveAsAdmin(page, orderId, 'OC', 'exportExecutive');
+
+      // 6b: the buyer's action link; 6c: their acknowledgement.
+      await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /Generate Buyer Action Link/);
 
       await openStage(page, 4);
       const ackForm = page.locator(`form[action="/orders/${orderId}/oc-acknowledgment"]`);
@@ -394,6 +426,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await openStage(page, 6);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/freight"]`);
       await recordForm.locator('input[name="freight_amount"]').fill('1070.00');
+      await recordForm.locator('input[name="freight_exchange_rate"]').fill('90.5');
       await recordForm.getByRole('button', { name: 'Record Freight Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
@@ -403,7 +436,20 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await expect(page.locator('.alert')).toContainText('unlocked');
     });
 
-    await test.step('Logistics Executive — Stage 7 packing, shipping, BL confirm (manage_shipping)', async () => {
+    await logout(page);
+
+    await test.step('Accounts Executive — Step 10a supplier balance paid before packing (manage_supplier_payments)', async () => {
+      await login(page, 'accountsExecutive');
+      await page.goto(`/orders/${orderId}`);
+      await submitStepForm(page, 7, `/orders/${orderId}/supplier-po/balance-paid`, { amount_paid_inr: '45000' }, 'Mark Balance Paid');
+      await expect(page.locator('.alert')).toContainText('balance payment recorded');
+    });
+
+    await logout(page);
+
+    await test.step('Logistics Executive — Stage 7 packing, packing list, shipping, BLI, BL confirm (manage_shipping)', async () => {
+      await login(page, 'logisticsExecutive');
+      await page.goto(`/orders/${orderId}`);
       await openStage(page, 7);
       const packingForm = page.locator(`form[action="/orders/${orderId}/packing"]`);
       await packingForm.locator('input[name="actual_quantity_packed"]').fill('100');
@@ -413,6 +459,9 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await packingForm.locator('input[name="total_cbm"]').fill('12.5');
       await packingForm.getByRole('button', { name: 'Save Packing & Crates' }).click();
       await expect(page.locator('.alert')).toBeVisible();
+
+      await generateDocument(page, orderId, 'PL', 'generated');
+      await approveAsAdmin(page, orderId, 'PL', 'logisticsExecutive');
 
       await openStage(page, 7);
       const shippingForm = page.locator(`form[action="/orders/${orderId}/shipping"]`);
@@ -424,8 +473,6 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await shippingForm.getByRole('button', { name: 'Save Shipping Details' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
-      await generateDocument(page, orderId, 'PL', 'generated');
-      await approveAsAdmin(page, orderId, 'PL', 'logisticsExecutive');
       await generateDocument(page, orderId, 'BLI', 'generated');
       await approveAsAdmin(page, orderId, 'BLI', 'logisticsExecutive');
 
@@ -443,6 +490,8 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await page.goto(`/orders/${orderId}`);
       await generateDocument(page, orderId, 'CI', 'generated');
       await approveAsAdmin(page, orderId, 'CI', 'exportExecutive');
+      // 11b: the scanned BL copy goes to the buyer before the balance (manage_shipping).
+      await submitStepForm(page, 8, `/orders/${orderId}/scanned-bl-sent`, {}, /Mark Scanned BL Copy Sent/);
     });
 
     await logout(page);
@@ -452,6 +501,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await page.goto(`/orders/${orderId}`);
       await openStage(page, 8);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
+      await recordForm.locator('input[name="balance_exchange_rate"]').fill('91');
       await recordForm.getByRole('button', { name: 'Record Balance Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
@@ -493,6 +543,12 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       // unresolved — bulk-resolve it here (close_orders also governs
       // this card, so Logistics Executive can do it themselves).
       await resolveComplianceChecklistIfNeeded(page, orderId);
+
+      // 13b–13f: original BLs received, endorsed, endorsement details, printed (manage_shipping).
+      await submitStepForm(page, 9, `/orders/${orderId}/bl-originals-received`, {}, /Record Original BLs Received/);
+      await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsed`, {}, /Mark Original BLs Endorsed/);
+      await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsement`, { bl_number: `ROLE-BL-${UNIQUE}` }, /Save BL Endorsement Details/);
+      await submitStepForm(page, 9, `/orders/${orderId}/bl-endorsement/generate`, {}, /Generate \/ Print BL Endorsement/);
 
       await openStage(page, 9);
       const closeForm = page.locator(`form[action="/orders/${orderId}/close"]`);

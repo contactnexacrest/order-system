@@ -16,11 +16,18 @@ const complianceTaskTypeRepository = require('../repositories/complianceTaskType
 async function index(req, res) {
   res.renderView('compliance_task_types/index', {
     taskTypes: await complianceTaskTypeRepository.all(true),
+    phases: complianceTaskTypeRepository.PHASES,
   }, 'layout/base');
 }
 
+/** The posted phase, falling back to 'shipment' for anything not in PHASES. */
+function phaseFromBody(req) {
+  const phase = scalarString(req.body.phase);
+  return Object.prototype.hasOwnProperty.call(complianceTaskTypeRepository.PHASES, phase) ? phase : 'shipment';
+}
+
 async function createForm(req, res) {
-  res.renderView('compliance_task_types/create', {}, 'layout/base');
+  res.renderView('compliance_task_types/create', { phases: complianceTaskTypeRepository.PHASES }, 'layout/base');
 }
 
 async function create(req, res) {
@@ -31,7 +38,7 @@ async function create(req, res) {
     return;
   }
 
-  const id = await complianceTaskTypeRepository.create(name, req.user.id);
+  const id = await complianceTaskTypeRepository.create(name, req.user.id, phaseFromBody(req));
   await auditLogRepository.log(req.user.id, 'COMPLIANCE_TASK_TYPE_ADDED', 'compliance_task_types', id, null, null, name);
   flash.set(req, 'success', `"${name}" added to the compliance checklist — it now appears on every order's checklist.`);
   res.redirect('/compliance-task-types');
@@ -44,7 +51,7 @@ async function editForm(req, res) {
     res.status(404).send('Compliance task type not found.');
     return;
   }
-  res.renderView('compliance_task_types/edit', { taskType }, 'layout/base');
+  res.renderView('compliance_task_types/edit', { taskType, phases: complianceTaskTypeRepository.PHASES }, 'layout/base');
 }
 
 async function update(req, res) {
@@ -62,7 +69,7 @@ async function update(req, res) {
     return;
   }
 
-  await complianceTaskTypeRepository.update(id, name);
+  await complianceTaskTypeRepository.update(id, name, phaseFromBody(req));
   await auditLogRepository.log(req.user.id, 'COMPLIANCE_TASK_TYPE_UPDATED', 'compliance_task_types', id, 'name', taskType.name, name);
   flash.set(req, 'success', `"${name}" updated.`);
   res.redirect('/compliance-task-types');

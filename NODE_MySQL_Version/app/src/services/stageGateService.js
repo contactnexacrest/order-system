@@ -79,6 +79,20 @@ async function isUnlocked(orderId, stageNumber) {
 }
 
 /**
+ * True once a stage is in progress or already passed (order still active)
+ * — for actions that stay valid after the gate, like paying the supplier's
+ * balance before packing, long after Stage 5 passed.
+ */
+async function isReachedOrPassed(orderId, stageNumber) {
+  const order = await orderRepository.find(orderId);
+  if (!order || order.status !== 'active') {
+    return false;
+  }
+  const stage = await orderStageRepository.findByOrderAndStageNumber(orderId, stageNumber);
+  return !!stage && ['in_progress', 'gate_passed'].includes(stage.status);
+}
+
+/**
  * Call immediately after Stage 5 (Supplier PO) passes. FOB orders skip
  * Stage 6 (Freight Payment) entirely — buyer arranges/pays freight
  * directly; NexaCrest never issues a Freight Debit Note for FOB.
@@ -113,4 +127,4 @@ async function currentStage(orderId) {
   return stages.length ? stages[stages.length - 1] : null;
 }
 
-module.exports = { passAndUnlockNext, isUnlocked, maybeAutoSkipFreightStage, currentStage };
+module.exports = { passAndUnlockNext, isUnlocked, maybeAutoSkipFreightStage, currentStage, isReachedOrPassed };

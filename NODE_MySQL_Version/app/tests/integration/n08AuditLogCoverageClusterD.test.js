@@ -177,7 +177,7 @@ describe('Audit log coverage, N-08 Cluster D', () => {
     await unlockThrough(orderId, 5);
     const userId = await createTestUser();
 
-    await ordersController.recordFreightPayment(fakeReq(orderId, userId, { freight_amount: '750' }), fakeRes());
+    await ordersController.recordFreightPayment(fakeReq(orderId, userId, { freight_amount: '750', freight_exchange_rate: '83.5' }), fakeRes());
 
     expect((await lastAuditLogAction()).action_type).toBe('FREIGHT_PAYMENT_RECORDED');
   });

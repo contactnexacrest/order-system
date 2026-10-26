@@ -107,15 +107,17 @@ final class OrderProcessStepperTest extends DbTestCase
      * scroll-to-current-card had nothing to scroll to (page stayed at the
      * top). Steps 1-7 done + checklist outstanding is exactly that state.
      */
-    public function testStepGroup8OpensWhenComplianceChecklistIsTheCurrentStep(): void
+    public function testComplianceChecklistOpensInsideStep7WhileTasksAreOutstanding(): void
     {
+        // Owner request (2026-10-26): the checklist is split by phase — the
+        // "with the Supplier PO" part sits at the start of Step 7 and opens
+        // with it while anything there is still outstanding.
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->createTestDocument($orderId, 'QT', 'sent');
         $this->createTestDocument($orderId, 'BUYERPO');
-        foreach ([1, 2, 3, 4, 5] as $stageNumber) {
-            $stage = \App\Repositories\OrderStageRepository::findByOrderAndStageNumber($orderId, $stageNumber);
-            \App\Repositories\OrderStageRepository::passGate((int) $stage['id'], $userId);
+        foreach ([1, 2, 3, 4] as $stageNumber) {
+            \App\Services\StageGateService::passAndUnlockNext($orderId, $stageNumber, $userId);
         }
         \App\Repositories\OrderComplianceTaskRepository::initializeForOrder($orderId);
 
@@ -124,8 +126,10 @@ final class OrderProcessStepperTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
+        self::assertStringContainsString('id="step-group-stage-5" open', $output);
         self::assertStringContainsString('id="compliance-checklist" open', $output);
-        self::assertStringContainsString('id="step-group-stage-production" open', $output);
+        self::assertLessThan(strpos($output, 'id="step-7a-supplier-po-terms"'), strpos($output, 'id="compliance-checklist"'), 'it is the first card in Step 7');
+        self::assertStringContainsString('id="compliance-checklist-shipment"', $output, 'the before-shipment part sits in Step 10');
     }
 
     /**

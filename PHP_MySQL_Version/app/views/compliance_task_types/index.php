@@ -7,13 +7,14 @@
     <p><a href="/compliance-task-types/create" class="btn-sm btn-accent">Add Task Type</a></p>
 
     <table class="list">
-      <tr><th>Task Name</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Task Name</th><th>When</th><th>Status</th><th>Actions</th></tr>
       <?php if (empty($taskTypes)): ?>
-      <tr><td colspan="3" class="muted">No compliance task types yet — add the first one above.</td></tr>
+      <tr><td colspan="4" class="muted">No compliance task types yet — add the first one above.</td></tr>
       <?php endif; ?>
       <?php foreach ($taskTypes as $t): ?>
       <tr>
         <td><?= htmlspecialchars($t['name']) ?></td>
+        <td><?= htmlspecialchars(\App\Repositories\ComplianceTaskTypeRepository::PHASES[$t['phase'] ?? 'shipment'] ?? $t['phase']) ?></td>
         <td><span class="badge <?= $t['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $t['is_active'] ? 'Active' : 'Inactive' ?></span></td>
         <td class="action-buttons">
           <a href="/compliance-task-types/<?= (int) $t['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>

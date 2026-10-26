@@ -182,14 +182,18 @@ as many times as needed if the underlying order data changes.
 
 ## Compliance Checklist
 
-A "Compliance Checklist" panel sits on every order's own page as **Step
-8b** (alongside "Production & Estimated Shipment" as 8a, under the
-shared "Production & Pre-Shipment Compliance" group — see [Stage
-5](./05-stage5-supplier-po.md#production--estimated-shipment--and-where-its-history-lives))
-tracking pre-closure compliance tasks — ECGC Cover, Pre-Shipment
+The "Compliance Checklist" is split in two by **when the task is done**
+(set per task type by Admin in
+[Compliance Task Types](./15-admin-settings.md) — "With the Supplier PO"
+or "Before shipment"): the **with-the-Supplier-PO** part (Due Diligence,
+ECGC Cover by default) is the first card of **Step 7**, and the
+**before-shipment** part (Fumigation, Phytosanitary, Pre-Shipment
+Inspection by default) is the first card of **Step 10**. Outstanding
+tasks show amber but run alongside the other sub-steps — they never lock
+them. Together they keep
+track of pre-closure compliance tasks — ECGC Cover, Pre-Shipment
 Inspection, Fumigation Certificate, Phytosanitary Certificate, Due
-Diligence by default; Admin can add more from
-[Compliance Task Types](./15-admin-settings.md). **A real row for every
+Diligence by default; Admin can add more. **A real row for every
 active task type is written the moment the order is created** — never
 left as a missing row standing in for "not applicable," so a report run
 directly against the underlying table always has an explicit value for
@@ -199,10 +203,15 @@ own starting value), **Pending Approval**, **Approved**, or **Skipped
 to this order" still needs to be recorded, not just silently left
 blank.
 
+Each row **saves on its own** (its own Save button, no page reload), so
+choices made on other rows stay as they are; the reason box appears only
+when **Skipped (Not Applicable)** is chosen, and any problem is shown
+right on that row.
+
 For a repeat order where the whole checklist genuinely doesn't apply, a
 **"Mark all remaining tasks Not Applicable"** action (appears only while
 something is still outstanding) resolves every currently-unresolved task
-in one submit with one shared reason, instead of skipping each task
+in that part of the checklist in one submit with one shared reason, instead of skipping each task
 individually.
 
 Visibility of the whole panel, and every status change on it (including

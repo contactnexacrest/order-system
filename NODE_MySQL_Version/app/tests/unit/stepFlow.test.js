@@ -4,7 +4,7 @@ const { computeStepFlow } = require('../../src/helpers/stepFlow');
 
 function states(overrides) {
   const base = {};
-  for (const key of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's8b', 's9', 's10', 's11', 's12', 's13']) {
+  for (const key of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13']) {
     base[key] = 'locked';
   }
   for (const key of ['s14', 's15', 's16', 's17', 's18']) {
@@ -32,13 +32,16 @@ describe('computeStepFlow (order page step/sub-step progression)', () => {
     expect(flow.currentUserStep).toBe('s5');
   });
 
-  it('keeps an outstanding checklist (s8b) amber but skips it as the current step once the pipeline is past it', () => {
-    const before = computeStepFlow(states({ s1: 'done', s7: 'done', s8: 'done', s8b: 'current', s9: 'locked' }), {});
-    const after = computeStepFlow(states({ s1: 'done', s10: 'done', s8b: 'current', s11: 'current' }), {});
+  // Owner request (2026-10-26): supplier payments (7e / 10a) always show
+  // their own real status — a finished step never paints them done.
+  it('keeps the supplier payment sub-steps honest after their step is done', () => {
+    const flow = computeStepFlow(
+      states({ s1: 'done', s7: 'done', s8: 'current' }),
+      { s7: { '7a': true, '7b': true, '7c': true, '7d': true, '7e': false } }
+    );
 
-    expect(before.currentUserStep).toBe('s8b');
-    expect(after.stepStates.s8b).toBe('current');
-    expect(after.currentUserStep).toBe('s11');
+    expect(flow.subStepStatus('s7', '7d')).toBe('done');
+    expect(flow.subStepStatus('s7', '7e')).toBe('current');
   });
 
   it('opens only the first unfinished sub-step of the current step and ticks the done ones', () => {
@@ -52,7 +55,8 @@ describe('computeStepFlow (order page step/sub-step progression)', () => {
     expect(flow.subStepStatus('s5', '5c')).toBe('locked');
     expect(flow.subCardOpen('s5', '5a')).toBe('');
     expect(flow.subCardOpen('s5', '5b')).toBe(' open');
-    expect(flow.subCardOpen('s5', '5c')).toBe('');
+    // Owner rule (2026-10-26): a sub-step waiting on the one before it is locked.
+    expect(String(flow.subCardOpen('s5', '5c'))).toBe(' data-locked="Complete Step 5b first"');
   });
 
   it('counts earlier sub-steps done when a later one is, and leaves optional ones following their step', () => {
@@ -70,7 +74,7 @@ describe('computeStepFlow (order page step/sub-step progression)', () => {
 
     expect(flow.subStepStatus('s4', '4a')).toBe('done');
     expect(flow.subStepStatus('s6', '6a')).toBe('locked');
-    expect(flow.subCardOpen('s6', '6a')).toBe('');
+    expect(String(flow.subCardOpen('s6', '6a'))).toBe(' data-locked="Complete the previous step first"');
   });
 
   // Owner request (2026-10-25): the active step and sub-step must stand out.

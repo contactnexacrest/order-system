@@ -178,7 +178,7 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         $this->unlockThrough($orderId, 5);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
-        $_POST = ['freight_amount' => '750'];
+        $_POST = ['freight_amount' => '750', 'freight_exchange_rate' => '83.5'];
 
         ob_start();
         (new OrderController())->recordFreightPayment(['id' => (string) $orderId]);

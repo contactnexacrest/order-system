@@ -46,6 +46,7 @@ async function forOrder(orderId) {
     `SELECT
         tt.id AS task_type_id,
         tt.name AS task_type_name,
+        tt.phase,
         COALESCE(oct.status, 'not_started') AS status,
         oct.skip_reason,
         oct.resolved_at,

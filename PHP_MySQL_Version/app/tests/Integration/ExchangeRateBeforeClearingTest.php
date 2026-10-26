@@ -53,7 +53,9 @@ final class ExchangeRateBeforeClearingTest extends DbTestCase
 
         $output = $this->renderOrderShow($orderId);
 
-        self::assertStringNotContainsString('name="advance_exchange_rate"', $output, 'there is nothing to fix a rate against until an amount is actually on record');
+        // The remittance form itself now asks for the day's rate alongside
+        // the amount; what must not appear yet is the separate CA rate box.
+        self::assertStringNotContainsString('/payment/advance/exchange-rate"', $output, 'there is nothing to fix a rate against until an amount is actually on record');
     }
 
     public function testAdvanceExchangeRateFormStillWorksAfterClearing(): void

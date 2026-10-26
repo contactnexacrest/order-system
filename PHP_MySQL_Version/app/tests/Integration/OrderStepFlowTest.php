@@ -106,20 +106,41 @@ final class OrderStepFlowTest extends DbTestCase
         self::assertTrue($this->cardIsOpen($output, 'step-5d-payment-record'));
     }
 
-    public function testOutstandingComplianceStaysAmberButNoLongerClaimsThePageOncePastIt(): void
+    public function testOutstandingComplianceRunsAlongsideAndNeverLocksTheSteps(): void
     {
+        // Owner request (2026-10-26): the checklist sits at the start of
+        // Steps 7 and 10, split by phase; outstanding tasks stay amber but
+        // never lock the sub-steps next to them.
         $orderId = $this->orderAtStep5();
         OrderComplianceTaskRepository::initializeForOrder($orderId);
-        foreach ([3, 4, 5, 6, 7] as $stageNumber) {
+        foreach ([3, 4, 5, 6] as $stageNumber) {
             StageGateService::passAndUnlockNext($orderId, $stageNumber, $this->userId);
         }
 
         $output = $this->render($orderId);
 
-        self::assertStringContainsString('compliance tasks still open', $output);
-        self::assertSame('current', $this->cardIcon($output, 'compliance-checklist'), '8b stays honest');
-        self::assertFalse($this->cardIsOpen($output, 'compliance-checklist'), 'but the page opens the real next action instead');
-        self::assertTrue($this->cardIsOpen($output, 'step-group-stage-8'), 'Step 11 (DB stage 8) is the current step');
+        self::assertSame('done', $this->cardIcon($output, 'step-7d-supplier-po-signed'));
+        self::assertSame('current', $this->cardIcon($output, 'compliance-checklist'), 'the Step 7 checklist stays honest');
+        self::assertSame('current', $this->cardIcon($output, 'compliance-checklist-shipment'));
+        self::assertTrue($this->cardIsOpen($output, 'compliance-checklist-shipment'), 'Step 10 is current, so its checklist opens');
+        self::assertStringNotContainsString('id="step-10a-supplier-balance-paid" data-locked', $output, 'outstanding compliance never locks 10a');
+    }
+
+    public function testASubStepWaitingOnTheOneBeforeItIsLocked(): void
+    {
+        // Owner rule (2026-10-26): a sub-step can't be opened until the one
+        // before it is complete — e.g. the PI can't be generated until the
+        // client's PI-stage form is applied or skipped.
+        $orderId = $this->orderAtStep5();
+
+        $output = $this->render($orderId);
+        self::assertStringContainsString('id="step-5c-pi-generate" data-locked="Complete Step 5a first"', $output);
+
+        \App\Repositories\OrderRepository::markPiFormSkipped($orderId, $this->userId, 'Repeat buyer, nothing changed');
+        $output = $this->render($orderId);
+        self::assertSame('done', $this->cardIcon($output, 'step-5b-pi-intake-apply'));
+        self::assertStringNotContainsString('id="step-5c-pi-generate" data-locked', $output);
+        self::assertTrue($this->cardIsOpen($output, 'step-5c-pi-generate'));
     }
 
     public function testLaterStepDoneMarksEveryEarlierPipelineStepDone(): void

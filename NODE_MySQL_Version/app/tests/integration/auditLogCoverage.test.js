@@ -140,7 +140,7 @@ describe('Audit log coverage (External QA report L-23)', () => {
     await stageGateService.passAndUnlockNext(orderId, 2, null);
 
     await ordersController.recordAdvancePayment(
-      fakeReq({ id: userId }, { advance_amount: '1000.00', advance_received_at: '2026-01-10' }, { id: String(orderId) }),
+      fakeReq({ id: userId }, { advance_amount: '1000.00', advance_received_at: '2026-01-10', advance_exchange_rate: '83.5' }, { id: String(orderId) }),
       fakeRes()
     );
     const recordedLog = await latestLogFor('ADVANCE_PAYMENT_RECORDED');
@@ -168,7 +168,7 @@ describe('Audit log coverage (External QA report L-23)', () => {
     await createTestDocument(orderId, 'CI', 'sent');
 
     await ordersController.recordBalancePayment(
-      fakeReq({ id: userId }, { balance_amount: '1500.00', balance_received_at: '2026-03-01' }, { id: String(orderId) }),
+      fakeReq({ id: userId }, { balance_amount: '1500.00', balance_received_at: '2026-03-01', balance_exchange_rate: '84' }, { id: String(orderId) }),
       fakeRes()
     );
     const recordedLog = await latestLogFor('BALANCE_PAYMENT_RECORDED');

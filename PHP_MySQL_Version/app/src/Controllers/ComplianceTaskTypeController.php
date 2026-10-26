@@ -43,7 +43,7 @@ final class ComplianceTaskTypeController
         }
 
         $user = AuthService::currentUser();
-        $id = ComplianceTaskTypeRepository::create($name, (int) $user['id']);
+        $id = ComplianceTaskTypeRepository::create($name, (int) $user['id'], self::phaseFromPost());
         AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_TYPE_ADDED', 'compliance_task_types', $id, null, null, $name);
         Flash::set('success', "\"{$name}\" added to the compliance checklist — it now appears on every order's checklist.");
         header('Location: /compliance-task-types');
@@ -79,7 +79,7 @@ final class ComplianceTaskTypeController
         }
 
         $user = AuthService::currentUser();
-        ComplianceTaskTypeRepository::update($id, $name);
+        ComplianceTaskTypeRepository::update($id, $name, self::phaseFromPost());
         AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_TYPE_UPDATED', 'compliance_task_types', $id, 'name', $taskType['name'], $name);
         Flash::set('success', "\"{$name}\" updated.");
         header('Location: /compliance-task-types');
@@ -124,5 +124,12 @@ final class ComplianceTaskTypeController
         AuditLogRepository::log((int) $user['id'], 'COMPLIANCE_TASK_TYPE_DELETED', 'compliance_task_types', $id, 'name', $taskType['name'], null);
         Flash::set('success', "\"{$taskType['name']}\" removed from the task-type list.");
         header('Location: /compliance-task-types');
+    }
+
+    /** The posted phase, falling back to 'shipment' for anything not in ComplianceTaskTypeRepository::PHASES. */
+    private static function phaseFromPost(): string
+    {
+        $phase = Input::scalarString($_POST['phase'] ?? '');
+        return array_key_exists($phase, ComplianceTaskTypeRepository::PHASES) ? $phase : 'shipment';
     }
 }

@@ -187,11 +187,19 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await poForm.getByRole('button', { name: 'Confirm Buyer PO Received' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
+    // 5c stays locked until the client's PI-stage form is applied — skip it.
+    await openStage(page, 3);
+    const piSkip = page.locator('details.pi-form-skip').first();
+    await piSkip.locator('summary').click();
+    await piSkip.locator('input[name="skip_reason"]').fill('Test client — details unchanged from the Quotation');
+    await piSkip.getByRole('button', { name: /Skip PI Form/ }).click();
+    await expect(page.locator('.alert')).toContainText('PI-stage form skipped');
     await generateAndApprove('PI', 3);
 
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
+    await recordForm.locator('input[name="advance_exchange_rate"]').fill('90.25');
     await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 

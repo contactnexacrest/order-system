@@ -1130,6 +1130,31 @@ async function removeAssignee(req, res) {
  * configured yet (emailService degrades to a log line in that case,
  * never a thrown error).
  */
+/**
+ * Owner decision (2026-10-26): Step 5c (Generate PI) stays locked until the
+ * client's PI-stage form is applied (5b) — so when a client won't use the
+ * form, staff record that here (reason required, audit-logged), which
+ * completes 5a/5b and unlocks 5c.
+ */
+async function skipPiForm(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await orderRepository.find(orderId))) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const reason = str(req.body.skip_reason);
+  const error = reasonValidator.check(reason);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect(`/orders/${orderId}#step-5b-pi-intake-apply`);
+    return;
+  }
+  await orderRepository.markPiFormSkipped(orderId, req.user.id, reason);
+  await auditLogRepository.log(req.user.id, 'PI_FORM_SKIPPED', 'orders', orderId, 'pi_form_skipped_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '), reason);
+  flash.set(req, 'success', 'PI-stage form skipped — Step 5c (Generate Proforma Invoice) is now open.');
+  res.redirect(`/orders/${orderId}`);
+}
+
 async function generatePiFormLink(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -1435,6 +1460,13 @@ async function showRemovedAdditionalDocuments(req, res) {
   });
 }
 
+/** "Received USD 1,800.00 at today's exchange rate of ₹83.2500 (= ₹149,850.00)." — the remittance + rate just recorded. */
+async function remittanceStatement(orderId, amount, rate) {
+  const order = await orderRepository.find(orderId);
+  const fmt = (n, digits) => Number(n).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return `Received ${(order && order.currency_code) || ''} ${fmt(amount, 2)} at today's exchange rate of ₹${fmt(rate, 4)} (= ₹${fmt(amount * rate, 2)}).`;
+}
+
 async function recordAdvancePayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const amount = parseFloat(req.body.advance_amount || 0);
@@ -1444,7 +1476,17 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner request (2026-10-26): the day's exchange rate is recorded
+  // together with the remittance itself.
+  const rate = parseFloat(req.body.advance_exchange_rate || 0);
+  if (!(rate > 0)) {
+    flash.set(req, 'error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderPaymentStatusRepository.recordAdvanceReceived(orderId, amount, receivedAt);
+  await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', rate, req.user ? req.user.id : null);
+  await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'advance_exchange_rate', null, String(rate));
   // External QA report L-23: advance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'advance_amount', null, String(amount));
 
@@ -1460,7 +1502,7 @@ async function recordAdvancePayment(req, res) {
     }
   }
 
-  flash.set(req, 'success', 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
+  flash.set(req, 'success', `${await remittanceStatement(orderId, amount, rate)} ${'Advance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -2057,7 +2099,7 @@ function validateSupplierPoPayment(req, res, orderId) {
  */
 async function markSupplierAdvancePaid(req, res) {
   const orderId = parseInt(req.params.id, 10);
-  if (!(await stageGateService.isUnlocked(orderId, 5))) {
+  if (!(await stageGateService.isReachedOrPassed(orderId, 5))) {
     flash.set(req, 'error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2084,7 +2126,7 @@ async function markSupplierAdvancePaid(req, res) {
 /** Order-page polish round: same missing isUnlocked(5) gate as markSupplierAdvancePaid() above — see its docblock. */
 async function markSupplierBalancePaid(req, res) {
   const orderId = parseInt(req.params.id, 10);
-  if (!(await stageGateService.isUnlocked(orderId, 5))) {
+  if (!(await stageGateService.isReachedOrPassed(orderId, 5))) {
     flash.set(req, 'error', 'Stage 5 has not been unlocked for this order yet — complete Stage 4 first.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2201,11 +2243,21 @@ async function recordFreightPayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner request (2026-10-26): the day's exchange rate is recorded
+  // together with the remittance itself.
+  const rate = parseFloat(req.body.freight_exchange_rate || 0);
+  if (!(rate > 0)) {
+    flash.set(req, 'error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderPaymentStatusRepository.recordFreightReceived(orderId, amount, receivedAt);
+  await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'freight', rate, req.user ? req.user.id : null);
+  await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'freight_exchange_rate', null, String(rate));
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
   await auditLogRepository.log(req.user.id, 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', orderId, 'freight_amount', null, String(amount));
-  flash.set(req, 'success', 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
+  flash.set(req, 'success', `${await remittanceStatement(orderId, amount, rate)} ${'Freight remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -2608,10 +2660,20 @@ async function recordBalancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner request (2026-10-26): the day's exchange rate is recorded
+  // together with the remittance itself.
+  const rate = parseFloat(req.body.balance_exchange_rate || 0);
+  if (!(rate > 0)) {
+    flash.set(req, 'error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderPaymentStatusRepository.recordBalanceReceived(orderId, amount, receivedAt);
+  await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'balance', rate, req.user ? req.user.id : null);
+  await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'balance_exchange_rate', null, String(rate));
   // External QA report L-23: balance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'balance_amount', null, String(amount));
-  flash.set(req, 'success', 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
+  flash.set(req, 'success', `${await remittanceStatement(orderId, amount, rate)} ${'Balance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -3161,31 +3223,43 @@ async function markFullySettled(req, res) {
 async function updateComplianceTask(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  // Owner request (2026-10-26): each checklist row saves on its own without
+  // reloading the page (so other rows' unsaved choices stay put) — the
+  // page's script posts with X-Requested-With and gets JSON back.
+  const wantsJson = String(req.get ? (req.get('X-Requested-With') || '') : '').toLowerCase() === 'xmlhttprequest';
+  const respond = (ok, message, extra = {}) => {
+    if (wantsJson) {
+      res.status(ok ? 200 : 422).json({ ok, message, ...extra });
+      return;
+    }
+    flash.set(req, ok ? 'success' : 'error', message);
+    res.redirect(`/orders/${orderId}#compliance-checklist`);
+  };
   if (!req.permissions || !req.permissions.close_orders) {
-    flash.set(req, 'error', 'You do not have permission to update the compliance checklist.');
-    res.redirect(`/orders/${orderId}`);
+    respond(false, 'You do not have permission to update the compliance checklist.');
     return;
   }
 
   const taskTypeId = parseInt(req.body.task_type_id, 10) || 0;
   const status = str(req.body.status);
   if (taskTypeId <= 0 || !Object.prototype.hasOwnProperty.call(orderComplianceTaskRepository.STATUSES, status)) {
-    flash.set(req, 'error', 'Select a valid compliance task and status.');
-    res.redirect(`/orders/${orderId}#compliance-checklist`);
+    respond(false, 'Select a valid compliance task and status.');
     return;
   }
 
   const skipReason = str(req.body.skip_reason);
   if (status === 'skipped' && skipReason === '') {
-    flash.set(req, 'error', 'A reason is required to mark a compliance task as not applicable/skipped.');
-    res.redirect(`/orders/${orderId}#compliance-checklist`);
+    respond(false, 'A reason is required to mark a compliance task as not applicable/skipped.');
     return;
   }
 
   await orderComplianceTaskRepository.setStatus(orderId, taskTypeId, status, status === 'skipped' ? skipReason : null, user.id);
   await auditLogRepository.log(user.id, 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', orderId, `compliance_task:${taskTypeId}`, null, status, status === 'skipped' ? skipReason : null);
-  flash.set(req, 'success', 'Compliance checklist updated.');
-  res.redirect(`/orders/${orderId}#compliance-checklist`);
+  const summary = await orderComplianceTaskRepository.summaryForOrder(orderId);
+  respond(true, `Saved — ${orderComplianceTaskRepository.STATUSES[status]}.`, {
+    resolved_text: `${new Date().toISOString().slice(0, 19).replace('T', ' ')} by ${user.name || 'you'}`,
+    outstanding: summary.outstanding,
+  });
 }
 
 /**
@@ -3211,8 +3285,11 @@ async function markAllComplianceTasksNotApplicable(req, res) {
     return;
   }
 
+  // Each checklist card (Step 7 / Step 10) offers this for its own phase.
+  const phase = str(req.body.phase);
   const tasks = await orderComplianceTaskRepository.forOrder(orderId);
-  const outstanding = tasks.filter((ct) => ct.status === 'not_started' || ct.status === 'pending_approval');
+  const outstanding = tasks.filter((ct) => (ct.status === 'not_started' || ct.status === 'pending_approval')
+    && (phase === '' || ct.phase === phase));
   for (const ct of outstanding) {
     await orderComplianceTaskRepository.setStatus(orderId, ct.task_type_id, 'skipped', skipReason, user.id);
     await auditLogRepository.log(user.id, 'COMPLIANCE_TASK_STATUS_UPDATED', 'orders', orderId, `compliance_task:${ct.task_type_id}`, ct.status, 'skipped', skipReason);
@@ -3476,7 +3553,7 @@ module.exports = {
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,
-  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
+  recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, createSupplierFactoryAddress, deleteSupplierFactoryAddress, confirmSupplierSigned, uploadSupplierPoDocument, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,

@@ -3958,3 +3958,22 @@ ALTER TABLE order_supplier_po
 
 INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('manage_suppliers', 'Manage suppliers', 'Add, edit, deactivate and delete suppliers (and their types and factory addresses) in the Suppliers directory the Supplier PO picks from. Same tier as manage_logistics_partners: Admin/MD/ED and Super Admin only by default.', 'catalog');
+
+-- ================================================================
+-- SECTION CA — ORDER PAGE FLOW (added 2026-10-26)
+-- ================================================================
+-- Step 5c (Generate PI) stays locked until the client's PI-stage form is
+-- applied; pi_form_skipped_* records staff skipping that form when a
+-- client won't use it. compliance_task_types.phase splits the Compliance
+-- Checklist into tasks done with the Supplier PO ('order', Step 7) and
+-- before shipment ('shipment', Step 10). See
+-- docs/migrations/2026-10-26b-order-page-flow.sql.
+-- ================================================================
+ALTER TABLE orders
+  ADD COLUMN pi_form_skipped_at  TIMESTAMP NULL,
+  ADD COLUMN pi_form_skipped_by  BIGINT UNSIGNED NULL,
+  ADD COLUMN pi_form_skip_reason VARCHAR(500) NULL,
+  ADD CONSTRAINT fk_orders_pi_form_skipped_by FOREIGN KEY (pi_form_skipped_by) REFERENCES users(id);
+
+ALTER TABLE compliance_task_types
+  ADD COLUMN phase ENUM('order','shipment') NOT NULL DEFAULT 'shipment' AFTER name;

@@ -133,6 +133,119 @@
     }
   }
 
+  // Owner request (2026-10-26): a remittance is recorded together with the
+  // day's exchange rate — this spells out what will be saved: "We received
+  // USD 1,800.00 at today's exchange rate of ₹83.2500 = ₹149,850.00".
+  function initRemittanceStatements() {
+    document.querySelectorAll('[data-remit-statement]').forEach(function (line) {
+      var form = line.closest('form');
+      var amountEl = form && form.querySelector('[data-remit-amount]');
+      var rateEl = form && form.querySelector('[data-remit-rate]');
+      if (!amountEl || !rateEl) return;
+      var currency = line.getAttribute('data-currency') || '';
+      function money(n, digits) {
+        return n.toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+      }
+      function update() {
+        var amount = parseFloat(amountEl.value);
+        var rate = parseFloat(rateEl.value);
+        if (!(amount > 0) || !(rate > 0)) {
+          line.textContent = 'Enter the amount received and today\'s exchange rate — both are recorded together.';
+          return;
+        }
+        line.textContent = 'We received ' + currency + ' ' + money(amount, 2) + ' at today\'s exchange rate of \u20B9' + money(rate, 4) + ' = \u20B9' + money(amount * rate, 2) + '.';
+      }
+      amountEl.addEventListener('input', update);
+      rateEl.addEventListener('input', update);
+      update();
+    });
+  }
+
+  // Owner request (2026-10-26): each Compliance Checklist row saves on its
+  // own, without reloading the page — so choices made on other rows but not
+  // yet saved stay put. The reason box only shows for "Skipped", and a
+  // missing/short reason is flagged right on that row.
+  function initComplianceRows() {
+    document.querySelectorAll('form.compliance-row-form').forEach(function (form) {
+      var status = form.querySelector('select[name="status"]');
+      var reason = form.querySelector('input[name="skip_reason"]');
+      var result = form.querySelector('.compliance-row-result');
+      var button = form.querySelector('button[type="submit"]');
+      function syncReason() {
+        if (!reason || !status) return;
+        var skipped = status.value === 'skipped';
+        reason.style.display = skipped ? '' : 'none';
+        reason.required = skipped;
+        // The sitewide reason hint/error sits next to the box — hide it too.
+        form.querySelectorAll('.reason-hint, .reason-error').forEach(function (el) {
+          el.style.display = skipped ? '' : 'none';
+        });
+      }
+      function show(message, isError) {
+        if (!result) return;
+        result.textContent = message;
+        result.className = 'compliance-row-result small ' + (isError ? 'form-field-error' : 'compliance-row-saved');
+      }
+      if (status) status.addEventListener('change', syncReason);
+      syncReason();
+      form.addEventListener('submit', function (e) {
+        // The page-wide pre-submit check (registered earlier) may already
+        // have refused this submit — respect that and stay put.
+        var refused = e.defaultPrevented;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (refused) return;
+        if (status && status.value === 'skipped' && reason && reason.value.trim().length < REASON_MIN_LENGTH) {
+          show('Give a reason of at least ' + REASON_MIN_LENGTH + ' characters to mark this Not Applicable.', true);
+          reason.focus();
+          return;
+        }
+        if (button) button.disabled = true;
+        show('Saving…', false);
+        fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+          credentials: 'same-origin'
+        }).then(function (res) {
+          return res.json().catch(function () { return { ok: false, message: 'Could not save — please reload the page and try again.' }; });
+        }).then(function (data) {
+          show(data.ok ? '\u2713 ' + data.message + (data.resolved_text ? ' ' + data.resolved_text : '') : (data.message || data.error || 'Could not save.'), !data.ok);
+          if (data.ok && typeof data.outstanding === 'number') {
+            document.querySelectorAll('[data-compliance-total-outstanding]').forEach(function (el) { el.textContent = data.outstanding; });
+          }
+        }).catch(function () {
+          show('Could not save — check your connection and try again.', true);
+        }).then(function () {
+          if (button) button.disabled = false;
+        });
+      }, true);
+    });
+  }
+
+  // Owner rule (2026-10-26): on the order page a sub-step can't be opened
+  // until the one before it is complete. The server marks such a card
+  // data-locked (CSS greys it and ignores clicks); this adds the "complete
+  // Step X first" label and keeps it shut against the keyboard or any
+  // script that tries to open it.
+  function initLockedSteps() {
+    document.querySelectorAll('details[data-locked]').forEach(function (card) {
+      var summary = card.querySelector(':scope > summary');
+      if (summary && !summary.querySelector('.step-locked-note')) {
+        var note = document.createElement('span');
+        note.className = 'step-locked-note';
+        note.textContent = '\uD83D\uDD12 ' + card.getAttribute('data-locked');
+        summary.appendChild(note);
+        summary.setAttribute('tabindex', '-1');
+        summary.setAttribute('aria-disabled', 'true');
+      }
+      card.open = false;
+      card.addEventListener('toggle', function () {
+        if (card.open) card.open = false;
+      });
+    });
+  }
+
   // Owner request (2026-10-25): "if any error occurs, whatever we filled
   // earlier should not disappear". Nearly every POST handler answers a
   // rejected submission with a redirect + error flash, which used to
@@ -363,6 +476,9 @@
     initTableScrollShadows();
     initReasonFieldValidation();
     initFormDraftRestore();
+    initLockedSteps();
+    initComplianceRows();
+    initRemittanceStatements();
   }
 
   if (document.readyState === 'loading') {

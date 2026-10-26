@@ -230,6 +230,13 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await expect(page.locator('.alert')).toContainText('unlocked');
       await assertNoHorizontalOverflow(page);
 
+      // 5c stays locked until the client's PI-stage form is applied — skip it.
+      await openStage(3);
+      const piSkip = page.locator('details.pi-form-skip').first();
+      await piSkip.locator('summary').click();
+      await piSkip.locator('input[name="skip_reason"]').fill('Test client — details unchanged from the Quotation');
+      await piSkip.getByRole('button', { name: /Skip PI Form/ }).click();
+      await expect(page.locator('.alert')).toContainText('PI-stage form skipped');
       await openStage(3);
       await docForm('PI').locator('button[type="submit"]').click();
       await expect(page.locator('.alert')).toContainText('generated');
@@ -238,6 +245,7 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await openStage(3);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
       await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
+      await recordForm.locator('input[name="advance_exchange_rate"]').fill('90.25');
       await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 
