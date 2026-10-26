@@ -3116,35 +3116,35 @@ $renderBuyerActionLink = function (string $badge, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/save-all">
         <?= Csrf::field() ?>
         <table class="list fin-benefits">
-          <tr><th>Scheme</th><th>Claim ref.</th><th>Claimed (&#8377;)</th><th>Claimed on</th><th>Received (&#8377;)</th><th>Received on</th><th>Status</th></tr>
+          <tr><th>Scheme</th><th>Claimed (&#8377;)</th><th>Received (&#8377;)</th></tr>
           <?php $__row = 0; ?>
           <?php foreach ($orderBenefitClaims as $b): ?>
           <tr>
-            <td><strong><?= htmlspecialchars($b['scheme_name']) ?></strong><input type="hidden" name="benefits[<?= $__row ?>][benefit_id]" value="<?= (int) $b['id'] ?>"></td>
-            <td><?= htmlspecialchars($b['reference_number'] ?? '—') ?></td>
-            <td><?= number_format((float) $b['claimed_amount'], 2) ?></td>
-            <td><?= htmlspecialchars((string) $b['claimed_at']) ?></td>
+            <td><strong><?= htmlspecialchars($b['scheme_name']) ?></strong><input type="hidden" name="benefits[<?= $__row ?>][benefit_id]" value="<?= (int) $b['id'] ?>"><br><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed — waiting</span>' ?></td>
+            <td><?= number_format((float) $b['claimed_amount'], 2) ?><br><span class="muted small"><?= htmlspecialchars($b['reference_number'] ?? 'no ref.') ?> · <?= htmlspecialchars((string) $b['claimed_at']) ?></span></td>
             <?php if ($b['received_amount'] !== null): ?>
-            <td><?= number_format((float) $b['received_amount'], 2) ?></td>
-            <td><?= htmlspecialchars((string) $b['received_at']) ?></td>
-            <td><span class="badge good">Received</span></td>
+            <td><?= number_format((float) $b['received_amount'], 2) ?><br><span class="muted small">on <?= htmlspecialchars((string) $b['received_at']) ?></span></td>
             <?php else: ?>
-            <td><input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="Amount received" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received amount"></td>
-            <td><input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>"></td>
-            <td><span class="badge">Claimed</span></td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="Amount received" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received amount">
+              <input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received on">
+            </td>
             <?php endif; ?>
           </tr>
           <?php $__row++; endforeach; ?>
           <?php foreach ($__finEligible as $sch): ?>
             <?php if (in_array($sch['scheme_name'], $__finClaimedNames, true)) { continue; } ?>
           <tr>
-            <td><strong><?= htmlspecialchars($sch['scheme_name']) ?></strong><input type="hidden" name="benefits[<?= $__row ?>][scheme_name]" value="<?= htmlspecialchars($sch['scheme_name']) ?>"></td>
-            <td><input type="text" name="benefits[<?= $__row ?>][reference_number]" placeholder="Shipping bill / scroll no."<?= $__benefitsDisabled ?>></td>
-            <td><input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][claimed_amount]" placeholder="Amount claimed" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claimed amount"<?= $__benefitsDisabled ?>></td>
-            <td><input type="date" name="benefits[<?= $__row ?>][claimed_at]" value="<?= date('Y-m-d') ?>"<?= $__benefitsDisabled ?>></td>
-            <td><input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="If already received"<?= $__benefitsDisabled ?>></td>
-            <td><input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>"<?= $__benefitsDisabled ?>></td>
-            <td><span class="badge warn">Not claimed</span></td>
+            <td><strong><?= htmlspecialchars($sch['scheme_name']) ?></strong><input type="hidden" name="benefits[<?= $__row ?>][scheme_name]" value="<?= htmlspecialchars($sch['scheme_name']) ?>"><br><span class="badge warn">Not claimed</span></td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][claimed_amount]" placeholder="Amount claimed" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claimed amount"<?= $__benefitsDisabled ?>>
+              <input type="text" name="benefits[<?= $__row ?>][reference_number]" placeholder="Shipping bill / scroll no." aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claim reference"<?= $__benefitsDisabled ?>>
+              <input type="date" name="benefits[<?= $__row ?>][claimed_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claimed on"<?= $__benefitsDisabled ?>>
+            </td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="If already received" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> received amount"<?= $__benefitsDisabled ?>>
+              <input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> received on"<?= $__benefitsDisabled ?>>
+            </td>
           </tr>
           <?php $__row++; endforeach; ?>
         </table>

@@ -156,7 +156,8 @@ fieldset.intake-step{padding-top:1.25rem;}
 .fin-add-cost-pick{font-weight:700;color:var(--navy);}
 .fin-add-cost-pick select{max-width:420px;}
 .fin-confirm{display:flex;flex-wrap:wrap;align-items:center;gap:0.6rem;margin-top:0.9rem;padding-top:0.75rem;border-top:1px solid var(--line);}
-.fin-benefits input{min-width:110px;}
+.fin-benefits input{min-width:0;width:100%;}
+.fin-benefits .fin-claim-cell input + input{margin-top:0.35rem;}
 @media (max-width:900px){.fin-kpis{grid-template-columns:1fr 1fr;} .fin-sub-summary{display:none;}}
 /* Owner request (2026-10-26): Buyer/Supplier Action Link pages — same look as the intake forms. */
 .action-step legend{flex-wrap:wrap;}

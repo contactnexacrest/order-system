@@ -2681,22 +2681,19 @@
       <form method="post" action="/orders/{{ order.id }}/export-benefits/save-all">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <table class="list fin-benefits">
-          <tr><th>Scheme</th><th>Claim ref.</th><th>Claimed (&#8377;)</th><th>Claimed on</th><th>Received (&#8377;)</th><th>Received on</th><th>Status</th></tr>
+          <tr><th>Scheme</th><th>Claimed (&#8377;)</th><th>Received (&#8377;)</th></tr>
           {% set row = 0 %}
           {% for b in orderBenefitClaims %}
           <tr>
-            <td><strong>{{ b.scheme_name }}</strong><input type="hidden" name="benefits[{{ row }}][benefit_id]" value="{{ b.id }}"></td>
-            <td>{{ b.reference_number or '—' }}</td>
-            <td>{{ b.claimed_amount | money }}</td>
-            <td>{{ b.claimed_at }}</td>
+            <td><strong>{{ b.scheme_name }}</strong><input type="hidden" name="benefits[{{ row }}][benefit_id]" value="{{ b.id }}"><br>{% if b.received_amount != null %}<span class="badge good">Received</span>{% else %}<span class="badge">Claimed — waiting</span>{% endif %}</td>
+            <td>{{ b.claimed_amount | money }}<br><span class="muted small">{{ b.reference_number or 'no ref.' }} · {{ b.claimed_at }}</span></td>
             {% if b.received_amount != null %}
-            <td>{{ b.received_amount | money }}</td>
-            <td>{{ b.received_at }}</td>
-            <td><span class="badge good">Received</span></td>
+            <td>{{ b.received_amount | money }}<br><span class="muted small">on {{ b.received_at }}</span></td>
             {% else %}
-            <td><input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="Amount received" aria-label="{{ b.scheme_name }} received amount"></td>
-            <td><input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}"></td>
-            <td><span class="badge">Claimed</span></td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="Amount received" aria-label="{{ b.scheme_name }} received amount">
+              <input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}" aria-label="{{ b.scheme_name }} received on">
+            </td>
             {% endif %}
           </tr>
           {% set row = row + 1 %}
@@ -2704,13 +2701,16 @@
           {% for sch in fin.eligible %}
             {% if sch.scheme_name not in fin.claimedNames %}
           <tr>
-            <td><strong>{{ sch.scheme_name }}</strong><input type="hidden" name="benefits[{{ row }}][scheme_name]" value="{{ sch.scheme_name }}"></td>
-            <td><input type="text" name="benefits[{{ row }}][reference_number]" placeholder="Shipping bill / scroll no."{{ benefitsDisabled }}></td>
-            <td><input type="number" step="0.01" min="0" name="benefits[{{ row }}][claimed_amount]" placeholder="Amount claimed" aria-label="{{ sch.scheme_name }} claimed amount"{{ benefitsDisabled }}></td>
-            <td><input type="date" name="benefits[{{ row }}][claimed_at]" value="{{ today() }}"{{ benefitsDisabled }}></td>
-            <td><input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="If already received"{{ benefitsDisabled }}></td>
-            <td><input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}"{{ benefitsDisabled }}></td>
-            <td><span class="badge warn">Not claimed</span></td>
+            <td><strong>{{ sch.scheme_name }}</strong><input type="hidden" name="benefits[{{ row }}][scheme_name]" value="{{ sch.scheme_name }}"><br><span class="badge warn">Not claimed</span></td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][claimed_amount]" placeholder="Amount claimed" aria-label="{{ sch.scheme_name }} claimed amount"{{ benefitsDisabled }}>
+              <input type="text" name="benefits[{{ row }}][reference_number]" placeholder="Shipping bill / scroll no." aria-label="{{ sch.scheme_name }} claim reference"{{ benefitsDisabled }}>
+              <input type="date" name="benefits[{{ row }}][claimed_at]" value="{{ today() }}" aria-label="{{ sch.scheme_name }} claimed on"{{ benefitsDisabled }}>
+            </td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="If already received" aria-label="{{ sch.scheme_name }} received amount"{{ benefitsDisabled }}>
+              <input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}" aria-label="{{ sch.scheme_name }} received on"{{ benefitsDisabled }}>
+            </td>
           </tr>
           {% set row = row + 1 %}
             {% endif %}
