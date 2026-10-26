@@ -406,6 +406,34 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .step-group-connector{display:flex;align-items:center;gap:0.4rem;padding:0 0.3rem;color:var(--ink-soft);font-size:0.72rem;}
 .step-group-connector::before{content:"\2193";color:var(--gold-strong);font-size:0.85rem;}
 .step-group > .step-card{margin:0;}
+
+/* Owner request (2026-10-26): the 19 steps grouped into five major sections
+   (Order Booking · Procurement & Production · Shipment & Balance · Closure &
+   Settlement · After-Sales & Records), collapsed by default — only the
+   section holding the current step opens. The current section gets the same
+   gold treatment as the current step inside it. */
+.phase-group{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:0 1rem;}
+.phase-group[open]{padding:0 1rem 1rem;display:flex;flex-direction:column;gap:0.9rem;}
+.phase-group > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:0.75rem;padding:1rem 0;}
+.phase-group > summary::-webkit-details-marker{display:none;}
+.phase-group > summary::after{content:"\25B8";color:var(--ink-soft);font-size:0.95rem;margin-left:0.25rem;}
+.phase-group[open] > summary::after{content:"\25BE";}
+.phase-group[open] > summary{border-bottom:1px solid var(--line);}
+.phase-tag{background:var(--navy);color:#fff;font-size:0.72rem;font-weight:800;border-radius:999px;padding:3px 10px;flex:none;}
+.phase-heading{display:flex;flex-direction:column;min-width:0;}
+.phase-heading h2{margin:0;font-size:1.05rem;color:var(--navy);display:flex;align-items:center;flex-wrap:wrap;gap:0.4rem;}
+.phase-sub{color:var(--ink-soft);font-size:0.78rem;}
+.phase-progress{margin-left:auto;text-align:right;font-size:0.75rem;color:var(--ink-soft);white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.phase-bar{display:block;width:120px;height:6px;border-radius:9px;background:var(--line);overflow:hidden;}
+.phase-bar i{display:block;height:100%;background:var(--success);}
+.phase-pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:0.7rem;font-weight:700;background:var(--navy-soft);color:var(--navy);}
+.phase-pill.warn{background:var(--danger-soft);color:var(--danger);}
+.step-card-icon.any{background:var(--navy-soft);color:var(--navy);}
+.phase-group:has(> summary > .step-card-icon.current){border:2px solid var(--gold);box-shadow:0 2px 10px rgba(201,150,43,0.18);}
+.phase-group:has(> summary > .step-card-icon.current) > summary .phase-tag{background:var(--gold-strong);}
+.phase-group:has(> summary > .step-card-icon.locked) > summary h2{color:var(--ink-soft);}
+.phase-group > .step-card,.phase-group > .step-group{margin:0;}
+@media (max-width:900px){.phase-progress{display:none;}.phase-group > summary{flex-wrap:wrap;}}
 /* Owner request (2026-10-25): the active step must stand out — driven by
    the same "current" status icon every step/sub-step header already
    carries, so no template changes. The current step box gets a gold frame

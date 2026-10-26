@@ -661,6 +661,44 @@ $stepStatusIcon = static function (string $status): string {
         default => '<span class="step-card-icon locked" aria-hidden="true">&#9675;</span>',
     };
 };
+// Owner request (2026-10-26): the 19 steps are grouped into five major
+// sections, collapsed by default — only the section holding the order's
+// current step opens on load. Steps 14-18 (after-sales records) are open
+// to use at any time, so their section has no progress of its own.
+$phases = [
+    'booking'    => ['A', 'Order Booking', 'Quotation → Buyer PO → PI & advance → Order Confirmation', ['1', '2', '3', '4', '5', '6']],
+    'production' => ['B', 'Procurement & Production', 'Supplier PO → production & estimated shipment', ['7', '8']],
+    'shipment'   => ['C', 'Shipment & Balance', 'Freight → packing & BL → commercial invoice & balance', ['9', '10', '11']],
+    'closure'    => ['D', 'Closure & Settlement', 'Financials & benefits → documents despatched → fully settled', ['12', '13', '19']],
+    'aftersales' => ['E', 'After-Sales & Records', 'Additional documents · communication · feedback · complaints · disputes · amendments', []],
+];
+$phaseState = static function (string $key) use ($phases, $stepStates, $currentUserStep): string {
+    $steps = $phases[$key][3];
+    if ($steps === []) {
+        return 'any';
+    }
+    if (in_array($currentUserStep, $steps, true) && $stepStates[$currentUserStep] !== 'done') {
+        return 'current';
+    }
+    $done = count(array_filter($steps, static fn (string $st): bool => $stepStates[$st] === 'done'));
+    return $done === count($steps) ? 'done' : 'locked';
+};
+$phaseOpen = static fn (string $key): string => in_array($currentUserStep, $phases[$key][3], true) ? ' open' : '';
+$phaseSummary = static function (string $key, string $badges = '') use ($phases, $stepStates, $phaseState, $stepStatusIcon): string {
+    [$letter, $title, $sub, $steps] = $phases[$key];
+    $state = $phaseState($key);
+    $icon = $state === 'any' ? '<span class="step-card-icon any" aria-hidden="true">&#8634;</span>' : $stepStatusIcon($state);
+    if ($steps === []) {
+        $progress = '<span class="phase-progress">available any time</span>';
+    } else {
+        $done = count(array_filter($steps, static fn (string $st): bool => $stepStates[$st] === 'done'));
+        $progress = '<span class="phase-progress">' . $done . ' of ' . count($steps) . ' steps done'
+            . '<span class="phase-bar"><i style="width:' . (int) round(100 * $done / count($steps)) . '%"></i></span></span>';
+    }
+    return '<summary>' . $icon . '<span class="phase-tag">' . $letter . '</span>'
+        . '<span class="phase-heading"><h2>' . htmlspecialchars($title) . $badges . '</h2><span class="phase-sub">' . htmlspecialchars($sub) . '</span></span>'
+        . $progress . '</summary>';
+};
 // Owner request (2026-10-26): the Compliance Checklist is split by when
 // each task is done — "order" tasks (Due Diligence, ECGC Cover...) sit at the
 // start of Step 7 alongside the Supplier PO; "shipment" tasks (Fumigation,
@@ -1190,8 +1228,9 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     </div>
   </details>
 
-  <details class="step-card step-card-reference" id="document-review-approval"<?= !empty($documents) ? ' open' : '' ?>>
-    <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small><?php if ($docPendingActions): ?> <span class="nav-badge doc-pending-badge"><?= count($docPendingActions) ?> need<?= count($docPendingActions) === 1 ? 's' : '' ?> action</span><?php endif; ?></h2></summary>
+  <?php // Owner decision (2026-10-26): opens by itself only when a document is waiting on someone; otherwise a slim bar with the count. ?>
+  <details class="step-card step-card-reference" id="document-review-approval"<?= $docPendingActions ? ' open' : '' ?>>
+    <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small><?php if ($docPendingActions): ?> <span class="nav-badge doc-pending-badge"><?= count($docPendingActions) ?> need<?= count($docPendingActions) === 1 ? 's' : '' ?> action</span><?php elseif ($documents): ?> <span class="phase-pill"><?= count($documents) ?> document<?= count($documents) === 1 ? '' : 's' ?></span><?php endif; ?></h2></summary>
     <?php if ($docPendingActions): ?>
     <div class="review-banner warn doc-pending-actions">
       <div><strong>Waiting on someone — don't move on without these:</strong>
@@ -1487,6 +1526,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       </details>
     <?php endforeach; ?>
   </details>
+
+  <details class="phase-group" id="phase-booking"<?= $phaseOpen('booking') ?>>
+    <?= $phaseSummary('booking') ?>
+
   <details class="step-card" id="step-1-quotation-prepare"<?= $stepCardOpen('1') ?>>
     <summary><?= $stepStatusIcon($stepStates['1']) ?><span class="step-group-num">STEP 1</span><h2>Prepare Quotation</h2></summary>
     <?php
@@ -1897,6 +1940,11 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
   </details>
 
+  </details>
+
+  <details class="phase-group" id="phase-production"<?= $phaseOpen('production') ?>>
+    <?= $phaseSummary('production') ?>
+
   <details class="step-group" id="step-group-stage-5"<?= $stepCardOpen('7') ?>>
     <summary><?= $stepStatusIcon($stepStates['7']) ?><span class="step-group-num">STEP 7</span><h3>Supplier PO</h3></summary>
 
@@ -2265,6 +2313,11 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   </details>
 
   </details>
+
+  </details>
+
+  <details class="phase-group" id="phase-shipment"<?= $phaseOpen('shipment') ?>>
+    <?= $phaseSummary('shipment') ?>
 
   <?php if ($isFob): ?>
   <?php // FOB: the buyer arranges and pays freight, so this whole step never applies — shown greyed out, with nothing to expand. ?>
@@ -2693,6 +2746,11 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   </details>
 
   </details>
+
+  </details>
+
+  <details class="phase-group" id="phase-closure"<?= $phaseOpen('closure') ?>>
+    <?= $phaseSummary('closure') ?>
 
   <?php if ($canManageOrderFinancials): ?>
   <details class="step-card" id="order-financials"<?= $stepCardOpen('12') ?>>
@@ -3168,6 +3226,20 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
   </details>
 
+  <details class="step-card" id="step-complete"<?= $stepCardOpen('19') ?>>
+    <summary><?= $stepStatusIcon($stepStates['19']) ?><span class="step-group-num">STEP 19</span><h2>Order Complete</h2></summary>
+    <?php if ($orderClosed): ?>
+      <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
+    <?php else: ?>
+      <p class="muted">Not yet complete — finish Step 13g above (Mark Fully Settled) to close this order.</p>
+    <?php endif; ?>
+  </details>
+
+  </details>
+
+  <details class="phase-group" id="phase-aftersales"<?= $phaseOpen('aftersales') ?>>
+    <?= $phaseSummary('aftersales', ($openComplaintCount > 0 ? '<span class="phase-pill warn">' . (int) $openComplaintCount . ' open complaint' . ($openComplaintCount === 1 ? '' : 's') . '</span>' : '') . ($openDisputeCount > 0 ? '<span class="phase-pill warn">' . (int) $openDisputeCount . ' open dispute' . ($openDisputeCount === 1 ? '' : 's') . '</span>' : '')) ?>
+
   <?php if ($canManageOrders): ?>
   <details class="step-card step-card-reference" id="amendments">
     <summary><h2>Amendments <small class="muted">(reference — mutually-agreed term changes)</small></h2></summary>
@@ -3321,13 +3393,6 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     </p>
   </details>
 
-  <details class="step-card" id="step-complete"<?= $stepCardOpen('19') ?>>
-    <summary><?= $stepStatusIcon($stepStates['19']) ?><span class="step-group-num">STEP 19</span><h2>Order Complete</h2></summary>
-    <?php if ($orderClosed): ?>
-      <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
-    <?php else: ?>
-      <p class="muted">Not yet complete — finish Step 13g above (Mark Fully Settled) to close this order.</p>
-    <?php endif; ?>
   </details>
 
   <?php if ($canEditLockedData): ?>
@@ -3562,7 +3627,11 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     if (initialId && document.getElementById(initialId)) {
       openAndScrollTo(initialId);
     } else {
-      var openCards = panelsContainer.querySelectorAll('details[open]');
+      // Inside the five sections first — a pinned reference card (Document
+      // Review opens itself when something needs action) must not steal
+      // the landing spot from the order's actual current step.
+      var openCards = panelsContainer.querySelectorAll('.phase-group details[open]');
+      if (!openCards.length) { openCards = panelsContainer.querySelectorAll('details[open]'); }
       var current = null;
       for (var i = 0; i < openCards.length; i++) {
         if (!openCards[i].querySelector('details[open]')) { current = openCards[i]; break; }

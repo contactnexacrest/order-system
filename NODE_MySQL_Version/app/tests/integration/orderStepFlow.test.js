@@ -151,6 +151,21 @@ describe('Order page sequential step flow', () => {
     expect(text.indexOf('id="step-11f-bl-endorsement-generate"')).toBeLessThan(text.indexOf('id="step-11c-bl-endorsed-mark"'));
   });
 
+  it('opens only the section holding the current step', async () => {
+    // Owner request (2026-10-26): the steps are grouped into five sections,
+    // collapsed by default except the one being worked on.
+    const { text } = await agent.get(`/orders/${await orderAtStep5()}`);
+
+    expect(cardIsOpen(text, 'phase-booking')).toBe(true);
+    expect(cardIcon(text, 'phase-booking')).toBe('current');
+    for (const phase of ['phase-production', 'phase-shipment', 'phase-closure', 'phase-aftersales']) {
+      expect(text).toContain(`id="${phase}">`);
+    }
+    expect(cardIcon(text, 'phase-production')).toBe('locked');
+    expect(text).toContain('available any time');
+    expect(text.indexOf('id="step-complete"')).toBeLessThan(text.indexOf('id="phase-aftersales"'));
+  });
+
   it('marks every earlier pipeline step done once a later one is', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await createTestDocument(orderId, 'QT', 'draft');

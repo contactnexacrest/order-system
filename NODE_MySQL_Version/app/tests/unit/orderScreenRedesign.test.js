@@ -142,38 +142,40 @@ describe('Order screen redesign (Point 2/4)', () => {
 
     const tokens = html.slice(panelsOpenPos).match(/<div\b[^>]*>|<\/div>|<details\b[^>]*>|<\/details>/g) || [];
 
-    let depth = 0;
-    let directStepCardCount = 0;
-    let groupCount = 0;
-    let groupedStepCardCount = 0;
-    let inGroupAtDepth = null;
+    // Owner request (2026-10-26): the steps now sit inside five major
+    // section boxes (<details class="phase-group">), so the expected shape
+    // is: #order-panels > [reference cards | phase-group] > [step-card |
+    // step-group] > step-card. A stack of each open element's kind tells
+    // exactly where every card landed.
+    const stack = [];
+    const counts = { direct: 0, phases: 0, phaseCards: 0, groups: 0, groupedCards: 0 };
     for (const token of tokens) {
       if (token === '</div>' || token === '</details>') {
-        depth--;
-        if (depth === 0) break; // #order-panels itself has closed
-        if (inGroupAtDepth !== null && depth < inGroupAtDepth) {
-          inGroupAtDepth = null;
-        }
+        stack.pop();
+        if (stack.length === 0) break; // #order-panels itself has closed
         continue;
       }
-      depth++;
-      if (depth === 2) {
-        if (token.startsWith('<details class="step-card')) {
-          directStepCardCount++;
-        } else if (token.startsWith('<details class="step-group"')) {
-          groupCount++;
-          inGroupAtDepth = depth;
-        }
-      } else if (depth === 3 && inGroupAtDepth === 2 && token.startsWith('<details class="step-card')) {
-        groupedStepCardCount++;
+      let kind = 'other';
+      if (token.startsWith('<details class="phase-group"')) kind = 'phase';
+      else if (token.startsWith('<details class="step-group"')) kind = 'group';
+      else if (token.startsWith('<details class="step-card')) kind = 'card';
+      const path = stack.join('>');
+      if (stack.length) {
+        if (kind === 'card' && path === 'panels') counts.direct++;
+        else if (kind === 'phase' && path === 'panels') counts.phases++;
+        else if (kind === 'card' && path === 'panels>phase') counts.phaseCards++;
+        else if (kind === 'group' && path === 'panels>phase') counts.groups++;
+        else if (kind === 'card' && path === 'panels>phase>group') counts.groupedCards++;
       }
+      stack.push(stack.length ? kind : 'panels');
     }
 
-    expect(directStepCardCount).toBe(17);
-    expect(groupCount).toBe(9);
-    // 40 since 2026-10-26: +1 Step 7e Supplier Advance Paid, +1 Step 10a
-    // Supplier Balance Paid, -1 the old Step 8b Compliance Checklist (now two
-    // cards rendered from a shared macro at the start of Steps 7 and 10).
-    expect(groupedStepCardCount).toBe(40);
+    // Products, Payment Overview, Document Review (pinned) + the two admin cards.
+    expect(counts.direct).toBe(5);
+    expect(counts.phases).toBe(5);
+    // Steps 1, 2, 3, the LC card, 12, 19, Amendments, 14-18.
+    expect(counts.phaseCards).toBe(12);
+    expect(counts.groups).toBe(9);
+    expect(counts.groupedCards).toBe(40);
   });
 });

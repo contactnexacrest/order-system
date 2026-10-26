@@ -235,9 +235,27 @@ Benefits & Costs → Closure — Documents & Settlement → Additional
 Documents → Communication → Feedback → Complaints → Disputes → Order
 Complete), each labelled with that step's own number (e.g. "Step 7 ·
 Supplier PO") so the screen's own order always matches the real order
-of work. The order's
-current step opens automatically; every other step-card starts
-collapsed — click its heading to open it. This is purely a layout and
+of work.
+
+**The steps are grouped into five sections** (owner request
+2026-10-26), each a collapsible box with its own status icon, a "x of y
+steps done" bar and any alert badges:
+
+| Section | Steps |
+|---|---|
+| **A · Order Booking** | 1–6: Quotation → send → acceptance → Buyer PO → PI & advance → Order Confirmation |
+| **B · Procurement & Production** | 7–8: Supplier PO → production & estimated shipment |
+| **C · Shipment & Balance** | 9–11: Freight → packing & BL → Commercial Invoice & balance |
+| **D · Closure & Settlement** | 12, 13 and 19: financials & benefits → documents despatched → fully settled → Order Complete |
+| **E · After-Sales & Records** | Amendments and 14–18: additional documents, communication, feedback, complaints, disputes — usable at any time, with open complaints/disputes shown on its header |
+
+Every section starts collapsed except the one holding the order's
+current step, which opens and scrolls to that step; inside it, the
+current step opens and the rest stay collapsed — click any heading to
+open it. Products, Payment Overview and Document Review & Approval stay
+pinned above the sections; Document Review opens by itself only when a
+document is waiting on someone (otherwise it shows just the number of
+documents). This is purely a layout and
 navigation change — nothing about what a section does, what permission
 it needs, or what button does what is any different; a section still
 works exactly as this SOP describes it, it's just reached by clicking

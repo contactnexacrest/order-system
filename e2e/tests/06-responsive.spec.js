@@ -159,6 +159,13 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
         .locator('details.step-card')
         .filter({ has: page.locator('summary', { hasText: 'Disputes' }) })
         .first();
+      // The steps are grouped into collapsible sections (2026-10-26): open
+      // After-Sales & Records with a tap, then the Disputes card inside it.
+      const afterSales = page.locator('#phase-aftersales');
+      expect(await afterSales.evaluate((el) => el.open)).toBe(false);
+      await afterSales.locator(':scope > summary').click();
+      expect(await afterSales.evaluate((el) => el.open)).toBe(true);
+      await assertNoHorizontalOverflow(page);
       expect(await disputesCard.evaluate((el) => el.open)).toBe(false);
       await disputesCard.locator('summary').click();
       expect(await disputesCard.evaluate((el) => el.open)).toBe(true);

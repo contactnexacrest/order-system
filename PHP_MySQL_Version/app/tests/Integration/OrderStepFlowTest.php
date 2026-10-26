@@ -163,6 +163,22 @@ final class OrderStepFlowTest extends DbTestCase
         self::assertLessThan(strpos($output, 'id="step-11c-bl-endorsed-mark"'), strpos($output, 'id="step-11f-bl-endorsement-generate"'), '13d (print) comes before 13e (endorsed)');
     }
 
+    public function testOnlyTheSectionHoldingTheCurrentStepStartsOpen(): void
+    {
+        // Owner request (2026-10-26): the steps are grouped into five
+        // sections, collapsed by default except the one being worked on.
+        $output = $this->render($this->orderAtStep5());
+
+        self::assertTrue($this->cardIsOpen($output, 'phase-booking'), 'Order Booking holds Step 5');
+        self::assertSame('current', $this->cardIcon($output, 'phase-booking'));
+        foreach (['phase-production', 'phase-shipment', 'phase-closure', 'phase-aftersales'] as $phase) {
+            self::assertStringContainsString('id="' . $phase . '">', $output, "{$phase} starts collapsed");
+        }
+        self::assertSame('locked', $this->cardIcon($output, 'phase-production'));
+        self::assertStringContainsString('available any time', $output);
+        self::assertLessThan(strpos($output, 'id="phase-aftersales"'), strpos($output, 'id="step-complete"'), 'Step 19 sits in Closure & Settlement');
+    }
+
     public function testLaterStepDoneMarksEveryEarlierPipelineStepDone(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());

@@ -403,6 +403,9 @@
 {% set stepStates = flow.stepStates %}
 {% set currentUserStep = flow.currentUserStep %}
 {% macro stepCardOpen(step) %}{{ flow.stepCardOpen(step) }}{% endmacro %}
+{# Owner request (2026-10-26): one of the five major sections' header —
+   ph comes from flow.phase(key) (helpers/stepFlow). #}
+{% macro phaseSummary(ph, badges = '') %}<summary>{% if ph.state == 'any' %}<span class="step-card-icon any" aria-hidden="true">&#8634;</span>{% else %}{{ stepStatusIcon(ph.state) }}{% endif %}<span class="phase-tag">{{ ph.letter }}</span><span class="phase-heading"><h2>{{ ph.title }}{{ badges | safe }}</h2><span class="phase-sub">{{ ph.sub }}</span></span>{% if ph.total %}<span class="phase-progress">{{ ph.done }} of {{ ph.total }} steps done<span class="phase-bar"><i style="width:{{ (100 * ph.done / ph.total) | round }}%"></i></span></span>{% else %}<span class="phase-progress">available any time</span>{% endif %}</summary>{% endmacro %}
 {% macro stepStatusIcon(status) %}{% if status == 'done' %}<span class="step-card-icon done" aria-hidden="true">&#10003;</span>{% elif status == 'current' %}<span class="step-card-icon current" aria-hidden="true">&#9679;</span>{% else %}<span class="step-card-icon locked" aria-hidden="true">&#9675;</span>{% endif %}{% endmacro %}
 
 <div class="card page-wide">
@@ -868,8 +871,9 @@
   </details>
 
   {% set pendingDocActions = docPendingActions(documents, mailSendingEnabled) %}
-  <details class="step-card step-card-reference" id="document-review-approval"{{ ' open' if (documents and documents.length) else '' }}>
-    <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small>{% if pendingDocActions.length %} <span class="nav-badge doc-pending-badge">{{ pendingDocActions.length }} need{{ 's' if pendingDocActions.length == 1 else '' }} action</span>{% endif %}</h2></summary>
+  {# Owner decision (2026-10-26): opens by itself only when a document is waiting on someone; otherwise a slim bar with the count. #}
+  <details class="step-card step-card-reference" id="document-review-approval"{{ ' open' if pendingDocActions.length else '' }}>
+    <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small>{% if pendingDocActions.length %} <span class="nav-badge doc-pending-badge">{{ pendingDocActions.length }} need{{ 's' if pendingDocActions.length == 1 else '' }} action</span>{% elif documents and documents.length %} <span class="phase-pill">{{ documents.length }} document{{ '' if documents.length == 1 else 's' }}</span>{% endif %}</h2></summary>
     {% if pendingDocActions.length %}
     <div class="review-banner warn doc-pending-actions">
       <div><strong>Waiting on someone — don't move on without these:</strong>
@@ -1138,6 +1142,10 @@
       </details>
     {% endfor %}
   </details>
+
+  {% set ph = flow.phase('booking') %}
+  <details class="phase-group" id="phase-booking"{{ ' open' if ph.open else '' }}>
+    {{ phaseSummary(ph) }}
 
   <details class="step-card" id="step-1-quotation-prepare"{{ stepCardOpen('s1') }}>
     <summary>{{ stepStatusIcon(stepStates['s1']) }}<span class="step-group-num">STEP 1</span><h2>Prepare Quotation</h2></summary>
@@ -1531,6 +1539,12 @@
 
   </details>
 
+  </details>
+
+  {% set ph = flow.phase('production') %}
+  <details class="phase-group" id="phase-production"{{ ' open' if ph.open else '' }}>
+    {{ phaseSummary(ph) }}
+
   <details class="step-group" id="step-group-stage-5"{{ stepCardOpen('s7') }}>
     <summary>{{ stepStatusIcon(stepStates['s7']) }}<span class="step-group-num">STEP 7</span><h3>Supplier PO</h3></summary>
 
@@ -1898,6 +1912,12 @@
 
 
   </details>
+
+  </details>
+
+  {% set ph = flow.phase('shipment') %}
+  <details class="phase-group" id="phase-shipment"{{ ' open' if ph.open else '' }}>
+    {{ phaseSummary(ph) }}
 
   {% if isFob %}
   {# FOB: the buyer arranges and pays freight, so this whole step never applies — shown greyed out, with nothing to expand. #}
@@ -2322,6 +2342,12 @@
   </details>
 
   </details>
+
+  </details>
+
+  {% set ph = flow.phase('closure') %}
+  <details class="phase-group" id="phase-closure"{{ ' open' if ph.open else '' }}>
+    {{ phaseSummary(ph) }}
 
   {% if canManageOrderFinancials %}
   <details class="step-card" id="order-financials"{{ stepCardOpen('s12') }}>
@@ -2787,6 +2813,22 @@
 
   </details>
 
+  <details class="step-card" id="step-complete"{{ stepCardOpen('s19') }}>
+    <summary>{{ stepStatusIcon(stepStates['s19']) }}<span class="step-group-num">STEP 19</span><h2>Order Complete</h2></summary>
+    {% if orderClosed %}
+    <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
+    {% else %}
+    <p class="muted">Not yet complete — finish Step 13g above (Mark Fully Settled) to close this order.</p>
+    {% endif %}
+  </details>
+
+  </details>
+
+  {% set aftersalesBadges %}{% if openComplaintCount > 0 %}<span class="phase-pill warn">{{ openComplaintCount }} open complaint{{ '' if openComplaintCount == 1 else 's' }}</span>{% endif %}{% if openDisputeCount > 0 %}<span class="phase-pill warn">{{ openDisputeCount }} open dispute{{ '' if openDisputeCount == 1 else 's' }}</span>{% endif %}{% endset %}
+  {% set ph = flow.phase('aftersales') %}
+  <details class="phase-group" id="phase-aftersales"{{ ' open' if ph.open else '' }}>
+    {{ phaseSummary(ph, aftersalesBadges) }}
+
   {% if permissions.manage_orders %}
   <details class="step-card step-card-reference" id="amendments">
     <summary><h2>Amendments <small class="muted">(reference — mutually-agreed term changes)</small></h2></summary>
@@ -2952,13 +2994,6 @@
     </p>
   </details>
 
-  <details class="step-card" id="step-complete"{{ stepCardOpen('s19') }}>
-    <summary>{{ stepStatusIcon(stepStates['s19']) }}<span class="step-group-num">STEP 19</span><h2>Order Complete</h2></summary>
-    {% if orderClosed %}
-    <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
-    {% else %}
-    <p class="muted">Not yet complete — finish Step 13g above (Mark Fully Settled) to close this order.</p>
-    {% endif %}
   </details>
 
   {% if permissions.edit_locked_data %}
@@ -3192,7 +3227,11 @@
     if (initialId && document.getElementById(initialId)) {
       openAndScrollTo(initialId);
     } else {
-      var openCards = panelsContainer.querySelectorAll('details[open]');
+      // Inside the five sections first — a pinned reference card (Document
+      // Review opens itself when something needs action) must not steal
+      // the landing spot from the order's actual current step.
+      var openCards = panelsContainer.querySelectorAll('.phase-group details[open]');
+      if (!openCards.length) { openCards = panelsContainer.querySelectorAll('details[open]'); }
       var current = null;
       for (var i = 0; i < openCards.length; i++) {
         if (!openCards[i].querySelector('details[open]')) { current = openCards[i]; break; }

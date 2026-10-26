@@ -177,43 +177,54 @@ final class OrderScreenRedesignTest extends TestCase
         preg_match_all('/<div\b[^>]*>|<\/div>|<details\b[^>]*>|<\/details>/', substr($html, $panelsOpenPos), $matches, PREG_OFFSET_CAPTURE);
         $tokens = $matches[0];
 
-        $depth = 0;
+        // Owner request (2026-10-26): the steps now sit inside five major
+        // section boxes (<details class="phase-group">), so the expected
+        // shape is: #order-panels > [reference cards | phase-group] >
+        // [step-card | step-group] > step-card. A stack of each open
+        // element's kind tells exactly where every card landed.
+        $stack = [];
         $directStepCardCount = 0;
+        $phaseCount = 0;
+        $phaseStepCardCount = 0;
         $groupCount = 0;
         $groupedStepCardCount = 0;
-        $inGroupAtDepth = null;
         foreach ($tokens as [$token, ]) {
             if ($token === '</div>' || $token === '</details>') {
-                $depth--;
-                if ($depth === 0) {
+                array_pop($stack);
+                if ($stack === []) {
                     // #order-panels itself has closed.
                     break;
                 }
-                if ($inGroupAtDepth !== null && $depth < $inGroupAtDepth) {
-                    $inGroupAtDepth = null;
-                }
                 continue;
             }
-            $depth++;
-            if ($depth === 2) {
-                if (str_starts_with($token, '<details class="step-card')) {
+            $kind = match (true) {
+                str_starts_with($token, '<details class="phase-group"') => 'phase',
+                str_starts_with($token, '<details class="step-group"') => 'group',
+                str_starts_with($token, '<details class="step-card') => 'card',
+                default => 'other',
+            };
+            $path = implode('>', $stack);
+            if ($stack !== []) {
+                if ($kind === 'card' && $path === 'panels') {
                     $directStepCardCount++;
-                } elseif (str_starts_with($token, '<details class="step-group"')) {
+                } elseif ($kind === 'phase' && $path === 'panels') {
+                    $phaseCount++;
+                } elseif ($kind === 'card' && $path === 'panels>phase') {
+                    $phaseStepCardCount++;
+                } elseif ($kind === 'group' && $path === 'panels>phase') {
                     $groupCount++;
-                    $inGroupAtDepth = $depth;
+                } elseif ($kind === 'card' && $path === 'panels>phase>group') {
+                    $groupedStepCardCount++;
                 }
-            } elseif ($depth === 3 && $inGroupAtDepth === 2 && str_starts_with($token, '<details class="step-card')) {
-                $groupedStepCardCount++;
             }
+            $stack[] = $stack === [] ? 'panels' : $kind;
         }
 
-        $this->assertSame(
-            17,
-            $directStepCardCount,
-            'Expected exactly 17 standalone step-card panels as direct children of #order-panels — a lower count means one panel\'s own markup never closed, silently nesting every panel after it inside the unclosed one (N-01). (Was 19 before the Compliance Checklist moved from its own standalone reference card into Step 8\'s group as "8b" — -1 for the standalone card removed, -1 for Step 8\'s former standalone card becoming that group\'s "8a".)'
-        );
-        $this->assertSame(9, $groupCount, 'Expected exactly 9 step-group wrapper boxes (Step 4, 5, 6, 7, 8 (Production), 9-freight, 10-packing/BL, 11 (CI&Balance), 13 (Documents & Settlement)) as direct children of #order-panels.');
-        $this->assertSame(40, $groupedStepCardCount, 'Expected exactly 40 step-cards nested one level inside a step-group box — together with the 17 standalone ones, every one of the 57 individual step/sub-step cards written in the page body. (Was 39: +1 Step 7e Supplier Advance Paid, +1 Step 10a Supplier Balance Paid, -1 the old Step 8b Compliance Checklist, now two shared cards rendered from a helper at the start of Steps 7 and 10.)');
+        $this->assertSame(5, $directStepCardCount, 'Expected exactly 5 cards directly in #order-panels: Products, Payment Overview, Document Review & Approval (pinned above the sections) and the two admin override cards below them. A different count means a card landed outside its section, or a panel\'s own markup never closed (N-01).');
+        $this->assertSame(5, $phaseCount, 'Expected the five major sections: Order Booking, Procurement & Production, Shipment & Balance, Closure & Settlement, After-Sales & Records.');
+        $this->assertSame(12, $phaseStepCardCount, 'Expected 12 standalone step-cards directly inside the sections (Steps 1, 2, 3, the LC card, 12, 19, Amendments, 14-18).');
+        $this->assertSame(9, $groupCount, 'Expected exactly 9 step-group boxes inside the sections (Step 4, 5, 6, 7, 8 (Production), 9-freight, 10-packing/BL, 11 (CI&Balance), 13 (Documents & Settlement)).');
+        $this->assertSame(40, $groupedStepCardCount, 'Expected exactly 40 step-cards nested inside a step-group box — every lettered sub-step card written in the page body.');
     }
 
     private function readCss(): string

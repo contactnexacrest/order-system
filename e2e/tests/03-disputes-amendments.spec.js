@@ -212,6 +212,12 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
         .locator('details.step-card')
         .filter({ has: page.locator('summary', { hasText: 'Disputes' }) })
         .first();
+      // It sits in the After-Sales & Records section, collapsed unless the
+      // order's current step is in it — open the section first.
+      const afterSales = page.locator('#phase-aftersales');
+      if (!(await afterSales.evaluate((el) => el.open))) {
+        await afterSales.locator(':scope > summary').click();
+      }
       if (!(await disputesCard.evaluate((el) => el.open))) {
         await disputesCard.locator('summary').click();
       }

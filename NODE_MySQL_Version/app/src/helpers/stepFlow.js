@@ -22,6 +22,18 @@ const { SafeString } = require('nunjucks').runtime;
 // and a finished step never paints them done.
 const HONEST_SUB_STEPS = new Set(['7e', '10a']);
 
+// Owner request (2026-10-26): the 19 steps are grouped into five major
+// sections, collapsed by default — only the section holding the order's
+// current step opens on load. Steps 14-18 (after-sales records) are open to
+// use at any time, so their section has no progress of its own.
+const PHASES = {
+  booking: { letter: 'A', title: 'Order Booking', sub: 'Quotation → Buyer PO → PI & advance → Order Confirmation', steps: ['s1', 's2', 's3', 's4', 's5', 's6'] },
+  production: { letter: 'B', title: 'Procurement & Production', sub: 'Supplier PO → production & estimated shipment', steps: ['s7', 's8'] },
+  shipment: { letter: 'C', title: 'Shipment & Balance', sub: 'Freight → packing & BL → commercial invoice & balance', steps: ['s9', 's10', 's11'] },
+  closure: { letter: 'D', title: 'Closure & Settlement', sub: 'Financials & benefits → documents despatched → fully settled', steps: ['s12', 's13', 's19'] },
+  aftersales: { letter: 'E', title: 'After-Sales & Records', sub: 'Additional documents · communication · feedback · complaints · disputes · amendments', steps: [] },
+};
+
 const PIPELINE_STEPS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13'];
 
 /**
@@ -89,6 +101,24 @@ function computeStepFlow(rawStepStates, rawSubStepDone) {
     stepCardOpen(step) {
       return step === currentUserStep ? ' open' : '';
     },
+    // One of the five sections: { letter, title, sub, state, open, done, total }
+    // — state is done/current/locked, or 'any' for the after-sales section.
+    phase(key) {
+      const phase = PHASES[key];
+      const done = phase.steps.filter((st) => stepStates[st] === 'done').length;
+      let state = 'any';
+      if (phase.steps.length) {
+        if (phase.steps.includes(currentUserStep) && stepStates[currentUserStep] !== 'done') {
+          state = 'current';
+        } else {
+          state = done === phase.steps.length ? 'done' : 'locked';
+        }
+      }
+      return {
+        letter: phase.letter, title: phase.title, sub: phase.sub, state,
+        open: phase.steps.includes(currentUserStep), done, total: phase.steps.length,
+      };
+    },
     // done/current/locked for one sub-step card: a done or locked step
     // overrides every sub-step; inside the current step, done sub-steps show
     // done, the first unfinished one is current, the rest wait their turn.
@@ -135,4 +165,4 @@ function computeStepFlow(rawStepStates, rawSubStepDone) {
   };
 }
 
-module.exports = { computeStepFlow };
+module.exports = { computeStepFlow, PHASES };
