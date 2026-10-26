@@ -243,8 +243,7 @@ test.describe('Email functionality — real attempts, right recipient, right att
       .first()
       .getAttribute('value');
     await page.locator('select[name="payment_preset_id"]').selectOption(presetValue);
-    await page.locator('input[name="indicative_freight_amount"]').fill('0');
-    await page.locator('input[name="indicative_insurance_amount"]').fill('0');
+    // FOB: the Indicative Freight / Insurance fields are hidden (buyer's own).
     await page.locator('input[name="product_description[]"]').first().fill('Granite Memorial Headstone');
     await page.locator('input[name="product_quantity[]"]').first().fill('50');
     await page.locator('input[name="product_unit_price[]"]').first().fill('60.00');

@@ -133,7 +133,10 @@ test.describe.serial('Client Intake -> PI Intake -> Reorder Request, one client 
     await page.goto(`/orders/${orderId}`);
     await openStage(page, 3);
     const linkForm = page.locator(`form[action="/orders/${orderId}/pi-form-link"]`);
-    await linkForm.getByRole('button', { name: /Generate PI Form Link/ }).click();
+    // The order is still at Step 1, so on the page Step 5's cards are locked
+    // (one step at a time, owner rule 2026-10-26); the server still issues
+    // the link at any stage, which is what this journey is about.
+    await Promise.all([page.waitForNavigation(), linkForm.evaluate((form) => form.requestSubmit())]);
     const alertText = await page.locator('.alert').textContent();
     const tokenMatch = alertText.match(/\/pi-details\/([a-f0-9]+)/);
     expect(tokenMatch, `expected a /pi-details/<token> link in the flash banner, got: "${alertText}"`).toBeTruthy();

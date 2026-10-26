@@ -32,6 +32,12 @@ test.describe('Form input is kept and checked before submit', () => {
     );
     await page.goto(`${orderHref}/edit`);
     await page.locator('input[name="estimated_gross_weight_kg"]').fill('27,000');
+    // An order already past its early stages asks for an override reason
+    // (required) — fill it so the comma check is what stops the submit.
+    const reason = page.locator(`form[action="${orderHref}/edit"] [name="reason"]`);
+    if (await reason.count()) {
+      await reason.first().fill('Correcting the estimated weight');
+    }
     await page.locator(`form[action="${orderHref}/edit"] button[type="submit"]`).first().click();
 
     await expect(page).toHaveURL(new RegExp(`${orderHref}/edit$`));
