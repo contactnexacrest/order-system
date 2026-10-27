@@ -60,14 +60,8 @@ use App\Repositories\OrderVendorBillRepository;
  */
 final class OrderProfitabilityService
 {
-    /**
-     * @param bool $withBillsAndExpenses false = the figures as they were
-     *        before vendor bills / order expenses (2026-10-27) — the CAFIN
-     *        document keeps using these until the owner approves its change
-     *        (no document change without showing before/after first).
-     * @return array<string,mixed>
-     */
-    public static function computeForOrder(int $orderId, bool $withBillsAndExpenses = true): array
+    /** @return array<string,mixed> */
+    public static function computeForOrder(int $orderId): array
     {
         $order = OrderRepository::find($orderId);
         $fobValue = OrderProductRepository::totalFobValue($orderId);
@@ -89,7 +83,7 @@ final class OrderProfitabilityService
         // never counted twice.
         $logisticsCostInr = 0.0;
         $oceanFreightBillsInr = null;
-        foreach ($withBillsAndExpenses ? OrderVendorBillRepository::forOrder($orderId, 'logistics') : [] as $bill) {
+        foreach (OrderVendorBillRepository::forOrder($orderId, 'logistics') as $bill) {
             if ($bill['bill_for'] === 'ocean_freight') {
                 $oceanFreightBillsInr = ($oceanFreightBillsInr ?? 0.0) + (float) $bill['total_inr'];
             } else {
@@ -102,7 +96,7 @@ final class OrderProfitabilityService
 
         // The order's actual expenses. Once any real travel expense is
         // recorded, it replaces the provisional travel % cost line.
-        $expenses = $withBillsAndExpenses ? OrderExpenseRepository::summary($orderId) : ['total' => 0.0, 'has_travel' => false];
+        $expenses = OrderExpenseRepository::summary($orderId);
 
         $costEntries = OrderCostEntryRepository::forOrder($orderId);
         $otherCostsInr = 0.0;

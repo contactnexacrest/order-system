@@ -10,8 +10,6 @@ use App\Helpers\DocumentImageOptimizer;
 use App\Helpers\MarkdownLite;
 use App\Repositories\AmendmentRepository;
 use App\Repositories\AuditLogRepository;
-use App\Repositories\CaExpenseRepository;
-use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
@@ -1073,16 +1071,9 @@ final class DocumentGenerationService
             throw new \RuntimeException('CAFIN document type is not seeded.');
         }
 
-        $benefits = CaExportBenefitRepository::forOrder($orderId);
-        $expenses = CaExpenseRepository::forOrder($orderId);
-        // Added alongside the Order Profitability Sheet (docs/schema.sql
-        // Section AP) — supplier pricing is exactly the kind of data this
-        // document exists for (internal-only, never client-facing) and was
-        // previously missing from it entirely.
-        $supplierPo = \App\Repositories\OrderSupplierPoRepository::findLatestForOrder($orderId);
-        $costEntries = \App\Repositories\OrderCostEntryRepository::forOrder($orderId);
-        // Unchanged by vendor bills / order expenses (2026-10-27) until the owner approves the CAFIN change.
-        $profitability = \App\Services\OrderProfitabilityService::computeForOrder($orderId, false);
+        // Owner request (2026-10-27, approved mockup, confirmed twice): the
+        // complete order snapshot, A to F — see CaFinancialSnapshotService.
+        $snapshot = \App\Services\CaFinancialSnapshotService::build($orderId);
 
         $revisionNumber = ReferenceNumberService::nextDocumentRevisionNumber($orderId, $docTypeId);
         $existing = DocumentRepository::findLatestForOrderAndType($orderId, $docTypeId);
@@ -1100,11 +1091,7 @@ final class DocumentGenerationService
                 'generated_date'     => (new \DateTimeImmutable())->format('d F Y H:i'),
                 'generated_by_name'  => \App\Repositories\UserRepository::findById($generatedByUserId)['name'] ?? 'Unknown',
             ],
-            'benefits' => $benefits,
-            'expenses' => $expenses,
-            'supplier_po' => $supplierPo,
-            'cost_entries' => $costEntries,
-            'profitability' => $profitability,
+            'snapshot' => $snapshot,
         ];
 
         $twig = self::twigEnvironment();

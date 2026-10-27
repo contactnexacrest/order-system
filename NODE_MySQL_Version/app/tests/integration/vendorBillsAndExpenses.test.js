@@ -183,7 +183,6 @@ describe('vendor bills and order expenses', () => {
     expect(after.expenses_inr).toBe(6200);
     expect(after.travel_is_provisional).toBe(false);
     expect(after.total_cost_inr).toBeCloseTo(before.total_cost_inr - 90000 + 85000 + 18500 + 6200 - 50000, 2);
-    expect((await orderProfitabilityService.computeForOrder(orderId, false)).total_cost_inr).toBe(before.total_cost_inr);
 
     await clearFreight(orderId);
     await pay(orderId, cha, 18500);

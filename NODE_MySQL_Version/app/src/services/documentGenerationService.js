@@ -10,17 +10,13 @@ const orderStorage = require('../helpers/orderStorage');
 const documentImageOptimizer = require('../helpers/documentImageOptimizer');
 const db = require('../config/db');
 const amendmentRepository = require('../repositories/amendmentRepository');
-const caExpenseRepository = require('../repositories/caExpenseRepository');
-const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderBlEndorsementRepository = require('../repositories/orderBlEndorsementRepository');
-const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
-const orderProfitabilityService = require('./orderProfitabilityService');
 const termsClauseRepository = require('../repositories/termsClauseRepository');
 const userRepository = require('../repositories/userRepository');
 const documentDataAssembler = require('./documentDataAssembler');
@@ -1112,32 +1108,9 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
     throw new Error('CAFIN document type is not seeded.');
   }
 
-  // mysql2 returns DECIMAL columns as strings, and JS's `+` concatenates
-  // rather than adds when either operand is a string — the template's
-  // running-total {% set total = total + row.amount %} would silently
-  // produce garbage (or a NaN once >1 row is summed) without this
-  // explicit Number() coercion up front.
-  const benefits = (await caExportBenefitRepository.forOrder(orderId)).map((b) => ({
-    ...b,
-    claimed_amount: Number(b.claimed_amount),
-    received_amount: b.received_amount !== null && b.received_amount !== undefined ? Number(b.received_amount) : null,
-  }));
-  const expenses = (await caExpenseRepository.forOrder(orderId)).map((e) => ({
-    ...e,
-    amount: Number(e.amount),
-    tds_amount: e.tds_amount !== null && e.tds_amount !== undefined ? Number(e.tds_amount) : null,
-  }));
-  // Added alongside the Order Profitability Sheet (docs/schema.sql Section
-  // AP) — supplier pricing is exactly the kind of data this document
-  // exists for (internal-only, never client-facing) and was previously
-  // missing from it entirely.
-  const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
-  const costEntries = (await orderCostEntryRepository.forOrder(orderId)).map((c) => ({
-    ...c,
-    amount_inr: Number(c.amount_inr),
-  }));
-  // Unchanged by vendor bills / order expenses (2026-10-27) until the owner approves the CAFIN change.
-  const profitability = await orderProfitabilityService.computeForOrder(orderId, false);
+  // Owner request (2026-10-27, approved mockup, confirmed twice): the
+  // complete order snapshot, A to F — see caFinancialSnapshotService.
+  const snapshot = await require('./caFinancialSnapshotService').build(orderId);
 
   const referenceNumberService = require('./referenceNumberService');
   const revisionNumber = await referenceNumberService.nextDocumentRevisionNumber(orderId, docTypeId);
@@ -1158,11 +1131,7 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
       generated_date: formatNowWithTime(),
       generated_by_name: (generatedByUser && generatedByUser.name) || 'Unknown',
     },
-    benefits,
-    expenses,
-    supplier_po: supplierPo,
-    cost_entries: costEntries,
-    profitability,
+    snapshot,
   };
 
   const twig = templatesEnvironment();

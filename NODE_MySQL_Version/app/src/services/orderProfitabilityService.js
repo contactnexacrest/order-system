@@ -53,13 +53,7 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
  * explicitly Number()/parseFloat()'d before arithmetic, never relying on
  * JS's implicit coercion (which concatenates rather than adds for `+`).
  */
-/**
- * withBillsAndExpenses false = the figures as they were before vendor bills /
- * order expenses (2026-10-27) — the CAFIN document keeps using these until
- * the owner approves its change (no document change without showing
- * before/after first).
- */
-async function computeForOrder(orderId, withBillsAndExpenses = true) {
+async function computeForOrder(orderId) {
   const order = await orderRepository.find(orderId);
   const fobValue = await orderProductRepository.totalFobValue(orderId);
   const currencyCode = (order && order.currency_code) || null;
@@ -86,7 +80,7 @@ async function computeForOrder(orderId, withBillsAndExpenses = true) {
   // counted twice.
   let logisticsCostInr = 0;
   let oceanFreightBillsInr = null;
-  for (const bill of withBillsAndExpenses ? await orderVendorBillRepository.forOrder(orderId, 'logistics') : []) {
+  for (const bill of await orderVendorBillRepository.forOrder(orderId, 'logistics')) {
     if (bill.bill_for === 'ocean_freight') {
       oceanFreightBillsInr = (oceanFreightBillsInr || 0) + Number(bill.total_inr);
     } else {
@@ -99,7 +93,7 @@ async function computeForOrder(orderId, withBillsAndExpenses = true) {
 
   // The order's actual expenses. Once any real travel expense is recorded, it
   // replaces the provisional travel % cost line.
-  const expenses = withBillsAndExpenses ? await orderExpenseRepository.summary(orderId) : { total: 0, has_travel: false };
+  const expenses = await orderExpenseRepository.summary(orderId);
 
   const costEntries = await orderCostEntryRepository.forOrder(orderId);
   let otherCostsInr = 0;

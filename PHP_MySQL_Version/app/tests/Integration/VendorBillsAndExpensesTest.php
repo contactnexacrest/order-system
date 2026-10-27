@@ -220,8 +220,6 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         self::assertFalse($after['travel_is_provisional']);
         self::assertSame(round($before['total_cost_inr'] - 90000 + 85000 + 18500 + 6200 - 50000, 2), $after['total_cost_inr'], 'the provisional travel line is replaced, not added to');
 
-        // The CAFIN document keeps its figures unchanged until the owner approves.
-        self::assertSame($before['total_cost_inr'], OrderProfitabilityService::computeForOrder($orderId, false)['total_cost_inr']);
 
         Database::connection()->prepare('INSERT INTO order_payment_status (order_id, freight_cleared_at) VALUES (:id, NOW()) ON DUPLICATE KEY UPDATE freight_cleared_at = NOW()')->execute(['id' => $orderId]);
         $this->pay($orderId, $cha, 18500);
