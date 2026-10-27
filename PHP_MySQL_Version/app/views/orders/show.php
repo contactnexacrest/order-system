@@ -3989,7 +3989,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     </div>
 
     <aside class="order-detail-sidebar" id="order-detail-sidebar">
-      <div class="sidebar-panel">
+      <div class="sidebar-panel sidebar-glance">
         <h3>At a Glance</h3>
         <div class="kv-grid">
           <div><span class="k">Current Stage</span><span class="v"><?= $currentStage ? 'Stage ' . (int) $currentStage['stage_number'] . ' — ' . htmlspecialchars($currentStage['stage_name']) : ($orderClosed ? 'Complete — all 9 stages resolved' : '—') ?></span></div>
@@ -4024,7 +4024,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       </div>
 
       <div class="sidebar-panel">
-        <h3>All Documents <small class="muted">(step 12)</small></h3>
+        <details class="sidebar-docs-toggle">
+          <summary>All Documents (<?= count($documents) ?>) &mdash; quick links</summary>
         <?php if (empty($documents)): ?>
           <p class="muted small">No documents generated yet.</p>
         <?php else: ?>
@@ -4038,6 +4039,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           </ul>
         <?php endif; ?>
         <p class="muted small"><a href="#document-review-approval">Full list with review/approval status &rarr;</a></p>
+        </details>
       </div>
     </aside>
   </div>
