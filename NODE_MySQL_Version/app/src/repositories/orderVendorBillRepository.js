@@ -19,13 +19,16 @@ const LOGISTICS_SERVICES = {
   other: 'Other',
 };
 
+/** Owner decision (2026-10-27): a logistics bill is an Advance (payable any time) or the Final bill (on CFR/CIF, after Step 9d). */
+const LOGISTICS_PAYMENT_KINDS = { advance: 'Advance', final: 'Final' };
+
 const PAYMENT_MODES = ['NEFT / RTGS', 'IMPS', 'UPI', 'Cheque'];
 
 async function create(orderId, vendorKind, data, userId) {
   const result = await db.execute(
-    `INSERT INTO order_vendor_bills (order_id, vendor_kind, supplier_po_id, logistics_partner_id, bill_for, bill_no, bill_date,
+    `INSERT INTO order_vendor_bills (order_id, vendor_kind, supplier_po_id, logistics_partner_id, bill_for, payment_kind, bill_no, bill_date,
         taxable_inr, gst_inr, total_inr, note, bill_file_id, created_by)
-     VALUES (:order_id, :vendor_kind, :supplier_po_id, :logistics_partner_id, :bill_for, :bill_no, :bill_date,
+     VALUES (:order_id, :vendor_kind, :supplier_po_id, :logistics_partner_id, :bill_for, :payment_kind, :bill_no, :bill_date,
         :taxable_inr, :gst_inr, :total_inr, :note, :bill_file_id, :created_by)`,
     {
       order_id: orderId,
@@ -33,6 +36,7 @@ async function create(orderId, vendorKind, data, userId) {
       supplier_po_id: data.supplier_po_id ?? null,
       logistics_partner_id: data.logistics_partner_id ?? null,
       bill_for: data.bill_for,
+      payment_kind: data.payment_kind || 'final',
       bill_no: data.bill_no,
       bill_date: data.bill_date,
       taxable_inr: data.taxable_inr,
@@ -88,4 +92,4 @@ async function supplierLegPaid(supplierPoId, leg) {
   return [parseFloat(row.paid), row.last_paid !== null ? String(row.last_paid) : null];
 }
 
-module.exports = { SUPPLIER_LEGS, LOGISTICS_SERVICES, PAYMENT_MODES, create, find, forOrder, markPaid, deleteUnpaid, supplierLegPaid };
+module.exports = { SUPPLIER_LEGS, LOGISTICS_SERVICES, LOGISTICS_PAYMENT_KINDS, PAYMENT_MODES, create, find, forOrder, markPaid, deleteUnpaid, supplierLegPaid };

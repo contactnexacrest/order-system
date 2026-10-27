@@ -276,7 +276,7 @@
     '7b': docComplete(documents, 'SUPPO', mailSendingEnabled),
     '7c': ((supplierPoDocuments and supplierPoDocuments.length > 0) or (supplierPo and supplierPo.ack_skipped_at)) if supplierPoCopyRequired else 'optional',
     '7d': supplierSigned,
-    '7e': supplierPo and supplierPo.advance_paid_at
+    '7e': supplierPo and (supplierPo.advance_paid_at or (supplierPo.advance_amount_inr | float) <= 0)
   },
   's9': {
     '9a': freight,
@@ -346,11 +346,15 @@
   {% else %}
   {% set t = vendorBillsView.totals(bills) %}
   <table class="list vendor-bills">
-    <tr>{% if showPartner %}<th>Partner</th>{% endif %}<th>For</th><th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
+    <tr>{% if showPartner %}<th>Partner</th>{% endif %}<th>For</th>{% if showPartner %}<th>Payment</th>{% endif %}<th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
     {% for b in bills %}
     <tr id="vendor-bill-{{ b.id }}">
       {% if showPartner %}<td>{{ b.partner_name or '—' }}</td>{% endif %}
       <td>{{ (vendorBillLegs[b.bill_for] or b.bill_for) if b.vendor_kind == 'supplier' else (logisticsServices[b.bill_for] or b.bill_for) }}</td>
+      {# Owner decision (2026-10-27): a logistics Advance bill is never held back; only the Final bill waits. #}
+      {% set isAdvanceBill = b.vendor_kind == 'logistics' and b.payment_kind == 'advance' %}
+      {% set rowBlocked = null if isAdvanceBill else payBlocked %}
+      {% if showPartner %}<td><span class="badge {{ 'badge-advance' if isAdvanceBill else 'badge-final' }}">{{ 'Advance' if isAdvanceBill else 'Final' }}</span></td>{% endif %}
       <td>{{ b.bill_no }} · {{ b.bill_date | shortDate }}{% if b.bill_file_id %} · <a href="/file-store/{{ b.bill_file_id }}/download">bill</a>{% endif %}{% if b.note %}<br><small class="muted">{{ b.note }}</small>{% endif %}</td>
       <td style="text-align:right">{{ b.taxable_inr | money }}</td>
       <td style="text-align:right">{{ b.gst_inr | money }}</td>
@@ -360,7 +364,7 @@
           <span class="vendor-bill-paid">&#10003; &#8377;{{ b.paid_amount_inr | money }} on {{ b.paid_at | shortDate }}</span><br><small class="muted">{{ b.payment_mode }} · {{ b.payment_ref }}</small>
         {% else %}
           <span class="vendor-bill-due">Unpaid</span>
-          {% if canPay and payBlocked === null %}
+          {% if canPay and rowBlocked === null %}
           <details class="vendor-bill-pay">
             <summary class="btn-sm">Mark Paid</summary>
             {% if b.vendor_kind == 'supplier' %}{{ vendorPayTo(supplierBank, '/suppliers/' + (supplierPo.supplier_id or 0) + '/edit', permissions.manage_suppliers and supplierPo.supplier_id) }}{% else %}{{ vendorPayTo(logisticsBanks[b.logistics_partner_id], '/logistics-partners/' + b.logistics_partner_id + '/edit', permissions.manage_logistics_partners) }}{% endif %}
@@ -386,7 +390,7 @@
       </td>
     </tr>
     {% endfor %}
-    <tr><td colspan="{{ 5 if showPartner else 4 }}"><strong>Total</strong></td><td style="text-align:right"><strong>{{ t.total | money }}</strong></td><td><span class="vendor-bill-paid">Paid &#8377;{{ t.paid | money }}</span>{% if t.due > 0 %}<br><span class="vendor-bill-due">Due &#8377;{{ t.due | money }}</span>{% endif %}</td></tr>
+    <tr><td colspan="{{ 6 if showPartner else 4 }}"><strong>Total</strong></td><td style="text-align:right"><strong>{{ t.total | money }}</strong></td><td><span class="vendor-bill-paid">Paid &#8377;{{ t.paid | money }}</span>{% if t.due > 0 %}<br><span class="vendor-bill-due">Due &#8377;{{ t.due | money }}</span>{% endif %}</td></tr>
   </table>
   {% if canPay and payBlocked !== null %}
     <p class="review-banner warn">&#9888; {{ payBlocked }} Bills can still be added now.</p>
@@ -426,12 +430,18 @@
     {% else %}
       {# Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one. #}
       {% set payBlocked = ('Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' + supplierPo.advance_amount_inr + '.') if (leg == 'balance' and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at) else null %}
-      {{ vendorBillTable(legBills, false, permissions.manage_supplier_payments, payBlocked) }}
+      {# Owner decision (2026-10-27): 0% advance — nothing to pay in 7e; the whole amount is the balance (10a). #}
+      {% set noAdvance = leg == 'advance' and not supplierPo.advance_paid_at and (supplierPo.advance_amount_inr | float) <= 0 %}
+      {% if noAdvance and not legBills.length %}
+        <p class="review-banner ok">&#10003; <span><strong>No advance on this order</strong> — the Supplier PO terms plan no advance, so there is nothing to pay here. The full amount is paid as the supplier balance in <a href="#step-10a-supplier-balance-paid">Step 10a</a>.</span></p>
+      {% else %}
+        {{ vendorBillTable(legBills, false, permissions.manage_supplier_payments, payBlocked) }}
+      {% endif %}
       {% if not permissions.manage_supplier_payments %}
         <p class="muted small">Bills and payments are recorded by Accounts (needs the "Manage supplier payments" permission).</p>
       {% else %}
-      <details class="vendor-bill-add"{% if not legBills.length %} open{% endif %}>
-        <summary class="small"><strong>+ Add the supplier's {{ label | lower }} bill</strong> <span class="muted">({{ 'advance / proforma invoice' if leg == 'advance' else 'tax invoice' }})</span></summary>
+      <details class="vendor-bill-add"{% if not legBills.length and not noAdvance %} open{% endif %}>
+        <summary class="small"><strong>+ Add the supplier's {{ label | lower }} bill{{ ' anyway' if noAdvance else '' }}</strong> <span class="muted">({{ 'advance / proforma invoice' if leg == 'advance' else 'tax invoice' }})</span></summary>
         <form method="post" action="/orders/{{ order.id }}/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="bill_for" value="{{ leg }}">
@@ -1871,10 +1881,13 @@
             var totalPayable = basicValue + gstAmount;
             f('total_payable_inr').value = basicValue ? totalPayable.toFixed(2) : '';
 
+            // Owner decision (2026-10-27): 0% advance is a real choice — advance
+            // 0.00 and the whole amount as the balance — not a blank field.
             var advancePct = num(f('advance_pct'));
+            var pctEntered = !!f('advance_pct') && f('advance_pct').value.trim() !== '';
             var advanceAmount = totalPayable * (advancePct / 100);
-            f('advance_amount_inr').value = totalPayable && advancePct ? advanceAmount.toFixed(2) : '';
-            f('balance_amount_inr').value = totalPayable && advancePct ? (totalPayable - advanceAmount).toFixed(2) : '';
+            f('advance_amount_inr').value = totalPayable && pctEntered ? advanceAmount.toFixed(2) : '';
+            f('balance_amount_inr').value = totalPayable && pctEntered ? (totalPayable - advanceAmount).toFixed(2) : '';
           }
           ['quantity', 'unit_price_inr', 'gst_rate_pct', 'advance_pct'].forEach(function (name) {
             var el = f(name);
@@ -2127,7 +2140,7 @@
   {% if permissions.manage_supplier_payments or permissions.manage_order_financials %}
   <details class="step-card step-card-parallel" id="logistics-bills"{% if inGroupC and (not logisticsBillsList.length or logisticsUnpaid > 0) %} open{% endif %}>
     <summary>{{ stepStatusIcon(logisticsStatus) }}<h2>Logistics Partner Bills &amp; Payments — CHA · Transport · Freight Forwarder{% if logisticsUnpaid > 0 %} <small class="muted">({{ logisticsUnpaid }} unpaid)</small>{% endif %}</h2></summary>
-    <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.{% if not isFob %} On this {{ order.incoterm_code }} order a bill can be paid once the buyer's Debit Note payment has cleared (Step 9d).{% endif %} Bills go into the order's financials (Step 12) automatically.</p>
+    <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.{% if not isFob %} On this {{ order.incoterm_code }} order an Advance bill can be paid any time; the Final bill once the buyer's Debit Note payment has cleared (Step 9d).{% endif %} Bills go into the order's financials (Step 12) automatically.</p>
     {{ vendorBillTable(logisticsBillsList, true, permissions.manage_supplier_payments, logisticsPaymentBlocked) }}
     {% if permissions.manage_supplier_payments %}
     {% set activePartners = logisticsPartners | whereEq('is_active', 1) %}
@@ -2150,6 +2163,14 @@
           <select name="bill_for" required>
             {% for key, svcLabel in logisticsServices %}<option value="{{ key }}">{{ svcLabel }}</option>{% endfor %}
           </select>
+        </label>
+        {# Owner decision (2026-10-27): an Advance can be paid any time; the Final bill waits for Step 9d on CFR/CIF. #}
+        <label>Payment *
+          <select name="payment_kind" required>
+            <option value="advance">Advance — paid before the service</option>
+            <option value="final" selected>Final — against the completed service</option>
+          </select>
+          <small class="muted">{{ 'Advance and Final bills can both be paid any time on an FOB order.' if isFob else 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' }}</small>
         </label>
         {{ vendorBillFields(gstRates) }}
         <div><button type="submit" class="btn-sm">Add Bill</button></div>

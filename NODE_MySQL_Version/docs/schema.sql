@@ -4153,3 +4153,12 @@ CREATE TABLE order_expenses (
 -- ================================================================
 ALTER TABLE documents
   ADD COLUMN document_date DATE NULL;
+
+-- ================================================================
+-- SECTION CG — LOGISTICS BILL ADVANCE / FINAL (owner decision 2026-10-27)
+-- A logistics partner's bill is an Advance (payable any time) or the
+-- Final bill (on CFR/CIF, payable once the buyer's Debit Note payment has
+-- cleared — Step 9d). Supplier bills use bill_for and ignore this.
+-- ================================================================
+ALTER TABLE order_vendor_bills
+  ADD COLUMN payment_kind VARCHAR(10) NOT NULL DEFAULT 'final';

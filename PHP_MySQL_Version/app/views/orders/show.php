@@ -525,13 +525,19 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
     $total = $paid = 0.0;
     ?>
     <table class="list vendor-bills">
-      <tr><?php if ($showPartner): ?><th>Partner</th><?php endif; ?><th>For</th><th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
+      <tr><?php if ($showPartner): ?><th>Partner</th><?php endif; ?><th>For</th><?php if ($showPartner): ?><th>Payment</th><?php endif; ?><th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
       <?php foreach ($bills as $b): ?>
         <?php $total += (float) $b['total_inr']; $paid += (float) ($b['paid_amount_inr'] ?? 0); ?>
         <?php $forLabel = $b['vendor_kind'] === 'supplier' ? (\App\Repositories\OrderVendorBillRepository::SUPPLIER_LEGS[$b['bill_for']] ?? $b['bill_for']) : (\App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES[$b['bill_for']] ?? $b['bill_for']); ?>
       <tr id="vendor-bill-<?= (int) $b['id'] ?>">
         <?php if ($showPartner): ?><td><?= htmlspecialchars((string) ($b['partner_name'] ?? '—')) ?></td><?php endif; ?>
         <td><?= htmlspecialchars($forLabel) ?></td>
+        <?php
+        // Owner decision (2026-10-27): a logistics Advance bill is never held back; only the Final bill waits.
+        $__isAdvanceBill = $b['vendor_kind'] === 'logistics' && ($b['payment_kind'] ?? 'final') === 'advance';
+        $__rowBlocked = $__isAdvanceBill ? null : $payBlocked;
+        ?>
+        <?php if ($showPartner): ?><td><span class="badge <?= $__isAdvanceBill ? 'badge-advance' : 'badge-final' ?>"><?= $__isAdvanceBill ? 'Advance' : 'Final' ?></span></td><?php endif; ?>
         <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php endif; ?><?php if (!empty($b['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $b['note']) ?></small><?php endif; ?></td>
         <td style="text-align:right"><?= number_format((float) $b['taxable_inr'], 2) ?></td>
         <td style="text-align:right"><?= number_format((float) $b['gst_inr'], 2) ?></td>
@@ -541,7 +547,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
             <span class="vendor-bill-paid">&#10003; &#8377;<?= number_format((float) $b['paid_amount_inr'], 2) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['paid_at'])) ?></span><br><small class="muted"><?= htmlspecialchars((string) $b['payment_mode']) ?> · <?= htmlspecialchars((string) $b['payment_ref']) ?></small>
           <?php else: ?>
             <span class="vendor-bill-due">Unpaid</span>
-            <?php if ($canPay && $payBlocked === null): ?>
+            <?php if ($canPay && $__rowBlocked === null): ?>
             <details class="vendor-bill-pay">
               <summary class="btn-sm">Mark Paid</summary>
               <?= $payToFor($b) ?>
@@ -567,7 +573,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
         </td>
       </tr>
       <?php endforeach; ?>
-      <tr><td colspan="<?= $showPartner ? 5 : 4 ?>"><strong>Total</strong></td><td style="text-align:right"><strong><?= number_format($total, 2) ?></strong></td><td><span class="vendor-bill-paid">Paid &#8377;<?= number_format($paid, 2) ?></span><?php if ($total - $paid > 0.004): ?><br><span class="vendor-bill-due">Due &#8377;<?= number_format($total - $paid, 2) ?></span><?php endif; ?></td></tr>
+      <tr><td colspan="<?= $showPartner ? 6 : 4 ?>"><strong>Total</strong></td><td style="text-align:right"><strong><?= number_format($total, 2) ?></strong></td><td><span class="vendor-bill-paid">Paid &#8377;<?= number_format($paid, 2) ?></span><?php if ($total - $paid > 0.004): ?><br><span class="vendor-bill-due">Due &#8377;<?= number_format($total - $paid, 2) ?></span><?php endif; ?></td></tr>
     </table>
     <?php if ($canPay && $payBlocked !== null): ?>
       <p class="review-banner warn">&#9888; <?= htmlspecialchars($payBlocked) ?> Bills can still be added now.</p>
@@ -623,14 +629,20 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     if ($leg === 'balance' && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
         $payBlocked = 'Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' . $supplierPo['advance_amount_inr'] . '.';
     }
-    $renderVendorBills($legBills, false, $canManageSupplierPayments, $payBlocked, static fn (array $b): string => $vendorBillPayTo($supplierBank, $editUrl, $canEditSupplier));
+    // Owner decision (2026-10-27): 0% advance — nothing to pay in 7e; the whole amount is the balance (10a).
+    $noAdvance = $leg === 'advance' && !$paidAt && (float) ($planned ?? 0) <= 0;
+    if ($noAdvance && $legBills === []) {
+        echo '<p class="review-banner ok">&#10003; <span><strong>No advance on this order</strong> — the Supplier PO terms plan no advance, so there is nothing to pay here. The full amount is paid as the supplier balance in <a href="#step-10a-supplier-balance-paid">Step 10a</a>.</span></p>';
+    } else {
+        $renderVendorBills($legBills, false, $canManageSupplierPayments, $payBlocked, static fn (array $b): string => $vendorBillPayTo($supplierBank, $editUrl, $canEditSupplier));
+    }
     if (!$canManageSupplierPayments) {
         echo '<p class="muted small">Bills and payments are recorded by Accounts (needs the "Manage supplier payments" permission).</p>';
         return;
     }
     ?>
-    <details class="vendor-bill-add"<?= $legBills === [] ? ' open' : '' ?>>
-      <summary class="small"><strong>+ Add the supplier's <?= strtolower($label) ?> bill</strong> <span class="muted">(<?= $leg === 'advance' ? 'advance / proforma invoice' : 'tax invoice' ?>)</span></summary>
+    <details class="vendor-bill-add"<?= $legBills === [] && !$noAdvance ? ' open' : '' ?>>
+      <summary class="small"><strong>+ Add the supplier's <?= strtolower($label) ?> bill<?= $noAdvance ? ' anyway' : '' ?></strong> <span class="muted">(<?= $leg === 'advance' ? 'advance / proforma invoice' : 'tax invoice' ?>)</span></summary>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
         <?= \App\Helpers\Csrf::field() ?>
         <input type="hidden" name="bill_for" value="<?= htmlspecialchars($leg) ?>">
@@ -708,7 +720,8 @@ $subStepDone = [
         // Owner request (2026-10-26, t4): done when the ack is on file, or staff recorded the supplier did not acknowledge.
         '7c' => $supplierPoCopyRequired ? (!empty($supplierPoDocuments) || !empty($supplierPo['ack_skipped_at'])) : null,
         '7d' => $supplierSigned,
-        '7e' => $supplierPo !== null && !empty($supplierPo['advance_paid_at']),
+        // Owner decision (2026-10-27): with no advance planned (0%), there is nothing to pay — 7e is done.
+        '7e' => $supplierPo !== null && (!empty($supplierPo['advance_paid_at']) || (float) ($supplierPo['advance_amount_inr'] ?? 0) <= 0),
     ],
     '9' => [
         '9a' => $freight !== null,
@@ -2332,10 +2345,13 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           var totalPayable = basicValue + gstAmount;
           f('total_payable_inr').value = basicValue ? totalPayable.toFixed(2) : '';
 
+          // Owner decision (2026-10-27): 0% advance is a real choice — advance
+          // 0.00 and the whole amount as the balance — not a blank field.
           var advancePct = num(f('advance_pct'));
+          var pctEntered = !!f('advance_pct') && f('advance_pct').value.trim() !== '';
           var advanceAmount = totalPayable * (advancePct / 100);
-          f('advance_amount_inr').value = totalPayable && advancePct ? advanceAmount.toFixed(2) : '';
-          f('balance_amount_inr').value = totalPayable && advancePct ? (totalPayable - advanceAmount).toFixed(2) : '';
+          f('advance_amount_inr').value = totalPayable && pctEntered ? advanceAmount.toFixed(2) : '';
+          f('balance_amount_inr').value = totalPayable && pctEntered ? (totalPayable - advanceAmount).toFixed(2) : '';
         }
         ['quantity', 'unit_price_inr', 'gst_rate_pct', 'advance_pct'].forEach(function (name) {
           var el = f(name);
@@ -2595,7 +2611,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <?php if ($canManageSupplierPayments || $canManageOrderFinancials): ?>
   <details class="step-card step-card-parallel" id="logistics-bills"<?= in_array($currentUserStep, ['9', '10', '11'], true) && ($__logisticsBills === [] || $__logisticsUnpaid > 0) ? ' open' : '' ?>>
     <summary><?= $stepStatusIcon($__logisticsStatus) ?><h2>Logistics Partner Bills &amp; Payments — CHA · Transport · Freight Forwarder<?php if ($__logisticsUnpaid > 0): ?> <small class="muted">(<?= $__logisticsUnpaid ?> unpaid)</small><?php endif; ?></h2></summary>
-    <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.<?= $isFob ? '' : ' On this ' . htmlspecialchars((string) $order['incoterm_code']) . ' order a bill can be paid once the buyer\'s Debit Note payment has cleared (Step 9d).' ?> Bills go into the order's financials (Step 12) automatically.</p>
+    <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.<?= $isFob ? '' : ' On this ' . htmlspecialchars((string) $order['incoterm_code']) . ' order an Advance bill can be paid any time; the Final bill once the buyer\'s Debit Note payment has cleared (Step 9d).' ?> Bills go into the order's financials (Step 12) automatically.</p>
     <?php $renderVendorBills($__logisticsBills, true, $canManageSupplierPayments, $logisticsPaymentBlocked, static fn (array $b): string => $vendorBillPayTo($logisticsBanks[(int) $b['logistics_partner_id']] ?? null, '/logistics-partners/' . (int) $b['logistics_partner_id'] . '/edit', $canManageLogisticsPartners)); ?>
     <?php if ($canManageSupplierPayments): ?>
     <?php $__activePartners = array_values(array_filter($logisticsPartners, static fn (array $lp): bool => !empty($lp['is_active']))); ?>
@@ -2618,6 +2634,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <select name="bill_for" required>
             <?php foreach (\App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
           </select>
+        </label>
+        <?php // Owner decision (2026-10-27): an Advance can be paid any time; the Final bill waits for Step 9d on CFR/CIF. ?>
+        <label>Payment *
+          <select name="payment_kind" required>
+            <option value="advance">Advance — paid before the service</option>
+            <option value="final" selected>Final — against the completed service</option>
+          </select>
+          <small class="muted"><?= $isFob ? 'Advance and Final bills can both be paid any time on an FOB order.' : 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' ?></small>
         </label>
         <?php $vendorBillFields(); ?>
         <div><button type="submit" class="btn-sm">Add Bill</button></div>

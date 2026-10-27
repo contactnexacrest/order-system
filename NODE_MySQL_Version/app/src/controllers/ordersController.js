@@ -2071,8 +2071,9 @@ async function saveSupplierPo(req, res) {
     gst_rate_pct: str(body.gst_rate_pct) || null,
     gst_amount_inr: str(body.gst_amount_inr) || null,
     total_payable_inr: str(body.total_payable_inr) || null,
-    advance_pct: str(body.advance_pct) || null,
-    advance_amount_inr: str(body.advance_amount_inr) || null,
+    // Owner decision (2026-10-27): 0% advance is saved as 0, not left blank.
+    advance_pct: str(body.advance_pct) !== '' ? str(body.advance_pct) : null,
+    advance_amount_inr: str(body.advance_amount_inr) !== '' ? str(body.advance_amount_inr) : null,
     balance_amount_inr: str(body.balance_amount_inr) || null,
     delivery_location: str(body.delivery_location) || null,
     required_delivery_date: str(body.required_delivery_date) || null,

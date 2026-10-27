@@ -130,6 +130,27 @@ describe('vendor bills and order expenses', () => {
     expect((await pay(fobOrder, fobBill, 22000)).type).toBe('success');
   });
 
+  // Owner decision (2026-10-27): a logistics Advance bill is paid any time; only the Final bill waits for 9d.
+  it('a logistics Advance bill is payable before 9d on CIF', async () => {
+    const partnerId = await logisticsPartnerRepository.create({ partner_name: 'Advance Forwarder', service_type: 'both' }, adminId);
+    const [cifOrder] = await orderWithSupplierPo('CIF');
+    const advance = await orderVendorBillRepository.create(cifOrder, 'logistics', { logistics_partner_id: partnerId, bill_for: 'ocean_freight', payment_kind: 'advance', bill_no: 'OF-ADV', bill_date: todayIst(), taxable_inr: 50000, gst_inr: 0 }, adminId);
+    const final = await logisticsBill(cifOrder, partnerId, 'cha', 18500);
+
+    expect((await orderVendorBillRepository.find(advance)).payment_kind).toBe('advance');
+    expect((await orderVendorBillRepository.find(final)).payment_kind).toBe('final');
+    expect((await pay(cifOrder, advance, 50000)).type).toBe('success');
+    expect((await pay(cifOrder, final, 18500)).message).toContain('Step 9d');
+  });
+
+  it('a logistics bill must say Advance or Final', async () => {
+    const partnerId = await logisticsPartnerRepository.create({ partner_name: 'Kind Check CHA', service_type: 'both' }, adminId);
+    const [orderId] = await orderWithSupplierPo('CIF');
+    const req = fakeReq({ id: String(orderId) }, { logistics_partner_id: String(partnerId), bill_for: 'cha', payment_kind: '', bill_no: 'K-1', bill_date: todayIst(), taxable_inr: '1000', gst_rate_pct: '18' });
+    await vendorBillController.addLogisticsBill(req, fakeRes());
+    expect(lastFlash(req).message).toBe('Choose whether the bill is an Advance or the Final bill.');
+  });
+
   it('an expense needs a receipt or a reason and respects the FY lock', async () => {
     const [orderId] = await orderWithSupplierPo();
     const base = { expense_date: todayIst(), category: 'hotel', details: 'Hotel Kota, 1 night', amount_inr: '3540', paid_by: 'company_card' };

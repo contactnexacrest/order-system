@@ -24,6 +24,9 @@ final class OrderVendorBillRepository
         'other'         => 'Other',
     ];
 
+    /** Owner decision (2026-10-27): a logistics bill is an Advance (payable any time) or the Final bill (on CFR/CIF, after Step 9d). */
+    public const LOGISTICS_PAYMENT_KINDS = ['advance' => 'Advance', 'final' => 'Final'];
+
     public const PAYMENT_MODES = ['NEFT / RTGS', 'IMPS', 'UPI', 'Cheque'];
 
     /** @param array<string,mixed> $data */
@@ -31,9 +34,9 @@ final class OrderVendorBillRepository
     {
         $pdo = Database::connection();
         $pdo->prepare(
-            'INSERT INTO order_vendor_bills (order_id, vendor_kind, supplier_po_id, logistics_partner_id, bill_for, bill_no, bill_date,
+            'INSERT INTO order_vendor_bills (order_id, vendor_kind, supplier_po_id, logistics_partner_id, bill_for, payment_kind, bill_no, bill_date,
                 taxable_inr, gst_inr, total_inr, note, bill_file_id, created_by)
-             VALUES (:order_id, :vendor_kind, :supplier_po_id, :logistics_partner_id, :bill_for, :bill_no, :bill_date,
+             VALUES (:order_id, :vendor_kind, :supplier_po_id, :logistics_partner_id, :bill_for, :payment_kind, :bill_no, :bill_date,
                 :taxable_inr, :gst_inr, :total_inr, :note, :bill_file_id, :created_by)'
         )->execute([
             'order_id'             => $orderId,
@@ -41,6 +44,7 @@ final class OrderVendorBillRepository
             'supplier_po_id'       => $data['supplier_po_id'] ?? null,
             'logistics_partner_id' => $data['logistics_partner_id'] ?? null,
             'bill_for'             => $data['bill_for'],
+            'payment_kind'         => $data['payment_kind'] ?? 'final',
             'bill_no'              => $data['bill_no'],
             'bill_date'            => $data['bill_date'],
             'taxable_inr'          => $data['taxable_inr'],

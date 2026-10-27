@@ -89,8 +89,9 @@ final class OrderSupplierPoRepository
             'gst_rate'    => $data['gst_rate_pct'] ?: null,
             'gst_amount'  => $data['gst_amount_inr'] ?: null,
             'total_payable' => $data['total_payable_inr'] ?: null,
-            'advance_pct' => $data['advance_pct'] ?: null,
-            'advance_amount' => $data['advance_amount_inr'] ?: null,
+            // Owner decision (2026-10-27): 0% advance is kept as 0, only a blank stays NULL.
+            'advance_pct' => ($data['advance_pct'] ?? '') !== '' ? $data['advance_pct'] : null,
+            'advance_amount' => ($data['advance_amount_inr'] ?? '') !== '' ? $data['advance_amount_inr'] : null,
             'balance_amount' => $data['balance_amount_inr'] ?: null,
             'delivery_location' => $data['delivery_location'] ?? null,
             'required_delivery_date' => $data['required_delivery_date'] ?: null,

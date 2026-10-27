@@ -197,6 +197,21 @@ final class SupplierDirectoryTest extends DbTestCase
         self::assertSame('Factory Owner', OrderSupplierPoRepository::findLatestForOrder($orderId)['supplier_type']);
     }
 
+    /** Owner decision (2026-10-27): 0% advance is saved as 0 (not blank), so the whole amount is the balance. */
+    public function testSupplierPoSavesAZeroPercentAdvance(): void
+    {
+        $orderId = $this->orderAtStage5();
+        $id = SupplierRepository::create(['supplier_legal_name' => $this->uniqueName('No Advance Supplier'), 'types' => ['Trader']]);
+        $_POST = ['supplier_id' => (string) $id, 'total_payable_inr' => '53100.00', 'advance_pct' => '0', 'advance_amount_inr' => '0.00', 'balance_amount_inr' => '53100.00'];
+        (new OrderController())->saveSupplierPo(['id' => (string) $orderId]);
+
+        $po = OrderSupplierPoRepository::findLatestForOrder($orderId);
+        self::assertSame(0.0, (float) $po['advance_pct']);
+        self::assertNotNull($po['advance_pct'], '0% is a real choice, not "not filled in"');
+        self::assertSame(0.0, (float) $po['advance_amount_inr']);
+        self::assertSame(53100.0, (float) $po['balance_amount_inr']);
+    }
+
     public function testSupplierPoPicksASingleTypeAutomaticallyAndRefusesAnInactiveSupplier(): void
     {
         $orderId = $this->orderAtStage5();

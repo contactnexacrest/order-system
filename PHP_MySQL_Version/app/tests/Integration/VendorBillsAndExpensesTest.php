@@ -156,6 +156,29 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         self::assertSame('success', $this->pay($fobOrder, $fobBill, 22000)['type'], 'FOB orders have no Debit Note to wait for');
     }
 
+    /** Owner decision (2026-10-27): a logistics Advance bill is paid any time; only the Final bill waits for 9d. */
+    public function testALogisticsAdvanceBillIsPayableBefore9dOnCif(): void
+    {
+        $partnerId = LogisticsPartnerRepository::create(['partner_name' => 'Advance Forwarder', 'service_type' => 'both'], $this->userId);
+        [$cifOrder] = $this->orderWithSupplierPo('CIF');
+        $advance = OrderVendorBillRepository::create($cifOrder, 'logistics', ['logistics_partner_id' => $partnerId, 'bill_for' => 'ocean_freight', 'payment_kind' => 'advance', 'bill_no' => 'OF-ADV', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 50000, 'gst_inr' => 0], $this->userId);
+        $final = $this->logisticsBill($cifOrder, $partnerId, 'cha', 18500);
+
+        self::assertSame('advance', OrderVendorBillRepository::find($advance)['payment_kind']);
+        self::assertSame('final', OrderVendorBillRepository::find($final)['payment_kind'], 'a bill is Final unless marked Advance');
+        self::assertSame('success', $this->pay($cifOrder, $advance, 50000)['type'], 'an Advance is never held back');
+        self::assertStringContainsString('Step 9d', $this->pay($cifOrder, $final, 18500)['message'], 'the Final bill still waits for the Debit Note payment');
+    }
+
+    public function testALogisticsBillMustSayAdvanceOrFinal(): void
+    {
+        $partnerId = LogisticsPartnerRepository::create(['partner_name' => 'Kind Check CHA', 'service_type' => 'both'], $this->userId);
+        [$orderId] = $this->orderWithSupplierPo('CIF');
+        $_POST = ['logistics_partner_id' => (string) $partnerId, 'bill_for' => 'cha', 'payment_kind' => '', 'bill_no' => 'K-1', 'bill_date' => date('Y-m-d'), 'taxable_inr' => '1000', 'gst_rate_pct' => '18'];
+        (new VendorBillController())->addLogisticsBill(['id' => (string) $orderId]);
+        self::assertSame('Choose whether the bill is an Advance or the Final bill.', $this->lastFlash()['message']);
+    }
+
     public function testAnExpenseNeedsAReceiptOrAReasonAndRespectsTheFyLock(): void
     {
         [$orderId] = $this->orderWithSupplierPo();

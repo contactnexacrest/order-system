@@ -2020,8 +2020,9 @@ final class OrderController
             'gst_rate_pct'          => trim((string) ($_POST['gst_rate_pct'] ?? '')) ?: null,
             'gst_amount_inr'        => trim((string) ($_POST['gst_amount_inr'] ?? '')) ?: null,
             'total_payable_inr'     => trim((string) ($_POST['total_payable_inr'] ?? '')) ?: null,
-            'advance_pct'           => trim((string) ($_POST['advance_pct'] ?? '')) ?: null,
-            'advance_amount_inr'    => trim((string) ($_POST['advance_amount_inr'] ?? '')) ?: null,
+            // Owner decision (2026-10-27): 0% advance is saved as 0, not left blank.
+            'advance_pct'           => trim((string) ($_POST['advance_pct'] ?? '')) !== '' ? trim((string) $_POST['advance_pct']) : null,
+            'advance_amount_inr'    => trim((string) ($_POST['advance_amount_inr'] ?? '')) !== '' ? trim((string) $_POST['advance_amount_inr']) : null,
             'balance_amount_inr'    => trim((string) ($_POST['balance_amount_inr'] ?? '')) ?: null,
             'delivery_location'     => trim((string) ($_POST['delivery_location'] ?? '')) ?: null,
             'required_delivery_date' => trim((string) ($_POST['required_delivery_date'] ?? '')) ?: null,

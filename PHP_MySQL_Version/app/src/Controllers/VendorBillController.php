@@ -131,6 +131,11 @@ final class VendorBillController
             $this->back($orderId, $anchor, 'error', 'Choose what the bill is for.');
             return;
         }
+        $paymentKind = (string) ($_POST['payment_kind'] ?? '');
+        if (!isset(OrderVendorBillRepository::LOGISTICS_PAYMENT_KINDS[$paymentKind])) {
+            $this->back($orderId, $anchor, 'error', 'Choose whether the bill is an Advance or the Final bill.');
+            return;
+        }
         $fields = $this->billFields();
         if (is_string($fields)) {
             $this->back($orderId, $anchor, 'error', $fields);
@@ -143,14 +148,16 @@ final class VendorBillController
             $this->back($orderId, $anchor, 'error', $e->getMessage());
             return;
         }
-        $billId = OrderVendorBillRepository::create($orderId, 'logistics', $fields + ['logistics_partner_id' => (int) $partner['id'], 'bill_for' => $service, 'bill_file_id' => $fileId], (int) $user['id']);
-        AuditLogRepository::log((int) $user['id'], 'LOGISTICS_BILL_ADDED', 'order_vendor_bills', $billId, 'bill_no', null, $fields['bill_no'], $partner['partner_name'] . ' — ' . OrderVendorBillRepository::LOGISTICS_SERVICES[$service] . ' ₹' . number_format($fields['taxable_inr'] + $fields['gst_inr'], 2));
+        $billId = OrderVendorBillRepository::create($orderId, 'logistics', $fields + ['logistics_partner_id' => (int) $partner['id'], 'bill_for' => $service, 'payment_kind' => $paymentKind, 'bill_file_id' => $fileId], (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'LOGISTICS_BILL_ADDED', 'order_vendor_bills', $billId, 'bill_no', null, $fields['bill_no'], $partner['partner_name'] . ' — ' . OrderVendorBillRepository::LOGISTICS_SERVICES[$service] . ' (' . OrderVendorBillRepository::LOGISTICS_PAYMENT_KINDS[$paymentKind] . ') ₹' . number_format($fields['taxable_inr'] + $fields['gst_inr'], 2));
         $this->back($orderId, $anchor, 'success', 'Bill ' . $fields['bill_no'] . ' from ' . $partner['partner_name'] . ' added.');
     }
 
     /**
-     * Why a logistics bill can't be paid yet, or null when it can: on a
-     * CFR/CIF order, only once the buyer's Debit Note payment has cleared (9d).
+     * Why a logistics partner's Final bill can't be paid yet, or null when it
+     * can: on a CFR/CIF order, only once the buyer's Debit Note payment has
+     * cleared (9d). An Advance bill is never held back (owner decision
+     * 2026-10-27).
      */
     public static function logisticsPaymentBlockedReason(array $order): ?string
     {
@@ -160,7 +167,7 @@ final class VendorBillController
         $payment = OrderPaymentStatusRepository::find((int) $order['id']);
         return !empty($payment['freight_cleared_at'])
             ? null
-            : 'Logistics bills on this ' . strtoupper((string) $order['incoterm_code']) . ' order can be paid once the buyer\'s Debit Note payment has cleared (Step 9d).';
+            : 'Final logistics bills on this ' . strtoupper((string) $order['incoterm_code']) . ' order can be paid once the buyer\'s Debit Note payment has cleared (Step 9d) — an Advance bill can be paid now.';
     }
 
     public function payBill(array $params): void
@@ -190,7 +197,7 @@ final class VendorBillController
                 $this->back($orderId, $anchor, 'error', 'Pay the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹' . number_format((float) $supplierPo['advance_amount_inr'], 2) . '.');
                 return;
             }
-        } elseif (($blocked = self::logisticsPaymentBlockedReason($order)) !== null) {
+        } elseif (($bill['payment_kind'] ?? 'final') !== 'advance' && ($blocked = self::logisticsPaymentBlockedReason($order)) !== null) {
             $this->back($orderId, $anchor, 'error', $blocked);
             return;
         }

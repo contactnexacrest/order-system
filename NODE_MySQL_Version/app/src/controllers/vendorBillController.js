@@ -111,6 +111,11 @@ async function addLogisticsBill(req, res) {
     back(req, res, orderId, anchor, 'error', 'Choose what the bill is for.');
     return;
   }
+  const paymentKind = str(req.body.payment_kind);
+  if (!orderVendorBillRepository.LOGISTICS_PAYMENT_KINDS[paymentKind]) {
+    back(req, res, orderId, anchor, 'error', 'Choose whether the bill is an Advance or the Final bill.');
+    return;
+  }
   const fields = await billFields(req);
   if (typeof fields === 'string') {
     back(req, res, orderId, anchor, 'error', fields);
@@ -123,19 +128,23 @@ async function addLogisticsBill(req, res) {
     back(req, res, orderId, anchor, 'error', e.message);
     return;
   }
-  const billId = await orderVendorBillRepository.create(orderId, 'logistics', { ...fields, logistics_partner_id: partner.id, bill_for: service, bill_file_id: fileId }, req.user.id);
-  await auditLogRepository.log(req.user.id, 'LOGISTICS_BILL_ADDED', 'order_vendor_bills', billId, 'bill_no', null, fields.bill_no, `${partner.partner_name} — ${orderVendorBillRepository.LOGISTICS_SERVICES[service]} ₹${money(fields.taxable_inr + fields.gst_inr)}`);
+  const billId = await orderVendorBillRepository.create(orderId, 'logistics', { ...fields, logistics_partner_id: partner.id, bill_for: service, payment_kind: paymentKind, bill_file_id: fileId }, req.user.id);
+  await auditLogRepository.log(req.user.id, 'LOGISTICS_BILL_ADDED', 'order_vendor_bills', billId, 'bill_no', null, fields.bill_no, `${partner.partner_name} — ${orderVendorBillRepository.LOGISTICS_SERVICES[service]} (${orderVendorBillRepository.LOGISTICS_PAYMENT_KINDS[paymentKind]}) ₹${money(fields.taxable_inr + fields.gst_inr)}`);
   back(req, res, orderId, anchor, 'success', `Bill ${fields.bill_no} from ${partner.partner_name} added.`);
 }
 
-/** Why a logistics bill can't be paid yet, or null: on a CFR/CIF order, only once the buyer's Debit Note payment has cleared (9d). */
+/**
+ * Why a logistics partner's Final bill can't be paid yet, or null: on a CFR/CIF
+ * order, only once the buyer's Debit Note payment has cleared (9d). An Advance
+ * bill is never held back (owner decision 2026-10-27).
+ */
 async function logisticsPaymentBlockedReason(order) {
   const incoterm = String(order.incoterm_code || 'FOB').toUpperCase();
   if (incoterm === 'FOB') return null;
   const payment = await orderPaymentStatusRepository.find(order.id);
   return payment && payment.freight_cleared_at
     ? null
-    : `Logistics bills on this ${incoterm} order can be paid once the buyer's Debit Note payment has cleared (Step 9d).`;
+    : `Final logistics bills on this ${incoterm} order can be paid once the buyer's Debit Note payment has cleared (Step 9d) — an Advance bill can be paid now.`;
 }
 
 async function payBill(req, res) {
@@ -163,7 +172,7 @@ async function payBill(req, res) {
       back(req, res, orderId, anchor, 'error', `Pay the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹${money(supplierPo.advance_amount_inr)}.`);
       return;
     }
-  } else {
+  } else if ((bill.payment_kind || 'final') !== 'advance') {
     const blocked = await logisticsPaymentBlockedReason(order);
     if (blocked !== null) {
       back(req, res, orderId, anchor, 'error', blocked);

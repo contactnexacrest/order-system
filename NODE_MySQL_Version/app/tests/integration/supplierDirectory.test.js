@@ -188,6 +188,19 @@ describe('Suppliers directory (Section BZ)', () => {
     expect((await orderSupplierPoRepository.findLatestForOrder(orderId)).supplier_type).toBe('Factory Owner');
   });
 
+  // Owner decision (2026-10-27): 0% advance is saved as 0 (not blank), so the whole amount is the balance.
+  it('saves a 0% advance on the Supplier PO', async () => {
+    const orderId = await orderAtStage5();
+    const id = await supplierRepository.create({ supplier_legal_name: uniqueName('No Advance Supplier'), types: ['Trader'] });
+    await ordersController.saveSupplierPo(fakeReq({ supplier_id: String(id), total_payable_inr: '53100.00', advance_pct: '0', advance_amount_inr: '0.00', balance_amount_inr: '53100.00' }, { id: String(orderId) }), fakeRes());
+
+    const po = await orderSupplierPoRepository.findLatestForOrder(orderId);
+    expect(po.advance_pct).not.toBeNull();
+    expect(Number(po.advance_pct)).toBe(0);
+    expect(Number(po.advance_amount_inr)).toBe(0);
+    expect(Number(po.balance_amount_inr)).toBe(53100);
+  });
+
   it('picks a single type automatically and refuses an inactive supplier', async () => {
     const orderId = await orderAtStage5();
     const id = await supplierRepository.create({ supplier_legal_name: uniqueName('One Type Supplier'), types: ['Trader'] });

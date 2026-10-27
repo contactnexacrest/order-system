@@ -746,3 +746,8 @@ details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.
 .badge.badge-internal{background:var(--danger-soft);color:var(--danger);}
 /* Owner request (2026-10-27): Step 11a's invoice date sits on its own line above the Generate button. */
 .ci-date-field{display:block;max-width:340px;margin:0 0 10px;}
+/* Owner decision (2026-10-27): logistics bills are tagged Advance or Final. */
+.badge.badge-advance{background:#EAF1FD;color:#1F4E9E;}
+.badge.badge-final{background:#FDF3E2;color:#A67623;}
+/* Owner decision (2026-10-27): a green "all clear" banner (e.g. Step 7e with no supplier advance). */
+.review-banner.ok{background:var(--success-soft);color:var(--success);}
