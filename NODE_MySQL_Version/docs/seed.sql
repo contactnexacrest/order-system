@@ -1625,6 +1625,28 @@ INSERT INTO ui_templates (template_key, name, is_active) VALUES
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
   ('default_ui_template', 'standard', 'string', 'ui', 'Which UI template (see Admin > UI Templates) a user sees when they have not chosen one for themselves on their own Account page. Must be an active template — picking it from the dropdown on this screen enforces that.', 0);
 
+-- ================================================================
+-- Owner request (2026-10-27): one sample supplier and sample logistics
+-- partners, so a fresh install can be tested without adding them first.
+-- Deactivate them (Suppliers / Logistics Partners -> Deactivate) once
+-- testing is done. Bank details are left empty: the account number is
+-- stored encrypted with each install's own key, so it can't be seeded —
+-- fill it from the directory or the Vendor Details Link if needed.
+-- The freight forwarder is included because Step 9a picks one.
+-- ================================================================
+INSERT INTO suppliers (supplier_legal_name, address, city, state, gstin, pan, contact_person, contact_person_phone, phone, email, notes, is_active) VALUES
+  ('Sample Stone Supplier (for testing)', 'Plot 12, RIICO Industrial Area', 'Kota', 'Rajasthan', '08ABCDE1234F1Z5', 'ABCDE1234F', 'Ramesh Kumar', '+91-9800000001', '+91-9800000001', 'sample.supplier@example.com', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1);
+SET @nx_sample_supplier := LAST_INSERT_ID();
+INSERT INTO supplier_type_links (supplier_id, supplier_type) VALUES
+  (@nx_sample_supplier, 'Quarry Owner'),
+  (@nx_sample_supplier, 'Factory Owner');
+INSERT INTO supplier_factory_addresses (supplier_id, label, address) VALUES
+  (@nx_sample_supplier, 'Kota Factory', 'Plot 12, RIICO Industrial Area, Kota, Rajasthan 324007');
+
+INSERT INTO logistics_partners (partner_name, service_type, address, city, state, phone, email, contact_person_name, contact_person_phone, gstin, pan, notes, is_active) VALUES
+  ('Sample CHA & Transport (for testing)', 'both', 'Office 4, Port Road', 'Chennai', 'Tamil Nadu', '+91-9800000002', 'sample.cha@example.com', 'Suresh Iyer', '+91-9800000002', '33ABCDE1234F1Z6', 'ABCDE1234F', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1),
+  ('Sample Freight Forwarder (for testing)', 'freight_forwarder', 'Suite 9, Harbour View', 'Chennai', 'Tamil Nadu', '+91-9800000003', 'sample.forwarder@example.com', 'Anita Rao', '+91-9800000003', '33ABCDE1234F1Z7', 'ABCDE1234F', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1);
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ================================================================
