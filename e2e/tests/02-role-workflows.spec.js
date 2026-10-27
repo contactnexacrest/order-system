@@ -470,7 +470,9 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
       await openStage(page, 6);
       const clearForm = page.locator(`form[action="/orders/${orderId}/payment/freight/clear"]`);
-      await clearForm.getByRole('button', { name: 'Mark Freight Cleared' }).click();
+      // Wait for the reload, not just the click — under a full-suite load the
+      // banner check could run before the redirect landed.
+      await Promise.all([page.waitForEvent('load'), clearForm.getByRole('button', { name: 'Mark Freight Cleared' }).click()]);
       await expect(page.locator('.alert')).toContainText('unlocked');
     });
 

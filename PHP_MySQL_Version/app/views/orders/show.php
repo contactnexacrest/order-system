@@ -532,13 +532,13 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
       <tr id="vendor-bill-<?= (int) $b['id'] ?>">
         <?php if ($showPartner): ?><td><?= htmlspecialchars((string) ($b['partner_name'] ?? '—')) ?></td><?php endif; ?>
         <td><?= htmlspecialchars($forLabel) ?></td>
-        <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::human((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php endif; ?><?php if (!empty($b['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $b['note']) ?></small><?php endif; ?></td>
+        <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php endif; ?><?php if (!empty($b['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $b['note']) ?></small><?php endif; ?></td>
         <td style="text-align:right"><?= number_format((float) $b['taxable_inr'], 2) ?></td>
         <td style="text-align:right"><?= number_format((float) $b['gst_inr'], 2) ?></td>
         <td style="text-align:right"><?= number_format((float) $b['total_inr'], 2) ?></td>
         <td>
           <?php if ($b['paid_at'] !== null): ?>
-            <span class="vendor-bill-paid">&#10003; &#8377;<?= number_format((float) $b['paid_amount_inr'], 2) ?> on <?= htmlspecialchars(\App\Helpers\Dates::human((string) $b['paid_at'])) ?></span><br><small class="muted"><?= htmlspecialchars((string) $b['payment_mode']) ?> · <?= htmlspecialchars((string) $b['payment_ref']) ?></small>
+            <span class="vendor-bill-paid">&#10003; &#8377;<?= number_format((float) $b['paid_amount_inr'], 2) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['paid_at'])) ?></span><br><small class="muted"><?= htmlspecialchars((string) $b['payment_mode']) ?> · <?= htmlspecialchars((string) $b['payment_ref']) ?></small>
           <?php else: ?>
             <span class="vendor-bill-due">Unpaid</span>
             <?php if ($canPay && $payBlocked === null): ?>
@@ -597,10 +597,11 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     $paidAt = $supplierPo[$leg . '_paid_at'] ?? null;
     $label = $leg === 'advance' ? 'Advance' : 'Balance';
     $legBills = array_values(array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'supplier' && (int) $b['supplier_po_id'] === (int) $supplierPo['id'] && $b['bill_for'] === $leg));
+    $inr = static fn ($v): string => is_numeric($v) ? '&#8377;' . number_format((float) $v, 2) : '—';
     echo '<div class="plan-bar"><div>Supplier PO<b>' . htmlspecialchars((string) $supplierPo['supplier_po_reference']) . '</b></div>'
-        . '<div>PO total<b>&#8377;' . htmlspecialchars((string) ($supplierPo['total_payable_inr'] ?? '—')) . '</b></div>'
-        . '<div>' . $label . ' planned<b>&#8377;' . htmlspecialchars((string) ($planned ?? '—')) . '</b></div>'
-        . ($paidAt ? '<div>' . $label . ' paid<b class="vendor-bill-paid">&#8377;' . htmlspecialchars((string) ($supplierPo[$leg . '_paid_amount_inr'] ?? $planned)) . ' on ' . htmlspecialchars(\App\Helpers\Dates::human((string) $paidAt)) . '</b></div>' : '')
+        . '<div>PO total<b>' . $inr($supplierPo['total_payable_inr'] ?? null) . '</b></div>'
+        . '<div>' . $label . ' planned<b>' . $inr($planned) . '</b></div>'
+        . ($paidAt ? '<div>' . $label . ' paid<b class="vendor-bill-paid">' . $inr($supplierPo[$leg . '_paid_amount_inr'] ?? $planned) . ' on ' . htmlspecialchars(\App\Helpers\Dates::human((string) $paidAt)) . '</b></div>' : '')
         . '</div>';
     if ($paidAt && $legBills === []) {
         // Recorded before bills were kept — the payment stands as it is.
@@ -3157,7 +3158,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <tr><th>Date</th><th>Category</th><th>Details</th><th style="text-align:right">&#8377;</th><th>Paid by</th><th>Receipt</th><th></th></tr>
           <?php foreach ($orderExpenses as $e): ?>
           <tr>
-            <td><?= htmlspecialchars(\App\Helpers\Dates::human((string) $e['expense_date'])) ?><?php if (!empty($e['added_later'])): ?><br><small class="muted">added later (entered <?= htmlspecialchars(\App\Helpers\Dates::human(substr((string) $e['created_at'], 0, 10))) ?>)</small><?php endif; ?></td>
+            <td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $e['expense_date'])) ?><?php if (!empty($e['added_later'])): ?><br><small class="muted">added later (entered <?= htmlspecialchars(\App\Helpers\Dates::short((string) $e['created_at'])) ?>)</small><?php endif; ?></td>
             <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::CATEGORIES[$e['category']] ?? (string) $e['category']) ?></td>
             <td><?= htmlspecialchars((string) $e['details']) ?></td>
             <td style="text-align:right"><?= number_format((float) $e['amount_inr'], 2) ?></td>

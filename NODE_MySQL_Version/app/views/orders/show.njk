@@ -351,13 +351,13 @@
     <tr id="vendor-bill-{{ b.id }}">
       {% if showPartner %}<td>{{ b.partner_name or '—' }}</td>{% endif %}
       <td>{{ (vendorBillLegs[b.bill_for] or b.bill_for) if b.vendor_kind == 'supplier' else (logisticsServices[b.bill_for] or b.bill_for) }}</td>
-      <td>{{ b.bill_no }} · {{ b.bill_date | humanDate }}{% if b.bill_file_id %} · <a href="/file-store/{{ b.bill_file_id }}/download">bill</a>{% endif %}{% if b.note %}<br><small class="muted">{{ b.note }}</small>{% endif %}</td>
+      <td>{{ b.bill_no }} · {{ b.bill_date | shortDate }}{% if b.bill_file_id %} · <a href="/file-store/{{ b.bill_file_id }}/download">bill</a>{% endif %}{% if b.note %}<br><small class="muted">{{ b.note }}</small>{% endif %}</td>
       <td style="text-align:right">{{ b.taxable_inr | money }}</td>
       <td style="text-align:right">{{ b.gst_inr | money }}</td>
       <td style="text-align:right">{{ b.total_inr | money }}</td>
       <td>
         {% if b.paid_at %}
-          <span class="vendor-bill-paid">&#10003; &#8377;{{ b.paid_amount_inr | money }} on {{ b.paid_at | humanDate }}</span><br><small class="muted">{{ b.payment_mode }} · {{ b.payment_ref }}</small>
+          <span class="vendor-bill-paid">&#10003; &#8377;{{ b.paid_amount_inr | money }} on {{ b.paid_at | shortDate }}</span><br><small class="muted">{{ b.payment_mode }} · {{ b.payment_ref }}</small>
         {% else %}
           <span class="vendor-bill-due">Unpaid</span>
           {% if canPay and payBlocked === null %}
@@ -411,7 +411,7 @@
     <p class="muted">Save the Supplier PO terms first (Step 7a).</p>
   {% else %}
     {% set legBills = vendorBillsView.supplierLeg(vendorBills, supplierPo.id, leg) %}
-    <div class="plan-bar"><div>Supplier PO<b>{{ supplierPo.supplier_po_reference }}</b></div><div>PO total<b>&#8377;{{ supplierPo.total_payable_inr or '—' }}</b></div><div>{{ label }} planned<b>&#8377;{{ supplierPo[leg + '_amount_inr'] or '—' }}</b></div>{% if supplierPo[leg + '_paid_at'] %}<div>{{ label }} paid<b class="vendor-bill-paid">&#8377;{{ supplierPo[leg + '_paid_amount_inr'] or supplierPo[leg + '_amount_inr'] }} on {{ supplierPo[leg + '_paid_at'] | humanDate }}</b></div>{% endif %}</div>
+    <div class="plan-bar"><div>Supplier PO<b>{{ supplierPo.supplier_po_reference }}</b></div><div>PO total<b>{{ ('&#8377;' + (supplierPo.total_payable_inr | money)) | safe if supplierPo.total_payable_inr !== null else '—' }}</b></div><div>{{ label }} planned<b>{{ ('&#8377;' + (supplierPo[leg + '_amount_inr'] | money)) | safe if supplierPo[leg + '_amount_inr'] !== null else '—' }}</b></div>{% if supplierPo[leg + '_paid_at'] %}<div>{{ label }} paid<b class="vendor-bill-paid">&#8377;{{ (supplierPo[leg + '_paid_amount_inr'] or supplierPo[leg + '_amount_inr']) | money }} on {{ supplierPo[leg + '_paid_at'] | humanDate }}</b></div>{% endif %}</div>
     {% if supplierPo[leg + '_paid_at'] and not legBills.length %}
       {# Recorded before bills were kept — the payment stands as it is. #}
       <p class="muted small">Paid before supplier bills were recorded here.</p>
@@ -2662,7 +2662,7 @@
           <tr><th>Date</th><th>Category</th><th>Details</th><th style="text-align:right">&#8377;</th><th>Paid by</th><th>Receipt</th><th></th></tr>
           {% for e in orderExpenses %}
           <tr>
-            <td>{{ e.expense_date | humanDate }}{% if e.added_later | int %}<br><small class="muted">added later (entered {{ e.created_at.slice(0, 10) | humanDate }})</small>{% endif %}</td>
+            <td>{{ e.expense_date | shortDate }}{% if e.added_later | int %}<br><small class="muted">added later (entered {{ e.created_at | shortDate }})</small>{% endif %}</td>
             <td>{{ expenseCategories[e.category] or e.category }}</td>
             <td>{{ e.details }}</td>
             <td style="text-align:right">{{ e.amount_inr | money }}</td>

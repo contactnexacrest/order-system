@@ -37,4 +37,13 @@ final class Dates
         $hasTime = (bool) preg_match('/\d{1,2}:\d{2}/', $value);
         return $hasTime ? $dt->format('d F Y, h:i A') : $dt->format('d F Y');
     }
+
+    /** 'YYYY-MM-DD...' -> '21 Sep 2026' — mirrors Node helpers/dates.js short(), for narrow table cells. */
+    public static function short(?string $value): string
+    {
+        if (!$value || !preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $value, $m)) {
+            return (string) $value;
+        }
+        return $m[3] . ' ' . date('M', mktime(0, 0, 0, (int) $m[2], 1)) . ' ' . $m[1];
+    }
 }
