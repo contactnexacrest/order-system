@@ -5,6 +5,7 @@ const orderStorage = require('../helpers/orderStorage');
 const { todayIst } = require('../helpers/dbDateTime');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const logisticsPartnerRepository = require('../repositories/logisticsPartnerRepository');
+const lookupRepository = require('../repositories/lookupRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
@@ -38,22 +39,25 @@ function validDate(date) {
 }
 
 /** The bill fields both kinds share — the cleaned fields, or an error message (string). */
-function billFields(req) {
+async function billFields(req) {
   const billNo = str(req.body.bill_no);
   if (billNo === '') return 'Enter the bill / invoice number.';
   const billDate = str(req.body.bill_date);
   if (!validDate(billDate) || billDate > todayIst()) return 'Enter the bill date (not in the future).';
   const taxable = str(req.body.taxable_inr);
   if (taxable === '' || Number.isNaN(Number(taxable)) || Number(taxable) <= 0) return 'Enter the taxable value of the bill (₹).';
-  const gst = str(req.body.gst_inr) || '0';
-  if (Number.isNaN(Number(gst)) || Number(gst) < 0) return 'Enter the GST on the bill (₹), or 0.';
+  // Owner request (2026-10-27): GST is picked as a rate (%) from the GST
+  // Rate list and the amount is worked out here, never typed.
+  const gstRate = str(req.body.gst_rate_pct);
+  const gstRates = (await lookupRepository.dropdownOptions('gst_rate')).map((o) => String(o.option_value));
+  if (!gstRates.includes(gstRate)) return 'Choose the GST rate (%) on the bill.';
   if (!req.file) return 'Attach the bill / invoice.';
   const note = str(req.body.note);
   return {
     bill_no: billNo.slice(0, 100),
     bill_date: billDate,
     taxable_inr: Math.round(Number(taxable) * 100) / 100,
-    gst_inr: Math.round(Number(gst) * 100) / 100,
+    gst_inr: Math.round((Math.round(Number(taxable) * 100) / 100) * Number(gstRate)) / 100,
     note: note !== '' ? note.slice(0, 500) : null,
   };
 }
@@ -72,7 +76,7 @@ async function addSupplierBill(req, res) {
     back(req, res, orderId, anchor, 'error', 'Choose whether this bill is for the advance or the balance.');
     return;
   }
-  const fields = billFields(req);
+  const fields = await billFields(req);
   if (typeof fields === 'string') {
     back(req, res, orderId, anchor, 'error', fields);
     return;
@@ -107,7 +111,7 @@ async function addLogisticsBill(req, res) {
     back(req, res, orderId, anchor, 'error', 'Choose what the bill is for.');
     return;
   }
-  const fields = billFields(req);
+  const fields = await billFields(req);
   if (typeof fields === 'string') {
     back(req, res, orderId, anchor, 'error', fields);
     return;

@@ -8,6 +8,7 @@ use App\Helpers\Flash;
 use App\Helpers\OrderStorage;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\LogisticsPartnerRepository;
+use App\Repositories\LookupRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderSupplierPoRepository;
@@ -54,12 +55,12 @@ final class VendorBillController
         if (!is_numeric($taxable) || (float) $taxable <= 0) {
             return 'Enter the taxable value of the bill (₹).';
         }
-        $gst = trim((string) ($_POST['gst_inr'] ?? ''));
-        if ($gst === '') {
-            $gst = '0';
-        }
-        if (!is_numeric($gst) || (float) $gst < 0) {
-            return 'Enter the GST on the bill (₹), or 0.';
+        // Owner request (2026-10-27): GST is picked as a rate (%) from the
+        // GST Rate list and the amount is worked out here, never typed.
+        $gstRate = trim((string) ($_POST['gst_rate_pct'] ?? ''));
+        $gstRates = array_map(static fn (array $o): string => (string) $o['option_value'], LookupRepository::dropdownOptions('gst_rate'));
+        if (!in_array($gstRate, $gstRates, true)) {
+            return 'Choose the GST rate (%) on the bill.';
         }
         if (empty($_FILES['bill_file']['name'])) {
             return 'Attach the bill / invoice.';
@@ -68,7 +69,7 @@ final class VendorBillController
             'bill_no' => mb_substr($billNo, 0, 100),
             'bill_date' => $billDate,
             'taxable_inr' => round((float) $taxable, 2),
-            'gst_inr' => round((float) $gst, 2),
+            'gst_inr' => round(round((float) $taxable, 2) * (float) $gstRate) / 100,
             'note' => trim((string) ($_POST['note'] ?? '')) !== '' ? mb_substr(trim((string) $_POST['note']), 0, 500) : null,
         ];
     }

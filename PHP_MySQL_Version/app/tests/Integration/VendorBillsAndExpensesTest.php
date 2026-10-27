@@ -110,12 +110,16 @@ final class VendorBillsAndExpensesTest extends DbTestCase
     public function testASupplierBillNeedsItsDetailsAndTheBillAttached(): void
     {
         [$orderId] = $this->orderWithSupplierPo();
-        $_POST = ['bill_for' => 'advance', 'bill_no' => 'SPI-1', 'bill_date' => date('Y-m-d'), 'taxable_inr' => '13500', 'gst_inr' => '675'];
+        $_POST = ['bill_for' => 'advance', 'bill_no' => 'SPI-1', 'bill_date' => date('Y-m-d'), 'taxable_inr' => '13500', 'gst_rate_pct' => '5'];
         (new VendorBillController())->addSupplierBill(['id' => (string) $orderId]);
         self::assertSame('Attach the bill / invoice.', $this->lastFlash()['message']);
         $_POST['bill_date'] = date('Y-m-d', strtotime('+2 days'));
         (new VendorBillController())->addSupplierBill(['id' => (string) $orderId]);
         self::assertStringContainsString('not in the future', $this->lastFlash()['message']);
+        $_POST['bill_date'] = date('Y-m-d');
+        $_POST['gst_rate_pct'] = '7';
+        (new VendorBillController())->addSupplierBill(['id' => (string) $orderId]);
+        self::assertSame('Choose the GST rate (%) on the bill.', $this->lastFlash()['message'], 'GST is a rate from the GST Rate list, never a typed amount');
         self::assertSame([], OrderVendorBillRepository::forOrder($orderId));
     }
 

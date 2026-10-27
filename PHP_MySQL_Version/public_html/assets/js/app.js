@@ -574,6 +574,36 @@
     }, true);
   }
 
+  // Owner request (2026-10-27): GST is always picked as a rate (%) and the
+  // amount worked out, never typed. Any form holding a [data-gst-base]
+  // value and a [data-gst-rate] select fills its read-only
+  // [data-gst-amount] / [data-gst-total] fields as either changes (the
+  // server recomputes the same figure, so this is display only).
+  function initGstCalc() {
+    function recalc(form) {
+      var base = form.querySelector('[data-gst-base]');
+      var rate = form.querySelector('[data-gst-rate]');
+      if (!base || !rate) return;
+      var b = Math.round((parseFloat(base.value) || 0) * 100) / 100;
+      var gst = Math.round(b * (parseFloat(rate.value) || 0)) / 100;
+      var amount = form.querySelector('[data-gst-amount]');
+      var total = form.querySelector('[data-gst-total]');
+      if (amount) amount.value = gst.toFixed(2);
+      if (total) total.value = (b + gst).toFixed(2);
+    }
+    document.addEventListener('input', function (e) {
+      var el = e.target;
+      if (el && el.form && (el.hasAttribute('data-gst-base') || el.hasAttribute('data-gst-rate'))) recalc(el.form);
+    });
+    document.addEventListener('change', function (e) {
+      var el = e.target;
+      if (el && el.form && el.hasAttribute('data-gst-rate')) recalc(el.form);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('form'), function (form) {
+      if (form.querySelector('[data-gst-rate]')) recalc(form);
+    });
+  }
+
   function init() {
     // Before initConfirmDialogs(): both listen in the capture phase, so
     // registering this first means an invalid form is stopped before any
@@ -608,6 +638,7 @@
     initFinCostPicker();
     initRemittanceStatements();
     initSchemeRows();
+    initGstCalc();
   }
 
   if (document.readyState === 'loading') {

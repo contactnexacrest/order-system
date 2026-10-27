@@ -86,13 +86,16 @@ describe('vendor bills and order expenses', () => {
 
   it('needs the bill details and the bill attached', async () => {
     const [orderId] = await orderWithSupplierPo();
-    const body = { bill_for: 'advance', bill_no: 'SPI-1', bill_date: todayIst(), taxable_inr: '13500', gst_inr: '675' };
+    const body = { bill_for: 'advance', bill_no: 'SPI-1', bill_date: todayIst(), taxable_inr: '13500', gst_rate_pct: '5' };
     let req = fakeReq({ id: String(orderId) }, body);
     await vendorBillController.addSupplierBill(req, fakeRes());
     expect(lastFlash(req).message).toBe('Attach the bill / invoice.');
     req = fakeReq({ id: String(orderId) }, { ...body, bill_date: '2999-01-01' });
     await vendorBillController.addSupplierBill(req, fakeRes());
     expect(lastFlash(req).message).toContain('not in the future');
+    req = fakeReq({ id: String(orderId) }, { ...body, gst_rate_pct: '7' });
+    await vendorBillController.addSupplierBill(req, fakeRes());
+    expect(lastFlash(req).message).toBe('Choose the GST rate (%) on the bill.');
     expect(await orderVendorBillRepository.forOrder(orderId)).toEqual([]);
   });
 

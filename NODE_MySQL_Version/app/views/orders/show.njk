@@ -394,11 +394,19 @@
   {% endif %}
 {% endmacro %}
 {# The bill fields both kinds share (number, date, taxable, GST, the bill itself). #}
-{% macro vendorBillFields() %}
+{% macro vendorBillFields(gstRates) %}
     <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
     <label>Bill date *<input type="date" name="bill_date" required max="{{ today() }}"></label>
-    <label>Taxable value (&#8377;) *<input type="number" step="0.01" min="0.01" name="taxable_inr" required></label>
-    <label>GST (&#8377;)<input type="number" step="0.01" min="0" name="gst_inr" value="0"></label>
+    <label>Taxable value (&#8377;) *<input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base></label>
+    <label>GST rate (%) *
+      <select name="gst_rate_pct" required data-gst-rate>
+        {% for o in gstRates %}
+          <option value="{{ o.option_value }}" {{ 'selected' if o.is_default else '' }}>{{ o.option_value }}%</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="0.00"></label>
+    <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="0.00"></label>
     <label>Attach bill *<input type="file" name="bill_file" required accept=".pdf,.jpg,.jpeg,.png"></label>
     <label>Note<input type="text" name="note" maxlength="500" placeholder="optional"></label>
 {% endmacro %}
@@ -427,7 +435,7 @@
         <form method="post" action="/orders/{{ order.id }}/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="bill_for" value="{{ leg }}">
-          {{ vendorBillFields() }}
+          {{ vendorBillFields(gstRates) }}
           <div><button type="submit" class="btn-sm">Add Bill</button></div>
         </form>
       </details>
@@ -2135,7 +2143,7 @@
             {% for key, svcLabel in logisticsServices %}<option value="{{ key }}">{{ svcLabel }}</option>{% endfor %}
           </select>
         </label>
-        {{ vendorBillFields() }}
+        {{ vendorBillFields(gstRates) }}
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
       {% endif %}

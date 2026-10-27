@@ -575,12 +575,20 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
     <?php
 };
 // The bill fields both kinds share (number, date, taxable, GST, the bill itself).
-$vendorBillFields = static function (): void {
+$vendorBillFields = static function () use ($gstRates): void {
     ?>
     <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
     <label>Bill date *<input type="date" name="bill_date" required max="<?= date('Y-m-d') ?>"></label>
-    <label>Taxable value (&#8377;) *<input type="number" step="0.01" min="0.01" name="taxable_inr" required></label>
-    <label>GST (&#8377;)<input type="number" step="0.01" min="0" name="gst_inr" value="0"></label>
+    <label>Taxable value (&#8377;) *<input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base></label>
+    <label>GST rate (%) *
+      <select name="gst_rate_pct" required data-gst-rate>
+        <?php foreach ($gstRates as $o): ?>
+          <option value="<?= htmlspecialchars((string) $o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $o['option_value']) ?>%</option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="0.00"></label>
+    <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="0.00"></label>
     <label>Attach bill *<input type="file" name="bill_file" required accept=".pdf,.jpg,.jpeg,.png"></label>
     <label>Note<input type="text" name="note" maxlength="500" placeholder="optional"></label>
     <?php

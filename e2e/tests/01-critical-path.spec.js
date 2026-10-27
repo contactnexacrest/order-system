@@ -168,6 +168,11 @@ async function addAndPayBill(page, stageNumber, cardSelector, fields, billNo, am
   await addForm.locator('input[name="bill_no"]').fill(billNo);
   await addForm.locator('input[name="bill_date"]').fill(new Date().toISOString().slice(0, 10));
   await addForm.locator('input[name="taxable_inr"]').fill(amount);
+  // GST is a rate (%) from the dropdown; the amount and total fill themselves.
+  const rate = Number(await addForm.locator('select[name="gst_rate_pct"]').inputValue());
+  const gst = Math.round(Number(amount) * rate) / 100;
+  await expect(addForm.locator('[data-gst-amount]')).toHaveValue(gst.toFixed(2));
+  await expect(addForm.locator('[data-gst-total]')).toHaveValue((Number(amount) + gst).toFixed(2));
   await addForm.locator('input[name="bill_file"]').setInputFiles(DUMMY_FILE);
   await Promise.all([page.waitForEvent('load'), addForm.getByRole('button', { name: 'Add Bill' }).click()]);
   await expect(page.locator('.alert')).toContainText(billNo);
