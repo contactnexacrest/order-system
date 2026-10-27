@@ -690,3 +690,18 @@ details.vendor-bill-pay > summary::-webkit-details-marker{display:none;}
 details.vendor-bill-pay[open]{background:#fffaf0;border:1px solid #ecd9a8;border-radius:8px;padding:8px;margin-top:6px;}
 details.vendor-bill-add{margin-top:10px;}
 .btn-link{background:none;border:none;color:var(--muted,#666);text-decoration:underline;cursor:pointer;padding:0;}
+/* Owner request (2026-10-27): each of the five order sections (A-E) in its own
+   colour — left stripe, tinted header, letter badge, title and progress bar.
+   The inside of each section is unchanged; the current section keeps its gold
+   outline. */
+#phase-booking{--ph:#1F4E9E;--ph-bg:#EAF1FD;}
+#phase-production{--ph:#2D7D56;--ph-bg:#E7F5EE;}
+#phase-shipment{--ph:#B7791F;--ph-bg:#FDF3E2;}
+#phase-closure{--ph:#6B3FA0;--ph-bg:#F2ECFA;}
+#phase-aftersales{--ph:#2B7A86;--ph-bg:#E5F4F6;}
+.phase-group[id]{border-left:6px solid var(--ph) !important;}
+.phase-group[id] > summary{background:var(--ph-bg);margin:0 -1rem;padding:1rem;border-radius:0 14px 14px 0;}
+.phase-group[id][open] > summary{border-radius:0 14px 0 0;}
+.phase-group[id] > summary .phase-tag{background:var(--ph) !important;}
+.phase-group[id] > summary h2{color:var(--ph) !important;}
+.phase-group[id] > summary .phase-bar i{background:var(--ph);}
