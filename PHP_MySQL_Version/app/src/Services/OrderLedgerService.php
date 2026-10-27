@@ -7,8 +7,10 @@ namespace App\Services;
 use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\ClientPaymentReportRepository;
 use App\Repositories\OrderCostEntryRepository;
+use App\Repositories\OrderExpenseRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderSupplierPoRepository;
+use App\Repositories\OrderVendorBillRepository;
 
 /**
  * Payment Overview → Ledger. Every money event recorded against one order,
@@ -78,7 +80,32 @@ final class OrderLedgerService
                 }
             }
         }
+        // Owner decisions (2026-10-27): logistics partners' bills paid, and the
+        // order's actual expenses. Real travel expenses replace the provisional
+        // travel % line.
+        foreach (OrderVendorBillRepository::forOrder($orderId, 'logistics') as $bill) {
+            if ($bill['paid_at'] !== null) {
+                $rows[] = self::out(
+                    (string) $bill['paid_at'],
+                    'Logistics paid — ' . ($bill['partner_name'] ?? 'Partner') . ' (' . (OrderVendorBillRepository::LOGISTICS_SERVICES[$bill['bill_for']] ?? $bill['bill_for']) . ', bill ' . $bill['bill_no'] . ')',
+                    $bill['paid_amount_inr'],
+                    'Logistics bill · ' . $bill['payment_mode'] . ' ' . $bill['payment_ref']
+                );
+            }
+        }
+        $expenseSummary = OrderExpenseRepository::summary($orderId);
+        foreach (OrderExpenseRepository::forOrder($orderId) as $expense) {
+            $rows[] = self::out(
+                (string) $expense['expense_date'],
+                'Expense — ' . (OrderExpenseRepository::CATEGORIES[$expense['category']] ?? $expense['category']) . ': ' . $expense['details'],
+                $expense['amount_inr'],
+                !empty($expense['receipt_file_id']) ? 'Order expense (receipt)' : 'Order expense (no receipt)'
+            );
+        }
         foreach (OrderCostEntryRepository::forOrder($orderId) as $entry) {
+            if ($entry['category'] === 'travel_expenses' && $expenseSummary['has_travel']) {
+                continue;
+            }
             $label = OrderCostEntryRepository::CATEGORIES[$entry['category']] ?? $entry['category'];
             $rows[] = self::out(
                 (string) ($entry['incurred_at'] ?? $entry['created_at']),
@@ -106,7 +133,7 @@ final class OrderLedgerService
         }
 
         $rows = self::sorted($rows);
-        $totals = ['buyer_foreign' => 0.0, 'buyer_inr' => 0.0, 'buyer_without_rate' => 0, 'benefits_inr' => 0.0, 'supplier_inr' => 0.0, 'expenses_inr' => 0.0];
+        $totals = ['buyer_foreign' => 0.0, 'buyer_inr' => 0.0, 'buyer_without_rate' => 0, 'benefits_inr' => 0.0, 'supplier_inr' => 0.0, 'logistics_inr' => 0.0, 'expenses_inr' => 0.0];
         foreach ($rows as $row) {
             if ($row['direction'] === 'in' && $row['source'] === 'Staff-recorded') {
                 $totals['buyer_foreign'] += (float) $row['amount'];
@@ -118,11 +145,11 @@ final class OrderLedgerService
             } elseif ($row['direction'] === 'in' && $row['inr'] !== null) {
                 $totals['benefits_inr'] += $row['inr'];
             } elseif ($row['direction'] === 'out') {
-                $key = str_starts_with($row['event'], 'Supplier ') ? 'supplier_inr' : 'expenses_inr';
+                $key = str_starts_with($row['event'], 'Supplier ') ? 'supplier_inr' : (str_starts_with($row['event'], 'Logistics ') ? 'logistics_inr' : 'expenses_inr');
                 $totals[$key] += (float) $row['inr'];
             }
         }
-        $totals['net_inr'] = $totals['buyer_inr'] + $totals['benefits_inr'] - $totals['supplier_inr'] - $totals['expenses_inr'];
+        $totals['net_inr'] = $totals['buyer_inr'] + $totals['benefits_inr'] - $totals['supplier_inr'] - $totals['logistics_inr'] - $totals['expenses_inr'];
         return ['rows' => $rows, 'totals' => $totals];
     }
 

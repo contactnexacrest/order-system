@@ -326,35 +326,112 @@
     </details>
   {% endif %}
 {% endmacro %}
+{# Owner decisions (2026-10-27): bill first, then pay. Whoever asks NexaCrest
+   for money — the supplier (7e advance, 10a balance) or a logistics partner
+   (CHA, transport, freight forwarder) — sends a bill; staff add it with the
+   bill attached, then record the payment against it (date, amount, mode,
+   UTR). One table + pay form for both kinds. #}
+{% macro vendorPayTo(bank, editUrl, canEditVendor) %}
+  {% set editLink %}{% if canEditVendor %} <a href="{{ editUrl }}#bank-details" target="_blank" rel="noopener">Open the directory entry</a>{% endif %}{% endset %}
+  {% if not bank or not bank.has_bank %}
+    <p class="review-banner warn">&#9888; No bank details on file — add them in the directory, or send the Vendor Details Link.{{ editLink | safe }}</p>
+  {% else %}
+    <div class="pay-to"><strong>Pay to:</strong> {{ bank.bank_account_name }} · {{ bank.bank_name }}{% if bank.bank_branch %} ({{ bank.bank_branch }}){% endif %} · A/c <code>{{ bank.bank_account_number }}</code> · IFSC <code>{{ bank.bank_ifsc }}</code>{% if bank.bank_upi_id %} · UPI {{ bank.bank_upi_id }}{% endif %}{% if bank.bank_verified_at %} <span class="badge good">&#10003; Verified</span>{% else %} <span class="badge warn">&#9888; Not verified — check before paying</span>{{ editLink | safe }}{% endif %}</div>
+  {% endif %}
+{% endmacro %}
+{% macro vendorBillTable(bills, showPartner, canPay, payBlocked) %}
+  {% if not bills.length %}
+    <p class="muted small">No bills added yet.</p>
+    {% if canPay and payBlocked !== null %}<p class="review-banner warn">&#9888; {{ payBlocked }} Bills can still be added now.</p>{% endif %}
+  {% else %}
+  {% set t = vendorBillsView.totals(bills) %}
+  <table class="list vendor-bills">
+    <tr>{% if showPartner %}<th>Partner</th>{% endif %}<th>For</th><th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
+    {% for b in bills %}
+    <tr id="vendor-bill-{{ b.id }}">
+      {% if showPartner %}<td>{{ b.partner_name or '—' }}</td>{% endif %}
+      <td>{{ (vendorBillLegs[b.bill_for] or b.bill_for) if b.vendor_kind == 'supplier' else (logisticsServices[b.bill_for] or b.bill_for) }}</td>
+      <td>{{ b.bill_no }} · {{ b.bill_date | humanDate }}{% if b.bill_file_id %} · <a href="/file-store/{{ b.bill_file_id }}/download">bill</a>{% endif %}{% if b.note %}<br><small class="muted">{{ b.note }}</small>{% endif %}</td>
+      <td style="text-align:right">{{ b.taxable_inr | money }}</td>
+      <td style="text-align:right">{{ b.gst_inr | money }}</td>
+      <td style="text-align:right">{{ b.total_inr | money }}</td>
+      <td>
+        {% if b.paid_at %}
+          <span class="vendor-bill-paid">&#10003; &#8377;{{ b.paid_amount_inr | money }} on {{ b.paid_at | humanDate }}</span><br><small class="muted">{{ b.payment_mode }} · {{ b.payment_ref }}</small>
+        {% else %}
+          <span class="vendor-bill-due">Unpaid</span>
+          {% if canPay and payBlocked === null %}
+          <details class="vendor-bill-pay">
+            <summary class="btn-sm">Mark Paid</summary>
+            {% if b.vendor_kind == 'supplier' %}{{ vendorPayTo(supplierBank, '/suppliers/' + (supplierPo.supplier_id or 0) + '/edit', permissions.manage_suppliers and supplierPo.supplier_id) }}{% else %}{{ vendorPayTo(logisticsBanks[b.logistics_partner_id], '/logistics-partners/' + b.logistics_partner_id + '/edit', permissions.manage_logistics_partners) }}{% endif %}
+            <form method="post" action="/orders/{{ order.id }}/vendor-bills/{{ b.id }}/pay" class="field-grid">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" name="paid_amount_inr" value="{{ b.total_inr }}" required></label>
+              <label>Paid on *<input type="date" name="paid_at" value="{{ today() }}" max="{{ today() }}" required></label>
+              <label>Mode *
+                <select name="payment_mode" required>
+                  {% for mode in paymentModes %}<option>{{ mode }}</option>{% endfor %}
+                </select>
+              </label>
+              <label>UTR / reference *<input type="text" name="payment_ref" required placeholder="e.g. SBIN1234567890"></label>
+              <div><button type="submit" class="btn-sm">Save Payment</button></div>
+            </form>
+          </details>
+          <form method="post" action="/orders/{{ order.id }}/vendor-bills/{{ b.id }}/delete" data-confirm="Remove the unpaid bill {{ b.bill_no }}?" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-link small">Remove</button>
+          </form>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    <tr><td colspan="{{ 5 if showPartner else 4 }}"><strong>Total</strong></td><td style="text-align:right"><strong>{{ t.total | money }}</strong></td><td><span class="vendor-bill-paid">Paid &#8377;{{ t.paid | money }}</span>{% if t.due > 0 %}<br><span class="vendor-bill-due">Due &#8377;{{ t.due | money }}</span>{% endif %}</td></tr>
+  </table>
+  {% if canPay and payBlocked !== null %}
+    <p class="review-banner warn">&#9888; {{ payBlocked }} Bills can still be added now.</p>
+  {% endif %}
+  {% endif %}
+{% endmacro %}
+{# The bill fields both kinds share (number, date, taxable, GST, the bill itself). #}
+{% macro vendorBillFields() %}
+    <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
+    <label>Bill date *<input type="date" name="bill_date" required max="{{ today() }}"></label>
+    <label>Taxable value (&#8377;) *<input type="number" step="0.01" min="0.01" name="taxable_inr" required></label>
+    <label>GST (&#8377;)<input type="number" step="0.01" min="0" name="gst_inr" value="0"></label>
+    <label>Attach bill *<input type="file" name="bill_file" required accept=".pdf,.jpg,.jpeg,.png"></label>
+    <label>Note<input type="text" name="note" maxlength="500" placeholder="optional"></label>
+{% endmacro %}
 {# Owner request (2026-10-26): the supplier's advance (Step 7e) and balance
-   (Step 10a — due before packing) are their own sub-steps. #}
+   (Step 10a — due before packing) are their own sub-steps; owner decisions
+   (2026-10-27): each is now the supplier's bill, then the payment against it. #}
 {% macro supplierPayment(leg) %}
   {% set label = 'Advance' if leg == 'advance' else 'Balance' %}
   {% if not supplierPo %}
     <p class="muted">Save the Supplier PO terms first (Step 7a).</p>
-  {% elif supplierPo[leg + '_paid_at'] %}
-    <p>{{ label }} paid: &#8377;{{ supplierPo[leg + '_paid_amount_inr'] or supplierPo[leg + '_amount_inr'] }} on {{ supplierPo[leg + '_paid_at'] }} <small class="muted">(planned &#8377;{{ supplierPo[leg + '_amount_inr'] or '—' }})</small></p>
   {% else %}
-    <p class="muted small">Planned {{ label | lower }}: &#8377;{{ supplierPo[leg + '_amount_inr'] or '—' }} (from the Supplier PO terms).</p>
-    {# Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one. #}
-    {% if leg == 'balance' and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at %}
-      <p class="review-banner warn">&#9888; Record the supplier <strong>advance</strong> first (<a href="#step-7e-supplier-advance-paid">Step 7e</a>) — the Supplier PO terms plan an advance of &#8377;{{ supplierPo.advance_amount_inr }}.</p>
-    {% elif not permissions.manage_supplier_payments %}
-      <p class="muted small">Recorded by Accounts (needs the "Manage supplier payments" permission).</p>
+    {% set legBills = vendorBillsView.supplierLeg(vendorBills, supplierPo.id, leg) %}
+    <div class="plan-bar"><div>Supplier PO<b>{{ supplierPo.supplier_po_reference }}</b></div><div>PO total<b>&#8377;{{ supplierPo.total_payable_inr or '—' }}</b></div><div>{{ label }} planned<b>&#8377;{{ supplierPo[leg + '_amount_inr'] or '—' }}</b></div>{% if supplierPo[leg + '_paid_at'] %}<div>{{ label }} paid<b class="vendor-bill-paid">&#8377;{{ supplierPo[leg + '_paid_amount_inr'] or supplierPo[leg + '_amount_inr'] }} on {{ supplierPo[leg + '_paid_at'] | humanDate }}</b></div>{% endif %}</div>
+    {% if supplierPo[leg + '_paid_at'] and not legBills.length %}
+      {# Recorded before bills were kept — the payment stands as it is. #}
+      <p class="muted small">Paid before supplier bills were recorded here.</p>
     {% else %}
-      {# Owner request (2026-10-27): where to pay — the supplier's bank details from the directory. #}
-      {% set supplierEditLink %}{% if permissions.manage_suppliers and supplierPo.supplier_id %} <a href="/suppliers/{{ supplierPo.supplier_id }}/edit#bank-details" target="_blank" rel="noopener">Open the supplier</a>{% endif %}{% endset %}
-      {% if not supplierBank or not supplierBank.has_bank %}
-        <p class="review-banner warn">&#9888; No bank details on file for this supplier — add them in the Suppliers directory, or send them the Vendor Details Link.{{ supplierEditLink | safe }}</p>
+      {# Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one. #}
+      {% set payBlocked = ('Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' + supplierPo.advance_amount_inr + '.') if (leg == 'balance' and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at) else null %}
+      {{ vendorBillTable(legBills, false, permissions.manage_supplier_payments, payBlocked) }}
+      {% if not permissions.manage_supplier_payments %}
+        <p class="muted small">Bills and payments are recorded by Accounts (needs the "Manage supplier payments" permission).</p>
       {% else %}
-        <div class="pay-to"><strong>Pay to:</strong> {{ supplierBank.bank_account_name }} · {{ supplierBank.bank_name }}{% if supplierBank.bank_branch %} ({{ supplierBank.bank_branch }}){% endif %} · A/c <code>{{ supplierBank.bank_account_number }}</code> · IFSC <code>{{ supplierBank.bank_ifsc }}</code>{% if supplierBank.bank_upi_id %} · UPI {{ supplierBank.bank_upi_id }}{% endif %}{% if supplierBank.bank_verified_at %} <span class="badge good">&#10003; Verified</span>{% else %} <span class="badge warn">&#9888; Not verified — check before paying</span>{{ supplierEditLink | safe }}{% endif %}</div>
+      <details class="vendor-bill-add"{% if not legBills.length %} open{% endif %}>
+        <summary class="small"><strong>+ Add the supplier's {{ label | lower }} bill</strong> <span class="muted">({{ 'advance / proforma invoice' if leg == 'advance' else 'tax invoice' }})</span></summary>
+        <form method="post" action="/orders/{{ order.id }}/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="bill_for" value="{{ leg }}">
+          {{ vendorBillFields() }}
+          <div><button type="submit" class="btn-sm">Add Bill</button></div>
+        </form>
+      </details>
       {% endif %}
-      <form method="post" action="/orders/{{ order.id }}/supplier-po/{{ leg }}-paid" class="field-grid">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Date Paid<input type="date" name="paid_date" value="{{ today() }}" max="{{ today() }}"></label>
-        <label>Amount Paid (INR)<input type="number" step="0.01" min="0.01" name="amount_paid_inr" value="{{ supplierPo[leg + '_amount_inr'] or '' }}" required></label>
-        <div>{{ stepBadge('7e' if leg == 'advance' else '10a') | safe }}<button type="submit" class="btn-sm">Mark {{ label }} Paid</button></div>
-      </form>
     {% endif %}
   {% endif %}
 {% endmacro %}
@@ -810,6 +887,7 @@
         <div><span class="k">Received from buyer</span><span class="v">{{ ledgerTotals.buyer_foreign | money }} {{ order.currency_code or '' }} = &#8377;{{ ledgerTotals.buyer_inr | money }}</span></div>
         <div><span class="k">Export benefits received</span><span class="v">&#8377;{{ ledgerTotals.benefits_inr | money }}</span></div>
         <div><span class="k">Paid to supplier</span><span class="v">&#8377;{{ ledgerTotals.supplier_inr | money }}</span></div>
+        <div><span class="k">Paid to logistics partners</span><span class="v">&#8377;{{ ledgerTotals.logistics_inr | money }}</span></div>
         <div><span class="k">Expenses</span><span class="v">&#8377;{{ ledgerTotals.expenses_inr | money }}</span></div>
         <div class="full"><span class="k">Net so far</span><span class="v"><strong>&#8377;{{ ledgerTotals.net_inr | money }}</strong></span></div>
       </div>
@@ -2022,6 +2100,50 @@
   <details class="phase-group" id="phase-shipment"{{ ' open' if ph.open else '' }}>
     {{ phaseSummary(ph) }}
 
+  {# Owner decisions (2026-10-27): the logistics partners' bills — CHA,
+     transport, freight forwarder — on every incoterm. Runs alongside Steps
+     9-11 and never locks them; on CFR/CIF orders a bill can be paid only once
+     the buyer's Debit Note payment has cleared (9d). #}
+  {% set logisticsBillsList = vendorBillsView.logistics(vendorBills) %}
+  {% set logisticsUnpaid = vendorBillsView.unpaid(logisticsBillsList) | length %}
+  {% set inGroupC = currentUserStep in ['s9', 's10', 's11'] %}
+  {% set logisticsStatus = 'done' if (logisticsBillsList.length and logisticsUnpaid == 0) else ('current' if inGroupC else 'locked') %}
+  {% if permissions.manage_supplier_payments or permissions.manage_order_financials %}
+  <details class="step-card step-card-parallel" id="logistics-bills"{% if inGroupC and (not logisticsBillsList.length or logisticsUnpaid > 0) %} open{% endif %}>
+    <summary>{{ stepStatusIcon(logisticsStatus) }}<h2>Logistics Partner Bills &amp; Payments — CHA · Transport · Freight Forwarder{% if logisticsUnpaid > 0 %} <small class="muted">({{ logisticsUnpaid }} unpaid)</small>{% endif %}</h2></summary>
+    <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.{% if not isFob %} On this {{ order.incoterm_code }} order a bill can be paid once the buyer's Debit Note payment has cleared (Step 9d).{% endif %} Bills go into the order's financials (Step 12) automatically.</p>
+    {{ vendorBillTable(logisticsBillsList, true, permissions.manage_supplier_payments, logisticsPaymentBlocked) }}
+    {% if permissions.manage_supplier_payments %}
+    {% set activePartners = logisticsPartners | whereEq('is_active', 1) %}
+    <details class="vendor-bill-add"{% if not logisticsBillsList.length %} open{% endif %}>
+      <summary class="small"><strong>+ Add a bill</strong></summary>
+      {% if not activePartners.length %}
+        <p class="muted small">No logistics partners in the directory yet — <a href="/logistics-partners/create" target="_blank" rel="noopener">add one</a>.</p>
+      {% else %}
+      <form method="post" action="/orders/{{ order.id }}/vendor-bills/logistics" enctype="multipart/form-data" class="field-grid">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Logistics partner *
+          <select name="logistics_partner_id" required>
+            <option value="">Select…</option>
+            {% for lp in activePartners %}
+              <option value="{{ lp.id }}">{{ lp.partner_name }} ({{ logisticsServiceTypes[lp.service_type] or lp.service_type }})</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>For *
+          <select name="bill_for" required>
+            {% for key, svcLabel in logisticsServices %}<option value="{{ key }}">{{ svcLabel }}</option>{% endfor %}
+          </select>
+        </label>
+        {{ vendorBillFields() }}
+        <div><button type="submit" class="btn-sm">Add Bill</button></div>
+      </form>
+      {% endif %}
+    </details>
+    {% endif %}
+  </details>
+  {% endif %}
+
   {% if isFob %}
   {# FOB: the buyer arranges and pays freight, so this whole step never applies — shown greyed out, with nothing to expand. #}
   <div class="step-group step-group-disabled" id="step-group-stage-6" aria-disabled="true" title="Not applicable — FOB order: the buyer arranges and pays freight directly.">
@@ -2519,6 +2641,67 @@
             {% endfor %}
           </table>
         {% endif %}
+      {# Owner decisions (2026-10-27): the order's actual expenses, each with
+         its receipt (or a reason when no bill exists). The travel % of FOB stays
+         the provisional figure until real travel expenses are recorded. #}
+      {% set logisticsTotalForFin = vendorBillsView.totals(vendorBillsView.logistics(vendorBills)).total %}
+      <div class="order-expenses" id="order-expenses">
+        <h3 style="font-size:0.95em; margin-top:10px;">Order Expenses — travel &amp; other</h3>
+        <div class="plan-bar">
+          <div>Travel budget{% if orderTravelExpenses %} ({{ orderTravelExpenses.expense_pct | money }}% of FOB){% endif %}<b>{% if orderTravelExpenses %}&#8377;{{ orderTravelExpenses.expense_amount | money }}{% else %}—{% endif %}</b></div>
+          <div>Actual travel<b>&#8377;{{ expenseSummary.travel | money }}</b></div>
+          <div>All expenses<b>&#8377;{{ expenseSummary.total | money }}</b></div>
+          <div>Receipts attached<b>{{ expenseSummary.with_receipt }} of {{ expenseSummary.count }}</b></div>
+          {% if expenseSummary.to_reimburse > 0 %}<div>Paid by staff, to reimburse<b class="vendor-bill-due">&#8377;{{ expenseSummary.to_reimburse | money }}</b></div>{% endif %}
+        </div>
+        <p class="muted small">{{ 'Travel cost now uses the actual travel expenses below; the travel % stays only as the budget to compare against.' if expenseSummary.has_travel else 'Until real travel expenses are recorded, travel cost uses the travel % of FOB (provisional).' }}
+          A voucher can be added later with its real date — unless the CA has locked that financial year.
+          {% if logisticsTotalForFin > 0 %}Logistics partner bills (&#8377;{{ logisticsTotalForFin | money }}) come in automatically from <a href="#logistics-bills">Group C</a>.{% endif %}</p>
+        {% if orderExpenses.length %}
+        <table class="list">
+          <tr><th>Date</th><th>Category</th><th>Details</th><th style="text-align:right">&#8377;</th><th>Paid by</th><th>Receipt</th><th></th></tr>
+          {% for e in orderExpenses %}
+          <tr>
+            <td>{{ e.expense_date | humanDate }}{% if e.added_later | int %}<br><small class="muted">added later (entered {{ e.created_at.slice(0, 10) | humanDate }})</small>{% endif %}</td>
+            <td>{{ expenseCategories[e.category] or e.category }}</td>
+            <td>{{ e.details }}</td>
+            <td style="text-align:right">{{ e.amount_inr | money }}</td>
+            <td>{{ expensePaidBy[e.paid_by] or e.paid_by }}{% if e.paid_by == 'staff' and e.staff_name %} — {{ e.staff_name }}{% endif %}</td>
+            <td>{% if e.receipt_file_id %}<a href="/file-store/{{ e.receipt_file_id }}/download">receipt</a>{% else %}<span class="vendor-bill-due">No bill — {{ e.no_receipt_reason }}</span>{% endif %}</td>
+            <td>
+              <form method="post" action="/orders/{{ order.id }}/expenses/{{ e.id }}/delete" data-confirm="Remove this expense?">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" class="btn-sm btn-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% endif %}
+        <details class="vendor-bill-add"{% if not orderExpenses.length %} open{% endif %}>
+          <summary class="small"><strong>+ Add an expense</strong></summary>
+          <form method="post" action="/orders/{{ order.id }}/expenses" enctype="multipart/form-data" class="field-grid">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Date *<input type="date" name="expense_date" required max="{{ today() }}"></label>
+            <label>Category *
+              <select name="category" required>
+                {% for key, catLabel in expenseCategories %}<option value="{{ key }}">{{ catLabel }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required></label>
+            <label>Paid by *
+              <select name="paid_by" required>
+                {% for key, byLabel in expensePaidBy %}<option value="{{ key }}">{{ byLabel }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Staff member to reimburse<input type="text" name="staff_name" maxlength="150" data-required-if="paid_by=staff" placeholder="only when staff paid"></label>
+            <label class="full">Details *<input type="text" name="details" required maxlength="255" placeholder="e.g. Factory visit 2 — Kota"></label>
+            <label>Receipt / bill<input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png"></label>
+            <label>No receipt? Reason<input type="text" name="no_receipt_reason" maxlength="255" minlength="10" data-required-unless="receipt" placeholder="only if no bill exists"></label>
+            <div><button type="submit" class="btn-sm">Add Expense</button></div>
+          </form>
+        </details>
+      </div>
       <details class="fin-zoho">
         <summary class="muted small">Linked from Zoho Books ({{ linkedCaExpenses.length }}) — for reference</summary>
         {% if linkedCaExpenses.length == 0 %}
@@ -2541,7 +2724,7 @@
         <label class="fin-add-cost-pick">+ Add a cost
           <select data-fin-cost-type aria-label="Type of cost">
             <option value="other">Other cost (CHA, port, courier, bank charges…)</option>
-            <option value="travel">Travel — factory visits (% of FOB)</option>
+            <option value="travel">Travel budget — % of FOB (provisional until real travel expenses are recorded)</option>
             {% if pendingInspectionTask %}<option value="inspection">Pre-shipment inspection fee</option>{% endif %}
             {% if isLcPayment %}<option value="lc">LC / bank loan interest</option>{% endif %}
           </select>
@@ -2694,9 +2877,11 @@
             <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | money }}</span></div>
             <div><span class="k">Govt. Export Benefits (INR){% if profitability.export_benefits_is_estimated %} — claimed, not yet received{% endif %}</span><span class="v">{{ profitability.export_benefits_inr | money }}</span></div>
             <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | money }}</span></div>
-            <div><span class="k">Ocean Freight (INR)</span><span class="v">{{ profitability.freight_cost_inr | money }}</span></div>
+            <div><span class="k">Ocean Freight (INR){{ " — from the forwarder's bills" if profitability.freight_from_bills else '' }}</span><span class="v">{{ profitability.freight_cost_inr | money }}</span></div>
             <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}</span></div>
-            <div><span class="k">Other Costs (INR)</span><span class="v">{{ profitability.other_costs_inr | money }}</span></div>
+            <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v">{{ profitability.logistics_cost_inr | money }}</span></div>
+            <div><span class="k">Order Expenses (INR)</span><span class="v">{{ profitability.expenses_inr | money }}</span></div>
+            <div><span class="k">Other Costs (INR){{ '' if profitability.travel_is_provisional else ' — travel % replaced by actual travel' }}</span><span class="v">{{ profitability.other_costs_inr | money }}</span></div>
             <div><span class="k">Total Order Cost (INR)</span><span class="v">{{ profitability.total_cost_inr | money }}</span></div>
             <div><span class="k">Order Profit (INR)</span><span class="v">{{ profitability.profit_inr | money }}</span></div>
             <div><span class="k">Order Margin %</span><span class="v">{% if profitability.margin_pct != null %}{{ profitability.margin_pct | money }}%{% else %}—{% endif %}</span></div>
@@ -3087,6 +3272,12 @@
         {{ stepBadge('13h') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
       <p class="muted small">Blocked until Step 13g is done — every eligible government export benefit received, or skipped with a reason.</p>
+      {# Owner decision (2026-10-27): unpaid supplier / logistics bills are a warning here, not a block — accounts may settle vendor bills later. #}
+      {% set unpaidBills = vendorBillsView.unpaid(vendorBills) %}
+      {% if unpaidBills.length %}
+        <p class="review-banner warn" id="unpaid-vendor-bills-warning">&#9888; {{ unpaidBills.length }} vendor bill{{ '' if unpaidBills.length == 1 else 's' }} still unpaid: &#8377;{{ vendorBillsView.totals(unpaidBills).total | money }}
+          ({% for b in unpaidBills %}{{ 'Supplier' if b.vendor_kind == 'supplier' else (b.partner_name or 'Logistics') }} {{ b.bill_no }}{% if not loop.last %}, {% endif %}{% endfor %}) — you can still mark the order fully settled.</p>
+      {% endif %}
       {% if permissions.edit_locked_data %}
       <details>
         <summary class="small">Override &amp; fully settle anyway (benefit genuinely never arriving)</summary>

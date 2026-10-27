@@ -1081,7 +1081,8 @@ final class DocumentGenerationService
         // previously missing from it entirely.
         $supplierPo = \App\Repositories\OrderSupplierPoRepository::findLatestForOrder($orderId);
         $costEntries = \App\Repositories\OrderCostEntryRepository::forOrder($orderId);
-        $profitability = \App\Services\OrderProfitabilityService::computeForOrder($orderId);
+        // Unchanged by vendor bills / order expenses (2026-10-27) until the owner approves the CAFIN change.
+        $profitability = \App\Services\OrderProfitabilityService::computeForOrder($orderId, false);
 
         $revisionNumber = ReferenceNumberService::nextDocumentRevisionNumber($orderId, $docTypeId);
         $existing = DocumentRepository::findLatestForOrderAndType($orderId, $docTypeId);

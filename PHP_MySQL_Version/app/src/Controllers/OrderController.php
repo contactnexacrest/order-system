@@ -983,6 +983,20 @@ final class OrderController
             'supplierPo' => $supplierPo,
             // Owner request (2026-10-27): who to pay in 7e / 10a.
             'supplierBank' => $supplierPo && !empty($supplierPo['supplier_id']) ? \App\Repositories\VendorDetailsRepository::bankDetails(\App\Repositories\VendorDetailsRepository::find('supplier', (int) $supplierPo['supplier_id'])) : null,
+            // Owner decisions (2026-10-27): bill first, then pay — the supplier's
+            // bills (7e / 10a) and the logistics partners' bills (Group C), and
+            // the order's actual expenses with receipts (12a).
+            'vendorBills' => $vendorBills = \App\Repositories\OrderVendorBillRepository::forOrder($orderId),
+            'logisticsBanks' => array_map(
+                static fn (int $partnerId): array => \App\Repositories\VendorDetailsRepository::bankDetails(\App\Repositories\VendorDetailsRepository::find('logistics_partner', $partnerId)),
+                array_combine(
+                    $__partnerIds = array_values(array_unique(array_map('intval', array_filter(array_column($vendorBills, 'logistics_partner_id'))))),
+                    $__partnerIds
+                ) ?: []
+            ),
+            'logisticsPaymentBlocked' => \App\Controllers\VendorBillController::logisticsPaymentBlockedReason($order),
+            'orderExpenses' => $canManageOrderFinancials ? \App\Repositories\OrderExpenseRepository::forOrder($orderId) : [],
+            'expenseSummary' => $canManageOrderFinancials ? \App\Repositories\OrderExpenseRepository::summary($orderId) : null,
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
             'supplierPoDocuments' => $supplierPo ? OrderSupplierPoDocumentRepository::forSupplierPo((int) $supplierPo['id']) : [],
             'freight'   => OrderFreightRepository::find($orderId),

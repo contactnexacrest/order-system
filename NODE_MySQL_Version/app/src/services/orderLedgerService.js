@@ -3,6 +3,8 @@
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
+const orderExpenseRepository = require('../repositories/orderExpenseRepository');
+const orderVendorBillRepository = require('../repositories/orderVendorBillRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 
@@ -100,7 +102,30 @@ async function forOrder(orderId, orderCurrency, full) {
       }
     }
   }
+  // Owner decisions (2026-10-27): logistics partners' bills paid, and the
+  // order's actual expenses. Real travel expenses replace the provisional
+  // travel % line.
+  for (const bill of await orderVendorBillRepository.forOrder(orderId, 'logistics')) {
+    if (bill.paid_at !== null) {
+      rows.push(out(
+        bill.paid_at,
+        `Logistics paid — ${bill.partner_name || 'Partner'} (${orderVendorBillRepository.LOGISTICS_SERVICES[bill.bill_for] || bill.bill_for}, bill ${bill.bill_no})`,
+        bill.paid_amount_inr,
+        `Logistics bill · ${bill.payment_mode} ${bill.payment_ref}`
+      ));
+    }
+  }
+  const expenseSummary = await orderExpenseRepository.summary(orderId);
+  for (const expense of await orderExpenseRepository.forOrder(orderId)) {
+    rows.push(out(
+      expense.expense_date,
+      `Expense — ${orderExpenseRepository.CATEGORIES[expense.category] || expense.category}: ${expense.details}`,
+      expense.amount_inr,
+      expense.receipt_file_id ? 'Order expense (receipt)' : 'Order expense (no receipt)'
+    ));
+  }
   for (const entry of await orderCostEntryRepository.forOrder(orderId)) {
+    if (entry.category === 'travel_expenses' && expenseSummary.has_travel) continue;
     const label = orderCostEntryRepository.CATEGORIES[entry.category] || entry.category;
     rows.push(out(entry.incurred_at || entry.created_at, `Expense — ${label}${entry.description ? `: ${entry.description}` : ''}`, entry.amount_inr, 'Order cost entry'));
   }
@@ -123,7 +148,7 @@ async function forOrder(orderId, orderCurrency, full) {
   }
 
   rows = sorted(rows);
-  const totals = { buyer_foreign: 0, buyer_inr: 0, buyer_without_rate: 0, benefits_inr: 0, supplier_inr: 0, expenses_inr: 0 };
+  const totals = { buyer_foreign: 0, buyer_inr: 0, buyer_without_rate: 0, benefits_inr: 0, supplier_inr: 0, logistics_inr: 0, expenses_inr: 0 };
   for (const row of rows) {
     if (row.direction === 'in' && row.source === 'Staff-recorded') {
       totals.buyer_foreign += parseFloat(row.amount) || 0;
@@ -135,10 +160,10 @@ async function forOrder(orderId, orderCurrency, full) {
     } else if (row.direction === 'in' && row.inr !== null) {
       totals.benefits_inr += row.inr;
     } else if (row.direction === 'out') {
-      totals[row.event.startsWith('Supplier ') ? 'supplier_inr' : 'expenses_inr'] += row.inr;
+      totals[row.event.startsWith('Supplier ') ? 'supplier_inr' : (row.event.startsWith('Logistics ') ? 'logistics_inr' : 'expenses_inr')] += row.inr;
     }
   }
-  totals.net_inr = totals.buyer_inr + totals.benefits_inr - totals.supplier_inr - totals.expenses_inr;
+  totals.net_inr = totals.buyer_inr + totals.benefits_inr - totals.supplier_inr - totals.logistics_inr - totals.expenses_inr;
   return { rows, totals };
 }
 

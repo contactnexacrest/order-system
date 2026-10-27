@@ -222,7 +222,7 @@ final class OrderScreenRedesignTest extends TestCase
 
         $this->assertSame(6, $directStepCardCount, 'Expected exactly 6 cards directly in #order-panels: Products, Payment Overview, Document Review & Approval, Order Communication (pinned above the sections) and the two admin override cards below them. A different count means a card landed outside its section, or a panel\'s own markup never closed (N-01).');
         $this->assertSame(5, $phaseCount, 'Expected the five major sections: Order Booking, Procurement & Production, Shipment & Balance, Closure & Settlement, After-Sales & Records.');
-        $this->assertSame(10, $phaseStepCardCount, 'Expected 10 standalone step-cards directly inside the sections (Steps 1, 2, 3, the LC card, 19, Amendments, 14, 16-18 — Order Communication is pinned above them; Step 12 is now a step-group).');
+        $this->assertSame(11, $phaseStepCardCount, 'Expected 11 standalone step-cards directly inside the sections (Steps 1, 2, 3, the LC card, 19, Amendments, 14, 16-18, Logistics Partner Bills — Order Communication is pinned above them; Step 12 is now a step-group).');
         $this->assertSame(10, $groupCount, 'Expected exactly 10 step-group boxes inside the sections (Step 4, 5, 6, 7, 8 (Production), 9-freight, 10-packing/BL, 11 (CI&Balance), 12 (Financials 12a-12d), 13 (Documents & Settlement)).');
         $this->assertSame(45, $groupedStepCardCount, 'Expected exactly 45 step-cards nested inside a step-group box — every lettered sub-step card written in the page body.');
     }

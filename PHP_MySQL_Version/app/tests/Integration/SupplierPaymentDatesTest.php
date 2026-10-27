@@ -206,17 +206,20 @@ final class SupplierPaymentDatesTest extends DbTestCase
         ]), 'issued');
         $this->unlockThrough($orderId, 5);
 
+        // Owner decisions (2026-10-27): bill first, then pay — 7e and 10a each
+        // offer "add the supplier's bill" until that leg is paid.
         $before = $this->render($orderId);
-        self::assertStringContainsString('/supplier-po/advance-paid', $before);
+        self::assertStringContainsString('name="bill_for" value="advance"', $before);
+        self::assertStringContainsString('name="bill_for" value="balance"', $before);
         // Owner report (2026-10-27): the balance waits for the planned advance.
-        self::assertStringNotContainsString('/supplier-po/balance-paid', $before);
-        self::assertStringContainsString('Record the supplier <strong>advance</strong> first', $before);
+        self::assertStringContainsString('Pay the supplier advance first (Step 7e)', $before);
 
         OrderSupplierPoRepository::markAdvancePaid($supplierPoId, '2026-10-20', $this->createTestUser('Admin'), 20000.0);
 
         $after = $this->render($orderId);
-        self::assertStringNotContainsString('/supplier-po/advance-paid', $after, 'once paid, the Mark Advance Paid form must not still offer itself');
-        self::assertStringContainsString('/supplier-po/balance-paid', $after);
+        self::assertStringNotContainsString('name="bill_for" value="advance"', $after, 'once paid, 7e must not still offer a bill');
+        self::assertStringContainsString('name="bill_for" value="balance"', $after);
+        self::assertStringNotContainsString('Pay the supplier advance first (Step 7e)', $after);
     }
 
     public function testTodaysPaymentsReportCombinesIncomingAndOutgoingLegsForTheGivenDate(): void

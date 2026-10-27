@@ -156,6 +156,30 @@ async function submitStepForm(page, stageNumber, action, fields, buttonName, sco
   await expect(page.locator('.alert')).toBeVisible();
 }
 
+// Owner decisions (2026-10-27): bill first, then pay — add a vendor bill in
+// the card `cardSelector`, then record the payment against it.
+async function addAndPayBill(page, stageNumber, cardSelector, fields, billNo, amount) {
+  await openStage(page, stageNumber);
+  const card = page.locator(cardSelector);
+  const addForm = card.locator('form[action*="/vendor-bills/"]').first();
+  for (const [name, value] of Object.entries(fields)) {
+    await addForm.locator(`select[name="${name}"]`).selectOption(value);
+  }
+  await addForm.locator('input[name="bill_no"]').fill(billNo);
+  await addForm.locator('input[name="bill_date"]').fill(new Date().toISOString().slice(0, 10));
+  await addForm.locator('input[name="taxable_inr"]').fill(amount);
+  await addForm.locator('input[name="bill_file"]').setInputFiles(DUMMY_FILE);
+  await Promise.all([page.waitForEvent('load'), addForm.getByRole('button', { name: 'Add Bill' }).click()]);
+  await expect(page.locator('.alert')).toContainText(billNo);
+
+  await openStage(page, stageNumber);
+  const row = page.locator(cardSelector).locator('tr', { hasText: billNo });
+  await row.locator('details.vendor-bill-pay > summary').click();
+  await row.locator('input[name="payment_ref"]').fill(`UTR-${billNo}`);
+  await Promise.all([page.waitForEvent('load'), row.getByRole('button', { name: 'Save Payment' }).click()]);
+  await expect(page.locator('.alert')).toContainText(`against bill ${billNo} recorded`);
+}
+
 // Step 5c (Generate PI) stays locked until the client's PI-stage form is
 // applied — this smoke order's client never uses it, so staff skip it.
 async function skipPiForm(page, orderId) {
@@ -428,12 +452,17 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     const clearForm = page.locator(`form[action="/orders/${orderId}/payment/freight/clear"]`);
     await clearForm.getByRole('button', { name: 'Mark Freight Cleared' }).click();
     await expect(page.locator('.alert')).toContainText('unlocked');
+
+    // Owner decisions (2026-10-27): the CHA's bill — on this CIF order it can
+    // be paid now that the buyer's Debit Note payment has cleared (9d).
+    await page.goto(`/orders/${orderId}`);
+    const chaPartner = await page.locator('#logistics-bills select[name="logistics_partner_id"] option', { hasText: `Smoke Test Forwarder ${UNIQUE}` }).first().getAttribute('value');
+    await addAndPayBill(page, 6, '#logistics-bills', { logistics_partner_id: chaPartner, bill_for: 'cha' }, 'CHA-INV-118', '18500');
   });
 
   await test.step('Stage 7 — Packing & BL Instruction: supplier balance, pack, PL, ship, BLI, confirm BL', async () => {
     // 10a: the supplier's balance is paid before packing starts.
-    await submitStepForm(page, 7, `/orders/${orderId}/supplier-po/balance-paid`, { amount_paid_inr: '45000' }, 'Mark Balance Paid');
-    await expect(page.locator('.alert')).toContainText('balance payment recorded');
+    await addAndPayBill(page, 7, '#step-10a-supplier-balance-paid', {}, 'SUP-TI-201', '45000');
 
     await openStage(page, 7);
     const packingForm = page.locator(`form[action="/orders/${orderId}/packing"]`);

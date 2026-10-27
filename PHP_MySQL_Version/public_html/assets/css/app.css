@@ -699,3 +699,14 @@ details.step-card[data-locked] > summary{cursor:not-allowed;pointer-events:none;
 /* Owner request (2026-10-26): a Generate button whose document already exists says so. */
 .doc-already-note{display:block;margin-top:6px;font-size:0.78rem;color:var(--gold-strong);}
 .doc-pending-badge{background:var(--gold-strong);vertical-align:middle;}
+/* Owner decisions (2026-10-27): vendor bills (supplier + logistics partners) and order expenses. */
+.plan-bar{display:flex;gap:18px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:0.85rem;margin:6px 0 8px;}
+.plan-bar b{display:block;font-size:1rem;}
+.vendor-bill-paid{color:#2D7D56;font-weight:600;}
+.vendor-bill-due{color:#a36b00;font-weight:600;}
+details.vendor-bill-pay{margin-top:4px;}
+details.vendor-bill-pay > summary{display:inline-block;cursor:pointer;list-style:none;}
+details.vendor-bill-pay > summary::-webkit-details-marker{display:none;}
+details.vendor-bill-pay[open]{background:#fffaf0;border:1px solid #ecd9a8;border-radius:8px;padding:8px;margin-top:6px;}
+details.vendor-bill-add{margin-top:10px;}
+.btn-link{background:none;border:none;color:var(--muted,#666);text-decoration:underline;cursor:pointer;padding:0;}

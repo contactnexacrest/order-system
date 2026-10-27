@@ -4079,3 +4079,70 @@ ALTER TABLE logistics_partners
   ADD COLUMN details_token_expires_at DATETIME        NULL,
   ADD COLUMN details_submitted_at     DATETIME        NULL,
   ADD INDEX idx_logistics_partners_details_token (details_token_hash);
+
+
+-- ================================================================
+-- SECTION CE — VENDOR BILLS & ORDER EXPENSES (owner decisions 2026-10-27)
+-- ================================================================
+-- Whoever asks NexaCrest for money sends a bill: the supplier (Step 7e
+-- advance, Step 10a balance) and the logistics partners — CHA, transport,
+-- freight forwarder (Group C, every incoterm). One row per bill, then the
+-- payment against it (date, amount, mode, UTR). On CFR/CIF orders a
+-- logistics bill can be paid only after the buyer's Debit Note payment
+-- has cleared (9d). bill_for: supplier -> advance|balance; logistics ->
+-- cha|transport|cha_transport|ocean_freight|other.
+-- order_expenses: the order's actual expenses (travel, hotel, courier,
+-- ...) with a receipt, or a reason when none exists. The travel % of FOB
+-- (order_travel_expenses) stays as the provisional figure until real travel
+-- expenses are recorded. A late voucher keeps its real expense_date;
+-- created_at shows when it was entered.
+-- See docs/migrations/2026-10-27e-vendor-bills-and-order-expenses.sql.
+-- ================================================================
+CREATE TABLE order_vendor_bills (
+  id                   BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id             BIGINT UNSIGNED NOT NULL,
+  vendor_kind          ENUM('supplier','logistics') NOT NULL,
+  supplier_po_id       BIGINT UNSIGNED NULL,
+  logistics_partner_id BIGINT UNSIGNED NULL,
+  bill_for             VARCHAR(30)  NOT NULL,
+  bill_no              VARCHAR(100) NOT NULL,
+  bill_date            DATE         NOT NULL,
+  taxable_inr          DECIMAL(14,2) NOT NULL,
+  gst_inr              DECIMAL(14,2) NOT NULL DEFAULT 0,
+  total_inr            DECIMAL(14,2) NOT NULL,
+  note                 VARCHAR(500) NULL,
+  bill_file_id         BIGINT UNSIGNED NULL,
+  paid_at              DATE NULL,
+  paid_amount_inr      DECIMAL(14,2) NULL,
+  payment_mode         VARCHAR(30)  NULL,
+  payment_ref          VARCHAR(100) NULL,
+  paid_by              BIGINT UNSIGNED NULL,
+  created_by           BIGINT UNSIGNED NULL,
+  created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (supplier_po_id) REFERENCES order_supplier_po(id),
+  FOREIGN KEY (logistics_partner_id) REFERENCES logistics_partners(id),
+  FOREIGN KEY (bill_file_id) REFERENCES file_store(id),
+  FOREIGN KEY (paid_by) REFERENCES users(id),
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  INDEX idx_order_vendor_bills_order (order_id, vendor_kind)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_expenses (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id          BIGINT UNSIGNED NOT NULL,
+  expense_date      DATE          NOT NULL,
+  category          VARCHAR(40)   NOT NULL,
+  details           VARCHAR(255)  NOT NULL,
+  amount_inr        DECIMAL(14,2) NOT NULL,
+  paid_by           ENUM('company_account','company_card','staff') NOT NULL,
+  staff_name        VARCHAR(150)  NULL,
+  receipt_file_id   BIGINT UNSIGNED NULL,
+  no_receipt_reason VARCHAR(255)  NULL,
+  created_by        BIGINT UNSIGNED NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (receipt_file_id) REFERENCES file_store(id),
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  INDEX idx_order_expenses_order (order_id)
+) ENGINE=InnoDB;

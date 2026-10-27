@@ -68,6 +68,8 @@ const piIntakeRepository = require('../repositories/piIntakeRepository');
 const supplierRepository = require('../repositories/supplierRepository');
 const logisticsPartnerRepository = require('../repositories/logisticsPartnerRepository');
 const vendorDetailsRepository = require('../repositories/vendorDetailsRepository');
+const orderVendorBillRepository = require('../repositories/orderVendorBillRepository');
+const orderExpenseRepository = require('../repositories/orderExpenseRepository');
 const supplierFactoryAddressRepository = require('../repositories/supplierFactoryAddressRepository');
 const benefitSettlementService = require('../services/benefitSettlementService');
 const userRepository = require('../repositories/userRepository');
@@ -967,9 +969,29 @@ async function show(req, res) {
 
   const assigneesForView = await orderAssigneeRepository.forOrder(orderId);
 
+  // Owner decisions (2026-10-27): bill first, then pay — the supplier's bills
+  // (7e / 10a) and the logistics partners' bills (Group C), and the order's
+  // actual expenses with receipts (12a).
+  const vendorBills = await orderVendorBillRepository.forOrder(orderId);
+  const logisticsBanks = {};
+  for (const partnerId of [...new Set(vendorBills.filter((b) => b.logistics_partner_id).map((b) => Number(b.logistics_partner_id)))]) {
+    logisticsBanks[partnerId] = vendorDetailsRepository.bankDetails(await vendorDetailsRepository.find('logistics_partner', partnerId));
+  }
+  const canManageOrderFinancialsForBills = !!req.permissions.manage_order_financials;
+
   res.renderView(
     'orders/show',
     {
+      vendorBills,
+      logisticsBanks,
+      logisticsPaymentBlocked: await require('./vendorBillController').logisticsPaymentBlockedReason(order),
+      orderExpenses: canManageOrderFinancialsForBills ? await orderExpenseRepository.forOrder(orderId) : [],
+      expenseSummary: canManageOrderFinancialsForBills ? await orderExpenseRepository.summary(orderId) : null,
+      vendorBillLegs: orderVendorBillRepository.SUPPLIER_LEGS,
+      logisticsServices: orderVendorBillRepository.LOGISTICS_SERVICES,
+      paymentModes: orderVendorBillRepository.PAYMENT_MODES,
+      expenseCategories: orderExpenseRepository.CATEGORIES,
+      expensePaidBy: orderExpenseRepository.PAID_BY,
       order,
       canAssignOwner,
       seesAllOrders,

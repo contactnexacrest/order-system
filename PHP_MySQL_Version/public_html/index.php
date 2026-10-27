@@ -16,6 +16,8 @@ use App\Controllers\VendorDetailsController;
 use App\Controllers\SupplierActionController;
 use App\Controllers\CaController;
 use App\Controllers\OrderFinancialsController;
+use App\Controllers\OrderExpenseController;
+use App\Controllers\VendorBillController;
 use App\Controllers\ClientController;
 use App\Controllers\DataExportController;
 use App\Controllers\ClientIntakeController;
@@ -119,6 +121,8 @@ $sop = new SopController();
 $gettingStarted = new GettingStartedController();
 $ca = new CaController();
 $orderFinancials = new OrderFinancialsController();
+$orderExpenses = new OrderExpenseController();
+$vendorBills = new VendorBillController();
 $auditLog = new AuditLogController();
 $notifications = new NotificationController();
 $reports = new ReportController();
@@ -544,6 +548,15 @@ $router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigne
 // 2026-10-23d-split-payment-and-supplier-payment-permissions.sql.
 $router->post('/orders/{id}/supplier-po/advance-paid', [$orders, 'markSupplierAdvancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/balance-paid', [$orders, 'markSupplierBalancePaid'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Owner decisions (2026-10-27): bill first, then pay — the supplier's bills
+// (7e / 10a) and the logistics partners' bills (CHA, transport, forwarder).
+$router->post('/orders/{id}/vendor-bills/supplier', [$vendorBills, 'addSupplierBill'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/vendor-bills/logistics', [$vendorBills, 'addLogisticsBill'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/vendor-bills/{billId}/pay', [$vendorBills, 'payBill'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/vendor-bills/{billId}/delete', [$vendorBills, 'deleteBill'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Owner decisions (2026-10-27): the order's actual expenses with receipts (Step 12a).
+$router->post('/orders/{id}/expenses', [$orderExpenses, 'add'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/expenses/{expenseId}/delete', [$orderExpenses, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/supplier-link', [$orders, 'generateSupplierActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/ack-skip', [$orders, 'skipSupplierPoAck'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);

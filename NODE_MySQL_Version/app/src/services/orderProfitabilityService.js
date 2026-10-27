@@ -2,6 +2,8 @@
 
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
+const orderExpenseRepository = require('../repositories/orderExpenseRepository');
+const orderVendorBillRepository = require('../repositories/orderVendorBillRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
@@ -51,7 +53,13 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
  * explicitly Number()/parseFloat()'d before arithmetic, never relying on
  * JS's implicit coercion (which concatenates rather than adds for `+`).
  */
-async function computeForOrder(orderId) {
+/**
+ * withBillsAndExpenses false = the figures as they were before vendor bills /
+ * order expenses (2026-10-27) — the CAFIN document keeps using these until
+ * the owner approves its change (no document change without showing
+ * before/after first).
+ */
+async function computeForOrder(orderId, withBillsAndExpenses = true) {
   const order = await orderRepository.find(orderId);
   const fobValue = await orderProductRepository.totalFobValue(orderId);
   const currencyCode = (order && order.currency_code) || null;
@@ -65,25 +73,47 @@ async function computeForOrder(orderId) {
     : 0;
 
   const freight = await orderFreightRepository.find(orderId);
-  const freightCostInr = freight && freight.confirmed_freight_rate !== null
+  let freightCostInr = freight && freight.confirmed_freight_rate !== null
     ? Number(freight.confirmed_freight_rate)
     : 0;
   const insuranceCostInr = freight && freight.insurance_amount !== null
     ? Number(freight.insurance_amount)
     : 0;
 
-  const costEntries = await orderCostEntryRepository.forOrder(orderId);
-  const otherCostsInr = await orderCostEntryRepository.totalForOrder(orderId);
+  // Owner decisions (2026-10-27): the logistics partners' bills (CHA,
+  // transport, forwarder) are costs of the order. The forwarder's real
+  // ocean-freight bills replace the 9a confirmed rate, so freight is never
+  // counted twice.
+  let logisticsCostInr = 0;
+  let oceanFreightBillsInr = null;
+  for (const bill of withBillsAndExpenses ? await orderVendorBillRepository.forOrder(orderId, 'logistics') : []) {
+    if (bill.bill_for === 'ocean_freight') {
+      oceanFreightBillsInr = (oceanFreightBillsInr || 0) + Number(bill.total_inr);
+    } else {
+      logisticsCostInr += Number(bill.total_inr);
+    }
+  }
+  if (oceanFreightBillsInr !== null) {
+    freightCostInr = oceanFreightBillsInr;
+  }
 
+  // The order's actual expenses. Once any real travel expense is recorded, it
+  // replaces the provisional travel % cost line.
+  const expenses = withBillsAndExpenses ? await orderExpenseRepository.summary(orderId) : { total: 0, has_travel: false };
+
+  const costEntries = await orderCostEntryRepository.forOrder(orderId);
+  let otherCostsInr = 0;
   const byCategory = {};
   for (const entry of costEntries) {
     const cat = entry.category;
+    if (cat === 'travel_expenses' && expenses.has_travel) continue;
+    otherCostsInr += Number(entry.amount_inr);
     byCategory[cat] = (byCategory[cat] || 0) + Number(entry.amount_inr);
   }
 
   const [exportBenefitsInr, exportBenefitsIsEstimated] = await exportBenefitsInInr(orderId);
 
-  const totalCostInr = supplierCostInr + freightCostInr + insuranceCostInr + otherCostsInr;
+  const totalCostInr = supplierCostInr + freightCostInr + insuranceCostInr + otherCostsInr + logisticsCostInr + expenses.total;
   const profitInr = revenueInr + exportBenefitsInr - totalCostInr;
   const marginPct = revenueInr > 0 ? round2(profitInr / revenueInr * 100) : null;
 
@@ -99,6 +129,10 @@ async function computeForOrder(orderId) {
     insurance_cost_inr: round2(insuranceCostInr),
     other_costs_inr: round2(otherCostsInr),
     other_costs_by_category: byCategory,
+    logistics_cost_inr: round2(logisticsCostInr),
+    freight_from_bills: oceanFreightBillsInr !== null,
+    expenses_inr: round2(expenses.total),
+    travel_is_provisional: !expenses.has_travel,
     total_cost_inr: round2(totalCostInr),
     profit_inr: round2(profitInr),
     margin_pct: marginPct,

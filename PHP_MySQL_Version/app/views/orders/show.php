@@ -497,9 +497,98 @@ $renderPiFormSkip = static function () use ($order, $piIntake, $piFormSkipped, $
     </details>
     <?php
 };
+// Owner decisions (2026-10-27): bill first, then pay. Whoever asks NexaCrest
+// for money — the supplier (7e advance, 10a balance) or a logistics partner
+// (CHA, transport, freight forwarder) — sends a bill; staff add it with the
+// bill attached, then record the payment against it (date, amount, mode,
+// UTR). One table + pay form for both kinds.
+$vendorBillPayTo = static function (?array $bank, string $editUrl, bool $canEditVendor): string {
+    $editLink = $canEditVendor ? ' <a href="' . htmlspecialchars($editUrl) . '#bank-details" target="_blank" rel="noopener">Open the directory entry</a>' : '';
+    if ($bank === null || !$bank['has_bank']) {
+        return '<p class="review-banner warn">&#9888; No bank details on file — add them in the directory, or send the Vendor Details Link.' . $editLink . '</p>';
+    }
+    return '<div class="pay-to"><strong>Pay to:</strong> ' . htmlspecialchars((string) $bank['bank_account_name']) . ' · ' . htmlspecialchars((string) $bank['bank_name'])
+        . ($bank['bank_branch'] ? ' (' . htmlspecialchars((string) $bank['bank_branch']) . ')' : '')
+        . ' · A/c <code>' . htmlspecialchars((string) $bank['bank_account_number']) . '</code> · IFSC <code>' . htmlspecialchars((string) $bank['bank_ifsc']) . '</code>'
+        . ($bank['bank_upi_id'] ? ' · UPI ' . htmlspecialchars((string) $bank['bank_upi_id']) : '')
+        . ($bank['bank_verified_at'] ? ' <span class="badge good">&#10003; Verified</span>' : ' <span class="badge warn">&#9888; Not verified — check before paying</span>' . $editLink)
+        . '</div>';
+};
+$renderVendorBills = static function (array $bills, bool $showPartner, bool $canPay, ?string $payBlocked, callable $payToFor) use ($order): void {
+    if ($bills === []) {
+        echo '<p class="muted small">No bills added yet.</p>';
+        if ($canPay && $payBlocked !== null) {
+            echo '<p class="review-banner warn">&#9888; ' . htmlspecialchars($payBlocked) . ' Bills can still be added now.</p>';
+        }
+        return;
+    }
+    $total = $paid = 0.0;
+    ?>
+    <table class="list vendor-bills">
+      <tr><?php if ($showPartner): ?><th>Partner</th><?php endif; ?><th>For</th><th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
+      <?php foreach ($bills as $b): ?>
+        <?php $total += (float) $b['total_inr']; $paid += (float) ($b['paid_amount_inr'] ?? 0); ?>
+        <?php $forLabel = $b['vendor_kind'] === 'supplier' ? (\App\Repositories\OrderVendorBillRepository::SUPPLIER_LEGS[$b['bill_for']] ?? $b['bill_for']) : (\App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES[$b['bill_for']] ?? $b['bill_for']); ?>
+      <tr id="vendor-bill-<?= (int) $b['id'] ?>">
+        <?php if ($showPartner): ?><td><?= htmlspecialchars((string) ($b['partner_name'] ?? '—')) ?></td><?php endif; ?>
+        <td><?= htmlspecialchars($forLabel) ?></td>
+        <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::human((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php endif; ?><?php if (!empty($b['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $b['note']) ?></small><?php endif; ?></td>
+        <td style="text-align:right"><?= number_format((float) $b['taxable_inr'], 2) ?></td>
+        <td style="text-align:right"><?= number_format((float) $b['gst_inr'], 2) ?></td>
+        <td style="text-align:right"><?= number_format((float) $b['total_inr'], 2) ?></td>
+        <td>
+          <?php if ($b['paid_at'] !== null): ?>
+            <span class="vendor-bill-paid">&#10003; &#8377;<?= number_format((float) $b['paid_amount_inr'], 2) ?> on <?= htmlspecialchars(\App\Helpers\Dates::human((string) $b['paid_at'])) ?></span><br><small class="muted"><?= htmlspecialchars((string) $b['payment_mode']) ?> · <?= htmlspecialchars((string) $b['payment_ref']) ?></small>
+          <?php else: ?>
+            <span class="vendor-bill-due">Unpaid</span>
+            <?php if ($canPay && $payBlocked === null): ?>
+            <details class="vendor-bill-pay">
+              <summary class="btn-sm">Mark Paid</summary>
+              <?= $payToFor($b) ?>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/<?= (int) $b['id'] ?>/pay" class="field-grid">
+                <?= \App\Helpers\Csrf::field() ?>
+                <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" name="paid_amount_inr" value="<?= htmlspecialchars((string) $b['total_inr']) ?>" required></label>
+                <label>Paid on *<input type="date" name="paid_at" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required></label>
+                <label>Mode *
+                  <select name="payment_mode" required>
+                    <?php foreach (\App\Repositories\OrderVendorBillRepository::PAYMENT_MODES as $__mode): ?><option><?= htmlspecialchars($__mode) ?></option><?php endforeach; ?>
+                  </select>
+                </label>
+                <label>UTR / reference *<input type="text" name="payment_ref" required placeholder="e.g. SBIN1234567890"></label>
+                <div><button type="submit" class="btn-sm">Save Payment</button></div>
+              </form>
+            </details>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/<?= (int) $b['id'] ?>/delete" data-confirm="Remove the unpaid bill <?= htmlspecialchars((string) $b['bill_no'], ENT_QUOTES) ?>?" style="display:inline">
+              <?= \App\Helpers\Csrf::field() ?>
+              <button type="submit" class="btn-link small">Remove</button>
+            </form>
+            <?php endif; ?>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+      <tr><td colspan="<?= $showPartner ? 5 : 4 ?>"><strong>Total</strong></td><td style="text-align:right"><strong><?= number_format($total, 2) ?></strong></td><td><span class="vendor-bill-paid">Paid &#8377;<?= number_format($paid, 2) ?></span><?php if ($total - $paid > 0.004): ?><br><span class="vendor-bill-due">Due &#8377;<?= number_format($total - $paid, 2) ?></span><?php endif; ?></td></tr>
+    </table>
+    <?php if ($canPay && $payBlocked !== null): ?>
+      <p class="review-banner warn">&#9888; <?= htmlspecialchars($payBlocked) ?> Bills can still be added now.</p>
+    <?php endif; ?>
+    <?php
+};
+// The bill fields both kinds share (number, date, taxable, GST, the bill itself).
+$vendorBillFields = static function (): void {
+    ?>
+    <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
+    <label>Bill date *<input type="date" name="bill_date" required max="<?= date('Y-m-d') ?>"></label>
+    <label>Taxable value (&#8377;) *<input type="number" step="0.01" min="0.01" name="taxable_inr" required></label>
+    <label>GST (&#8377;)<input type="number" step="0.01" min="0" name="gst_inr" value="0"></label>
+    <label>Attach bill *<input type="file" name="bill_file" required accept=".pdf,.jpg,.jpeg,.png"></label>
+    <label>Note<input type="text" name="note" maxlength="500" placeholder="optional"></label>
+    <?php
+};
 // Owner request (2026-10-26): the supplier's advance (Step 7e) and balance
-// (Step 10a — due before packing) are their own sub-steps.
-$renderSupplierPayment = static function (string $leg) use ($supplierPo, $supplierBank, $canManageSuppliers, $order, $canManageSupplierPayments, $stepBadge): void {
+// (Step 10a — due before packing) are their own sub-steps; owner decisions
+// (2026-10-27): each is now the supplier's bill, then the payment against it.
+$renderSupplierPayment = static function (string $leg) use ($supplierPo, $supplierBank, $canManageSuppliers, $order, $canManageSupplierPayments, $vendorBills, $renderVendorBills, $vendorBillFields, $vendorBillPayTo): void {
     if (!$supplierPo) {
         echo '<p class="muted">Save the Supplier PO terms first (Step 7a).</p>';
         return;
@@ -507,41 +596,39 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     $planned = $supplierPo[$leg . '_amount_inr'] ?? null;
     $paidAt = $supplierPo[$leg . '_paid_at'] ?? null;
     $label = $leg === 'advance' ? 'Advance' : 'Balance';
-    if ($paidAt) {
-        echo '<p>' . $label . ' paid: &#8377;' . htmlspecialchars((string) ($supplierPo[$leg . '_paid_amount_inr'] ?? $planned)) . ' on ' . htmlspecialchars((string) $paidAt) . ' <small class="muted">(planned &#8377;' . htmlspecialchars((string) ($planned ?? '—')) . ')</small></p>';
+    $legBills = array_values(array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'supplier' && (int) $b['supplier_po_id'] === (int) $supplierPo['id'] && $b['bill_for'] === $leg));
+    echo '<div class="plan-bar"><div>Supplier PO<b>' . htmlspecialchars((string) $supplierPo['supplier_po_reference']) . '</b></div>'
+        . '<div>PO total<b>&#8377;' . htmlspecialchars((string) ($supplierPo['total_payable_inr'] ?? '—')) . '</b></div>'
+        . '<div>' . $label . ' planned<b>&#8377;' . htmlspecialchars((string) ($planned ?? '—')) . '</b></div>'
+        . ($paidAt ? '<div>' . $label . ' paid<b class="vendor-bill-paid">&#8377;' . htmlspecialchars((string) ($supplierPo[$leg . '_paid_amount_inr'] ?? $planned)) . ' on ' . htmlspecialchars(\App\Helpers\Dates::human((string) $paidAt)) . '</b></div>' : '')
+        . '</div>';
+    if ($paidAt && $legBills === []) {
+        // Recorded before bills were kept — the payment stands as it is.
+        echo '<p class="muted small">Paid before supplier bills were recorded here.</p>';
         return;
     }
-    echo '<p class="muted small">Planned ' . strtolower($label) . ': &#8377;' . htmlspecialchars((string) ($planned ?? '—')) . ' (from the Supplier PO terms).</p>';
-    // Owner report (2026-10-27): the supplier advance was never recorded
-    // because nothing asked for it — the balance now waits for it whenever
-    // the Supplier PO terms plan an advance.
+    $editUrl = '/suppliers/' . (int) ($supplierPo['supplier_id'] ?? 0) . '/edit';
+    $canEditSupplier = $canManageSuppliers && !empty($supplierPo['supplier_id']);
+    $payBlocked = null;
+    // Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one.
     if ($leg === 'balance' && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
-        echo '<p class="review-banner warn">&#9888; Record the supplier <strong>advance</strong> first (<a href="#step-7e-supplier-advance-paid">Step 7e</a>) — the Supplier PO terms plan an advance of &#8377;' . htmlspecialchars((string) $supplierPo['advance_amount_inr']) . '.</p>';
-        return;
+        $payBlocked = 'Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' . $supplierPo['advance_amount_inr'] . '.';
     }
+    $renderVendorBills($legBills, false, $canManageSupplierPayments, $payBlocked, static fn (array $b): string => $vendorBillPayTo($supplierBank, $editUrl, $canEditSupplier));
     if (!$canManageSupplierPayments) {
-        echo '<p class="muted small">Recorded by Accounts (needs the "Manage supplier payments" permission).</p>';
+        echo '<p class="muted small">Bills and payments are recorded by Accounts (needs the "Manage supplier payments" permission).</p>';
         return;
-    }
-    // Owner request (2026-10-27): where to pay — the supplier's bank details from the directory.
-    $editLink = $canManageSuppliers && !empty($supplierPo['supplier_id']) ? ' <a href="/suppliers/' . (int) $supplierPo['supplier_id'] . '/edit#bank-details" target="_blank" rel="noopener">Open the supplier</a>' : '';
-    if ($supplierBank === null || !$supplierBank['has_bank']) {
-        echo '<p class="review-banner warn">&#9888; No bank details on file for this supplier — add them in the Suppliers directory, or send them the Vendor Details Link.' . $editLink . '</p>';
-    } else {
-        echo '<div class="pay-to"><strong>Pay to:</strong> ' . htmlspecialchars((string) $supplierBank['bank_account_name']) . ' · ' . htmlspecialchars((string) $supplierBank['bank_name'])
-            . ($supplierBank['bank_branch'] ? ' (' . htmlspecialchars((string) $supplierBank['bank_branch']) . ')' : '')
-            . ' · A/c <code>' . htmlspecialchars((string) $supplierBank['bank_account_number']) . '</code> · IFSC <code>' . htmlspecialchars((string) $supplierBank['bank_ifsc']) . '</code>'
-            . ($supplierBank['bank_upi_id'] ? ' · UPI ' . htmlspecialchars((string) $supplierBank['bank_upi_id']) : '')
-            . ($supplierBank['bank_verified_at'] ? ' <span class="badge good">&#10003; Verified</span>' : ' <span class="badge warn">&#9888; Not verified — check before paying</span>' . $editLink)
-            . '</div>';
     }
     ?>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/<?= $leg ?>-paid" class="field-grid">
-      <?= \App\Helpers\Csrf::field() ?>
-      <label>Date Paid<input type="date" name="paid_date" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
-      <label>Amount Paid (INR)<input type="number" step="0.01" min="0.01" name="amount_paid_inr" value="<?= htmlspecialchars((string) ($planned ?? '')) ?>" required></label>
-      <div><?= $stepBadge($leg === 'advance' ? '7e' : '10a') ?><button type="submit" class="btn-sm">Mark <?= $label ?> Paid</button></div>
-    </form>
+    <details class="vendor-bill-add"<?= $legBills === [] ? ' open' : '' ?>>
+      <summary class="small"><strong>+ Add the supplier's <?= strtolower($label) ?> bill</strong> <span class="muted">(<?= $leg === 'advance' ? 'advance / proforma invoice' : 'tax invoice' ?>)</span></summary>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
+        <?= \App\Helpers\Csrf::field() ?>
+        <input type="hidden" name="bill_for" value="<?= htmlspecialchars($leg) ?>">
+        <?php $vendorBillFields(); ?>
+        <div><button type="submit" class="btn-sm">Add Bill</button></div>
+      </form>
+    </details>
     <?php
 };
 // Owner request (2026-10-26): before generating a document that already
@@ -1207,6 +1294,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <div><span class="k">Received from buyer</span><span class="v"><?= number_format($ledgerTotals['buyer_foreign'], 2) ?> <?= htmlspecialchars($order['currency_code'] ?? '') ?> = &#8377;<?= number_format($ledgerTotals['buyer_inr'], 2) ?></span></div>
         <div><span class="k">Export benefits received</span><span class="v">&#8377;<?= number_format($ledgerTotals['benefits_inr'], 2) ?></span></div>
         <div><span class="k">Paid to supplier</span><span class="v">&#8377;<?= number_format($ledgerTotals['supplier_inr'], 2) ?></span></div>
+        <div><span class="k">Paid to logistics partners</span><span class="v">&#8377;<?= number_format($ledgerTotals['logistics_inr'], 2) ?></span></div>
         <div><span class="k">Expenses</span><span class="v">&#8377;<?= number_format($ledgerTotals['expenses_inr'], 2) ?></span></div>
         <div class="full"><span class="k">Net so far</span><span class="v"><strong>&#8377;<?= number_format($ledgerTotals['net_inr'], 2) ?></strong></span></div>
       </div>
@@ -2475,6 +2563,51 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <details class="phase-group" id="phase-shipment"<?= $phaseOpen('shipment') ?>>
     <?= $phaseSummary('shipment') ?>
 
+  <?php
+    // Owner decisions (2026-10-27): the logistics partners' bills — CHA,
+    // transport, freight forwarder — on every incoterm. Runs alongside
+    // Steps 9-11 and never locks them; on CFR/CIF orders a bill can be paid
+    // only once the buyer's Debit Note payment has cleared (9d).
+    $__logisticsBills = array_values(array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'logistics'));
+    $__logisticsUnpaid = count(array_filter($__logisticsBills, static fn (array $b): bool => $b['paid_at'] === null));
+    $__logisticsStatus = $__logisticsBills !== [] && $__logisticsUnpaid === 0 ? 'done' : (in_array($currentUserStep, ['9', '10', '11'], true) ? 'current' : 'locked');
+  ?>
+  <?php if ($canManageSupplierPayments || $canManageOrderFinancials): ?>
+  <details class="step-card step-card-parallel" id="logistics-bills"<?= in_array($currentUserStep, ['9', '10', '11'], true) && ($__logisticsBills === [] || $__logisticsUnpaid > 0) ? ' open' : '' ?>>
+    <summary><?= $stepStatusIcon($__logisticsStatus) ?><h2>Logistics Partner Bills &amp; Payments — CHA · Transport · Freight Forwarder<?php if ($__logisticsUnpaid > 0): ?> <small class="muted">(<?= $__logisticsUnpaid ?> unpaid)</small><?php endif; ?></h2></summary>
+    <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.<?= $isFob ? '' : ' On this ' . htmlspecialchars((string) $order['incoterm_code']) . ' order a bill can be paid once the buyer\'s Debit Note payment has cleared (Step 9d).' ?> Bills go into the order's financials (Step 12) automatically.</p>
+    <?php $renderVendorBills($__logisticsBills, true, $canManageSupplierPayments, $logisticsPaymentBlocked, static fn (array $b): string => $vendorBillPayTo($logisticsBanks[(int) $b['logistics_partner_id']] ?? null, '/logistics-partners/' . (int) $b['logistics_partner_id'] . '/edit', $canManageLogisticsPartners)); ?>
+    <?php if ($canManageSupplierPayments): ?>
+    <?php $__activePartners = array_values(array_filter($logisticsPartners, static fn (array $lp): bool => !empty($lp['is_active']))); ?>
+    <details class="vendor-bill-add"<?= $__logisticsBills === [] ? ' open' : '' ?>>
+      <summary class="small"><strong>+ Add a bill</strong></summary>
+      <?php if ($__activePartners === []): ?>
+        <p class="muted small">No logistics partners in the directory yet — <a href="/logistics-partners/create" target="_blank" rel="noopener">add one</a>.</p>
+      <?php else: ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/logistics" enctype="multipart/form-data" class="field-grid">
+        <?= Csrf::field() ?>
+        <label>Logistics partner *
+          <select name="logistics_partner_id" required>
+            <option value="">Select…</option>
+            <?php foreach ($__activePartners as $lp): ?>
+              <option value="<?= (int) $lp['id'] ?>"><?= htmlspecialchars((string) $lp['partner_name']) ?> (<?= htmlspecialchars(\App\Repositories\LogisticsPartnerRepository::SERVICE_TYPES[$lp['service_type']] ?? (string) $lp['service_type']) ?>)</option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>For *
+          <select name="bill_for" required>
+            <?php foreach (\App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+          </select>
+        </label>
+        <?php $vendorBillFields(); ?>
+        <div><button type="submit" class="btn-sm">Add Bill</button></div>
+      </form>
+      <?php endif; ?>
+    </details>
+    <?php endif; ?>
+  </details>
+  <?php endif; ?>
+
   <?php if ($isFob): ?>
   <?php // FOB: the buyer arranges and pays freight, so this whole step never applies — shown greyed out, with nothing to expand. ?>
   <div class="step-group step-group-disabled" id="step-group-stage-6" aria-disabled="true" title="Not applicable — FOB order: the buyer arranges and pays freight directly.">
@@ -2998,6 +3131,72 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php endforeach; ?>
           </table>
         <?php endif; ?>
+      <?php
+        // Owner decisions (2026-10-27): the order's actual expenses, each with
+        // its receipt (or a reason when no bill exists). The travel % of FOB
+        // stays the provisional figure until real travel expenses are recorded.
+        $__travelBudget = $orderTravelExpenses ? (float) $orderTravelExpenses['expense_amount'] : null;
+        $__logisticsTotal = array_sum(array_map(static fn (array $b): float => (float) $b['total_inr'], array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'logistics')));
+      ?>
+      <div class="order-expenses" id="order-expenses">
+        <h3 style="font-size:0.95em; margin-top:10px;">Order Expenses — travel &amp; other</h3>
+        <div class="plan-bar">
+          <div>Travel budget<?= $orderTravelExpenses ? ' (' . number_format((float) $orderTravelExpenses['expense_pct'], 2) . '% of FOB)' : '' ?><b><?= $__travelBudget !== null ? '&#8377;' . number_format($__travelBudget, 2) : '—' ?></b></div>
+          <div>Actual travel<b>&#8377;<?= number_format($expenseSummary['travel'], 2) ?></b></div>
+          <div>All expenses<b>&#8377;<?= number_format($expenseSummary['total'], 2) ?></b></div>
+          <div>Receipts attached<b><?= (int) $expenseSummary['with_receipt'] ?> of <?= (int) $expenseSummary['count'] ?></b></div>
+          <?php if ($expenseSummary['to_reimburse'] > 0): ?><div>Paid by staff, to reimburse<b class="vendor-bill-due">&#8377;<?= number_format($expenseSummary['to_reimburse'], 2) ?></b></div><?php endif; ?>
+        </div>
+        <p class="muted small"><?= $expenseSummary['has_travel']
+            ? 'Travel cost now uses the actual travel expenses below; the travel % stays only as the budget to compare against.'
+            : 'Until real travel expenses are recorded, travel cost uses the travel % of FOB (provisional).' ?>
+          A voucher can be added later with its real date — unless the CA has locked that financial year.
+          <?php if ($__logisticsTotal > 0): ?>Logistics partner bills (&#8377;<?= number_format($__logisticsTotal, 2) ?>) come in automatically from <a href="#logistics-bills">Group C</a>.<?php endif; ?></p>
+        <?php if ($orderExpenses !== []): ?>
+        <table class="list">
+          <tr><th>Date</th><th>Category</th><th>Details</th><th style="text-align:right">&#8377;</th><th>Paid by</th><th>Receipt</th><th></th></tr>
+          <?php foreach ($orderExpenses as $e): ?>
+          <tr>
+            <td><?= htmlspecialchars(\App\Helpers\Dates::human((string) $e['expense_date'])) ?><?php if (!empty($e['added_later'])): ?><br><small class="muted">added later (entered <?= htmlspecialchars(\App\Helpers\Dates::human(substr((string) $e['created_at'], 0, 10))) ?>)</small><?php endif; ?></td>
+            <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::CATEGORIES[$e['category']] ?? (string) $e['category']) ?></td>
+            <td><?= htmlspecialchars((string) $e['details']) ?></td>
+            <td style="text-align:right"><?= number_format((float) $e['amount_inr'], 2) ?></td>
+            <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::PAID_BY[$e['paid_by']] ?? (string) $e['paid_by']) ?><?= $e['paid_by'] === 'staff' && !empty($e['staff_name']) ? ' — ' . htmlspecialchars((string) $e['staff_name']) : '' ?></td>
+            <td><?php if (!empty($e['receipt_file_id'])): ?><a href="/file-store/<?= (int) $e['receipt_file_id'] ?>/download">receipt</a><?php else: ?><span class="vendor-bill-due">No bill — <?= htmlspecialchars((string) $e['no_receipt_reason']) ?></span><?php endif; ?></td>
+            <td>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/expenses/<?= (int) $e['id'] ?>/delete" data-confirm="Remove this expense?">
+                <?= Csrf::field() ?>
+                <button type="submit" class="btn-sm btn-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </table>
+        <?php endif; ?>
+        <details class="vendor-bill-add"<?= $orderExpenses === [] ? ' open' : '' ?>>
+          <summary class="small"><strong>+ Add an expense</strong></summary>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/expenses" enctype="multipart/form-data" class="field-grid">
+            <?= Csrf::field() ?>
+            <label>Date *<input type="date" name="expense_date" required max="<?= date('Y-m-d') ?>"></label>
+            <label>Category *
+              <select name="category" required>
+                <?php foreach (\App\Repositories\OrderExpenseRepository::CATEGORIES as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+              </select>
+            </label>
+            <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required></label>
+            <label>Paid by *
+              <select name="paid_by" required>
+                <?php foreach (\App\Repositories\OrderExpenseRepository::PAID_BY as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+              </select>
+            </label>
+            <label>Staff member to reimburse<input type="text" name="staff_name" maxlength="150" data-required-if="paid_by=staff" placeholder="only when staff paid"></label>
+            <label class="full">Details *<input type="text" name="details" required maxlength="255" placeholder="e.g. Factory visit 2 — Kota"></label>
+            <label>Receipt / bill<input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png"></label>
+            <label>No receipt? Reason<input type="text" name="no_receipt_reason" maxlength="255" minlength="<?= \App\Helpers\ReasonValidator::MIN_LENGTH ?>" data-required-unless="receipt" placeholder="only if no bill exists"></label>
+            <div><button type="submit" class="btn-sm">Add Expense</button></div>
+          </form>
+        </details>
+      </div>
       <details class="fin-zoho">
         <summary class="muted small">Linked from Zoho Books (<?= count($linkedCaExpenses) ?>) — for reference</summary>
         <?php if (empty($linkedCaExpenses)): ?>
@@ -3020,7 +3219,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label class="fin-add-cost-pick">+ Add a cost
           <select data-fin-cost-type aria-label="Type of cost">
             <option value="other">Other cost (CHA, port, courier, bank charges…)</option>
-            <option value="travel">Travel — factory visits (% of FOB)</option>
+            <option value="travel">Travel budget — % of FOB (provisional until real travel expenses are recorded)</option>
             <?php if ($pendingInspectionTask): ?><option value="inspection">Pre-shipment inspection fee</option><?php endif; ?>
             <?php if ($isLcPayment): ?><option value="lc">LC / bank loan interest</option><?php endif; ?>
           </select>
@@ -3173,9 +3372,11 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <div><span class="k">Revenue (INR)<?= $profitability['revenue_is_estimated'] ? ' — estimated' : '' ?></span><span class="v"><?= number_format($profitability['revenue_inr'], 2) ?></span></div>
             <div><span class="k">Govt. Export Benefits (INR)<?= $profitability['export_benefits_is_estimated'] ? ' — claimed, not yet received' : '' ?></span><span class="v"><?= number_format($profitability['export_benefits_inr'], 2) ?></span></div>
             <div><span class="k">Supplier Cost (INR)</span><span class="v"><?= number_format($profitability['supplier_cost_inr'], 2) ?></span></div>
-            <div><span class="k">Ocean Freight (INR)</span><span class="v"><?= number_format($profitability['freight_cost_inr'], 2) ?></span></div>
+            <div><span class="k">Ocean Freight (INR)<?= $profitability['freight_from_bills'] ? ' — from the forwarder\'s bills' : '' ?></span><span class="v"><?= number_format($profitability['freight_cost_inr'], 2) ?></span></div>
             <div><span class="k">Insurance (INR)</span><span class="v"><?= number_format($profitability['insurance_cost_inr'], 2) ?></span></div>
-            <div><span class="k">Other Costs (INR)</span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
+            <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v"><?= number_format($profitability['logistics_cost_inr'], 2) ?></span></div>
+            <div><span class="k">Order Expenses (INR)</span><span class="v"><?= number_format($profitability['expenses_inr'], 2) ?></span></div>
+            <div><span class="k">Other Costs (INR)<?= $profitability['travel_is_provisional'] ? '' : ' — travel % replaced by actual travel' ?></span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
             <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
             <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
             <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
@@ -3575,6 +3776,15 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?= $stepBadge('13h') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
       <p class="muted small">Blocked until Step 13g is done — every eligible government export benefit received, or skipped with a reason.</p>
+      <?php
+        // Owner decision (2026-10-27): unpaid supplier / logistics bills are a
+        // warning here, not a block — accounts may settle vendor bills later.
+        $__unpaidBills = array_values(array_filter($vendorBills, static fn (array $b): bool => $b['paid_at'] === null));
+      ?>
+      <?php if ($__unpaidBills !== []): ?>
+        <p class="review-banner warn" id="unpaid-vendor-bills-warning">&#9888; <?= count($__unpaidBills) ?> vendor bill<?= count($__unpaidBills) === 1 ? '' : 's' ?> still unpaid: &#8377;<?= number_format(array_sum(array_map(static fn (array $b): float => (float) $b['total_inr'], $__unpaidBills)), 2) ?>
+          (<?= htmlspecialchars(implode(', ', array_map(static fn (array $b): string => ($b['vendor_kind'] === 'supplier' ? 'Supplier' : (string) ($b['partner_name'] ?? 'Logistics')) . ' ' . $b['bill_no'], $__unpaidBills))) ?>) — you can still mark the order fully settled.</p>
+      <?php endif; ?>
       <?php if ($canEditLockedData): ?>
       <details>
         <summary class="small">Override &amp; fully settle anyway (benefit genuinely never arriving)</summary>

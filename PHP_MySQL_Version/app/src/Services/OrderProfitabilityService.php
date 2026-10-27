@@ -6,11 +6,13 @@ namespace App\Services;
 
 use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\OrderCostEntryRepository;
+use App\Repositories\OrderExpenseRepository;
 use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderSupplierPoRepository;
+use App\Repositories\OrderVendorBillRepository;
 
 /**
  * Order Profitability Sheet (docs/schema.sql Section AP) — the "is this
@@ -47,6 +49,10 @@ use App\Repositories\OrderSupplierPoRepository;
  *     order_supplier_po already uses, since in practice NexaCrest pays
  *     its freight forwarder domestically — see docs/SOP for the caveat if
  *     a forwarder is ever paid in foreign currency instead.
+ *   - Logistics partners' bills (CHA, transport, forwarder) and the order's
+ *     actual expenses (owner decisions 2026-10-27): order_vendor_bills /
+ *     order_expenses. Real ocean-freight bills replace the confirmed rate
+ *     above; real travel expenses replace the provisional travel % line.
  *   - Every other cost line (CHA, documentation, port charges, bank
  *     charges, commission, packing/crates, ECGC insurance, due diligence,
  *     inland transport, other): OrderCostEntryRepository, manually
@@ -54,8 +60,14 @@ use App\Repositories\OrderSupplierPoRepository;
  */
 final class OrderProfitabilityService
 {
-    /** @return array<string,mixed> */
-    public static function computeForOrder(int $orderId): array
+    /**
+     * @param bool $withBillsAndExpenses false = the figures as they were
+     *        before vendor bills / order expenses (2026-10-27) — the CAFIN
+     *        document keeps using these until the owner approves its change
+     *        (no document change without showing before/after first).
+     * @return array<string,mixed>
+     */
+    public static function computeForOrder(int $orderId, bool $withBillsAndExpenses = true): array
     {
         $order = OrderRepository::find($orderId);
         $fobValue = OrderProductRepository::totalFobValue($orderId);
@@ -71,18 +83,42 @@ final class OrderProfitabilityService
         $freightCostInr = ($freight !== null && $freight['confirmed_freight_rate'] !== null) ? (float) $freight['confirmed_freight_rate'] : 0.0;
         $insuranceCostInr = ($freight !== null && $freight['insurance_amount'] !== null) ? (float) $freight['insurance_amount'] : 0.0;
 
-        $costEntries = OrderCostEntryRepository::forOrder($orderId);
-        $otherCostsInr = OrderCostEntryRepository::totalForOrder($orderId);
+        // Owner decisions (2026-10-27): the logistics partners' bills (CHA,
+        // transport, forwarder) are costs of the order. The forwarder's real
+        // ocean-freight bills replace the 9a confirmed rate, so freight is
+        // never counted twice.
+        $logisticsCostInr = 0.0;
+        $oceanFreightBillsInr = null;
+        foreach ($withBillsAndExpenses ? OrderVendorBillRepository::forOrder($orderId, 'logistics') : [] as $bill) {
+            if ($bill['bill_for'] === 'ocean_freight') {
+                $oceanFreightBillsInr = ($oceanFreightBillsInr ?? 0.0) + (float) $bill['total_inr'];
+            } else {
+                $logisticsCostInr += (float) $bill['total_inr'];
+            }
+        }
+        if ($oceanFreightBillsInr !== null) {
+            $freightCostInr = $oceanFreightBillsInr;
+        }
 
+        // The order's actual expenses. Once any real travel expense is
+        // recorded, it replaces the provisional travel % cost line.
+        $expenses = $withBillsAndExpenses ? OrderExpenseRepository::summary($orderId) : ['total' => 0.0, 'has_travel' => false];
+
+        $costEntries = OrderCostEntryRepository::forOrder($orderId);
+        $otherCostsInr = 0.0;
         $byCategory = [];
         foreach ($costEntries as $entry) {
             $cat = $entry['category'];
+            if ($cat === 'travel_expenses' && $expenses['has_travel']) {
+                continue;
+            }
+            $otherCostsInr += (float) $entry['amount_inr'];
             $byCategory[$cat] = ($byCategory[$cat] ?? 0.0) + (float) $entry['amount_inr'];
         }
 
         [$exportBenefitsInr, $exportBenefitsIsEstimated] = self::exportBenefitsInInr($orderId);
 
-        $totalCostInr = $supplierCostInr + $freightCostInr + $insuranceCostInr + $otherCostsInr;
+        $totalCostInr = $supplierCostInr + $freightCostInr + $insuranceCostInr + $otherCostsInr + $logisticsCostInr + $expenses['total'];
         $profitInr = $revenueInr + $exportBenefitsInr - $totalCostInr;
         $marginPct = $revenueInr > 0 ? round($profitInr / $revenueInr * 100, 2) : null;
 
@@ -98,6 +134,10 @@ final class OrderProfitabilityService
             'insurance_cost_inr'   => round($insuranceCostInr, 2),
             'other_costs_inr'      => round($otherCostsInr, 2),
             'other_costs_by_category' => $byCategory,
+            'logistics_cost_inr'   => round($logisticsCostInr, 2),
+            'freight_from_bills'   => $oceanFreightBillsInr !== null,
+            'expenses_inr'         => round($expenses['total'], 2),
+            'travel_is_provisional' => !$expenses['has_travel'],
             'total_cost_inr'       => round($totalCostInr, 2),
             'profit_inr'           => round($profitInr, 2),
             'margin_pct'           => $marginPct,

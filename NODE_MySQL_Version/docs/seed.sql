@@ -567,6 +567,8 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
   ('amendment_signed_copy', 'pdf,jpg,jpeg,png', 10485760, 'Countersigned Payment Terms Amendment Agreement (Section 8) — activates the amendment once uploaded.'),
   ('dispute_document',      'pdf,jpg,jpeg,png,docx,eml,msg', 10485760, 'Any document related to a dispute — notice, correspondence, supporting evidence.'),
   ('received_remittance',   'pdf,jpg,jpeg,png', 10485760, 'Buyer/bank remittance advice or payment confirmation copy.'),
+  ('vendor_bill',           'pdf,jpg,jpeg,png', 10485760, 'A bill / invoice from the supplier or a logistics partner (CHA, transport, freight forwarder) — Steps 7e/10a and the logistics bills card.'),
+  ('expense_receipt',       'pdf,jpg,jpeg,png', 10485760, 'Receipt or bill for an order expense (travel, hotel, courier, ...) — Step 12a.'),
   ('draft_bl',              'pdf,doc,docx,xls,xlsx,odt,ods,rtf,txt,csv,jpg,jpeg,png,gif,webp,bmp,tif,tiff,heic,eml,msg,zip', 10485760, 'Draft Bill of Lading from the CHA/shipping line, pending written approval before originals are issued.'),
   ('bl_copy',               'pdf,doc,docx,xls,xlsx,odt,ods,rtf,txt,csv,jpg,jpeg,png,gif,webp,bmp,tif,tiff,heic,eml,msg,zip', 10485760, 'External QA report L-22: scanned FINAL Bill of Lading, attached at the Stage 7->8 BL-issued gate or any time after — distinct from draft_bl above, which is the pre-approval draft.'),
   ('fumigation_cert',       'pdf,jpg,jpeg,png', 5242880, 'Fumigation certificate for wooden packing.'),

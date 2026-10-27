@@ -202,6 +202,30 @@ async function submitStepForm(page, stageNumber, action, fields, buttonName, sco
   await expect(page.locator('.alert')).toBeVisible();
 }
 
+// Owner decisions (2026-10-27): bill first, then pay — add a vendor bill in
+// the card `cardSelector`, then record the payment against it.
+async function addAndPayBill(page, stageNumber, cardSelector, fields, billNo, amount) {
+  await openStage(page, stageNumber);
+  const card = page.locator(cardSelector);
+  const addForm = card.locator('form[action*="/vendor-bills/"]').first();
+  for (const [name, value] of Object.entries(fields)) {
+    await addForm.locator(`select[name="${name}"]`).selectOption(value);
+  }
+  await addForm.locator('input[name="bill_no"]').fill(billNo);
+  await addForm.locator('input[name="bill_date"]').fill(new Date().toISOString().slice(0, 10));
+  await addForm.locator('input[name="taxable_inr"]').fill(amount);
+  await addForm.locator('input[name="bill_file"]').setInputFiles(DUMMY_FILE);
+  await Promise.all([page.waitForEvent('load'), addForm.getByRole('button', { name: 'Add Bill' }).click()]);
+  await expect(page.locator('.alert')).toContainText(billNo);
+
+  await openStage(page, stageNumber);
+  const row = page.locator(cardSelector).locator('tr', { hasText: billNo });
+  await row.locator('details.vendor-bill-pay > summary').click();
+  await row.locator('input[name="payment_ref"]').fill(`UTR-${billNo}`);
+  await Promise.all([page.waitForEvent('load'), row.getByRole('button', { name: 'Save Payment' }).click()]);
+  await expect(page.locator('.alert')).toContainText(`against bill ${billNo} recorded`);
+}
+
 async function resolveExportBenefitSchemes(page, orderId) {
   // Owner decision (2026-10-26): eligibility is Step 12b (#financials-12b).
   await page.goto(`/orders/${orderId}#financials-12b`);
@@ -455,8 +479,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     await test.step('Accounts Executive — Step 10a supplier balance paid before packing (manage_supplier_payments)', async () => {
       await login(page, 'accountsExecutive');
       await page.goto(`/orders/${orderId}`);
-      await submitStepForm(page, 7, `/orders/${orderId}/supplier-po/balance-paid`, { amount_paid_inr: '45000' }, 'Mark Balance Paid');
-      await expect(page.locator('.alert')).toContainText('balance payment recorded');
+      await addAndPayBill(page, 7, '#step-10a-supplier-balance-paid', {}, 'SUP-TI-201', '45000');
     });
 
     await logout(page);

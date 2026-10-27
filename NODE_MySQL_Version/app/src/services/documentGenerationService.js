@@ -1136,7 +1136,8 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
     ...c,
     amount_inr: Number(c.amount_inr),
   }));
-  const profitability = await orderProfitabilityService.computeForOrder(orderId);
+  // Unchanged by vendor bills / order expenses (2026-10-27) until the owner approves the CAFIN change.
+  const profitability = await orderProfitabilityService.computeForOrder(orderId, false);
 
   const referenceNumberService = require('./referenceNumberService');
   const revisionNumber = await referenceNumberService.nextDocumentRevisionNumber(orderId, docTypeId);

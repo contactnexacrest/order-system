@@ -45,6 +45,8 @@ const galleryController = require('./controllers/galleryController');
 const gettingStartedController = require('./controllers/gettingStartedController');
 const caController = require('./controllers/caController');
 const orderFinancialsController = require('./controllers/orderFinancialsController');
+const orderExpenseController = require('./controllers/orderExpenseController');
+const vendorBillController = require('./controllers/vendorBillController');
 const assetController = require('./controllers/assetController');
 const clientsController = require('./controllers/clientsController');
 const clientIntakeController = require('./controllers/clientIntakeController');
@@ -199,6 +201,7 @@ njkEnv.addGlobal('formatLeadTimeRange', require('./helpers/leadTimeDisplay').for
 // Order detail page step/sub-step progression (current step, cascade,
 // per-sub-step ticks) — see helpers/stepFlow.js.
 njkEnv.addGlobal('computeStepFlow', require('./helpers/stepFlow').computeStepFlow);
+njkEnv.addGlobal('vendorBillsView', require('./helpers/vendorBillsView'));
 // A "Generate …" sub-step is only done once its document is complete —
 // approved, or sent while email sending is on (owner decision 2026-10-25,
 // documentGenerationService.isDocumentComplete()) — not merely generated.
@@ -813,6 +816,15 @@ app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manag
 // profitability report.
 app.post('/orders/:id/supplier-po/advance-paid', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierAdvancePaid));
 app.post('/orders/:id/supplier-po/balance-paid', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markSupplierBalancePaid));
+// Owner decisions (2026-10-27): bill first, then pay — the supplier's bills
+// (7e / 10a) and the logistics partners' bills (CHA, transport, forwarder).
+app.post('/orders/:id/vendor-bills/supplier', requireAuth, requirePermission('manage_supplier_payments'), uploadLarge.single('bill_file'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.addSupplierBill));
+app.post('/orders/:id/vendor-bills/logistics', requireAuth, requirePermission('manage_supplier_payments'), uploadLarge.single('bill_file'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.addLogisticsBill));
+app.post('/orders/:id/vendor-bills/:billId/pay', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.payBill));
+app.post('/orders/:id/vendor-bills/:billId/delete', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.deleteBill));
+// Owner decisions (2026-10-27): the order's actual expenses with receipts (Step 12a).
+app.post('/orders/:id/expenses', requireAuth, requirePermission('manage_order_financials'), uploadLarge.single('receipt'), checkOrderLock, verifyCsrf, asyncHandler(orderExpenseController.add));
+app.post('/orders/:id/expenses/:expenseId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderExpenseController.remove));
 app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
 app.post('/orders/:id/supplier-po/supplier-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateSupplierActionLink));
 app.post('/orders/:id/supplier-po/ack-skip', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.skipSupplierPoAck));
