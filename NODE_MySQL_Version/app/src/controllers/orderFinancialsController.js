@@ -14,6 +14,7 @@ const orderProductRepository = require('../repositories/orderProductRepository')
 const orderRepository = require('../repositories/orderRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
+const benefitSettlementService = require('../services/benefitSettlementService');
 const fileUploadService = require('../services/fileUploadService');
 const { todayIst } = require('../helpers/dbDateTime');
 
@@ -76,7 +77,7 @@ async function addExportBenefit(req, res) {
   const id = await caExportBenefitRepository.record(orderId, schemeName, referenceNumber, parseFloat(claimedAmount), claimedAt, currencyCode, notes, user.id);
   await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', id, null, null, schemeName);
   flash.set(req, 'success', `${schemeName} claim recorded for this order.`);
-  res.redirect(`/orders/${orderId}#order-financials`);
+  res.redirect(`/orders/${orderId}#step-13g-benefits`);
 }
 
 async function markExportBenefitReceived(req, res) {
@@ -110,7 +111,7 @@ async function markExportBenefitReceived(req, res) {
   await caExportBenefitRepository.markReceived(benefitId, parseFloat(receivedAmount), receivedAt);
   await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', benefitId, null, null, receivedAmount);
   flash.set(req, 'success', 'Marked as received.');
-  res.redirect(`/orders/${orderId}#order-financials`);
+  res.redirect(`/orders/${orderId}#step-13g-benefits`);
 }
 
 /**
@@ -130,11 +131,11 @@ async function benefitForChange(req, res, field) {
   const error = reasonValidator.check(req.body.reason);
   if (error) {
     flash.set(req, 'error', error);
-    res.redirect(`/orders/${orderId}#financials-12c`);
+    res.redirect(`/orders/${orderId}#step-13g-benefits`);
     return null;
   }
   if (!(await caFyLockGuard.allow(req, String(benefit.claimed_at), 'ca_export_benefits', benefitId, field))) {
-    res.redirect(`/orders/${orderId}#financials-12c`);
+    res.redirect(`/orders/${orderId}#step-13g-benefits`);
     return null;
   }
   return benefit;
@@ -151,7 +152,7 @@ async function correctExportBenefit(req, res) {
   if (!benefit) {
     return;
   }
-  const back = `/orders/${orderId}#financials-12c`;
+  const back = `/orders/${orderId}#step-13g-benefits`;
   const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(new Date(d).getTime());
   const claimed = String(req.body.claimed_amount || '').trim();
   const claimedAt = String(req.body.claimed_at || '').trim();
@@ -188,7 +189,60 @@ async function deleteExportBenefit(req, res) {
   await caExportBenefitRepository.remove(benefit.id);
   await auditLogRepository.log(req.user.id, 'CA_EXPORT_BENEFIT_DELETED', 'ca_export_benefits', benefit.id, benefit.scheme_name, describeBenefit(benefit), null, String(req.body.reason).trim());
   flash.set(req, 'success', `${benefit.scheme_name} claim deleted.`);
-  res.redirect(`/orders/${orderId}#financials-12c`);
+  res.redirect(`/orders/${orderId}#step-13g-benefits`);
+}
+
+/**
+ * Owner decision (2026-10-27): at Step 13g an eligible scheme the company
+ * will not claim — or whose money will never come — is skipped with a
+ * reason (scheme_name set), or every scheme still open at once (scheme_name
+ * empty). action=undo clears one scheme's skip.
+ */
+async function skipExportBenefitClaim(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await orderRepository.find(orderId))) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const back = `/orders/${orderId}#step-13g-benefits`;
+  const userId = req.user.id;
+  const schemeName = String(req.body.scheme_name || '').trim();
+  const state = await benefitSettlementService.state(orderId);
+  const bySettlement = Object.fromEntries(state.schemes.map((r) => [r.scheme_name, r.settlement]));
+
+  if (req.body.action === 'undo') {
+    if (bySettlement[schemeName] !== 'skipped') {
+      flash.set(req, 'error', 'That scheme is not skipped.');
+      res.redirect(back);
+      return;
+    }
+    await orderExportBenefitSchemeRepository.setClaimSkipped(orderId, schemeName, null, userId);
+    await auditLogRepository.log(userId, 'EXPORT_BENEFIT_CLAIM_SKIP_UNDONE', 'orders', orderId, 'scheme_name', schemeName, null);
+    flash.set(req, 'success', `${schemeName} is open again in Step 13g.`);
+    res.redirect(back);
+    return;
+  }
+
+  const reason = String(req.body.reason || '').trim();
+  const error = reasonValidator.check(reason);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect(back);
+    return;
+  }
+  const open = [...state.unclaimed, ...state.waiting];
+  const targets = schemeName === '' ? open : (open.includes(schemeName) ? [schemeName] : []);
+  if (targets.length === 0) {
+    flash.set(req, 'error', schemeName === '' ? 'Every eligible scheme is already received or skipped.' : `${schemeName} is not an eligible scheme still waiting on this order.`);
+    res.redirect(back);
+    return;
+  }
+  for (const name of targets) {
+    await orderExportBenefitSchemeRepository.setClaimSkipped(orderId, name, reason, userId);
+    await auditLogRepository.log(userId, 'EXPORT_BENEFIT_CLAIM_SKIPPED', 'orders', orderId, 'scheme_name', null, name, reason);
+  }
+  flash.set(req, 'success', `Skipped: ${targets.join(', ')}.`);
+  res.redirect(back);
 }
 
 /**
@@ -718,7 +772,7 @@ async function saveExportBenefits(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
-  const back = () => res.redirect(`/orders/${orderId}#financials-12c`);
+  const back = () => res.redirect(`/orders/${orderId}#step-13g-benefits`);
   const fail = (message) => {
     flash.set(req, 'error', `${message} Nothing was saved.`);
     back();
@@ -799,4 +853,4 @@ async function saveExportBenefits(req, res) {
   back();
 }
 
-module.exports = { correctExportBenefit, deleteExportBenefit, confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };
+module.exports = { skipExportBenefitClaim, correctExportBenefit, deleteExportBenefit, confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };

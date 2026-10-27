@@ -221,6 +221,16 @@ async function resolveExportBenefitSchemes(page, orderId) {
 }
 
 
+// Owner request (2026-10-27): Step 9a picks the freight forwarder from the
+// Logistics Partners directory (manage_logistics_partners — Admin/MD/ED).
+async function addLogisticsPartner(page, name) {
+  await page.goto('/logistics-partners/create');
+  await page.locator('input[name="partner_name"]').fill(name);
+  await page.locator('select[name="service_type"]').selectOption('freight_forwarder');
+  await page.locator('form[action="/logistics-partners"] button[type="submit"]').click();
+  await expect(page.locator('.alert')).toContainText('added to the logistics partners directory');
+}
+
 // Suppliers live in the Suppliers directory (manage_suppliers — Admin/MD/
 // ED), not an inline form on the order page; adding one lands on its
 // edit page with a success banner.
@@ -288,8 +298,8 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
     await test.step('Admin adds the supplier to the Suppliers directory (manage_suppliers — Export Executive does not hold it)', async () => {
       await addSupplierInDirectory(page, `Role Workflow Quarry ${UNIQUE}`, ['Quarry Owner']);
-      // Step 9a picks the freight forwarder from the directory too.
-      await addSupplierInDirectory(page, `Role Workflow Forwarder ${UNIQUE}`, ['Logistics Partner (Freight Forwarder)']);
+      // Step 9a picks the freight forwarder from the Logistics Partners directory.
+      await addLogisticsPartner(page, `Role Workflow Forwarder ${UNIQUE}`);
       await page.goto(`/orders/${orderId}`);
     });
 
@@ -408,7 +418,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       const termsForm = page.locator(`form[action="/orders/${orderId}/freight-terms"]`);
       await termsForm.locator('input[name="confirmed_freight_rate"]').fill('950');
       await termsForm.locator('input[name="insurance_amount"]').fill('120');
-      await termsForm.locator('select[name="freight_forwarder_supplier_id"]').selectOption({ label: `Role Workflow Forwarder ${UNIQUE}` });
+      await termsForm.locator('select[name="freight_forwarder_partner_id"]').selectOption({ label: `Role Workflow Forwarder ${UNIQUE} (Freight Forwarder)` });
       await termsForm.getByRole('button', { name: 'Save Freight Terms' }).click();
       await expect(page.locator('.alert')).toBeVisible();
 

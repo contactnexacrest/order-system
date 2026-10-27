@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const { formatForDb } = require('../helpers/dbDateTime');
 
 /**
  * Per-order eligibility decision against the export_benefit_scheme
@@ -50,6 +51,8 @@ async function forOrder(orderId) {
         COALESCE(oebs.status, 'pending') AS status,
         oebs.reason,
         oebs.resolved_at,
+        oebs.claim_skipped_at,
+        oebs.claim_skip_reason,
         u.name AS resolved_by_name
      FROM dropdown_options d
      LEFT JOIN order_export_benefit_schemes oebs
@@ -87,4 +90,18 @@ async function summaryForOrder(orderId) {
   return { total, resolved, pending: total - resolved };
 }
 
-module.exports = { STATUSES, initializeForOrder, forOrder, setStatus, summaryForOrder };
+/**
+ * Owner decision (2026-10-27): at Step 13g an eligible scheme the company
+ * will not claim (or whose money will never come) is skipped with a reason;
+ * a null reason undoes the skip.
+ */
+async function setClaimSkipped(orderId, schemeName, reason, userId) {
+  await db.execute(
+    `UPDATE order_export_benefit_schemes
+        SET claim_skipped_at = :at, claim_skipped_by = :by, claim_skip_reason = :reason
+      WHERE order_id = :order_id AND scheme_name = :scheme_name`,
+    { at: reason === null ? null : formatForDb(new Date()), by: reason === null ? null : userId, reason, order_id: orderId, scheme_name: schemeName }
+  );
+}
+
+module.exports = { STATUSES, initializeForOrder, forOrder, setStatus, setClaimSkipped, summaryForOrder };

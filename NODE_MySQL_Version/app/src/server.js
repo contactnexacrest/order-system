@@ -52,6 +52,7 @@ const clientIntakeReviewController = require('./controllers/clientIntakeReviewCo
 const piIntakeController = require('./controllers/piIntakeController');
 const buyerActionController = require('./controllers/buyerActionController');
 const paymentActionController = require('./controllers/paymentActionController');
+const vendorDetailsController = require('./controllers/vendorDetailsController');
 const supplierActionController = require('./controllers/supplierActionController');
 const piIntakeReviewController = require('./controllers/piIntakeReviewController');
 const reorderRequestController = require('./controllers/reorderRequestController');
@@ -460,6 +461,9 @@ app.post('/buyer-action/:token/report-payment', uploadLarge.single('screenshot')
 app.get('/payment-action/:token', asyncHandler(paymentActionController.show));
 app.get('/payment-action/:token/document', asyncHandler(paymentActionController.downloadDocument));
 app.post('/payment-action/:token/report', uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(paymentActionController.report));
+// Owner request (2026-10-27): no-login Vendor Details Link — a supplier / logistics partner fills in their company and bank details.
+app.get('/vendor-details/:token', asyncHandler(vendorDetailsController.show));
+app.post('/vendor-details/:token', verifyCsrf, asyncHandler(vendorDetailsController.submit));
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -521,6 +525,7 @@ app.get('/logistics-partners/:id/edit', requireAuth, requirePermission('manage_l
 app.post('/logistics-partners/:id/update', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.update));
 app.post('/logistics-partners/:id/toggle', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.toggleActive));
 app.post('/logistics-partners/:id/delete', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.remove));
+app.post('/logistics-partners/:id/details-link', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.sendDetailsLink));
 // Suppliers directory (docs/schema.sql Section BZ) — same shape as Logistics Partners.
 app.get('/suppliers', requireAuth, requirePermission('manage_suppliers'), asyncHandler(supplierController.index));
 app.get('/suppliers/create', requireAuth, requirePermission('manage_suppliers'), asyncHandler(supplierController.createForm));
@@ -529,6 +534,7 @@ app.get('/suppliers/:id/edit', requireAuth, requirePermission('manage_suppliers'
 app.post('/suppliers/:id/update', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.update));
 app.post('/suppliers/:id/toggle', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.toggleActive));
 app.post('/suppliers/:id/delete', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.remove));
+app.post('/suppliers/:id/details-link', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.sendDetailsLink));
 app.post('/suppliers/:id/factory-addresses', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.addFactoryAddress));
 app.post('/suppliers/:id/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.deleteFactoryAddress));
 
@@ -728,6 +734,7 @@ app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, require
 app.post('/orders/:id/financials/costs-confirmed', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.confirmCosts));
 app.post('/orders/:id/financials/complete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.completeFinancials));
 app.post('/orders/:id/export-benefits/save-all', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveExportBenefits));
+app.post('/orders/:id/export-benefits/skip', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.skipExportBenefitClaim));
 app.post('/orders/:id/export-benefits/:benefitId/correct', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.correctExportBenefit));
 app.post('/orders/:id/export-benefits/:benefitId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.deleteExportBenefit));
 app.post('/orders/:id/financials/skip', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.skipFinancials));

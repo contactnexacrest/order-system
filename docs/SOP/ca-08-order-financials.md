@@ -57,17 +57,20 @@ later):
 |---|---|---|
 | **12a · Order Costs** | One table of every cost on the order, and a single **+ Add a cost** with a type picker (other cost, travel, inspection fee, LC/bank loan — each opens its own short form; parts 4–6 below). Zoho-linked expenses are listed under it for reference. | You click **Costs are complete** (you can still add a cost later, or **Reopen costs**). |
 | **12b · Export Benefit Eligibility** | Answer Eligible / Not Eligible for every scheme (part 1). | No scheme is still Pending. |
-| **12c · Government Benefits — Claimed & Received** | One table: a row per claim and an empty row per eligible scheme not claimed yet. Fill the claim when you file it and the **received amount and date when the money lands**, then one **Save Benefits** (part 2). Rows are checked first — if any is wrong, nothing is saved. | Every eligible scheme is claimed and every claim's money is received. |
-| **12d · Review Profit & Complete** | Read the Profitability Summary (part 7), generate the Internal Annexure if needed, then **Mark Step 12 complete** (needs 12a and 12b done; benefit money can still be recorded in 12c afterwards). | Marked complete — or skipped with a reason. |
+| **12c · Review Profit & Complete** | Read the Profitability Summary (part 7), generate the Internal Annexure if needed, then **Mark Step 12 complete** (needs 12a and 12b done). | Marked complete — or skipped with a reason. |
+
+**Government benefits claimed & received moved to Step 13g** (owner
+decision 2026-10-27) — just before Mark Fully Settled, because the money
+usually lands after the buyer has paid in full. See part 2 below.
 
 Above the sub-steps, four numbers give the order's money picture at a
 glance: **received from buyer**, **total costs**, **govt benefits
 received** (of claimed), and **net profit** with margin. Step 12's own
-status icon turns ✓ once 12d is marked complete (or skipped).
+status icon turns ✓ once 12c is marked complete (or skipped).
 
 The parts below describe each piece in detail.
 
-**Nothing to record? Skip it.** At the bottom of 12d,
+**Nothing to record? Skip it.** At the bottom of 12c,
 **Skip financials — mark Step 12 complete** (reason of at least 10
 characters, audit-logged) marks Step 12 done **without writing any
 figure** — costs, benefits and expenses stay blank rather than being
@@ -108,14 +111,18 @@ the full list of what Mark Fully Settled checks, in order.
 
 ### 2. Government Export Benefits Claimed
 
-Step 12c. Every RODTEP/export-benefit claim linked to this order (see
+Step 13g (moved from Step 12 — owner decision 2026-10-27). Every
+RODTEP/export-benefit claim linked to this order (see
 [Government Export Benefits](./ca-07-export-benefits.md)) is a row of one
 table, with an empty row for each eligible scheme not claimed yet — type
 the claim (reference, amount, date) and, when it arrives, the **received
 amount and date** on the same row, then **Save Benefits**. It opens for
 claims once the documents are sent and the balance remittance is
 received. **Record another claim** (under the table) covers a second
-claim on the same scheme or a scheme not listed.
+claim on the same scheme or a scheme not listed. An eligible scheme the
+company won't claim is **skipped with a reason** ("Skip — not claiming",
+with **Undo skip**). 13g is done — and 13h Mark Fully Settled opens —
+once every eligible scheme is received or skipped.
 
 **Typed a wrong amount, or recorded a claim twice?** Open **Correct or
 delete a recorded claim** under the table (owner request 2026-10-27). Each

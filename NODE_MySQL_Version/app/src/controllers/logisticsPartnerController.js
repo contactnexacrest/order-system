@@ -1,5 +1,8 @@
 'use strict';
 
+const vendorDetailsService = require('../services/vendorDetailsService');
+const vendorDetailsRepository = require('../repositories/vendorDetailsRepository');
+const bankDetailsInput = require('../helpers/bankDetailsInput');
 const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const logisticsPartnerRepository = require('../repositories/logisticsPartnerRepository');
@@ -21,6 +24,8 @@ async function index(req, res) {
 
 async function createForm(req, res) {
   res.renderView('logistics_partners/create', {
+    bank: vendorDetailsRepository.bankDetails(null),
+    bankAccountTypes: bankDetailsInput.ACCOUNT_TYPES,
     serviceTypes: logisticsPartnerRepository.SERVICE_TYPES,
   }, 'layout/base');
 }
@@ -58,13 +63,15 @@ function collectFormData(req) {
 
 async function create(req, res) {
   const result = collectFormData(req);
-  if (result.error) {
-    flash.set(req, 'error', result.error);
+  const error = result.error || (await vendorDetailsService.bankInputError('logistics_partner', null, req.body));
+  if (error) {
+    flash.set(req, 'error', error);
     res.redirect('/logistics-partners/create');
     return;
   }
 
   const id = await logisticsPartnerRepository.create(result.data, req.user.id);
+  await vendorDetailsService.applyStaffBankInput('logistics_partner', id, req.user.id, req.body);
   await auditLogRepository.log(req.user.id, 'LOGISTICS_PARTNER_ADDED', 'logistics_partners', id, null, null, result.data.partner_name);
   flash.set(req, 'success', `"${result.data.partner_name}" added to the logistics partners directory.`);
   res.redirect('/logistics-partners');
@@ -79,6 +86,11 @@ async function editForm(req, res) {
   }
   res.renderView('logistics_partners/edit', {
     partner,
+    bank: vendorDetailsRepository.bankDetails(partner),
+    bankAccountTypes: bankDetailsInput.ACCOUNT_TYPES,
+    detailsLink: vendorDetailsService.detailsLinkUrl(partner),
+    vendorKind: 'logistics_partner',
+    vendor: partner,
     serviceTypes: logisticsPartnerRepository.SERVICE_TYPES,
   }, 'layout/base');
 }
@@ -98,7 +110,15 @@ async function update(req, res) {
     return;
   }
 
+  const bankError = await vendorDetailsService.bankInputError('logistics_partner', id, req.body);
+  if (bankError) {
+    flash.set(req, 'error', bankError);
+    res.redirect(`/logistics-partners/${id}/edit#bank-details`);
+    return;
+  }
+
   await logisticsPartnerRepository.update(id, result.data);
+  await vendorDetailsService.applyStaffBankInput('logistics_partner', id, req.user.id, req.body);
   await auditLogRepository.log(req.user.id, 'LOGISTICS_PARTNER_UPDATED', 'logistics_partners', id, 'partner_name', partner.partner_name, result.data.partner_name);
   flash.set(req, 'success', `"${result.data.partner_name}" updated.`);
   res.redirect('/logistics-partners');
@@ -139,4 +159,16 @@ async function remove(req, res) {
   res.redirect('/logistics-partners');
 }
 
-module.exports = { index, createForm, create, editForm, update, toggleActive, remove };
+/** Owner request (2026-10-27): send the partner the Vendor Details Link (company + bank details). */
+async function sendDetailsLink(req, res) {
+  const id = parseInt(req.params.id, 10);
+  if (!(await logisticsPartnerRepository.find(id))) {
+    res.status(404).send('Logistics partner not found.');
+    return;
+  }
+  const sent = await vendorDetailsService.sendDetailsLink('logistics_partner', id, req.user.id);
+  flash.set(req, 'success', `Vendor Details Link ${sent.emailedTo ? `emailed to ${sent.emailedTo}` : 'generated'}: ${sent.link}`);
+  res.redirect(`/logistics-partners/${id}/edit#vendor-details-link`);
+}
+
+module.exports = { index, createForm, create, editForm, update, toggleActive, remove, sendDetailsLink };

@@ -54,7 +54,7 @@ final class OrderStep12SubStepsTest extends DbTestCase
             (new OrderController())->show(['id' => (string) $orderId]);
             return (string) ob_get_clean();
         })();
-        foreach (['financials-12a', 'financials-12b', 'financials-12c', 'financials-12d'] as $id) {
+        foreach (['financials-12a', 'financials-12b', 'financials-12c', 'step-13g-benefits'] as $id) {
             self::assertStringContainsString('id="' . $id . '"', $page());
         }
 

@@ -17,9 +17,9 @@
     </form>
 
     <table class="list">
-      <tr><th>Partner</th><th>Service</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Partner</th><th>Service</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Bank</th><th>Status</th><th>Actions</th></tr>
       {% if partners.length == 0 %}
-      <tr><td colspan="8" class="muted">No logistics partners yet — add the first one above.</td></tr>
+      <tr><td colspan="9" class="muted">No logistics partners yet — add the first one above.</td></tr>
       {% endif %}
       {% for p in partners %}
       <tr>
@@ -35,6 +35,7 @@
           {% if p.contact_person_phone %}<br><small class="muted">{{ p.contact_person_phone }}</small>{% endif %}
         </td>
         <td>{{ p.gstin or '—' }}</td>
+        <td>{% if not p.bank_account_number %}<span class="muted">—</span>{% elif p.bank_verified_at %}<span class="badge good">&#10003; Verified</span>{% else %}<span class="badge warn">&#9888; Not verified</span>{% endif %}</td>
         <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
         <td>
           <a href="/logistics-partners/{{ p.id }}/edit" class="btn-sm btn-secondary">Edit</a>

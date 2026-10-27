@@ -53,6 +53,7 @@
         </label>
       </div>
     </fieldset>
+    <?php include __DIR__ . '/../partials/_vendor_bank_fields.php'; ?>
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — service area, rate notes, preferred ports, etc."></textarea></label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Add Partner</button>

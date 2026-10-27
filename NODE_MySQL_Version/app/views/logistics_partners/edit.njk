@@ -51,10 +51,12 @@
         </label>
       </div>
     </fieldset>
+    {% include "partials/_vendor_bank_fields.njk" %}
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — service area, rate notes, preferred ports, etc.">{{ partner.notes or '' }}</textarea></label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>
       <a href="/logistics-partners" class="btn-sm btn-secondary">Cancel</a>
     </div>
   </form>
+  {% include "partials/_vendor_details_link.njk" %}
 </div>

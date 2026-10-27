@@ -158,8 +158,18 @@ final class OrderStepFlowTest extends DbTestCase
 
         self::assertSame('current', $this->cardIcon($output, 'step-group-stage-9'));
         self::assertSame('done', $this->cardIcon($output, 'step-11g-close-order'));
+        // Owner decision (2026-10-27): 13g government benefits, then 13h
+        // Mark Fully Settled once every scheme is received or skipped.
+        self::assertSame('current', $this->cardIcon($output, 'step-13g-benefits'));
+        self::assertSame('locked', $this->cardIcon($output, 'step-despatch'));
+        self::assertLessThan(strpos($output, 'id="step-despatch"'), strpos($output, 'id="step-13g-benefits"'), '13g (benefits) comes before 13h');
+        foreach (\App\Repositories\OrderExportBenefitSchemeRepository::forOrder($orderId) as $scheme) {
+            \App\Repositories\OrderExportBenefitSchemeRepository::setStatus($orderId, $scheme['scheme_name'], 'not_eligible', 'Not applicable to this order', $this->userId);
+        }
+        $output = $this->render($orderId);
+        self::assertSame('done', $this->cardIcon($output, 'step-13g-benefits'));
         self::assertSame('current', $this->cardIcon($output, 'step-despatch'));
-        self::assertLessThan(strpos($output, 'id="step-despatch"'), strpos($output, 'id="step-11c-bl-endorsed-mark"'), '13e (endorsed) comes before 13g');
+        self::assertLessThan(strpos($output, 'id="step-despatch"'), strpos($output, 'id="step-11c-bl-endorsed-mark"'), '13e (endorsed) comes before 13h');
         self::assertLessThan(strpos($output, 'id="step-11c-bl-endorsed-mark"'), strpos($output, 'id="step-11f-bl-endorsement-generate"'), '13d (print) comes before 13e (endorsed)');
     }
 

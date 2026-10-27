@@ -978,9 +978,11 @@ final class OrderController
             'emailLogByDocument' => $emailLogByDocument,
             'activeUsers' => UserRepository::listActive(),
             'fobTotal' => OrderProductRepository::totalFobValue($orderId),
-            'suppliers' => SupplierRepository::goodsSuppliers(),
-            'logisticsPartners' => SupplierRepository::logisticsPartners(),
+            'suppliers' => SupplierRepository::all(),
+            'logisticsPartners' => \App\Repositories\LogisticsPartnerRepository::all(),
             'supplierPo' => $supplierPo,
+            // Owner request (2026-10-27): who to pay in 7e / 10a.
+            'supplierBank' => $supplierPo && !empty($supplierPo['supplier_id']) ? \App\Repositories\VendorDetailsRepository::bankDetails(\App\Repositories\VendorDetailsRepository::find('supplier', (int) $supplierPo['supplier_id'])) : null,
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
             'supplierPoDocuments' => $supplierPo ? OrderSupplierPoDocumentRepository::forSupplierPo((int) $supplierPo['id']) : [],
             'freight'   => OrderFreightRepository::find($orderId),
@@ -997,6 +999,7 @@ final class OrderController
             'amendmentCount' => count(AmendmentRepository::forOrder($orderId)),
             'complianceTasks' => $complianceTasksForOrder,
             'exportBenefitEligibility' => $exportBenefitSchemesForOrder,
+            'benefitSettlement' => \App\Services\BenefitSettlementService::state($orderId),
             'pendingInspectionTask' => $pendingInspectionTask,
             'orderInspectionFee' => $canManageOrderFinancials ? OrderInspectionFeeRepository::find($orderId) : null,
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
@@ -2293,26 +2296,26 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        // Owner request (2026-10-27): the forwarder is a logistics partner
-        // picked from the Suppliers directory (like the supplier in 7a);
-        // its name and contact are copied onto this order.
-        $partner = SupplierRepository::find((int) ($_POST['freight_forwarder_supplier_id'] ?? 0));
-        if (!$partner || !$partner['is_active'] || !in_array(SupplierRepository::LOGISTICS_TYPE, $partner['types'], true)) {
-            Flash::set('error', 'Choose the logistics partner (freight forwarder) from the Suppliers directory.');
+        // Owner request (2026-10-27): the forwarder is picked from the
+        // Logistics Partners directory (like the supplier in 7a from the
+        // Suppliers directory); its name and contact are copied onto this order.
+        $partner = \App\Repositories\LogisticsPartnerRepository::find((int) ($_POST['freight_forwarder_partner_id'] ?? 0));
+        if (!$partner || !$partner['is_active']) {
+            Flash::set('error', 'Choose the freight forwarder from the Logistics Partners directory.');
             header("Location: /orders/{$orderId}#step-9a-freight-terms");
             return;
         }
         $contact = implode(' · ', array_filter([
-            $partner['contact_person'] ?? null,
+            $partner['contact_person_name'] ?? null,
             $partner['contact_person_phone'] ?: ($partner['phone'] ?? null),
             $partner['email'] ?? null,
         ]));
         OrderFreightRepository::upsert($orderId, [
             'confirmed_freight_rate'    => trim((string) ($_POST['confirmed_freight_rate'] ?? '')) ?: null,
             'insurance_amount'          => trim((string) ($_POST['insurance_amount'] ?? '')) ?: null,
-            'freight_forwarder_name'    => $partner['supplier_legal_name'],
+            'freight_forwarder_name'    => $partner['partner_name'],
             'freight_forwarder_contact' => $contact !== '' ? $contact : null,
-            'freight_forwarder_supplier_id' => (int) $partner['id'],
+            'freight_forwarder_partner_id' => (int) $partner['id'],
         ]);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
@@ -3329,13 +3332,13 @@ final class OrderController
         }
 
         if (!$allowOverride) {
-            $pendingBenefits = array_filter(
-                CaExportBenefitRepository::forOrder($orderId),
-                static fn(array $b): bool => $b['received_amount'] === null
-            );
-            if (!empty($pendingBenefits)) {
-                Flash::set('error', 'This order has a government export benefit claim still awaiting receipt — record it as received first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
-                header("Location: /orders/{$orderId}#order-financials");
+            // Owner decision (2026-10-27): Step 13g — every eligible scheme
+            // received, or skipped with a reason (a skipped scheme's open
+            // claim no longer blocks).
+            $benefits = \App\Services\BenefitSettlementService::state($orderId);
+            if ($benefits['waiting'] !== []) {
+                Flash::set('error', 'This order has a government export benefit claim still awaiting receipt (' . implode(', ', $benefits['waiting']) . ') — record it as received in Step 13g, or skip it there with a reason. A user with the "Override locked data" permission can also force this through with a reason if absolutely necessary.');
+                header("Location: /orders/{$orderId}#step-13g-benefits");
                 return;
             }
 
@@ -3356,6 +3359,12 @@ final class OrderController
             if (!empty($pendingExportBenefitSchemes)) {
                 Flash::set('error', 'This order still has a government export-benefit scheme with no eligibility decision — mark it Eligible or Not Eligible first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
                 header("Location: /orders/{$orderId}#order-financials");
+                return;
+            }
+
+            if ($benefits['unclaimed'] !== []) {
+                Flash::set('error', 'An eligible government export benefit has not been claimed yet (' . implode(', ', $benefits['unclaimed']) . ') — record the claim and the money received in Step 13g, or skip it there with a reason. A user with the "Override locked data" permission can also force this through with a reason if absolutely necessary.');
+                header("Location: /orders/{$orderId}#step-13g-benefits");
                 return;
             }
         }

@@ -2,8 +2,8 @@
 
 /**
  * Owner decision (2026-10-26): Step 12 as guided sub-steps (Option A) —
- * 12a costs, 12b scheme eligibility, 12c benefits claimed & received, 12d
- * review & complete. Port of the status block at the top of PHP's Step 12
+ * 12a costs, 12b scheme eligibility, 12c review & complete. Benefits
+ * claimed & received moved to Step 13g (owner decision 2026-10-27). Port of the status block at the top of PHP's Step 12
  * markup. Sub-steps never lock each other (benefit money can arrive months
  * later); the next unfinished one is simply opened.
  */
@@ -17,8 +17,7 @@ function financialsStep(order, eligibility, claims, costEntries, payment) {
   const done = {
     '12a': skipped || !!order.financials_costs_confirmed_at,
     '12b': skipped || pending === 0,
-    '12c': skipped || (pending === 0 && unclaimed === 0 && waiting === 0),
-    '12d': skipped || !!order.financials_completed_at,
+    '12c': skipped || !!order.financials_completed_at,
   };
   const current = Object.keys(done).find((sub) => !done[sub]) || null;
   const sum = (rows, key) => (rows || []).reduce((total, r) => total + Number(r[key] || 0), 0);

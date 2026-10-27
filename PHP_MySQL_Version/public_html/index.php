@@ -12,6 +12,7 @@ use App\Controllers\AuditLogController;
 use App\Controllers\AuthController;
 use App\Controllers\BuyerActionController;
 use App\Controllers\PaymentActionController;
+use App\Controllers\VendorDetailsController;
 use App\Controllers\SupplierActionController;
 use App\Controllers\CaController;
 use App\Controllers\OrderFinancialsController;
@@ -85,6 +86,7 @@ $piIntake = new PiIntakeController();
 $piIntakeReview = new PiIntakeReviewController();
 $buyerAction = new BuyerActionController();
 $paymentAction = new PaymentActionController();
+$vendorDetails = new VendorDetailsController();
 $supplierAction = new SupplierActionController();
 $reorderRequests = new ReorderRequestController();
 $clientPortal = new ClientPortalController();
@@ -179,6 +181,9 @@ $router->post('/buyer-action/{token}/report-payment', [$buyerAction, 'reportPaym
 $router->get('/payment-action/{token}', [$paymentAction, 'show']);
 $router->get('/payment-action/{token}/document', [$paymentAction, 'downloadDocument']);
 $router->post('/payment-action/{token}/report', [$paymentAction, 'report'], [CsrfCheck::verify()]);
+// Owner request (2026-10-27): no-login Vendor Details Link — a supplier / logistics partner fills in their company and bank details.
+$router->get('/vendor-details/{token}', [$vendorDetails, 'show']);
+$router->post('/vendor-details/{token}', [$vendorDetails, 'submit'], [CsrfCheck::verify()]);
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -223,6 +228,7 @@ $router->get('/logistics-partners/{id}/edit', [$logisticsPartners, 'editForm'], 
 $router->post('/logistics-partners/{id}/update', [$logisticsPartners, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/toggle', [$logisticsPartners, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/delete', [$logisticsPartners, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+$router->post('/logistics-partners/{id}/details-link', [$logisticsPartners, 'sendDetailsLink'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 // Suppliers directory (docs/schema.sql Section BZ) — same shape as Logistics Partners.
 $router->get('/suppliers', [$suppliersDirectory, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers')]);
 $router->get('/suppliers/create', [$suppliersDirectory, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers')]);
@@ -231,6 +237,7 @@ $router->get('/suppliers/{id}/edit', [$suppliersDirectory, 'editForm'], [Session
 $router->post('/suppliers/{id}/update', [$suppliersDirectory, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/toggle', [$suppliersDirectory, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/delete', [$suppliersDirectory, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+$router->post('/suppliers/{id}/details-link', [$suppliersDirectory, 'sendDetailsLink'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/factory-addresses', [$suppliersDirectory, 'addFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/factory-addresses/{addressId}/delete', [$suppliersDirectory, 'deleteFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 
@@ -453,6 +460,7 @@ $router->post('/orders/{id}/export-benefits/{benefitId}/received', [$orderFinanc
 $router->post('/orders/{id}/financials/costs-confirmed', [$orderFinancials, 'confirmCosts'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/financials/complete', [$orderFinancials, 'completeFinancials'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits/save-all', [$orderFinancials, 'saveExportBenefits'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/export-benefits/skip', [$orderFinancials, 'skipExportBenefitClaim'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits/{benefitId}/correct', [$orderFinancials, 'correctExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits/{benefitId}/delete', [$orderFinancials, 'deleteExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/financials/skip', [$orderFinancials, 'skipFinancials'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);

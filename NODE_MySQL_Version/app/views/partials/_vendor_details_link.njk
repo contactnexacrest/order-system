@@ -1,0 +1,20 @@
+{# Owner request (2026-10-27): the no-login Vendor Details Link. Expects vendorKind, vendor, detailsLink. #}
+{% set vendorBase = '/suppliers/' if vendorKind == 'supplier' else '/logistics-partners/' %}
+  <div class="section" id="vendor-details-link">
+    <h2 style="font-size:1rem;">Vendor Details Link</h2>
+    <p class="muted small">Send this link so they fill in their own company and bank details — no login needed. It works once and for 30 days; when they submit, the details land here and the bank account shows as <strong>not verified</strong> until you check it. If they reply by email instead, fill the details in above on their behalf.</p>
+    {% if vendor.details_submitted_at %}
+      <p class="small">&#10003; Last filled in by them on {{ vendor.details_submitted_at }}.</p>
+    {% endif %}
+    {% if detailsLink %}
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+        <input type="text" readonly value="{{ detailsLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Vendor Details Link">
+        <button type="button" class="btn-sm btn-secondary" onclick="navigator.clipboard.writeText('{{ detailsLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+      </div>
+    {% endif %}
+    <form method="post" action="{{ vendorBase }}{{ vendor.id }}/details-link">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm">{{ 'Regenerate &amp; Email Details Link' | safe if detailsLink else 'Generate &amp; Email Details Link' | safe }}</button>
+      {% if not vendor.email %}<span class="muted small">No email on file — copy the link and send it yourself (WhatsApp etc.).</span>{% endif %}
+    </form>
+  </div>

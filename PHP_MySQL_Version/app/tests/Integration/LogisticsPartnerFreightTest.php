@@ -7,15 +7,15 @@ namespace App\Tests\Integration;
 use App\Controllers\OrderController;
 use App\Helpers\Flash;
 use App\Repositories\OrderFreightRepository;
-use App\Repositories\SupplierRepository;
+use App\Repositories\LogisticsPartnerRepository;
 use App\Services\StageGateService;
 use App\Tests\Support\DbTestCase;
 
 /**
- * Owner request (2026-10-27): the freight forwarder in Step 9a is a
- * logistics partner picked from the Suppliers directory (like the supplier
- * in 7a), not free text; Step 7a's supplier list leaves logistics-only
- * partners out; factory addresses are edited only in the directory.
+ * Owner request (2026-10-27): the freight forwarder in Step 9a is picked
+ * from the Logistics Partners directory (like the supplier in 7a from the
+ * Suppliers directory), not free text; factory addresses are edited only in
+ * the Suppliers directory.
  */
 final class LogisticsPartnerFreightTest extends DbTestCase
 {
@@ -45,35 +45,28 @@ final class LogisticsPartnerFreightTest extends DbTestCase
     public function testTheForwarderMustBeALogisticsPartnerFromTheDirectory(): void
     {
         self::assertSame('error', $this->save([])['type']);
-        $quarry = SupplierRepository::create(['supplier_legal_name' => 'Quarry Co']);
-        SupplierRepository::setTypes($quarry, ['Quarry Owner']);
-        self::assertSame('error', $this->save(['freight_forwarder_supplier_id' => (string) $quarry])['type']);
+        $inactive = LogisticsPartnerRepository::create(['partner_name' => 'Old Forwarder', 'service_type' => 'freight_forwarder'], (int) $_SESSION['_auth_user_id']);
+        LogisticsPartnerRepository::toggleActive($inactive);
+        self::assertSame('error', $this->save(['freight_forwarder_partner_id' => (string) $inactive])['type']);
         self::assertNull(OrderFreightRepository::find($this->orderId));
 
-        $partner = SupplierRepository::create(['supplier_legal_name' => 'Blue Wave Logistics', 'contact_person' => 'Ravi', 'phone' => '+91 90000 11111', 'email' => 'ops@bluewave.test']);
-        SupplierRepository::setTypes($partner, [SupplierRepository::LOGISTICS_TYPE]);
-        self::assertSame('success', $this->save(['freight_forwarder_supplier_id' => (string) $partner, 'freight_forwarder_name' => 'ignored free text'])['type']);
+        $partner = LogisticsPartnerRepository::create(['partner_name' => 'Blue Wave Logistics', 'service_type' => 'freight_forwarder', 'contact_person_name' => 'Ravi', 'phone' => '+91 90000 11111', 'email' => 'ops@bluewave.test'], (int) $_SESSION['_auth_user_id']);
+        self::assertSame('success', $this->save(['freight_forwarder_partner_id' => (string) $partner, 'freight_forwarder_name' => 'ignored free text'])['type']);
         $freight = OrderFreightRepository::find($this->orderId);
         self::assertSame('Blue Wave Logistics', $freight['freight_forwarder_name']);
         self::assertSame('Ravi · +91 90000 11111 · ops@bluewave.test', $freight['freight_forwarder_contact']);
-        self::assertSame($partner, (int) $freight['freight_forwarder_supplier_id']);
+        self::assertSame($partner, (int) $freight['freight_forwarder_partner_id']);
     }
 
-    public function testTheOrderPageListsPartnersIn9aAndSuppliersIn7a(): void
+    public function testThe9aListComesFromTheLogisticsPartnersDirectory(): void
     {
-        $partner = SupplierRepository::create(['supplier_legal_name' => 'Blue Wave Logistics']);
-        SupplierRepository::setTypes($partner, [SupplierRepository::LOGISTICS_TYPE]);
-        $quarry = SupplierRepository::create(['supplier_legal_name' => 'Quarry Co']);
-        SupplierRepository::setTypes($quarry, ['Quarry Owner']);
+        $partner = LogisticsPartnerRepository::create(['partner_name' => 'Blue Wave Logistics', 'service_type' => 'freight_forwarder'], (int) $_SESSION['_auth_user_id']);
 
         ob_start();
         (new OrderController())->show(['id' => (string) $this->orderId]);
         $html = (string) ob_get_clean();
 
-        self::assertMatchesRegularExpression('/name="freight_forwarder_supplier_id".*?value="' . $partner . '"/s', $html);
-        $spoSelect = substr($html, (int) strpos($html, 'id="spo-supplier-select"'), 3000);
-        self::assertStringContainsString('Quarry Co', $spoSelect);
-        self::assertStringNotContainsString('Blue Wave Logistics', $spoSelect);
+        self::assertMatchesRegularExpression('/name="freight_forwarder_partner_id".*?value="' . $partner . '">Blue Wave Logistics \\(Freight Forwarder\\)/s', $html);
         self::assertStringNotContainsString('Manage factory addresses', $html);
     }
 }

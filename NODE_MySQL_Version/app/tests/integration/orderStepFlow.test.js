@@ -3,6 +3,7 @@
 const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
+const orderExportBenefitSchemeRepository = require('../../src/repositories/orderExportBenefitSchemeRepository');
 const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
 const orderRepository = require('../../src/repositories/orderRepository');
 const piIntakeRepository = require('../../src/repositories/piIntakeRepository');
@@ -146,7 +147,17 @@ describe('Order page sequential step flow', () => {
 
     expect(cardIcon(text, 'step-group-stage-9')).toBe('current');
     expect(cardIcon(text, 'step-11g-close-order')).toBe('done');
-    expect(cardIcon(text, 'step-despatch')).toBe('current');
+    // Owner decision (2026-10-27): 13g government benefits, then 13h Mark
+    // Fully Settled once every scheme is received or skipped.
+    expect(cardIcon(text, 'step-13g-benefits')).toBe('current');
+    expect(cardIcon(text, 'step-despatch')).toBe('locked');
+    expect(text.indexOf('id="step-13g-benefits"')).toBeLessThan(text.indexOf('id="step-despatch"'));
+    for (const scheme of await orderExportBenefitSchemeRepository.forOrder(orderId)) {
+      await orderExportBenefitSchemeRepository.setStatus(orderId, scheme.scheme_name, 'not_eligible', 'Not applicable to this order', null);
+    }
+    const after = (await agent.get(`/orders/${orderId}`)).text;
+    expect(cardIcon(after, 'step-13g-benefits')).toBe('done');
+    expect(cardIcon(after, 'step-despatch')).toBe('current');
     expect(text.indexOf('id="step-11c-bl-endorsed-mark"')).toBeLessThan(text.indexOf('id="step-despatch"'));
     expect(text.indexOf('id="step-11f-bl-endorsement-generate"')).toBeLessThan(text.indexOf('id="step-11c-bl-endorsed-mark"'));
   });

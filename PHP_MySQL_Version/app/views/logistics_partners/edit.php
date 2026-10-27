@@ -52,10 +52,12 @@
         </label>
       </div>
     </fieldset>
+    <?php include __DIR__ . '/../partials/_vendor_bank_fields.php'; ?>
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — service area, rate notes, preferred ports, etc."><?= htmlspecialchars($partner['notes'] ?? '') ?></textarea></label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>
       <a href="/logistics-partners" class="btn-sm btn-secondary">Cancel</a>
     </div>
   </form>
+  <?php $vendorKind = 'logistics_partner'; $vendorId = (int) $partner['id']; $vendor = $partner; include __DIR__ . '/../partials/_vendor_details_link.php'; ?>
 </div>

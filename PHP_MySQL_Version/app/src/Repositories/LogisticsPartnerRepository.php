@@ -18,6 +18,8 @@ final class LogisticsPartnerRepository
         'cha'            => 'CHA',
         'transportation' => 'Transportation',
         'both'           => 'CHA + Transportation',
+        // Owner request (2026-10-27): Step 9a picks the freight forwarder from this directory.
+        'freight_forwarder' => 'Freight Forwarder',
     ];
 
     /** @return array<int, array<string,mixed>> newest first; $serviceType filters to 'cha'/'transportation' matching either that type alone or 'both' */

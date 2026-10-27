@@ -22,9 +22,9 @@
     </form>
 
     <table class="list">
-      <tr><th>Supplier</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Supplier</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Bank</th><th>Status</th><th>Actions</th></tr>
       <?php if (empty($suppliers)): ?>
-      <tr><td colspan="8" class="muted"><?= ($filterType !== '' || $search !== '') ? 'No suppliers match this filter.' : 'No suppliers yet — add the first one above.' ?></td></tr>
+      <tr><td colspan="9" class="muted"><?= ($filterType !== '' || $search !== '') ? 'No suppliers match this filter.' : 'No suppliers yet — add the first one above.' ?></td></tr>
       <?php endif; ?>
       <?php foreach ($suppliers as $s): ?>
       <?php $used = isset($usedIds[(int) $s['id']]); ?>
@@ -41,6 +41,7 @@
           <?php if (!empty($s['contact_person_phone'])): ?><br><small class="muted"><?= htmlspecialchars($s['contact_person_phone']) ?></small><?php endif; ?>
         </td>
         <td><?= $s['gstin'] ? htmlspecialchars($s['gstin']) : '—' ?></td>
+        <td><?php if (empty($s['bank_account_number'])): ?><span class="muted">—</span><?php elseif (!empty($s['bank_verified_at'])): ?><span class="badge good">&#10003; Verified</span><?php else: ?><span class="badge warn">&#9888; Not verified</span><?php endif; ?></td>
         <td><span class="badge <?= $s['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $s['is_active'] ? 'Active' : 'Inactive' ?></span></td>
         <td>
           <a href="/suppliers/<?= (int) $s['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>

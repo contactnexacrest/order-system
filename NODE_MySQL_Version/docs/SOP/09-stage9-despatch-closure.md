@@ -46,10 +46,23 @@ done:
 - **13e · Mark Original BLs Endorsed by NexaCrest** — confirms the
   originals have been endorsed (signed over) ready for the buyer.
 - **13f · Close Order (Document Despatch)** — below.
-- **13g · Mark Fully Settled** — the final close (see "Closing the order
-  — two phases" below). Step 13 shows its green tick only once this is
-  done; until then 13g stays the current, highlighted step even though
-  Close Order has passed the stage gate.
+- **13g · Government Benefits — Claimed & Received** (owner decision
+  2026-10-27) — the benefits usually arrive after the buyer has paid in
+  full, so they are recorded here, just before the order is settled: one
+  table with a row per claim (claimed amount, reference, date; then the
+  **received amount and date when the money lands**) and an empty row per
+  eligible scheme not claimed yet, saved with one **Save Benefits**. A
+  scheme the company won't claim — or whose money will never come — is
+  **skipped with a reason** ("Skip — not claiming"; one scheme, or all
+  still open at once; **Undo skip** reopens it). A wrong entry is fixed
+  under **Correct or delete a recorded claim** (reason required). 13g is
+  done once every eligible scheme is received or skipped (and every scheme
+  was answered in 12b).
+- **13h · Mark Fully Settled** — the final close (see "Closing the order
+  — two phases" below); locked until 13g is done. Step 13 shows its green
+  tick only once this is done. A user with "Override locked data" can
+  still force it through from 13g with a reason (a benefit genuinely never
+  arriving).
 
 ![Stage 9 section — originals received and endorsed](./images/s9_originals_endorsed.png)
 

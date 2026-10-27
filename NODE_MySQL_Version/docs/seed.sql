@@ -485,7 +485,6 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
   ('supplier_type', 'Processor (Job-Work Basis)', 2, 0, 1),
   ('supplier_type', 'Trader', 3, 0, 1),
   ('supplier_type', 'Factory Owner', 4, 0, 1),
-  ('supplier_type', 'Logistics Partner (Freight Forwarder)', 5, 0, 1),
   ('export_benefit_scheme', 'RODTEP', 1, 1, 1),
   ('export_benefit_scheme', 'Duty Drawback', 2, 0, 1),
   ('export_benefit_scheme', 'RoSCTL', 3, 0, 1),

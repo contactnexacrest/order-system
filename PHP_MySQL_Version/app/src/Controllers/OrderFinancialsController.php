@@ -9,6 +9,7 @@ use App\Helpers\ReasonValidator;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\OrderCostEntryRepository;
+use App\Repositories\OrderExportBenefitSchemeRepository;
 use App\Repositories\OrderInspectionFeeRepository;
 use App\Repositories\OrderLcDetailRepository;
 use App\Repositories\OrderRepository;
@@ -77,7 +78,7 @@ final class OrderFinancialsController
         $id = CaExportBenefitRepository::record($orderId, $schemeName, $referenceNumber, (float) $claimedAmount, $claimedAt, $currencyCode, $notes, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', $id, null, null, $schemeName);
         Flash::set('success', "{$schemeName} claim recorded for this order.");
-        header("Location: /orders/{$orderId}#order-financials");
+        header("Location: /orders/{$orderId}#step-13g-benefits");
     }
 
     public function markExportBenefitReceived(array $params): void
@@ -114,7 +115,7 @@ final class OrderFinancialsController
         CaExportBenefitRepository::markReceived($benefitId, (float) $receivedAmount, $receivedAt);
         AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', $benefitId, null, null, $receivedAmount);
         Flash::set('success', 'Marked as received.');
-        header("Location: /orders/{$orderId}#order-financials");
+        header("Location: /orders/{$orderId}#step-13g-benefits");
     }
 
     /**
@@ -137,13 +138,13 @@ final class OrderFinancialsController
         $reason = trim((string) ($_POST['reason'] ?? ''));
         if ($error = ReasonValidator::check($reason)) {
             Flash::set('error', $error);
-            header("Location: /orders/{$orderId}#financials-12c");
+            header("Location: /orders/{$orderId}#step-13g-benefits");
             return null;
         }
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         if (!CaFyLockGuard::allow((string) $benefit['claimed_at'], (int) $user['id'], $roleId, 'ca_export_benefits', $benefitId, $field)) {
-            header("Location: /orders/{$orderId}#financials-12c");
+            header("Location: /orders/{$orderId}#step-13g-benefits");
             return null;
         }
         return [$benefit, $user, (int) $user['id'], $roleId];
@@ -157,7 +158,7 @@ final class OrderFinancialsController
             return;
         }
         [$benefit, , $userId, $roleId] = $found;
-        $back = "Location: /orders/{$orderId}#financials-12c";
+        $back = "Location: /orders/{$orderId}#step-13g-benefits";
 
         $claimed = trim((string) ($_POST['claimed_amount'] ?? ''));
         $claimedAt = trim((string) ($_POST['claimed_at'] ?? ''));
@@ -215,7 +216,61 @@ final class OrderFinancialsController
             trim((string) $_POST['reason'])
         );
         Flash::set('success', "{$benefit['scheme_name']} claim deleted.");
-        header("Location: /orders/{$orderId}#financials-12c");
+        header("Location: /orders/{$orderId}#step-13g-benefits");
+    }
+
+    /**
+     * Owner decision (2026-10-27): at Step 13g an eligible scheme the company
+     * will not claim — or whose money will never come — is skipped with a
+     * reason (scheme_name set), or every scheme still open at once
+     * (scheme_name empty). action=undo clears one scheme's skip.
+     */
+    public function skipExportBenefitClaim(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!OrderRepository::find($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $back = "Location: /orders/{$orderId}#step-13g-benefits";
+        $userId = (int) AuthService::currentUserId();
+        $schemeName = trim((string) ($_POST['scheme_name'] ?? ''));
+        $state = \App\Services\BenefitSettlementService::state($orderId);
+        $bySettlement = array_column($state['schemes'], 'settlement', 'scheme_name');
+
+        if (($_POST['action'] ?? '') === 'undo') {
+            if (($bySettlement[$schemeName] ?? null) !== 'skipped') {
+                Flash::set('error', 'That scheme is not skipped.');
+                header($back);
+                return;
+            }
+            OrderExportBenefitSchemeRepository::setClaimSkipped($orderId, $schemeName, null, $userId);
+            AuditLogRepository::log($userId, 'EXPORT_BENEFIT_CLAIM_SKIP_UNDONE', 'orders', $orderId, 'scheme_name', $schemeName, null);
+            Flash::set('success', "{$schemeName} is open again in Step 13g.");
+            header($back);
+            return;
+        }
+
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if ($error = ReasonValidator::check($reason)) {
+            Flash::set('error', $error);
+            header($back);
+            return;
+        }
+        $open = array_merge($state['unclaimed'], $state['waiting']);
+        $targets = $schemeName === '' ? $open : (in_array($schemeName, $open, true) ? [$schemeName] : []);
+        if ($targets === []) {
+            Flash::set('error', $schemeName === '' ? 'Every eligible scheme is already received or skipped.' : "{$schemeName} is not an eligible scheme still waiting on this order.");
+            header($back);
+            return;
+        }
+        foreach ($targets as $name) {
+            OrderExportBenefitSchemeRepository::setClaimSkipped($orderId, $name, $reason, $userId);
+            AuditLogRepository::log($userId, 'EXPORT_BENEFIT_CLAIM_SKIPPED', 'orders', $orderId, 'scheme_name', null, $name, $reason);
+        }
+        Flash::set('success', 'Skipped: ' . implode(', ', $targets) . '.');
+        header($back);
     }
 
     /**
@@ -792,7 +847,7 @@ final class OrderFinancialsController
         $isAmount = static fn(string $a, bool $allowZero): bool => is_numeric($a) && ($allowZero ? (float) $a >= 0 : (float) $a > 0);
         $fail = static function (string $message) use ($orderId): void {
             Flash::set('error', $message . ' Nothing was saved.');
-            header("Location: /orders/{$orderId}#financials-12c");
+            header("Location: /orders/{$orderId}#step-13g-benefits");
         };
 
         $claims = [];
@@ -832,7 +887,7 @@ final class OrderFinancialsController
         }
         if ($claims === [] && $receipts === []) {
             Flash::set('success', 'Nothing new to save in 12c.');
-            header("Location: /orders/{$orderId}#financials-12c");
+            header("Location: /orders/{$orderId}#step-13g-benefits");
             return;
         }
         $payment = \App\Repositories\OrderPaymentStatusRepository::find($orderId);
@@ -843,13 +898,13 @@ final class OrderFinancialsController
         foreach ($claims as [$scheme, , , $claimedAt, $receivedAmount, $receivedAt]) {
             if (!CaFyLockGuard::allow($claimedAt, (int) $user['id'], $roleId, 'ca_export_benefits', 0, 'record')
                 || ($receivedAmount !== '' && !CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'ca_export_benefits', 0, 'mark_received'))) {
-                header("Location: /orders/{$orderId}#financials-12c");
+                header("Location: /orders/{$orderId}#step-13g-benefits");
                 return;
             }
         }
         foreach ($receipts as [$benefitId, , $receivedAt]) {
             if (!CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'ca_export_benefits', $benefitId, 'mark_received')) {
-                header("Location: /orders/{$orderId}#financials-12c");
+                header("Location: /orders/{$orderId}#step-13g-benefits");
                 return;
             }
         }
@@ -866,6 +921,6 @@ final class OrderFinancialsController
             AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', $benefitId, null, null, $receivedAmount);
         }
         Flash::set('success', 'Benefits saved — ' . count($claims) . ' claim(s) recorded, ' . count($receipts) . ' receipt(s) recorded.');
-        header("Location: /orders/{$orderId}#financials-12c");
+        header("Location: /orders/{$orderId}#step-13g-benefits");
     }
 }

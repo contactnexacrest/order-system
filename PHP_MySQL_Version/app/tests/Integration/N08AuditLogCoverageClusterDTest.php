@@ -164,9 +164,8 @@ final class N08AuditLogCoverageClusterDTest extends DbTestCase
         // unlocked — see OrderPageStageGateFixesTest.
         $this->unlockThrough($orderId, 5);
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
-        $partnerId = SupplierRepository::create(['supplier_legal_name' => 'N08 Forwarder']);
-        SupplierRepository::setTypes($partnerId, [SupplierRepository::LOGISTICS_TYPE]);
-        $_POST = ['confirmed_freight_rate' => '500', 'freight_forwarder_supplier_id' => (string) $partnerId];
+        $partnerId = \App\Repositories\LogisticsPartnerRepository::create(['partner_name' => 'N08 Forwarder', 'service_type' => 'freight_forwarder'], (int) $_SESSION['_auth_user_id']);
+        $_POST = ['confirmed_freight_rate' => '500', 'freight_forwarder_partner_id' => (string) $partnerId];
 
         ob_start();
         (new OrderController())->saveFreightTerms(['id' => (string) $orderId]);

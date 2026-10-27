@@ -52,7 +52,7 @@ describe('Step 12 sub-steps (12a–12d)', () => {
     const orderId = await createTestOrder(await createTestClient());
     const page = async () => (await staff.get(`/orders/${orderId}`)).text;
     const html = await page();
-    for (const id of ['financials-12a', 'financials-12b', 'financials-12c', 'financials-12d']) {
+    for (const id of ['financials-12a', 'financials-12b', 'financials-12c', 'step-13g-benefits']) {
       expect(html).toContain(`id="${id}"`);
     }
 

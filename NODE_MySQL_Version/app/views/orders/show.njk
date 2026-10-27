@@ -222,8 +222,8 @@
 {% set quotationAccepted = hasBuyerPoDoc or hasBuyerPo %}
 {% macro step123Status(reached, done) %}{% if orderClosed %}done{% elif not reached %}locked{% elif done %}done{% else %}current{% endif %}{% endmacro %}
 {# Step 13: Close Order passes Stage 9's gate, but Step 13 isn't finished
-   until the order is marked fully settled (13g) — owner report 2026-10-26. #}
-{# Owner request (2026-10-26, t4): s12 is also done once Step 12 is completed (12d) or skipped with a reason; 7c is done once the ack is on file or staff recorded the supplier did not acknowledge. #}
+   until the order is marked fully settled (13h) — owner report 2026-10-26. #}
+{# Owner request (2026-10-26, t4): s12 is also done once Step 12 is completed (12c) or skipped with a reason; 7c is done once the ack is on file or staff recorded the supplier did not acknowledge. #}
 {% set stepStates = {
   's1': step123Status(true, hasQtDoc),
   's2': step123Status(hasQtDoc, qtSent or quotationAccepted),
@@ -305,7 +305,8 @@
     '13d': docComplete(documents, 'BLE', mailSendingEnabled),
     '13e': shipping and shipping.bl_endorsed_at,
     '13f': orderClosed or order.status == 'shipped_docs_sent',
-    '13g': orderClosed
+    '13g': orderClosed or (order.status == 'shipped_docs_sent' and benefitSettlement.done),
+    '13h': orderClosed
   }
 } %}
 {# Owner decision (2026-10-26): staff can skip the PI-stage form when the
@@ -341,6 +342,13 @@
     {% elif not permissions.manage_supplier_payments %}
       <p class="muted small">Recorded by Accounts (needs the "Manage supplier payments" permission).</p>
     {% else %}
+      {# Owner request (2026-10-27): where to pay — the supplier's bank details from the directory. #}
+      {% set supplierEditLink %}{% if permissions.manage_suppliers and supplierPo.supplier_id %} <a href="/suppliers/{{ supplierPo.supplier_id }}/edit#bank-details" target="_blank" rel="noopener">Open the supplier</a>{% endif %}{% endset %}
+      {% if not supplierBank or not supplierBank.has_bank %}
+        <p class="review-banner warn">&#9888; No bank details on file for this supplier — add them in the Suppliers directory, or send them the Vendor Details Link.{{ supplierEditLink | safe }}</p>
+      {% else %}
+        <div class="pay-to"><strong>Pay to:</strong> {{ supplierBank.bank_account_name }} · {{ supplierBank.bank_name }}{% if supplierBank.bank_branch %} ({{ supplierBank.bank_branch }}){% endif %} · A/c <code>{{ supplierBank.bank_account_number }}</code> · IFSC <code>{{ supplierBank.bank_ifsc }}</code>{% if supplierBank.bank_upi_id %} · UPI {{ supplierBank.bank_upi_id }}{% endif %}{% if supplierBank.bank_verified_at %} <span class="badge good">&#10003; Verified</span>{% else %} <span class="badge warn">&#9888; Not verified — check before paying</span>{{ supplierEditLink | safe }}{% endif %}</div>
+      {% endif %}
       <form method="post" action="/orders/{{ order.id }}/supplier-po/{{ leg }}-paid" class="field-grid">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Date Paid<input type="date" name="paid_date" value="{{ today() }}" max="{{ today() }}"></label>
@@ -2028,16 +2036,16 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
         <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
-        {# Owner request (2026-10-27): the forwarder comes from the Suppliers directory, like the supplier in 7a. #}
-        <label>Logistics Partner (Freight Forwarder) *
-          <select name="freight_forwarder_supplier_id" required>
+        {# Owner request (2026-10-27): the forwarder comes from the Logistics Partners directory, like the supplier in 7a. #}
+        <label>Freight Forwarder (Logistics Partner) *
+          <select name="freight_forwarder_partner_id" required>
             <option value="">Select logistics partner…</option>
             {% for lp in logisticsPartners %}
-              <option value="{{ lp.id }}">{{ lp.supplier_legal_name }}{% if lp.contact_person %} — {{ lp.contact_person }}{% endif %}</option>
+              <option value="{{ lp.id }}">{{ lp.partner_name }} ({{ logisticsServiceTypes[lp.service_type] or lp.service_type }})</option>
             {% endfor %}
           </select>
         </label>
-        <p class="muted small">Logistics partners come from the Suppliers directory (type "{{ logisticsType }}"){% if permissions.manage_suppliers %} — <a href="/suppliers/create" target="_blank" rel="noopener">add one</a> (opens in a new tab; reload this page afterwards){% else %} — ask an Admin/MD/ED to add one there{% endif %}. Their name and contact are copied onto this order.</p>
+        <p class="muted small">Partners come from the Logistics Partners directory{% if permissions.manage_logistics_partners %} — <a href="/logistics-partners/create" target="_blank" rel="noopener">add one</a> (opens in a new tab; reload this page afterwards){% else %} — ask an Admin/MD/ED to add one there{% endif %}. Their name and contact are copied onto this order.</p>
         {{ stepBadge('9a') | safe }}<button type="submit" class="btn-sm">Save Freight Terms</button>
       </form>
     {% else %}
@@ -2465,13 +2473,13 @@
 
   {% if canManageOrderFinancials %}
   {# Owner decision (2026-10-26): Step 12 as guided sub-steps (Option A) — 12a costs, 12b scheme eligibility,
-     12c benefits claimed & received, 12d review & complete — with the order's money picture on top
+     12c review & complete (benefits moved to Step 13g, owner decision 2026-10-27) — with the order's money picture on top
      (status from helpers/financialsStep). #}
   {% set fin = financialsStep(order, exportBenefitEligibility, orderBenefitClaims, orderCostEntries, payment) %}
   {% set benefitsDisabled = '' if fin.benefitsApplicable else ' disabled' %}
   <details class="step-group" id="order-financials"{{ stepCardOpen('s12') }}>
-    <summary>{{ stepStatusIcon(stepStates['s12']) }}<span class="step-group-num">STEP 12</span><h3>Closure &mdash; Financials, Benefits &amp; Costs</h3><span class="fin-progress">{{ fin.doneCount }} of 4 done</span></summary>
-    <p class="muted small">Everything financial about this order, in four short parts — visible only to Super Admin and roles granted "Manage order financials". Work top to bottom; the next unfinished part opens by itself.</p>
+    <summary>{{ stepStatusIcon(stepStates['s12']) }}<span class="step-group-num">STEP 12</span><h3>Closure &mdash; Financials, Benefits &amp; Costs</h3><span class="fin-progress">{{ fin.doneCount }} of 3 done</span></summary>
+    <p class="muted small">Everything financial about this order, in three short parts (government benefits are recorded later, in Step 13g) — visible only to Super Admin and roles granted "Manage order financials". Work top to bottom; the next unfinished part opens by itself.</p>
 
     <div class="fin-kpis">
       <div class="fin-kpi"><span class="l">Received from buyer{{ ' (estimated)' if profitability and profitability.revenue_is_estimated else '' }}</span><span class="v">{% if profitability %}&#8377;{{ profitability.revenue_inr | money }}{% else %}—{% endif %}</span></div>
@@ -2641,7 +2649,7 @@
 
     <details class="step-card" id="financials-12b"{{ fin.open('12b') }}>
       <summary>{{ stepStatusIcon(fin.icon('12b')) }}<h2>Step 12b &middot; Export Benefit Eligibility</h2><span class="fin-sub-summary">{{ (fin.pending ~ ' still to answer') if fin.pending > 0 else (fin.eligible.length ~ ' eligible') }}</span></summary>
-        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Marking the order fully settled (Step 13g) is blocked while any scheme here is still Pending.</p>
+        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Marking the order fully settled (Step 13h) is blocked while any scheme here is still Pending.</p>
         <form method="post" action="/orders/{{ order.id }}/export-benefit-schemes">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <table class="list">
@@ -2670,110 +2678,10 @@
         </form>
     </details>
 
-    <div class="step-group-connector">then record what you claimed and what you received</div>
+    <div class="step-group-connector">then review the profit and complete Step 12</div>
 
     <details class="step-card" id="financials-12c"{{ fin.open('12c') }}>
-      <summary>{{ stepStatusIcon(fin.icon('12c')) }}<h2>Step 12c &middot; Government Benefits &mdash; Claimed &amp; Received</h2><span class="fin-sub-summary">{% if fin.waiting > 0 %}<span class="phase-pill warn">{{ fin.waiting }} waiting for money</span>{% elif fin.unclaimed > 0 %}{{ fin.unclaimed }} not claimed yet{% else %}&#8377;{{ fin.receivedBenefits | money }} received{% endif %}</span></summary>
-      <p class="muted small">One row per claim, plus an empty row for each eligible scheme not claimed yet. Fill in the claim when you file it, and the <strong>received amount when the money lands</strong> — right here — then <strong>Save Benefits</strong>.</p>
-      {% if not fin.benefitsApplicable %}
-        <p class="review-banner warn">&#9888; Not applicable until the order is complete and the CI (balance) remittance has been received — claims are recorded here once the documents are sent to the buyer (13f) and the balance has landed.</p>
-      {% elif fin.eligible.length == 0 and orderBenefitClaims.length == 0 %}
-        <p class="muted">{{ 'Answer the eligibility in 12b first — eligible schemes appear here.' if fin.pending > 0 else 'No scheme is eligible on this order — nothing to claim.' }}</p>
-      {% else %}
-      <form method="post" action="/orders/{{ order.id }}/export-benefits/save-all">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <table class="list fin-benefits">
-          <tr><th>Scheme</th><th>Claimed (&#8377;)</th><th>Received (&#8377;)</th></tr>
-          {% set row = 0 %}
-          {% for b in orderBenefitClaims %}
-          <tr>
-            <td><strong>{{ b.scheme_name }}</strong><input type="hidden" name="benefits[{{ row }}][benefit_id]" value="{{ b.id }}"><br>{% if b.received_amount != null %}<span class="badge good">Received</span>{% else %}<span class="badge">Claimed — waiting</span>{% endif %}</td>
-            <td>{{ b.claimed_amount | money }}<br><span class="muted small">{{ b.reference_number or 'no ref.' }} · {{ b.claimed_at }}</span></td>
-            {% if b.received_amount != null %}
-            <td>{{ b.received_amount | money }}<br><span class="muted small">on {{ b.received_at }}</span></td>
-            {% else %}
-            <td class="fin-claim-cell">
-              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="Amount received" aria-label="{{ b.scheme_name }} received amount">
-              <input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}" aria-label="{{ b.scheme_name }} received on">
-            </td>
-            {% endif %}
-          </tr>
-          {% set row = row + 1 %}
-          {% endfor %}
-          {% for sch in fin.eligible %}
-            {% if sch.scheme_name not in fin.claimedNames %}
-          <tr>
-            <td><strong>{{ sch.scheme_name }}</strong><input type="hidden" name="benefits[{{ row }}][scheme_name]" value="{{ sch.scheme_name }}"><br><span class="badge warn">Not claimed</span></td>
-            <td class="fin-claim-cell">
-              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][claimed_amount]" placeholder="Amount claimed" aria-label="{{ sch.scheme_name }} claimed amount"{{ benefitsDisabled }}>
-              <input type="text" name="benefits[{{ row }}][reference_number]" placeholder="Shipping bill / scroll no." aria-label="{{ sch.scheme_name }} claim reference"{{ benefitsDisabled }}>
-              <input type="date" name="benefits[{{ row }}][claimed_at]" value="{{ today() }}" aria-label="{{ sch.scheme_name }} claimed on"{{ benefitsDisabled }}>
-            </td>
-            <td class="fin-claim-cell">
-              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="If already received" aria-label="{{ sch.scheme_name }} received amount"{{ benefitsDisabled }}>
-              <input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}" aria-label="{{ sch.scheme_name }} received on"{{ benefitsDisabled }}>
-            </td>
-          </tr>
-          {% set row = row + 1 %}
-            {% endif %}
-          {% endfor %}
-        </table>
-        <button type="submit" class="btn-sm"{{ '' if (fin.benefitsApplicable or fin.waiting > 0) else ' disabled' }}>Save Benefits</button>
-      </form>
-      {% endif %}
-      {# Owner request (2026-10-27): a wrongly typed claim can be corrected or deleted (reason required, audit-logged). #}
-      {% if orderBenefitClaims.length and fin.benefitsApplicable %}
-      <details class="fin-more-claim" id="financials-12c-corrections">
-        <summary class="muted small">Correct or delete a recorded claim (typed a wrong amount? fix it here — a reason is required)</summary>
-        {% for b in orderBenefitClaims %}
-          <div class="card-nested fin-correct-claim">
-            <strong>{{ b.scheme_name }}</strong> <span class="muted small">— claimed &#8377;{{ b.claimed_amount | money }} on {{ b.claimed_at }}{% if b.received_amount != null %}, received &#8377;{{ b.received_amount | money }}{% endif %}</span>
-            <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/correct" class="field-grid">
-              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="{{ b.claimed_amount }}"></label>
-              <label>Claimed On *<input type="date" name="claimed_at" required value="{{ b.claimed_at }}"></label>
-              <label>Claim Ref.<input type="text" name="reference_number" value="{{ b.reference_number or '' }}"></label>
-              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="{{ b.received_amount if b.received_amount != null else '' }}"></label>
-              <label>Received On<input type="date" name="received_at" value="{{ b.received_at or today() }}"></label>
-              <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
-              <div><button type="submit" class="btn-sm">Save Correction</button></div>
-            </form>
-            <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/delete" class="fin-delete-claim" onsubmit="return confirm('Delete this {{ b.scheme_name }} claim? This cannot be undone (it stays in the audit log).');">
-              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <input type="text" name="reason" required minlength="10" placeholder="Reason for deleting (e.g. recorded twice by mistake)" aria-label="Reason for deleting the {{ b.scheme_name }} claim">
-              <button type="submit" class="btn-sm btn-danger">Delete Claim</button>
-            </form>
-          </div>
-        {% endfor %}
-      </details>
-      {% endif %}
-      {% if fin.benefitsApplicable %}
-      <details class="fin-more-claim">
-        <summary class="muted small">Record another claim (a second claim on the same scheme, or a scheme not listed above)</summary>
-          <form method="post" action="/orders/{{ order.id }}/export-benefits">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Scheme *
-              <select name="scheme_name" required>
-                {% for opt in exportBenefitSchemes %}
-                  <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
-            <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
-            <label>Claimed On *<input type="date" name="claimed_at" value="{{ today() }}" required></label>
-            <label>Currency<input type="text" name="currency_code" value="INR"></label>
-            <label>Notes<input type="text" name="notes"></label>
-            <button type="submit" class="btn-sm">Record Claim</button>
-          </form>
-      </details>
-      {% endif %}
-    </details>
-
-    <div class="step-group-connector">finally, review the profit and complete Step 12</div>
-
-    <details class="step-card" id="financials-12d"{{ fin.open('12d') }}>
-      <summary>{{ stepStatusIcon(fin.icon('12d')) }}<h2>Step 12d &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary">{% if profitability %}Net profit &#8377;{{ profitability.profit_inr | money }}{% endif %}</span></summary>
+      <summary>{{ stepStatusIcon(fin.icon('12c')) }}<h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary">{% if profitability %}Net profit &#8377;{{ profitability.profit_inr | money }}{% endif %}</span></summary>
         {% if profitability %}
           <h3 style="font-size:0.95em; margin-top:0;">Profitability Summary</h3>
           <div class="kv-grid">
@@ -2828,7 +2736,7 @@
           <button type="submit" class="btn-sm btn-secondary">Reopen Step 12</button>
         {% elif not fin.skipped %}
           <button type="submit" class="btn-sm btn-success">Mark Step 12 complete</button>
-          <span class="muted small">Needs 12a marked complete and every scheme answered in 12b. Benefit money still to come can be recorded in 12c later.</span>
+          <span class="muted small">Needs 12a marked complete and every scheme answered in 12b. Government benefits are recorded later, in Step 13g — just before the order is marked fully settled.</span>
         {% endif %}
       </form>
       {# Owner request (2026-10-26, t4): skip Step 12 with a reason — figures stay blank, never 0. #}
@@ -2961,7 +2869,7 @@
   <details class="step-card" id="step-11g-close-order"{{ flow.subCardOpen('s13', '13f') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13f')) }}<h2>Step 13f &middot; Close Order (Document Despatch)</h2></summary>
     {% if orderClosed or order.status == 'shipped_docs_sent' %}
-      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }} — see Step 13g to mark this order fully settled.</p>
+      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }} — see Step 13g (government benefits) and 13h to mark this order fully settled.</p>
     {% elif despatchLocked %}
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     {% elif not permissions.close_orders %}
@@ -2988,10 +2896,181 @@
     {% endif %}
   </details>
 
-  <div class="step-group-connector">last — once the balance has actually cleared too</div>
+  <div class="step-group-connector">then the government benefits — they usually arrive after the buyer has paid</div>
 
-  <details class="step-card" id="step-despatch"{{ flow.subCardOpen('s13', '13g') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13g')) }}<h2>Step 13g &middot; Mark Fully Settled</h2></summary>
+  <details class="step-card" id="step-13g-benefits"{{ flow.subCardOpen('s13', '13g') }}>
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13g')) }}<h2>Step 13g &middot; Government Benefits &mdash; Claimed &amp; Received</h2><span class="fin-sub-summary">{% if benefitSettlement.waiting.length %}<span class="phase-pill warn">{{ benefitSettlement.waiting.length }} waiting for money</span>{% elif benefitSettlement.unclaimed.length %}{{ benefitSettlement.unclaimed.length }} not claimed yet{% elif benefitSettlement.undecided.length %}eligibility not answered (12b){% else %}all received or skipped{% endif %}</span></summary>
+    {% if not orderClosed and order.status != 'shipped_docs_sent' %}
+      <p class="muted">Not applicable until the order is complete — claims are recorded here once the documents are sent to the buyer (Step 13f) and the balance has landed.</p>
+    {% else %}
+    {% if benefitSettlement.undecided.length %}
+      <p class="review-banner warn">&#9888; Answer the scheme eligibility first (Step 12b): {{ benefitSettlement.undecided | join(', ') }}.</p>
+    {% endif %}
+    {% if not canManageOrderFinancials %}
+      {% set settlementLabels = { 'undecided': 'Eligibility not answered', 'skipped': 'Skipped', 'received': 'Received', 'waiting': 'Claimed — waiting for money', 'unclaimed': 'Not claimed yet' } %}
+      <table class="list">
+        <tr><th>Scheme</th><th>Status</th></tr>
+        {% for sch in benefitSettlement.schemes %}{% if sch.settlement != 'not_eligible' %}
+          <tr><td>{{ sch.scheme_name }}</td><td>{{ settlementLabels[sch.settlement] }}</td></tr>
+        {% endif %}{% endfor %}
+      </table>
+      <p class="muted small">Recorded by users with the "Manage order financials" permission.</p>
+    {% else %}
+      {% set fin = financialsStep(order, exportBenefitEligibility, orderBenefitClaims, orderCostEntries, payment) %}
+      {% set benefitsDisabled = '' if fin.benefitsApplicable else ' disabled' %}
+      <p class="muted small">The government benefits usually arrive after the buyer has paid in full. One row per claim, plus an empty row for each eligible scheme not claimed yet: fill in the claim when you file it and the <strong>received amount when the money lands</strong>, then <strong>Save Benefits</strong> — or skip a scheme you will not claim (reason required). The order can be marked fully settled (13h) once every eligible scheme is received or skipped.</p>
+      {% if not fin.benefitsApplicable %}
+        <p class="review-banner warn">&#9888; Not applicable until the order is complete and the CI (balance) remittance has been received — claims are recorded here once the documents are sent to the buyer (13f) and the balance has landed.</p>
+      {% elif fin.eligible.length == 0 and orderBenefitClaims.length == 0 %}
+        <p class="muted">{{ 'Answer the eligibility in 12b first — eligible schemes appear here.' if fin.pending > 0 else 'No scheme is eligible on this order — nothing to claim.' }}</p>
+      {% else %}
+      <form method="post" action="/orders/{{ order.id }}/export-benefits/save-all">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <table class="list fin-benefits">
+          <tr><th>Scheme</th><th>Claimed (&#8377;)</th><th>Received (&#8377;)</th></tr>
+          {% set row = 0 %}
+          {% for b in orderBenefitClaims %}
+          <tr>
+            <td><strong>{{ b.scheme_name }}</strong><input type="hidden" name="benefits[{{ row }}][benefit_id]" value="{{ b.id }}"><br>{% if b.received_amount != null %}<span class="badge good">Received</span>{% else %}<span class="badge">Claimed — waiting</span>{% endif %}</td>
+            <td>{{ b.claimed_amount | money }}<br><span class="muted small">{{ b.reference_number or 'no ref.' }} · {{ b.claimed_at }}</span></td>
+            {% if b.received_amount != null %}
+            <td>{{ b.received_amount | money }}<br><span class="muted small">on {{ b.received_at }}</span></td>
+            {% else %}
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="Amount received" aria-label="{{ b.scheme_name }} received amount">
+              <input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}" aria-label="{{ b.scheme_name }} received on">
+            </td>
+            {% endif %}
+          </tr>
+          {% set row = row + 1 %}
+          {% endfor %}
+          {% for sch in fin.eligible %}
+            {% if sch.scheme_name not in fin.claimedNames %}
+          <tr>
+            <td><strong>{{ sch.scheme_name }}</strong><input type="hidden" name="benefits[{{ row }}][scheme_name]" value="{{ sch.scheme_name }}"><br><span class="badge warn">Not claimed</span></td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][claimed_amount]" placeholder="Amount claimed" aria-label="{{ sch.scheme_name }} claimed amount"{{ benefitsDisabled }}>
+              <input type="text" name="benefits[{{ row }}][reference_number]" placeholder="Shipping bill / scroll no." aria-label="{{ sch.scheme_name }} claim reference"{{ benefitsDisabled }}>
+              <input type="date" name="benefits[{{ row }}][claimed_at]" value="{{ today() }}" aria-label="{{ sch.scheme_name }} claimed on"{{ benefitsDisabled }}>
+            </td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="If already received" aria-label="{{ sch.scheme_name }} received amount"{{ benefitsDisabled }}>
+              <input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}" aria-label="{{ sch.scheme_name }} received on"{{ benefitsDisabled }}>
+            </td>
+          </tr>
+          {% set row = row + 1 %}
+            {% endif %}
+          {% endfor %}
+        </table>
+        <button type="submit" class="btn-sm"{{ '' if (fin.benefitsApplicable or fin.waiting > 0) else ' disabled' }}>Save Benefits</button>
+      </form>
+      {% endif %}
+      {# Owner request (2026-10-27): a wrongly typed claim can be corrected or deleted (reason required, audit-logged). #}
+      {% if orderBenefitClaims.length and fin.benefitsApplicable %}
+      <details class="fin-more-claim" id="step-13g-corrections">
+        <summary class="muted small">Correct or delete a recorded claim (typed a wrong amount? fix it here — a reason is required)</summary>
+        {% for b in orderBenefitClaims %}
+          <div class="card-nested fin-correct-claim">
+            <strong>{{ b.scheme_name }}</strong> <span class="muted small">— claimed &#8377;{{ b.claimed_amount | money }} on {{ b.claimed_at }}{% if b.received_amount != null %}, received &#8377;{{ b.received_amount | money }}{% endif %}</span>
+            <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/correct" class="field-grid">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="{{ b.claimed_amount }}"></label>
+              <label>Claimed On *<input type="date" name="claimed_at" required value="{{ b.claimed_at }}"></label>
+              <label>Claim Ref.<input type="text" name="reference_number" value="{{ b.reference_number or '' }}"></label>
+              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="{{ b.received_amount if b.received_amount != null else '' }}"></label>
+              <label>Received On<input type="date" name="received_at" value="{{ b.received_at or today() }}"></label>
+              <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
+              <div><button type="submit" class="btn-sm">Save Correction</button></div>
+            </form>
+            <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/delete" class="fin-delete-claim" onsubmit="return confirm('Delete this {{ b.scheme_name }} claim? This cannot be undone (it stays in the audit log).');">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="text" name="reason" required minlength="10" placeholder="Reason for deleting (e.g. recorded twice by mistake)" aria-label="Reason for deleting the {{ b.scheme_name }} claim">
+              <button type="submit" class="btn-sm btn-danger">Delete Claim</button>
+            </form>
+          </div>
+        {% endfor %}
+      </details>
+      {% endif %}
+      {% if fin.benefitsApplicable %}
+      <details class="fin-more-claim">
+        <summary class="muted small">Record another claim (a second claim on the same scheme, or a scheme not listed above)</summary>
+          <form method="post" action="/orders/{{ order.id }}/export-benefits">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Scheme *
+              <select name="scheme_name" required>
+                {% for opt in exportBenefitSchemes %}
+                  <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
+            <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+            <label>Claimed On *<input type="date" name="claimed_at" value="{{ today() }}" required></label>
+            <label>Currency<input type="text" name="currency_code" value="INR"></label>
+            <label>Notes<input type="text" name="notes"></label>
+            <button type="submit" class="btn-sm">Record Claim</button>
+          </form>
+      </details>
+      {% endif %}
+
+      {# Owner decision (2026-10-27): skip a scheme the company won't claim (or whose money will never come). #}
+      {% set skippable = benefitSettlement.unclaimed.concat(benefitSettlement.waiting) %}
+      {% if benefitSettlement.skipped.length %}
+        <table class="list">
+          <tr><th>Skipped scheme</th><th>Reason</th><th></th></tr>
+          {% for sch in benefitSettlement.schemes %}{% if sch.settlement == 'skipped' %}
+          <tr>
+            <td><strong>{{ sch.scheme_name }}</strong><br><span class="badge">Skipped</span></td>
+            <td class="small">{{ sch.claim_skip_reason }}</td>
+            <td>
+              <form method="post" action="/orders/{{ order.id }}/export-benefits/skip">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="action" value="undo">
+                <input type="hidden" name="scheme_name" value="{{ sch.scheme_name }}">
+                <button type="submit" class="btn-sm btn-secondary">Undo skip</button>
+              </form>
+            </td>
+          </tr>
+          {% endif %}{% endfor %}
+        </table>
+      {% endif %}
+      {% if skippable.length %}
+      <details class="fin-more-claim" id="step-13g-skip">
+        <summary class="muted small">Not claiming a scheme, or its money will never come? Skip it here (reason required)</summary>
+        <form method="post" action="/orders/{{ order.id }}/export-benefits/skip" class="field-grid">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Scheme
+            <select name="scheme_name">
+              {% for name in skippable %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+              {% if skippable.length > 1 %}<option value="">All {{ skippable.length }} still open</option>{% endif %}
+            </select>
+          </label>
+          <label class="full">Reason *<input type="text" name="reason" required minlength="10" placeholder="e.g. Below the minimum claim amount — not worth filing"></label>
+          <div><button type="submit" class="btn-sm btn-secondary">Skip — not claiming</button></div>
+        </form>
+      </details>
+      {% endif %}
+    {% endif %}
+    {% if not benefitSettlement.done and order.status == 'shipped_docs_sent' and permissions.close_orders and permissions.edit_locked_data %}
+      <details>
+        <summary class="small">Override &amp; fully settle anyway (a benefit genuinely never arriving)</summary>
+        <form method="post" action="/orders/{{ order.id }}/mark-fully-settled" onsubmit="return confirmFieldOverride(this, 'fully settling this order with a benefit claim still outstanding');" style="border:1px solid #D9822B; padding:10px; border-radius:4px;">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="override_gate" value="1">
+          <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+          </label>
+          <button type="submit" class="btn-sm btn-danger">Override &amp; Mark Fully Settled</button>
+        </form>
+      </details>
+    {% endif %}
+    {% endif %}
+  </details>
+
+  <div class="step-group-connector">last — once every benefit is received or skipped</div>
+
+  <details class="step-card" id="step-despatch"{{ flow.subCardOpen('s13', '13h') }}>
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13h')) }}<h2>Step 13h &middot; Mark Fully Settled</h2></summary>
     {% if orderClosed %}
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: {{ shipping.courier_tracking_number or '—' }}</p>
     {% elif order.status == 'shipped_docs_sent' %}
@@ -2999,9 +3078,9 @@
       {% if permissions.close_orders %}
       <form method="post" action="/orders/{{ order.id }}/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {{ stepBadge('13g') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
+        {{ stepBadge('13h') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
-      <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials above).</p>
+      <p class="muted small">Blocked until Step 13g is done — every eligible government export benefit received, or skipped with a reason.</p>
       {% if permissions.edit_locked_data %}
       <details>
         <summary class="small">Override &amp; fully settle anyway (benefit genuinely never arriving)</summary>
@@ -3030,7 +3109,7 @@
     {% if orderClosed %}
     <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
     {% else %}
-    <p class="muted">Not yet complete — finish Step 13g above (Mark Fully Settled) to close this order.</p>
+    <p class="muted">Not yet complete — finish Step 13h above (Mark Fully Settled) to close this order.</p>
     {% endif %}
   </details>
 

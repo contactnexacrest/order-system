@@ -18,9 +18,9 @@
     </form>
 
     <table class="list">
-      <tr><th>Partner</th><th>Service</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Partner</th><th>Service</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Bank</th><th>Status</th><th>Actions</th></tr>
       <?php if (empty($partners)): ?>
-      <tr><td colspan="8" class="muted">No logistics partners yet — add the first one above.</td></tr>
+      <tr><td colspan="9" class="muted">No logistics partners yet — add the first one above.</td></tr>
       <?php endif; ?>
       <?php foreach ($partners as $p): ?>
       <tr>
@@ -36,6 +36,7 @@
           <?php if (!empty($p['contact_person_phone'])): ?><br><small class="muted"><?= htmlspecialchars($p['contact_person_phone']) ?></small><?php endif; ?>
         </td>
         <td><?= $p['gstin'] ? htmlspecialchars($p['gstin']) : '—' ?></td>
+        <td><?php if (empty($p['bank_account_number'])): ?><span class="muted">—</span><?php elseif (!empty($p['bank_verified_at'])): ?><span class="badge good">&#10003; Verified</span><?php else: ?><span class="badge warn">&#9888; Not verified</span><?php endif; ?></td>
         <td><span class="badge <?= $p['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $p['is_active'] ? 'Active' : 'Inactive' ?></span></td>
         <td>
           <a href="/logistics-partners/<?= (int) $p['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>

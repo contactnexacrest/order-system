@@ -958,7 +958,7 @@ CREATE TABLE order_freight (
   insurance_amount          DECIMAL(14,2) NULL,
   freight_forwarder_name    VARCHAR(255) NULL,
   freight_forwarder_contact VARCHAR(255) NULL,
-  freight_forwarder_supplier_id BIGINT UNSIGNED NULL,  -- owner request 2026-10-27: the logistics partner picked from the Suppliers directory
+  freight_forwarder_partner_id BIGINT UNSIGNED NULL,  -- owner request 2026-10-27: the partner picked from the Logistics Partners directory
   gst_treatment             ENUM('NIL','IGST_18') NULL,
   fdn_document_id           BIGINT UNSIGNED NULL,  -- FK added after documents table
   freight_cleared_at        TIMESTAMP NULL,
@@ -2792,7 +2792,7 @@ CREATE TABLE order_cost_entries (
 CREATE TABLE logistics_partners (
   id                       BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   partner_name             VARCHAR(255) NOT NULL,
-  service_type             ENUM('cha','transportation','both') NOT NULL,
+  service_type             ENUM('cha','transportation','both','freight_forwarder') NOT NULL,  -- freight_forwarder: owner request 2026-10-27
   address                  VARCHAR(500) NULL,
   city                     VARCHAR(120) NULL,
   state                    VARCHAR(120) NULL,
@@ -4019,3 +4019,55 @@ UPDATE file_upload_contexts
  WHERE context_key IN ('draft_bl', 'bl_copy');
 
 CREATE INDEX idx_orders_payment_action_token ON orders(payment_action_token_hash);
+
+-- ============================================================================
+-- SECTION CD — BENEFITS AT SETTLEMENT (13g) + SUPPLIER BANK DETAILS & DETAILS LINK (owner decisions 2026-10-27)
+-- ============================================================================
+
+-- Government benefits are recorded at Step 13g, just before Mark Fully
+-- Settled; an eligible scheme the company won't claim is skipped with a
+-- reason, so the order can still be settled.
+ALTER TABLE order_export_benefit_schemes
+  ADD COLUMN IF NOT EXISTS claim_skipped_at  DATETIME        NULL,
+  ADD COLUMN IF NOT EXISTS claim_skipped_by  BIGINT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS claim_skip_reason VARCHAR(500)    NULL;
+
+-- Suppliers and logistics partners: bank details to pay them, filled by
+-- staff or by the supplier through a no-login Supplier Details Link. The
+-- account number is stored encrypted; a supplier's own submission clears
+-- the "verified" mark until staff check it again.
+ALTER TABLE suppliers
+  ADD COLUMN IF NOT EXISTS bank_account_name        VARCHAR(255)    NULL,
+  ADD COLUMN IF NOT EXISTS bank_name                VARCHAR(150)    NULL,
+  ADD COLUMN IF NOT EXISTS bank_branch              VARCHAR(150)    NULL,
+  ADD COLUMN IF NOT EXISTS bank_account_number      TEXT            NULL,
+  ADD COLUMN IF NOT EXISTS bank_ifsc                VARCHAR(20)     NULL,
+  ADD COLUMN IF NOT EXISTS bank_account_type        VARCHAR(30)     NULL,
+  ADD COLUMN IF NOT EXISTS bank_upi_id              VARCHAR(100)    NULL,
+  ADD COLUMN IF NOT EXISTS bank_updated_at          DATETIME        NULL,
+  ADD COLUMN IF NOT EXISTS bank_updated_source      VARCHAR(20)     NULL,
+  ADD COLUMN IF NOT EXISTS bank_verified_at         DATETIME        NULL,
+  ADD COLUMN IF NOT EXISTS bank_verified_by         BIGINT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS details_token_hash       CHAR(64)        NULL,
+  ADD COLUMN IF NOT EXISTS details_token_plain      TEXT            NULL,
+  ADD COLUMN IF NOT EXISTS details_token_expires_at DATETIME        NULL,
+  ADD COLUMN IF NOT EXISTS details_submitted_at     DATETIME        NULL,
+  ADD INDEX IF NOT EXISTS idx_suppliers_details_token (details_token_hash);
+
+ALTER TABLE logistics_partners
+  ADD COLUMN IF NOT EXISTS bank_account_name        VARCHAR(255)    NULL,
+  ADD COLUMN IF NOT EXISTS bank_name                VARCHAR(150)    NULL,
+  ADD COLUMN IF NOT EXISTS bank_branch              VARCHAR(150)    NULL,
+  ADD COLUMN IF NOT EXISTS bank_account_number      TEXT            NULL,
+  ADD COLUMN IF NOT EXISTS bank_ifsc                VARCHAR(20)     NULL,
+  ADD COLUMN IF NOT EXISTS bank_account_type        VARCHAR(30)     NULL,
+  ADD COLUMN IF NOT EXISTS bank_upi_id              VARCHAR(100)    NULL,
+  ADD COLUMN IF NOT EXISTS bank_updated_at          DATETIME        NULL,
+  ADD COLUMN IF NOT EXISTS bank_updated_source      VARCHAR(20)     NULL,
+  ADD COLUMN IF NOT EXISTS bank_verified_at         DATETIME        NULL,
+  ADD COLUMN IF NOT EXISTS bank_verified_by         BIGINT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS details_token_hash       CHAR(64)        NULL,
+  ADD COLUMN IF NOT EXISTS details_token_plain      TEXT            NULL,
+  ADD COLUMN IF NOT EXISTS details_token_expires_at DATETIME        NULL,
+  ADD COLUMN IF NOT EXISTS details_submitted_at     DATETIME        NULL,
+  ADD INDEX IF NOT EXISTS idx_logistics_partners_details_token (details_token_hash);

@@ -12,6 +12,8 @@ const SERVICE_TYPES = {
   cha: 'CHA',
   transportation: 'Transportation',
   both: 'CHA + Transportation',
+  // Owner request (2026-10-27): Step 9a picks the freight forwarder from this directory.
+  freight_forwarder: 'Freight Forwarder',
 };
 
 function bindData(data) {

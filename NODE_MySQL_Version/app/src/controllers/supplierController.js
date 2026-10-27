@@ -6,6 +6,9 @@ const lookupRepository = require('../repositories/lookupRepository');
 const supplierFactoryAddressRepository = require('../repositories/supplierFactoryAddressRepository');
 const supplierRepository = require('../repositories/supplierRepository');
 const testModeService = require('../services/testModeService');
+const vendorDetailsService = require('../services/vendorDetailsService');
+const vendorDetailsRepository = require('../repositories/vendorDetailsRepository');
+const bankDetailsInput = require('../helpers/bankDetailsInput');
 
 /**
  * Port of App\Controllers\SupplierController — the Suppliers directory
@@ -89,6 +92,8 @@ async function index(req, res) {
 
 async function createForm(req, res) {
   res.renderView('suppliers/form', {
+    bank: vendorDetailsRepository.bankDetails(null),
+    bankAccountTypes: bankDetailsInput.ACCOUNT_TYPES,
     supplier: null,
     supplierTypes: await typeOptions(),
     factoryAddresses: [],
@@ -97,13 +102,15 @@ async function createForm(req, res) {
 
 async function create(req, res) {
   const result = await collectFormData(req);
-  if (result.error) {
-    flash.set(req, 'error', result.error);
+  const error = result.error || (await vendorDetailsService.bankInputError('supplier', null, req.body));
+  if (error) {
+    flash.set(req, 'error', error);
     res.redirect('/suppliers/create');
     return;
   }
 
   const id = await supplierRepository.create(result.data, req.user.id);
+  await vendorDetailsService.applyStaffBankInput('supplier', id, req.user.id, req.body);
   if (await testModeService.isEnabled()) {
     await supplierRepository.markTest(id);
   }
@@ -124,6 +131,11 @@ async function editForm(req, res) {
     supplierTypes: await typeOptions(supplier.types),
     factoryAddresses: await supplierFactoryAddressRepository.forSupplier(id),
     usedOnAnOrder: await supplierRepository.isUsedOnAnOrder(id),
+    bank: vendorDetailsRepository.bankDetails(supplier),
+    bankAccountTypes: bankDetailsInput.ACCOUNT_TYPES,
+    detailsLink: vendorDetailsService.detailsLinkUrl(supplier),
+    vendorKind: 'supplier',
+    vendor: supplier,
   }, 'layout/base');
 }
 
@@ -142,7 +154,15 @@ async function update(req, res) {
     return;
   }
 
+  const bankError = await vendorDetailsService.bankInputError('supplier', id, req.body);
+  if (bankError) {
+    flash.set(req, 'error', bankError);
+    res.redirect(`/suppliers/${id}/edit#bank-details`);
+    return;
+  }
+
   await supplierRepository.update(id, result.data);
+  await vendorDetailsService.applyStaffBankInput('supplier', id, req.user.id, req.body);
   await auditLogRepository.log(req.user.id, 'SUPPLIER_UPDATED', 'suppliers', id, 'supplier_legal_name', supplier.supplier_legal_name, result.data.supplier_legal_name);
   flash.set(req, 'success', `"${result.data.supplier_legal_name}" updated. Orders that already saved Supplier PO terms keep the details they recorded.`);
   res.redirect('/suppliers');
@@ -218,6 +238,19 @@ async function deleteFactoryAddress(req, res) {
   res.redirect(`/suppliers/${id}/edit#factory-addresses`);
 }
 
+/** Owner request (2026-10-27): send the supplier the Vendor Details Link (company + bank details). */
+async function sendDetailsLink(req, res) {
+  const id = parseInt(req.params.id, 10);
+  if (!(await supplierRepository.find(id))) {
+    res.status(404).send('Supplier not found.');
+    return;
+  }
+  const sent = await vendorDetailsService.sendDetailsLink('supplier', id, req.user.id);
+  flash.set(req, 'success', `Vendor Details Link ${sent.emailedTo ? `emailed to ${sent.emailedTo}` : 'generated'}: ${sent.link}`);
+  res.redirect(`/suppliers/${id}/edit#vendor-details-link`);
+}
+
 module.exports = {
+  sendDetailsLink,
   index, createForm, create, editForm, update, toggleActive, remove, addFactoryAddress, deleteFactoryAddress,
 };

@@ -8,6 +8,8 @@ use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\LogisticsPartnerRepository;
+use App\Repositories\VendorDetailsRepository;
+use App\Services\VendorDetailsService;
 use App\Services\AuthService;
 
 /**
@@ -37,13 +39,17 @@ final class LogisticsPartnerController
     public function create(array $params): void
     {
         $data = $this->collectFormData();
-        if ($data === null) {
+        if ($data === null || ($bankError = VendorDetailsService::bankInputError('logistics_partner', null)) !== null) {
+            if (isset($bankError)) {
+                Flash::set('error', $bankError);
+            }
             header('Location: /logistics-partners/create');
             return;
         }
 
         $user = AuthService::currentUser();
         $id = LogisticsPartnerRepository::create($data, (int) $user['id']);
+        VendorDetailsService::applyStaffBankInput('logistics_partner', $id, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'LOGISTICS_PARTNER_ADDED', 'logistics_partners', $id, null, null, $data['partner_name']);
         Flash::set('success', "\"{$data['partner_name']}\" added to the logistics partners directory.");
         header('Location: /logistics-partners');
@@ -60,6 +66,8 @@ final class LogisticsPartnerController
         }
         View::render('logistics_partners/edit', [
             'partner' => $partner,
+            'bank' => VendorDetailsRepository::bankDetails($partner),
+            'detailsLink' => ($token = VendorDetailsRepository::liveDetailsToken($partner)) ? rtrim(\App\Config\Env::get('APP_URL', ''), '/') . '/vendor-details/' . $token : null,
             'serviceTypes' => LogisticsPartnerRepository::SERVICE_TYPES,
         ], 'layout/base');
     }
@@ -80,8 +88,15 @@ final class LogisticsPartnerController
             return;
         }
 
+        if (($bankError = VendorDetailsService::bankInputError('logistics_partner', $id)) !== null) {
+            Flash::set('error', $bankError);
+            header("Location: /logistics-partners/{$id}/edit#bank-details");
+            return;
+        }
+
         $user = AuthService::currentUser();
         LogisticsPartnerRepository::update($id, $data);
+        VendorDetailsService::applyStaffBankInput('logistics_partner', $id, (int) AuthService::currentUserId());
         AuditLogRepository::log((int) $user['id'], 'LOGISTICS_PARTNER_UPDATED', 'logistics_partners', $id, 'partner_name', $partner['partner_name'], $data['partner_name']);
         Flash::set('success', "\"{$data['partner_name']}\" updated.");
         header('Location: /logistics-partners');
@@ -120,6 +135,20 @@ final class LogisticsPartnerController
         AuditLogRepository::log((int) $user['id'], 'LOGISTICS_PARTNER_DELETED', 'logistics_partners', $id, 'partner_name', $partner['partner_name'], null);
         Flash::set('success', "\"{$partner['partner_name']}\" removed from the directory.");
         header('Location: /logistics-partners');
+    }
+
+    /** Owner request (2026-10-27): send the partner the Vendor Details Link (company + bank details). */
+    public function sendDetailsLink(array $params): void
+    {
+        $id = (int) $params['id'];
+        if (!LogisticsPartnerRepository::find($id)) {
+            http_response_code(404);
+            echo 'Logistics partner not found.';
+            return;
+        }
+        $sent = VendorDetailsService::sendDetailsLink('logistics_partner', $id, (int) AuthService::currentUserId());
+        Flash::set('success', 'Vendor Details Link ' . ($sent['emailed_to'] ? "emailed to {$sent['emailed_to']}" : 'generated') . ": {$sent['link']}");
+        header("Location: /logistics-partners/{$id}/edit#vendor-details-link");
     }
 
     /** @return array<string,mixed>|null null if validation failed (flash already set) */

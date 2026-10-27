@@ -10,8 +10,10 @@ use App\Repositories\AuditLogRepository;
 use App\Repositories\LookupRepository;
 use App\Repositories\SupplierFactoryAddressRepository;
 use App\Repositories\SupplierRepository;
+use App\Repositories\VendorDetailsRepository;
 use App\Services\AuthService;
 use App\Services\TestModeService;
+use App\Services\VendorDetailsService;
 
 /**
  * Suppliers directory (docs/schema.sql Section BZ) — built the same way as
@@ -38,6 +40,7 @@ final class SupplierController
     public function createForm(array $params): void
     {
         View::render('suppliers/form', [
+            'bank' => VendorDetailsRepository::bankDetails(null),
             'supplier' => null,
             'supplierTypes' => self::typeOptions(),
             'factoryAddresses' => [],
@@ -47,13 +50,17 @@ final class SupplierController
     public function create(array $params): void
     {
         $data = $this->collectFormData();
-        if ($data === null) {
+        if ($data === null || ($bankError = VendorDetailsService::bankInputError('supplier', null)) !== null) {
+            if (isset($bankError)) {
+                Flash::set('error', $bankError);
+            }
             header('Location: /suppliers/create');
             return;
         }
 
         $userId = (int) AuthService::currentUserId();
         $id = SupplierRepository::create($data, $userId);
+        VendorDetailsService::applyStaffBankInput('supplier', $id, $userId);
         if (TestModeService::isEnabled()) {
             SupplierRepository::markTest($id);
         }
@@ -76,6 +83,8 @@ final class SupplierController
             'supplierTypes' => self::typeOptions($supplier['types']),
             'factoryAddresses' => SupplierFactoryAddressRepository::forSupplier($id),
             'usedOnAnOrder' => SupplierRepository::isUsedOnAnOrder($id),
+            'bank' => VendorDetailsRepository::bankDetails($supplier),
+            'detailsLink' => self::detailsLinkUrl($supplier),
         ], 'layout/base');
     }
 
@@ -95,7 +104,14 @@ final class SupplierController
             return;
         }
 
+        if (($bankError = VendorDetailsService::bankInputError('supplier', $id)) !== null) {
+            Flash::set('error', $bankError);
+            header("Location: /suppliers/{$id}/edit#bank-details");
+            return;
+        }
+
         SupplierRepository::update($id, $data);
+        VendorDetailsService::applyStaffBankInput('supplier', $id, (int) AuthService::currentUserId());
         AuditLogRepository::log((int) AuthService::currentUserId(), 'SUPPLIER_UPDATED', 'suppliers', $id, 'supplier_legal_name', $supplier['supplier_legal_name'], $data['supplier_legal_name']);
         Flash::set('success', "\"{$data['supplier_legal_name']}\" updated. Orders that already saved Supplier PO terms keep the details they recorded.");
         header('Location: /suppliers');
@@ -183,6 +199,26 @@ final class SupplierController
      * @param array<int,string> $alsoInclude
      * @return array<int,string>
      */
+    /** Owner request (2026-10-27): send the supplier the Vendor Details Link (company + bank details). */
+    public function sendDetailsLink(array $params): void
+    {
+        $id = (int) $params['id'];
+        if (!SupplierRepository::find($id)) {
+            http_response_code(404);
+            echo 'Supplier not found.';
+            return;
+        }
+        $sent = VendorDetailsService::sendDetailsLink('supplier', $id, (int) AuthService::currentUserId());
+        Flash::set('success', 'Vendor Details Link ' . ($sent['emailed_to'] ? "emailed to {$sent['emailed_to']}" : 'generated') . ": {$sent['link']}");
+        header("Location: /suppliers/{$id}/edit#vendor-details-link");
+    }
+
+    private static function detailsLinkUrl(array $vendor): ?string
+    {
+        $token = VendorDetailsRepository::liveDetailsToken($vendor);
+        return $token ? rtrim(\App\Config\Env::get('APP_URL', ''), '/') . '/vendor-details/' . $token : null;
+    }
+
     private static function typeOptions(array $alsoInclude = []): array
     {
         $options = array_map(static fn(array $o): string => $o['option_value'], LookupRepository::dropdownOptions('supplier_type'));

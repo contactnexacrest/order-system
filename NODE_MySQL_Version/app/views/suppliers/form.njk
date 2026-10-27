@@ -60,6 +60,7 @@
         </label>
       </div>
     </fieldset>
+    {% include "partials/_vendor_bank_fields.njk" %}
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — material specialities, capacity, payment terms, etc.">{{ supplier.notes if isEdit and supplier.notes else '' }}</textarea></label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">{{ 'Save Changes' if isEdit else 'Add Supplier' }}</button>
@@ -68,6 +69,7 @@
   </form>
 
   {% if isEdit %}
+  {% include "partials/_vendor_details_link.njk" %}
   <div class="section" id="factory-addresses">
     <h2 style="font-size:1rem;">Factory Addresses</h2>
     <p class="muted small">Offered as the Delivery Location when saving Supplier PO terms for this supplier. Removing one never changes a Supplier PO that already recorded it.</p>

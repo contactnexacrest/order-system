@@ -10,10 +10,10 @@ const db = require('../config/db');
 async function upsert(orderId, data) {
   await db.execute(
     `INSERT INTO order_freight
-        (order_id, confirmed_freight_rate, insurance_amount, freight_forwarder_name, freight_forwarder_contact, freight_forwarder_supplier_id)
-     VALUES (:order_id, :rate, :insurance, :forwarder_name, :forwarder_contact, :forwarder_supplier_id)
+        (order_id, confirmed_freight_rate, insurance_amount, freight_forwarder_name, freight_forwarder_contact, freight_forwarder_partner_id)
+     VALUES (:order_id, :rate, :insurance, :forwarder_name, :forwarder_contact, :forwarder_partner_id)
      ON DUPLICATE KEY UPDATE
-        freight_forwarder_supplier_id = VALUES(freight_forwarder_supplier_id),
+        freight_forwarder_partner_id = VALUES(freight_forwarder_partner_id),
         confirmed_freight_rate = VALUES(confirmed_freight_rate),
         insurance_amount = VALUES(insurance_amount),
         freight_forwarder_name = VALUES(freight_forwarder_name),
@@ -24,7 +24,7 @@ async function upsert(orderId, data) {
       insurance: data.insurance_amount || null,
       forwarder_name: data.freight_forwarder_name ?? null,
       forwarder_contact: data.freight_forwarder_contact ?? null,
-      forwarder_supplier_id: data.freight_forwarder_supplier_id ?? null,
+      forwarder_partner_id: data.freight_forwarder_partner_id ?? null,
     }
   );
 }

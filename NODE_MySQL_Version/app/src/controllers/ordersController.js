@@ -66,7 +66,10 @@ const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
 const supplierRepository = require('../repositories/supplierRepository');
+const logisticsPartnerRepository = require('../repositories/logisticsPartnerRepository');
+const vendorDetailsRepository = require('../repositories/vendorDetailsRepository');
 const supplierFactoryAddressRepository = require('../repositories/supplierFactoryAddressRepository');
+const benefitSettlementService = require('../services/benefitSettlementService');
 const userRepository = require('../repositories/userRepository');
 const env = require('../config/env');
 const emailService = require('../services/emailService');
@@ -1003,10 +1006,12 @@ async function show(req, res) {
       emailLogByDocument,
       activeUsers,
       fobTotal: await orderProductRepository.totalFobValue(orderId),
-      suppliers: await supplierRepository.goodsSuppliers(),
-      logisticsPartners: await supplierRepository.logisticsPartners(),
-      logisticsType: supplierRepository.LOGISTICS_TYPE,
+      suppliers: await supplierRepository.all(),
+      logisticsPartners: await logisticsPartnerRepository.all(),
+      logisticsServiceTypes: logisticsPartnerRepository.SERVICE_TYPES,
       supplierPo,
+      // Owner request (2026-10-27): who to pay in 7e / 10a.
+      supplierBank: supplierPo && supplierPo.supplier_id ? vendorDetailsRepository.bankDetails(await vendorDetailsRepository.find('supplier', supplierPo.supplier_id)) : null,
       buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(orderId),
       supplierPoDocuments: supplierPo ? await orderSupplierPoDocumentRepository.forSupplierPo(supplierPo.id) : [],
       freight: await orderFreightRepository.find(orderId),
@@ -1028,6 +1033,7 @@ async function show(req, res) {
       complianceStatuses: orderComplianceTaskRepository.STATUSES,
       pendingInspectionTask,
       exportBenefitEligibility: exportBenefitSchemesForOrder,
+      benefitSettlement: await benefitSettlementService.state(orderId),
       exportBenefitEligibilityStatuses: orderExportBenefitSchemeRepository.STATUSES,
       orderInspectionFee: canManageOrderFinancialsForInspection ? await orderInspectionFeeRepository.find(orderId) : null,
       openDisputeCount: disputes.filter((d) => d.status !== 'Resolved').length,
@@ -2327,22 +2333,22 @@ async function saveFreightTerms(req, res) {
     return;
   }
   const body = req.body;
-  // Owner request (2026-10-27): the forwarder is a logistics partner picked
-  // from the Suppliers directory (like the supplier in 7a); its name and
-  // contact are copied onto this order.
-  const partner = await supplierRepository.find(parseInt(body.freight_forwarder_supplier_id, 10) || 0);
-  if (!partner || !Number(partner.is_active) || !partner.types.includes(supplierRepository.LOGISTICS_TYPE)) {
-    flash.set(req, 'error', 'Choose the logistics partner (freight forwarder) from the Suppliers directory.');
+  // Owner request (2026-10-27): the forwarder is picked from the Logistics
+  // Partners directory (like the supplier in 7a from the Suppliers
+  // directory); its name and contact are copied onto this order.
+  const partner = await logisticsPartnerRepository.find(parseInt(body.freight_forwarder_partner_id, 10) || 0);
+  if (!partner || !Number(partner.is_active)) {
+    flash.set(req, 'error', 'Choose the freight forwarder from the Logistics Partners directory.');
     res.redirect(`/orders/${orderId}#step-9a-freight-terms`);
     return;
   }
-  const contact = [partner.contact_person, partner.contact_person_phone || partner.phone, partner.email].filter(Boolean).join(' · ');
+  const contact = [partner.contact_person_name, partner.contact_person_phone || partner.phone, partner.email].filter(Boolean).join(' · ');
   await orderFreightRepository.upsert(orderId, {
     confirmed_freight_rate: str(body.confirmed_freight_rate) || null,
     insurance_amount: str(body.insurance_amount) || null,
-    freight_forwarder_name: partner.supplier_legal_name,
+    freight_forwarder_name: partner.partner_name,
     freight_forwarder_contact: contact || null,
-    freight_forwarder_supplier_id: partner.id,
+    freight_forwarder_partner_id: partner.id,
   });
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
@@ -3324,11 +3330,13 @@ async function markFullySettled(req, res) {
   }
 
   if (!allowOverride) {
-    const benefits = await caExportBenefitRepository.forOrder(orderId);
-    const pendingBenefits = benefits.filter((b) => b.received_amount === null);
-    if (pendingBenefits.length > 0) {
-      flash.set(req, 'error', 'This order has a government export benefit claim still awaiting receipt — record it as received first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
-      res.redirect(`/orders/${orderId}#order-financials`);
+    // Owner decision (2026-10-27): Step 13g — every eligible scheme
+    // received, or skipped with a reason (a skipped scheme's open claim no
+    // longer blocks).
+    const benefits = await benefitSettlementService.state(orderId);
+    if (benefits.waiting.length > 0) {
+      flash.set(req, 'error', `This order has a government export benefit claim still awaiting receipt (${benefits.waiting.join(', ')}) — record it as received in Step 13g, or skip it there with a reason. A user with the "Override locked data" permission can also force this through with a reason if absolutely necessary.`);
+      res.redirect(`/orders/${orderId}#step-13g-benefits`);
       return;
     }
 
@@ -3345,6 +3353,12 @@ async function markFullySettled(req, res) {
     if (pendingExportBenefitSchemes.length > 0) {
       flash.set(req, 'error', 'This order still has a government export-benefit scheme with no eligibility decision — mark it Eligible or Not Eligible first, or a user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
       res.redirect(`/orders/${orderId}#order-financials`);
+      return;
+    }
+
+    if (benefits.unclaimed.length > 0) {
+      flash.set(req, 'error', `An eligible government export benefit has not been claimed yet (${benefits.unclaimed.join(', ')}) — record the claim and the money received in Step 13g, or skip it there with a reason. A user with the "Override locked data" permission can also force this through with a reason if absolutely necessary.`);
+      res.redirect(`/orders/${orderId}#step-13g-benefits`);
       return;
     }
   }

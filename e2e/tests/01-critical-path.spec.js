@@ -186,6 +186,16 @@ async function resolveExportBenefitSchemes(page, orderId) {
 }
 
 
+// Owner request (2026-10-27): Step 9a picks the freight forwarder from the
+// Logistics Partners directory (manage_logistics_partners — Admin/MD/ED).
+async function addLogisticsPartner(page, name) {
+  await page.goto('/logistics-partners/create');
+  await page.locator('input[name="partner_name"]').fill(name);
+  await page.locator('select[name="service_type"]').selectOption('freight_forwarder');
+  await page.locator('form[action="/logistics-partners"] button[type="submit"]').click();
+  await expect(page.locator('.alert')).toContainText('added to the logistics partners directory');
+}
+
 // Suppliers live in the Suppliers directory (manage_suppliers — Admin/MD/
 // ED), not an inline form on the order page; adding one lands on its
 // edit page with a success banner.
@@ -351,8 +361,8 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   await test.step('Stage 5 — Supplier PO: add supplier, save terms, generate doc, sign', async () => {
     // Two types, so the Supplier PO form asks which applies to this order.
     await addSupplierInDirectory(page, `Smoke Test Quarry ${UNIQUE}`, ['Quarry Owner', 'Factory Owner']);
-    // Step 9a picks the freight forwarder from the directory too.
-    await addSupplierInDirectory(page, `Smoke Test Forwarder ${UNIQUE}`, ['Logistics Partner (Freight Forwarder)']);
+    // Step 9a picks the freight forwarder from the Logistics Partners directory.
+    await addLogisticsPartner(page, `Smoke Test Forwarder ${UNIQUE}`);
     await page.goto(`/orders/${orderId}`);
 
     await openStage(page, 5);
@@ -388,7 +398,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     const termsForm = page.locator(`form[action="/orders/${orderId}/freight-terms"]`);
     await termsForm.locator('input[name="confirmed_freight_rate"]').fill('950');
     await termsForm.locator('input[name="insurance_amount"]').fill('120');
-    await termsForm.locator('select[name="freight_forwarder_supplier_id"]').selectOption({ label: `Smoke Test Forwarder ${UNIQUE}` });
+    await termsForm.locator('select[name="freight_forwarder_partner_id"]').selectOption({ label: `Smoke Test Forwarder ${UNIQUE} (Freight Forwarder)` });
     await termsForm.getByRole('button', { name: 'Save Freight Terms' }).click();
     await expect(page.locator('.alert')).toBeVisible();
 
@@ -491,14 +501,18 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await resolveExportBenefitSchemes(page, orderId);
 
     // Owner decision (2026-10-26): Step 12 is guided — 12a costs marked
-    // complete, 12b answered above, then 12d completes Step 12.
+    // complete, 12b answered above, then 12c completes Step 12. Benefits
+    // are recorded at Step 13g (owner decision 2026-10-27).
     await page.goto(`/orders/${orderId}#financials-12a`);
     await openCardAndAncestors(page, '#financials-12a');
     await page.locator('#financials-12a').getByRole('button', { name: /Costs are complete/ }).click();
     await expect(page.locator('.alert')).toContainText('Costs marked complete');
-    await openCardAndAncestors(page, '#financials-12d');
-    await page.locator('#financials-12d').getByRole('button', { name: 'Mark Step 12 complete', exact: true }).click();
+    await openCardAndAncestors(page, '#financials-12c');
+    await page.locator('#financials-12c').getByRole('button', { name: 'Mark Step 12 complete', exact: true }).click();
     await expect(page.locator('.alert')).toContainText('Step 12 complete');
+
+    // 13g: no scheme is eligible on this order, so nothing is left to claim.
+    await expect(page.locator('#step-13g-benefits > summary')).toContainText('all received or skipped');
 
     await openStage(page, 9);
     const settleForm = page.locator(`form[action="/orders/${orderId}/mark-fully-settled"]`);

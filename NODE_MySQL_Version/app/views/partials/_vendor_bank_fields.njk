@@ -1,0 +1,38 @@
+{# Owner request (2026-10-27): bank details to pay a supplier / logistics partner — filled by
+   staff (e.g. from the vendor's email) or by the vendor through the Vendor Details Link.
+   Expects bank (vendorDetailsRepository.bankDetails()) and bankAccountTypes. #}
+    <fieldset id="bank-details">
+      <legend>Bank Details <small class="muted">(to pay them)</small></legend>
+      {% if bank.has_bank %}
+        <p class="small">
+          On file: <strong>A/c ••••{{ bank.bank_account_number.slice(-4) }}</strong>
+          — entered by {{ 'them through the details link' if bank.bank_updated_source == 'vendor' else 'staff' }}{% if bank.bank_updated_at %} on {{ bank.bank_updated_at }}{% endif %}.
+          {% if bank.bank_verified_at %}
+            <span class="badge good">&#10003; Verified {{ bank.bank_verified_at }}</span>
+          {% else %}
+            <span class="badge warn">&#9888; Not verified — check against a cancelled cheque or bank letter before paying</span>
+          {% endif %}
+        </p>
+        <details class="small"><summary>Show full account number</summary><code>{{ bank.bank_account_number }}</code></details>
+      {% else %}
+        <p class="muted small">No bank details yet — fill them in here, or send the Vendor Details Link so they fill them in themselves.</p>
+      {% endif %}
+      <div class="field-grid">
+        <label>Account Holder Name<input type="text" name="bank_account_name" value="{{ bank.bank_account_name or '' }}" placeholder="As printed on the cheque"></label>
+        <label>Bank Name<input type="text" name="bank_name" value="{{ bank.bank_name or '' }}" placeholder="e.g., State Bank of India"></label>
+        <label>Branch<input type="text" name="bank_branch" value="{{ bank.bank_branch or '' }}" placeholder="e.g., Udaipur Main"></label>
+        <label>IFSC Code<input type="text" name="bank_ifsc" value="{{ bank.bank_ifsc or '' }}" placeholder="e.g., SBIN0001234" maxlength="11" style="text-transform:uppercase"></label>
+        <label>Account Number<input type="text" name="bank_account_number" inputmode="numeric" autocomplete="off" placeholder="{{ ('Leave blank to keep ••••' + bank.bank_account_number.slice(-4)) if bank.has_bank else 'Digits only' }}"></label>
+        <label>Re-enter Account Number<input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off" placeholder="Type it again to confirm"></label>
+        <label>Account Type
+          <select name="bank_account_type">
+            <option value="">—</option>
+            {% for t in bankAccountTypes %}
+              <option value="{{ t }}"{% if bank.bank_account_type == t %} selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>UPI ID <small class="muted">(optional)</small><input type="text" name="bank_upi_id" value="{{ bank.bank_upi_id or '' }}" placeholder="e.g., name@sbi"></label>
+        <label class="checkbox-row full" style="font-weight:normal;"><input type="checkbox" name="bank_verified" value="1"> I have verified these bank details (cancelled cheque / bank letter)</label>
+      </div>
+    </fieldset>

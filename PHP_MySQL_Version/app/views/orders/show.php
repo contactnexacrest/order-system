@@ -15,6 +15,7 @@ $canViewReports = PermissionService::can((int) $currentUser['id'], $currentUser[
 $canEditLockedData = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'edit_locked_data');
 $canManageOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_orders');
 $canManageSuppliers = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_suppliers');
+$canManageLogisticsPartners = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_logistics_partners');
 // QA-5 RBAC-03/04: duty-specific split of manage_orders — see docs/seed.sql.
 $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_payments');
 // External QA report Q-ROLE-1: clearing a buyer payment (confirming the
@@ -383,10 +384,10 @@ $stepStates = [
     '10'   => $stepStatus($stage7),
     '11'   => $stepStatus($stage8),
     // Owner request (2026-10-26, t4): Step 12 can also be skipped with a reason.
-    // Owner request (2026-10-26): Step 12 is done once completed in 12d or skipped with a reason.
+    // Owner request (2026-10-26): Step 12 is done once completed in 12c or skipped with a reason.
     '12'   => !empty($order['financials_skipped_at']) || !empty($order['financials_completed_at']) ? 'done' : $stepStatus($stage9),
     // Close Order passes Stage 9's gate, but Step 13 isn't finished until
-    // the order is marked fully settled (13g) — owner report 2026-10-26.
+    // the order is marked fully settled (13h) — owner report 2026-10-26.
     '13'   => $orderClosed ? 'done' : ($stage9 === null || $stage9['status'] === 'locked' ? 'locked' : 'current'),
     '14'   => 'done', // reference/upload card — never gated
     '15'   => 'done',
@@ -470,7 +471,7 @@ $renderPiFormSkip = static function () use ($order, $piIntake, $piFormSkipped, $
 };
 // Owner request (2026-10-26): the supplier's advance (Step 7e) and balance
 // (Step 10a — due before packing) are their own sub-steps.
-$renderSupplierPayment = static function (string $leg) use ($supplierPo, $order, $canManageSupplierPayments, $stepBadge): void {
+$renderSupplierPayment = static function (string $leg) use ($supplierPo, $supplierBank, $canManageSuppliers, $order, $canManageSupplierPayments, $stepBadge): void {
     if (!$supplierPo) {
         echo '<p class="muted">Save the Supplier PO terms first (Step 7a).</p>';
         return;
@@ -493,6 +494,18 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $order,
     if (!$canManageSupplierPayments) {
         echo '<p class="muted small">Recorded by Accounts (needs the "Manage supplier payments" permission).</p>';
         return;
+    }
+    // Owner request (2026-10-27): where to pay — the supplier's bank details from the directory.
+    $editLink = $canManageSuppliers && !empty($supplierPo['supplier_id']) ? ' <a href="/suppliers/' . (int) $supplierPo['supplier_id'] . '/edit#bank-details" target="_blank" rel="noopener">Open the supplier</a>' : '';
+    if ($supplierBank === null || !$supplierBank['has_bank']) {
+        echo '<p class="review-banner warn">&#9888; No bank details on file for this supplier — add them in the Suppliers directory, or send them the Vendor Details Link.' . $editLink . '</p>';
+    } else {
+        echo '<div class="pay-to"><strong>Pay to:</strong> ' . htmlspecialchars((string) $supplierBank['bank_account_name']) . ' · ' . htmlspecialchars((string) $supplierBank['bank_name'])
+            . ($supplierBank['bank_branch'] ? ' (' . htmlspecialchars((string) $supplierBank['bank_branch']) . ')' : '')
+            . ' · A/c <code>' . htmlspecialchars((string) $supplierBank['bank_account_number']) . '</code> · IFSC <code>' . htmlspecialchars((string) $supplierBank['bank_ifsc']) . '</code>'
+            . ($supplierBank['bank_upi_id'] ? ' · UPI ' . htmlspecialchars((string) $supplierBank['bank_upi_id']) : '')
+            . ($supplierBank['bank_verified_at'] ? ' <span class="badge good">&#10003; Verified</span>' : ' <span class="badge warn">&#9888; Not verified — check before paying</span>' . $editLink)
+            . '</div>';
     }
     ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/<?= $leg ?>-paid" class="field-grid">
@@ -600,7 +613,10 @@ $subStepDone = [
         '13d' => $docComplete('BLE'),
         '13e' => $shipping !== null && !empty($shipping['bl_endorsed_at']),
         '13f' => $orderClosed || $order['status'] === 'shipped_docs_sent',
-        '13g' => $orderClosed,
+        // Owner decision (2026-10-27): government benefits at 13g — every
+        // eligible scheme received or skipped — then 13h Mark Fully Settled.
+        '13g' => $orderClosed || ($order['status'] === 'shipped_docs_sent' && $benefitSettlement['done']),
+        '13h' => $orderClosed,
     ],
 ];
 // Supplier payments (owner request 2026-10-26: their own sub-steps) are
@@ -2451,16 +2467,16 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?= Csrf::field() ?>
         <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
         <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
-        <?php // Owner request (2026-10-27): the forwarder comes from the Suppliers directory, like the supplier in 7a. ?>
-        <label>Logistics Partner (Freight Forwarder) *
-          <select name="freight_forwarder_supplier_id" required>
+        <?php // Owner request (2026-10-27): the forwarder comes from the Logistics Partners directory, like the supplier in 7a. ?>
+        <label>Freight Forwarder (Logistics Partner) *
+          <select name="freight_forwarder_partner_id" required>
             <option value="">Select logistics partner…</option>
             <?php foreach ($logisticsPartners as $lp): ?>
-              <option value="<?= (int) $lp['id'] ?>"><?= htmlspecialchars($lp['supplier_legal_name']) ?><?= !empty($lp['contact_person']) ? ' — ' . htmlspecialchars($lp['contact_person']) : '' ?></option>
+              <option value="<?= (int) $lp['id'] ?>"><?= htmlspecialchars($lp['partner_name']) ?> (<?= htmlspecialchars(\App\Repositories\LogisticsPartnerRepository::SERVICE_TYPES[$lp['service_type']] ?? $lp['service_type']) ?>)</option>
             <?php endforeach; ?>
           </select>
         </label>
-        <p class="muted small">Logistics partners come from the Suppliers directory (type "<?= htmlspecialchars(\App\Repositories\SupplierRepository::LOGISTICS_TYPE) ?>")<?php if ($canManageSuppliers): ?> — <a href="/suppliers/create" target="_blank" rel="noopener">add one</a> (opens in a new tab; reload this page afterwards)<?php else: ?> — ask an Admin/MD/ED to add one there<?php endif; ?>. Their name and contact are copied onto this order.</p>
+        <p class="muted small">Partners come from the Logistics Partners directory<?php if ($canManageLogisticsPartners): ?> — <a href="/logistics-partners/create" target="_blank" rel="noopener">add one</a> (opens in a new tab; reload this page afterwards)<?php else: ?> — ask an Admin/MD/ED to add one there<?php endif; ?>. Their name and contact are copied onto this order.</p>
         <?= $stepBadge('9a') ?><button type="submit" class="btn-sm">Save Freight Terms</button>
       </form>
     <?php else: ?>
@@ -2892,8 +2908,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <?php if ($canManageOrderFinancials): ?>
   <?php
     // Owner decision (2026-10-26): Step 12 as guided sub-steps (Option A) —
-    // 12a costs, 12b scheme eligibility, 12c benefits claimed & received,
-    // 12d review & complete — with the order's money picture on top.
+    // 12a costs, 12b scheme eligibility, 12c review & complete — with the
+    // order's money picture on top.
     // Sub-steps here never lock each other (benefit money can arrive months
     // later); the next unfinished one is simply opened for you.
     $__finEligible = array_values(array_filter($exportBenefitEligibility, static fn($r) => $r['status'] === 'eligible'));
@@ -2902,11 +2918,12 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     $__finWaiting = count(array_filter($orderBenefitClaims, static fn($c) => $c['received_amount'] === null));
     $__finUnclaimed = count(array_filter($__finEligible, static fn($r) => !in_array($r['scheme_name'], $__finClaimedNames, true)));
     $__finSkipped = !empty($order['financials_skipped_at']);
+    // Owner decision (2026-10-27): benefits claimed & received moved to
+    // Step 13g (just before Mark Fully Settled) — Step 12 is now three parts.
     $__finDone = [
         '12a' => $__finSkipped || !empty($order['financials_costs_confirmed_at']),
         '12b' => $__finSkipped || $__finPending === 0,
-        '12c' => $__finSkipped || ($__finPending === 0 && $__finUnclaimed === 0 && $__finWaiting === 0),
-        '12d' => $__finSkipped || !empty($order['financials_completed_at']),
+        '12c' => $__finSkipped || !empty($order['financials_completed_at']),
     ];
     $__finCurrent = array_search(false, $__finDone, true) ?: null;
     $__finIcon = static fn(string $sub): string => $__finDone[$sub] ? 'done' : ($sub === $__finCurrent ? 'current' : 'locked');
@@ -2918,8 +2935,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     $__claimedBenefits = array_sum(array_map(static fn($c) => (float) $c['claimed_amount'], $orderBenefitClaims));
   ?>
   <details class="step-group" id="order-financials"<?= $stepCardOpen('12') ?>>
-    <summary><?= $stepStatusIcon($stepStates['12']) ?><span class="step-group-num">STEP 12</span><h3>Closure &mdash; Financials, Benefits &amp; Costs</h3><span class="fin-progress"><?= count(array_filter($__finDone)) ?> of 4 done</span></summary>
-    <p class="muted small">Everything financial about this order, in four short parts — visible only to Super Admin and roles granted "Manage order financials". Work top to bottom; the next unfinished part opens by itself.</p>
+    <summary><?= $stepStatusIcon($stepStates['12']) ?><span class="step-group-num">STEP 12</span><h3>Closure &mdash; Financials, Benefits &amp; Costs</h3><span class="fin-progress"><?= count(array_filter($__finDone)) ?> of 3 done</span></summary>
+    <p class="muted small">Everything financial about this order, in three short parts (government benefits are recorded later, in Step 13g) — visible only to Super Admin and roles granted "Manage order financials". Work top to bottom; the next unfinished part opens by itself.</p>
 
     <div class="fin-kpis">
       <div class="fin-kpi"><span class="l">Received from buyer<?= $profitability && $profitability['revenue_is_estimated'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['revenue_inr'], 2) : '—' ?></span></div>
@@ -3089,7 +3106,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
     <details class="step-card" id="financials-12b"<?= $__finOpen('12b') ?>>
       <summary><?= $stepStatusIcon($__finIcon('12b')) ?><h2>Step 12b &middot; Export Benefit Eligibility</h2><span class="fin-sub-summary"><?= $__finPending > 0 ? $__finPending . ' still to answer' : count($__finEligible) . ' eligible' ?></span></summary>
-        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Marking the order fully settled (Step 13g) is blocked while any scheme here is still Pending.</p>
+        <p class="muted small">Not every order qualifies for every scheme — resolve each one explicitly (never leave it "pending") so a report never has to guess whether "no claim" meant ineligible or forgotten. Marking the order fully settled (Step 13h) is blocked while any scheme here is still Pending.</p>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefit-schemes">
           <?= Csrf::field() ?>
           <table class="list">
@@ -3118,107 +3135,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </form>
     </details>
 
-    <div class="step-group-connector">then record what you claimed and what you received</div>
+    <div class="step-group-connector">then review the profit and complete Step 12</div>
 
     <details class="step-card" id="financials-12c"<?= $__finOpen('12c') ?>>
-      <summary><?= $stepStatusIcon($__finIcon('12c')) ?><h2>Step 12c &middot; Government Benefits &mdash; Claimed &amp; Received</h2><span class="fin-sub-summary"><?php if ($__finWaiting > 0): ?><span class="phase-pill warn"><?= $__finWaiting ?> waiting for money</span><?php elseif ($__finUnclaimed > 0): ?><?= $__finUnclaimed ?> not claimed yet<?php else: ?>&#8377;<?= number_format($__receivedBenefits, 2) ?> received<?php endif; ?></span></summary>
-      <p class="muted small">One row per claim, plus an empty row for each eligible scheme not claimed yet. Fill in the claim when you file it, and the <strong>received amount when the money lands</strong> — right here — then <strong>Save Benefits</strong>.</p>
-      <?php if (!$__benefitsApplicable): ?>
-        <p class="review-banner warn">&#9888; Not applicable until the order is complete and the CI (balance) remittance has been received — claims are recorded here once the documents are sent to the buyer (13f) and the balance has landed.</p>
-      <?php elseif ($__finEligible === [] && $orderBenefitClaims === []): ?>
-        <p class="muted"><?= $__finPending > 0 ? 'Answer the eligibility in 12b first — eligible schemes appear here.' : 'No scheme is eligible on this order — nothing to claim.' ?></p>
-      <?php else: ?>
-      <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/save-all">
-        <?= Csrf::field() ?>
-        <table class="list fin-benefits">
-          <tr><th>Scheme</th><th>Claimed (&#8377;)</th><th>Received (&#8377;)</th></tr>
-          <?php $__row = 0; ?>
-          <?php foreach ($orderBenefitClaims as $b): ?>
-          <tr>
-            <td><strong><?= htmlspecialchars($b['scheme_name']) ?></strong><input type="hidden" name="benefits[<?= $__row ?>][benefit_id]" value="<?= (int) $b['id'] ?>"><br><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed — waiting</span>' ?></td>
-            <td><?= number_format((float) $b['claimed_amount'], 2) ?><br><span class="muted small"><?= htmlspecialchars($b['reference_number'] ?? 'no ref.') ?> · <?= htmlspecialchars((string) $b['claimed_at']) ?></span></td>
-            <?php if ($b['received_amount'] !== null): ?>
-            <td><?= number_format((float) $b['received_amount'], 2) ?><br><span class="muted small">on <?= htmlspecialchars((string) $b['received_at']) ?></span></td>
-            <?php else: ?>
-            <td class="fin-claim-cell">
-              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="Amount received" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received amount">
-              <input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received on">
-            </td>
-            <?php endif; ?>
-          </tr>
-          <?php $__row++; endforeach; ?>
-          <?php foreach ($__finEligible as $sch): ?>
-            <?php if (in_array($sch['scheme_name'], $__finClaimedNames, true)) { continue; } ?>
-          <tr>
-            <td><strong><?= htmlspecialchars($sch['scheme_name']) ?></strong><input type="hidden" name="benefits[<?= $__row ?>][scheme_name]" value="<?= htmlspecialchars($sch['scheme_name']) ?>"><br><span class="badge warn">Not claimed</span></td>
-            <td class="fin-claim-cell">
-              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][claimed_amount]" placeholder="Amount claimed" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claimed amount"<?= $__benefitsDisabled ?>>
-              <input type="text" name="benefits[<?= $__row ?>][reference_number]" placeholder="Shipping bill / scroll no." aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claim reference"<?= $__benefitsDisabled ?>>
-              <input type="date" name="benefits[<?= $__row ?>][claimed_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claimed on"<?= $__benefitsDisabled ?>>
-            </td>
-            <td class="fin-claim-cell">
-              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="If already received" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> received amount"<?= $__benefitsDisabled ?>>
-              <input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> received on"<?= $__benefitsDisabled ?>>
-            </td>
-          </tr>
-          <?php $__row++; endforeach; ?>
-        </table>
-        <button type="submit" class="btn-sm"<?= $__benefitsApplicable || $__finWaiting > 0 ? '' : ' disabled' ?>>Save Benefits</button>
-      </form>
-      <?php endif; ?>
-      <?php // Owner request (2026-10-27): a wrongly typed claim can be corrected or deleted (reason required, audit-logged). ?>
-      <?php if (!empty($orderBenefitClaims) && $__benefitsApplicable): ?>
-      <details class="fin-more-claim" id="financials-12c-corrections">
-        <summary class="muted small">Correct or delete a recorded claim (typed a wrong amount? fix it here — a reason is required)</summary>
-        <?php foreach ($orderBenefitClaims as $b): ?>
-          <div class="card-nested fin-correct-claim">
-            <strong><?= htmlspecialchars($b['scheme_name']) ?></strong> <span class="muted small">— claimed &#8377;<?= number_format((float) $b['claimed_amount'], 2) ?> on <?= htmlspecialchars((string) $b['claimed_at']) ?><?= $b['received_amount'] !== null ? ', received &#8377;' . number_format((float) $b['received_amount'], 2) : '' ?></span>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/correct" class="field-grid">
-              <?= Csrf::field() ?>
-              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="<?= htmlspecialchars((string) $b['claimed_amount']) ?>"></label>
-              <label>Claimed On *<input type="date" name="claimed_at" required value="<?= htmlspecialchars((string) $b['claimed_at']) ?>"></label>
-              <label>Claim Ref.<input type="text" name="reference_number" value="<?= htmlspecialchars((string) ($b['reference_number'] ?? '')) ?>"></label>
-              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="<?= htmlspecialchars((string) ($b['received_amount'] ?? '')) ?>"></label>
-              <label>Received On<input type="date" name="received_at" value="<?= htmlspecialchars((string) ($b['received_at'] ?? date('Y-m-d'))) ?>"></label>
-              <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
-              <div><button type="submit" class="btn-sm">Save Correction</button></div>
-            </form>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/delete" class="fin-delete-claim" onsubmit="return confirm('Delete this <?= htmlspecialchars($b['scheme_name'], ENT_QUOTES) ?> claim? This cannot be undone (it stays in the audit log).');">
-              <?= Csrf::field() ?>
-              <input type="text" name="reason" required minlength="10" placeholder="Reason for deleting (e.g. recorded twice by mistake)" aria-label="Reason for deleting the <?= htmlspecialchars($b['scheme_name']) ?> claim">
-              <button type="submit" class="btn-sm btn-danger">Delete Claim</button>
-            </form>
-          </div>
-        <?php endforeach; ?>
-      </details>
-      <?php endif; ?>
-      <?php if ($__benefitsApplicable): ?>
-      <details class="fin-more-claim">
-        <summary class="muted small">Record another claim (a second claim on the same scheme, or a scheme not listed above)</summary>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits">
-            <?= Csrf::field() ?>
-            <label>Scheme *
-              <select name="scheme_name" required>
-                <?php foreach ($exportBenefitSchemes as $opt): ?>
-                  <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </label>
-            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
-            <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
-            <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
-            <label>Currency<input type="text" name="currency_code" value="INR"></label>
-            <label>Notes<input type="text" name="notes"></label>
-            <button type="submit" class="btn-sm">Record Claim</button>
-          </form>
-      </details>
-      <?php endif; ?>
-    </details>
-
-    <div class="step-group-connector">finally, review the profit and complete Step 12</div>
-
-    <details class="step-card" id="financials-12d"<?= $__finOpen('12d') ?>>
-      <summary><?= $stepStatusIcon($__finIcon('12d')) ?><h2>Step 12d &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary"><?= $profitability ? 'Net profit &#8377;' . number_format($profitability['profit_inr'], 2) : '' ?></span></summary>
+      <summary><?= $stepStatusIcon($__finIcon('12c')) ?><h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary"><?= $profitability ? 'Net profit &#8377;' . number_format($profitability['profit_inr'], 2) : '' ?></span></summary>
         <?php if ($profitability): ?>
           <h3 style="font-size:0.95em; margin-top:0;">Profitability Summary</h3>
           <div class="kv-grid">
@@ -3273,7 +3193,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <button type="submit" class="btn-sm btn-secondary">Reopen Step 12</button>
         <?php elseif (!$__finSkipped): ?>
           <button type="submit" class="btn-sm btn-success">Mark Step 12 complete</button>
-          <span class="muted small">Needs 12a marked complete and every scheme answered in 12b. Benefit money still to come can be recorded in 12c later.</span>
+          <span class="muted small">Needs 12a marked complete and every scheme answered in 12b. Government benefits are recorded later, in Step 13g — just before the order is marked fully settled.</span>
         <?php endif; ?>
       </form>
       <?php // Owner request (2026-10-26, t4): skip Step 12 with a reason — figures stay blank, never 0. ?>
@@ -3307,7 +3227,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     // OrderController::closeOrder()), not just a display-only hint.
     $__closeBlockedBy = $despatchLocked ? [] : DocumentGenerationService::closureBlockedBy((int) $order['id']);
     // Owner sequence (2026-10-26): 13c save the endorsement, 13d print it,
-    // 13e mark the originals endorsed, 13f close, 13g fully settled.
+    // 13e mark the originals endorsed, 13f close, 13g government benefits
+    // (owner decision 2026-10-27), 13h fully settled.
   ?>
 
   <details class="step-group" id="step-group-stage-9"<?= $stepCardOpen('13') ?>>
@@ -3416,7 +3337,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <details class="step-card" id="step-11g-close-order"<?= $subCardOpen('13', '13f') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('13', '13f')) ?><h2>Step 13f &middot; Close Order (Document Despatch)</h2></summary>
     <?php if ($orderClosed || $order['status'] === 'shipped_docs_sent'): ?>
-      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — see Step 13g to mark this order fully settled.</p>
+      <p><strong>&#10003; Documents despatched.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — see Step 13g (government benefits) and 13h to mark this order fully settled.</p>
     <?php elseif ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif (!$canCloseOrders): ?>
@@ -3443,10 +3364,179 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php endif; ?>
   </details>
 
-  <div class="step-group-connector">last — once the balance has actually cleared too</div>
+  <div class="step-group-connector">then the government benefits — they usually arrive after the buyer has paid</div>
 
-  <details class="step-card" id="step-despatch"<?= $subCardOpen('13', '13g') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('13', '13g')) ?><h2>Step 13g &middot; Mark Fully Settled</h2></summary>
+  <details class="step-card" id="step-13g-benefits"<?= $subCardOpen('13', '13g') ?>>
+    <summary><?= $stepStatusIcon($subStepStatus('13', '13g')) ?><h2>Step 13g &middot; Government Benefits &mdash; Claimed &amp; Received</h2><span class="fin-sub-summary"><?php if ($benefitSettlement['waiting'] !== []): ?><span class="phase-pill warn"><?= count($benefitSettlement['waiting']) ?> waiting for money</span><?php elseif ($benefitSettlement['unclaimed'] !== []): ?><?= count($benefitSettlement['unclaimed']) ?> not claimed yet<?php elseif ($benefitSettlement['undecided'] !== []): ?>eligibility not answered (12b)<?php else: ?>all received or skipped<?php endif; ?></span></summary>
+    <?php if (!$orderClosed && $order['status'] !== 'shipped_docs_sent'): ?>
+      <p class="muted">Not applicable until the order is complete — claims are recorded here once the documents are sent to the buyer (Step 13f) and the balance has landed.</p>
+    <?php else: ?>
+    <?php if ($benefitSettlement['undecided'] !== []): ?>
+      <p class="review-banner warn">&#9888; Answer the scheme eligibility first (Step 12b): <?= htmlspecialchars(implode(', ', $benefitSettlement['undecided'])) ?>.</p>
+    <?php endif; ?>
+    <?php if (!$canManageOrderFinancials): ?>
+      <table class="list">
+        <tr><th>Scheme</th><th>Status</th></tr>
+        <?php foreach ($benefitSettlement['schemes'] as $__s): ?>
+          <?php if ($__s['settlement'] === 'not_eligible') { continue; } ?>
+          <tr><td><?= htmlspecialchars($__s['scheme_name']) ?></td><td><?= htmlspecialchars(['undecided' => 'Eligibility not answered', 'skipped' => 'Skipped', 'received' => 'Received', 'waiting' => 'Claimed — waiting for money', 'unclaimed' => 'Not claimed yet'][$__s['settlement']]) ?></td></tr>
+        <?php endforeach; ?>
+      </table>
+      <p class="muted small">Recorded by users with the "Manage order financials" permission.</p>
+    <?php else: ?>
+      <p class="muted small">The government benefits usually arrive after the buyer has paid in full. One row per claim, plus an empty row for each eligible scheme not claimed yet: fill in the claim when you file it and the <strong>received amount when the money lands</strong>, then <strong>Save Benefits</strong> — or skip a scheme you will not claim (reason required). The order can be marked fully settled (13h) once every eligible scheme is received or skipped.</p>
+      <?php if (!$__benefitsApplicable): ?>
+        <p class="review-banner warn">&#9888; Not applicable until the order is complete and the CI (balance) remittance has been received — claims are recorded here once the documents are sent to the buyer (13f) and the balance has landed.</p>
+      <?php elseif ($__finEligible === [] && $orderBenefitClaims === []): ?>
+        <p class="muted"><?= $__finPending > 0 ? 'Answer the eligibility in 12b first — eligible schemes appear here.' : 'No scheme is eligible on this order — nothing to claim.' ?></p>
+      <?php else: ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/save-all">
+        <?= Csrf::field() ?>
+        <table class="list fin-benefits">
+          <tr><th>Scheme</th><th>Claimed (&#8377;)</th><th>Received (&#8377;)</th></tr>
+          <?php $__row = 0; ?>
+          <?php foreach ($orderBenefitClaims as $b): ?>
+          <tr>
+            <td><strong><?= htmlspecialchars($b['scheme_name']) ?></strong><input type="hidden" name="benefits[<?= $__row ?>][benefit_id]" value="<?= (int) $b['id'] ?>"><br><?= $b['received_amount'] !== null ? '<span class="badge good">Received</span>' : '<span class="badge">Claimed — waiting</span>' ?></td>
+            <td><?= number_format((float) $b['claimed_amount'], 2) ?><br><span class="muted small"><?= htmlspecialchars($b['reference_number'] ?? 'no ref.') ?> · <?= htmlspecialchars((string) $b['claimed_at']) ?></span></td>
+            <?php if ($b['received_amount'] !== null): ?>
+            <td><?= number_format((float) $b['received_amount'], 2) ?><br><span class="muted small">on <?= htmlspecialchars((string) $b['received_at']) ?></span></td>
+            <?php else: ?>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="Amount received" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received amount">
+              <input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received on">
+            </td>
+            <?php endif; ?>
+          </tr>
+          <?php $__row++; endforeach; ?>
+          <?php foreach ($__finEligible as $sch): ?>
+            <?php if (in_array($sch['scheme_name'], $__finClaimedNames, true)) { continue; } ?>
+          <tr>
+            <td><strong><?= htmlspecialchars($sch['scheme_name']) ?></strong><input type="hidden" name="benefits[<?= $__row ?>][scheme_name]" value="<?= htmlspecialchars($sch['scheme_name']) ?>"><br><span class="badge warn">Not claimed</span></td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][claimed_amount]" placeholder="Amount claimed" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claimed amount"<?= $__benefitsDisabled ?>>
+              <input type="text" name="benefits[<?= $__row ?>][reference_number]" placeholder="Shipping bill / scroll no." aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claim reference"<?= $__benefitsDisabled ?>>
+              <input type="date" name="benefits[<?= $__row ?>][claimed_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> claimed on"<?= $__benefitsDisabled ?>>
+            </td>
+            <td class="fin-claim-cell">
+              <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="If already received" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> received amount"<?= $__benefitsDisabled ?>>
+              <input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> received on"<?= $__benefitsDisabled ?>>
+            </td>
+          </tr>
+          <?php $__row++; endforeach; ?>
+        </table>
+        <button type="submit" class="btn-sm"<?= $__benefitsApplicable || $__finWaiting > 0 ? '' : ' disabled' ?>>Save Benefits</button>
+      </form>
+      <?php endif; ?>
+      <?php // Owner request (2026-10-27): a wrongly typed claim can be corrected or deleted (reason required, audit-logged). ?>
+      <?php if (!empty($orderBenefitClaims) && $__benefitsApplicable): ?>
+      <details class="fin-more-claim" id="step-13g-corrections">
+        <summary class="muted small">Correct or delete a recorded claim (typed a wrong amount? fix it here — a reason is required)</summary>
+        <?php foreach ($orderBenefitClaims as $b): ?>
+          <div class="card-nested fin-correct-claim">
+            <strong><?= htmlspecialchars($b['scheme_name']) ?></strong> <span class="muted small">— claimed &#8377;<?= number_format((float) $b['claimed_amount'], 2) ?> on <?= htmlspecialchars((string) $b['claimed_at']) ?><?= $b['received_amount'] !== null ? ', received &#8377;' . number_format((float) $b['received_amount'], 2) : '' ?></span>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/correct" class="field-grid">
+              <?= Csrf::field() ?>
+              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="<?= htmlspecialchars((string) $b['claimed_amount']) ?>"></label>
+              <label>Claimed On *<input type="date" name="claimed_at" required value="<?= htmlspecialchars((string) $b['claimed_at']) ?>"></label>
+              <label>Claim Ref.<input type="text" name="reference_number" value="<?= htmlspecialchars((string) ($b['reference_number'] ?? '')) ?>"></label>
+              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="<?= htmlspecialchars((string) ($b['received_amount'] ?? '')) ?>"></label>
+              <label>Received On<input type="date" name="received_at" value="<?= htmlspecialchars((string) ($b['received_at'] ?? date('Y-m-d'))) ?>"></label>
+              <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
+              <div><button type="submit" class="btn-sm">Save Correction</button></div>
+            </form>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/delete" class="fin-delete-claim" onsubmit="return confirm('Delete this <?= htmlspecialchars($b['scheme_name'], ENT_QUOTES) ?> claim? This cannot be undone (it stays in the audit log).');">
+              <?= Csrf::field() ?>
+              <input type="text" name="reason" required minlength="10" placeholder="Reason for deleting (e.g. recorded twice by mistake)" aria-label="Reason for deleting the <?= htmlspecialchars($b['scheme_name']) ?> claim">
+              <button type="submit" class="btn-sm btn-danger">Delete Claim</button>
+            </form>
+          </div>
+        <?php endforeach; ?>
+      </details>
+      <?php endif; ?>
+      <?php if ($__benefitsApplicable): ?>
+      <details class="fin-more-claim">
+        <summary class="muted small">Record another claim (a second claim on the same scheme, or a scheme not listed above)</summary>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits">
+            <?= Csrf::field() ?>
+            <label>Scheme *
+              <select name="scheme_name" required>
+                <?php foreach ($exportBenefitSchemes as $opt): ?>
+                  <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
+            <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+            <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
+            <label>Currency<input type="text" name="currency_code" value="INR"></label>
+            <label>Notes<input type="text" name="notes"></label>
+            <button type="submit" class="btn-sm">Record Claim</button>
+          </form>
+      </details>
+      <?php endif; ?>
+
+      <?php // Owner decision (2026-10-27): skip a scheme the company won't claim (or whose money will never come). ?>
+      <?php $__skippable = array_merge($benefitSettlement['unclaimed'], $benefitSettlement['waiting']); ?>
+      <?php $__skippedRows = array_values(array_filter($benefitSettlement['schemes'], static fn($r) => $r['settlement'] === 'skipped')); ?>
+      <?php if ($__skippedRows !== []): ?>
+        <table class="list">
+          <tr><th>Skipped scheme</th><th>Reason</th><th></th></tr>
+          <?php foreach ($__skippedRows as $__s): ?>
+          <tr>
+            <td><strong><?= htmlspecialchars($__s['scheme_name']) ?></strong><br><span class="badge">Skipped</span></td>
+            <td class="small"><?= htmlspecialchars((string) $__s['claim_skip_reason']) ?></td>
+            <td>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/skip">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="action" value="undo">
+                <input type="hidden" name="scheme_name" value="<?= htmlspecialchars($__s['scheme_name']) ?>">
+                <button type="submit" class="btn-sm btn-secondary">Undo skip</button>
+              </form>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </table>
+      <?php endif; ?>
+      <?php if ($__skippable !== []): ?>
+      <details class="fin-more-claim" id="step-13g-skip">
+        <summary class="muted small">Not claiming a scheme, or its money will never come? Skip it here (reason required)</summary>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/skip" class="field-grid">
+          <?= Csrf::field() ?>
+          <label>Scheme
+            <select name="scheme_name">
+              <?php foreach ($__skippable as $__name): ?>
+                <option value="<?= htmlspecialchars($__name) ?>"><?= htmlspecialchars($__name) ?></option>
+              <?php endforeach; ?>
+              <?php if (count($__skippable) > 1): ?><option value="">All <?= count($__skippable) ?> still open</option><?php endif; ?>
+            </select>
+          </label>
+          <label class="full">Reason *<input type="text" name="reason" required minlength="10" placeholder="e.g. Below the minimum claim amount — not worth filing"></label>
+          <div><button type="submit" class="btn-sm btn-secondary">Skip — not claiming</button></div>
+        </form>
+      </details>
+      <?php endif; ?>
+    <?php endif; ?>
+    <?php if (!$benefitSettlement['done'] && $order['status'] === 'shipped_docs_sent' && $canCloseOrders && $canEditLockedData): ?>
+      <details>
+        <summary class="small">Override &amp; fully settle anyway (a benefit genuinely never arriving)</summary>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirmFieldOverride(this, 'fully settling this order with a benefit claim still outstanding');" style="border:1px solid #D9822B; padding:10px; border-radius:4px;">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="override_gate" value="1">
+          <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+          </label>
+          <button type="submit" class="btn-sm btn-danger">Override &amp; Mark Fully Settled</button>
+        </form>
+      </details>
+    <?php endif; ?>
+    <?php endif; ?>
+  </details>
+
+  <div class="step-group-connector">last — once every benefit is received or skipped</div>
+
+  <details class="step-card" id="step-despatch"<?= $subCardOpen('13', '13h') ?>>
+    <summary><?= $stepStatusIcon($subStepStatus('13', '13h')) ?><h2>Step 13h &middot; Mark Fully Settled</h2></summary>
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
     <?php elseif ($order['status'] === 'shipped_docs_sent'): ?>
@@ -3454,9 +3544,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if ($canCloseOrders): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <?= Csrf::field() ?>
-        <?= $stepBadge('13g') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
+        <?= $stepBadge('13h') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
-      <p class="muted small">Blocked while a government export benefit claim on this order is still awaiting receipt — record it as received first (Order Financials above).</p>
+      <p class="muted small">Blocked until Step 13g is done — every eligible government export benefit received, or skipped with a reason.</p>
       <?php if ($canEditLockedData): ?>
       <details>
         <summary class="small">Override &amp; fully settle anyway (benefit genuinely never arriving)</summary>
@@ -3485,7 +3575,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php if ($orderClosed): ?>
       <p><strong>&#10003; This order is fully settled and closed.</strong> Nothing further is needed.</p>
     <?php else: ?>
-      <p class="muted">Not yet complete — finish Step 13g above (Mark Fully Settled) to close this order.</p>
+      <p class="muted">Not yet complete — finish Step 13h above (Mark Fully Settled) to close this order.</p>
     <?php endif; ?>
   </details>
 

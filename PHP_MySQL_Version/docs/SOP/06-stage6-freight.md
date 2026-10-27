@@ -43,11 +43,12 @@ On a CFR/CIF order, Stage 6 unlocks as a normal stage once Stage 5 passes:
 
 **Save Freight Terms** records the rate NexaCrest actually agreed with the
 shipping line/forwarder (confirmed freight rate, insurance amount on CIF
-orders) and the **Logistics Partner (Freight Forwarder)**, chosen from the
-Suppliers directory like the supplier in Step 7a (owner request
-2026-10-27). Logistics partners are suppliers with the type **"Logistics
-Partner (Freight Forwarder)"** — add one at Suppliers → Add Supplier. Their
-name and contact are copied onto the order when the terms are saved. This
+orders) and the **Freight Forwarder**, chosen from the **Logistics
+Partners** directory like the supplier in Step 7a comes from the
+Suppliers directory (owner request 2026-10-27). The directory has a
+**Freight Forwarder** service type for them (alongside CHA and
+Transportation) — add one at Logistics Partners → Add Partner. Their name
+and contact are copied onto the order when the terms are saved. This
 is internal record-keeping only and doesn't pass any gate. From **Documents**, **Generate Freight Debit
 Note** then produces the FDN — the actual invoice sent to the buyer for
 these charges.

@@ -21,9 +21,9 @@
     </form>
 
     <table class="list">
-      <tr><th>Supplier</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Supplier</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Bank</th><th>Status</th><th>Actions</th></tr>
       {% if not suppliers.length %}
-      <tr><td colspan="8" class="muted">{{ 'No suppliers match this filter.' if (filterType or search) else 'No suppliers yet — add the first one above.' }}</td></tr>
+      <tr><td colspan="9" class="muted">{{ 'No suppliers match this filter.' if (filterType or search) else 'No suppliers yet — add the first one above.' }}</td></tr>
       {% endif %}
       {% for s in suppliers %}
       {% set location = [s.city, s.state] | select | join(', ') %}
@@ -40,6 +40,7 @@
           {% if s.contact_person_phone %}<br><small class="muted">{{ s.contact_person_phone }}</small>{% endif %}
         </td>
         <td>{{ s.gstin or '—' }}</td>
+        <td>{% if not s.bank_account_number %}<span class="muted">—</span>{% elif s.bank_verified_at %}<span class="badge good">&#10003; Verified</span>{% else %}<span class="badge warn">&#9888; Not verified</span>{% endif %}</td>
         <td><span class="badge {{ 'badge-active' if s.is_active else 'badge-inactive' }}">{{ 'Active' if s.is_active else 'Inactive' }}</span></td>
         <td>
           <a href="/suppliers/{{ s.id }}/edit" class="btn-sm btn-secondary">Edit</a>

@@ -229,14 +229,29 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   contact directory, gated by its own `manage_logistics_partners`
   permission (same tier as HS Codes: Admin/MD/ED and Super Admin by
   default). Each partner carries a **Service Type** — CHA only,
-  Transportation only, or **CHA + Transportation** — since the same
+  Transportation only, **CHA + Transportation**, or **Freight Forwarder**
+  (the list Step 9a picks the order's forwarder from) — since the same
   company sometimes handles both and sometimes only one; a "both" partner
   shows up whichever way staff filter the list. Alongside name/address/
   city/state, every entry can carry a WhatsApp number and phone for both
   the company and a named contact person, plus GSTIN and PAN for the
-  paperwork side. This directory is standalone for now — a quick
-  "who do we call for this" lookup — not yet wired into a specific order
-  or Order Cost Entry.
+  paperwork side. Step 9a (Save Freight Terms) picks the order's freight
+  forwarder from this directory.
+- **Bank details & the Vendor Details Link** (Suppliers and Logistics
+  Partners, owner request 2026-10-27) — each supplier and partner has a
+  **Bank Details** section: account holder, bank, branch, IFSC, account
+  number (typed twice; stored encrypted, shown masked in lists), account
+  type and UPI ID. Fill it in on their behalf (e.g. from their email) and
+  tick **"I have verified these bank details"** once checked against a
+  cancelled cheque or bank letter. Or press **Generate & Email Details
+  Link** on their edit page: they get a no-login page to fill in their
+  company and bank details themselves. The link works **once** and for
+  30 days; what they enter lands as **not verified** until you check it,
+  and their existing account number is never shown back to them (only the
+  last four digits). The directory lists show a **Bank** column (✓
+  Verified / ⚠ Not verified / —), and Steps 7e and 10a show the supplier's
+  bank details ("Pay to") with the same status, so Accounts pay the right,
+  checked account.
 - **Suppliers** (`/suppliers`) — the supplier directory every Supplier PO
   is raised against, gated by its own `manage_suppliers` permission (same
   tier as Logistics Partners: Admin/MD/ED and Super Admin by default).

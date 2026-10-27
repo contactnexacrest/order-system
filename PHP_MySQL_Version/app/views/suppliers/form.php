@@ -65,6 +65,7 @@ $selectedTypes = $supplier['types'] ?? [];
         </label>
       </div>
     </fieldset>
+    <?php include __DIR__ . '/../partials/_vendor_bank_fields.php'; ?>
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — material specialities, capacity, payment terms, etc."><?= $v('notes') ?></textarea></label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success"><?= $isEdit ? 'Save Changes' : 'Add Supplier' ?></button>
@@ -73,6 +74,7 @@ $selectedTypes = $supplier['types'] ?? [];
   </form>
 
   <?php if ($isEdit): ?>
+  <?php $vendorKind = 'supplier'; $vendorId = (int) $supplier['id']; $vendor = $supplier; include __DIR__ . '/../partials/_vendor_details_link.php'; ?>
   <div class="section" id="factory-addresses">
     <h2 style="font-size:1rem;">Factory Addresses</h2>
     <p class="muted small">Offered as the Delivery Location when saving Supplier PO terms for this supplier. Removing one never changes a Supplier PO that already recorded it.</p>

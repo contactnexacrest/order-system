@@ -42,7 +42,7 @@ one that owns the quarry or the factory itself), **Trader**, and
 A supplier can hold **more than one** type in the directory (e.g. Quarry
 Owner *and* Factory Owner). When the supplier picked on **Save Supplier PO
 Terms** has several, a **Supplier Type for this order** dropdown appears and
-staff choose the one that applies — it is what prints on the Supplier PO. Logistics partners (type "Logistics Partner (Freight Forwarder)") are left out of this list — they are picked in Step 9a instead. A
+staff choose the one that applies — it is what prints on the Supplier PO. A
 supplier with a single type has it recorded automatically.
 
 **Delivery Location** is a dropdown of the *selected supplier's own*

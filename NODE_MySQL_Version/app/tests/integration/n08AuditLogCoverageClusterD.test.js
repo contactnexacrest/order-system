@@ -167,9 +167,8 @@ describe('Audit log coverage, N-08 Cluster D', () => {
     await unlockThrough(orderId, 5);
     const userId = await createTestUser();
 
-    const partnerId = await supplierRepository.create({ supplier_legal_name: 'N08 Forwarder' });
-    await supplierRepository.setTypes(partnerId, [supplierRepository.LOGISTICS_TYPE]);
-    await ordersController.saveFreightTerms(fakeReq(orderId, userId, { confirmed_freight_rate: '500', freight_forwarder_supplier_id: String(partnerId) }), fakeRes());
+    const partnerId = await require('../../src/repositories/logisticsPartnerRepository').create({ partner_name: 'N08 Forwarder', service_type: 'freight_forwarder' }, userId);
+    await ordersController.saveFreightTerms(fakeReq(orderId, userId, { confirmed_freight_rate: '500', freight_forwarder_partner_id: String(partnerId) }), fakeRes());
 
     expect((await lastAuditLogAction()).action_type).toBe('ORDER_FREIGHT_TERMS_SAVED');
   });

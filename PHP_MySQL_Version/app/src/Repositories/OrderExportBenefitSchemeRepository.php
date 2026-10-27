@@ -53,6 +53,8 @@ final class OrderExportBenefitSchemeRepository
                     COALESCE(oebs.status, 'pending') AS status,
                     oebs.reason,
                     oebs.resolved_at,
+                    oebs.claim_skipped_at,
+                    oebs.claim_skip_reason,
                     u.name AS resolved_by_name
                 FROM dropdown_options d
                 LEFT JOIN order_export_benefit_schemes oebs
@@ -80,6 +82,26 @@ final class OrderExportBenefitSchemeRepository
             'status'      => $status,
             'reason'      => $reason,
             'resolved_by' => $userId,
+        ]);
+    }
+
+    /**
+     * Owner decision (2026-10-27): at Step 13g an eligible scheme the company
+     * will not claim (or whose money will never come) is skipped with a
+     * reason; null $reason undoes the skip.
+     */
+    public static function setClaimSkipped(int $orderId, string $schemeName, ?string $reason, int $userId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE order_export_benefit_schemes
+                SET claim_skipped_at = :at, claim_skipped_by = :by, claim_skip_reason = :reason
+              WHERE order_id = :order_id AND scheme_name = :scheme_name'
+        )->execute([
+            'at' => $reason === null ? null : date('Y-m-d H:i:s'),
+            'by' => $reason === null ? null : $userId,
+            'reason' => $reason,
+            'order_id' => $orderId,
+            'scheme_name' => $schemeName,
         ]);
     }
 
