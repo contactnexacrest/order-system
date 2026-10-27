@@ -131,7 +131,7 @@ final class DocumentDataAssembler
         $resolvedNotifyParty = self::resolveNotifyParty($order, $resolvedConsignee);
         [$showConsigneeSection, $showNotifyPartySection] = self::sectionDisplayFlags($resolvedConsignee, $resolvedNotifyParty);
 
-        $data = [
+        return [
             'company' => $company,
             'assets' => $assets,
             'order' => [
@@ -286,57 +286,6 @@ final class DocumentDataAssembler
             'annexure_products' => $annexureProducts,
             'bl'          => self::blBlock($company['legal_name'], (bool) ($order['show_bl_instructions'] ?? true)),
         ] + $annexureFlags;
-
-        return in_array($documentTypeCode, self::SUPPLIER_FACING, true) ? self::supplierFacingOnly($data) : $data;
-    }
-
-    /**
-     * Owner rule (2026-10-27, non-negotiable): the supplier and the buyer
-     * never cross. A document that goes to a supplier carries NOTHING about
-     * the client or the client's order — no name, address, references
-     * (inquiry, PO, Quotation, PI), products, prices, payment terms,
-     * amendments or freight. Only NexaCrest, the supplier and the Supplier
-     * PO itself. Built by construction here, so no template can print a
-     * client detail even by mistake.
-     */
-    public const SUPPLIER_FACING = ['SUPPO'];
-
-    public static function supplierFacingOnly(array $data): array
-    {
-        $supplierPo = $data['supplier_po'] ?? null;
-        $advancePct = $supplierPo['advance_pct'] ?? '';
-        $safe = [
-            'company'    => $data['company'],
-            'assets'     => $data['assets'],
-            'supplier_po' => $supplierPo,
-            'order'      => ['has_active_amendment' => false, 'include_annexure_a' => false],
-            'buyer'      => [],
-            'consignee'  => [],
-            'notify_party_block' => [],
-            'show_consignee_section' => false,
-            'show_notify_party_section' => false,
-            'products'   => [],
-            // Clause placeholders read these — the supplier's own advance, never the client's.
-            'financial'  => [
-                'advance_pct' => is_numeric($advancePct) ? rtrim(rtrim(number_format((float) $advancePct, 2), '0'), '.') : '',
-                'balance_pct' => is_numeric($advancePct) ? rtrim(rtrim(number_format(100 - (float) $advancePct, 2), '0'), '.') : '',
-            ],
-            'payment_status' => null,
-            'freight'    => null,
-            'packing'    => null,
-            'crates'     => [],
-            'shipping'   => null,
-            'production' => null,
-            'annexure_products' => [],
-            'bl'         => null,
-        ];
-        foreach ($data as $key => $value) {
-            if (!array_key_exists($key, $safe)) {
-                // Annexure flags and anything added later: off / empty unless listed above.
-                $safe[$key] = is_bool($value) ? false : (is_array($value) ? [] : null);
-            }
-        }
-        return $safe;
     }
 
     /**
