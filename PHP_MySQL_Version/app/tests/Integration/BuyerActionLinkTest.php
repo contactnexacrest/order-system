@@ -181,6 +181,24 @@ final class BuyerActionLinkTest extends DbTestCase
         self::assertNull($ack['acknowledged_at']);
     }
 
+    /** Owner decision (2026-10-27): the buyer can download the exact Order Confirmation they acknowledge. */
+    public function testTheOcStepOffersTheIssuedOrderConfirmationForDownload(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $this->unlockThroughStage3($orderId);
+        $docId = $this->createTestDocument($orderId, 'OC', 'approved', $this->createTestFile($orderId));
+        $reference = (string) \App\Repositories\DocumentRepository::find($docId)['document_reference'];
+        $token = OrderRepository::generateBuyerActionToken($orderId);
+
+        ob_start();
+        (new BuyerActionController())->show(['token' => $token]);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('/buyer-action/' . $token . '/order-confirmation', $html);
+        self::assertStringContainsString('Download Order Confirmation (' . htmlspecialchars($reference) . ')', $html);
+        self::assertStringContainsString('I have read Order Confirmation ' . htmlspecialchars($reference), $html);
+    }
+
     public function testAcknowledgeOcSucceedsWhenOcWasApprovedButNeverEmailed(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());

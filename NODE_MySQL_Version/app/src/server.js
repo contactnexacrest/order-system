@@ -455,6 +455,7 @@ app.get('/buyer-action/:token', asyncHandler(buyerActionController.show));
 app.post('/buyer-action/:token/acknowledge-oc', verifyCsrf, asyncHandler(buyerActionController.acknowledgeOc));
 app.get('/buyer-action/:token/buyer-po-document', asyncHandler(buyerActionController.downloadBuyerPo));
 app.get('/buyer-action/:token/proforma-invoice', asyncHandler(buyerActionController.downloadProformaInvoice));
+app.get('/buyer-action/:token/order-confirmation', asyncHandler(buyerActionController.downloadOrderConfirmation));
 app.post('/buyer-action/:token/buyer-po', uploadLarge.single('document'), verifyCsrf, asyncHandler(buyerActionController.uploadBuyerPo));
 app.post('/buyer-action/:token/report-payment', uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(buyerActionController.reportPayment));
 // Owner request (2026-10-27): no-login Payment Action Link — payment details only.

@@ -165,7 +165,7 @@ final class BuyerActionService
      */
     public static function issuedBuyerDocument(int $orderId, string $typeCode): ?array
     {
-        $stage = ['BUYERPO' => 2, 'PI' => 3][$typeCode] ?? null;
+        $stage = ['BUYERPO' => 2, 'PI' => 3, 'OC' => 4][$typeCode] ?? null;
         $latest = $stage !== null ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, $typeCode) : null;
         if (!$latest || empty($latest['pdf_file_id']) || DocumentGenerationService::stageDocumentBlockedBy($orderId, $stage) !== []) {
             return null;

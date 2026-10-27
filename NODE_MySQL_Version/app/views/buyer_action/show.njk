@@ -90,7 +90,11 @@
   {% elif task == 'oc' %}
   <fieldset class="intake-step action-step">
     <legend><span class="intake-step-num">3</span> Order Confirmation <span class="action-status todo">Action needed</span></legend>
-    <p><strong>Your Acknowledgement Needed</strong> — please check the order below and confirm to proceed.</p>
+    <p><strong>Your Acknowledgement Needed</strong> — please read the Order Confirmation, check the summary below and confirm to proceed.</p>
+    {# Owner decision (2026-10-27): the buyer reads the exact document they acknowledge. #}
+    {% if issuedOc %}
+      <p><a class="btn btn-secondary" href="/buyer-action/{{ token }}/order-confirmation">&#11015; Download Order Confirmation ({{ issuedOc.document_reference }})</a></p>
+    {% endif %}
     <div class="action-kv">
       <div><span class="k">Order Reference</span><span class="v">{{ order.order_reference }}</span></div>
       <div><span class="k">Total Order Value (FOB)</span><span class="v">{{ order.currency_code or '' }} {{ totalFobValue | money }}</span></div>
@@ -107,7 +111,7 @@
     </table>
     <form method="post" action="/buyer-action/{{ token }}/acknowledge-oc">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <button type="submit" class="btn-success">I acknowledge and confirm to proceed</button>
+      <button type="submit" class="btn-success">{% if issuedOc %}I have read Order Confirmation {{ issuedOc.document_reference }} — {% endif %}I acknowledge and confirm to proceed</button>
     </form>
   </fieldset>
 

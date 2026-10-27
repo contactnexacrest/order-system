@@ -81,6 +81,7 @@ async function show(req, res) {
     task: await buyerActionService.currentTask(order, ocAcknowledgment),
     issuedBuyerPo: await buyerActionService.issuedBuyerDocument(order.id, 'BUYERPO'),
     issuedPi: await buyerActionService.issuedBuyerDocument(order.id, 'PI'),
+    issuedOc: await buyerActionService.issuedBuyerDocument(order.id, 'OC'),
     token: req.params.token,
     order,
     products: await orderProductRepository.forOrder(order.id),
@@ -145,5 +146,7 @@ async function downloadIssued(req, res, typeCode) {
 
 const downloadBuyerPo = (req, res) => downloadIssued(req, res, 'BUYERPO');
 const downloadProformaInvoice = (req, res) => downloadIssued(req, res, 'PI');
+/** Owner decision (2026-10-27): the buyer reads the Order Confirmation they acknowledge. */
+const downloadOrderConfirmation = (req, res) => downloadIssued(req, res, 'OC');
 
-module.exports = { show, acknowledgeOc, uploadBuyerPo, reportPayment, downloadBuyerPo, downloadProformaInvoice };
+module.exports = { show, acknowledgeOc, uploadBuyerPo, reportPayment, downloadBuyerPo, downloadProformaInvoice, downloadOrderConfirmation };

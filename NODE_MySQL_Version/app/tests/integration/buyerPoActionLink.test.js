@@ -75,6 +75,29 @@ describe('Buyer PO Action Link (Step 4b)', () => {
   });
 
   // Owner request (2026-10-26): one step at a time on the link.
+  it('offers the issued Order Confirmation for download at the OC step', async () => {
+    // Owner decision (2026-10-27): the buyer reads the exact OC they acknowledge.
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    for (const stage of [1, 2, 3]) await stageGateService.passAndUnlockNext(orderId, stage, null);
+    const fileId = await createTestFile(orderId, clientId);
+    const file = await db.queryOne('SELECT server_path FROM file_store WHERE id = :id', { id: fileId });
+    const content = '%PDF-1.4 order confirmation';
+    fs.writeFileSync(file.server_path, content);
+    await db.execute('UPDATE file_store SET file_size_bytes = :n WHERE id = :id', { n: content.length, id: fileId });
+    const documentId = await createTestDocument(orderId, 'OC', 'sent');
+    await db.execute('UPDATE documents SET pdf_file_id = :f WHERE id = :id', { f: fileId, id: documentId });
+    const reference = (await db.queryOne('SELECT document_reference FROM documents WHERE id = :id', { id: documentId })).document_reference;
+    const token = await orderRepository.generateBuyerActionToken(orderId);
+
+    const page = await request(app).get(`/buyer-action/${token}`);
+    expect(page.text).toContain(`/buyer-action/${token}/order-confirmation`);
+    expect(page.text).toContain(`I have read Order Confirmation ${reference}`);
+    const download = await request(app).get(`/buyer-action/${token}/order-confirmation`);
+    expect(download.status).toBe(200);
+    expect(download.headers['content-disposition']).toContain('attachment');
+  });
+
   it('shows only the payment step once the PI is issued, and waits before that', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);

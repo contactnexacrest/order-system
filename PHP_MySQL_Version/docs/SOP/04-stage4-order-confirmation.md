@@ -47,6 +47,14 @@ figures always add up. The Commercial Invoice uses the same balance. The
 client's acknowledgement page shows the order value, the advance paid and
 the balance due as well.
 
+**The OC itself on the Buyer Action Link** (owner decision 2026-10-27): at
+the Order Confirmation step the buyer gets a **Download Order Confirmation
+(SC/OC/…)** button for the exact issued OC (approved, or sent while email
+is on — the same rule as every other link download, so internal documents
+such as the CA annexure can never be reached), and the button reads **"I
+have read Order Confirmation SC/OC/… — I acknowledge and confirm to
+proceed"**, so the acknowledgement names the document it accepts.
+
 Once the OC has actually been emailed, the order page shows exactly where
 things stand and offers the one thing staff can still do here — record an
 acknowledgment that arrived by a channel other than the portal:

@@ -145,7 +145,7 @@ async function uploadBuyerPo(req, order) {
  * while email is on). Null until then, and for any other type.
  */
 async function issuedBuyerDocument(orderId, typeCode) {
-  const stage = { BUYERPO: 2, PI: 3 }[typeCode];
+  const stage = { BUYERPO: 2, PI: 3, OC: 4 }[typeCode];
   const latest = stage ? await documentRepository.findLatestForOrderAndTypeCode(orderId, typeCode) : null;
   if (!latest || !latest.pdf_file_id || (await documentGenerationService.stageDocumentBlockedBy(orderId, stage)).length > 0) {
     return null;

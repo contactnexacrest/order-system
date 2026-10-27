@@ -96,7 +96,11 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
   <?php elseif ($task === 'oc'): ?>
   <fieldset class="intake-step action-step">
     <legend><span class="intake-step-num">3</span> Order Confirmation <span class="action-status todo">Action needed</span></legend>
-    <p><strong>Your Acknowledgement Needed</strong> — please check the order below and confirm to proceed.</p>
+    <p><strong>Your Acknowledgement Needed</strong> — please read the Order Confirmation, check the summary below and confirm to proceed.</p>
+    <?php // Owner decision (2026-10-27): the buyer reads the exact document they acknowledge. ?>
+    <?php if ($issuedOc): ?>
+      <p><a class="btn btn-secondary" href="/buyer-action/<?= htmlspecialchars($token) ?>/order-confirmation">&#11015; Download Order Confirmation (<?= htmlspecialchars((string) $issuedOc['document_reference']) ?>)</a></p>
+    <?php endif; ?>
     <div class="action-kv">
       <div><span class="k">Order Reference</span><span class="v"><?= htmlspecialchars($order['order_reference']) ?></span></div>
       <div><span class="k">Total Order Value (FOB)</span><span class="v"><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $totalFobValue, 2) ?></span></div>
@@ -113,7 +117,7 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
     </table>
     <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/acknowledge-oc">
       <?= Csrf::field() ?>
-      <button type="submit" class="btn-success">I acknowledge and confirm to proceed</button>
+      <button type="submit" class="btn-success"><?= $issuedOc ? 'I have read Order Confirmation ' . htmlspecialchars((string) $issuedOc['document_reference']) . ' — ' : '' ?>I acknowledge and confirm to proceed</button>
     </form>
   </fieldset>
 

@@ -89,6 +89,7 @@ final class BuyerActionController
             'task' => BuyerActionService::currentTask($order, $ocAcknowledgment),
             'issuedBuyerPo' => BuyerActionService::issuedBuyerDocument($orderId, 'BUYERPO'),
             'issuedPi' => BuyerActionService::issuedBuyerDocument($orderId, 'PI'),
+            'issuedOc' => BuyerActionService::issuedBuyerDocument($orderId, 'OC'),
             'token' => $params['token'],
             'order' => $order,
             'products' => OrderProductRepository::forOrder($orderId),
@@ -153,6 +154,12 @@ final class BuyerActionController
     public function downloadProformaInvoice(array $params): void
     {
         $this->downloadIssued($params, 'PI');
+    }
+
+    /** Owner decision (2026-10-27): the buyer reads the Order Confirmation they acknowledge. */
+    public function downloadOrderConfirmation(array $params): void
+    {
+        $this->downloadIssued($params, 'OC');
     }
 
     private function downloadIssued(array $params, string $typeCode): void
