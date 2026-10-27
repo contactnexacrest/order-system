@@ -121,14 +121,17 @@ to an existing buyer document (a risk that a future change, a bug, or a
 mis-click could quietly undo), this is built as three separate,
 structural guarantees:
 
-1. **Off by default, and behind its own permission.** At the bottom of
-   the same Order Financials box, someone
-   holding `ca_internal_doc_manage` sees a checkbox — *"Enable internal
-   financial annexure for this order"* — unchecked by default for every
-   order. Only once it's checked does a **Generate Internal Financial
-   Annexure (PDF)** button appear. Anyone else (including a CA-role user
-   with `ca_module_view`) sees a plain read-only line stating whether
-   it's currently enabled, with no way to change it.
+1. **Behind its own permission, and available any time** (owner request
+   2026-10-27). The order page has a **CAFIN box at the top, under At a
+   Glance** — shown only to staff with the Order Financials permission
+   (Admin, MD and ED by default). Someone who also holds
+   `ca_internal_doc_manage` sees one **Generate CAFIN now (PDF)** button
+   there, at any stage of the order — including after it is closed or
+   locked (benefits are often credited months later). There is no
+   per-order "enable" tick any more. The box also links the latest CAFIN;
+   anyone in it without `ca_internal_doc_manage` sees "Only Admin/MD/ED
+   (or someone specifically granted the permission) can generate it."
+   Step 12c simply points to the box.
 2. **A different document type entirely.** The generated PDF (document
    type code `CAFIN`) is not a variant of any buyer-facing document — it
    is its own internal-only document type, using the exact same
@@ -144,8 +147,8 @@ structural guarantees:
    it could never be mistaken for one even printed on paper.
 3. **Viewing it needs `ca_module_view`, specifically — even on the
    generic download link.** Once generated, anyone with `ca_module_view`
-   can open it from the same box (it shows the latest one generated,
-   with its reference and date) — the same permission that already lets
+   can open it (the CAFIN box shows the latest one generated, with its
+   reference and date) — the same permission that already lets
    them see this data on-screen, so this adds no new exposure. But the
    system's one generic "download any document" link is normally gated
    only by the much broader "Download PDF" permission most staff hold —

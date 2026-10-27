@@ -55,7 +55,7 @@ later):
 
 | Sub-step | What you do | Done when |
 |---|---|---|
-| **12a · Order Costs** | One table of every cost on the order, and a single **+ Add a cost** with a type picker (other cost, travel, inspection fee, LC/bank loan — each opens its own short form; parts 4–6 below). Zoho-linked expenses are listed under it for reference. | You click **Costs are complete** (you can still add a cost later, or **Reopen costs**). |
+| **12a · Order Costs** | One table of every cost on the order, and a **+ Add a cost** button that opens and closes like **+ Add an expense** (owner request 2026-10-27), with a type picker inside (other cost, travel, inspection fee, LC/bank loan — each opens its own short form; parts 4–6 below). Actual order expenses with receipts are added under **+ Add an expense** (see "Order expenses" below); supplier and logistics bills come in by themselves. Zoho-linked expenses are listed under it for reference. | You click **Costs are complete** (you can still add a cost later, or **Reopen costs**). |
 | **12b · Export Benefit Eligibility** | Answer Eligible / Not Eligible for every scheme (part 1). | No scheme is still Pending. |
 | **12c · Review Profit & Complete** | Read the Profitability Summary (part 7), generate the Internal Annexure if needed, then **Mark Step 12 complete** (needs 12a and 12b done). | Marked complete — or skipped with a reason. |
 
@@ -91,7 +91,9 @@ always-materialized pattern the Compliance Checklist uses (see [Stage
 starts **Pending** and is resolved to either **Eligible** (then a claim
 can be recorded against it in "Government Export Benefits Claimed"
 below) or **Not Eligible** (a reason is required, same "not applicable
-still needs recording" rule as everywhere else in this system) — there
+still needs recording" rule as everywhere else in this system; choosing
+Not Eligible fills in "Not eligible for this order." for you, still
+editable — owner request 2026-10-27) — there
 is no path back to Pending once resolved.
 
 All schemes are edited in **one table and saved together** with **Save
@@ -131,6 +133,39 @@ amount and date — empty the received amount if the money hasn't actually
 arrived) with **Save Correction**, or removed with **Delete Claim**. Both
 need a reason of at least 10 characters, both are written to the audit log
 with the old and new figures, and both respect the CA financial-year lock.
+
+### Order expenses — actual, with receipts (owner decisions 2026-10-27)
+
+Step 12a lists the order's **actual expenses** and has **+ Add an
+expense** (open by default while none are recorded). Each expense has:
+
+- **Date** (today or earlier) and **Category** — Travel — fuel / tolls,
+  Travel — train / flight / bus, Local conveyance (taxi / auto), Hotel,
+  Food, Courier, Samples, Other;
+- **Details** and **Amount (₹)**;
+- **Paid by** — Company account, Company card, or Staff (to reimburse),
+  with the staff member's name;
+- the **receipt / bill** — or, only when no bill exists, a reason of at
+  least 10 characters.
+
+Dates inside a locked financial year are refused (see [FY
+lock](./ca-06-fy-lock.md)). A voucher entered more than 30 days after the
+expense keeps its real date and is marked "added later". Staff-paid
+amounts are totalled as "to reimburse".
+
+**Travel:** the Travel Expense % (part 5) is a **provisional** budget.
+Once any actual travel expense is recorded (fuel/tolls, tickets, local
+conveyance, hotel or food), the actual figures replace the provisional %
+in the profit — the summary then says "travel % replaced by actual
+travel".
+
+**Supplier and logistics bills** (Steps 7e / 10a and the Logistics
+Partner Bills card — see [Chapter 5](./05-stage5-supplier-po.md) and
+[Chapter 6](./06-stage6-freight.md)) flow into the profit by themselves:
+CHA / transport / other bills as **Logistics Bills — CHA / Transport**,
+and ocean-freight bills replace the Step 9 freight quote as **Ocean
+Freight — from the forwarder's bills**. GST on every bill is picked as a
+rate (%), with the amount worked out automatically.
 
 ### 3. Expenses Imported from Zoho Books
 

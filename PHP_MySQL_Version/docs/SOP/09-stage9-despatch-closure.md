@@ -217,15 +217,20 @@ active task type is written the moment the order is created** — never
 left as a missing row standing in for "not applicable," so a report run
 directly against the underlying table always has an explicit value for
 every order. Each task's status is one of **Not Started** (the row's
-own starting value), **Pending Approval**, **Approved**, or **Skipped
-(Not Applicable)** — skipping requires a reason, since "not applicable
-to this order" still needs to be recorded, not just silently left
-blank.
+own starting value), **Pending Approval**, **Approved**, **Not
+Applicable** or **Skipped (give a reason)** (owner request 2026-10-27).
+Both of the last two need a reason, since "not applicable to this order"
+still has to be recorded, not silently left blank — but **Not
+Applicable fills its reason in for you** ("Not applicable to this
+order.", still editable), while **Skipped** clears it so one has to be
+typed. Both are saved the same way and count as resolved; when the
+order is reopened, the dropdown shows Not Applicable again if the saved
+reason is that standard text.
 
 Each card has **one Save Checklist button** that saves every row at once,
 each into its own task — only the rows you changed are updated (so
 untouched rows keep their "resolved by" stamp). The reason box appears
-only when **Skipped (Not Applicable)** is chosen and must then be at least
+only for **Not Applicable** or **Skipped** and must then be at least
 10 characters; if any row is invalid, **nothing** on the card is saved
 and the message names the row.
 
@@ -233,7 +238,7 @@ For a repeat order where the whole checklist genuinely doesn't apply, a
 **"Mark all remaining tasks Not Applicable"** action (appears only while
 something is still outstanding) resolves every currently-unresolved task
 in that part of the checklist in one submit with one shared reason, instead of skipping each task
-individually.
+individually Its reason box comes pre-filled with "Not applicable to this order." (editable).
 
 Visibility of the whole panel, and every status change on it (including
 the bulk action), is gated on the same `close_orders` permission that

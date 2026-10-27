@@ -265,10 +265,19 @@ its own heading rather than scrolling to it or picking it from a
 separate nav. Step-cards are native, no-JavaScript-required HTML
 (`<details>`/`<summary>`): if a browser's JavaScript never runs, every
 step-card still opens and closes with a plain click, and nothing is
-hidden behind a script that isn't there as a backup. A persistent panel
-beside the step-cards (stacked below them on a phone) always shows an
-"At a Glance" summary and the full list of documents generated so far,
-whichever step-card happens to be open.
+hidden behind a script that isn't there as a backup. Across the **top of
+the page**, above the step-cards (owner request 2026-10-27, so the
+step-cards and document tables get the full width), sit the "At a
+Glance" summary, the CAFIN box (Admin/MD/ED only — see [CA
+Overview](./ca-01-overview.md)) and an **▸ All Documents (N) — quick
+links** button that opens the list of documents generated so far.
+
+The steps are grouped into five coloured sections — **A** Order Booking,
+**B** Procurement & Production, **C** Shipment & Balance, **D** Closure &
+Settlement, **E** After-Sales & Records — each with its own colour.
+Every smaller open/close toggle on the page (for example "+ Add a bill",
+"+ Add an expense", "Linked from Zoho Books") is a clear navy button with
+a ▸ / ▾ marker, so none of them is easy to miss.
 
 **Each stage's own action buttons still carry a small sub-step badge**
 (e.g. "7a", "7b", "7c") immediately before the button itself, wherever a
@@ -290,7 +299,7 @@ never lock anything. The badge is purely a labelling aid — it
 changes no permission, no gate, and no button's underlying behaviour.
 
 **"At a Glance" is the order's own persistent summary panel, not just
-its commercial terms.** Open at all times beside the step-cards (never
+its commercial terms.** Open at all times across the top of the page (never
 collapsed, since it's how staff get back their bearings while stepping
 through the page) is a quick row of counts — **Current Stage**,
 **Products** (line count), **Payment Legs** (how many of
@@ -304,7 +313,8 @@ Quotation Date, and the rest of the order's own commercial terms. The
 idea is that opening an order answers "where does this stand?" without
 scrolling or opening every step-card first; every number here is a
 read-only reflection of data recorded elsewhere on the same page, never
-something edited from this panel. The same panel's "All Documents" list
+something edited from this panel. The fields run in five columns on a
+wide screen and fewer on a narrow one. The "All Documents" quick-links list
 (every document generated so far, newest first) is covered in
 [Document Review & Approval](./13-document-review-approval.md).
 

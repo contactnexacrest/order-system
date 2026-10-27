@@ -34,6 +34,17 @@ From **Documents**, **Generate Commercial Invoice** produces the CI —
 pre-filled with the actual shipped quantities and final figures rather than
 the estimates the PI was built on.
 
+**Invoice date** (owner decision 2026-10-27). Step 11a has an **Invoice
+date (printed on the CI)** field just above the Generate button. It is
+**today** by default; pick an earlier date when the CI must carry the BL
+date. A future date, or a date before the order was created, is refused
+(in the browser and again on the server). The chosen date is what the
+CI's **DATE** box prints, and the COO preparation sheet's "Invoice No. &
+Date" line shows the same date — including when the CI is later approved
+and re-rendered. CIs generated before this change keep their own dates.
+The old warning comparing the recorded BL date with today is gone: the BL
+date on file is not a reliable record of the actual BL date.
+
 The CI's own Section A keeps **FOB Value** as its own separate line
 regardless of Incoterm — required for the Indian Shipping Bill and IGST
 refund — but on a non-FOB order (CFR/CIF/etc.), **TOTAL COMMERCIAL

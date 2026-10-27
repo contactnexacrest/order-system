@@ -50,7 +50,7 @@ Step 4 on the order page has four sub-steps, done in order:
 
 > **Common confusion this causes:** if staff attach the buyer's PO copy but
 > never separately type the reference number into "Confirm Buyer PO
-> Received," the order's **Buyer's PO Ref** in the "At a Glance" sidebar
+> Received," the order's **Buyer's PO Ref** in the "At a Glance" panel at the top
 > panel will still read a plain "NIL" — even though a file is clearly on
 > record. The system
 > now shows *"Not yet recorded — N file(s) attached"* instead of a bare NIL

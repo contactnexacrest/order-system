@@ -78,6 +78,43 @@ two-step pattern as the advance payment in Stage 3:
 
    ![Stage 6 section — freight payment cleared](./images/s6_cleared.png)
 
+## Paying the logistics partners (CHA, transport, forwarder)
+
+The **Logistics Partner Bills & Payments** card (in section C, alongside
+Steps 9–11 — it never locks them) records what NexaCrest pays its own
+logistics partners, as opposed to the freight the buyer pays NexaCrest.
+It is shown to staff with the **Manage supplier payments** or **Order
+Financials** permission; bills are added and paid by **Manage supplier
+payments** holders (Admin, MD, ED and Accounts Executive by default).
+CHA/logistics payments are made in India.
+
+**+ Add a bill** — one row per bill from the partner (a partner doing both
+CHA and transport can send one combined bill or separate bills):
+
+- **Logistics partner** (from the Logistics Partners directory) and
+  **For** — CHA charges, Transport, CHA + Transport (one bill), Ocean
+  freight or Other;
+- **Payment** — **Advance** (paid before the service) or **Final**
+  (against the completed service) (owner decision 2026-10-27);
+- bill number, bill date, taxable value, **GST rate (%)** — GST (₹) and
+  the bill total fill in by themselves — the bill file and a note.
+
+Each bill then gets the green **₹ Mark Paid** button (amount, date, mode,
+UTR), exactly like the supplier bills in Steps 7e / 10a.
+
+**When a bill can be paid:**
+
+| Order | Advance bill | Final bill |
+|---|---|---|
+| CFR / CIF | any time | only after the buyer's Debit Note payment has cleared (**Step 9d**) |
+| FOB | any time | any time |
+
+Until 9d, a Final bill shows no Mark Paid and the card explains why;
+Advance bills stay payable. Bills recorded before this choice existed
+count as Final. The table tags each row **Advance** or **Final** and
+totals what is paid and still due. Every logistics bill flows into the
+order's financials (Step 12) as logistics cost.
+
 ## What the client does (or doesn't)
 
 The buyer pays the freight charge by wire transfer against the Debit Note.

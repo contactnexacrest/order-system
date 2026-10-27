@@ -76,6 +76,13 @@ auto-filled figure stays a plain, directly-editable field, so a genuine
 exception (a negotiated lump-sum total that doesn't follow the formula, for
 instance) can still be typed in by hand after the fact.
 
+**A 0% advance is allowed** (owner decision 2026-10-27). Type `0` in
+Advance %: the form fills Advance Amount as 0.00 and the whole Total
+Payable as the Balance, and 0 is saved as 0 — not as "not filled in". The
+Supplier PO then prints **"Advance (0.00%) \* 0.00"** and the full balance,
+instead of "Advance (X%) \* To Be Confirmed". Step 7e completes by itself
+(see below).
+
 **Save Supplier PO Terms** creates the internal procurement record (and
 generates the Supplier PO reference) — it does **not** generate the document
 or pass any gate by itself. From **Documents**, **Generate Supplier PO**
@@ -132,22 +139,46 @@ order:
 > with zero physical evidence ever attached. Turn the toggle off only for
 > a workflow that genuinely doesn't need the physical copy.
 
-Below the signing actions, staff with the Order Financials permission
-(the same one that unlocks the Order Profitability Sheet — Admin/MD/ED
-and Super Admin by default) record the supplier's payments as two sub-steps of their own:
-**7e · Supplier Advance Paid** (the last card of Step 7) and
-**10a · Supplier Balance Paid** (the first card of Step 10, before
-packing — it can be marked any time after the Supplier PO, even long
-after this stage has passed), each with its own date and amount.
-**When the Supplier PO terms plan an advance, 10a waits for 7e** (owner
-report 2026-10-27): the balance card shows "Record the supplier advance
-first (Step 7e)" until the advance is recorded, so the advance can't be
-forgotten. Suppliers whose terms plan no advance go straight to 10a.
-Previously only the amount owed to a supplier was ever recorded —
-nothing tracked whether or when it was actually paid, so "today's
-supplier payments" had no data to report on at all. Each button
-disappears once that leg is marked paid; the paid date then feeds the
-Reports hub's **Today's Payments** view (see Chapter 14).
+Below the signing actions, the supplier is paid as two sub-steps of their
+own (owner decisions 2026-10-27): **7e · Supplier Advance Paid** (the
+last card of Step 7) and **10a · Supplier Balance Paid** (the first card
+of Step 10, before packing). Both are recorded by staff with the **Manage
+supplier payments** permission (Admin, MD, ED and Accounts Executive by
+default); everyone else sees the amounts but no buttons.
+
+Each leg is **bill first, then payment**:
+
+1. **+ Add the supplier's advance bill** (7e — the supplier's advance /
+   proforma invoice) or **balance bill** (10a — the tax invoice): bill
+   number, bill date, taxable value, **GST rate (%)** picked from the GST
+   Rate list (0, 5, 12, 18, 28 — 18% preselected), the bill file and an
+   optional note. **GST (₹)** and **Bill total (₹)** fill in by themselves
+   and can't be typed; the server works the GST out again on save and
+   refuses a rate that isn't on the list.
+2. **₹ Mark Paid** (the green button in the bill's row) opens the payment
+   form: amount paid (the bill total, prefilled), paid on, mode (NEFT /
+   RTGS, IMPS, UPI, Cheque) and UTR / reference. The supplier's bank
+   details show above it, or a warning with a link when none are on file.
+   **Save Payment** marks the bill paid; the leg is done once its bills are
+   paid.
+
+The top of each card shows the Supplier PO reference, the PO total, the
+amount planned for that leg and — once paid — how much and when.
+
+- **When the Supplier PO terms plan an advance, 10a waits for 7e** (owner
+  report 2026-10-27): the balance bills can be added, but their Mark Paid
+  stays hidden behind "Pay the supplier advance first (Step 7e)" until the
+  advance is paid, so the advance can't be forgotten.
+- **No advance planned (0%, or none entered):** 7e completes by itself and
+  shows **"✓ No advance on this order"** — the full amount is paid as the
+  balance in 10a. An **"+ Add the supplier's advance bill anyway"** toggle
+  stays available if the supplier still asks for something up front.
+- A payment recorded before supplier bills were kept stays as it is
+  ("Paid before supplier bills were recorded here").
+
+The paid date feeds the Reports hub's **Today's Payments** view (see
+Chapter 14), and every bill and payment flows into the order's
+financials (Step 12, [CA chapter 8](./ca-08-order-financials.md)).
 
 Once confirmed:
 

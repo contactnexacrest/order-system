@@ -104,3 +104,16 @@ The spec's Section 17 lists 28 entities as a **minimum**. I designed 46 tables. 
    - **Phase D** — review/approval workflow, deferred email send, amendments, disputes, audit log viewer
    - **Phase E** — dashboard, reports, security hardening pass
    I'll show you working output at the end of each phase rather than after every sub-step. Confirm this grouping works for you, or tell me where you want a harder checkpoint (e.g., you may want to see Phase B's generated QT/PI PDFs against the ZIP before I touch anything else).
+
+## 7. Additions since v1.0 (owner decisions, 27 Oct 2026)
+
+Both stacks carry the same additions (parity rule). Schema sections are in `docs/schema.sql`; each has a guarded, re-runnable migration in the repository's `docs/migrations/` (information_schema + PREPARE, MySQL 8 safe).
+
+| Area | Data | Code |
+|---|---|---|
+| Vendor bills — supplier advance/balance (Steps 7e / 10a) and logistics partner bills | `order_vendor_bills` (Section CE); `payment_kind` = `advance` / `final` for logistics bills (Section CG, migration `2026-10-27g`) | `VendorBillController`, `OrderExpenseController`, `OrderVendorBillRepository`, `OrderExpenseRepository`. A logistics Final bill on CFR/CIF is payable only after Step 9d; an Advance any time. GST is a rate from `dropdown_options('gst_rate')`, recomputed on the server |
+| Order expenses — actual, with receipt or reason | `order_expenses` (Section CE, migration `2026-10-27e`); upload contexts `vendor_bill`, `expense_receipt` | Actual travel replaces the provisional travel % in profitability; FY lock respected |
+| CAFIN — internal financial annexure | `documents` row of type `CAFIN` (category `internal`) | `app/src/Services/CaFinancialSnapshotService.php` builds the pre-formatted snapshot; template `templates/CAFIN/ca_financial_annexure.html.twig`. Generated from the CAFIN box at the top of the order page at any stage (no per-order enable, not behind the order lock); never reachable by the client |
+| Document date (Commercial Invoice) | `documents.document_date` (Section CF, migration `2026-10-27f`); NULL = the day generated | The CI's DATE and the COO prep sheet's CI date use it, including the approval re-render |
+| Supplier PO with 0% advance | `order_supplier_po.advance_pct` / `advance_amount_inr` keep 0 (only blank is NULL) | Step 7e completes when no advance is planned |
+| Shared browser behaviour | — | `public_html/assets/js/app.js`: `initGstCalc()` (GST % → amount and total) and `initAutoReasons()` (Not Applicable / Not Eligible fill their reason), alongside the sitewide form validation (`fieldError()`) |
