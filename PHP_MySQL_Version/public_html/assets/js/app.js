@@ -398,18 +398,92 @@
   // deliberately free text ("TBD at packing"), so counts are listed by name.
   var NUMERIC_FIELD_NAME = /(_amount|amount_|_inr$|_kg$|_cbm$|^cbm$|_pct$|_rate$|unit_price|quantity|^crate_count$|_days$)/;
 
+  // Owner request (2026-10-27): a "Re-enter ..." field is only worth
+  // having if the page checks it. A field matches the one it confirms:
+  // data-match="<name>" names it, and the conventions need no attribute —
+  // "<name>_confirm" confirms "<name>", "confirm_password" confirms
+  // "new_password" (or "password").
+  function matchTarget(el) {
+    var form = el.form;
+    if (!form || !el.name) return null;
+    var names = [];
+    if (el.dataset.match) names.push(el.dataset.match);
+    else if (/_confirm$/.test(el.name)) names.push(el.name.replace(/_confirm$/, ''));
+    else if (el.name === 'confirm_password') names.push('new_password', 'password');
+    for (var i = 0; i < names.length; i++) {
+      var target = form.elements.namedItem(names[i]);
+      if (target && target !== el && 'value' in target) return target;
+    }
+    return null;
+  }
+
+  function matchError(el) {
+    var target = matchTarget(el);
+    if (!target) return null;
+    // Account numbers ignore spaces, exactly like the server; passwords must match as typed.
+    var normalise = function (v) { return /account/i.test(el.name) ? v.replace(/\s+/g, '') : v; };
+    var mine = normalise(el.value);
+    var theirs = normalise(target.value);
+    if (mine === theirs || (mine === '' && theirs === '')) return null;
+    if (el.dataset.matchMessage) return el.dataset.matchMessage;
+    if (/account/i.test(el.name)) return 'The two account numbers do not match — type it again.';
+    if (/password/i.test(el.name)) return 'The two passwords do not match — type it again.';
+    return 'This does not match the field above — type it again.';
+  }
+
+  // Bank details (supplier / logistics partner): the same rules the server
+  // applies in BankDetailsInput — once an account number is typed the
+  // holder, bank and IFSC are needed; other bank fields need an account
+  // number (unless one is already on file); the IFSC has to look like one.
+  var BANK_FIELDS = ['bank_account_name', 'bank_name', 'bank_branch', 'bank_ifsc', 'bank_account_type', 'bank_upi_id'];
+  var BANK_LABELS = { bank_account_name: 'account holder name', bank_name: 'bank name', bank_ifsc: 'IFSC code' };
+
+  function bankError(el, value) {
+    var form = el.form;
+    var number = form && form.elements.namedItem('bank_account_number');
+    if (!number || !('value' in number)) return null;
+    var typedNumber = number.value.replace(/\s+/g, '') !== '';
+    if (BANK_LABELS[el.name] && typedNumber && value === '') {
+      return 'Enter the ' + BANK_LABELS[el.name] + ' for the bank account.';
+    }
+    if (el.name === 'bank_ifsc' && value !== '' && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(value.toUpperCase())) {
+      return 'Enter a valid 11-character IFSC code (e.g. SBIN0001234).';
+    }
+    if (el === number && !typedNumber && number.dataset.bankOnFile !== '1') {
+      var anyFilled = BANK_FIELDS.some(function (n) {
+        var f = form.elements.namedItem(n);
+        return f && 'value' in f && f.value.trim() !== '';
+      });
+      if (anyFilled) return 'Enter the bank account number (twice), or leave the whole bank section empty.';
+    }
+    return null;
+  }
+
   function fieldError(el) {
     var value = el.value.trim();
     var name = (el.name || '').replace(/\[.*$/, '');
     var type = (el.type || '').toLowerCase();
-    if (el.required && value === '' && (el.tagName === 'TEXTAREA' || type === 'text' || type === 'search' || type === 'email' || type === 'tel' || type === 'url')) {
+    if (el.required && value === '' && (el.tagName === 'TEXTAREA' || type === 'text' || type === 'search' || type === 'email' || type === 'tel' || type === 'url' || type === 'password' || type === 'number')) {
       return 'This field is required.';
+    }
+    var mismatch = matchError(el);
+    if (mismatch) return mismatch;
+    var bankMessage = bankError(el, value);
+    if (bankMessage) return bankMessage;
+    if (/^bank_account_number(_confirm)?$/.test(name) && value !== '' && !/^[0-9]{6,20}$/.test(value.replace(/\s+/g, ''))) {
+      return 'Enter the bank account number as digits only (6 to 20 digits).';
     }
     if (/reason/i.test(name) && value !== '' && value.length < REASON_MIN_LENGTH) {
       return 'Reason must be at least ' + REASON_MIN_LENGTH + ' characters (' + value.length + ' so far).';
     }
     if (type === 'text' && NUMERIC_FIELD_NAME.test(name) && value !== '' && !/^\d*\.?\d+$/.test(value)) {
       return 'Enter a number — digits and a decimal point only (no commas, spaces or units).';
+    }
+    // Every other built-in rule (required selects, dates and files, min /
+    // max, minlength, pattern, email...) — so every form, present and
+    // future, is checked before it is sent, with the message beside the field.
+    if (el.willValidate && el.validity && !el.validity.valid) {
+      return el.validationMessage || 'Please check this field.';
     }
     return null;
   }
@@ -459,7 +533,32 @@
     document.addEventListener('input', function (e) {
       var el = e.target;
       if (el && el.classList && el.classList.contains('field-invalid') && !fieldError(el)) clearFieldError(el);
+      // Typing in the field a "Re-enter" field confirms re-checks the confirmation once it has been filled in.
+      if (el && el.form && el.name) {
+        Array.prototype.forEach.call(el.form.elements, function (other) {
+          if (other !== el && other.value !== '' && matchTarget(other) === el) {
+            var message = fieldError(other);
+            if (message) showFieldError(other, message); else clearFieldError(other);
+          }
+        });
+      }
     });
+    // A "Re-enter" field says straight away when it does not match — no need to wait for Save.
+    document.addEventListener('focusout', function (e) {
+      var el = e.target;
+      if (!el || !el.form || el.value === '' || !matchTarget(el)) return;
+      var message = fieldError(el);
+      if (message) showFieldError(el, message); else clearFieldError(el);
+    });
+    // The browser's own check stops a submit before the submit listener
+    // above runs; a field inside a closed step card cannot even show its
+    // bubble, so the button just did nothing. Open the card and say why.
+    document.addEventListener('invalid', function (e) {
+      var el = e.target;
+      if (!el || !('value' in el)) return;
+      revealElement(el);
+      showFieldError(el, el.validationMessage || 'Please check this field.');
+    }, true);
   }
 
   function init() {

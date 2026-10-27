@@ -41,7 +41,7 @@ $bv = static fn(string $k): string => htmlspecialchars((string) ($bank[$k] ?? ''
         <label>Bank Name *<input type="text" name="bank_name" required value="<?= $bv('bank_name') ?>"></label>
         <label>Branch<input type="text" name="bank_branch" value="<?= $bv('bank_branch') ?>"></label>
         <label>IFSC Code *<input type="text" name="bank_ifsc" required value="<?= $bv('bank_ifsc') ?>" maxlength="11" placeholder="e.g., SBIN0001234" style="text-transform:uppercase"></label>
-        <label>Account Number<?= $bank['has_bank'] ? '' : ' *' ?><input type="text" name="bank_account_number" inputmode="numeric" autocomplete="off"<?= $bank['has_bank'] ? '' : ' required' ?>></label>
+        <label>Account Number<?= $bank['has_bank'] ? '' : ' *' ?><input type="text" name="bank_account_number" data-bank-on-file="<?= $bank['has_bank'] ? '1' : '0' ?>" inputmode="numeric" autocomplete="off"<?= $bank['has_bank'] ? '' : ' required' ?>></label>
         <label>Re-enter Account Number<?= $bank['has_bank'] ? '' : ' *' ?><input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off"<?= $bank['has_bank'] ? '' : ' required' ?>></label>
         <label>Account Type
           <select name="bank_account_type">

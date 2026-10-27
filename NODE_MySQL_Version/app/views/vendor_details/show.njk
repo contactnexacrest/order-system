@@ -33,7 +33,7 @@
         <label>Bank Name *<input type="text" name="bank_name" required value="{{ bank.bank_name or '' }}"></label>
         <label>Branch<input type="text" name="bank_branch" value="{{ bank.bank_branch or '' }}"></label>
         <label>IFSC Code *<input type="text" name="bank_ifsc" required value="{{ bank.bank_ifsc or '' }}" maxlength="11" placeholder="e.g., SBIN0001234" style="text-transform:uppercase"></label>
-        <label>Account Number{{ '' if bank.has_bank else ' *' }}<input type="text" name="bank_account_number" inputmode="numeric" autocomplete="off"{{ '' if bank.has_bank else ' required' }}></label>
+        <label>Account Number{{ '' if bank.has_bank else ' *' }}<input type="text" name="bank_account_number" data-bank-on-file="{{ '1' if bank.has_bank else '0' }}" inputmode="numeric" autocomplete="off"{{ '' if bank.has_bank else ' required' }}></label>
         <label>Re-enter Account Number{{ '' if bank.has_bank else ' *' }}<input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off"{{ '' if bank.has_bank else ' required' }}></label>
         <label>Account Type
           <select name="bank_account_type">

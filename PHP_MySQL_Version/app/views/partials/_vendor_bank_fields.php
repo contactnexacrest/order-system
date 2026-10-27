@@ -29,7 +29,7 @@ $__bv = static fn(string $k): string => htmlspecialchars((string) ($__b[$k] ?? '
         <label>Bank Name<input type="text" name="bank_name" value="<?= $__bv('bank_name') ?>" placeholder="e.g., State Bank of India"></label>
         <label>Branch<input type="text" name="bank_branch" value="<?= $__bv('bank_branch') ?>" placeholder="e.g., Udaipur Main"></label>
         <label>IFSC Code<input type="text" name="bank_ifsc" value="<?= $__bv('bank_ifsc') ?>" placeholder="e.g., SBIN0001234" maxlength="11" style="text-transform:uppercase"></label>
-        <label>Account Number<input type="text" name="bank_account_number" inputmode="numeric" autocomplete="off" placeholder="<?= $__b['has_bank'] ? 'Leave blank to keep ' . htmlspecialchars(VendorDetailsRepository::maskAccount($__b['bank_account_number'])) : 'Digits only' ?>"></label>
+        <label>Account Number<input type="text" name="bank_account_number" data-bank-on-file="<?= $__b['has_bank'] ? '1' : '0' ?>" inputmode="numeric" autocomplete="off" placeholder="<?= $__b['has_bank'] ? 'Leave blank to keep ' . htmlspecialchars(VendorDetailsRepository::maskAccount($__b['bank_account_number'])) : 'Digits only' ?>"></label>
         <label>Re-enter Account Number<input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off" placeholder="Type it again to confirm"></label>
         <label>Account Type
           <select name="bank_account_type">

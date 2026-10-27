@@ -78,4 +78,47 @@ test.describe('Form input is kept and checked before submit', () => {
     await page.goto('/email-templates/create');
     await expect(page.locator('input[name="subject"]')).toHaveValue('');
   });
+
+  // Owner request (2026-10-27): "Account Number" and "Re-enter Account
+  // Number" must be checked on the page — else what is the purpose of it.
+  test('a re-entered account number that does not match stops the submit', async ({ page }) => {
+    await page.goto('/suppliers/create');
+    await page.locator('input[name="supplier_legal_name"]').fill(`E2E Bank Match ${Date.now()}`);
+    await page.locator('input[name="types[]"]').first().check();
+    const confirm = page.locator('input[name="bank_account_number_confirm"]');
+    await page.locator('input[name="bank_account_number"]').fill('123456789012');
+    await confirm.fill('123456789021');
+    await confirm.blur();
+    // Said straight away, before Save is pressed.
+    await expect(confirm.locator('xpath=following-sibling::*[contains(@class,"form-field-error")]')).toContainText('do not match');
+    await page.getByRole('button', { name: 'Add Supplier' }).click();
+    await expect(page).toHaveURL(/\/suppliers\/create$/);
+    await expect(confirm).toHaveClass(/field-invalid/);
+    // Correcting it clears the message. The holder, bank and IFSC are
+    // then asked for, still before anything is sent.
+    await confirm.fill('1234 5678 9012');
+    await expect(confirm).not.toHaveClass(/field-invalid/);
+    await page.getByRole('button', { name: 'Add Supplier' }).click();
+    await expect(page).toHaveURL(/\/suppliers\/create$/);
+    await expect(page.locator('input[name="bank_account_name"]')).toHaveClass(/field-invalid/);
+    await page.locator('input[name="bank_account_name"]').fill('E2E Exports Pvt Ltd');
+    await page.locator('input[name="bank_name"]').fill('State Bank of India');
+    await page.locator('input[name="bank_ifsc"]').fill('SBIN123');
+    await page.getByRole('button', { name: 'Add Supplier' }).click();
+    await expect(page.locator('input[name="bank_ifsc"] ~ .form-field-error')).toContainText('valid 11-character IFSC');
+    await page.locator('input[name="bank_ifsc"]').fill('SBIN0001234');
+    await page.getByRole('button', { name: 'Add Supplier' }).click();
+    await expect(page.locator('.alert')).toContainText('added to the suppliers directory');
+  });
+
+  test('a confirm password that does not match stops the submit', async ({ page }) => {
+    await page.goto('/account');
+    const form = page.locator('form[action="/account/password"]');
+    await form.locator('[name="current_password"]').fill('whatever-it-is');
+    await form.locator('[name="new_password"]').fill('NewPassword#2026');
+    await form.locator('[name="confirm_password"]').fill('NewPassword#2027');
+    await form.getByRole('button', { name: 'Update Password' }).click();
+    await expect(page).toHaveURL(/\/account$/);
+    await expect(form.locator('.form-field-error')).toContainText('passwords do not match');
+  });
 });
