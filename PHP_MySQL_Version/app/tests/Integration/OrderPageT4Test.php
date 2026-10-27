@@ -88,7 +88,9 @@ final class OrderPageT4Test extends DbTestCase
         $page = $this->render(fn () => (new SupplierActionController())->show(['token' => $token]));
         self::assertStringContainsString($supplierPo['supplier_po_reference'], $page);
         self::assertStringContainsString('/acknowledgment', $page);
-        self::assertStringNotContainsString('1234', $page, 'no PO prices on the supplier page');
+        // Random link/CSRF tokens can contain any digit run — drop them before
+        // checking that the PO price never reaches the supplier page.
+        self::assertStringNotContainsString('1234', (string) preg_replace('/[A-Za-z0-9_-]{20,}/', '', $page), 'no PO prices on the supplier page');
         self::assertStringNotContainsString((string) OrderRepository::find($orderId)['company_legal_name'], $page, 'the buyer is never named to the supplier');
 
         $expired = $this->render(fn () => (new SupplierActionController())->show(['token' => 'bogus']));

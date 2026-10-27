@@ -87,7 +87,9 @@ describe('Order page t4 (owner requests 2026-10-26)', () => {
     const page = await agent.get(`/supplier-action/${token}`);
     expect(page.status).toBe(200);
     expect(page.text).toContain(supplierPo.supplier_po_reference);
-    expect(page.text).not.toContain('1234');
+    // Random link/CSRF tokens can contain any digit run — drop them before
+    // checking that the PO price never reaches the supplier page.
+    expect(page.text.replace(/[A-Za-z0-9_-]{20,}/g, '')).not.toContain('1234');
     expect(page.text).not.toContain((await orderRepository.find(orderId)).company_legal_name);
     expect((await agent.get('/supplier-action/bogus')).text).toContain('Link No Longer Valid');
 
