@@ -2,7 +2,8 @@
 
 - **Parity:** PHP_MySQL_Version and NODE_MySQL_Version must always behave the same. Every change goes into both.
 - **Verify before pushing:** PHPUnit, Jest and the Playwright e2e suite (`e2e/`) against both stacks.
-- **Push always:** commit and push finished work without waiting to be asked.
+- **Ask before pushing:** never push to git without asking the owner first (this replaces the earlier "push always" rule, 2026-10-27).
+- **No PDF / document changes without double confirmation.** Before changing anything that ends up in a generated document (PDF or DOCX templates, the document data assembler, document builders), first show the owner what the document shows now and what it will show after the change, and get their confirmation twice. All current PDFs are correct as they are.
 - **Mockups first:** for a larger UI redesign, show mockup images and get confirmation before building.
 - **CAFIN must never reach the client**, at any cost: not by download, link, email or portal.
 - **Browser-side validation on every form, existing or new.** Every input form is checked in the browser before it is submitted, with the message shown beside the field (server-side checks stay as well).
