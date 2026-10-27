@@ -27,5 +27,7 @@
 
 SET NAMES utf8mb4;
 -- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
-ALTER TABLE payment_presets
-  ADD COLUMN IF NOT EXISTS show_bl_instructions TINYINT(1) NOT NULL DEFAULT 1 AFTER requires_md_approval;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'payment_presets' AND COLUMN_NAME = 'show_bl_instructions') = 0, 'ALTER TABLE payment_presets ADD COLUMN show_bl_instructions TINYINT(1) NOT NULL DEFAULT 1 AFTER requires_md_approval', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;

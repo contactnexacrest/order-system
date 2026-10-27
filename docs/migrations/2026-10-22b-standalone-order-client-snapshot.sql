@@ -25,41 +25,143 @@
 -- ================================================================
 
 SET NAMES utf8mb4;
-ALTER TABLE orders
-  ADD COLUMN IF NOT EXISTS company_legal_name       VARCHAR(255) NULL AFTER show_bl_instructions,
-  ADD COLUMN IF NOT EXISTS billing_address          TEXT NULL AFTER company_legal_name,
-  ADD COLUMN IF NOT EXISTS billing_address_line1    VARCHAR(255) NULL AFTER billing_address,
-  ADD COLUMN IF NOT EXISTS billing_address_line2    VARCHAR(255) NULL AFTER billing_address_line1,
-  ADD COLUMN IF NOT EXISTS billing_city             VARCHAR(100) NULL AFTER billing_address_line2,
-  ADD COLUMN IF NOT EXISTS billing_postcode         VARCHAR(30) NULL AFTER billing_city,
-  ADD COLUMN IF NOT EXISTS billing_country          VARCHAR(100) NULL AFTER billing_postcode,
-  ADD COLUMN IF NOT EXISTS vat_eori_tax_no          VARCHAR(100) NULL AFTER billing_country,
-  ADD COLUMN IF NOT EXISTS contact_person           VARCHAR(150) NULL AFTER vat_eori_tax_no,
-  ADD COLUMN IF NOT EXISTS client_email             VARCHAR(190) NULL AFTER contact_person,
-  ADD COLUMN IF NOT EXISTS client_phone             VARCHAR(30) NULL AFTER client_email,
-  ADD COLUMN IF NOT EXISTS country_of_destination   VARCHAR(100) NULL AFTER client_phone,
-  ADD COLUMN IF NOT EXISTS consignee_same_as_buyer  TINYINT(1) NOT NULL DEFAULT 1 AFTER country_of_destination,
-  ADD COLUMN IF NOT EXISTS consignee_name           VARCHAR(255) NULL AFTER consignee_same_as_buyer,
-  ADD COLUMN IF NOT EXISTS consignee_address        TEXT NULL AFTER consignee_name,
-  ADD COLUMN IF NOT EXISTS consignee_address_line1  VARCHAR(255) NULL AFTER consignee_address,
-  ADD COLUMN IF NOT EXISTS consignee_address_line2  VARCHAR(255) NULL AFTER consignee_address_line1,
-  ADD COLUMN IF NOT EXISTS consignee_city           VARCHAR(100) NULL AFTER consignee_address_line2,
-  ADD COLUMN IF NOT EXISTS consignee_postcode       VARCHAR(30) NULL AFTER consignee_city,
-  ADD COLUMN IF NOT EXISTS consignee_country        VARCHAR(100) NULL AFTER consignee_postcode,
-  ADD COLUMN IF NOT EXISTS consignee_vat_eori_tax_no VARCHAR(100) NULL AFTER consignee_country,
-  ADD COLUMN IF NOT EXISTS consignee_contact_person VARCHAR(150) NULL AFTER consignee_vat_eori_tax_no,
-  ADD COLUMN IF NOT EXISTS consignee_phone          VARCHAR(30) NULL AFTER consignee_contact_person,
-  ADD COLUMN IF NOT EXISTS consignee_email          VARCHAR(190) NULL AFTER consignee_phone,
-  ADD COLUMN IF NOT EXISTS notify_party_same_as_consignee TINYINT(1) NOT NULL DEFAULT 1 AFTER consignee_email,
-  ADD COLUMN IF NOT EXISTS notify_party             VARCHAR(255) NULL AFTER notify_party_same_as_consignee,
-  ADD COLUMN IF NOT EXISTS notify_party_address_line1 VARCHAR(255) NULL AFTER notify_party,
-  ADD COLUMN IF NOT EXISTS notify_party_address_line2 VARCHAR(255) NULL AFTER notify_party_address_line1,
-  ADD COLUMN IF NOT EXISTS notify_party_city        VARCHAR(100) NULL AFTER notify_party_address_line2,
-  ADD COLUMN IF NOT EXISTS notify_party_postcode    VARCHAR(30) NULL AFTER notify_party_city,
-  ADD COLUMN IF NOT EXISTS notify_party_country     VARCHAR(100) NULL AFTER notify_party_postcode,
-  ADD COLUMN IF NOT EXISTS notify_party_contact_person VARCHAR(150) NULL AFTER notify_party_country,
-  ADD COLUMN IF NOT EXISTS notify_party_phone       VARCHAR(30) NULL AFTER notify_party_contact_person,
-  ADD COLUMN IF NOT EXISTS notify_party_email       VARCHAR(190) NULL AFTER notify_party_phone;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'company_legal_name') = 0, 'ALTER TABLE orders ADD COLUMN company_legal_name VARCHAR(255) NULL AFTER show_bl_instructions', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'billing_address') = 0, 'ALTER TABLE orders ADD COLUMN billing_address TEXT NULL AFTER company_legal_name', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'billing_address_line1') = 0, 'ALTER TABLE orders ADD COLUMN billing_address_line1 VARCHAR(255) NULL AFTER billing_address', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'billing_address_line2') = 0, 'ALTER TABLE orders ADD COLUMN billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'billing_city') = 0, 'ALTER TABLE orders ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'billing_postcode') = 0, 'ALTER TABLE orders ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'billing_country') = 0, 'ALTER TABLE orders ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'vat_eori_tax_no') = 0, 'ALTER TABLE orders ADD COLUMN vat_eori_tax_no VARCHAR(100) NULL AFTER billing_country', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'contact_person') = 0, 'ALTER TABLE orders ADD COLUMN contact_person VARCHAR(150) NULL AFTER vat_eori_tax_no', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'client_email') = 0, 'ALTER TABLE orders ADD COLUMN client_email VARCHAR(190) NULL AFTER contact_person', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'client_phone') = 0, 'ALTER TABLE orders ADD COLUMN client_phone VARCHAR(30) NULL AFTER client_email', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'country_of_destination') = 0, 'ALTER TABLE orders ADD COLUMN country_of_destination VARCHAR(100) NULL AFTER client_phone', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_same_as_buyer') = 0, 'ALTER TABLE orders ADD COLUMN consignee_same_as_buyer TINYINT(1) NOT NULL DEFAULT 1 AFTER country_of_destination', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_name') = 0, 'ALTER TABLE orders ADD COLUMN consignee_name VARCHAR(255) NULL AFTER consignee_same_as_buyer', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_address') = 0, 'ALTER TABLE orders ADD COLUMN consignee_address TEXT NULL AFTER consignee_name', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_address_line1') = 0, 'ALTER TABLE orders ADD COLUMN consignee_address_line1 VARCHAR(255) NULL AFTER consignee_address', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_address_line2') = 0, 'ALTER TABLE orders ADD COLUMN consignee_address_line2 VARCHAR(255) NULL AFTER consignee_address_line1', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_city') = 0, 'ALTER TABLE orders ADD COLUMN consignee_city VARCHAR(100) NULL AFTER consignee_address_line2', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_postcode') = 0, 'ALTER TABLE orders ADD COLUMN consignee_postcode VARCHAR(30) NULL AFTER consignee_city', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_country') = 0, 'ALTER TABLE orders ADD COLUMN consignee_country VARCHAR(100) NULL AFTER consignee_postcode', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_vat_eori_tax_no') = 0, 'ALTER TABLE orders ADD COLUMN consignee_vat_eori_tax_no VARCHAR(100) NULL AFTER consignee_country', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_contact_person') = 0, 'ALTER TABLE orders ADD COLUMN consignee_contact_person VARCHAR(150) NULL AFTER consignee_vat_eori_tax_no', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_phone') = 0, 'ALTER TABLE orders ADD COLUMN consignee_phone VARCHAR(30) NULL AFTER consignee_contact_person', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'consignee_email') = 0, 'ALTER TABLE orders ADD COLUMN consignee_email VARCHAR(190) NULL AFTER consignee_phone', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_same_as_consignee') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_same_as_consignee TINYINT(1) NOT NULL DEFAULT 1 AFTER consignee_email', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party') = 0, 'ALTER TABLE orders ADD COLUMN notify_party VARCHAR(255) NULL AFTER notify_party_same_as_consignee', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_address_line1') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_address_line1 VARCHAR(255) NULL AFTER notify_party', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_address_line2') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_address_line2 VARCHAR(255) NULL AFTER notify_party_address_line1', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_city') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_city VARCHAR(100) NULL AFTER notify_party_address_line2', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_postcode') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_postcode VARCHAR(30) NULL AFTER notify_party_city', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_country') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_country VARCHAR(100) NULL AFTER notify_party_postcode', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_contact_person') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_contact_person VARCHAR(150) NULL AFTER notify_party_country', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_phone') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_phone VARCHAR(30) NULL AFTER notify_party_contact_person', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'notify_party_email') = 0, 'ALTER TABLE orders ADD COLUMN notify_party_email VARCHAR(190) NULL AFTER notify_party_phone', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+
 
 -- ================================================================
 -- STEP 2 — backfill every existing order from whatever the live join

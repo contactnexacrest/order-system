@@ -122,4 +122,32 @@ final class MigrationFileConventionsTest extends TestCase
 
         self::assertSame([], $unguarded, 'every migration file must guard its statements so the file is safe to re-run (idempotent) — see the fix direction for L-32');
     }
+
+    /**
+     * Owner report (2026-10-27): a fresh install of schema.sql on the
+     * host's MySQL failed with #1064 at `ADD COLUMN IF NOT EXISTS`. The
+     * dev database is MariaDB, which accepts IF [NOT] EXISTS on columns
+     * and indexes; MySQL does not. Schema files and migrations guard
+     * these through information_schema plus PREPARE instead, so nothing
+     * here may use the MariaDB-only forms.
+     */
+    public function testNoMariaDbOnlyColumnOrIndexIfExistsClauses(): void
+    {
+        $root = __DIR__ . '/../../../..';
+        $files = array_merge($this->migrationFiles(), [
+            $root . '/PHP_MySQL_Version/docs/schema.sql',
+            $root . '/NODE_MySQL_Version/docs/schema.sql',
+        ]);
+        $pattern = '/\b(?:(?:ADD|DROP|CHANGE|MODIFY)\s+(?:COLUMN|INDEX|KEY|UNIQUE\s+(?:INDEX|KEY))\s+IF\s+(?:NOT\s+)?EXISTS|CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS)\b/i';
+        $offending = [];
+        foreach ($files as $path) {
+            self::assertFileExists($path);
+            foreach (preg_split('/\R/', (string) file_get_contents($path)) as $n => $line) {
+                if (!str_starts_with(trim($line), '--') && preg_match($pattern, $line)) {
+                    $offending[] = basename(dirname($path, 2)) . '/' . basename($path) . ':' . ($n + 1);
+                }
+            }
+        }
+        self::assertSame([], $offending, 'MySQL rejects IF [NOT] EXISTS on ADD/DROP/CHANGE COLUMN and on indexes — guard through information_schema + PREPARE instead');
+    }
 }

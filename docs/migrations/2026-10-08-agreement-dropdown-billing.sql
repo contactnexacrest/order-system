@@ -44,12 +44,27 @@ WHERE r.name IN ('Admin', 'Managing Director', 'Executive Director')
 -- ----------------------------------------------------------------
 -- Section BE — Client Agreement: file upload + expiry
 -- ----------------------------------------------------------------
-ALTER TABLE clients
-  ADD COLUMN IF NOT EXISTS agreement_file_path VARCHAR(500) NULL AFTER agreement_footer_text,
-  ADD COLUMN IF NOT EXISTS agreement_file_original_name VARCHAR(255) NULL AFTER agreement_file_path,
-  ADD COLUMN IF NOT EXISTS agreement_uploaded_at TIMESTAMP NULL AFTER agreement_file_original_name,
-  ADD COLUMN IF NOT EXISTS agreement_expiry_date DATE NULL AFTER agreement_uploaded_at,
-  ADD COLUMN IF NOT EXISTS agreement_force_expired TINYINT(1) NOT NULL DEFAULT 0 AFTER agreement_expiry_date;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'agreement_file_path') = 0, 'ALTER TABLE clients ADD COLUMN agreement_file_path VARCHAR(500) NULL AFTER agreement_footer_text', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'agreement_file_original_name') = 0, 'ALTER TABLE clients ADD COLUMN agreement_file_original_name VARCHAR(255) NULL AFTER agreement_file_path', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'agreement_uploaded_at') = 0, 'ALTER TABLE clients ADD COLUMN agreement_uploaded_at TIMESTAMP NULL AFTER agreement_file_original_name', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'agreement_expiry_date') = 0, 'ALTER TABLE clients ADD COLUMN agreement_expiry_date DATE NULL AFTER agreement_uploaded_at', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'agreement_force_expired') = 0, 'ALTER TABLE clients ADD COLUMN agreement_force_expired TINYINT(1) NOT NULL DEFAULT 0 AFTER agreement_expiry_date', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+
 
 -- New upload context for the agreement file itself (type/size validation).
 INSERT IGNORE INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description) VALUES
@@ -59,17 +74,35 @@ INSERT IGNORE INTO file_upload_contexts (context_key, allowed_extensions, max_si
 -- ----------------------------------------------------------------
 -- Section BF — QT intake: structured billing address
 -- ----------------------------------------------------------------
-ALTER TABLE client_intake_submissions
-  ADD COLUMN IF NOT EXISTS billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
-  ADD COLUMN IF NOT EXISTS billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
-  ADD COLUMN IF NOT EXISTS billing_city VARCHAR(100) NULL AFTER billing_address_line2,
-  ADD COLUMN IF NOT EXISTS billing_postcode VARCHAR(30) NULL AFTER billing_city,
-  ADD COLUMN IF NOT EXISTS billing_country VARCHAR(100) NULL AFTER billing_postcode;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'client_intake_submissions' AND COLUMN_NAME = 'billing_address_line1') = 0, 'ALTER TABLE client_intake_submissions ADD COLUMN billing_address_line1 VARCHAR(255) NULL AFTER billing_address', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'client_intake_submissions' AND COLUMN_NAME = 'billing_address_line2') = 0, 'ALTER TABLE client_intake_submissions ADD COLUMN billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'client_intake_submissions' AND COLUMN_NAME = 'billing_city') = 0, 'ALTER TABLE client_intake_submissions ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'client_intake_submissions' AND COLUMN_NAME = 'billing_postcode') = 0, 'ALTER TABLE client_intake_submissions ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'client_intake_submissions' AND COLUMN_NAME = 'billing_country') = 0, 'ALTER TABLE client_intake_submissions ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+
 
 -- Backfills a gap in the original clients table rollout (Section BA
 -- added billing_address_line1/2/city/postcode but not country).
-ALTER TABLE clients
-  ADD COLUMN IF NOT EXISTS billing_country VARCHAR(100) NULL AFTER billing_postcode;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'billing_country') = 0, 'ALTER TABLE clients ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+
 
 
 -- ----------------------------------------------------------------

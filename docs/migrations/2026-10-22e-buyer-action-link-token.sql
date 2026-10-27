@@ -27,9 +27,21 @@
 
 SET NAMES utf8mb4;
 -- External QA report L-32: IF NOT EXISTS makes both statements below safe to re-run.
-ALTER TABLE orders
-  ADD COLUMN IF NOT EXISTS buyer_action_token_hash VARCHAR(64) NULL AFTER pi_valid_until,
-  ADD COLUMN IF NOT EXISTS buyer_action_token_plain VARCHAR(255) NULL AFTER buyer_action_token_hash,
-  ADD COLUMN IF NOT EXISTS buyer_action_token_expires_at DATETIME NULL AFTER buyer_action_token_plain;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'buyer_action_token_hash') = 0, 'ALTER TABLE orders ADD COLUMN buyer_action_token_hash VARCHAR(64) NULL AFTER pi_valid_until', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'buyer_action_token_plain') = 0, 'ALTER TABLE orders ADD COLUMN buyer_action_token_plain VARCHAR(255) NULL AFTER buyer_action_token_hash', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'buyer_action_token_expires_at') = 0, 'ALTER TABLE orders ADD COLUMN buyer_action_token_expires_at DATETIME NULL AFTER buyer_action_token_plain', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
 
-CREATE INDEX IF NOT EXISTS idx_orders_buyer_action_token_hash ON orders(buyer_action_token_hash);
+
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND INDEX_NAME = 'idx_orders_buyer_action_token_hash') = 0, 'CREATE INDEX idx_orders_buyer_action_token_hash ON orders(buyer_action_token_hash)', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;

@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS port_routes (
   FOREIGN KEY (port_of_discharge_id) REFERENCES ports(id)
 ) ENGINE=InnoDB;
 
-ALTER TABLE orders
-  ADD COLUMN IF NOT EXISTS sailing_lead_time_min_days INT UNSIGNED NULL AFTER lead_time_max_days,
-  ADD COLUMN IF NOT EXISTS sailing_lead_time_max_days INT UNSIGNED NULL AFTER sailing_lead_time_min_days;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'sailing_lead_time_min_days') = 0, 'ALTER TABLE orders ADD COLUMN sailing_lead_time_min_days INT UNSIGNED NULL AFTER lead_time_max_days', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'sailing_lead_time_max_days') = 0, 'ALTER TABLE orders ADD COLUMN sailing_lead_time_max_days INT UNSIGNED NULL AFTER sailing_lead_time_min_days', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;

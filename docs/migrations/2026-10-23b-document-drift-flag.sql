@@ -16,6 +16,11 @@
 
 SET NAMES utf8mb4;
 -- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
-ALTER TABLE documents
-  ADD COLUMN IF NOT EXISTS drift_flagged_at TIMESTAMP NULL,
-  ADD COLUMN IF NOT EXISTS drift_flagged_reason VARCHAR(255) NULL;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND COLUMN_NAME = 'drift_flagged_at') = 0, 'ALTER TABLE documents ADD COLUMN drift_flagged_at TIMESTAMP NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND COLUMN_NAME = 'drift_flagged_reason') = 0, 'ALTER TABLE documents ADD COLUMN drift_flagged_reason VARCHAR(255) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;

@@ -19,21 +19,63 @@
 -- ================================================================
 
 SET NAMES utf8mb4;
-ALTER TABLE orders
-  ADD COLUMN IF NOT EXISTS incoterm_code           VARCHAR(10) NULL AFTER port_of_discharge_text,
-  ADD COLUMN IF NOT EXISTS currency_code           VARCHAR(10) NULL AFTER incoterm_code,
-  ADD COLUMN IF NOT EXISTS port_of_loading_name    VARCHAR(150) NULL AFTER currency_code,
-  ADD COLUMN IF NOT EXISTS port_of_loading_city    VARCHAR(100) NULL AFTER port_of_loading_name,
-  ADD COLUMN IF NOT EXISTS port_of_discharge_name  VARCHAR(150) NULL AFTER port_of_loading_city,
-  ADD COLUMN IF NOT EXISTS port_of_discharge_city  VARCHAR(100) NULL AFTER port_of_discharge_name,
-  ADD COLUMN IF NOT EXISTS preset_name             VARCHAR(100) NULL AFTER port_of_discharge_city,
-  ADD COLUMN IF NOT EXISTS advance_pct             DECIMAL(5,2) NULL AFTER preset_name,
-  ADD COLUMN IF NOT EXISTS advance_trigger_text    VARCHAR(255) NULL AFTER advance_pct,
-  ADD COLUMN IF NOT EXISTS balance_pct             DECIMAL(5,2) NULL AFTER advance_trigger_text,
-  ADD COLUMN IF NOT EXISTS balance_trigger_option  ENUM('A_BEFORE_SHIPMENT','B_AGAINST_BL') NULL AFTER balance_pct,
-  ADD COLUMN IF NOT EXISTS balance_days            INT NULL AFTER balance_trigger_option,
-  ADD COLUMN IF NOT EXISTS balance_trigger_wording TEXT NULL AFTER balance_days,
-  ADD COLUMN IF NOT EXISTS show_bl_instructions    TINYINT(1) NOT NULL DEFAULT 1 AFTER balance_trigger_wording;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'incoterm_code') = 0, 'ALTER TABLE orders ADD COLUMN incoterm_code VARCHAR(10) NULL AFTER port_of_discharge_text', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'currency_code') = 0, 'ALTER TABLE orders ADD COLUMN currency_code VARCHAR(10) NULL AFTER incoterm_code', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'port_of_loading_name') = 0, 'ALTER TABLE orders ADD COLUMN port_of_loading_name VARCHAR(150) NULL AFTER currency_code', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'port_of_loading_city') = 0, 'ALTER TABLE orders ADD COLUMN port_of_loading_city VARCHAR(100) NULL AFTER port_of_loading_name', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'port_of_discharge_name') = 0, 'ALTER TABLE orders ADD COLUMN port_of_discharge_name VARCHAR(150) NULL AFTER port_of_loading_city', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'port_of_discharge_city') = 0, 'ALTER TABLE orders ADD COLUMN port_of_discharge_city VARCHAR(100) NULL AFTER port_of_discharge_name', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'preset_name') = 0, 'ALTER TABLE orders ADD COLUMN preset_name VARCHAR(100) NULL AFTER port_of_discharge_city', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'advance_pct') = 0, 'ALTER TABLE orders ADD COLUMN advance_pct DECIMAL(5,2) NULL AFTER preset_name', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'advance_trigger_text') = 0, 'ALTER TABLE orders ADD COLUMN advance_trigger_text VARCHAR(255) NULL AFTER advance_pct', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'balance_pct') = 0, 'ALTER TABLE orders ADD COLUMN balance_pct DECIMAL(5,2) NULL AFTER advance_trigger_text', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'balance_trigger_option') = 0, 'ALTER TABLE orders ADD COLUMN balance_trigger_option ENUM(''A_BEFORE_SHIPMENT'',''B_AGAINST_BL'') NULL AFTER balance_pct', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'balance_days') = 0, 'ALTER TABLE orders ADD COLUMN balance_days INT NULL AFTER balance_trigger_option', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'balance_trigger_wording') = 0, 'ALTER TABLE orders ADD COLUMN balance_trigger_wording TEXT NULL AFTER balance_days', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'show_bl_instructions') = 0, 'ALTER TABLE orders ADD COLUMN show_bl_instructions TINYINT(1) NOT NULL DEFAULT 1 AFTER balance_trigger_wording', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+
 
 -- ================================================================
 -- STEP 2 — backfill every existing order from whatever the live join

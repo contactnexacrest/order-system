@@ -2442,22 +2442,28 @@ CREATE TABLE reference_sequences (
 -- never collide with one already on a real row. {NNN} is always the last 3
 -- characters of the rendered reference (see ReferenceNumberService::render).
 INSERT INTO reference_sequences (scope_key, last_seq)
-SELECT CONCAT('client_unique:', DATE_FORMAT(created_at, '%Y%m%d')), MAX(CAST(RIGHT(client_unique_number, 3) AS UNSIGNED))
-FROM clients
-GROUP BY DATE_FORMAT(created_at, '%Y%m%d')
+SELECT k, MAX(n) FROM (
+  SELECT CONCAT('client_unique:', DATE_FORMAT(created_at, '%Y%m%d')) AS k, CAST(RIGHT(client_unique_number, 3) AS UNSIGNED) AS n
+  FROM clients
+) t
+GROUP BY k
 ON DUPLICATE KEY UPDATE last_seq = GREATEST(last_seq, VALUES(last_seq));
 
 INSERT INTO reference_sequences (scope_key, last_seq)
-SELECT CONCAT('document:', document_type_id, ':', DATE_FORMAT(generated_at, '%Y%m%d')), MAX(CAST(RIGHT(document_reference, 3) AS UNSIGNED))
-FROM documents
-WHERE document_reference IS NOT NULL
-GROUP BY document_type_id, DATE_FORMAT(generated_at, '%Y%m%d')
+SELECT k, MAX(n) FROM (
+  SELECT CONCAT('document:', document_type_id, ':', DATE_FORMAT(generated_at, '%Y%m%d')) AS k, CAST(RIGHT(document_reference, 3) AS UNSIGNED) AS n
+  FROM documents
+  WHERE document_reference IS NOT NULL
+) t
+GROUP BY k
 ON DUPLICATE KEY UPDATE last_seq = GREATEST(last_seq, VALUES(last_seq));
 
 INSERT INTO reference_sequences (scope_key, last_seq)
-SELECT CONCAT('amendment:', DATE_FORMAT(created_at, '%Y%m%d')), MAX(CAST(RIGHT(amendment_reference, 3) AS UNSIGNED))
-FROM amendments
-GROUP BY DATE_FORMAT(created_at, '%Y%m%d')
+SELECT k, MAX(n) FROM (
+  SELECT CONCAT('amendment:', DATE_FORMAT(created_at, '%Y%m%d')) AS k, CAST(RIGHT(amendment_reference, 3) AS UNSIGNED) AS n
+  FROM amendments
+) t
+GROUP BY k
 ON DUPLICATE KEY UPDATE last_seq = GREATEST(last_seq, VALUES(last_seq));
 
 -- ================================================================
@@ -4030,46 +4036,46 @@ CREATE INDEX idx_orders_payment_action_token ON orders(payment_action_token_hash
 -- Settled; an eligible scheme the company won't claim is skipped with a
 -- reason, so the order can still be settled.
 ALTER TABLE order_export_benefit_schemes
-  ADD COLUMN IF NOT EXISTS claim_skipped_at  DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS claim_skipped_by  BIGINT UNSIGNED NULL,
-  ADD COLUMN IF NOT EXISTS claim_skip_reason VARCHAR(500)    NULL;
+  ADD COLUMN claim_skipped_at  DATETIME        NULL,
+  ADD COLUMN claim_skipped_by  BIGINT UNSIGNED NULL,
+  ADD COLUMN claim_skip_reason VARCHAR(500)    NULL;
 
 -- Suppliers and logistics partners: bank details to pay them, filled by
 -- staff or by the supplier through a no-login Supplier Details Link. The
 -- account number is stored encrypted; a supplier's own submission clears
 -- the "verified" mark until staff check it again.
 ALTER TABLE suppliers
-  ADD COLUMN IF NOT EXISTS bank_account_name        VARCHAR(255)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_name                VARCHAR(150)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_branch              VARCHAR(150)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_account_number      TEXT            NULL,
-  ADD COLUMN IF NOT EXISTS bank_ifsc                VARCHAR(20)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_account_type        VARCHAR(30)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_upi_id              VARCHAR(100)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_updated_at          DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS bank_updated_source      VARCHAR(20)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_verified_at         DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS bank_verified_by         BIGINT UNSIGNED NULL,
-  ADD COLUMN IF NOT EXISTS details_token_hash       CHAR(64)        NULL,
-  ADD COLUMN IF NOT EXISTS details_token_plain      TEXT            NULL,
-  ADD COLUMN IF NOT EXISTS details_token_expires_at DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS details_submitted_at     DATETIME        NULL,
-  ADD INDEX IF NOT EXISTS idx_suppliers_details_token (details_token_hash);
+  ADD COLUMN bank_account_name        VARCHAR(255)    NULL,
+  ADD COLUMN bank_name                VARCHAR(150)    NULL,
+  ADD COLUMN bank_branch              VARCHAR(150)    NULL,
+  ADD COLUMN bank_account_number      TEXT            NULL,
+  ADD COLUMN bank_ifsc                VARCHAR(20)     NULL,
+  ADD COLUMN bank_account_type        VARCHAR(30)     NULL,
+  ADD COLUMN bank_upi_id              VARCHAR(100)    NULL,
+  ADD COLUMN bank_updated_at          DATETIME        NULL,
+  ADD COLUMN bank_updated_source      VARCHAR(20)     NULL,
+  ADD COLUMN bank_verified_at         DATETIME        NULL,
+  ADD COLUMN bank_verified_by         BIGINT UNSIGNED NULL,
+  ADD COLUMN details_token_hash       CHAR(64)        NULL,
+  ADD COLUMN details_token_plain      TEXT            NULL,
+  ADD COLUMN details_token_expires_at DATETIME        NULL,
+  ADD COLUMN details_submitted_at     DATETIME        NULL,
+  ADD INDEX idx_suppliers_details_token (details_token_hash);
 
 ALTER TABLE logistics_partners
-  ADD COLUMN IF NOT EXISTS bank_account_name        VARCHAR(255)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_name                VARCHAR(150)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_branch              VARCHAR(150)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_account_number      TEXT            NULL,
-  ADD COLUMN IF NOT EXISTS bank_ifsc                VARCHAR(20)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_account_type        VARCHAR(30)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_upi_id              VARCHAR(100)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_updated_at          DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS bank_updated_source      VARCHAR(20)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_verified_at         DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS bank_verified_by         BIGINT UNSIGNED NULL,
-  ADD COLUMN IF NOT EXISTS details_token_hash       CHAR(64)        NULL,
-  ADD COLUMN IF NOT EXISTS details_token_plain      TEXT            NULL,
-  ADD COLUMN IF NOT EXISTS details_token_expires_at DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS details_submitted_at     DATETIME        NULL,
-  ADD INDEX IF NOT EXISTS idx_logistics_partners_details_token (details_token_hash);
+  ADD COLUMN bank_account_name        VARCHAR(255)    NULL,
+  ADD COLUMN bank_name                VARCHAR(150)    NULL,
+  ADD COLUMN bank_branch              VARCHAR(150)    NULL,
+  ADD COLUMN bank_account_number      TEXT            NULL,
+  ADD COLUMN bank_ifsc                VARCHAR(20)     NULL,
+  ADD COLUMN bank_account_type        VARCHAR(30)     NULL,
+  ADD COLUMN bank_upi_id              VARCHAR(100)    NULL,
+  ADD COLUMN bank_updated_at          DATETIME        NULL,
+  ADD COLUMN bank_updated_source      VARCHAR(20)     NULL,
+  ADD COLUMN bank_verified_at         DATETIME        NULL,
+  ADD COLUMN bank_verified_by         BIGINT UNSIGNED NULL,
+  ADD COLUMN details_token_hash       CHAR(64)        NULL,
+  ADD COLUMN details_token_plain      TEXT            NULL,
+  ADD COLUMN details_token_expires_at DATETIME        NULL,
+  ADD COLUMN details_submitted_at     DATETIME        NULL,
+  ADD INDEX idx_logistics_partners_details_token (details_token_hash);

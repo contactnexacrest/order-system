@@ -13,6 +13,11 @@
 
 SET NAMES utf8mb4;
 
-ALTER TABLE order_supplier_po
-  ADD COLUMN IF NOT EXISTS advance_paid_amount_inr DECIMAL(14,2) NULL,
-  ADD COLUMN IF NOT EXISTS balance_paid_amount_inr DECIMAL(14,2) NULL;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'advance_paid_amount_inr') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN advance_paid_amount_inr DECIMAL(14,2) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'balance_paid_amount_inr') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN balance_paid_amount_inr DECIMAL(14,2) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;

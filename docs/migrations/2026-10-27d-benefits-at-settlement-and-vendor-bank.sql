@@ -4,47 +4,151 @@ SET NAMES utf8mb4;
 -- Government benefits are recorded at Step 13g, just before Mark Fully
 -- Settled; an eligible scheme the company won't claim is skipped with a
 -- reason, so the order can still be settled.
-ALTER TABLE order_export_benefit_schemes
-  ADD COLUMN IF NOT EXISTS claim_skipped_at  DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS claim_skipped_by  BIGINT UNSIGNED NULL,
-  ADD COLUMN IF NOT EXISTS claim_skip_reason VARCHAR(500)    NULL;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_export_benefit_schemes' AND COLUMN_NAME = 'claim_skipped_at') = 0, 'ALTER TABLE order_export_benefit_schemes ADD COLUMN claim_skipped_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_export_benefit_schemes' AND COLUMN_NAME = 'claim_skipped_by') = 0, 'ALTER TABLE order_export_benefit_schemes ADD COLUMN claim_skipped_by BIGINT UNSIGNED NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_export_benefit_schemes' AND COLUMN_NAME = 'claim_skip_reason') = 0, 'ALTER TABLE order_export_benefit_schemes ADD COLUMN claim_skip_reason VARCHAR(500) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+
 
 -- Suppliers and logistics partners (both directories): bank details to pay them, filled by
 -- staff or by the supplier through a no-login Supplier Details Link. The
 -- account number is stored encrypted; a supplier's own submission clears
 -- the "verified" mark until staff check it again.
-ALTER TABLE suppliers
-  ADD COLUMN IF NOT EXISTS bank_account_name        VARCHAR(255)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_name                VARCHAR(150)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_branch              VARCHAR(150)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_account_number      TEXT            NULL,
-  ADD COLUMN IF NOT EXISTS bank_ifsc                VARCHAR(20)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_account_type        VARCHAR(30)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_upi_id              VARCHAR(100)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_updated_at          DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS bank_updated_source      VARCHAR(20)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_verified_at         DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS bank_verified_by         BIGINT UNSIGNED NULL,
-  ADD COLUMN IF NOT EXISTS details_token_hash       CHAR(64)        NULL,
-  ADD COLUMN IF NOT EXISTS details_token_plain      TEXT            NULL,
-  ADD COLUMN IF NOT EXISTS details_token_expires_at DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS details_submitted_at     DATETIME        NULL,
-  ADD INDEX IF NOT EXISTS idx_suppliers_details_token (details_token_hash);
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_account_name') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_account_name VARCHAR(255) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_name') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_name VARCHAR(150) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_branch') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_branch VARCHAR(150) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_account_number') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_account_number TEXT NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_ifsc') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_ifsc VARCHAR(20) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_account_type') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_account_type VARCHAR(30) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_upi_id') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_upi_id VARCHAR(100) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_updated_at') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_updated_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_updated_source') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_updated_source VARCHAR(20) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_verified_at') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_verified_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'bank_verified_by') = 0, 'ALTER TABLE suppliers ADD COLUMN bank_verified_by BIGINT UNSIGNED NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'details_token_hash') = 0, 'ALTER TABLE suppliers ADD COLUMN details_token_hash CHAR(64) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'details_token_plain') = 0, 'ALTER TABLE suppliers ADD COLUMN details_token_plain TEXT NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'details_token_expires_at') = 0, 'ALTER TABLE suppliers ADD COLUMN details_token_expires_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND COLUMN_NAME = 'details_submitted_at') = 0, 'ALTER TABLE suppliers ADD COLUMN details_submitted_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers' AND INDEX_NAME = 'idx_suppliers_details_token') = 0, 'ALTER TABLE suppliers ADD INDEX idx_suppliers_details_token (details_token_hash)', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
 
-ALTER TABLE logistics_partners
-  ADD COLUMN IF NOT EXISTS bank_account_name        VARCHAR(255)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_name                VARCHAR(150)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_branch              VARCHAR(150)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_account_number      TEXT            NULL,
-  ADD COLUMN IF NOT EXISTS bank_ifsc                VARCHAR(20)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_account_type        VARCHAR(30)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_upi_id              VARCHAR(100)    NULL,
-  ADD COLUMN IF NOT EXISTS bank_updated_at          DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS bank_updated_source      VARCHAR(20)     NULL,
-  ADD COLUMN IF NOT EXISTS bank_verified_at         DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS bank_verified_by         BIGINT UNSIGNED NULL,
-  ADD COLUMN IF NOT EXISTS details_token_hash       CHAR(64)        NULL,
-  ADD COLUMN IF NOT EXISTS details_token_plain      TEXT            NULL,
-  ADD COLUMN IF NOT EXISTS details_token_expires_at DATETIME        NULL,
-  ADD COLUMN IF NOT EXISTS details_submitted_at     DATETIME        NULL,
-  ADD INDEX IF NOT EXISTS idx_logistics_partners_details_token (details_token_hash);
+
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_account_name') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_account_name VARCHAR(255) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_name') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_name VARCHAR(150) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_branch') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_branch VARCHAR(150) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_account_number') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_account_number TEXT NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_ifsc') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_ifsc VARCHAR(20) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_account_type') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_account_type VARCHAR(30) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_upi_id') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_upi_id VARCHAR(100) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_updated_at') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_updated_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_updated_source') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_updated_source VARCHAR(20) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_verified_at') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_verified_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'bank_verified_by') = 0, 'ALTER TABLE logistics_partners ADD COLUMN bank_verified_by BIGINT UNSIGNED NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'details_token_hash') = 0, 'ALTER TABLE logistics_partners ADD COLUMN details_token_hash CHAR(64) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'details_token_plain') = 0, 'ALTER TABLE logistics_partners ADD COLUMN details_token_plain TEXT NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'details_token_expires_at') = 0, 'ALTER TABLE logistics_partners ADD COLUMN details_token_expires_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND COLUMN_NAME = 'details_submitted_at') = 0, 'ALTER TABLE logistics_partners ADD COLUMN details_submitted_at DATETIME NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logistics_partners' AND INDEX_NAME = 'idx_logistics_partners_details_token') = 0, 'ALTER TABLE logistics_partners ADD INDEX idx_logistics_partners_details_token (details_token_hash)', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;

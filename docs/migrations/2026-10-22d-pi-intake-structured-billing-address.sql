@@ -18,9 +18,23 @@
 
 SET NAMES utf8mb4;
 -- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
-ALTER TABLE pi_intake_submissions
-  ADD COLUMN IF NOT EXISTS billing_address_line1 VARCHAR(255) NULL AFTER billing_address,
-  ADD COLUMN IF NOT EXISTS billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1,
-  ADD COLUMN IF NOT EXISTS billing_city VARCHAR(100) NULL AFTER billing_address_line2,
-  ADD COLUMN IF NOT EXISTS billing_postcode VARCHAR(30) NULL AFTER billing_city,
-  ADD COLUMN IF NOT EXISTS billing_country VARCHAR(100) NULL AFTER billing_postcode;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pi_intake_submissions' AND COLUMN_NAME = 'billing_address_line1') = 0, 'ALTER TABLE pi_intake_submissions ADD COLUMN billing_address_line1 VARCHAR(255) NULL AFTER billing_address', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pi_intake_submissions' AND COLUMN_NAME = 'billing_address_line2') = 0, 'ALTER TABLE pi_intake_submissions ADD COLUMN billing_address_line2 VARCHAR(255) NULL AFTER billing_address_line1', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pi_intake_submissions' AND COLUMN_NAME = 'billing_city') = 0, 'ALTER TABLE pi_intake_submissions ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_address_line2', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pi_intake_submissions' AND COLUMN_NAME = 'billing_postcode') = 0, 'ALTER TABLE pi_intake_submissions ADD COLUMN billing_postcode VARCHAR(30) NULL AFTER billing_city', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pi_intake_submissions' AND COLUMN_NAME = 'billing_country') = 0, 'ALTER TABLE pi_intake_submissions ADD COLUMN billing_country VARCHAR(100) NULL AFTER billing_postcode', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;

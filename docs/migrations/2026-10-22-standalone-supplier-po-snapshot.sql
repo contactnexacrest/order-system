@@ -18,14 +18,35 @@
 
 SET NAMES utf8mb4;
 -- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
-ALTER TABLE order_supplier_po
-  ADD COLUMN IF NOT EXISTS supplier_legal_name    VARCHAR(255) NULL AFTER supplier_id,
-  ADD COLUMN IF NOT EXISTS supplier_address       TEXT NULL AFTER supplier_legal_name,
-  ADD COLUMN IF NOT EXISTS supplier_gstin         VARCHAR(20) NULL AFTER supplier_address,
-  ADD COLUMN IF NOT EXISTS supplier_pan           VARCHAR(20) NULL AFTER supplier_gstin,
-  ADD COLUMN IF NOT EXISTS supplier_contact_person VARCHAR(150) NULL AFTER supplier_pan,
-  ADD COLUMN IF NOT EXISTS supplier_phone         VARCHAR(30) NULL AFTER supplier_contact_person,
-  ADD COLUMN IF NOT EXISTS supplier_type          VARCHAR(50) NULL AFTER supplier_phone;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'supplier_legal_name') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN supplier_legal_name VARCHAR(255) NULL AFTER supplier_id', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'supplier_address') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN supplier_address TEXT NULL AFTER supplier_legal_name', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'supplier_gstin') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN supplier_gstin VARCHAR(20) NULL AFTER supplier_address', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'supplier_pan') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN supplier_pan VARCHAR(20) NULL AFTER supplier_gstin', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'supplier_contact_person') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN supplier_contact_person VARCHAR(150) NULL AFTER supplier_pan', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'supplier_phone') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN supplier_phone VARCHAR(30) NULL AFTER supplier_contact_person', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_supplier_po' AND COLUMN_NAME = 'supplier_type') = 0, 'ALTER TABLE order_supplier_po ADD COLUMN supplier_type VARCHAR(50) NULL AFTER supplier_phone', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+
 
 -- ================================================================
 -- STEP 2 — backfill every existing Supplier PO from whatever the live

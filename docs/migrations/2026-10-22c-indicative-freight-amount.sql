@@ -20,6 +20,11 @@
 
 SET NAMES utf8mb4;
 -- External QA report L-32: IF EXISTS makes this safe to re-run.
-ALTER TABLE orders
-  CHANGE COLUMN IF EXISTS indicative_freight_low indicative_freight_amount DECIMAL(14,2) NULL,
-  DROP COLUMN IF EXISTS indicative_freight_high;
+SET @nx_sql := IF((SELECT 1 - LEAST(1, (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'indicative_freight_low'))) = 0, 'ALTER TABLE orders CHANGE COLUMN indicative_freight_low indicative_freight_amount DECIMAL(14,2) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+SET @nx_sql := IF((SELECT 1 - LEAST(1, (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'indicative_freight_high'))) = 0, 'ALTER TABLE orders DROP COLUMN indicative_freight_high', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;

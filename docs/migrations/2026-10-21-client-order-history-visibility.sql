@@ -5,8 +5,11 @@
 
 SET NAMES utf8mb4;
 -- External QA report L-32: IF NOT EXISTS makes this safe to re-run.
-ALTER TABLE clients
-  ADD COLUMN IF NOT EXISTS order_history_visibility_override TINYINT(1) NULL;
+SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'order_history_visibility_override') = 0, 'ALTER TABLE clients ADD COLUMN order_history_visibility_override TINYINT(1) NULL', 'DO 0');
+PREPARE nx_stmt FROM @nx_sql;
+EXECUTE nx_stmt;
+DEALLOCATE PREPARE nx_stmt;
+
 
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin)
 SELECT 'client_portal_show_order_history', '1', 'boolean', 'clients',
