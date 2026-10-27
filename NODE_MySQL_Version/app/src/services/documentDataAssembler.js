@@ -125,7 +125,7 @@ async function assemble(orderId, documentTypeCode = null) {
   const resolvedNotifyParty = resolveNotifyParty(order, resolvedConsignee);
   const [showConsigneeSection, showNotifyPartySection] = await sectionDisplayFlags(resolvedConsignee, resolvedNotifyParty);
 
-  return {
+  const data = {
     company,
     assets,
     order: {
@@ -278,6 +278,55 @@ async function assemble(orderId, documentTypeCode = null) {
     bl: await blBlock(company.legal_name, !!(order.show_bl_instructions ?? true)),
     ...annexureFlags,
   };
+  return SUPPLIER_FACING.includes(documentTypeCode) ? supplierFacingOnly(data) : data;
+}
+
+/**
+ * Owner rule (2026-10-27, non-negotiable): the supplier and the buyer never
+ * cross. A document that goes to a supplier carries NOTHING about the client
+ * or the client's order — no name, address, references (inquiry, PO,
+ * Quotation, PI), products, prices, payment terms, amendments or freight.
+ * Only NexaCrest, the supplier and the Supplier PO itself. Built by
+ * construction here, so no template can print a client detail even by mistake.
+ */
+const SUPPLIER_FACING = ['SUPPO'];
+
+function supplierFacingOnly(data) {
+  const supplierPo = data.supplier_po || null;
+  const advancePct = supplierPo && supplierPo.advance_pct != null ? supplierPo.advance_pct : '';
+  const numeric = advancePct !== '' && !Number.isNaN(Number(String(advancePct).replace(/,/g, '')));
+  const safe = {
+    company: data.company,
+    assets: data.assets,
+    supplier_po: supplierPo,
+    order: { has_active_amendment: false, include_annexure_a: false },
+    buyer: {},
+    consignee: {},
+    notify_party_block: {},
+    show_consignee_section: false,
+    show_notify_party_section: false,
+    products: [],
+    // Clause placeholders read these — the supplier's own advance, never the client's.
+    financial: {
+      advance_pct: numeric ? trimTrailingZeros(Number(advancePct).toFixed(2)) : '',
+      balance_pct: numeric ? trimTrailingZeros((100 - Number(advancePct)).toFixed(2)) : '',
+    },
+    payment_status: null,
+    freight: null,
+    packing: null,
+    crates: [],
+    shipping: null,
+    production: null,
+    annexure_products: [],
+    bl: null,
+  };
+  for (const [key, value] of Object.entries(data)) {
+    if (!(key in safe)) {
+      // Annexure flags and anything added later: off / empty unless listed above.
+      safe[key] = typeof value === 'boolean' ? false : (Array.isArray(value) ? [] : null);
+    }
+  }
+  return safe;
 }
 
 /**
@@ -985,6 +1034,8 @@ function trimTrailingZeros(numStr) {
 
 module.exports = {
   assemble,
+  SUPPLIER_FACING,
+  supplierFacingOnly,
   companyBlock,
   companyFromSnapshot,
   assetsBlock,

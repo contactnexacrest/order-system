@@ -381,6 +381,27 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await generateDocument(page, orderId, 'SUPPO', 'generated');
     await assignSelfAndApprove(page, 'SUPPO');
 
+    // Owner rule (2026-10-27): the supplier and the buyer never cross. Step
+    // 7c offers only the Supplier Action Link — none before it is generated,
+    // never a buyer link — and that link shows the supplier their own PO and
+    // nothing about the client.
+    await openStage(page, 5);
+    const supplierLinkBox = page.locator('#step-7c-supplier-po-attach .supplier-action-link');
+    await expect(supplierLinkBox.locator('input[aria-label="Supplier Action Link"]')).toHaveCount(0);
+    await expect(supplierLinkBox).not.toContainText('buyer-action');
+    await supplierLinkBox.getByRole('button', { name: 'Generate Supplier Link' }).click();
+    await openStage(page, 5);
+    const supplierLink = await supplierLinkBox.locator('input[aria-label="Supplier Action Link"]').inputValue();
+    expect(supplierLink).toMatch(/\/supplier-action\/[0-9a-f]{64}$/);
+    const supplierPage = await page.context().newPage();
+    await supplierPage.goto(supplierLink.replace(/^https?:\/\/[^/]+/, ''));
+    await expect(supplierPage.locator('h1')).toContainText('Purchase Order');
+    await expect(supplierPage.locator('body')).toContainText(`Smoke Test Quarry ${UNIQUE}`);
+    const supplierText = await supplierPage.locator('body').innerText();
+    expect(supplierText).not.toContain(`Playwright Smoke Buyer ${UNIQUE}`);
+    expect(supplierText).not.toMatch(/buyer|client|proforma|USD|FOB/i);
+    await supplierPage.close();
+
     await openStage(page, 5);
     const ackUploadForm = page.locator(`form[action="/orders/${orderId}/supplier-po/documents"]`);
     await ackUploadForm.locator('input[type="file"]').setInputFiles(DUMMY_FILE);

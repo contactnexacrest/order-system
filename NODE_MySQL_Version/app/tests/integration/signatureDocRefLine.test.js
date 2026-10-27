@@ -62,7 +62,9 @@ describe('Signature doc-ref line (90-item backlog Phase 6 Item C)', () => {
 
   it('SUPPO acceptance table carries the doc-ref line', () => {
     const html = templateEnv().render('SUPPO/supplier_po.njk', minimalDocContext());
-    expect(html).toContain('This signature forms part of QUOTATION QT/2026/00123, dated 21 October 2026, Buyer Inquiry Ref NC/SC/2026/0099.');
+    // Owner rule (2026-10-27): the supplier never sees a client reference — no Buyer Inquiry Ref here.
+    expect(html).toContain('This signature forms part of QUOTATION QT/2026/00123, dated 21 October 2026.');
+    expect(html).not.toContain('NC/SC/2026/0099');
   });
 
   it('doc-ref line omits missing pieces gracefully', () => {

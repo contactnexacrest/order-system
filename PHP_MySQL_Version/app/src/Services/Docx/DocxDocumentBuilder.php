@@ -864,8 +864,8 @@ final class DocxDocumentBuilder
         DocxComponents::addMetaBar($section, [
             ['label' => 'PO NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'BUYER ORDER REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
-            ['label' => 'EXPORT ORDER REF *', 'value' => self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'quotation_ref', '—')],
+            ['label' => 'REQUIRED DELIVERY DATE *', 'value' => self::g($sp, 'required_delivery_date', 'To Be Confirmed')],
+            ['label' => 'DELIVERY LOCATION *', 'value' => self::g($sp, 'delivery_location', 'To Be Confirmed')],
         ]);
 
         self::addDefaultSection1($section, $context, 'BUYER (NexaCrest International Private Limited)');

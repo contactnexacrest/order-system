@@ -68,7 +68,9 @@ final class SignatureDocRefLineTest extends TestCase
         $context = $this->minimalDocContext();
         $html = $this->twigEnvironment()->render('SUPPO/supplier_po.html.twig', $context);
 
-        self::assertStringContainsString('This signature forms part of QUOTATION QT/2026/00123, dated 21 October 2026, Buyer Inquiry Ref NC/SC/2026/0099.', $html);
+        // Owner rule (2026-10-27): the supplier never sees a client reference — no Buyer Inquiry Ref here.
+        self::assertStringContainsString('This signature forms part of QUOTATION QT/2026/00123, dated 21 October 2026.', $html);
+        self::assertStringNotContainsString('NC/SC/2026/0099', $html);
     }
 
     public function testDocRefLineOmitsMissingPiecesGracefully(): void

@@ -876,8 +876,8 @@ function renderSupPo(context) {
     ...C.metaBar([
       { label: 'PO NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
-      { label: 'BUYER ORDER REF *', value: g(order, 'buyer_inquiry_ref', '') },
-      { label: 'EXPORT ORDER REF *', value: g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : g(order, 'quotation_ref', '—') },
+      { label: 'REQUIRED DELIVERY DATE *', value: g(sp, 'required_delivery_date', 'To Be Confirmed') },
+      { label: 'DELIVERY LOCATION *', value: g(sp, 'delivery_location', 'To Be Confirmed') },
     ])
   );
 
