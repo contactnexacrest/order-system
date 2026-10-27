@@ -407,6 +407,18 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       const signedForm = page.locator(`form[action="/orders/${orderId}/supplier-po/signed"]`);
       await signedForm.getByRole('button', { name: /Confirm Supplier Signed/ }).click();
       await expect(page.locator('.alert')).toBeVisible();
+
+      // Owner report (2026-10-27): confirming the supplier signed (7d) does
+      // not tick Step 8 or open Group C — Step 8 is done only once production
+      // status / estimated shipment is actually entered.
+      await expect(page.locator('#step-group-stage-production > summary .step-card-icon.done')).toHaveCount(0);
+      await expect(page.locator('#phase-shipment')).not.toHaveAttribute('open', '');
+      await openStage(page, 5);
+      const productionForm = page.locator(`form[action="/orders/${orderId}/production-status"]`);
+      await productionForm.locator('input[name="production_status_text"]').fill('Cutting and finishing in progress');
+      await Promise.all([page.waitForEvent('load'), productionForm.getByRole('button', { name: 'Update' }).click()]);
+      await expect(page.locator('.alert')).toContainText('Production status updated');
+      await expect(page.locator('#step-group-stage-production > summary .step-card-icon.done')).toHaveCount(1);
     });
 
     await logout(page);

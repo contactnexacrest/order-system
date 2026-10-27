@@ -396,6 +396,34 @@ $stepStates = [
     '18'   => 'done',
     '19'   => $orderClosed ? 'done' : 'locked',
 ];
+// Owner report (2026-10-27): confirming the supplier signed (7d) passes
+// Stage 5's gate, which used to tick all of Step 7, tick Step 8 with
+// nothing entered, and open Group C. Now Step 7 stays open until the
+// supplier advance is paid (7e) when the Supplier PO plans one; Step 8
+// opens after Step 7 and is done only once production status or the
+// estimated shipment has actually been entered; and Group C (Steps 9-11)
+// waits until Group B is finished — a step that would be current there, or
+// Step 9 auto-skipped on an FOB order, shows waiting instead. Mirrors Node
+// helpers/stepFlow.js applyProcurementOrder().
+if (!$orderClosed) {
+    $supplierAdvancePending = $supplierPo !== null && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at']);
+    // 'Not yet commenced' is the column's default on every new order, not an entry.
+    $productionUpdated = !in_array(trim((string) ($order['production_status_text'] ?? '')), ['', 'Not yet commenced'], true)
+        || !empty($order['est_shipment_date_text']) || !empty($order['est_shipment_date']);
+    if ($stepStates['7'] === 'done' && $supplierAdvancePending) {
+        $stepStates['7'] = 'current';
+    }
+    if ($stepStates['8'] === 'done') {
+        $stepStates['8'] = $stepStates['7'] !== 'done' ? 'locked' : ($productionUpdated ? 'done' : 'current');
+    }
+    if ($stepStates['7'] !== 'done' || $stepStates['8'] !== 'done') {
+        foreach (['9', '10', '11'] as $__step) {
+            if ($stepStates[$__step] === 'current' || ($__step === '9' && $stage6 !== null && $stage6['status'] === 'skipped')) {
+                $stepStates[$__step] = 'locked';
+            }
+        }
+    }
+}
 // Owner rule (2026-10-25): "when a later step is completed, the previous
 // ones must be completed" — so once any later pipeline step is done, every
 // earlier one shows done too. (The Compliance Checklist cards keep their

@@ -414,7 +414,13 @@
   {% endif %}
   {% endif %}
 {% endmacro %}
-{% set flow = computeStepFlow(stepStates, subStepDone) %}
+{# Owner report (2026-10-27): Step 7 waits for the supplier advance (7e), Step 8 for a real production / shipment entry ('Not yet commenced' is the column default, not an entry), Group C for Group B (helpers/stepFlow.js). #}
+{% set flow = computeStepFlow(stepStates, subStepDone, {
+  orderClosed: orderClosed,
+  supplierAdvancePending: (supplierPo and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at),
+  productionUpdated: ((order.production_status_text and (order.production_status_text | trim) != 'Not yet commenced') or order.est_shipment_date_text or order.est_shipment_date),
+  freightSkipped: (stage6 and stage6.status == 'skipped')
+}) %}
 {% set stepStates = flow.stepStates %}
 {% set currentUserStep = flow.currentUserStep %}
 {% macro stepCardOpen(step) %}{{ flow.stepCardOpen(step) }}{% endmacro %}

@@ -37,15 +37,42 @@ const PHASES = {
 const PIPELINE_STEPS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13'];
 
 /**
+ * Owner report (2026-10-27): confirming the supplier signed (7d) passes
+ * Stage 5's gate, which used to tick all of Step 7, tick Step 8 with
+ * nothing entered, and open Group C. Now:
+ * - Step 7 stays open until the supplier advance is paid (7e), when the
+ *   Supplier PO plans one;
+ * - Step 8 opens after Step 7 and is done only once production status or
+ *   the estimated shipment has actually been entered;
+ * - Group C (Steps 9-11) waits until Group B is finished — a step that
+ *   would be current there, or Step 9 auto-skipped on an FOB order, shows
+ *   waiting instead.
+ * Mirrors PHP views/orders/show.php.
+ */
+function applyProcurementOrder(stepStates, { orderClosed, supplierAdvancePending, productionUpdated, freightSkipped }) {
+  if (orderClosed) return;
+  if (stepStates.s7 === 'done' && supplierAdvancePending) stepStates.s7 = 'current';
+  if (stepStates.s8 === 'done') {
+    stepStates.s8 = stepStates.s7 !== 'done' ? 'locked' : (productionUpdated ? 'done' : 'current');
+  }
+  if (stepStates.s7 !== 'done' || stepStates.s8 !== 'done') {
+    for (const key of ['s9', 's10', 's11']) {
+      if (stepStates[key] === 'current' || (key === 's9' && freightSkipped)) stepStates[key] = 'locked';
+    }
+  }
+}
+
+/**
  * @param {Object<string, *>} rawStepStates step key ('s1'..'s19', 's8b') -> 'done'|'current'|'locked'
  * @param {Object<string, Object<string, *>>} rawSubStepDone step key -> { sub key -> truthy/falsy done
  *   signal, in card order }, or the string 'optional' for a sub-step with no signal of its own
  */
-function computeStepFlow(rawStepStates, rawSubStepDone) {
+function computeStepFlow(rawStepStates, rawSubStepDone, procurement = null) {
   const stepStates = {};
   for (const key of Object.keys(rawStepStates)) {
     stepStates[key] = String(rawStepStates[key]);
   }
+  if (procurement) applyProcurementOrder(stepStates, procurement);
 
   // Owner rule (2026-10-25): "when a later step is completed, the previous
   // ones must be completed" — once any later pipeline step is done, every
@@ -165,4 +192,4 @@ function computeStepFlow(rawStepStates, rawSubStepDone) {
   };
 }
 
-module.exports = { computeStepFlow, PHASES };
+module.exports = { computeStepFlow, applyProcurementOrder, PHASES };

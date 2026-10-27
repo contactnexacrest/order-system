@@ -116,6 +116,8 @@ final class OrderStepFlowTest extends DbTestCase
         foreach ([3, 4, 5, 6] as $stageNumber) {
             StageGateService::passAndUnlockNext($orderId, $stageNumber, $this->userId);
         }
+        // Owner report (2026-10-27): Group C waits until Step 8 has a real entry.
+        \App\Config\Database::connection()->prepare("UPDATE orders SET production_status_text = 'Cutting in progress' WHERE id = :id")->execute(['id' => $orderId]);
 
         $output = $this->render($orderId);
 

@@ -109,6 +109,8 @@ describe('Order page sequential step flow', () => {
     for (const stageNumber of [3, 4, 5, 6]) {
       await stageGateService.passAndUnlockNext(orderId, stageNumber, null);
     }
+    // Owner report (2026-10-27): Group C waits until Step 8 has a real entry.
+    await db.execute("UPDATE orders SET production_status_text = 'Cutting in progress' WHERE id = :id", { id: orderId });
 
     const { text } = await agent.get(`/orders/${orderId}`);
 
