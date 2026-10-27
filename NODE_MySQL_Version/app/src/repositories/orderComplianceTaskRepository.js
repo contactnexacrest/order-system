@@ -87,4 +87,7 @@ async function summaryForOrder(orderId) {
   return { total, approved, outstanding: total - approved };
 }
 
-module.exports = { STATUSES, initializeForOrder, forOrder, setStatus, summaryForOrder };
+/** Owner request (2026-10-27): the reason filled in for you when a task is marked Not Applicable (a plain Skip still needs a typed reason). */
+const NOT_APPLICABLE_REASON = 'Not applicable to this order.';
+
+module.exports = { STATUSES, NOT_APPLICABLE_REASON, initializeForOrder, forOrder, setStatus, summaryForOrder };

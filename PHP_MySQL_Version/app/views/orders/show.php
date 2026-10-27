@@ -878,7 +878,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?= \App\Helpers\Csrf::field() ?>
       <input type="hidden" name="phase" value="<?= htmlspecialchars($phase) ?>">
       <table class="list">
-        <tr><th>Task</th><th>Status</th><th>Reason <small class="muted">(only if Skipped)</small></th></tr>
+        <tr><th>Task</th><th>Status</th><th>Reason <small class="muted">(Not Applicable fills it in; Skipped needs one)</small></th></tr>
         <?php foreach ($tasks as $__i => $ct): ?>
         <tr data-compliance-row>
           <td><?= htmlspecialchars($ct['task_type_name']) ?>
@@ -887,8 +887,19 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           </td>
           <td>
             <select name="tasks[<?= (int) $__i ?>][status]" data-compliance-status aria-label="<?= htmlspecialchars($ct['task_type_name']) ?> status" style="min-width:170px;">
+              <?php
+              // Owner request (2026-10-27): "Not Applicable" fills its reason in;
+              // "Skipped" needs one typed. Both are saved as 'skipped'.
+              $__naReason = \App\Repositories\OrderComplianceTaskRepository::NOT_APPLICABLE_REASON;
+              $__isNa = $ct['status'] === 'skipped' && trim((string) ($ct['skip_reason'] ?? '')) === $__naReason;
+              ?>
               <?php foreach (\App\Repositories\OrderComplianceTaskRepository::STATUSES as $key => $label): ?>
+              <?php if ($key === 'skipped'): ?>
+              <option value="skipped" data-auto-reason="<?= htmlspecialchars($__naReason) ?>" <?= $__isNa ? 'selected' : '' ?>>Not Applicable</option>
+              <option value="skipped" <?= $ct['status'] === 'skipped' && !$__isNa ? 'selected' : '' ?>>Skipped (give a reason)</option>
+              <?php else: ?>
               <option value="<?= htmlspecialchars($key) ?>" <?= $ct['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+              <?php endif; ?>
               <?php endforeach; ?>
             </select>
           </td>
@@ -904,7 +915,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?= \App\Helpers\Csrf::field() ?>
       <input type="hidden" name="phase" value="<?= htmlspecialchars($phase) ?>">
       <label>Mark all remaining tasks here Not Applicable <small class="muted">(e.g. repeat order — reason required, applied to every outstanding task above)</small>
-        <input type="text" name="skip_reason" placeholder="Reason (mandatory)" required style="min-width:260px;">
+        <input type="text" name="skip_reason" placeholder="Reason (mandatory)" required style="min-width:260px;" value="<?= htmlspecialchars(\App\Repositories\OrderComplianceTaskRepository::NOT_APPLICABLE_REASON) ?>">
       </label>
       <button type="submit" class="btn-sm">Mark All N/A</button>
     </form>
@@ -3224,8 +3235,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           </table>
         <?php endif; ?>
       </details>
-      <div class="fin-add-cost">
-        <label class="fin-add-cost-pick">+ Add a cost
+      <details class="fin-add-cost">
+        <summary class="small"><strong>+ Add a cost</strong></summary>
+        <label class="fin-add-cost-pick">Type of cost
           <select data-fin-cost-type aria-label="Type of cost">
             <option value="other">Other cost (CHA, port, courier, bank charges…)</option>
             <option value="travel">Travel budget — % of FOB (provisional until real travel expenses are recorded)</option>
@@ -3324,7 +3336,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </details>
         </div>
         <?php endif; ?>
-      </div>
+      </details>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/financials/costs-confirmed" class="fin-confirm">
         <?= Csrf::field() ?>
         <?php if (!empty($order['financials_costs_confirmed_at'])): ?>
@@ -3346,7 +3358,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefit-schemes">
           <?= Csrf::field() ?>
           <table class="list">
-            <tr><th>Scheme</th><th>Eligibility</th><th>Reason <small class="muted">(required if Not Eligible)</small></th></tr>
+            <tr><th>Scheme</th><th>Eligibility</th><th>Reason <small class="muted">(filled in when Not Eligible — edit if needed)</small></th></tr>
             <?php foreach ($exportBenefitEligibility as $__i => $sch): ?>
             <tr>
               <td><?= htmlspecialchars($sch['scheme_name']) ?>
@@ -3358,7 +3370,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <td>
                 <select name="schemes[<?= (int) $__i ?>][status]" data-scheme-status style="min-width:140px;">
                   <?php foreach (\App\Repositories\OrderExportBenefitSchemeRepository::STATUSES as $key => $label): ?>
-                  <option value="<?= htmlspecialchars($key) ?>" <?= $sch['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                  <option value="<?= htmlspecialchars($key) ?>" <?= $sch['status'] === $key ? 'selected' : '' ?><?= $key === 'not_eligible' ? ' data-auto-reason="' . htmlspecialchars(\App\Repositories\OrderExportBenefitSchemeRepository::NOT_ELIGIBLE_REASON) . '"' : '' ?>><?= htmlspecialchars($label) ?></option>
                   <?php endforeach; ?>
                 </select>
               </td>

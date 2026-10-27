@@ -463,7 +463,7 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <input type="hidden" name="phase" value="{{ phase }}">
       <table class="list">
-        <tr><th>Task</th><th>Status</th><th>Reason <small class="muted">(only if Skipped)</small></th></tr>
+        <tr><th>Task</th><th>Status</th><th>Reason <small class="muted">(Not Applicable fills it in; Skipped needs one)</small></th></tr>
         {% for ct in tasks %}
         {% set i = loop.index0 %}
         <tr data-compliance-row>
@@ -473,8 +473,16 @@
           </td>
           <td>
             <select name="tasks[{{ i }}][status]" data-compliance-status aria-label="{{ ct.task_type_name }} status" style="min-width:170px;">
+              {# Owner request (2026-10-27): "Not Applicable" fills its reason in;
+                 "Skipped" needs one typed. Both are saved as 'skipped'. #}
+              {% set isNa = ct.status == 'skipped' and (ct.skip_reason or '') | trim == complianceNaReason %}
               {% for key, label in complianceStatuses %}
+              {% if key == 'skipped' %}
+              <option value="skipped" data-auto-reason="{{ complianceNaReason }}" {% if isNa %}selected{% endif %}>Not Applicable</option>
+              <option value="skipped" {% if ct.status == 'skipped' and not isNa %}selected{% endif %}>Skipped (give a reason)</option>
+              {% else %}
               <option value="{{ key }}" {% if ct.status == key %}selected{% endif %}>{{ label }}</option>
+              {% endif %}
               {% endfor %}
             </select>
           </td>
@@ -490,7 +498,7 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <input type="hidden" name="phase" value="{{ phase }}">
       <label>Mark all remaining tasks here Not Applicable <small class="muted">(e.g. repeat order — reason required, applied to every outstanding task above)</small>
-        <input type="text" name="skip_reason" placeholder="Reason (mandatory)" required style="min-width:260px;">
+        <input type="text" name="skip_reason" placeholder="Reason (mandatory)" required style="min-width:260px;" value="{{ complianceNaReason }}">
       </label>
       <button type="submit" class="btn-sm">Mark All N/A</button>
     </form>
@@ -2728,8 +2736,9 @@
           </table>
         {% endif %}
       </details>
-      <div class="fin-add-cost">
-        <label class="fin-add-cost-pick">+ Add a cost
+      <details class="fin-add-cost">
+        <summary class="small"><strong>+ Add a cost</strong></summary>
+        <label class="fin-add-cost-pick">Type of cost
           <select data-fin-cost-type aria-label="Type of cost">
             <option value="other">Other cost (CHA, port, courier, bank charges…)</option>
             <option value="travel">Travel budget — % of FOB (provisional until real travel expenses are recorded)</option>
@@ -2828,7 +2837,7 @@
         </details>
         </div>
         {% endif %}
-      </div>
+      </details>
       <form method="post" action="/orders/{{ order.id }}/financials/costs-confirmed" class="fin-confirm">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         {% if order.financials_costs_confirmed_at %}
@@ -2850,7 +2859,7 @@
         <form method="post" action="/orders/{{ order.id }}/export-benefit-schemes">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <table class="list">
-            <tr><th>Scheme</th><th>Eligibility</th><th>Reason <small class="muted">(required if Not Eligible)</small></th></tr>
+            <tr><th>Scheme</th><th>Eligibility</th><th>Reason <small class="muted">(filled in when Not Eligible — edit if needed)</small></th></tr>
             {% for sch in exportBenefitEligibility %}
             <tr>
               <td>{{ sch.scheme_name }}
@@ -2862,7 +2871,7 @@
               <td>
                 <select name="schemes[{{ loop.index0 }}][status]" data-scheme-status style="min-width:140px;">
                   {% for key, label in exportBenefitEligibilityStatuses %}
-                  <option value="{{ key }}" {% if sch.status == key %}selected{% endif %}>{{ label }}</option>
+                  <option value="{{ key }}" {% if sch.status == key %}selected{% endif %}{% if key == 'not_eligible' %} data-auto-reason="{{ schemeNotEligibleReason }}"{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </select>
               </td>

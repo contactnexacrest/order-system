@@ -178,4 +178,18 @@ describe('Order screen redesign (Point 2/4)', () => {
     expect(counts.groups).toBe(10);
     expect(counts.groupedCards).toBe(45);
   });
+
+  it('Not Applicable / Not Eligible fill their reason in, and "+ Add a cost" folds', () => {
+    // Owner request (2026-10-27): "Not Applicable" / "Not Eligible" fill
+    // the reason in; a plain "Skipped" still needs one typed.
+    const html = showNjk();
+    expect(html).toContain('data-auto-reason="{{ complianceNaReason }}"');
+    expect(html).toContain('>Not Applicable</option>');
+    expect(html).toContain('>Skipped (give a reason)</option>');
+    expect(html).toContain('data-auto-reason="{{ schemeNotEligibleReason }}"');
+    expect(require('../../src/repositories/orderComplianceTaskRepository').NOT_APPLICABLE_REASON.length).toBeGreaterThanOrEqual(10);
+    expect(require('../../src/repositories/orderExportBenefitSchemeRepository').NOT_ELIGIBLE_REASON.length).toBeGreaterThanOrEqual(10);
+    // "+ Add a cost" opens and closes like "+ Add an expense".
+    expect(html).toContain('<details class="fin-add-cost">\n        <summary class="small"><strong>+ Add a cost</strong></summary>');
+  });
 });

@@ -227,6 +227,21 @@ final class OrderScreenRedesignTest extends TestCase
         $this->assertSame(45, $groupedStepCardCount, 'Expected exactly 45 step-cards nested inside a step-group box — every lettered sub-step card written in the page body.');
     }
 
+    public function testNotApplicableAndNotEligibleFillTheirReasonAndAddACostFolds(): void
+    {
+        // Owner request (2026-10-27): "Not Applicable" / "Not Eligible" fill
+        // the reason in; a plain "Skipped" still needs one typed.
+        $html = $this->showPhp();
+        self::assertStringContainsString('data-auto-reason="<?= htmlspecialchars($__naReason) ?>"', $html);
+        self::assertStringContainsString('>Not Applicable</option>', $html);
+        self::assertStringContainsString('>Skipped (give a reason)</option>', $html);
+        self::assertStringContainsString("data-auto-reason=\"' . htmlspecialchars(\\App\\Repositories\\OrderExportBenefitSchemeRepository::NOT_ELIGIBLE_REASON)", $html);
+        self::assertGreaterThanOrEqual(10, mb_strlen(\App\Repositories\OrderComplianceTaskRepository::NOT_APPLICABLE_REASON), 'the filled-in reason passes the 10-character rule');
+        self::assertGreaterThanOrEqual(10, mb_strlen(\App\Repositories\OrderExportBenefitSchemeRepository::NOT_ELIGIBLE_REASON));
+        // "+ Add a cost" opens and closes like "+ Add an expense".
+        self::assertStringContainsString("<details class=\"fin-add-cost\">\n        <summary class=\"small\"><strong>+ Add a cost</strong></summary>", $html);
+    }
+
     private function readCss(): string
     {
         return (string) file_get_contents(__DIR__ . '/../../../public_html/assets/css/app.css');

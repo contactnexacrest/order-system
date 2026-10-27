@@ -27,6 +27,9 @@ final class OrderComplianceTaskRepository
         'skipped'          => 'Skipped (Not Applicable)',
     ];
 
+    /** Owner request (2026-10-27): the reason filled in for you when a task is marked Not Applicable (a plain Skip still needs a typed reason). */
+    public const NOT_APPLICABLE_REASON = 'Not applicable to this order.';
+
     /** Writes a real 'not_started' row for every active task type — called once, at order creation. */
     public static function initializeForOrder(int $orderId): void
     {

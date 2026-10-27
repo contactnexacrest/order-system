@@ -104,4 +104,7 @@ async function setClaimSkipped(orderId, schemeName, reason, userId) {
   );
 }
 
-module.exports = { STATUSES, initializeForOrder, forOrder, setStatus, setClaimSkipped, summaryForOrder };
+/** Owner request (2026-10-27): the reason filled in for you when a scheme is marked Not Eligible (editable). */
+const NOT_ELIGIBLE_REASON = 'Not eligible for this order.';
+
+module.exports = { STATUSES, NOT_ELIGIBLE_REASON, initializeForOrder, forOrder, setStatus, setClaimSkipped, summaryForOrder };

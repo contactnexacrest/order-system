@@ -604,6 +604,33 @@
     });
   }
 
+  // Owner request (2026-10-27): choosing "Not Applicable" / "Not Eligible"
+  // fills the row's reason in (an <option data-auto-reason>, still
+  // editable); choosing a plain "Skipped" clears a filled-in reason so one
+  // has to be typed.
+  function initAutoReasons() {
+    document.querySelectorAll('[data-compliance-status], [data-scheme-status]').forEach(function (select) {
+      var row = select.closest('tr');
+      var reason = row && row.querySelector('[data-compliance-reason], [data-scheme-reason]');
+      if (!reason) return;
+      var autos = Array.prototype.map.call(select.options, function (o) { return o.getAttribute('data-auto-reason'); }).filter(Boolean);
+      select.addEventListener('change', function () {
+        var opt = select.options[select.selectedIndex];
+        var auto = opt && opt.getAttribute('data-auto-reason');
+        var current = reason.value.trim();
+        if (auto) {
+          reason.value = auto;
+        } else if (autos.indexOf(current) !== -1) {
+          reason.value = '';
+          if (select.value === 'skipped') reason.focus();
+        } else {
+          return;
+        }
+        reason.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    });
+  }
+
   function init() {
     // Before initConfirmDialogs(): both listen in the capture phase, so
     // registering this first means an invalid form is stopped before any
@@ -639,6 +666,7 @@
     initRemittanceStatements();
     initSchemeRows();
     initGstCalc();
+    initAutoReasons();
   }
 
   if (document.readyState === 'loading') {

@@ -1053,6 +1053,8 @@ async function show(req, res) {
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
       complianceTasks: complianceTasksForOrder,
       complianceStatuses: orderComplianceTaskRepository.STATUSES,
+      complianceNaReason: orderComplianceTaskRepository.NOT_APPLICABLE_REASON,
+      schemeNotEligibleReason: orderExportBenefitSchemeRepository.NOT_ELIGIBLE_REASON,
       pendingInspectionTask,
       exportBenefitEligibility: exportBenefitSchemesForOrder,
       benefitSettlement: await benefitSettlementService.state(orderId),

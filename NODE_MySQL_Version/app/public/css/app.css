@@ -152,7 +152,9 @@ fieldset.intake-step{padding-top:1.25rem;}
 .fin-kpi .l{font-size:0.75rem;color:var(--ink-soft);}
 .fin-kpi .v{font-size:1.05rem;font-weight:700;color:var(--navy);}
 .fin-kpi.good .v{color:var(--success);}
-.fin-add-cost{border:1px dashed var(--line);border-radius:12px;padding:0.75rem 0.9rem;margin:0.9rem 0;background:#fffdf8;}
+.fin-add-cost{margin:0.6rem 0;}
+.fin-add-cost[open]{border:1px dashed var(--line);border-radius:12px;padding:0.75rem 0.9rem;background:#fffdf8;}
+.fin-add-cost-pick{display:block;margin-top:0.4rem;}
 .fin-add-cost-pick{font-weight:700;color:var(--navy);}
 .fin-add-cost-pick select{max-width:420px;}
 .fin-confirm{display:flex;flex-wrap:wrap;align-items:center;gap:0.6rem;margin-top:0.9rem;padding-top:0.75rem;border-top:1px solid var(--line);}

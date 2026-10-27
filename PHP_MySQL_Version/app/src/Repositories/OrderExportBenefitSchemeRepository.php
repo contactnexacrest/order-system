@@ -28,6 +28,9 @@ final class OrderExportBenefitSchemeRepository
         'not_eligible' => 'Not Eligible',
     ];
 
+    /** Owner request (2026-10-27): the reason filled in for you when a scheme is marked Not Eligible (editable). */
+    public const NOT_ELIGIBLE_REASON = 'Not eligible for this order.';
+
     /** Writes a real 'pending' row for every active scheme option — called once, at order creation. */
     public static function initializeForOrder(int $orderId): void
     {
